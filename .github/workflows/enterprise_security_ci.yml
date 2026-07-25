@@ -1,4 +1,4 @@
-name: Enterprise Security & Vulnerability Audit Pipeline
+﻿name: Enterprise Security & Vulnerability Audit Pipeline
 
 'on':
   push:
@@ -84,7 +84,7 @@ jobs:
           command: docker build ./backend -t cfi-backend:latest
 
       - name: Trivy Backend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'cfi-backend:latest'
           format: 'table'
@@ -106,7 +106,7 @@ jobs:
           command: docker build ./frontend -t cfi-frontend:latest
 
       - name: Trivy Frontend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: 'cfi-frontend:latest'
           format: 'table'
