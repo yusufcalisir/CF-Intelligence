@@ -68,11 +68,23 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
           docker system prune -af || true
 
-      - name: Build Backend Container Image
-        run: docker build ./backend -t cfi-backend:latest
+      - name: Log in to Docker Hub (avoid unauthenticated rate-limit timeouts)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true  # Best-effort — build still attempted if creds missing
+
+      - name: Build Backend Container Image (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: docker build ./backend -t cfi-backend:latest
 
       - name: Trivy Backend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: 'cfi-backend:latest'
           format: 'table'
@@ -85,11 +97,16 @@ jobs:
       - name: Prune Backend Container Image
         run: docker rmi cfi-backend:latest || true
 
-      - name: Build Frontend Container Image
-        run: docker build ./frontend -t cfi-frontend:latest
+      - name: Build Frontend Container Image (with retry)
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 15
+          command: docker build ./frontend -t cfi-frontend:latest
 
       - name: Trivy Frontend Container Vulnerability Scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@0.28.0
         with:
           image-ref: 'cfi-frontend:latest'
           format: 'table'
