@@ -13,6 +13,34 @@ Before initiating node registration, the institution's IT/Security team must ver
 
 ---
 
+## 1a. Network Requirements
+
+> [!IMPORTANT]
+> All CF-Intelligence bank→coordinator communication is **mandatory mTLS over gRPC**.
+> Plain HTTP connections and TLS 1.2 are **refused at the transport layer** — there is no fallback.
+
+| Requirement | Detail |
+|---|---|
+| **Protocol** | gRPC over TLS 1.3 only (TLS 1.2 rejected) |
+| **Port** | TCP `50051` outbound from bank network to coordinator |
+| **Authentication** | Mutual TLS — both client and server present certificates |
+| **Client cert CN** | Must match `{bank_id}.client.cf-intelligence.io` (issued by onboarding API) |
+| **HTTP fallback** | None — insecure channels are rejected at the server interceptor level |
+| **Coordinator FQDN** | `coordinator.cf-intelligence.io` — add to firewall allowlist |
+| **Cert rotation** | gRPC client auto-detects cert file changes and recycles the channel |
+
+### Firewall Rule (example — adapt to your environment)
+
+```bash
+# Allow outbound gRPC to CF-Intelligence coordinator
+iptables -A OUTPUT -p tcp --dport 50051 -d coordinator.cf-intelligence.io -j ACCEPT
+
+# Block all other outbound on 50051 (defence-in-depth)
+iptables -A OUTPUT -p tcp --dport 50051 -j DROP
+```
+
+---
+
 ## 2. Step 1: API Registration
 
 Issue a registration request to the central coordinator admin endpoint:

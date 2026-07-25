@@ -53,12 +53,19 @@ class ProtocolVersionInterceptor(grpc.ServerInterceptor):
         )
 
         if status == VersionNegotiationStatus.INCOMPATIBLE:
-            logger.warning("Aborting RPC call: %s", reason)
+            logger.warning(
+                "SIEM | VERSION_MISMATCH | client_version=%s min_supported=%s reason=%s",
+                client_version,
+                self.matrix.min_supported_version,
+                reason,
+            )
 
             def abort_handler(request: Any, context: grpc.ServicerContext) -> Any:
                 context.abort(
-                    grpc.StatusCode.OUT_OF_RANGE,
-                    f"Protocol version incompatible: {reason}",
+                    grpc.StatusCode.FAILED_PRECONDITION,
+                    f"Protocol version {client_version} unsupported. "
+                    f"Minimum: {self.matrix.min_supported_version}. "
+                    "Upgrade: https://docs.cf-intelligence.io/upgrade",
                 )
 
             return grpc.unary_unary_rpc_method_handler(abort_handler)

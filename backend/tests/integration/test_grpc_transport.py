@@ -76,9 +76,30 @@ async def test_invalid_certificate_rejected() -> None:
 
 @pytest.mark.asyncio
 async def test_grpc_server_manager_lifecycle() -> None:
-    """Verifies GRPCServerManager start/stop lifecycle."""
-    server_mgr = GRPCServerManager(port=50051)
-    await server_mgr.start()
-    assert server_mgr.is_running
-    await server_mgr.stop()
-    assert not server_mgr.is_running
+    """Verifies GRPCServerManager start/stop lifecycle with mocked TLS credentials.
+
+    The real mTLS code path is exercised (interceptors, port binding) but
+    grpc.ssl_server_credentials and grpc.server are mocked so no PEM files
+    or real socket are required in unit/CI environments.
+    """
+    import unittest.mock as mock
+
+    mock_server = mock.MagicMock()
+    mock_credentials = mock.MagicMock()
+
+    with (
+        mock.patch(
+            "app.infrastructure.grpc.server.GRPCServerManager._load_tls_credentials",
+            return_value=mock_credentials,
+        ),
+        mock.patch("app.infrastructure.grpc.server.grpc.server", return_value=mock_server),
+    ):
+        server_mgr = GRPCServerManager(port=50051)
+        await server_mgr.start()
+        assert server_mgr.is_running
+        mock_server.add_secure_port.assert_called_once()
+        mock_server.start.assert_called_once()
+
+        await server_mgr.stop()
+        assert not server_mgr.is_running
+        mock_server.stop.assert_called_once_with(grace=5)
