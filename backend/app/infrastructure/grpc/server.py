@@ -60,7 +60,7 @@ async def _async_bank_lookup(bank_id: str) -> bool:
     from app.infrastructure.models import TenantConfigModel
 
     try:
-        async with async_sessionmaker() as session:
+        async with async_sessionmaker() as session:  # type: ignore[attr-defined]
             result = await session.execute(
                 select(TenantConfigModel.status).where(TenantConfigModel.bank_id == bank_id)
             )
