@@ -9,6 +9,7 @@ any RPC method is executed.
 from __future__ import annotations
 
 import asyncio
+import concurrent.futures as futures
 import logging
 import os
 import re
@@ -210,13 +211,13 @@ class GRPCServerManager:
         """
         credentials = self._load_tls_credentials()
 
-        interceptors = [
+        interceptors: list[grpc.ServerInterceptor] = [
             BankCertificateInterceptor(),
             ProtocolVersionInterceptor(),
         ]
 
         self._server = grpc.server(
-            futures_executor=None,  # uses default ThreadPoolExecutor
+            thread_pool=futures.ThreadPoolExecutor(max_workers=10),
             interceptors=interceptors,
             options=[("grpc.max_concurrent_streams", 50)],
         )
