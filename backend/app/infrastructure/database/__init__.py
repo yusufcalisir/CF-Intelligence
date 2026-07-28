@@ -19,12 +19,15 @@ Multi-Tenancy (SOC2/PCI-DSS Compliance):
         Separate database names suffixed per tenant (e.g. fraud_intelligence_bank_a).
 """
 
+from __future__ import annotations
+
 import contextvars
 import logging
 import os
 from collections.abc import AsyncGenerator, Callable, Coroutine
 from typing import Any
 
+from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -33,6 +36,9 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine,
 )
 from sqlalchemy.orm import DeclarativeBase
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+from starlette.responses import Response
 
 from app.config import get_settings
 
@@ -131,8 +137,11 @@ async def init_tenant_tables(tenant: str | None) -> None:
     if tenant in _tenant_initialized:
         return
     eng = _get_or_create_engine(tenant)
-    async with eng.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    try:
+        async with eng.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+    except Exception as exc:
+        logger.warning("Could not initialize tenant tables for tenant=%s: %s", tenant, exc)
     _tenant_initialized.add(tenant)
     logger.info("Initialized tables for tenant=%s", tenant or "central")
 
@@ -160,10 +169,62 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     await init_tenant_tables(tenant)
     factory = get_session_factory(tenant)
     async with factory() as session:
+        if tenant and settings.database_type != "sqlite":
+            from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+            try:
+                clean_id = sanitize_bank_id(tenant)
+                await session.execute(text(f"SET search_path TO tenant_{clean_id}, public"))
+            except Exception as exc:
+                logger.warning("Could not set search_path for tenant_%s: %s", tenant, exc)
         try:
             yield session
         finally:
             await session.close()
+
+
+async def get_tenant_session(bank_id: str) -> AsyncGenerator[AsyncSession, None]:
+    """Yield an AsyncSession scoped to the specified tenant's PostgreSQL schema (tenant_{bank_id})."""
+    from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+    clean_bank_id = sanitize_bank_id(bank_id)
+    await init_tenant_tables(clean_bank_id)
+    factory = get_session_factory(clean_bank_id)
+
+    async with factory() as session:
+        if settings.database_type != "sqlite":
+            try:
+                await session.execute(text(f"SET search_path TO tenant_{clean_bank_id}, public"))
+            except Exception as exc:
+                logger.warning("Could not set search_path for tenant_%s: %s", clean_bank_id, exc)
+        try:
+            yield session
+        finally:
+            await session.close()
+
+
+class TenantContextMiddleware(BaseHTTPMiddleware):
+    """FastAPI/Starlette middleware reading X-Bank-ID header and setting active_tenant contextvar."""
+
+    async def dispatch(  # type: ignore[override]
+        self, request: Request, call_next: Callable[[Request], Coroutine[Any, Any, Response]]
+    ) -> Response:
+        bank_id_hdr = request.headers.get("X-Bank-ID") or request.headers.get("x-bank-id")
+        token_reset = None
+        if bank_id_hdr:
+            from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+            try:
+                clean_id = sanitize_bank_id(bank_id_hdr)
+                token_reset = active_tenant.set(clean_id)
+            except ValueError as err:
+                logger.warning("Invalid X-Bank-ID header '%s': %s", bank_id_hdr, err)
+
+        try:
+            return await call_next(request)
+        finally:
+            if token_reset:
+                active_tenant.reset(token_reset)
 
 
 async def run_cockroach_transaction(

@@ -184,6 +184,25 @@ The CF-Intelligence platform natively ingests data from core banking systems usi
 
 ---
 
+## 6c. Data Isolation Guarantee
+
+> [!IMPORTANT]
+> The CF-Intelligence platform enforces **PostgreSQL Engine-Level Schema Isolation** (SOC2 Type II / PCI-DSS v4.0 compliant).
+
+1. **Dedicated PostgreSQL Schema (`tenant_{bank_id}`)**:
+   - Upon registration, `TenantProvisioner` executes DDL statements to create an isolated schema space: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}`.
+   - All tenant database tables (`alerts`, `cases`, `features`, `audit_logs`) reside exclusively within this schema.
+
+2. **Dedicated Database Role (`tenant_{bank_id}_role`)**:
+   - A dedicated database user role is provisioned: `CREATE ROLE tenant_{bank_id}_role WITH NOINHERIT LOGIN`.
+   - Privileges are granted exclusively for `tenant_{bank_id}`. The role has **zero permissions** on other bank schemas (`tenant_bank_b`, `tenant_bank_c`).
+   - Cross-bank SQL queries are blocked directly at the database engine parser level, raising a `PermissionError` / `SQLState 42501 (insufficient_privilege)`.
+
+3. **Session Search Path Isolation**:
+   - Every request session initialized via `get_tenant_session(bank_id)` automatically executes `SET search_path TO tenant_{bank_id}, public`.
+
+---
+
 ## 7. Troubleshooting
 
 | Issue | Root Cause | Resolution |

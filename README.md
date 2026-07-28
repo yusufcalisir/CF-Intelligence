@@ -531,6 +531,9 @@ CF-Intelligence/
 
 ### 15.1 Real-Time Inference Scoring Endpoint
 
+> [!NOTE]
+> All transaction data access and feature store queries are schema-isolated per bank institution (`tenant_{bank_id}`) at the PostgreSQL engine level, enforcing strict multi-tenant boundary security.
+
 ```http
 POST /v1/inference/score HTTP/1.1
 Host: api.cfi-platform.org
