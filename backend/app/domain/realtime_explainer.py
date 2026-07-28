@@ -97,7 +97,7 @@ class FastInferenceExplainer:
             velocity_1h = int(feature_vector.get("velocity_1h", 1))
             mcc = str(feature_vector.get("merchant_category", "retail"))
         else:
-            amount = float(feature_vector[0]) if len(feature_vector) > 0 else 100.0
+            amount = feature_vector[0] if len(feature_vector) > 0 else 100.0
             velocity_1h = int(feature_vector[1]) if len(feature_vector) > 1 else 1
             mcc = "retail"
 
