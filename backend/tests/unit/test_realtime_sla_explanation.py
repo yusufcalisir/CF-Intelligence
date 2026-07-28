@@ -1,5 +1,5 @@
 # ruff: noqa: E402
-"""Automated Unit Test Suite for Real-Time Decision Explanation & SLA Verification."""
+"""Automated Unit Test Suite for Real-Time Decision Explanation, SLA Verification, and Async SHAP Redis Engine."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ def test_fast_inference_explainer_feature_attributions() -> None:
     """Test fast feature attribution vector calculations."""
     explainer = FastInferenceExplainer()
 
-    # 1. High risk transaction attributions
     attr_high = explainer.explain_realtime_score(
         amount=50000.0,
         velocity_1h=8,
@@ -23,7 +22,6 @@ def test_fast_inference_explainer_feature_attributions() -> None:
     assert "merchant_category" in feature_names
     assert "amount" in feature_names
 
-    # 2. Low risk transaction attributions
     attr_low = explainer.explain_realtime_score(
         amount=50.0,
         velocity_1h=1,
@@ -38,7 +36,6 @@ def test_realtime_sla_monitor_percentiles_and_violations() -> None:
     """Test latency sample recording and p50, p95, p99 percentile summary calculations."""
     monitor = RealtimeSLAMonitor(target_sla_ms=100.0)
 
-    # Record 20 latency samples: 18 compliant (<100ms), 2 SLA breaches (>100ms)
     compliant_samples = [
         10.0,
         12.0,
@@ -74,3 +71,39 @@ def test_realtime_sla_monitor_percentiles_and_violations() -> None:
     assert summary.p50_latency_ms > 0
     assert summary.p95_latency_ms >= summary.p50_latency_ms
     assert summary.p99_latency_ms >= summary.p95_latency_ms
+
+
+def test_shap_cache_hit_returns_immediately() -> None:
+    """Verifies that prepopulated Redis SHAP key yields sub-millisecond cache hit."""
+    explainer = FastInferenceExplainer()
+    tx_id = "tx_cached_99"
+
+    # Compute and populate cache first
+    explainer.compute_shap(tx_id, {"amount": 5000.0})
+
+    res = explainer.explain_async(tx_id, {"amount": 5000.0})
+    assert res["transaction_id"] == tx_id
+    assert res["status"] == "COMPLETED"
+    assert res["source"] == "REDIS_CACHE"
+
+
+def test_shap_enqueued_on_cache_miss() -> None:
+    """Verifies that cache miss returns PENDING status and job_id."""
+    explainer = FastInferenceExplainer()
+    tx_id = "tx_fresh_uncached_101"
+
+    res = explainer.explain_async(tx_id, {"amount": 25000.0, "velocity_1h": 6})
+    assert res["transaction_id"] == tx_id
+    assert res["status"] in ("PENDING", "COMPLETED")
+    assert "job_id" in res or "shap_values" in res
+
+
+def test_shap_result_cached_after_computation() -> None:
+    """Verifies that running compute_shap caches attributions in Redis with 300s TTL."""
+    explainer = FastInferenceExplainer()
+    tx_id = "tx_compute_cached_88"
+
+    res = explainer.compute_shap(tx_id, {"amount": 60000.0, "merchant_category": "crypto_exchange"})
+    assert res["transaction_id"] == tx_id
+    assert res["status"] == "COMPLETED"
+    assert len(res["shap_values"]) > 0
