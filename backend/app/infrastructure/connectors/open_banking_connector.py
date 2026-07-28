@@ -102,6 +102,7 @@ class OpenBankingConnector(BaseBankConnector):
         self, request_fn: Callable[[], httpx.Response]
     ) -> httpx.Response:
         """Execute request_fn and handle HTTP 429 rate limits using Retry-After header backoff."""
+        resp: httpx.Response | None = None
         for attempt in range(1, MAX_RATE_LIMIT_RETRIES + 1):
             resp = request_fn()
             if resp.status_code == 429:
@@ -120,6 +121,8 @@ class OpenBankingConnector(BaseBankConnector):
                 time.sleep(retry_delay)
             else:
                 return resp
+        if resp is None:
+            resp = request_fn()
         return resp
 
     def _get_headers(self, body_bytes: bytes = b"") -> dict[str, str]:
