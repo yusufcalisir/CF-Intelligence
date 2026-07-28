@@ -108,3 +108,22 @@ class SignatureVerifier:
             bank_id=envelope.bank_id,
             public_key_pem=public_key_pem,
         )
+
+    def verify(
+        self,
+        bank_id: str,
+        message_bytes: bytes,
+        signature_bytes: bytes,
+        public_key_pem: str | None = None,
+    ) -> bool:
+        """Verifies a message signature for a given bank_id using ECDSA/RSA-PSS or HMAC.
+
+        Returns True if signature is valid, False otherwise.
+        """
+        valid, _ = self.verify_signature(
+            payload_bytes=message_bytes,
+            signature_bytes=signature_bytes,
+            bank_id=bank_id,
+            public_key_pem=public_key_pem,
+        )
+        return valid

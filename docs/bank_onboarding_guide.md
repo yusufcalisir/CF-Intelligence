@@ -137,6 +137,34 @@ Expected output:
 
 ---
 
+## 6a. How Gradient Submission Works
+
+> [!NOTE]
+> Gradient updates submitted during a federated learning round are protected by three layers of defence:
+> **Secure Aggregation (SecAgg)**, **Opacus Differential Privacy (DP)**, and **HSM/PKI ECDSA Digital Signatures**.
+
+1. **Secure Aggregation (SecAgg) Masking**:
+   - Each participating bank node generates pairwise random zero-sum masks $s_{u,v}$ with all other online consortium members.
+   - The local gradient vector $g_u$ is masked: $m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,u}$.
+   - Upon coordinator aggregation, pairwise masks cancel out exactly ($\sum_u m_u = \sum_u g_u$), revealing only the aggregate model update while guaranteeing individual bank gradient privacy.
+
+2. **Differential Privacy ($\epsilon, \delta$) Noise**:
+   - Local gradients are clipped to $L_2$ norm threshold $C$ (e.g., $1.0$).
+   - Gaussian noise calibrated to privacy budget $\epsilon$ is added. The coordinator enforces $\epsilon \le 10.0$ per round. Submissions exceeding this limit are rejected with `REJECTED_EPSILON`.
+
+3. **Cryptographic Payload Compression & Signing**:
+   - The masked gradient tensor is compressed using `zlib`.
+   - The node signs the payload digest using its HSM / PKI private key (ECDSA P-256 / RSA-PSS):
+     $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round\_id} \mathbin{\Vert} \text{bank\_id} \mathbin{\Vert} \text{SHA-256}(\text{compressed\_gradient})\Big)$$
+   - The coordinator verifies the signature via `SignatureVerifier` before storing in `gradient_submissions` and logging to the `ImmutableAuditChain`.
+
+4. **Quorum Aggregation**:
+   - The coordinator accumulates validated submissions until reaching the round quorum threshold (e.g. 3 banks).
+   - Once quorum is satisfied, global model parameter aggregation is triggered.
+
+---
+
+
 ## 7. Troubleshooting
 
 | Issue | Root Cause | Resolution |

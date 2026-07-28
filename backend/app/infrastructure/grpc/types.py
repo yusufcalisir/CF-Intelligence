@@ -63,6 +63,17 @@ class AggregationAck:
 
 
 @dataclass
+class SubmitGradientRequest:
+    round_id: str
+    bank_id: str
+    compressed_masked_gradient: bytes
+    dp_epsilon_used: float
+    participant_count: int
+    signature: bytes
+    protocol_version: str = "1.0.0"
+
+
+@dataclass
 class ModelDownloadRequest:
     bank_id: str
     target_version: str = "latest"

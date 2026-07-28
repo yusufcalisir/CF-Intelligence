@@ -25,6 +25,7 @@ from app.infrastructure.grpc.types import (
     ModelChunk,
     ModelDownloadRequest,
     ParameterChunk,
+    SubmitGradientRequest,
 )
 
 if TYPE_CHECKING:
@@ -258,3 +259,45 @@ class GRPCBankClient:
 
         downloaded_chunks.sort(key=lambda c: c.chunk_index)
         return b"".join(c.chunk_data for c in downloaded_chunks)
+
+    async def submit_gradient(
+        self,
+        round_id: str,
+        bank_id: str,
+        masked_gradient_bytes: bytes,
+        dp_epsilon_used: float = 1.0,
+        participant_count: int = 3,
+        private_key_pem: str | None = None,
+        protocol_version: str = "1.0.0",
+    ) -> AggregationAck:
+        """Compress, sign, and submit SecAgg masked gradient update to coordinator."""
+        import zlib
+
+        from app.infrastructure.security.signature_verifier import DigitalEnvelopeSigner
+
+        compressed = zlib.compress(masked_gradient_bytes)
+        signed_message = f"{round_id}:{bank_id}".encode() + hashlib.sha256(compressed).digest()
+        signer = DigitalEnvelopeSigner()
+        signature = signer.sign_payload(
+            payload_bytes=signed_message,
+            bank_id=bank_id,
+            private_key_pem=private_key_pem,
+        )
+
+        req = SubmitGradientRequest(
+            round_id=str(round_id),
+            bank_id=bank_id,
+            compressed_masked_gradient=compressed,
+            dp_epsilon_used=dp_epsilon_used,
+            participant_count=participant_count,
+            signature=signature,
+            protocol_version=protocol_version,
+        )
+
+        if self._servicer:
+            return await self._servicer.SubmitGradient(req)
+
+        await self._ensure_channel()
+        return await self._channel.unary_unary(  # type: ignore[union-attr]
+            "/federated.FederatedLearning/SubmitGradient"
+        )(req)
