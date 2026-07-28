@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from typing import Any
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
@@ -54,6 +55,14 @@ async def run_migrations_online() -> None:
     await connectable.dispose()
 
 
+def _configure_tenant_schema(sync_conn: Any, target_schema: str) -> None:
+    context.configure(
+        connection=sync_conn,
+        target_metadata=target_metadata,
+        version_table_schema=target_schema,
+    )
+
+
 async def run_migrations_for_all_tenants() -> None:
     """Query active bank tenants and execute Alembic migrations per tenant schema space."""
     from sqlalchemy import text
@@ -74,13 +83,7 @@ async def run_migrations_for_all_tenants() -> None:
             clean_bank_id = sanitize_bank_id(tenant)
             s_name = f"tenant_{clean_bank_id}"
             await connection.execute(text(f"SET search_path TO {s_name}, public"))
-            await connection.run_sync(
-                lambda conn, s=s_name: context.configure(
-                    connection=conn,
-                    target_metadata=target_metadata,
-                    version_table_schema=s,
-                )
-            )
+            await connection.run_sync(_configure_tenant_schema, s_name)
             async with connection.begin():
                 await connection.run_sync(lambda conn: context.run_migrations())
 
