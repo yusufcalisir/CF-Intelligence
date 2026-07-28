@@ -168,3 +168,6 @@ class HSMSignerEngine:
             "attestation_signature": attestation_sig,
             "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
         }
+
+
+HSMSigner = HSMSignerEngine

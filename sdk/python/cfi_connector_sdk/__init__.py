@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from cfi_connector_sdk.adapters.entity_adapter import BaseEntityAdapter
 from cfi_connector_sdk.adapters.feature_adapter import BaseFeatureAdapter
-from cfi_connector_sdk.adapters.transaction_adapter import BaseTransactionAdapter, NormalizedTransaction
+from cfi_connector_sdk.adapters.transaction_adapter import (
+    BaseTransactionAdapter,
+    NormalizedTransaction,
+)
 from cfi_connector_sdk.client.local_fl_client import LocalFLClient
 from cfi_connector_sdk.health import ConnectorHealthMonitor, ConnectorHealthStatus
 

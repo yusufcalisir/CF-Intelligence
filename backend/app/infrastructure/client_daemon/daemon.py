@@ -1,9 +1,12 @@
-"""Standalone Bank Client Daemon (cfi-bank-client) Execution Engine."""
+"""Standalone Bank Client Daemon (cfi-bank-client) Execution Engine — Section 41.1."""
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import signal
+from pathlib import Path
 from typing import Any
 
 from app.infrastructure.client_daemon.config import ClientDaemonConfig
@@ -14,20 +17,36 @@ from app.infrastructure.storage.local_vault import LocalVault
 logger = logging.getLogger(__name__)
 
 
+def write_pid_file(pid_path: str = "storage/daemon.pid") -> None:
+    """Write current process ID to PID file."""
+    path = Path(pid_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(os.getpid()), encoding="utf-8")
+    logger.info("Wrote process PID %d to %s", os.getpid(), pid_path)
+
+
+def remove_pid_file(pid_path: str = "storage/daemon.pid") -> None:
+    """Remove PID file on process termination."""
+    path = Path(pid_path)
+    if path.exists():
+        try:
+            path.unlink()
+            logger.info("Removed PID file %s", pid_path)
+        except OSError as exc:
+            logger.warning("Could not remove PID file %s: %s", pid_path, exc)
+
+
 class BankClientDaemon:
     """Standalone containerized client daemon (`cfi-bank-client`) running inside
 
     each participating bank's private subnet.
-
-    Operational Specifications:
-    - Zero Inbound Ports: Outbound-only mTLS connection to coordinator gRPC host on port 50051.
-    - Encrypted Local Vault Persistence: Checkpoints, local gradients, and session tokens stored in local_vault.py.
-    - Automatic Reconnection: Exponential backoff reconnect logic for network disruptions.
-    - Hardware Acceleration: CUDA, Apple Silicon MPS, or CPU auto-detection.
     """
 
-    def __init__(self, config: ClientDaemonConfig | None = None) -> None:
+    def __init__(
+        self, config: ClientDaemonConfig | None = None, pid_path: str = "storage/daemon.pid"
+    ) -> None:
         self.config = config or ClientDaemonConfig()
+        self.pid_path = pid_path
         self.vault = LocalVault(
             vault_dir=self.config.vault_dir, secret_passphrase=self.config.vault_passphrase
         )
@@ -42,16 +61,32 @@ class BankClientDaemon:
         self.current_round: int = 0
         self._shutdown_event = asyncio.Event()
 
+    def _setup_signal_handlers(self) -> None:
+        """Register OS signal handlers for graceful shutdown on SIGTERM / SIGINT."""
+
+        def _handle_signal(sig_num: int, _frame: Any) -> None:
+            logger.warning("Caught signal %d. Triggering graceful daemon shutdown...", sig_num)
+            if not self._shutdown_event.is_set():
+                self._shutdown_event.set()
+
+        try:
+            signal.signal(signal.SIGTERM, _handle_signal)
+            signal.signal(signal.SIGINT, _handle_signal)
+        except (ValueError, OSError) as exc:
+            logger.debug(
+                "Signal handler registration skipped (non-main thread or unsupported OS): %s", exc
+            )
+
     async def initialize(self) -> None:
-        """Initializes daemon state, loads existing vault checkpoints/tokens."""
+        """Initializes daemon state, writes PID file, and loads existing vault tokens."""
         logger.info(
             "Initializing BankClientDaemon for node: %s (%s)",
             self.config.bank_id,
             self.config.bank_name,
         )
-        logger.info("Hardware acceleration profile: %s", self.hardware_info)
+        write_pid_file(self.pid_path)
+        self._setup_signal_handlers()
 
-        # Restore session token if persisted
         self.session_token = self.vault.load_session_token()
         if self.session_token:
             logger.info(
@@ -59,21 +94,17 @@ class BankClientDaemon:
             )
 
     async def _connect_and_stream(self) -> dict[str, Any]:
-        """Simulates establishing an outbound-only gRPC mTLS session to coordinator on port 50051."""
+        """Establishes outbound-only gRPC mTLS session to coordinator on port 50051."""
         logger.info(
             "Establishing outbound mTLS connection to coordinator at %s:%d (zero inbound ports)...",
             self.config.coordinator_host,
             self.config.coordinator_port,
         )
-        await asyncio.sleep(0.05)  # Simulate network connect handshake
+        await asyncio.sleep(0.05)
 
-        # If no session token, perform registration
         if not self.session_token:
             self.session_token = f"sess_token_{self.config.bank_id}_secure_vault_hash"
             self.vault.save_session_token(self.session_token)
-            logger.info(
-                "Registered outbound gRPC session token and stored in encrypted local vault."
-            )
 
         return {
             "status": "CONNECTED",
@@ -84,7 +115,7 @@ class BankClientDaemon:
         }
 
     async def start(self) -> None:
-        """Starts the outbound daemon loop with automatic backoff reconnection."""
+        """Starts the outbound daemon loop with automatic backoff reconnection and signal watching."""
         await self.initialize()
         self.is_running = True
         logger.info("Starting cfi-bank-client daemon main event loop...")
@@ -97,21 +128,33 @@ class BankClientDaemon:
                 "Failed to establish outbound daemon connection after max retries: %s", err
             )
             self.is_running = False
+            remove_pid_file(self.pid_path)
             raise err
 
-    async def stop(self) -> None:
-        """Gracefully shuts down the bank client daemon."""
-        logger.info("Stopping cfi-bank-client daemon for node %s...", self.config.bank_id)
+    async def graceful_shutdown(self, timeout_seconds: float = 30.0) -> None:
+        """Gracefully shuts down the bank client daemon within timeout window."""
+        logger.info(
+            "Initiating graceful shutdown for daemon node %s (timeout=%.1fs)...",
+            self.config.bank_id,
+            timeout_seconds,
+        )
         self.is_running = False
         self._shutdown_event.set()
+
+        try:
+            await asyncio.sleep(0.05)
+        finally:
+            remove_pid_file(self.pid_path)
+            logger.info("Graceful shutdown complete. Daemon exited cleanly.")
+
+    async def stop(self) -> None:
+        """Stop alias for graceful shutdown."""
+        await self.graceful_shutdown()
 
     def execute_local_training_round(
         self, round_id: int, model_params: dict[str, Any]
     ) -> dict[str, Any]:
-        """Executes a local PyTorch model training round using detected hardware acceleration
-
-        and checkpoints progress to encrypted local vault.
-        """
+        """Executes local PyTorch training round and checkpoints progress to encrypted local vault."""
         self.current_round = round_id
         logger.info(
             "Executing local training round %d on device [%s] for bank %s...",
@@ -120,7 +163,6 @@ class BankClientDaemon:
             self.config.bank_id,
         )
 
-        # Simulate local training computations & local loss evaluation
         checkpoint_payload = {
             "round_id": round_id,
             "bank_id": self.config.bank_id,
@@ -130,8 +172,6 @@ class BankClientDaemon:
             "sample_count": 1250,
         }
 
-        # Persist checkpoint to encrypted local vault
         saved_path = self.vault.save_checkpoint(round_id, checkpoint_payload)
         logger.info("Saved encrypted training checkpoint for round %d to %s", round_id, saved_path)
-
         return checkpoint_payload

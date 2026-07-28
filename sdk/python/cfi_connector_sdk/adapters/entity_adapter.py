@@ -27,5 +27,7 @@ class BaseEntityAdapter:
         if "customer_id" in masked:
             masked["customer_id"] = self.hash_customer_id(str(masked["customer_id"]))
         if "account_number" in masked:
-            masked["account_number"] = self.hash_customer_id(str(masked["account_number"]))
+            masked["account_number"] = self.hash_customer_id(
+                str(masked["account_number"])
+            )
         return masked

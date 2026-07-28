@@ -20,21 +20,27 @@ class NormalizedTransaction(BaseModel):
     amount: float = Field(..., gt=0, description="Transaction monetary amount")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc), description="UTC transaction timestamp"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="UTC transaction timestamp",
     )
     merchant_category_code: str = Field(
         default="0000", description="ISO 18245 Merchant Category Code"
     )
-    origin_country: str = Field(default="US", description="ISO 3166-1 alpha-2 origin country code")
+    origin_country: str = Field(
+        default="US", description="ISO 3166-1 alpha-2 origin country code"
+    )
     destination_country: str = Field(
         default="US", description="ISO 3166-1 alpha-2 destination country code"
     )
     device_fingerprint: str = Field(
         default="", description="Cryptographic device or browser fingerprint"
     )
-    ip_subnet: str = Field(default="", description="Masked IP subnet (e.g. 192.168.1.0/24)")
+    ip_subnet: str = Field(
+        default="", description="Masked IP subnet (e.g. 192.168.1.0/24)"
+    )
     channel_type: str = Field(
-        default="ONLINE", description="Transaction channel (ONLINE, MOBILE, ATM, POS, SWIFT)"
+        default="ONLINE",
+        description="Transaction channel (ONLINE, MOBILE, ATM, POS, SWIFT)",
     )
 
 

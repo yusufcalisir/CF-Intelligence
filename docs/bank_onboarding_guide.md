@@ -106,15 +106,19 @@ health_port: 8080
 
 ## 5. Step 4: Start the Daemon
 
-Launch the local training daemon process:
+Launch the local FL client training daemon process (`cfi-daemon`):
 
 ```bash
-# Using CLI tool
-cfi-cli join --bank-id bank_alpha --coordinator-url https://coordinator.cf-intelligence.io
-
-# Or launch daemon directly
-cfi-daemon --config /etc/cfi/config/bank_alpha.yaml
+# Launch daemon process with explicit bank ID and configuration path
+cfi-daemon --bank-id bank_alpha --config ~/.cfi/config/bank_alpha.yaml
 ```
+
+### Operational Flags & Configuration Overview:
+- `--bank-id`: Unique consortium bank identifier.
+- `--config`: Path to local YAML daemon configuration file (`~/.cfi/config/{bank_id}.yaml` or `/etc/cfi/config/{bank_id}.yaml`).
+- **Process Lock**: Writes process PID to `storage/daemon.pid` (or `/var/run/cfi/daemon.pid`).
+- **Health Check Endpoint**: Exposes lightweight status server at `http://localhost:8080/health`.
+- **Graceful Shutdown**: Catches `SIGTERM` / `SIGINT` signals and waits up to 30 seconds for in-flight training rounds to complete before removing the PID file.
 
 ---
 

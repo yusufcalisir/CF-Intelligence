@@ -41,11 +41,16 @@ class ConnectorHealthMonitor:
     def check_broker_ping(self, timeout: float = 2.0) -> bool:
         """Performs TCP connection ping to check message broker reachability."""
         try:
-            with socket.create_connection((self.broker_host, self.broker_port), timeout=timeout):
+            with socket.create_connection(
+                (self.broker_host, self.broker_port), timeout=timeout
+            ):
                 return True
         except (OSError, socket.timeout, ConnectionRefusedError) as exc:
             logger.warning(
-                "Broker ping failed for %s:%d - %s", self.broker_host, self.broker_port, exc
+                "Broker ping failed for %s:%d - %s",
+                self.broker_host,
+                self.broker_port,
+                exc,
             )
             return False
 
@@ -59,14 +64,16 @@ class ConnectorHealthMonitor:
             not_after_str = cert_dict.get("notAfter", "")
             if not_after_str:
                 # Format: 'MMM DD HH:MM:SS YYYY GMT'
-                expire_dt = datetime.strptime(not_after_str, "%b %d %H:%M:%S %Y %Z").replace(
-                    tzinfo=timezone.utc
-                )
+                expire_dt = datetime.strptime(
+                    not_after_str, "%b %d %H:%M:%S %Y %Z"
+                ).replace(tzinfo=timezone.utc)
                 now = datetime.now(timezone.utc)
                 days_left = (expire_dt - now).days
                 return max(days_left, 0)
         except Exception as exc:
-            logger.warning("Failed to parse X.509 certificate at %s: %s", self.cert_path, exc)
+            logger.warning(
+                "Failed to parse X.509 certificate at %s: %s", self.cert_path, exc
+            )
 
         return 30  # Default safe estimate on parse error
 

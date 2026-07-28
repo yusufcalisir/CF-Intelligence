@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cfi-connector-sdk"
+version = "1.0.0"
+description = "Collaborative Fraud Intelligence (CFI) Bank Connector SDK & FL Client Daemon"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pyyaml>=6.0",
+    "httpx>=0.25.0",
+    "cryptography>=41.0.0",
+]
+
+[project.scripts]
+cfi-daemon = "cfi_connector_sdk.daemon:main"
