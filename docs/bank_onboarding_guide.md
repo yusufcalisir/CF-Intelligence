@@ -164,6 +164,25 @@ Expected output:
 
 ---
 
+## 6b. Supported Core Banking Integration Formats
+
+The CF-Intelligence platform natively ingests data from core banking systems using the following standardized messaging standards and API specs:
+
+### 1. ISO 20022 Financial Messaging (MX)
+- **`pacs.008.001.08`**: Financial Institution Customer Credit Transfer. Validated against XSD schema `pacs.008.001.08.xsd`.
+- **`camt.053.001.08`**: Bank-to-Customer Statement. Validated against XSD schema `camt.053.001.08.xsd`.
+- **`pain.001.001.08`**: Customer Credit Transfer Initiation. Validated against XSD schema `pain.001.001.08.xsd`.
+- **`pacs.002.001.10`**: Payment Status Report.
+
+### 2. Legacy SWIFT Financial Messaging (MT)
+- **`MT103`**: Single Customer Credit Transfer text payload parser.
+
+### 3. Open Banking & PSD2 REST APIs
+- **Berlin Group NextGenPSD2**: Version 1.3 Account Information Service (AIS) and Payment Initiation Service (PIS).
+- **UK Open Banking**: Read/Write Data API Specification v3.1.
+- **Security & Lifecycle**: OAuth2 Client Credentials grant with automatic token refresh (< 5 minutes TTL) and HTTP 429 rate limit backoff (`Retry-After`).
+
+---
 
 ## 7. Troubleshooting
 

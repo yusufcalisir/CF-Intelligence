@@ -1,10 +1,12 @@
-"""Berlin Group NextGenPSD2 and Open Banking REST Bank Connector."""
+"""Berlin Group NextGenPSD2 and Open Banking REST Bank Connector — Section 38.2."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 import logging
+import os
+import time
 import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
@@ -14,9 +16,11 @@ import httpx
 from app.infrastructure.connectors.base_connector import BaseBankConnector, NormalizedTransaction
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator
 
 logger = logging.getLogger(__name__)
+
+MAX_RATE_LIMIT_RETRIES = 3
 
 
 class OpenBankingConnector(BaseBankConnector):
@@ -24,7 +28,7 @@ class OpenBankingConnector(BaseBankConnector):
 
     def __init__(
         self,
-        base_url: str = "https://sandbox.berlingroup.org/psd2/v1",
+        base_url: str | None = None,
         auth_type: str = "oauth2",
         api_key: str = "",
         client_id: str = "tpp_demo_client_id",
@@ -32,6 +36,15 @@ class OpenBankingConnector(BaseBankConnector):
         token_url: str = "https://sandbox.berlingroup.org/oauth/token",
         tpp_signature_key: str = "",
     ) -> None:
+        app_env = os.getenv("APP_ENV", "development").lower()
+        if not base_url:
+            if app_env == "production":
+                base_url = os.getenv("OPEN_BANKING_PROD_URL", "https://api.berlingroup.org/psd2/v1")
+            else:
+                base_url = os.getenv(
+                    "OPEN_BANKING_SANDBOX_URL", "https://sandbox.berlingroup.org/psd2/v1"
+                )
+
         self.base_url = base_url.rstrip("/")
         self.auth_type = auth_type
         self.api_key = api_key
@@ -44,10 +57,10 @@ class OpenBankingConnector(BaseBankConnector):
         self._token_expires_at: float = 0.0
         self._buffered_transactions: list[NormalizedTransaction] = []
 
-    def _get_oauth2_token(self) -> str:
+    def _get_oauth2_token(self, force_refresh: bool = False) -> str:
         """Retrieves or returns cached OAuth 2.0 bearer token using Client Credentials Grant with TTL refresh."""
         now = datetime.now(UTC).timestamp()
-        if self._cached_token and now < self._token_expires_at:
+        if not force_refresh and self._cached_token and now < self._token_expires_at:
             return self._cached_token
 
         if not self.token_url:
@@ -75,8 +88,44 @@ class OpenBankingConnector(BaseBankConnector):
         self._token_expires_at = now + 3600.0
         return self._cached_token
 
+    def _refresh_token_if_expiring(self) -> None:
+        """Proactively refresh OAuth2 token if less than 5 minutes (300s) remain before expiry."""
+        now = datetime.now(UTC).timestamp()
+        if self._token_expires_at > 0 and (self._token_expires_at - now) < 300:
+            logger.info(
+                "OAuth2 token expiring in <5 minutes (ttl=%.1fs) -> proactively refreshing",
+                self._token_expires_at - now,
+            )
+            self._get_oauth2_token(force_refresh=True)
+
+    def _handle_rate_limit_and_execute(
+        self, request_fn: Callable[[], httpx.Response]
+    ) -> httpx.Response:
+        """Execute request_fn and handle HTTP 429 rate limits using Retry-After header backoff."""
+        for attempt in range(1, MAX_RATE_LIMIT_RETRIES + 1):
+            resp = request_fn()
+            if resp.status_code == 429:
+                retry_after_hdr = resp.headers.get("Retry-After", "1.0")
+                try:
+                    retry_delay = float(retry_after_hdr)
+                except ValueError:
+                    retry_delay = 1.0
+
+                logger.warning(
+                    "Open Banking API HTTP 429 Rate Limit (attempt %d/%d). Sleeping %.1fs",
+                    attempt,
+                    MAX_RATE_LIMIT_RETRIES,
+                    retry_delay,
+                )
+                time.sleep(retry_delay)
+            else:
+                return resp
+        return resp
+
     def _get_headers(self, body_bytes: bytes = b"") -> dict[str, str]:
         """Constructs PSD2 compliant HTTP request headers including X-Request-ID, Digest, and TPP-Signature."""
+        self._refresh_token_if_expiring()
+
         req_id = str(uuid.uuid4())
         digest_val = f"SHA-256={hashlib.sha256(body_bytes).hexdigest()}"
 
@@ -165,7 +214,9 @@ class OpenBankingConnector(BaseBankConnector):
         date_from: str | None = None,
         date_to: str | None = None,
     ) -> list[NormalizedTransaction]:
-        """Queries the sandbox /v1/accounts/{account_id}/transactions REST endpoint."""
+        """Queries the sandbox /v1/accounts/{account_id}/transactions REST endpoint with 429 retry handling."""
+        self._refresh_token_if_expiring()
+
         url = f"{self.base_url}/accounts/{account_id}/transactions"
         params: dict[str, str] = {"bookingStatus": "both"}
         if date_from:
@@ -176,7 +227,9 @@ class OpenBankingConnector(BaseBankConnector):
         headers = self._get_headers()
 
         try:
-            resp = httpx.get(url, headers=headers, params=params, timeout=5.0)
+            resp = self._handle_rate_limit_and_execute(
+                lambda: httpx.get(url, headers=headers, params=params, timeout=5.0)
+            )
             if resp.status_code == 200:
                 payload = resp.json()
                 return self.parse_psd2_payload(payload)

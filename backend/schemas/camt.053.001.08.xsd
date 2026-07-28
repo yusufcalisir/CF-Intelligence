@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"
+           targetNamespace="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"
+           elementFormDefault="qualified">
+  <xs:element name="Document" type="Document"/>
+  <xs:complexType name="Document">
+    <xs:sequence>
+      <xs:element name="BkToCstmrStmt" type="BkToCstmrStmt"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BkToCstmrStmt">
+    <xs:sequence>
+      <xs:element name="Stmt" type="Stmt" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Stmt">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:string" minOccurs="0"/>
+      <xs:element name="Acct" type="AccountIdentification" minOccurs="0"/>
+      <xs:element name="Ntry" type="Ntry" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="Ntry">
+    <xs:sequence>
+      <xs:element name="NtryRef" type="xs:string" minOccurs="0"/>
+      <xs:element name="Amt" type="ActiveCurrencyAndAmount"/>
+      <xs:element name="CdtDbtInd" type="xs:string" minOccurs="0"/>
+      <xs:element name="Sts" type="xs:string" minOccurs="0"/>
+      <xs:element name="NtryDtls" type="NtryDtls" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="NtryDtls">
+    <xs:sequence>
+      <xs:element name="TxDtls" type="TxDtls" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="TxDtls">
+    <xs:sequence>
+      <xs:element name="RltdPties" type="RltdPties" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RltdPties">
+    <xs:sequence>
+      <xs:element name="Dbtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="DbtrAcct" type="AccountIdentification" minOccurs="0"/>
+      <xs:element name="Cdtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="CdtrAcct" type="AccountIdentification" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PartyIdentification">
+    <xs:sequence>
+      <xs:element name="Nm" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountIdentification">
+    <xs:sequence>
+      <xs:element name="Id" type="AccountChoice"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountChoice">
+    <xs:sequence>
+      <xs:element name="IBAN" type="xs:string" minOccurs="0"/>
+      <xs:element name="Othr" type="OtherAccount" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OtherAccount">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ActiveCurrencyAndAmount">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="Ccy" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+</xs:schema>

@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
+           targetNamespace="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
+           elementFormDefault="qualified">
+  <xs:element name="Document" type="Document"/>
+  <xs:complexType name="Document">
+    <xs:sequence>
+      <xs:element name="FIToFICstmrCdtTrf" type="FIToFICstmrCdtTrf"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FIToFICstmrCdtTrf">
+    <xs:sequence>
+      <xs:element name="GrpHdr" type="GrpHdr"/>
+      <xs:element name="CdtTrfTxInf" type="CdtTrfTxInf" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GrpHdr">
+    <xs:sequence>
+      <xs:element name="MsgId" type="xs:string"/>
+      <xs:element name="CreDtTm" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CdtTrfTxInf">
+    <xs:sequence>
+      <xs:element name="PmtId" type="PmtId" minOccurs="0"/>
+      <xs:element name="IntrBkSttlmAmt" type="ActiveCurrencyAndAmount"/>
+      <xs:element name="Dbtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="DbtrAcct" type="AccountIdentification" minOccurs="0"/>
+      <xs:element name="Cdtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="CdtrAcct" type="AccountIdentification" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PmtId">
+    <xs:sequence>
+      <xs:element name="EndToEndId" type="xs:string" minOccurs="0"/>
+      <xs:element name="UETR" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ActiveCurrencyAndAmount">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="Ccy" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="PartyIdentification">
+    <xs:sequence>
+      <xs:element name="Nm" type="xs:string" minOccurs="0"/>
+      <xs:element name="PstlAdr" type="PostalAddress" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PostalAddress">
+    <xs:sequence>
+      <xs:element name="Ctry" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountIdentification">
+    <xs:sequence>
+      <xs:element name="Id" type="AccountChoice"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountChoice">
+    <xs:sequence>
+      <xs:element name="IBAN" type="xs:string" minOccurs="0"/>
+      <xs:element name="Othr" type="OtherAccount" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OtherAccount">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>
