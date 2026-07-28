@@ -229,6 +229,9 @@ class _NoOpHistogram:
     def record(self, value: float, attributes: dict | None = None) -> None:
         pass
 
+    def observe(self, value: float, attributes: dict | None = None) -> None:
+        pass
+
 
 class _NoOpUpDownCounter:
     def add(self, amount: int | float, attributes: dict | None = None) -> None:
@@ -258,6 +261,7 @@ cfi_active_alerts_count: Any = _NoOpGauge()
 cfi_active_clients_count: Any = _NoOpGauge()
 cfi_privacy_epsilon_consumed: Any = _NoOpGauge()
 cfi_mia_attack_success_rate: Any = _NoOpGauge()
+cfi_inference_latency_ms: Any = _NoOpHistogram()
 cfi_dlg_gradient_leakage_score: Any = _NoOpGauge()
 
 

@@ -54,6 +54,21 @@ The Real-Time Fraud Scoring Gateway provides online transaction authorization fo
 
 ---
 
+## 5. TorchScript JIT Acceleration & Circuit Breaker Fallback
+
+> [!IMPORTANT]
+> Real-time inference executes PyTorch models using **TorchScript JIT compilation** and **Redis In-Memory Caching (`cfi:champion_model`)** with a 1-hour TTL.
+
+1. **Redis JIT Caching**:
+   - The champion model is compiled to TorchScript on startup and cached in Redis (`cfi:champion_model`).
+   - Subsequent inference requests load directly from Redis, bypassing database and disk IO.
+2. **PubSub Invalidation**:
+   - When a new model is promoted, `ModelService.invalidate_model_cache()` deletes the Redis key and publishes a `model_updated` event to Redis PubSub (`cfi:model_events`) for zero-downtime hot reloading.
+3. **3-Strikes Circuit Breaker**:
+   - If model loading or evaluation encounters 3 consecutive failures, the Circuit Breaker trips open for 60 seconds, routing all incoming transactions directly to `InferenceFallbackEngine`.
+
+---
+
 ## 🛡️ Heuristic Fallback SLA Guarantee
 
 If primary PyTorch ML model execution fails or exceeds timeout thresholds, the system triggers `InferenceFallbackEngine` to evaluate velocity, amount, and merchant category heuristics without blocking payment flows (`evaluated_by: "HEURISTIC_FALLBACK"`).

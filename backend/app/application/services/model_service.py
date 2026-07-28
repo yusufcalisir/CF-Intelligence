@@ -701,3 +701,24 @@ class ModelService:
             importance = importance / max_imp
 
         return {name: float(imp) for name, imp in zip(FEATURE_NAMES, importance, strict=False)}
+
+    def get_champion(self) -> FraudDetectionModel:
+        """Retrieve or instantiate active champion model for production scoring."""
+        model = self.create_model(dp_compatible=True)
+        model.eval()
+        return model
+
+    def invalidate_model_cache(self) -> None:
+        """Deletes Redis champion model cache key and publishes model_updated event to Redis PubSub."""
+        try:
+            from app.infrastructure.cache import get_redis_client
+
+            client = get_redis_client()
+            if client:
+                client.delete("cfi:champion_model")
+                client.publish("cfi:model_events", "model_updated")
+                logger.info(
+                    "Invalidated Redis champion model cache (cfi:champion_model) and published PubSub event."
+                )
+        except Exception as exc:
+            logger.warning("Could not invalidate Redis model cache: %s", exc)

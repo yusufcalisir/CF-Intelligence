@@ -319,3 +319,16 @@ async def publish_training_event(simulation_id: str, event: dict) -> None:
 async def check_redis_health() -> bool:
     """Backward-compatible wrapper used by health.py router."""
     return await CacheService.get().health()
+
+
+def get_redis_client() -> Any | None:
+    """Synchronous Redis client helper for model cache and pubsub operations."""
+    try:
+        import redis
+        from app.config import get_settings
+
+        settings = get_settings()
+        url = getattr(settings, "redis_url", None) or "redis://localhost:6379/0"
+        return redis.from_url(url)
+    except Exception:
+        return None
