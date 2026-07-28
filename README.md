@@ -464,6 +464,15 @@ CF-Intelligence/
 │   │   │   ├── value_objects_phase2.py              # Extended value objects
 │   │   │   └── web_console.py                       # Multi-role console view config & metrics
 │   │   ├── infrastructure/
+│   │   │   ├── connectors/
+│   │   │   │   ├── factory.py                       # Dynamic production bank connector factory
+│   │   │   │   ├── fixture_connector.py             # Test-only fixture reader (not importable in production)
+│   │   │   │   ├── iso20022_connector.py            # ISO 20022 XML financial message connector
+│   │   │   │   ├── kafka_connector.py               # Apache Kafka payment stream connector
+│   │   │   │   ├── open_banking_connector.py        # PSD2 Open Banking REST API connector
+│   │   │   │   ├── parquet_connector.py             # Apache Parquet dataset connector
+│   │   │   │   ├── rabbitmq_connector.py            # RabbitMQ AMQP message connector
+│   │   │   │   └── rest_connector.py                # REST API payment connector
 │   │   │   ├── deployment/
 │   │   │   │   └── airgap_installer.py              # Air-gapped bundle builder & checksum verifier
 │   │   │   ├── disaster_recovery/

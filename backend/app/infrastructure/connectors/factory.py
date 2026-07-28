@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
@@ -20,6 +21,20 @@ if TYPE_CHECKING:
     from app.config import Settings
 
 logger = logging.getLogger(__name__)
+
+APPROVED_PRODUCTION_CONNECTORS = {
+    "iso20022",
+    "open_banking",
+    "psd2",
+    "kafka",
+    "rabbitmq",
+    "parquet",
+    "rest",
+    "redis",
+    "streaming",
+    "batch",
+    "benchmark",
+}
 
 
 class BankConnectorFactory:
@@ -47,10 +62,15 @@ class BankConnectorFactory:
             auth_type,
         )
 
+        app_env = os.getenv("APP_ENV", "development").lower()
+        if app_env == "production" and connector_type not in APPROVED_PRODUCTION_CONNECTORS:
+            raise ValueError(
+                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
+            )
+
         if connector_type in ("mock", "mq_skeleton"):
             raise ValueError(
-                f"Connector type '{connector_type}' has been deprecated and removed under Enterprise Zero-Mock Policy. "
-                "Use 'open_banking', 'psd2', 'parquet', 'rabbitmq', 'kafka', 'iso20022', or 'rest'."
+                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
             )
 
         if connector_type == "rest":
@@ -94,6 +114,5 @@ class BankConnectorFactory:
             )
         else:
             raise ValueError(
-                f"Unsupported connector_type '{connector_type}' requested for bank '{bank_id}'. "
-                "Available production connectors: 'open_banking', 'psd2', 'parquet', 'rabbitmq', 'kafka', 'iso20022', 'rest'."
+                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
             )

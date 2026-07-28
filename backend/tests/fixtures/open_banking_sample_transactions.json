@@ -1,0 +1,806 @@
+{
+  "transactions": {
+    "booked": [
+      {
+        "transactionId": "psd2_tx_001",
+        "debtorAccount": {
+          "iban": "DE89370400440532013001"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789001"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "65.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_002",
+        "debtorAccount": {
+          "iban": "DE89370400440532013002"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789002"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "80.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_003",
+        "debtorAccount": {
+          "iban": "DE89370400440532013003"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789003"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "95.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_004",
+        "debtorAccount": {
+          "iban": "DE89370400440532013004"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789004"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "110.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_005",
+        "debtorAccount": {
+          "iban": "DE89370400440532013005"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789005"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "126.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_006",
+        "debtorAccount": {
+          "iban": "DE89370400440532013006"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789006"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "141.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_007",
+        "debtorAccount": {
+          "iban": "DE89370400440532013007"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789007"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "156.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_008",
+        "debtorAccount": {
+          "iban": "DE89370400440532013008"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789008"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "171.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_009",
+        "debtorAccount": {
+          "iban": "DE89370400440532013009"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789009"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "186.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_010",
+        "debtorAccount": {
+          "iban": "DE89370400440532013010"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789010"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "202.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_011",
+        "debtorAccount": {
+          "iban": "DE89370400440532013011"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789011"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "217.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_012",
+        "debtorAccount": {
+          "iban": "DE89370400440532013012"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789012"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "232.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_013",
+        "debtorAccount": {
+          "iban": "DE89370400440532013013"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789013"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "247.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_014",
+        "debtorAccount": {
+          "iban": "DE89370400440532013014"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789014"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "262.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_015",
+        "debtorAccount": {
+          "iban": "DE89370400440532013015"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789015"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "278.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_016",
+        "debtorAccount": {
+          "iban": "DE89370400440532013016"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789016"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "293.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_017",
+        "debtorAccount": {
+          "iban": "DE89370400440532013017"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789017"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "308.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_018",
+        "debtorAccount": {
+          "iban": "DE89370400440532013018"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789018"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "323.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_019",
+        "debtorAccount": {
+          "iban": "DE89370400440532013019"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789019"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "338.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_020",
+        "debtorAccount": {
+          "iban": "DE89370400440532013020"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789020"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "354.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_021",
+        "debtorAccount": {
+          "iban": "DE89370400440532013021"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789021"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "369.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_022",
+        "debtorAccount": {
+          "iban": "DE89370400440532013022"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789022"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "384.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_023",
+        "debtorAccount": {
+          "iban": "DE89370400440532013023"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789023"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "399.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_024",
+        "debtorAccount": {
+          "iban": "DE89370400440532013024"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789024"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "414.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_025",
+        "debtorAccount": {
+          "iban": "DE89370400440532013025"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789025"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "430.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_026",
+        "debtorAccount": {
+          "iban": "DE89370400440532013026"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789026"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "445.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_027",
+        "debtorAccount": {
+          "iban": "DE89370400440532013027"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789027"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "460.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_028",
+        "debtorAccount": {
+          "iban": "DE89370400440532013028"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789028"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "475.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_029",
+        "debtorAccount": {
+          "iban": "DE89370400440532013029"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789029"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "490.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_030",
+        "debtorAccount": {
+          "iban": "DE89370400440532013030"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789030"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "506.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_031",
+        "debtorAccount": {
+          "iban": "DE89370400440532013031"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789031"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "521.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_032",
+        "debtorAccount": {
+          "iban": "DE89370400440532013032"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789032"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "536.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_033",
+        "debtorAccount": {
+          "iban": "DE89370400440532013033"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789033"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "551.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_034",
+        "debtorAccount": {
+          "iban": "DE89370400440532013034"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789034"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "566.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_035",
+        "debtorAccount": {
+          "iban": "DE89370400440532013035"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789035"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "582.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_036",
+        "debtorAccount": {
+          "iban": "DE89370400440532013036"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789036"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "597.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_037",
+        "debtorAccount": {
+          "iban": "DE89370400440532013037"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789037"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "612.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_038",
+        "debtorAccount": {
+          "iban": "DE89370400440532013038"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789038"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "627.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_039",
+        "debtorAccount": {
+          "iban": "DE89370400440532013039"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789039"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "642.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_040",
+        "debtorAccount": {
+          "iban": "DE89370400440532013040"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789040"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "658.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_041",
+        "debtorAccount": {
+          "iban": "DE89370400440532013041"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789041"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "673.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_042",
+        "debtorAccount": {
+          "iban": "DE89370400440532013042"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789042"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "688.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_043",
+        "debtorAccount": {
+          "iban": "DE89370400440532013043"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789043"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "703.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_044",
+        "debtorAccount": {
+          "iban": "DE89370400440532013044"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789044"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "718.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_045",
+        "debtorAccount": {
+          "iban": "DE89370400440532013045"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789045"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "734.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_046",
+        "debtorAccount": {
+          "iban": "DE89370400440532013046"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789046"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "749.2"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_047",
+        "debtorAccount": {
+          "iban": "DE89370400440532013047"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789047"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "764.4"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_048",
+        "debtorAccount": {
+          "iban": "DE89370400440532013048"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789048"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "779.6"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_049",
+        "debtorAccount": {
+          "iban": "DE89370400440532013049"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789049"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "794.8"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      },
+      {
+        "transactionId": "psd2_tx_050",
+        "debtorAccount": {
+          "iban": "DE89370400440532013050"
+        },
+        "creditorAccount": {
+          "iban": "TR330006100511123456789050"
+        },
+        "transactionAmount": {
+          "currency": "EUR",
+          "amount": "810.0"
+        },
+        "bookingDate": "2026-07-28T12:00:00Z",
+        "valueDate": "2026-07-28T12:00:00Z",
+        "proprietaryBankTransactionCode": "ONLINE_TRANSFER"
+      }
+    ]
+  }
+}
