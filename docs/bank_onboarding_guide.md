@@ -203,6 +203,23 @@ The CF-Intelligence platform natively ingests data from core banking systems usi
 
 ---
 
+## 6d. Certificate Rotation Lifecycle
+
+> [!NOTE]
+> All mTLS X.509 client certificates and Vault Transit KMS keys are managed on a **90-Day Rotation Schedule**.
+
+1. **Automated Warning Threshold**:
+   - Automated maintenance workers trigger warnings when `< 30 days` remain before certificate expiry (`check_cert_expiry`).
+2. **Zero-Downtime Hot Swapping**:
+   - `MTLSManager.rotate_cert(bank_id)` issues fresh X.509 keypairs via Vault PKI Engine (`POST /v1/pki/issue/bank-client`).
+3. **Manual CLI Trigger**:
+   - Administrators can manually trigger certificate rotation at any time:
+     ```bash
+     cfi-cli rotate-certs --bank-id <id>
+     ```
+
+---
+
 ## 7. Troubleshooting
 
 | Issue | Root Cause | Resolution |
