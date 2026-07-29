@@ -8,7 +8,7 @@ import zlib
 from typing import Any
 
 try:
-    from app.infrastructure.security.hsm_signer import HSMSigner
+    from app.infrastructure.security.hsm_signer import HSMSigner  # type: ignore[import-not-found]  # pyright: ignore[reportMissingImports]
 except ImportError:
     class HSMSigner:  # type: ignore[no-redef]
         def sign_data(self, data: bytes) -> bytes:
