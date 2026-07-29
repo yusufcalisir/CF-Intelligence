@@ -152,7 +152,39 @@ class ImmutableAuditChain:
         logger.info(
             "Cryptographic audit log #%d appended [%s]. Hash: %s", index, event_type, curr_hash[:12]
         )
+
+        # SIEM Real-Time Stream Forwarding
+        try:
+            from app.infrastructure.logging.siem_exporter import siem_exporter
+
+            siem_exporter.export(
+                {
+                    "event": event_type,
+                    "actor": actor,
+                    "target_id": target_id,
+                    "timestamp": timestamp,
+                    "details": evt_details,
+                    "curr_hash": curr_hash,
+                }
+            )
+        except Exception as exc:
+            logger.warning("SIEM dispatch failed for audit entry #%d: %s", index, exc)
+
         return entry
+
+    def append(
+        self,
+        event_type: str,
+        actor_bank_id: str,
+        payload: dict[str, Any] | None = None,
+    ) -> AuditLogEntry:
+        """Alias method appending event with bank actor and payload dict."""
+        return self.append_event(
+            event_type=event_type,
+            actor=actor_bank_id,
+            target_id=payload.get("target_id", "consortium") if payload else "consortium",
+            details=payload or {},
+        )
 
     def verify_chain_integrity(self) -> ChainVerificationReport:
         """Verify full SHA-256 chain integrity from Genesis Block to tail."""

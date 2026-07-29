@@ -1,15 +1,29 @@
 # ruff: noqa: UP042
-"""SIEM Log Exporter (Syslog CEF / Splunk HEC / Datadog JSON)."""
+"""SIEM Log Exporter (Syslog RFC 5424 / CEF / Splunk HEC / Datadog JSON)."""
 
 from __future__ import annotations
 
 import json
 import logging
+import os
+import socket
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
+from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
+
+RETRY_QUEUE_FILE = Path(__file__).parent.parent.parent / "storage" / "siem_retry_queue.jsonl"
+
+
+class SIEMExportError(Exception):
+    """Raised when an active SIEM exporter fails to deliver an audit event payload."""
+
+    pass
 
 
 class SIEMFormat(str, Enum):
@@ -33,19 +47,158 @@ class SIEMAuditEvent:
 
 
 class SIEMLogExporter:
-    """Formats security audit events into Syslog CEF (Common Event Format) and JSON for SIEM ingestion."""
+    """Formats security audit events and exports them to Syslog (RFC 5424), Splunk HEC, or Datadog."""
+
+    def format_rfc5424_syslog(self, event: dict[str, Any]) -> str:
+        """Formats audit dictionary as valid RFC 5424 Syslog message string."""
+        pri = 134  # Facility: local0 (16), Severity: Notice (6) -> 16*8 + 6 = 134
+        version = 1
+        timestamp_iso = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+        hostname = socket.gethostname() or "cfi-coordinator"
+        app_name = "CFI"
+        proc_id = os.getpid()
+        msg_id = str(event.get("event", event.get("event_type", "AUDIT_EVENT")))
+
+        msg_body = json.dumps(event)
+        return f"<{pri}>{version} {timestamp_iso} {hostname} {app_name} {proc_id} {msg_id} - {msg_body}"
+
+    def export_syslog(self, event: dict[str, Any], host: str | None = None) -> None:
+        """Format as RFC 5424 syslog string, send via UDP to host:514 (or TCP 6514 fallback)."""
+        syslog_host = host or os.getenv("SIEM_SYSLOG_HOST", "127.0.0.1")
+        syslog_msg = self.format_rfc5424_syslog(event).encode("utf-8")
+
+        # Try UDP 514
+        udp_success = False
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
+                sock.settimeout(2.0)
+                sock.sendto(syslog_msg, (syslog_host, 514))
+                udp_success = True
+        except Exception as e:
+            logger.debug("Syslog UDP send failed (%s), attempting TCP 6514 fallback...", e)
+
+        if not udp_success:
+            # Fallback to TCP 6514
+            try:
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+                    sock.settimeout(2.0)
+                    sock.connect((syslog_host, 6514))
+                    sock.sendall(syslog_msg + b"\n")
+            except Exception as e:
+                logger.error("Syslog export failed via UDP and TCP: %s", e)
+                raise SIEMExportError(f"Syslog delivery failed to {syslog_host}: {e}") from e
+
+    def export_splunk(
+        self, event: dict[str, Any], hec_url: str | None = None, token: str | None = None
+    ) -> None:
+        """HTTP POST to {SPLUNK_HEC_URL}/services/collector/event with Authorization header."""
+        splunk_url = (hec_url or os.getenv("SPLUNK_HEC_URL") or "").rstrip("/")
+        hec_token = token or os.getenv("SPLUNK_HEC_TOKEN", "")
+
+        if not splunk_url:
+            raise SIEMExportError("SPLUNK_HEC_URL is unconfigured")
+
+        url = f"{splunk_url}/services/collector/event"
+        headers = {
+            "Authorization": f"Splunk {hec_token}",
+            "Content-Type": "application/json",
+        }
+        payload = json.dumps(
+            {
+                "event": event,
+                "sourcetype": "cfi:audit:json",
+                "source": "cfi_platform",
+            }
+        ).encode("utf-8")
+
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status not in (200, 201, 202):
+                    raise SIEMExportError(f"Splunk HEC returned HTTP {resp.status}")
+        except Exception as e:
+            logger.error("Splunk HEC export failed: %s", e)
+            raise SIEMExportError(f"Splunk export failed: {e}") from e
+
+    def export_datadog(self, event: dict[str, Any], api_key: str | None = None) -> None:
+        """HTTP POST to Datadog log intake API."""
+        dd_key = api_key or os.getenv("DD_API_KEY", "")
+        if not dd_key:
+            raise SIEMExportError("DD_API_KEY is unconfigured")
+
+        url = "https://http-intake.logs.datadoghq.com/api/v2/logs"
+        headers = {
+            "DD-API-KEY": dd_key,
+            "Content-Type": "application/json",
+        }
+        payload = json.dumps(
+            [
+                {
+                    "message": json.dumps(event),
+                    "ddsource": "cfi_platform",
+                    "service": "cfi_backend",
+                }
+            ]
+        ).encode("utf-8")
+
+        req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
+        try:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:
+                if resp.status not in (200, 202):
+                    raise SIEMExportError(f"Datadog API returned HTTP {resp.status}")
+        except Exception as e:
+            logger.error("Datadog log export failed: %s", e)
+            raise SIEMExportError(f"Datadog export failed: {e}") from e
+
+    def export(self, event: dict[str, Any]) -> None:
+        """Dispatch event to all configured exporters; append to retry queue on failure."""
+        exporters_run = 0
+        failed = False
+
+        if os.getenv("SIEM_SYSLOG_HOST"):
+            exporters_run += 1
+            try:
+                self.export_syslog(event)
+            except SIEMExportError:
+                failed = True
+
+        if os.getenv("SPLUNK_HEC_URL"):
+            exporters_run += 1
+            try:
+                self.export_splunk(event)
+            except SIEMExportError:
+                failed = True
+
+        if os.getenv("DD_API_KEY"):
+            exporters_run += 1
+            try:
+                self.export_datadog(event)
+            except SIEMExportError:
+                failed = True
+
+        if failed or exporters_run == 0:
+            # Append to offline retry queue for background flushing
+            self._queue_retry_event(event)
+
+    def _queue_retry_event(self, event: dict[str, Any]) -> None:
+        """Append event payload to local storage/siem_retry_queue.jsonl file."""
+        try:
+            RETRY_QUEUE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            with open(RETRY_QUEUE_FILE, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event) + "\n")
+            logger.info("Queued SIEM event to retry buffer: %s", RETRY_QUEUE_FILE)
+        except Exception as e:
+            logger.error("Failed to queue SIEM event to retry file: %s", e)
 
     def format_cef_event(self, event: SIEMAuditEvent) -> str:
-        """Formats audit event into Common Event Format (CEF:0|Vendor|Product|Version|SignatureID|Name|Severity|Extension)."""
+        """Formats audit event into Common Event Format (CEF)."""
         severity_map = {"LOW": "1", "MEDIUM": "4", "HIGH": "7", "CRITICAL": "10"}
         cef_sev = severity_map.get(event.severity.upper(), "5")
-
         ts_str = event.timestamp.isoformat()
-        cef_string = (
+        return (
             f"CEF:0|CFI|Simulator|2.0|{event.event_type}|{event.message}|{cef_sev}|"
             f"eventId={event.event_id} srcBank={event.source_bank} rt={ts_str}"
         )
-        return cef_string
 
     def export_event(
         self,
@@ -86,3 +239,6 @@ class SIEMLogExporter:
 
         logger.info("Exported SIEM audit event %s (%s format)", event.event_id, format_type.value)
         return formatted
+
+
+siem_exporter = SIEMLogExporter()

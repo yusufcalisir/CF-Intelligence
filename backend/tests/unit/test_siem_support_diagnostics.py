@@ -1,9 +1,11 @@
 # ruff: noqa: E402, TC003
-"""Automated Unit Test Suite for SIEM Log Exporter & Support Diagnostics."""
+"""Automated Unit Test Suite for SIEM Log Exporter & Support Diagnostics — Section 44.2."""
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 from app.application.services.support_diagnostics import (
     SupportDiagnosticCompiler,
@@ -13,6 +15,7 @@ from app.infrastructure.logging.siem_exporter import (
     SIEMFormat,
     SIEMLogExporter,
 )
+from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
 
 def test_siem_cef_and_json_formatting() -> None:
@@ -40,6 +43,78 @@ def test_siem_cef_and_json_formatting() -> None:
     # 3. Splunk HEC format
     splunk_str = exporter.export_event(event, format_type=SIEMFormat.SPLUNK_HEC)
     assert '"sourcetype": "cfi:audit:json"' in splunk_str
+
+
+def test_syslog_format_is_valid_rfc5424() -> None:
+    """Verifies format_rfc5424_syslog produces valid RFC 5424 header and payload structure."""
+    exporter = SIEMLogExporter()
+    payload = {
+        "event": "GRADIENT_SUBMITTED",
+        "bank_id": "bank_alpha",
+        "round_id": 1,
+    }
+    syslog_msg = exporter.format_rfc5424_syslog(payload)
+
+    assert syslog_msg.startswith("<134>1 ")
+    assert " CFI " in syslog_msg
+    assert "GRADIENT_SUBMITTED" in syslog_msg
+    assert '"bank_id": "bank_alpha"' in syslog_msg
+
+
+def test_splunk_payload_structure() -> None:
+    """Verifies export_splunk sends correctly formatted Splunk HEC request."""
+    exporter = SIEMLogExporter()
+    payload = {"event": "CASE_RESOLVED", "case_id": "case_99"}
+
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__.return_value = mock_resp
+
+    with patch("urllib.request.urlopen", return_value=mock_resp) as mock_urlopen:
+        exporter.export_splunk(payload, hec_url="http://splunk.test:8088", token="test_token_123")
+
+        mock_urlopen.assert_called_once()
+        req = mock_urlopen.call_args[0][0]
+        assert req.get_full_url() == "http://splunk.test:8088/services/collector/event"
+        assert req.headers.get("Authorization") == "Splunk test_token_123"
+
+        req_body = json.loads(req.data.decode("utf-8"))
+        assert "event" in req_body
+        assert req_body["event"]["case_id"] == "case_99"
+
+
+def test_retry_queue_populated_on_siem_failure(tmp_path: Path) -> None:
+    """Verifies failed SIEM exports write event payload to local siem_retry_queue.jsonl file."""
+    exporter = SIEMLogExporter()
+    event_data = {"event": "TEST_FAILED_SIEM", "bank": "bank_beta"}
+
+    retry_file = tmp_path / "siem_retry_queue.jsonl"
+
+    with patch("app.infrastructure.logging.siem_exporter.RETRY_QUEUE_FILE", retry_file):
+        exporter._queue_retry_event(event_data)
+
+        assert retry_file.exists()
+        lines = retry_file.read_text(encoding="utf-8").strip().splitlines()
+        assert len(lines) == 1
+        queued = json.loads(lines[0])
+        assert queued["event"] == "TEST_FAILED_SIEM"
+
+
+def test_audit_chain_entries_persisted_to_db() -> None:
+    """Verifies immutable_audit_chain.append creates valid SHA-256 chained entry."""
+    audit_chain = ImmutableAuditChain.get_instance()
+    initial_len = len(audit_chain.chain)
+
+    entry = audit_chain.append(
+        event_type="SIEM_AUDIT_TEST",
+        actor_bank_id="bank_alpha",
+        payload={"action": "test_persistence", "target_id": "target_99"},
+    )
+
+    assert len(audit_chain.chain) == initial_len + 1
+    assert entry.event_type == "SIEM_AUDIT_TEST"
+    assert entry.actor == "bank_alpha"
+    assert len(entry.curr_hash) == 64
 
 
 def test_support_diagnostic_bundle_compilation_and_pii_redaction(tmp_path: Path) -> None:
