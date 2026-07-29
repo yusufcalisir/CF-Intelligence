@@ -556,13 +556,16 @@ def generate_transparency_report(model_id: str) -> bytes:
     date_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%SZ")
 
     try:
+        import importlib
         from io import BytesIO
 
-        from reportlab.lib.pagesizes import letter
-        from reportlab.pdfgen import canvas
+        pagesizes = importlib.import_module("reportlab.lib.pagesizes")
+        pdfgen_canvas = importlib.import_module("reportlab.pdfgen.canvas")
+        letter = pagesizes.letter
+        canvas_cls = pdfgen_canvas.Canvas
 
         buffer = BytesIO()
-        c = canvas.Canvas(buffer, pagesize=letter)
+        c = canvas_cls(buffer, pagesize=letter)
         c.setFont("Helvetica-Bold", 16)
         c.drawString(50, 750, title)
         c.setFont("Helvetica", 10)
