@@ -443,7 +443,8 @@ export function useAuditLogs() {
       const { data } = await apiClient.get('/api/v1/cases/audit/logs');
       return data;
     },
-    refetchInterval: 5000,
+    retry: false,
+    refetchInterval: (query) => (query.state.error ? false : 5000),
   });
 }
 
@@ -489,7 +490,8 @@ export function useShadowMetrics(simulationId: string | undefined) {
       return data;
     },
     enabled: !!simulationId,
-    refetchInterval: 3000,
+    retry: false,
+    refetchInterval: (query) => (query.state.error ? false : 3000),
   });
 }
 
