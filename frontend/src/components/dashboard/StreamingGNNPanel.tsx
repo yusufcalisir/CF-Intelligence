@@ -7,17 +7,15 @@ interface StreamingGNNPanelProps {
 }
 
 export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps) {
+  if (!simulation?.config?.enable_streaming_gnn) {
+    return null;
+  }
+
   const {
-    config,
     streaming_gnn_node_count = 0,
     streaming_gnn_edge_count = 0,
     streaming_gnn_loss_history = []
   } = simulation;
-
-  // Do not render if streaming GNN is not enabled
-  if (!config.enable_streaming_gnn) {
-    return null;
-  }
 
   // Map loss history to charting structure
   const chartData = streaming_gnn_loss_history.map((loss, idx) => ({
