@@ -4,6 +4,7 @@ import os
 from fastapi.testclient import TestClient
 from app.main import app
 from app.application.services.security_compliance import SecurityComplianceEngine
+from app.infrastructure.security.perimeter_waf import PerimeterWAFGuard, WAFRuleCategory
 
 client = TestClient(app)
 
@@ -77,3 +78,46 @@ def test_soc2_evidence_endpoint():
     assert response_post.status_code == 200
     data_post = response_post.json()
     assert data_post["compliance_status"] == "COMPLIANT"
+
+
+def test_sql_injection_rejected():
+    """Verify WAF rejects requests containing malicious SQL injection payloads."""
+    waf = PerimeterWAFGuard()
+    sqli_body = '{"transaction_id": "\'; DROP TABLE alerts;--"}'
+
+    res = waf.inspect_request(client_ip="192.168.1.100", body=sqli_body)
+    assert res.allowed is False
+    assert res.rule_triggered == WAFRuleCategory.SQLI_INJECTION
+    assert "SQL" in res.reason
+
+
+def test_env_file_not_exposed():
+    """Verify WAF blocks requests attempting to read sensitive /.env or /admin paths."""
+    waf = PerimeterWAFGuard()
+
+    res_env = waf.inspect_request(client_ip="192.168.1.100", path="/.env")
+    assert res_env.allowed is False
+    assert res_env.rule_triggered == WAFRuleCategory.SENSITIVE_PATH_BLOCKED
+
+    res_git = waf.inspect_request(client_ip="192.168.1.100", path="/.git/config")
+    assert res_git.allowed is False
+    assert res_git.rule_triggered == WAFRuleCategory.SENSITIVE_PATH_BLOCKED
+
+
+def test_auth_lockout_after_5_failures():
+    """Verify 5 consecutive failed auth attempts trigger WAF lockout for client IP."""
+    waf = PerimeterWAFGuard(max_auth_failures=5)
+    test_ip = "198.51.100.42"
+
+    for i in range(4):
+        is_locked = waf.record_failed_auth_attempt(test_ip)
+        assert is_locked is False
+
+    # 5th failure triggers lockout
+    is_locked_5 = waf.record_failed_auth_attempt(test_ip)
+    assert is_locked_5 is True
+
+    # 6th request inspection is blocked with AUTH_LOCKOUT_EXCEEDED
+    res = waf.inspect_request(client_ip=test_ip, path="/v1/inference/score")
+    assert res.allowed is False
+    assert res.rule_triggered == WAFRuleCategory.AUTH_LOCKOUT_EXCEEDED
