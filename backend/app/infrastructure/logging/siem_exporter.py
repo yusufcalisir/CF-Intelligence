@@ -7,6 +7,8 @@ import json
 import logging
 import os
 import socket
+import threading
+import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -48,6 +50,10 @@ class SIEMAuditEvent:
 
 class SIEMLogExporter:
     """Formats security audit events and exports them to Syslog (RFC 5424), Splunk HEC, or Datadog."""
+
+    def __init__(self) -> None:
+        self._flusher_thread: threading.Thread | None = None
+        self._running = False
 
     def format_rfc5424_syslog(self, event: dict[str, Any]) -> str:
         """Formats audit dictionary as valid RFC 5424 Syslog message string."""
@@ -151,7 +157,7 @@ class SIEMLogExporter:
             raise SIEMExportError(f"Datadog export failed: {e}") from e
 
     def export(self, event: dict[str, Any]) -> None:
-        """Dispatch event to all configured exporters; append to retry queue on failure."""
+        """Dispatch event to all configured exporters based on env vars; if any fails, append to retry queue."""
         exporters_run = 0
         failed = False
 
@@ -189,6 +195,69 @@ class SIEMLogExporter:
             logger.info("Queued SIEM event to retry buffer: %s", RETRY_QUEUE_FILE)
         except Exception as e:
             logger.error("Failed to queue SIEM event to retry file: %s", e)
+
+    def flush_retry_queue(self) -> int:
+        """Flush queued events in storage/siem_retry_queue.jsonl to active exporters."""
+        if not RETRY_QUEUE_FILE.exists():
+            return 0
+
+        try:
+            lines = RETRY_QUEUE_FILE.read_text(encoding="utf-8").strip().splitlines()
+            if not lines:
+                return 0
+
+            flushed_count = 0
+            remaining_lines: list[str] = []
+
+            for line in lines:
+                if not line.strip():
+                    continue
+                try:
+                    event = json.loads(line)
+                    # Attempt sending via syslog or splunk if configured
+                    if os.getenv("SIEM_SYSLOG_HOST") or os.getenv("SPLUNK_HEC_URL"):
+                        if os.getenv("SIEM_SYSLOG_HOST"):
+                            self.export_syslog(event)
+                        if os.getenv("SPLUNK_HEC_URL"):
+                            self.export_splunk(event)
+                    flushed_count += 1
+                except Exception:
+                    remaining_lines.append(line)
+
+            if remaining_lines:
+                RETRY_QUEUE_FILE.write_text("\n".join(remaining_lines) + "\n", encoding="utf-8")
+            else:
+                RETRY_QUEUE_FILE.write_text("", encoding="utf-8")
+
+            logger.info(
+                "Flushed %d SIEM retry events (%d remaining)", flushed_count, len(remaining_lines)
+            )
+            return flushed_count
+        except Exception as e:
+            logger.error("Error flushing SIEM retry queue: %s", e)
+            return 0
+
+    def start_retry_flusher(self, interval_seconds: int = 60) -> None:
+        """Start background thread that periodically flushes retry queue every interval_seconds."""
+        if self._running:
+            return
+
+        self._running = True
+
+        def _flusher_loop() -> None:
+            while self._running:
+                time.sleep(interval_seconds)
+                self.flush_retry_queue()
+
+        self._flusher_thread = threading.Thread(target=_flusher_loop, daemon=True)
+        self._flusher_thread.start()
+        logger.info(
+            "Started SIEM retry flusher background daemon thread (interval: %ds)", interval_seconds
+        )
+
+    def stop_retry_flusher(self) -> None:
+        """Stop background retry flusher thread."""
+        self._running = False
 
     def format_cef_event(self, event: SIEMAuditEvent) -> str:
         """Formats audit event into Common Event Format (CEF)."""
