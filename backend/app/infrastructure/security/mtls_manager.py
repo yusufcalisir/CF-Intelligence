@@ -47,7 +47,7 @@ class MTLSManager:
         days_valid: int = 365,
     ) -> X509CertificateInfo:
         """Generate certificate metadata descriptor."""
-        san_list = sans or [cn, f"{cn}.{self.default_domain}", "localhost"]
+        san_list = sans or [cn, f"{cn}.{self.default_domain}", f"{cn}.internal", "localhost"]
         now = time.time()
         from_str = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(now))
         until_str = time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime(now + days_valid * 86400))

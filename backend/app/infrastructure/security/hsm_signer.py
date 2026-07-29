@@ -112,7 +112,7 @@ class HSMSignerEngine:
         algorithm: str = "RSA-PSS-SHA256",
     ) -> bytes:
         """Executes hardware-anchored cryptographic signature over a payload digest."""
-        if not self.is_session_active:
+        if not self.is_session_active and not self.initialize_session():
             raise RuntimeError("HSM session is not active. Call initialize_session() first.")
 
         if key_label not in self._key_handles:
@@ -130,6 +130,11 @@ class HSMSignerEngine:
             len(signature),
         )
         return signature
+
+    def sign_data(self, data: bytes, key_label: str = "cfi_node_identity_key") -> bytes:
+        """Sign raw data bytes using HSM hardware-anchored key."""
+        digest = hashlib.sha256(data).digest()
+        return self.sign_digest(digest, key_label=key_label)
 
     def verify_signature(
         self,

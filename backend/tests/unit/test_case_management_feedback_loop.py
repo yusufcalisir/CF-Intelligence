@@ -88,6 +88,14 @@ def test_fincen_sar_report_generation_and_download() -> None:
         priority=CasePriority.P2_HIGH,
         alert_ids=["alt_4001"],
     )
+    case_service.assign_case(case.id, investigator="analyst_alice")
+    case_service.change_status(case.id, new_status=CaseStatus.INVESTIGATING, actor="analyst_alice")
+    case_service.change_status(
+        case.id,
+        new_status=CaseStatus.CLOSED_CONFIRMED,
+        actor="analyst_alice",
+        supervisor_signature="supervisor_carol",
+    )
 
     response = client.get(f"/api/v1/cases/{case.id}/sar-report")
     assert response.status_code == 200

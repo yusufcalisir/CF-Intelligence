@@ -74,7 +74,7 @@ def test_hardware_attestation_report() -> None:
 
 def test_hsm_uninitialized_session_error_handling() -> None:
     """Verifies sign_digest raises RuntimeError when session is uninitialized."""
-    engine = HSMSignerEngine()
+    engine = HSMSignerEngine(config=HSMSessionConfig(pin=""))
     engine.is_session_active = False
 
     with pytest.raises(RuntimeError, match="HSM session is not active"):

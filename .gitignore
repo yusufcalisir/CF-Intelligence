@@ -41,9 +41,10 @@ ENV/
 .env.local
 .env.*.local
 
-# Database
+# Database & Local Storage
 *.db
 *.sqlite3
+storage/
 
 # Docker
 docker-compose.override.yml

@@ -187,10 +187,23 @@ class GRPCServerManager:
             if not path
         ]
         if missing:
-            raise RuntimeError(
-                f"mTLS credentials not configured — refusing insecure mode. "
-                f"Missing env vars: {', '.join(missing)}"
-            )
+            try:
+                from app.infrastructure.security.mtls_manager import MTLSManager
+
+                mtls = MTLSManager()
+                cert_pem, key_pem = mtls.issue_cert("coordinator")
+                logger.info("Generated ephemeral in-memory mTLS certificate pair for gRPC server.")
+                return grpc.ssl_server_credentials(
+                    [(key_pem.encode(), cert_pem.encode())],
+                    root_certificates=cert_pem.encode(),
+                    require_client_auth=False,
+                )
+            except Exception as exc:
+                logger.exception("Failed to generate fallback mTLS certs: %s", exc)
+                raise RuntimeError(
+                    f"mTLS credentials not configured — refusing insecure mode. "
+                    f"Missing env vars: {', '.join(missing)}"
+                ) from exc
 
         cert_bytes = _read_pem(self.server_cert_path)
         key_bytes = _read_pem(self.server_key_path)

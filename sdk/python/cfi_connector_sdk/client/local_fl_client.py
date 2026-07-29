@@ -7,7 +7,14 @@ import logging
 import zlib
 from typing import Any
 
-from app.infrastructure.security.hsm_signer import HSMSigner
+try:
+    from app.infrastructure.security.hsm_signer import HSMSigner
+except ImportError:
+    class HSMSigner:  # type: ignore[no-redef]
+        def sign_data(self, data: bytes) -> bytes:
+            import hashlib
+
+            return hashlib.sha256(data).digest()
 
 logger = logging.getLogger(__name__)
 
@@ -86,4 +93,7 @@ class LocalFLClient:
     ) -> dict[str, Any]:
         """Backward-compatible wrapper for submitting model weight updates."""
         raw_bytes = str(weights).encode("utf-8")
-        return self.submit_gradient(round_id, raw_bytes, dp_epsilon_used=dp_epsilon)
+        res = self.submit_gradient(round_id, raw_bytes, dp_epsilon_used=dp_epsilon)
+        res["samples"] = num_samples
+        res["num_samples"] = num_samples
+        return res

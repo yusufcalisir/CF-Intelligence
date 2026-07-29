@@ -259,10 +259,14 @@ class MetricProxy:
         self.registry._gauges[self.name] = float(value)
 
     def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + float(amount)
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + float(
+            amount
+        )
 
     def dec(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - float(amount)
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - float(
+            amount
+        )
 
     def add(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
         self.inc(amount)

@@ -58,7 +58,7 @@ async def test_register_bank_creates_db_record(db_session: AsyncSession) -> None
     assert registration.bank_id == "bank_test1"
     assert registration.legal_name == "Test Bank One"
     assert registration.status == BankStatus.PENDING_VERIFICATION
-    assert registration.schema_provisioned is False
+    assert bool(registration.schema_provisioned) is False
 
 
 @pytest.mark.asyncio
@@ -87,7 +87,7 @@ async def test_full_onboarding_pipeline_sets_active(
 
     assert activated is not None
     assert activated.status == BankStatus.ACTIVE
-    assert activated.schema_provisioned is True
+    assert bool(activated.schema_provisioned) is True
     assert activated.vault_key_path == "transit/keys/tenant_bank_test2"
 
 
