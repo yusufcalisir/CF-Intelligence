@@ -36,6 +36,7 @@ from app.presentation.routers import (
     predict,
     privacy_defense,
     psd2,
+    realtime_inference,
     rules,
     scenarios,
     security,
@@ -419,8 +420,7 @@ elif service_name == "fraud-alert":
 elif service_name.startswith("bank-") or service_name == "bank_client":
     app.include_router(health.router)
     app.include_router(bank_client.router)
-    app.include_router(psd2.router)
-
+else:
     from app.presentation.routers import onboarding
 
     app.include_router(health.router)
@@ -448,6 +448,7 @@ elif service_name.startswith("bank-") or service_name == "bank_client":
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)
     app.include_router(settlement.router)
+    app.include_router(realtime_inference.router)
 
 
 @app.get("/", tags=["root"])

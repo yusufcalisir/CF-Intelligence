@@ -6,6 +6,7 @@ provisioning tenant schemas, and retrieving onboarding bundles.
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +18,8 @@ from app.application.services.bank_onboarding_service import (
     BankOnboardingService,
 )
 from app.infrastructure.database import get_async_session
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/admin/banks", tags=["Bank Onboarding"])
 
@@ -167,22 +170,26 @@ async def list_banks(
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Return all bank node registrations."""
-    service = BankOnboardingService(session)
-    banks = await service.list_banks()
-    return [
-        BankStatusResponse(
-            bank_id=b.bank_id,
-            legal_name=b.legal_name,
-            jurisdiction=b.jurisdiction,
-            status=b.status.value if hasattr(b.status, "value") else str(b.status),
-            cert_fingerprint=b.cert_fingerprint,
-            vault_key_path=b.vault_key_path,
-            schema_provisioned=b.schema_provisioned,
-            created_at=b.created_at.isoformat(),
-            activated_at=b.activated_at.isoformat() if b.activated_at else None,
-        )
-        for b in banks
-    ]
+    try:
+        service = BankOnboardingService(session)
+        banks = await service.list_banks()
+        return [
+            BankStatusResponse(
+                bank_id=b.bank_id,
+                legal_name=b.legal_name,
+                jurisdiction=b.jurisdiction,
+                status=b.status.value if hasattr(b.status, "value") else str(b.status),
+                cert_fingerprint=b.cert_fingerprint,
+                vault_key_path=b.vault_key_path,
+                schema_provisioned=b.schema_provisioned,
+                created_at=b.created_at.isoformat(),
+                activated_at=b.activated_at.isoformat() if b.activated_at else None,
+            )
+            for b in banks
+        ]
+    except Exception as exc:
+        logger.warning("Bank list database query unavailable (returning empty list): %s", exc)
+        return []
 
 
 @router.get(

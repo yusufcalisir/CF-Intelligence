@@ -758,10 +758,23 @@ Execute full automated unit test suite:
 pytest backend/tests/unit/ -v
 ```
 
+Execute end-to-end multi-bank integration & fault-tolerance suite:
+
+```bash
+pytest backend/tests/integration/ -v
+```
+
 Execute static code format and lint validation:
 
 ```bash
 ruff check backend/app/ backend/tests/
+```
+
+Execute post-deployment automated production smoke test:
+
+```bash
+# Against local stack or live deployment base URL:
+python scripts/production_smoke_test.py --base-url http://localhost:8000
 ```
 
 ---
