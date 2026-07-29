@@ -110,7 +110,6 @@ def get_scripted_model() -> tuple[Any, bool]:
     dummy_input = torch.randn(2, 10)
     try:
         scripted = torch.jit.trace(raw_model, dummy_input)
-        scripted.eval()
     except Exception as exc:
         logger.warning("TorchScript tracing failed (%s); using PyTorch raw model", exc)
         scripted = raw_model
