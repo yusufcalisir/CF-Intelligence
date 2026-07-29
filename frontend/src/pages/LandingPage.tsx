@@ -38,6 +38,21 @@ const LockIcon = () => (
   </svg>
 );
 
+const MenuIcon = () => (
+  <svg className="w-6 h-6 text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+);
+
+const CloseIcon = () => (
+  <svg className="w-6 h-6 text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
+  </svg>
+);
+
 // Bank Detail Interface for Drawer
 interface BankInfoDetail {
   id: string;
@@ -107,6 +122,9 @@ export default function LandingPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  // Responsive Mobile Menu State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
+
   // Hero interactive state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isDpShieldActive, setIsDpShieldActive] = useState<boolean>(true);
@@ -152,7 +170,7 @@ export default function LandingPage() {
   const [wizRegulation, setWizRegulation] = useState<'eu_ai_act' | 'ffiec' | 'fca'>('eu_ai_act');
   const [copiedWizCmd, setCopiedWizCmd] = useState<boolean>(false);
 
-  // Continuous 4-Phase Cyclic FL Storytelling Animation Loop
+  // Increment FL round periodically
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
@@ -188,7 +206,8 @@ export default function LandingPage() {
     window.addEventListener('resize', handleResize);
 
     const bgNodes: Array<{ x: number; y: number; vx: number; vy: number; radius: number }> = [];
-    for (let i = 0; i < 35; i++) {
+    const count = w < 640 ? 18 : 35;
+    for (let i = 0; i < count; i++) {
       bgNodes.push({
         x: Math.random() * w,
         y: Math.random() * h,
@@ -253,20 +272,21 @@ export default function LandingPage() {
 
     let animationFrameId: number;
     let width = (canvas.width = canvas.parentElement?.clientWidth || 800);
-    let height = (canvas.height = 420);
+    let height = (canvas.height = width < 640 ? 360 : 420);
 
     const handleResize = () => {
       if (!canvas) return;
       width = canvas.width = canvas.parentElement?.clientWidth || 800;
-      height = canvas.height = 420;
+      height = canvas.height = width < 640 ? 360 : 420;
     };
     window.addEventListener('resize', handleResize);
 
+    const isMobile = width < 640;
     const nodes = {
-      alpha: { x: width * 0.2, y: 100, color: '#6366f1' },
-      beta: { x: width * 0.8, y: 100, color: '#a855f7' },
-      gamma: { x: width * 0.5, y: 340, color: '#10b981' },
-      core: { x: width * 0.5, y: 200, color: '#ec4899' },
+      alpha: { x: isMobile ? width * 0.25 : width * 0.2, y: isMobile ? 80 : 100, color: '#6366f1' },
+      beta: { x: isMobile ? width * 0.75 : width * 0.8, y: isMobile ? 80 : 100, color: '#a855f7' },
+      gamma: { x: width * 0.5, y: isMobile ? 300 : 340, color: '#10b981' },
+      core: { x: width * 0.5, y: isMobile ? 180 : 200, color: '#ec4899' },
     };
 
     const particles: Array<{
@@ -462,14 +482,14 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative">
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
       {/* ── LIVING DISTRIBUTED BACKGROUND MESH CANVAS ────────── */}
       <canvas ref={bgCanvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-20" />
 
       <div className="relative z-10">
         {/* ── SECTION 1: GLASSMORPHIC TOP NAVBAR ─────────────────── */}
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80">
-          <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
               <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20">
                 <div className="h-full w-full bg-slate-950 rounded-[10px] flex items-center justify-center font-black text-white text-lg">
@@ -478,7 +498,7 @@ export default function LandingPage() {
               </div>
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                  <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
                     CF-Intelligence
                   </span>
                   <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/30">
@@ -492,7 +512,7 @@ export default function LandingPage() {
             </div>
 
             {/* Desktop Navigation Anchors */}
-            <nav className="hidden md:flex items-center gap-8 text-xs font-semibold text-slate-300">
+            <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-slate-300">
               <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
@@ -501,8 +521,8 @@ export default function LandingPage() {
               <a href="#docs" className="hover:text-indigo-400 transition-colors">Deploy Wizard</a>
             </nav>
 
-            {/* Actions & Launch Demo */}
-            <div className="flex items-center gap-4">
+            {/* Actions & Mobile Menu Button */}
+            <div className="flex items-center gap-3">
               <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 Quorum Active (3/3 Synced)
@@ -510,7 +530,7 @@ export default function LandingPage() {
 
               <button
                 onClick={() => navigate('/dashboard')}
-                className="group relative inline-flex items-center justify-center p-0.5 overflow-hidden rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:scale-105"
+                className="hidden sm:inline-flex group relative items-center justify-center p-0.5 overflow-hidden rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:scale-105"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 animate-gradient" />
                 <span className="relative px-5 py-2.5 rounded-[10px] bg-slate-950 text-white flex items-center gap-2 group-hover:bg-slate-900 transition-all">
@@ -518,12 +538,89 @@ export default function LandingPage() {
                   <ArrowRightIcon />
                 </span>
               </button>
+
+              {/* Mobile Hamburger Toggle Button */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="md:hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none"
+                aria-label="Toggle Navigation Menu"
+              >
+                {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
+              </button>
             </div>
           </div>
         </header>
 
+        {/* ── RESPONSIVE MOBILE MENU OVERLAY ──────────────────── */}
+        <AnimatePresence>
+          {isMobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
+            >
+              <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
+                <a
+                  href="#product"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  Product Capabilities
+                </a>
+                <a
+                  href="#platform"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  Platform Simulator
+                </a>
+                <a
+                  href="#architecture"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  System Architecture
+                </a>
+                <a
+                  href="#security"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  Security Playground
+                </a>
+                <a
+                  href="#api"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  API Execution Studio
+                </a>
+                <a
+                  href="#docs"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
+                >
+                  Deployment Wizard
+                </a>
+              </nav>
+
+              <button
+                onClick={() => {
+                  setIsMobileMenuOpen(false);
+                  navigate('/dashboard');
+                }}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2"
+              >
+                <span>Launch Live Platform Demo</span>
+                <ArrowRightIcon />
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ── PALANTIR/CROWDSTRIKE STYLE LIVE LOG TICKER BAR ───── */}
-        <div className="bg-slate-900/90 border-b border-slate-800/80 px-6 py-2 overflow-hidden flex items-center gap-3 text-xs font-mono">
+        <div className="bg-slate-900/90 border-b border-slate-800/80 px-4 sm:px-6 py-2 overflow-hidden flex items-center gap-3 text-xs font-mono">
           <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider flex-shrink-0">
             LIVE TELEMETRY LOG
           </span>
@@ -534,27 +631,27 @@ export default function LandingPage() {
         </div>
 
         {/* ── SECTION 2: HERO SECTION WITH CONTINUOUS FL LIFECYCLE ── */}
-        <section className="relative pt-12 pb-24 px-6 max-w-7xl mx-auto overflow-hidden">
+        <section className="relative pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="text-center max-w-4xl mx-auto space-y-6">
+          <div className="text-center max-w-4xl mx-auto space-y-4 sm:space-y-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold"
+              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] sm:text-xs font-semibold"
             >
               <span>✨ Privacy-Preserving Collaborative Machine Learning</span>
-              <span className="text-indigo-500">•</span>
-              <span className="text-emerald-400 font-bold">GDPR & EU AI Act Compliant</span>
+              <span className="text-indigo-500 hidden sm:inline">•</span>
+              <span className="text-emerald-400 font-bold hidden sm:inline">GDPR & EU AI Act Compliant</span>
             </motion.div>
 
             <motion.h1
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-4xl sm:text-6xl font-black tracking-tight leading-tight text-slate-100"
+              className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-slate-100"
             >
               Detect Cross-Bank Fraud Rings Without Sharing Raw Customer Data
             </motion.h1>
@@ -563,7 +660,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-base sm:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed"
+              className="text-xs sm:text-base lg:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed"
             >
               Leverage Heterogeneous Federated Learning, Secure Enclaves, and Streaming Graph Neural Networks to stop multi-institutional money laundering and fraud syndicates in real time.
             </motion.p>
@@ -574,23 +671,23 @@ export default function LandingPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-10 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl"
+            className="mt-8 sm:mt-10 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl"
           >
             <div className="text-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active FL Round</span>
-              <div className="text-xl font-black text-indigo-400 font-mono mt-0.5">#{flRound}</div>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active FL Round</span>
+              <div className="text-lg sm:text-xl font-black text-indigo-400 font-mono mt-0.5">#{flRound}</div>
             </div>
             <div className="text-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Global GNN Accuracy</span>
-              <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">{accuracy}%</div>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Global GNN Accuracy</span>
+              <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono mt-0.5">{accuracy}%</div>
             </div>
             <div className="text-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Privacy Budget (ε)</span>
-              <div className="text-xl font-black text-purple-400 font-mono mt-0.5">0.50 (Strict)</div>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Privacy Budget (ε)</span>
+              <div className="text-lg sm:text-xl font-black text-purple-400 font-mono mt-0.5">0.50 (Strict)</div>
             </div>
             <div className="text-center">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stream Bandwidth</span>
-              <div className="text-xl font-black text-blue-400 font-mono mt-0.5">1.4 GB/s</div>
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stream Bandwidth</span>
+              <div className="text-lg sm:text-xl font-black text-blue-400 font-mono mt-0.5">1.4 GB/s</div>
             </div>
           </motion.div>
 
@@ -599,24 +696,24 @@ export default function LandingPage() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.6, delay: 0.4 }}
-            className="mt-10 rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-6 sm:p-10 shadow-2xl relative overflow-hidden"
+            className="mt-8 sm:mt-10 rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden"
           >
             {/* Phase Indicator Header Bar */}
-            <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
               <div className="flex items-center gap-3">
                 <span className="h-3 w-3 rounded-full bg-emerald-400 animate-ping" />
                 <div>
-                  <span className="text-[11px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
+                  <span className="text-[10px] sm:text-[11px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
                     FEDERATION CYCLE IN PROGRESS
                   </span>
-                  <h3 className="text-sm sm:text-base font-bold text-slate-100">{getPhaseTitle()}</h3>
+                  <h3 className="text-xs sm:text-base font-bold text-slate-100">{getPhaseTitle()}</h3>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setFraudWaveCount((prev) => prev + 1)}
-                  className="px-3.5 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
+                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
                 >
                   <span>Inject Fraud Wave 🚨</span>
                   {fraudWaveCount > 0 && (
@@ -628,14 +725,14 @@ export default function LandingPage() {
 
                 <button
                   onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
                     isDpShieldActive
                       ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
                       : 'bg-slate-800 text-slate-400 border-slate-700'
                   }`}
                 >
                   <LockIcon />
-                  <span>DP Shield: {isDpShieldActive ? 'ON (ε=0.5)' : 'OFF'}</span>
+                  <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
                 </button>
 
                 <button
@@ -648,27 +745,27 @@ export default function LandingPage() {
             </div>
 
             {/* HTML5 Canvas Topology Element */}
-            <div className="relative w-full h-[420px] mt-6 flex items-center justify-center">
+            <div className="relative w-full h-[360px] sm:h-[420px] mt-6 flex items-center justify-center">
               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
               {/* Bank Alpha Node (Top Left) */}
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 onClick={() => BANK_DETAILS.bank_alpha && setActiveBankDrawer(BANK_DETAILS.bank_alpha)}
-                className={`absolute top-4 left-6 sm:left-16 p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-56 ${
+                className={`absolute top-2 left-2 sm:top-4 sm:left-16 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
                   flPhase === 0
                     ? 'bg-indigo-500/30 border-indigo-400 shadow-xl shadow-indigo-500/30 ring-2 ring-indigo-500/50'
                     : 'bg-indigo-500/15 border-indigo-500/40 hover:border-indigo-400'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-bold text-indigo-400">BANK ALPHA</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-400">BANK ALPHA</span>
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 </div>
-                <div className="text-sm font-bold text-slate-100">Santander UK Node</div>
-                <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">Santander UK</div>
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
                   <ZapIcon />
-                  <span>{flPhase === 0 ? '🧠 Training Epoch 3/3...' : 'RTX 4090 (Click Inspect)'}</span>
+                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'RTX 4090'}</span>
                 </div>
               </motion.div>
 
@@ -676,45 +773,45 @@ export default function LandingPage() {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 onClick={() => BANK_DETAILS.bank_beta && setActiveBankDrawer(BANK_DETAILS.bank_beta)}
-                className={`absolute top-4 right-6 sm:right-16 p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-56 ${
+                className={`absolute top-2 right-2 sm:top-4 sm:right-16 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
                   flPhase === 0
                     ? 'bg-purple-500/30 border-purple-400 shadow-xl shadow-purple-500/30 ring-2 ring-purple-500/50'
                     : 'bg-purple-500/15 border-purple-500/40 hover:border-purple-400'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-bold text-purple-400">BANK BETA</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-purple-400">BANK BETA</span>
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 </div>
-                <div className="text-sm font-bold text-slate-100">BNP Paribas Node</div>
-                <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">BNP Paribas</div>
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
                   <ZapIcon />
-                  <span>{flPhase === 0 ? '🧠 Training Epoch 3/3...' : 'NVIDIA A100 (Click Inspect)'}</span>
+                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'NVIDIA A100'}</span>
                 </div>
               </motion.div>
 
               {/* Central Aggregator Core (Center) */}
               <div
-                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-3xl bg-slate-950 border-2 transition-all duration-300 text-center w-64 z-10 ${
+                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4 sm:p-6 rounded-3xl bg-slate-950 border-2 transition-all duration-300 text-center w-52 sm:w-64 z-10 ${
                   flPhase === 2
                     ? 'border-emerald-400 shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
                     : 'border-indigo-500 shadow-2xl shadow-indigo-500/30'
                 }`}
               >
                 <div className="relative inline-block">
-                  <div className="h-12 w-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto text-2xl mb-2">
+                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto text-xl sm:text-2xl mb-1.5">
                     🛰️
                   </div>
                   {isDpShieldActive && (
-                    <div className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[10px] font-black">
+                    <div className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[9px] sm:text-[10px] font-black">
                       🔒
                     </div>
                   )}
                 </div>
-                <h4 className="text-sm font-extrabold text-slate-100">CFI Aggregator Core</h4>
-                <p className="text-[11px] text-slate-400 mt-0.5">Secure Enclave (Intel SGX)</p>
-                <div className="mt-3 py-1 px-2.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold">
-                  {flPhase === 2 ? '⚡ Aggregating Weight Tensors...' : 'FedAvg + Differential Privacy'}
+                <h4 className="text-xs sm:text-sm font-extrabold text-slate-100">CFI Aggregator Core</h4>
+                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Secure Enclave (Intel SGX)</p>
+                <div className="mt-2.5 py-1 px-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[9px] sm:text-[10px] font-bold truncate">
+                  {flPhase === 2 ? '⚡ Aggregating...' : 'FedAvg + Differential Privacy'}
                 </div>
               </div>
 
@@ -722,20 +819,20 @@ export default function LandingPage() {
               <motion.div
                 whileHover={{ scale: 1.05 }}
                 onClick={() => BANK_DETAILS.bank_gamma && setActiveBankDrawer(BANK_DETAILS.bank_gamma)}
-                className={`absolute bottom-4 left-1/2 -translate-x-1/2 p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-56 ${
+                className={`absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
                   flPhase === 0
                     ? 'bg-emerald-500/30 border-emerald-400 shadow-xl shadow-emerald-500/30 ring-2 ring-emerald-500/50'
                     : 'bg-emerald-500/15 border-emerald-500/40 hover:border-emerald-400'
                 }`}
               >
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-mono font-bold text-emerald-400">BANK GAMMA</span>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-emerald-400">BANK GAMMA</span>
                   <span className="h-2 w-2 rounded-full bg-emerald-400" />
                 </div>
-                <div className="text-sm font-bold text-slate-100">Deutsche Bank Node</div>
-                <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1.5">
+                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">Deutsche Bank</div>
+                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
                   <CpuIcon />
-                  <span>{flPhase === 0 ? '🧠 Accumulating Gradients...' : 'CPU Cluster (Click Inspect)'}</span>
+                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'CPU Cluster'}</span>
                 </div>
               </motion.div>
             </div>
@@ -758,12 +855,12 @@ export default function LandingPage() {
                 exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 25 }}
                 onClick={(e) => e.stopPropagation()}
-                className="w-full max-w-xl bg-slate-900 border-l border-slate-800 p-8 overflow-y-auto space-y-6"
+                className="w-full sm:max-w-xl bg-slate-900 border-l border-slate-800 p-6 sm:p-8 overflow-y-auto space-y-6"
               >
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
                     <span className="text-xs font-mono font-bold text-indigo-400 uppercase">INSPECTING NODE</span>
-                    <h3 className="text-xl font-bold text-slate-100">{activeBankDrawer.name}</h3>
+                    <h3 className="text-lg sm:text-xl font-bold text-slate-100">{activeBankDrawer.name}</h3>
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
@@ -776,7 +873,7 @@ export default function LandingPage() {
                 <div className="grid grid-cols-2 gap-3 text-xs font-mono">
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                     <span className="text-slate-500">Hardware:</span>
-                    <div className="text-indigo-300 font-bold mt-0.5">{activeBankDrawer.hardware}</div>
+                    <div className="text-indigo-300 font-bold mt-0.5 truncate">{activeBankDrawer.hardware}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                     <span className="text-slate-500">RAM Allocation:</span>
@@ -802,15 +899,15 @@ export default function LandingPage() {
         </AnimatePresence>
 
         {/* ── SECTION 3: PRODUCT & EPSILON CALCULATOR ──────────────── */}
-        <section id="product" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="product" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold">
               DIFFERENTIAL PRIVACY CALCULATOR
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
               Privacy Budget ($\epsilon$) vs Accuracy Trade-off Calculator
             </h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-xs sm:text-sm text-slate-400">
               Adjust the privacy budget ($\epsilon$) slider to see real-time mathematical accuracy and reconstruction risk guarantees.
             </p>
           </div>
@@ -835,30 +932,30 @@ export default function LandingPage() {
                 </div>
 
                 <div className="space-y-3 font-mono text-xs">
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between">
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
                     <span className="text-slate-400">Reconstruction Guarantee:</span>
                     <span className="text-emerald-400 font-bold">
                       {epsilonCalc <= 0.5 ? 'Mathematically Impossible' : epsilonCalc <= 1.5 ? 'Very High' : 'Moderate'}
                     </span>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between">
+                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
                     <span className="text-slate-400">Gaussian Noise Std Dev ($\sigma$):</span>
                     <span className="text-purple-400 font-bold">{(0.5 / epsilonCalc).toFixed(3)}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="lg:col-span-7 grid grid-cols-2 gap-4">
+              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 flex flex-col justify-between">
                   <span className="text-xs text-slate-400 uppercase font-bold">Estimated Model Accuracy</span>
-                  <div className="text-4xl font-black text-emerald-400 font-mono mt-4">
+                  <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono mt-4">
                     {(88 + (epsilonCalc / 5.0) * 11.2).toFixed(2)}%
                   </div>
                 </div>
 
                 <div className="p-6 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col justify-between">
                   <span className="text-xs text-slate-400 uppercase font-bold">Training Loss Convergence</span>
-                  <div className="text-4xl font-black text-purple-400 font-mono mt-4">
+                  <div className="text-3xl sm:text-4xl font-black text-purple-400 font-mono mt-4">
                     {(0.18 - (epsilonCalc / 5.0) * 0.14).toFixed(4)}
                   </div>
                 </div>
@@ -868,14 +965,14 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 4: PLATFORM & FRAUD RING GRAPH COLLUSION SIMULATOR ── */}
-        <section id="platform" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="platform" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-purple-400 uppercase tracking-wider">
                   STREAMING GNN COLLUSION DETECTOR
                 </span>
-                <h2 className="text-2xl font-extrabold text-slate-100 mt-1">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
                   Cross-Bank Money Mule Ring Graph Simulator
                 </h2>
               </div>
@@ -900,7 +997,7 @@ export default function LandingPage() {
             </div>
 
             {/* Interactive SVG Node-Link Graph */}
-            <div className="relative w-full h-[320px] mt-8 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
+            <div className="relative w-full h-[280px] sm:h-[320px] mt-8 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
               <svg className="w-full h-full" viewBox="0 0 600 280">
                 {/* Links */}
                 {!isGraphIsolated && (
@@ -929,7 +1026,7 @@ export default function LandingPage() {
               </svg>
 
               {isGraphDetected && (
-                <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-xs font-bold">
+                <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] sm:text-xs font-bold">
                   ⚠️ SUSPICIOUS RING DETECTED (Risk Score: 0.94)
                 </div>
               )}
@@ -938,12 +1035,12 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 5: ARCHITECTURE 5-LAYER STACK & PATH HIGHLIGHTING ── */}
-        <section id="architecture" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="architecture" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
               5-LAYER SYSTEM ARCHITECTURE
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
               Interactive Technical Layer Stack
             </h2>
           </div>
@@ -974,7 +1071,7 @@ export default function LandingPage() {
             <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
               <div>
                 <span className="text-xs font-mono text-indigo-400 uppercase font-bold">SPECIFICATION DETAIL</span>
-                <h3 className="text-lg font-bold text-slate-100 mt-2">
+                <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-2">
                   {activeLayer === 1 && 'Native ISO 20022 Financial XML Intake'}
                   {activeLayer === 2 && 'PyTorch Geometric GNN Embedding Feature Store'}
                   {activeLayer === 3 && 'Intel SGX Secure Enclave & Paillier Homomorphic Encryption'}
@@ -997,30 +1094,30 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 6: SECURITY ATTACK SIMULATOR ────────────────── */}
-        <section id="security" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="security" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
                   SECURITY ATTACK SIMULATOR
                 </span>
-                <h2 className="text-2xl font-extrabold text-slate-100 mt-1">
+                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
                   Adversarial Attack Simulation Playground
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleRunAttack('mia')}
                   className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md"
                 >
-                  Launch MIA Attack 🎯
+                  Launch MIA 🎯
                 </button>
                 <button
                   onClick={() => handleRunAttack('dlg')}
                   className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md"
                 >
-                  Launch DLG Attack 🔓
+                  Launch DLG 🔓
                 </button>
                 <button
                   onClick={() => handleRunAttack('byzantine')}
@@ -1033,7 +1130,7 @@ export default function LandingPage() {
 
             <div className="mt-6 p-6 rounded-2xl bg-slate-950 border border-slate-800 text-center font-mono">
               <span className="text-xs text-slate-400 uppercase font-bold">Simulation Result Output</span>
-              <div className="text-base font-bold text-emerald-400 mt-2">
+              <div className="text-xs sm:text-base font-bold text-emerald-400 mt-2">
                 {attackStatus || 'Click any attack button above to test zero-trust defense mechanisms.'}
               </div>
             </div>
@@ -1041,13 +1138,13 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 7: LIVE REST API PLAYGROUND ─────────────────── */}
-        <section id="api" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="api" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
                   <CodeIcon />
-                  <h2 className="text-2xl font-extrabold text-slate-100">Live REST API Execution Studio</h2>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100">Live REST API Execution Studio</h2>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
                   Edit request payloads and execute test API calls live against simulated endpoints.
@@ -1058,7 +1155,7 @@ export default function LandingPage() {
                 <select
                   value={apiEndpoint}
                   onChange={(e) => setApiEndpoint(e.target.value)}
-                  className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300 font-bold"
+                  className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300 font-bold max-w-[200px] sm:max-w-none"
                 >
                   <option value="handshake">POST /api/v1/coordinator/handshake</option>
                   <option value="clients">GET /api/v1/coordinator/clients</option>
@@ -1068,9 +1165,9 @@ export default function LandingPage() {
                 <button
                   onClick={handleSendApiRequest}
                   disabled={isApiLoading}
-                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 flex-shrink-0"
                 >
-                  {isApiLoading ? 'Executing...' : 'Send Test Request 🚀'}
+                  {isApiLoading ? 'Executing...' : 'Send Test 🚀'}
                 </button>
               </div>
             </div>
@@ -1088,7 +1185,7 @@ export default function LandingPage() {
               <div>
                 <span className="text-xs font-mono font-bold text-slate-400 uppercase">HTTP 200 JSON Response</span>
                 <div className="w-full h-48 mt-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 overflow-y-auto">
-                  {apiResponse ? <pre>{apiResponse}</pre> : <span className="text-slate-600">// Click "Send Test Request" to execute</span>}
+                  {apiResponse ? <pre>{apiResponse}</pre> : <span className="text-slate-600">// Click "Send Test" to execute</span>}
                 </div>
               </div>
             </div>
@@ -1096,13 +1193,13 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 8: CUSTOMIZED DEPLOYMENT WIZARD ────────────── */}
-        <section id="docs" className="py-16 px-6 max-w-7xl mx-auto space-y-12">
+        <section id="docs" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
           <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="text-center max-w-3xl mx-auto space-y-4 mb-8">
               <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
                 DEPLOYMENT BLUEPRINT WIZARD
               </span>
-              <h2 className="text-3xl font-extrabold text-slate-100">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
                 Generate Customized Node Deployment Script
               </h2>
             </div>
@@ -1165,12 +1262,12 @@ export default function LandingPage() {
         </section>
 
         {/* ── SECTION 9: ENTERPRISE FOOTER ────────────────────────── */}
-        <footer className="border-t border-slate-800 bg-slate-950/90 py-16 px-6">
+        <footer className="border-t border-slate-800 bg-slate-950/90 py-12 sm:py-16 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="space-y-2 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-2">
                 <span className="text-xl">🛡️</span>
-                <span className="font-extrabold text-lg text-slate-100">Collaborative Fraud Intelligence Platform</span>
+                <span className="font-extrabold text-base sm:text-lg text-slate-100">Collaborative Fraud Intelligence Platform</span>
               </div>
               <p className="text-xs text-slate-400">
                 Privacy-Preserving Cross-Bank Federated Learning Infrastructure.
