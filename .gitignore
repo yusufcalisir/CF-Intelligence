@@ -46,6 +46,7 @@ ENV/
 *.sqlite3
 storage/
 *.bat
+run_local.*
 
 # Docker
 docker-compose.override.yml
