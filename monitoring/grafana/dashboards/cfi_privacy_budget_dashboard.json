@@ -1,0 +1,76 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "title": "Differential Privacy Epsilon Consumed per Bank Node",
+      "type": "barchart",
+      "gridPos": { "h": 9, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(cfi_dp_epsilon_consumed_total) by (bank_id)",
+          "legendFormat": "{{bank_id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "stacking": { "group": "A", "mode": "normal" }
+          }
+        }
+      }
+    },
+    {
+      "title": "Time to Privacy Budget Exhaustion Projection",
+      "type": "timeseries",
+      "gridPos": { "h": 9, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "(8.0 - sum(cfi_dp_epsilon_consumed_total)) / (sum(rate(cfi_dp_epsilon_consumed_total[1h])) + 1e-6) / 3600",
+          "legendFormat": "Hours to Exhaustion",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Remaining Privacy Budget Percentage",
+      "type": "gauge",
+      "gridPos": { "h": 9, "w": 24, "x": 0, "y": 9 },
+      "targets": [
+        {
+          "expr": "(1.0 - (sum(cfi_dp_epsilon_consumed_total) / 8.0)) * 100",
+          "legendFormat": "Remaining Budget %",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 100,
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 20 },
+              { "color": "green", "value": 50 }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["cfi", "privacy", "dp", "prometheus"],
+  "time": { "from": "now-1h", "to": "now" },
+  "title": "CFI Differential Privacy Budget Dashboard",
+  "uid": "cfi_privacy_budget_dashboard"
+}

@@ -93,3 +93,29 @@ class TestMetricsService:
         assert d["accuracy"] == 0.95
         assert d["f1_score"] == 0.85
         assert len(d["confusion_matrix"]) == 2
+
+
+def test_prometheus_telemetry_exposition() -> None:
+    """Verifies all 6 required cfi_* Prometheus metrics are correctly rendered in text format."""
+    from app.infrastructure.telemetry import telemetry_registry
+
+    telemetry_registry.record_inference_latency(45.0, decision="ALLOW")
+    telemetry_registry.set_active_bank_nodes(3)
+    telemetry_registry.record_federated_round_duration(12.5)
+    telemetry_registry.record_dp_epsilon_consumed(1.2, bank_id="bank_alpha")
+    telemetry_registry.record_gradient_rejection(reason="byzantine")
+    telemetry_registry.set_champion_model_auc(0.895)
+
+    prom_text = telemetry_registry.get_prometheus_metrics_text()
+
+    required_metrics = [
+        "cfi_inference_latency_ms",
+        "cfi_active_bank_nodes",
+        "cfi_federated_round_duration_seconds",
+        "cfi_dp_epsilon_consumed_total",
+        "cfi_gradient_rejections_total",
+        "cfi_champion_model_auc",
+    ]
+
+    for metric in required_metrics:
+        assert metric in prom_text, f"Metric '{metric}' missing from Prometheus exposition text"

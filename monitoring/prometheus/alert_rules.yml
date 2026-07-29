@@ -1,38 +1,38 @@
-﻿groups:
+groups:
   - name: cfi_platform_alerts
     rules:
-      - alert: HighGatewayLatency
-        expr: http_request_duration_seconds_bucket{le="0.1"} < 0.95
+      - alert: CFI_HighInferenceLatency
+        expr: histogram_quantile(0.95, sum(rate(cfi_inference_latency_ms_bucket[5m])) by (le)) > 100
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Real-time inference p95 scoring latency exceeds 100ms SLA threshold"
+          description: "P95 transaction scoring latency has been above 100ms for more than 2 minutes."
+
+      - alert: CFI_QuorumRisk
+        expr: cfi_active_bank_nodes < 2
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "API Gateway 95th percentile latency elevated (>100ms)"
-          description: "Gateway response time has exceeded 100ms for more than 5 minutes."
+          summary: "Federated Consortium Quorum Risk (Active Banks < 2)"
+          description: "Count of active participating bank nodes has dropped below minimum quorum (2 nodes) for 5 minutes."
 
-      - alert: HighClientDropoutRate
-        expr: active_simulations > 0
-        for: 2m
+      - alert: CFI_DPBudgetDepleting
+        expr: cfi_dp_epsilon_consumed_total > 6.4
+        for: 1m
         labels:
           severity: warning
         annotations:
-          summary: "FL Client Dropout Rate Elevated"
-          description: "More than 50% of registered bank clients dropped out during active FL rounds."
+          summary: "Differential Privacy Epsilon Budget Depleting (> 80% used)"
+          description: "Cumulative differential privacy epsilon consumed has exceeded 80% (6.4 / 8.0) of maximum round budget."
 
-      - alert: SignificantConceptDrift
-        expr: cfi_concept_drift_psi > 0.20
+      - alert: CFI_ModelDrift
+        expr: cfi_champion_model_auc < 0.75
         for: 1m
         labels:
           severity: critical
         annotations:
-          summary: "Significant Model Concept Drift Detected (PSI > 0.20)"
-          description: "Population Stability Index on transaction risk scores exceeded critical 0.20 threshold. Automated re-training recommended."
-
-      - alert: PoorModelCalibration
-        expr: cfi_model_brier_score > 0.15
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Model Calibration Degradation (Brier Score > 0.15)"
-          description: "Model probability predictions are miscalibrated relative to empirical fraud outcomes."
+          summary: "Champion Model Performance Drift (AUC < 0.75)"
+          description: "Active champion global model holdout evaluation AUC score dropped below critical quality threshold 0.75."
