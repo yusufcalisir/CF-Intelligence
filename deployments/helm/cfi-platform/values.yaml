@@ -118,6 +118,15 @@ aggregator:
     limits:
       cpu: 2000m
       memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
   autoscaling:
     enabled: true
     minReplicas: 1
@@ -142,6 +151,15 @@ bankNode:
     limits:
       cpu: 2000m
       memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
   hsm:
     enabled: true
     secretName: cfi-hsm-pkcs11-credentials
