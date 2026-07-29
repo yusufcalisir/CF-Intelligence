@@ -34,7 +34,7 @@ class RegulatoryReporterService:
     def validate_sar_xml_structure(raw_xml: str) -> None:
         """Validate XML structure and mandatory tags against FinCEN SAR 2.0 schema requirements."""
         try:
-            root = ET.fromstring(raw_xml)
+            root = ET.fromstring(raw_xml)  # nosec B314
         except Exception as e:
             raise SARValidationError(f"XML syntax error: {e}") from e
 

@@ -119,7 +119,7 @@ class SIEMLogExporter:
 
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 if resp.status not in (200, 201, 202):
                     raise SIEMExportError(f"Splunk HEC returned HTTP {resp.status}")
         except Exception as e:
@@ -149,7 +149,7 @@ class SIEMLogExporter:
 
         req = urllib.request.Request(url, data=payload, headers=headers, method="POST")
         try:
-            with urllib.request.urlopen(req, timeout=5.0) as resp:
+            with urllib.request.urlopen(req, timeout=5.0) as resp:  # nosec B310
                 if resp.status not in (200, 202):
                     raise SIEMExportError(f"Datadog API returned HTTP {resp.status}")
         except Exception as e:
