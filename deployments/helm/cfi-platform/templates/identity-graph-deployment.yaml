@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cfi-platform.fullname" . }}-identity-graph
+  labels:
+    app.kubernetes.io/component: identity-graph
+    {{- include "cfi-platform.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.identityGraph.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: identity-graph
+      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: identity-graph
+        {{- include "cfi-platform.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: identity-graph
+          image: "{{ .Values.identityGraph.image.repository }}:{{ .Values.identityGraph.image.tag }}"
+          imagePullPolicy: {{ .Values.identityGraph.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.identityGraph.service.httpPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.identityGraph.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.identityGraph.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.identityGraph.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.identityGraph.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.identityGraph.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.identityGraph.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.identityGraph.resources | nindent 12 }}

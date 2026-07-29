@@ -1,0 +1,27 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cfi-platform.fullname" . }}-coordinator-pdb
+  labels:
+    app.kubernetes.io/component: coordinator
+    {{- include "cfi-platform.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: coordinator
+      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cfi-platform.fullname" . }}-fraud-alert-pdb
+  labels:
+    app.kubernetes.io/component: fraud-alert
+    {{- include "cfi-platform.labels" . | nindent 4 }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: fraud-alert
+      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}

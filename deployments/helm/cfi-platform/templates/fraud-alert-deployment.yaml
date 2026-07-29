@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cfi-platform.fullname" . }}-fraud-alert
+  labels:
+    app.kubernetes.io/component: fraud-alert
+    {{- include "cfi-platform.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.fraudAlert.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: fraud-alert
+      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: fraud-alert
+        {{- include "cfi-platform.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: fraud-alert
+          image: "{{ .Values.fraudAlert.image.repository }}:{{ .Values.fraudAlert.image.tag }}"
+          imagePullPolicy: {{ .Values.fraudAlert.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.fraudAlert.service.httpPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.fraudAlert.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.fraudAlert.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fraudAlert.probes.liveness.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.fraudAlert.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.fraudAlert.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.fraudAlert.probes.readiness.periodSeconds }}
+          resources:
+            {{- toYaml .Values.fraudAlert.resources | nindent 12 }}

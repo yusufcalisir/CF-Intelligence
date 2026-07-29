@@ -1,12 +1,106 @@
-# CFI Platform — Production Helm Values
+# CFI Platform — Production Hardened Helm Values
 # Override per-environment using: helm install cfi-platform . -f values-prod.yaml
 
 global:
   imageRegistry: ""
   imagePullSecrets: []
-  storageClass: ""
+  storageClass: "gp3"
 
-# ─── Aggregator (Central FL Server) ──────────────────────────────────────────
+# ─── Coordinator Service (Central FL Coordinator) ─────────────────────────────
+coordinator:
+  replicas: 2
+  image:
+    repository: cfi-platform/coordinator
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      path: /ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+  service:
+    type: ClusterIP
+    grpcPort: 50051
+    httpPort: 8080
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# ─── Fraud Alert Service ──────────────────────────────────────────────────────
+fraudAlert:
+  replicas: 2
+  image:
+    repository: cfi-platform/fraud-alert
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 15
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  service:
+    type: ClusterIP
+    httpPort: 8082
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+
+# ─── Identity Graph Service ───────────────────────────────────────────────────
+identityGraph:
+  replicas: 1
+  image:
+    repository: cfi-platform/identity-graph
+    tag: "2.0.0"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  probes:
+    liveness:
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+    readiness:
+      path: /health
+      initialDelaySeconds: 10
+      periodSeconds: 5
+  service:
+    type: ClusterIP
+    httpPort: 8083
+  autoscaling:
+    enabled: false
+
+# ─── Aggregator (Central FL Legacy) ───────────────────────────────────────────
 aggregator:
   replicaCount: 2
   image:
@@ -16,28 +110,10 @@ aggregator:
   resources:
     requests:
       cpu: 500m
-      memory: 2Gi
+      memory: 512Mi
     limits:
       cpu: 2000m
-      memory: 8Gi
-  probes:
-    liveness:
-      path: /healthz
-      initialDelaySeconds: 30
-      periodSeconds: 10
-    readiness:
-      path: /readyz
-      initialDelaySeconds: 10
-      periodSeconds: 5
-  service:
-    type: ClusterIP
-    grpcPort: 50051
-    httpPort: 8080
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 10
-    targetCPUUtilizationPercentage: 70
+      memory: 2Gi
 
 # ─── Bank Nodes (FL Clients) ──────────────────────────────────────────────────
 bankNode:
@@ -48,60 +124,22 @@ bankNode:
     pullPolicy: IfNotPresent
   resources:
     requests:
-      cpu: 250m
-      memory: 1Gi
+      cpu: 500m
+      memory: 512Mi
     limits:
       cpu: 2000m
-      memory: 8Gi
-  probes:
-    liveness:
-      path: /healthz
-      initialDelaySeconds: 20
-      periodSeconds: 10
-    readiness:
-      path: /readyz
-      initialDelaySeconds: 10
-      periodSeconds: 5
-  hsm:
-    enabled: true
-    secretName: cfi-hsm-pkcs11-credentials
-  service:
-    type: ClusterIP
-    grpcPort: 50052
-    httpPort: 8081
+      memory: 2Gi
 
-# ─── Database (CockroachDB / PostgreSQL) ─────────────────────────────────────
+# ─── Database (PostgreSQL) ────────────────────────────────────────────────────
 database:
-  url: "postgresql://cfi_user:changeme@cockroachdb-public:26257/cfi_platform?sslmode=require"
+  url: "postgresql://cfi_user:changeme@postgresql:5432/cfi_platform"
   secretName: cfi-db-credentials
-  poolSize: 20
-  maxOverflow: 10
-
-postgresql:
-  enabled: false
-
-# ─── Message Queue ────────────────────────────────────────────────────────────
-kafka:
-  brokers: "kafka-broker-0:9093,kafka-broker-1:9093"
-  saslUsername: "cfi_kafka_user"
-  secretName: cfi-kafka-credentials
-
-rabbitmq:
-  url: "amqps://cfi_rabbit_user:changeme@rabbitmq:5671/"
-  secretName: cfi-rabbitmq-credentials
 
 # ─── Redis Feature Store ──────────────────────────────────────────────────────
 redis:
-  enabled: false
+  enabled: true
   url: "redis://redis-master:6379/0"
   secretName: cfi-redis-credentials
-
-# ─── Vault PKI ────────────────────────────────────────────────────────────────
-vault:
-  enabled: true
-  address: "https://vault.enterprise.local:8200"
-  secretName: cfi-vault-token
-  pkiRole: "cfi-node"
 
 # ─── Ingress ──────────────────────────────────────────────────────────────────
 ingress:
@@ -109,14 +147,13 @@ ingress:
   className: nginx
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: "GRPC"
   hosts:
-    - host: cfi-aggregator.enterprise.local
+    - host: api.cfi-platform.org
       paths:
         - path: /
           pathType: Prefix
-          service: aggregator
+          service: coordinator
   tls:
     - secretName: cfi-tls-cert
       hosts:
-        - cfi-aggregator.enterprise.local
+        - api.cfi-platform.org
