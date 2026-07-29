@@ -24,8 +24,13 @@ from __future__ import annotations
 import contextvars
 import logging
 import os
-from collections.abc import AsyncGenerator, Callable, Coroutine
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, Callable, Coroutine
+
+    from starlette.requests import Request
+    from starlette.responses import Response
 
 from sqlalchemy import text
 from sqlalchemy.exc import DBAPIError
@@ -37,8 +42,6 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
-from starlette.responses import Response
 
 from app.config import get_settings
 

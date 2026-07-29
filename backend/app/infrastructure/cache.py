@@ -325,7 +325,6 @@ def get_redis_client() -> Any | None:
     """Synchronous Redis client helper for model cache and pubsub operations."""
     try:
         import redis
-        from app.config import get_settings
 
         settings = get_settings()
         url = getattr(settings, "redis_url", None) or "redis://localhost:6379/0"
