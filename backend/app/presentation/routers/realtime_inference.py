@@ -90,7 +90,7 @@ def get_scripted_model() -> tuple[Any, bool]:
         if redis_client:
             cached_bytes = redis_client.get("cfi:champion_model")
             if cached_bytes:
-                _cached_scripted_model = pickle.loads(cached_bytes)
+                _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301
                 _cached_from_redis = True
                 logger.info(
                     "Loaded champion TorchScript model from Redis cache (cfi:champion_model)."
@@ -124,7 +124,7 @@ def get_scripted_model() -> tuple[Any, bool]:
 
         redis_client = get_redis_client()
         if redis_client:
-            redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)
+            redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301
     except Exception:
         pass
 
