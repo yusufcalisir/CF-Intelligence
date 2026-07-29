@@ -70,7 +70,8 @@ class BankConnectorFactory:
 
         if connector_type in ("mock", "mq_skeleton"):
             raise ValueError(
-                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
+                f"Connector type '{connector_type}' is deprecated and removed under Enterprise Zero-Mock Policy. "
+                "Supported connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
             )
 
         if connector_type == "rest":

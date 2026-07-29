@@ -87,21 +87,25 @@ class PerimeterWAFGuard:
 
         # Remove failures older than lockout_duration_seconds
         self._auth_failures[client_ip] = [
-            t for t in self._auth_failures[client_ip]
-            if now - t <= self.lockout_duration_seconds
+            t for t in self._auth_failures[client_ip] if now - t <= self.lockout_duration_seconds
         ]
         self._auth_failures[client_ip].append(now)
 
         is_locked = len(self._auth_failures[client_ip]) >= self.max_auth_failures
         if is_locked:
-            logger.warning("WAF LOCKOUT ACTIVE for IP %s (%d failed attempts).", client_ip, len(self._auth_failures[client_ip]))
+            logger.warning(
+                "WAF LOCKOUT ACTIVE for IP %s (%d failed attempts).",
+                client_ip,
+                len(self._auth_failures[client_ip]),
+            )
         return is_locked
 
     def is_client_locked_out(self, client_ip: str) -> bool:
         """Checks if client IP is currently locked out due to consecutive auth failures."""
         now = time.time()
         failures = [
-            t for t in self._auth_failures.get(client_ip, [])
+            t
+            for t in self._auth_failures.get(client_ip, [])
             if now - t <= self.lockout_duration_seconds
         ]
         return len(failures) >= self.max_auth_failures
@@ -155,7 +159,9 @@ class PerimeterWAFGuard:
         # 3. A05: Sensitive Path Inspection
         path_lower = path.lower()
         if any(path_lower.startswith(p) or path_lower == p for p in self.SENSITIVE_PATHS):
-            logger.warning("WAF BLOCKED IP %s: Sensitive path access blocked (%s).", client_ip, path)
+            logger.warning(
+                "WAF BLOCKED IP %s: Sensitive path access blocked (%s).", client_ip, path
+            )
             return WAFInspectionResult(
                 allowed=False,
                 rule_triggered=WAFRuleCategory.SENSITIVE_PATH_BLOCKED,

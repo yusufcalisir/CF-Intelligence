@@ -1,6 +1,6 @@
 ---
 # Aggregator HPA
-{{- if .Values.aggregator.autoscaling.enabled }}
+{{- if and .Values.aggregator.autoscaling .Values.aggregator.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:

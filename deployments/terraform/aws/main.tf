@@ -325,7 +325,7 @@ resource "aws_db_instance" "cfi_postgresql" {
 
   db_name  = "cfi_platform"
   username = "cfi_admin"
-  password = "SuperSecretProductionPassword123!"
+  password = var.db_password
 
   skip_final_snapshot       = false
   final_snapshot_identifier = "${var.cluster_name}-postgres-final"

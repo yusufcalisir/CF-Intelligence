@@ -248,9 +248,51 @@ class DummyTracer:
         return DummySpan()
 
 
+class MetricProxy:
+    """Proxy object simulating Prometheus and OpenTelemetry metric methods (.set, .inc, .dec, .add, .observe, .record, .labels)."""
+
+    def __init__(self, name: str, registry: TelemetryRegistry) -> None:
+        self.name = name
+        self.registry = registry
+
+    def set(self, value: float, *args: Any, **kwargs: Any) -> None:
+        self.registry._gauges[self.name] = float(value)
+
+    def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + float(amount)
+
+    def dec(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - float(amount)
+
+    def add(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
+        self.inc(amount)
+
+    def observe(self, value: float, *args: Any, **kwargs: Any) -> None:
+        self.registry._histograms.setdefault(self.name, []).append(float(value))
+
+    def record(self, value: float, *args: Any, **kwargs: Any) -> None:
+        self.observe(value)
+
+    def labels(self, **kwargs: Any) -> MetricProxy:
+        return self
+
+
 # Global Singleton Registry Instance
 telemetry_registry = TelemetryRegistry()
 telemetry = telemetry_registry
+
+# Module-level Metric Proxy Exports for static type checkers (mypy)
+cfi_mia_attack_success_rate = MetricProxy("cfi_mia_attack_success_rate", telemetry_registry)
+cfi_dlg_gradient_leakage_score = MetricProxy("cfi_dlg_gradient_leakage_score", telemetry_registry)
+cfi_privacy_epsilon_consumed = MetricProxy("cfi_privacy_epsilon_consumed", telemetry_registry)
+cfi_concept_drift_psi = MetricProxy("cfi_concept_drift_psi", telemetry_registry)
+cfi_feature_drift_ks_stat = MetricProxy("cfi_feature_drift_ks_stat", telemetry_registry)
+cfi_model_brier_score = MetricProxy("cfi_model_brier_score", telemetry_registry)
+cfi_model_ece = MetricProxy("cfi_model_ece", telemetry_registry)
+cfi_inference_latency_ms = MetricProxy("cfi_inference_latency_ms", telemetry_registry)
+active_simulations = MetricProxy("active_simulations", telemetry_registry)
+simulation_duration_seconds = MetricProxy("simulation_duration_seconds", telemetry_registry)
+simulation_rounds_total = MetricProxy("simulation_rounds_total", telemetry_registry)
 
 
 def setup_telemetry(app: FastAPI) -> None:
@@ -295,7 +337,9 @@ def track_fl_round(func: Callable) -> Callable:
             participant_count = len(res["participants"])
         elif isinstance(res, (list, tuple)):
             participant_count = len(res)
-        telemetry_registry.record_fl_round(duration_seconds=duration, participant_count=participant_count)
+        telemetry_registry.record_fl_round(
+            duration_seconds=duration, participant_count=participant_count
+        )
         return res
 
     return wrapper

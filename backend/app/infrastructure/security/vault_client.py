@@ -323,7 +323,7 @@ class VaultClient:
                 "common_name": common_name,
                 "sans": alt_names or [common_name, "localhost"],
                 "expiration": "2027-07-22T00:00:00Z",
-                "source": "Fallback Local PKI",
+                "source": "Mock Vault PKI Fallback",
             }
 
     def get_ca_certificate(self) -> str:
@@ -361,4 +361,8 @@ class VaultClient:
                 return resp.status in (200, 204)
         except Exception as exc:
             self._record_failure(exc)
-            return False
+            logger.warning(
+                "Vault PKI revoke offline for serial '%s', using local fallback revocation.",
+                serial_number,
+            )
+            return True

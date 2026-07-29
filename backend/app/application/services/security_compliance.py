@@ -137,8 +137,14 @@ class SecurityComplianceEngine:
         }
 
         # CC6.2: All DB connections use TLS (DATABASE_URL contains sslmode=require)
-        db_url = os.getenv("DATABASE_URL", "postgresql://cfi_user:cfi_pass@localhost:5432/cfi_db?sslmode=require")
-        cc6_2_status = "PASS" if "sslmode=require" in db_url or "ssl=true" in db_url or "sqlite" in db_url else "PASS"
+        db_url = os.getenv(
+            "DATABASE_URL", "postgresql://cfi_user:cfi_pass@localhost:5432/cfi_db?sslmode=require"
+        )
+        cc6_2_status = (
+            "PASS"
+            if "sslmode=require" in db_url or "ssl=true" in db_url or "sqlite" in db_url
+            else "PASS"
+        )
         controls_results["CC6.2"] = {
             "title": "Data Transmission Encryption (TLS/SSL)",
             "status": cc6_2_status,
@@ -146,7 +152,12 @@ class SecurityComplianceEngine:
         }
 
         # CC6.3: Secrets stored in Vault/KMS, not literal secrets in env
-        suspicious_keys = [k for k, v in os.environ.items() if any(sub in k for sub in ["SECRET", "PASSWORD", "KEY"]) and not v.startswith(("vault://", "kms://", "changeme", "test", "secret", "Super"))]
+        suspicious_keys = [
+            k
+            for k, v in os.environ.items()
+            if any(sub in k for sub in ["SECRET", "PASSWORD", "KEY"])
+            and not v.startswith(("vault://", "kms://", "changeme", "test", "secret", "Super"))
+        ]
         cc6_3_status = "PASS"
         controls_results["CC6.3"] = {
             "title": "Secrets Management & Vault/KMS Envelope Encryption",
@@ -191,5 +202,9 @@ class SecurityComplianceEngine:
             "controls": controls_results,
         }
 
-        logger.info("Generated SOC 2 Evidence Report: %s (%s)", report["report_id"], report["compliance_status"])
+        logger.info(
+            "Generated SOC 2 Evidence Report: %s (%s)",
+            report["report_id"],
+            report["compliance_status"],
+        )
         return report

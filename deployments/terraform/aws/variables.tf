@@ -69,3 +69,10 @@ variable "max_node_count" {
   type        = number
   default     = 10
 }
+
+variable "db_password" {
+  description = "Database master password for RDS PostgreSQL"
+  type        = string
+  sensitive   = true
+  default     = "CHANGEME_USE_SECRETS_MANAGER"
+}

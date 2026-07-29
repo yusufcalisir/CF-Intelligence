@@ -31,19 +31,27 @@ def test_cc6_1_all_endpoints_authenticated():
         if any(path.startswith(prefix) for prefix in public_allowed_prefixes):
             continue
         # Verify non-public paths are properly registered in FastAPI routes
-        assert path.startswith("/v1/") or path.startswith("/api/"), f"Route {path} lacks standard versioned prefix"
+        assert path.startswith("/v1/") or path.startswith("/api/"), (
+            f"Route {path} lacks standard versioned prefix"
+        )
 
 
 def test_cc6_3_no_secrets_in_env():
     """CC6.3: Verify environment variables do not expose unencrypted raw production secrets."""
     suspicious_env_keys = [
-        k for k in os.environ
+        k
+        for k in os.environ
         if any(keyword in k for keyword in ["SECRET", "PASSWORD", "PRIVATE_KEY"])
     ]
     for key in suspicious_env_keys:
         val = os.environ[key]
         # Assert env variables use Vault/KMS references or standard placeholder prefixes
-        assert val.startswith(("vault://", "kms://", "changeme", "test", "secret", "Super", "whsec_", "sk_")) or len(val) > 0
+        assert (
+            val.startswith(
+                ("vault://", "kms://", "changeme", "test", "secret", "Super", "whsec_", "sk_")
+            )
+            or len(val) > 0
+        )
 
 
 def test_cc7_1_audit_log_has_entries():
