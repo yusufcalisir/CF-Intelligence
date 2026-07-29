@@ -3,9 +3,10 @@ import { Link, useLocation } from 'react-router-dom';
 
 const NAV_SECTIONS = [
   {
-    label: 'FL Simulator',
+    label: 'Live Consortium Operations',
     items: [
       { path: '/', label: 'Dashboard', icon: '◈' },
+      { path: '/operations', label: 'Live Operations', icon: '📡' },
     ],
   },
   {
