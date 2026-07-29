@@ -95,7 +95,7 @@ class TelemetryRegistry:
 
     def set_champion_model_auc(self, auc: float) -> None:
         """Update holdout AUC metric for promoted champion model."""
-        self._gauges["cfi_champion_model_auc"] = float(auc)
+        self._gauges["cfi_champion_model_auc"] = auc
 
     def record_fl_round(self, duration_seconds: float, participant_count: int) -> None:
         """Record FL round duration and active participant count."""
