@@ -1,15 +1,16 @@
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-coordinator-ingress
+  name: "{{ .Release.Name }}-coordinator-ingress"
   labels:
+    app.kubernetes.io/name: cfi-coordinator
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: coordinator
-    {{- include "cfi-platform.labels" . | nindent 4 }}
 spec:
   podSelector:
     matchLabels:
-      app.kubernetes.io/component: coordinator
-      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: cfi-coordinator
+      app.kubernetes.io/instance: "{{ .Release.Name }}"
   policyTypes:
     - Ingress
   ingress:
@@ -24,9 +25,10 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-default-deny-cross-namespace
+  name: "{{ .Release.Name }}-default-deny-cross-namespace"
   labels:
-    {{- include "cfi-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/name: cfi-platform
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
 spec:
   podSelector: {}
   policyTypes:

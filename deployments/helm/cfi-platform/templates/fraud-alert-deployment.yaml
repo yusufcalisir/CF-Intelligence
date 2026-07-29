@@ -1,21 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-fraud-alert
+  name: "{{ .Release.Name }}-fraud-alert"
   labels:
+    app.kubernetes.io/name: cfi-fraud-alert
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: fraud-alert
-    {{- include "cfi-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: cfi-platform
 spec:
   replicas: {{ .Values.fraudAlert.replicas }}
   selector:
     matchLabels:
-      app.kubernetes.io/component: fraud-alert
-      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: cfi-fraud-alert
+      app.kubernetes.io/instance: "{{ .Release.Name }}"
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: cfi-fraud-alert
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
         app.kubernetes.io/component: fraud-alert
-        {{- include "cfi-platform.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: fraud-alert
@@ -38,4 +41,9 @@ spec:
             initialDelaySeconds: {{ .Values.fraudAlert.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.fraudAlert.probes.readiness.periodSeconds }}
           resources:
-            {{- toYaml .Values.fraudAlert.resources | nindent 12 }}
+            requests:
+              cpu: {{ .Values.fraudAlert.resources.requests.cpu }}
+              memory: {{ .Values.fraudAlert.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.fraudAlert.resources.limits.cpu }}
+              memory: {{ .Values.fraudAlert.resources.limits.memory }}

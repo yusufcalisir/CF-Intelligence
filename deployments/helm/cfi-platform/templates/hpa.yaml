@@ -1,16 +1,16 @@
-{{- if .Values.coordinator.autoscaling.enabled -}}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-coordinator-hpa
+  name: "{{ .Release.Name }}-coordinator-hpa"
   labels:
+    app.kubernetes.io/name: cfi-coordinator
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: coordinator
-    {{- include "cfi-platform.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "cfi-platform.fullname" . }}-coordinator
+    name: "{{ .Release.Name }}-coordinator"
   minReplicas: {{ .Values.coordinator.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.coordinator.autoscaling.maxReplicas }}
   metrics:
@@ -20,21 +20,20 @@ spec:
         target:
           type: Utilization
           averageUtilization: {{ .Values.coordinator.autoscaling.targetCPUUtilizationPercentage }}
-{{- end }}
 ---
-{{- if .Values.fraudAlert.autoscaling.enabled -}}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-fraud-alert-hpa
+  name: "{{ .Release.Name }}-fraud-alert-hpa"
   labels:
+    app.kubernetes.io/name: cfi-fraud-alert
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: fraud-alert
-    {{- include "cfi-platform.labels" . | nindent 4 }}
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "cfi-platform.fullname" . }}-fraud-alert
+    name: "{{ .Release.Name }}-fraud-alert"
   minReplicas: {{ .Values.fraudAlert.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.fraudAlert.autoscaling.maxReplicas }}
   metrics:
@@ -44,4 +43,3 @@ spec:
         target:
           type: Utilization
           averageUtilization: {{ .Values.fraudAlert.autoscaling.targetCPUUtilizationPercentage }}
-{{- end }}

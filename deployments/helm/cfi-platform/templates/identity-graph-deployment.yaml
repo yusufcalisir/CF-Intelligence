@@ -1,21 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-identity-graph
+  name: "{{ .Release.Name }}-identity-graph"
   labels:
+    app.kubernetes.io/name: cfi-identity-graph
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: identity-graph
-    {{- include "cfi-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: cfi-platform
 spec:
   replicas: {{ .Values.identityGraph.replicas }}
   selector:
     matchLabels:
-      app.kubernetes.io/component: identity-graph
-      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: cfi-identity-graph
+      app.kubernetes.io/instance: "{{ .Release.Name }}"
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: cfi-identity-graph
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
         app.kubernetes.io/component: identity-graph
-        {{- include "cfi-platform.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: identity-graph
@@ -38,4 +41,9 @@ spec:
             initialDelaySeconds: {{ .Values.identityGraph.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.identityGraph.probes.readiness.periodSeconds }}
           resources:
-            {{- toYaml .Values.identityGraph.resources | nindent 12 }}
+            requests:
+              cpu: {{ .Values.identityGraph.resources.requests.cpu }}
+              memory: {{ .Values.identityGraph.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.identityGraph.resources.limits.cpu }}
+              memory: {{ .Values.identityGraph.resources.limits.memory }}

@@ -1,21 +1,24 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cfi-platform.fullname" . }}-coordinator
+  name: "{{ .Release.Name }}-coordinator"
   labels:
+    app.kubernetes.io/name: cfi-coordinator
+    app.kubernetes.io/instance: "{{ .Release.Name }}"
     app.kubernetes.io/component: coordinator
-    {{- include "cfi-platform.labels" . | nindent 4 }}
+    app.kubernetes.io/part-of: cfi-platform
 spec:
   replicas: {{ .Values.coordinator.replicas }}
   selector:
     matchLabels:
-      app.kubernetes.io/component: coordinator
-      {{- include "cfi-platform.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: cfi-coordinator
+      app.kubernetes.io/instance: "{{ .Release.Name }}"
   template:
     metadata:
       labels:
+        app.kubernetes.io/name: cfi-coordinator
+        app.kubernetes.io/instance: "{{ .Release.Name }}"
         app.kubernetes.io/component: coordinator
-        {{- include "cfi-platform.selectorLabels" . | nindent 8 }}
     spec:
       containers:
         - name: coordinator
@@ -41,4 +44,9 @@ spec:
             initialDelaySeconds: {{ .Values.coordinator.probes.readiness.initialDelaySeconds }}
             periodSeconds: {{ .Values.coordinator.probes.readiness.periodSeconds }}
           resources:
-            {{- toYaml .Values.coordinator.resources | nindent 12 }}
+            requests:
+              cpu: {{ .Values.coordinator.resources.requests.cpu }}
+              memory: {{ .Values.coordinator.resources.requests.memory }}
+            limits:
+              cpu: {{ .Values.coordinator.resources.limits.cpu }}
+              memory: {{ .Values.coordinator.resources.limits.memory }}
