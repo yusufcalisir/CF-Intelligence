@@ -279,3 +279,214 @@ resource "aws_kms_alias" "cfi" {
   name          = "alias/${var.cluster_name}-key"
   target_key_id = aws_kms_key.cfi.key_id
 }
+
+# ---------------------------------------------------------------------------
+# RDS PostgreSQL 16 Database
+# ---------------------------------------------------------------------------
+resource "aws_db_subnet_group" "cfi" {
+  name       = "${var.cluster_name}-db-subnets"
+  subnet_ids = aws_subnet.private[*].id
+  tags       = merge(local.common_tags, { Name = "${var.cluster_name}-db-subnets" })
+}
+
+resource "aws_security_group" "rds" {
+  name        = "${var.cluster_name}-rds-sg"
+  description = "Security group for PostgreSQL RDS"
+  vpc_id      = aws_vpc.cfi.id
+
+  ingress {
+    description = "PostgreSQL access from EKS nodes"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    security_groups = [aws_security_group.eks_nodes.id]
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-rds-sg" })
+}
+
+resource "aws_db_instance" "cfi_postgresql" {
+  identifier                  = "${var.cluster_name}-postgres"
+  engine                      = "postgres"
+  engine_version              = "16.2"
+  instance_class              = "db.m6i.xlarge"
+  allocated_storage           = 100
+  max_allocated_storage       = 1000
+  storage_type                = "gp3"
+  storage_encrypted           = true
+  kms_key_id                  = aws_kms_key.cfi.arn
+  multi_az                    = true
+  publicly_accessible         = false
+  deletion_protection         = true
+  backup_retention_period     = 7
+  backup_window               = "03:00-04:00"
+  db_subnet_group_name        = aws_db_subnet_group.cfi.name
+  vpc_security_group_ids      = [aws_security_group.rds.id]
+
+  db_name  = "cfi_platform"
+  username = "cfi_admin"
+  password = "SuperSecretProductionPassword123!"
+
+  skip_final_snapshot       = false
+  final_snapshot_identifier = "${var.cluster_name}-postgres-final"
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-postgres" })
+}
+
+# ---------------------------------------------------------------------------
+# ElastiCache Redis Replication Group
+# ---------------------------------------------------------------------------
+resource "aws_elasticache_subnet_group" "cfi" {
+  name       = "${var.cluster_name}-redis-subnets"
+  subnet_ids = aws_subnet.private[*].id
+}
+
+resource "aws_security_group" "redis" {
+  name        = "${var.cluster_name}-redis-sg"
+  description = "Security group for ElastiCache Redis"
+  vpc_id      = aws_vpc.cfi.id
+
+  ingress {
+    description     = "Redis port from EKS nodes"
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [aws_security_group.eks_nodes.id]
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-redis-sg" })
+}
+
+resource "aws_elasticache_replication_group" "cfi_redis" {
+  replication_group_id       = "${var.cluster_name}-redis"
+  description                = "CFI Platform Feature Store Redis Cluster"
+  node_type                  = "cache.m6g.large"
+  num_cache_clusters         = 2
+  parameter_group_name       = "default.redis7"
+  port                       = 6379
+  automatic_failover_enabled = true
+  at_rest_encryption_enabled = true
+  transit_encryption_enabled = true
+  kms_key_id                 = aws_kms_key.cfi.arn
+  subnet_group_name          = aws_elasticache_subnet_group.cfi.name
+  security_group_ids         = [aws_security_group.redis.id]
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-redis" })
+}
+
+# ---------------------------------------------------------------------------
+# AWS WAFv2 Web ACL
+# ---------------------------------------------------------------------------
+resource "aws_wafv2_web_acl" "cfi" {
+  name        = "${var.cluster_name}-waf-acl"
+  description = "WAF Web ACL for CFI Platform API"
+  scope       = "REGIONAL"
+
+  default_action {
+    allow {}
+  }
+
+  rule {
+    name     = "AWSManagedRulesCommonRuleSet"
+    priority = 10
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesCommonRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "CommonRuleSetMetric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  rule {
+    name     = "AWSManagedRulesSQLiRuleSet"
+    priority = 20
+
+    override_action {
+      none {}
+    }
+
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesSQLiRuleSet"
+        vendor_name = "AWS"
+      }
+    }
+
+    visibility_config {
+      cloudwatch_metrics_enabled = true
+      metric_name                = "SQLiRuleSetMetric"
+      sampled_requests_enabled   = true
+    }
+  }
+
+  visibility_config {
+    cloudwatch_metrics_enabled = true
+    metric_name                = "${var.cluster_name}-waf-metrics"
+    sampled_requests_enabled   = true
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-waf-acl" })
+}
+
+# ---------------------------------------------------------------------------
+# CloudFront CDN Distribution
+# ---------------------------------------------------------------------------
+resource "aws_cloudfront_distribution" "cfi_cdn" {
+  enabled             = true
+  is_ipv6_enabled     = true
+  comment             = "CFI Platform CDN distribution"
+  default_root_object = "index.html"
+
+  origin {
+    domain_name = "api.cfi-platform.org"
+    origin_id   = "ALB-CFI-Platform"
+
+    custom_origin_config {
+      http_port              = 80
+      https_port             = 443
+      origin_protocol_policy = "https-only"
+      origin_ssl_protocols   = ["TLSv1.2", "TLSv1.3"]
+    }
+  }
+
+  default_cache_behavior {
+    allowed_methods  = ["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"]
+    cached_methods   = ["GET", "HEAD"]
+    target_origin_id = "ALB-CFI-Platform"
+
+    forwarded_values {
+      query_string = true
+      cookies {
+        forward = "all"
+      }
+    }
+
+    viewer_protocol_policy = "redirect-to-https"
+    min_ttl                = 0
+    default_ttl            = 3600
+    max_ttl                = 86400
+  }
+
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-cdn" })
+}
