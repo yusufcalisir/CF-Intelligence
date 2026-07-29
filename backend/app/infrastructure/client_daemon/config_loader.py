@@ -33,7 +33,7 @@ def load_config(bank_id: str, config_path: str | None = None) -> dict[str, Any]:
 
     if target_path.exists():
         try:
-            import yaml
+            import yaml  # type: ignore[import-untyped]
 
             content = target_path.read_text(encoding="utf-8")
             parsed = yaml.safe_load(content)
