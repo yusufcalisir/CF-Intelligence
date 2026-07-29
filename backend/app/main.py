@@ -241,7 +241,7 @@ def seed_mock_data() -> None:
     entity_svc.increment_alert_count(c3.id)
     entity_svc.update_risk_level(c3.id, RiskLevel.MEDIUM)
 
-    # 4. Create mock case
+    # 4. Create initial demonstration case
     case = case_svc.create_case(
         title="High-Risk Activity: Device Sharing & Crypto Outflow",
         priority=CasePriority.P2_HIGH,
@@ -262,7 +262,7 @@ def seed_mock_data() -> None:
         related_alert_count=1,
     )
     alert_svc._intelligence_store.push_list("intelligence_list", _intel_to_dict(intel))
-    logger.info("Successfully seeded mock data for Phase 2")
+    logger.info("Successfully seeded initial demonstration data for local environment")
 
 
 @asynccontextmanager
