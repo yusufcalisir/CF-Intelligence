@@ -511,6 +511,7 @@ export function useRules() {
       const { data } = await apiClient.get('/api/v1/rules');
       return data;
     },
+    retry: false,
   });
 }
 
@@ -604,14 +605,14 @@ export function useAlertGNNExplanation(alertId: string | undefined) {
 }
 
 export function useSecurityStatus() {
-
   return useQuery<SecurityStatus>({
     queryKey: ['security-status'],
     queryFn: async () => {
       const { data } = await apiClient.get('/api/v1/security/status');
       return data;
     },
-    refetchInterval: 5000,
+    retry: false,
+    refetchInterval: (query) => (query.state.error ? false : 5000),
   });
 }
 
@@ -633,7 +634,8 @@ export function useAuditChain(limit: number = 50) {
       });
       return data;
     },
-    refetchInterval: 5000,
+    retry: false,
+    refetchInterval: (query) => (query.state.error ? false : 5000),
   });
 }
 
