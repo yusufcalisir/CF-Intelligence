@@ -371,7 +371,6 @@ Exports audit events in Syslog CEF (`CEF:0|CFI|...`), Splunk HEC, and Datadog JS
 
 ```
 CF-Intelligence/
-├── SECURITY.md                                      # Responsible Vulnerability Disclosure Policy
 ├── pyproject.toml                                   # Python packaging & cfi-cli entrypoint
 ├── backend/
 │   ├── app/
@@ -519,6 +518,10 @@ CF-Intelligence/
     ├── label_feedback_loop_spec.md
     ├── public_api_webhooks_spec.md
     ├── realtime_inference_api.md
+    ├── security/
+    │   ├── SECURITY.md                              # Responsible Vulnerability Disclosure Policy
+    │   ├── pentest_scope.md                         # Penetration Testing Scope & Rules of Engagement
+    │   └── soc2_type2_controls_matrix.md            # SOC2 Type II & ISO 27001 Security Controls
     ├── security_controls_matrix.md
     ├── siem_and_support_guide.md
     ├── sla_slo_contract_spec.md
