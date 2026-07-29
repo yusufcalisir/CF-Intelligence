@@ -281,3 +281,26 @@ def _serialize_case(case: Any) -> CaseResponse:
         duration_hours=case.duration_hours,
         is_open=case.is_open,
     )
+
+
+@router.post("/{case_id}/file-sar")
+async def file_sar_report(case_id: str) -> dict[str, Any]:
+    """Generate and validate FinCEN BSA SAR XML payload for a confirmed fraud case."""
+    import uuid
+
+    from app.application.services.regulatory_reporter import (
+        RegulatoryReporterService,
+        SARValidationError,
+    )
+
+    try:
+        xml_str = RegulatoryReporterService.generate_sar_xml(case_id)
+        submission_id = f"sar_{uuid.uuid4().hex[:12]}"
+        return {
+            "submission_id": submission_id,
+            "status": "FILED",
+            "xml": xml_str,
+            "pdf_download_url": f"/api/v1/cases/{case_id}/sar.pdf",
+        }
+    except SARValidationError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc

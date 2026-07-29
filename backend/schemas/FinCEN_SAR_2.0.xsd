@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://www.fincen.gov/spec/bsa"
+           xmlns="http://www.fincen.gov/spec/bsa"
+           elementFormDefault="qualified">
+
+  <!-- Root Element -->
+  <xs:element name="EFilingSubmission">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="SubmissionHeader" type="SubmissionHeaderType"/>
+        <xs:element name="Activity" type="ActivityType"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- Header Type -->
+  <xs:complexType name="SubmissionHeaderType">
+    <xs:sequence>
+      <xs:element name="ActivityType" type="xs:string"/>
+      <xs:element name="SubmissionType" type="xs:string"/>
+      <xs:element name="CreatedTimestamp" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Activity Type -->
+  <xs:complexType name="ActivityType">
+    <xs:sequence>
+      <xs:element name="ActivityID" type="xs:string"/>
+      <xs:element name="ActivityStatus" type="xs:string"/>
+      <xs:element name="ReportingInstitution" type="ReportingInstitutionType"/>
+      <xs:element name="Subjects" type="SubjectsType"/>
+      <xs:element name="SuspiciousActivityDetails" type="SuspiciousActivityDetailsType"/>
+      <xs:element name="Narrative" type="NarrativeType"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Reporting Institution Type -->
+  <xs:complexType name="ReportingInstitutionType">
+    <xs:sequence>
+      <xs:element name="InstitutionName" type="xs:string"/>
+      <xs:element name="TINType" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Subjects Type -->
+  <xs:complexType name="SubjectsType">
+    <xs:sequence>
+      <xs:element name="Subject" maxOccurs="unbounded" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="EntityPrivacyHash" type="xs:string"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Suspicious Activity Details Type -->
+  <xs:complexType name="SuspiciousActivityDetailsType">
+    <xs:sequence>
+      <xs:element name="TotalRiskScore" type="xs:string"/>
+      <xs:element name="Priority" type="xs:string"/>
+      <xs:element name="AlertIds">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="AlertId" type="xs:string" maxOccurs="unbounded" minOccurs="0"/>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Narrative Type -->
+  <xs:complexType name="NarrativeType">
+    <xs:sequence>
+      <xs:element name="Summary" type="xs:string"/>
+      <xs:element name="Notes" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Note" maxOccurs="unbounded" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="Author" type="xs:string"/>
+                  <xs:element name="Content" type="xs:string"/>
+                  <xs:element name="Timestamp" type="xs:string"/>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+      <xs:element name="Timeline" minOccurs="0">
+        <xs:complexType>
+          <xs:sequence>
+            <xs:element name="Event" maxOccurs="unbounded" minOccurs="0">
+              <xs:complexType>
+                <xs:sequence>
+                  <xs:element name="Type" type="xs:string"/>
+                  <xs:element name="Description" type="xs:string"/>
+                  <xs:element name="Actor" type="xs:string"/>
+                  <xs:element name="Timestamp" type="xs:string"/>
+                </xs:sequence>
+              </xs:complexType>
+            </xs:element>
+          </xs:sequence>
+        </xs:complexType>
+      </xs:element>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>
