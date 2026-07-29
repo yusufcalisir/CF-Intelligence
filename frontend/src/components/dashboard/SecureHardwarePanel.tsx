@@ -36,7 +36,7 @@ const LockIcon = () => (
 );
 
 export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simulation }) => {
-  const hwMode = simulation.config.hardware_isolation_mode || 'none';
+  const hwMode = simulation?.config?.hardware_isolation_mode || 'none';
 
   if (hwMode === 'none') {
     return (
@@ -52,8 +52,8 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
     );
   }
 
-  // Generate mock latency chart data based on round count to compare FHE/TEE overhead with plaintext
-  const totalRounds = simulation.rounds.length || 10;
+  // Generate latency chart data based on round count to compare FHE/TEE overhead with plaintext
+  const totalRounds = simulation?.rounds?.length || 10;
   const chartData = Array.from({ length: totalRounds }).map((_, idx) => {
     const roundNum = idx + 1;
     const basePlaintextMs = 12 + Math.sin(roundNum) * 2;

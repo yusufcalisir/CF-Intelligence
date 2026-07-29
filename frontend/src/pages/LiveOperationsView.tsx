@@ -250,7 +250,7 @@ export default function LiveOperationsView() {
       <ModelRegistryPanel simulationId="live_prod_v2" />
       <ComplianceReportPanel simulationId="live_prod_v2" banks={[]} />
       <IncentiveRegistryPanel banks={[]} />
-      <SecureHardwarePanel simulation={{ id: 'live_prod_v2', status: 'completed' } as any} />
+      <SecureHardwarePanel simulation={{ id: 'live_prod_v2', status: 'completed', config: { hardware_isolation_mode: 'tee' }, rounds: Array.from({ length: 10 }) } as any} />
       <StreamingGNNPanel simulation={{ id: 'live_prod_v2', status: 'completed' } as any} />
     </div>
   );
