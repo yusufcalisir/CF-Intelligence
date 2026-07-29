@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import LiveOperationsView from './pages/LiveOperationsView';
+import BankOnboardingPage from './pages/BankOnboardingPage';
 import AlertsPage from './pages/AlertsPage';
 import CasesPage from './pages/CasesPage';
 import CaseDetailPage from './pages/CaseDetailPage';
@@ -38,7 +39,8 @@ export default function App() {
           <Route path="/scenarios" element={<ScenariosPage />} />
           <Route path="/graph" element={<GraphPage />} />
 
-          {/* Enterprise Platform */}
+          {/* Enterprise Platform & Onboarding */}
+          <Route path="/onboarding" element={<BankOnboardingPage />} />
           <Route path="/coordinator" element={<CoordinatorPage />} />
           <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
         </Route>
