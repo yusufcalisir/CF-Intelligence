@@ -15,14 +15,18 @@ import SecurityPage from './pages/SecurityPage';
 import ObservabilityPage from './pages/ObservabilityPage';
 import CoordinatorPage from './pages/CoordinatorPage';
 import PrivacyDefensePage from './pages/PrivacyDefensePage';
+import LandingPage from './pages/LandingPage';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/* Enterprise SaaS Landing Page */}
+        <Route path="/" element={<LandingPage />} />
+
         <Route element={<Layout />}>
           {/* Live Operations & FL Consortium */}
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/operations" element={<LiveOperationsView />} />
           <Route path="/operations/:id" element={<LiveOperationsView />} />
           <Route path="/simulation/:id" element={<LiveOperationsView />} />
