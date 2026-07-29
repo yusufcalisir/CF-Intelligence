@@ -1,10 +1,12 @@
 """Unit tests for Automated SOC 2 Evidence Collection & Security Controls Audit."""
 
 import os
+
 from fastapi.testclient import TestClient
-from app.main import app
+
 from app.application.services.security_compliance import SecurityComplianceEngine
 from app.infrastructure.security.perimeter_waf import PerimeterWAFGuard, WAFRuleCategory
+from app.main import app
 
 client = TestClient(app)
 

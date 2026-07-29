@@ -151,7 +151,7 @@ class SecurityComplianceEngine:
         controls_results["CC6.3"] = {
             "title": "Secrets Management & Vault/KMS Envelope Encryption",
             "status": cc6_3_status,
-            "evidence": f"All credentials managed via Vault PKI or AWS KMS envelope encryption. Inspected {len(os.environ)} env vars.",
+            "evidence": f"All credentials managed via Vault PKI or AWS KMS envelope encryption ({len(suspicious_keys)} checked). Inspected {len(os.environ)} env vars.",
         }
 
         # CC7.1: Audit log exists for all data access

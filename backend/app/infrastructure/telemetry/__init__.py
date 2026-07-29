@@ -99,7 +99,9 @@ class TelemetryRegistry:
 
     def record_fl_round(self, duration_seconds: float, participant_count: int) -> None:
         """Record FL round duration and active participant count."""
+        self._histograms.setdefault("cfi_fl_round_duration_seconds", []).append(duration_seconds)
         self.record_federated_round_duration(duration_seconds)
+        self._gauges["cfi_fl_round_participants"] = float(participant_count)
         self.set_active_bank_nodes(participant_count)
 
     def record_dp_epsilon(self, bank_id: str, epsilon: float) -> None:
@@ -108,6 +110,9 @@ class TelemetryRegistry:
 
     def record_spectral_anomaly(self, bank_id: str, anomaly_type: str = "poisoning") -> None:
         """Increment spectral anomaly detection count."""
+        key = f'bank_id="{bank_id}",anomaly_type="{anomaly_type}"'
+        labels = self._counter_labels.setdefault("cfi_spectral_anomalies_detected_total", {})
+        labels[key] = labels.get(key, 0.0) + 1.0
         self.record_gradient_rejection(reason="byzantine")
 
     def record_grpc_latency(self, method: str, duration_seconds: float, status: str = "OK") -> None:
@@ -245,6 +250,7 @@ class DummyTracer:
 
 # Global Singleton Registry Instance
 telemetry_registry = TelemetryRegistry()
+telemetry = telemetry_registry
 
 
 def setup_telemetry(app: FastAPI) -> None:
@@ -270,6 +276,50 @@ def trace_span(span_name: str) -> Callable:
             tracer = telemetry_registry.get_tracer()
             with tracer.start_as_current_span(span_name):
                 return func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def track_fl_round(func: Callable) -> Callable:
+    """Decorator to measure FL round duration and record participant count."""
+
+    @functools.wraps(func)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        start = time.time()
+        res = func(*args, **kwargs)
+        duration = time.time() - start
+        participant_count = 0
+        if isinstance(res, dict) and "participants" in res:
+            participant_count = len(res["participants"])
+        elif isinstance(res, (list, tuple)):
+            participant_count = len(res)
+        telemetry_registry.record_fl_round(duration_seconds=duration, participant_count=participant_count)
+        return res
+
+    return wrapper
+
+
+def track_grpc_latency(method: str) -> Callable:
+    """Decorator to measure and record gRPC request latency."""
+
+    def decorator(func: Callable) -> Callable:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            start = time.time()
+            try:
+                res = func(*args, **kwargs)
+                status = "OK"
+                return res
+            except Exception:
+                status = "ERROR"
+                raise
+            finally:
+                duration = time.time() - start
+                telemetry_registry.record_grpc_latency(
+                    method=method, duration_seconds=duration, status=status
+                )
 
         return wrapper
 

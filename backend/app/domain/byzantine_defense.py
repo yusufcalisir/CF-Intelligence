@@ -44,9 +44,7 @@ class SpectralByzantineDefense:
 
         for b_id, norm_val in zip(bank_ids, norms, strict=False):
             is_anomaly = False
-            if mad > 1e-4 and (norm_val - median_norm) > 3.0 * mad:
-                is_anomaly = True
-            elif median_norm > 0 and norm_val > 3.0 * max(median_norm, 1.0):
+            if mad > 1e-4 and (norm_val - median_norm) > 3.0 * mad or median_norm > 0 and norm_val > 3.0 * max(median_norm, 1.0):
                 is_anomaly = True
 
             if is_anomaly:

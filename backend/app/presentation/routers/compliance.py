@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter
+
 from app.application.services.security_compliance import SecurityComplianceEngine
 
 router = APIRouter(prefix="/v1/compliance", tags=["Security & Compliance"])
