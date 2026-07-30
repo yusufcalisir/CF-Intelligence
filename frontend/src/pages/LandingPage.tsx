@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 // ── TYPE DEFINITIONS ────────────────────────────────────────────────────────
@@ -14,7 +15,6 @@ export interface BankInfoDetail {
   latency: string;
   xmlLogs: string[];
 }
-
 interface Module {
   id: string;
   name: string;
@@ -25,7 +25,6 @@ interface Module {
   outputs: string;
   tech: string;
 }
-
 interface ArchNode {
   id: string;
   label: string;
@@ -106,15 +105,145 @@ const ARCH_NODES: ArchNode[] = [
 ];
 
 const WORKFLOW_STEPS = [
-  { id: 1, label: 'ISO 20022 Ingestion', short: 'Ingestion', description: 'Each bank node ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 statements) via the Bank Connector Framework. Messages are validated against XSD schemas, normalised, and streamed into the local transaction graph store.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser\nfrom lxml import etree\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\ngraph_builder.ingest(msg)` },
-  { id: 2, label: 'Local GNN Training', short: 'Local Training', description: 'The local PyTorch Geometric GAT model is trained exclusively on data stored within the bank premises. The model learns multi-hop transaction graph embeddings capturing structural patterns associated with money laundering networks without ever transmitting raw data externally.', tech: ['PyTorch Geometric 2.6', 'GATConv', 'GraphSAGE', 'Adam optimiser'], code: `# Local GATConv Training\nfrom torch_geometric.nn import GATConv\n\nmodel = GATConv(in_channels=512,\n                out_channels=256,\n                heads=8, dropout=0.1)\noptimiser = Adam(model.parameters(), lr=3e-4)\n\nfor batch in local_loader:\n    loss = criterion(model(batch.x, batch.edge_index), batch.y)\n    loss.backward()` },
-  { id: 3, label: 'Differential Privacy', short: 'Diff. Privacy', description: 'Before any gradient leaves the bank, Opacus injects calibrated Gaussian noise proportional to the gradient L2-sensitivity. The (ε, δ)-DP guarantee is tracked by the Rényi Differential Privacy accountant. Only after budget verification is the noised gradient forwarded.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'Gradient Clipping'], code: `# Opacus DP Training\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimiser, loader = privacy_engine.make_private_with_epsilon(\n    module=model,\n    optimizer=optimiser,\n    data_loader=loader,\n    epochs=10, target_epsilon=0.50,\n    target_delta=1e-5, max_grad_norm=1.0,\n)` },
-  { id: 4, label: 'Secure Aggregation', short: 'Sec. Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and transmitted to the Intel SGX hardware enclave. The enclave performs homomorphic summation without decrypting individual bank contributions, providing cryptographic isolation guarantees.', tech: ['Paillier HE', 'Intel SGX v2', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// SGX Enclave Aggregation (C++)\nsgx_status_t ecall_homomorphic_aggregate(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_a, size_t len_a,\n    const uint8_t* cipher_b, size_t len_b,\n    uint8_t* cipher_sum, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_a, cipher_b);\n    memcpy(cipher_sum, sum.data(), sum.size());\n}` },
-  { id: 5, label: 'Byzantine Aggregation', short: 'BFT Filter', description: 'The FL Coordinator applies Byzantine-robust aggregation using the Krum algorithm and Trimmed Mean to neutralise adversarial gradient poisoning attacks from any compromised bank node before updating the global model.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine similarity'], code: `# Krum Byzantine Filtering\ndef krum(gradients: list[Tensor], f: int) -> Tensor:\n    """Select gradient maximally close to all others, excluding f adversaries.\"\"\"\n    n = len(gradients)\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2 for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:n - f - 2]))\n    return gradients[scores.index(min(scores))]` },
-  { id: 6, label: 'Global Model Update', short: 'Global Update', description: 'The aggregated and validated global model weights are committed to the Model Registry. All bank nodes receive the updated weights for the next training round. A Coordinator audit log records the cryptographic hash of each round\'s aggregated model.', tech: ['FedAvg', 'Model Registry', 'SHA-256 audit', 'gRPC broadcast'], code: `# FedAvg Global Aggregation\ndef fedavg(updates: list[dict], weights: list[int]) -> dict:\n    total = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(\n            w * u[key] for w, u in zip(weights, updates)\n        ) / total\n    return global_state` },
-  { id: 7, label: 'Risk Scoring', short: 'Risk Intelligence', description: 'The global GNN model produces 512-dimensional transaction embeddings which are passed to the Risk Scoring Engine. XGBoost ensemble classifier scores each transaction [0-1], with SHAP value decomposition providing interpretable feature attributions for each risk decision.', tech: ['XGBoost 2.0', 'SHAP', 'Platt Calibration', 'LIME'], code: `# Risk Score + SHAP Explanation\nimport shap\n\nrisk_model = xgboost.XGBClassifier()\nrisk_score = risk_model.predict_proba(embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_values = explainer.shap_values(embedding)\n# → interpretable feature attributions` },
-  { id: 8, label: 'SAR Export', short: 'SAR Export', description: 'Transactions crossing the configured risk threshold automatically trigger SAR (Suspicious Activity Report) generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM or regulatory submission.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
+  { id: 1, short: 'Ingestion', label: 'ISO 20022 Ingestion', description: 'Each bank node ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 statements) via the Bank Connector Framework. Messages are validated against XSD schemas, normalised, and streamed into the local transaction graph store.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser\nfrom lxml import etree\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\ngraph_builder.ingest(msg)` },
+  { id: 2, short: 'Local Training', label: 'Local GNN Training', description: 'The local PyTorch Geometric GAT model is trained exclusively on data stored within the bank premises. The model learns multi-hop transaction graph embeddings without ever transmitting raw data externally.', tech: ['PyTorch Geometric 2.6', 'GATConv', 'GraphSAGE', 'Adam optimiser'], code: `# Local GATConv Training\nfrom torch_geometric.nn import GATConv\n\nmodel = GATConv(in_channels=512,\n                out_channels=256,\n                heads=8, dropout=0.1)\noptimiser = Adam(model.parameters(), lr=3e-4)\n\nfor batch in local_loader:\n    loss = criterion(model(batch.x, batch.edge_index), batch.y)\n    loss.backward()` },
+  { id: 3, short: 'Diff. Privacy', label: 'Differential Privacy', description: 'Before any gradient leaves the bank, Opacus injects calibrated Gaussian noise proportional to the gradient L2-sensitivity. The (ε, δ)-DP guarantee is tracked by the Rényi Differential Privacy accountant.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'Gradient Clipping'], code: `# Opacus DP Training\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimiser, loader = privacy_engine.make_private_with_epsilon(\n    module=model,\n    optimizer=optimiser,\n    data_loader=loader,\n    epochs=10, target_epsilon=0.50,\n    target_delta=1e-5, max_grad_norm=1.0,\n)` },
+  { id: 4, short: 'Sec. Aggregation', label: 'Secure Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and transmitted to the Intel SGX hardware enclave. The enclave performs homomorphic summation without decrypting individual bank contributions.', tech: ['Paillier HE', 'Intel SGX v2', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// SGX Enclave Aggregation (C++)\nsgx_status_t ecall_homomorphic_aggregate(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_a, size_t len_a,\n    const uint8_t* cipher_b, size_t len_b,\n    uint8_t* cipher_sum, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_a, cipher_b);\n    memcpy(cipher_sum, sum.data(), sum.size());\n}` },
+  { id: 5, short: 'BFT Filter', label: 'Byzantine Aggregation', description: 'The FL Coordinator applies Byzantine-robust aggregation using the Krum algorithm and Trimmed Mean to neutralise adversarial gradient poisoning attacks from any compromised bank node before updating the global model.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine similarity'], code: `# Krum Byzantine Filtering\ndef krum(gradients: list[Tensor], f: int) -> Tensor:\n    n = len(gradients)\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2\n                       for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:n - f - 2]))\n    return gradients[scores.index(min(scores))]` },
+  { id: 6, short: 'Global Update', label: 'Global Model Update', description: 'The aggregated and validated global model weights are committed to the Model Registry. All bank nodes receive the updated weights for the next training round. A Coordinator audit log records the cryptographic hash of each round.', tech: ['FedAvg', 'Model Registry', 'SHA-256 audit', 'gRPC broadcast'], code: `# FedAvg Global Aggregation\ndef fedavg(updates: list[dict], weights: list[int]) -> dict:\n    total = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(\n            w * u[key] for w, u in zip(weights, updates)\n        ) / total\n    return global_state` },
+  { id: 7, short: 'Risk Intelligence', label: 'Risk Scoring', description: 'The global GNN model produces 512-dimensional transaction embeddings passed to the Risk Scoring Engine. XGBoost ensemble classifier scores each transaction [0-1], with SHAP value decomposition providing interpretable feature attributions.', tech: ['XGBoost 2.0', 'SHAP', 'Platt Calibration', 'LIME'], code: `# Risk Score + SHAP Explanation\nimport shap\n\nrisk_model = xgboost.XGBClassifier()\nrisk_score = risk_model.predict_proba(embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_values = explainer.shap_values(embedding)\n# → interpretable feature attributions` },
+  { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
 ];
+
+// ── ANIMATED NETWORK SVG ─────────────────────────────────────────────────────
+function ConsortiumNetworkSVG() {
+  // node positions (cx, cy)
+  const banks = [
+    { id: 'JPM', x: 60,  y: 55,  color: '#6366f1' },
+    { id: 'HSB', x: 220, y: 30,  color: '#8b5cf6' },
+    { id: 'DBK', x: 220, y: 130, color: '#06b6d4' },
+    { id: 'SGX', x: 140, y: 90,  color: '#10b981' },
+  ];
+  const edges = [
+    [0, 3], [1, 3], [2, 3],
+  ];
+  const [tick, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick(p => p + 1), 80);
+    return () => clearInterval(t);
+  }, []);
+
+  return (
+    <svg viewBox="0 0 280 170" className="w-full h-full" style={{ overflow: 'visible' }}>
+      <defs>
+        {banks.map(b => (
+          <radialGradient key={b.id} id={`grd-${b.id}`} cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor={b.color} stopOpacity="0.3" />
+            <stop offset="100%" stopColor={b.color} stopOpacity="0" />
+          </radialGradient>
+        ))}
+      </defs>
+
+      {/* edges with animated dash */}
+      {edges.map(([a, b], i) => {
+        const from = banks[a];
+        const to = banks[b];
+        const offset = ((tick * 2) + i * 40) % 120;
+        return (
+          <g key={`e-${i}`}>
+            <line
+              x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+              stroke="#1e1b4b" strokeWidth="2"
+            />
+            <line
+              x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+              stroke={from.color}
+              strokeWidth="1.5"
+              strokeDasharray="12 60"
+              strokeDashoffset={-offset}
+              strokeOpacity="0.7"
+            />
+          </g>
+        );
+      })}
+
+      {/* nodes */}
+      {banks.map((b, i) => (
+        <g key={b.id}>
+          {/* glow halo */}
+          <circle cx={b.x} cy={b.y} r="22" fill={`url(#grd-${b.id})`} />
+          {/* outer ring */}
+          <circle
+            cx={b.x} cy={b.y} r="14"
+            fill="none"
+            stroke={b.color}
+            strokeWidth="1"
+            strokeOpacity="0.4"
+            strokeDasharray="3 3"
+          />
+          {/* inner circle */}
+          <circle cx={b.x} cy={b.y} r="9" fill="#0f0f18" stroke={b.color} strokeWidth="1.5" />
+          {/* pulse ring */}
+          <circle
+            cx={b.x} cy={b.y}
+            r={9 + ((tick + i * 30) % 60) / 8}
+            fill="none"
+            stroke={b.color}
+            strokeWidth="0.8"
+            strokeOpacity={1 - ((tick + i * 30) % 60) / 60}
+          />
+          {/* label */}
+          <text
+            x={b.x} y={b.y + 26}
+            textAnchor="middle"
+            fontSize="8"
+            fill={b.color}
+            fontFamily="monospace"
+            fontWeight="600"
+          >
+            {b.id}
+          </text>
+          {/* center dot */}
+          <circle cx={b.x} cy={b.y} r="3" fill={b.color} />
+        </g>
+      ))}
+
+      {/* floating data packets on edges */}
+      {edges.map(([a, b], i) => {
+        const from = banks[a];
+        const to = banks[b];
+        const t = ((tick + i * 25) % 80) / 80;
+        const px = from.x + (to.x - from.x) * t;
+        const py = from.y + (to.y - from.y) * t;
+        return (
+          <circle
+            key={`pkt-${i}`}
+            cx={px} cy={py} r="2.5"
+            fill={banks[i].color}
+            opacity={t > 0.1 && t < 0.9 ? 0.9 : 0}
+          />
+        );
+      })}
+    </svg>
+  );
+}
+
+// ── FADE-IN SECTION WRAPPER ─────────────────────────────────────────────────
+function FadeSection({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const inView = useInView(ref, { once: true, margin: '-60px' });
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0, y: 24 }}
+      animate={inView ? { opacity: 1, y: 0 } : { opacity: 0, y: 24 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className={className}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 // ── ICON PRIMITIVES ──────────────────────────────────────────────────────────
 const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
@@ -125,31 +254,23 @@ const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
     <circle cx="22" cy="22" r="14" stroke="#4f46e5" strokeWidth="1" strokeDasharray="3 3" strokeOpacity="0.5" />
   </svg>
 );
-
 const MenuIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="18" x2="21" y2="18" />
+    <line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="18" x2="21" y2="18" />
   </svg>
 );
-
 const ArrowRight = () => (
   <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="5" y1="12" x2="19" y2="12" />
-    <polyline points="12 5 19 12 12 19" />
+    <line x1="5" y1="12" x2="19" y2="12" /><polyline points="12 5 19 12 12 19" />
   </svg>
 );
-
 const ChevronRight = () => (
-  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-4 h-4 text-slate-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="9 18 15 12 9 6" />
   </svg>
 );
 
-
-
-// ── MAIN COMPONENT ───────────────────────────────────────────────────────────
+// ── MAIN ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -162,27 +283,39 @@ export default function LandingPage() {
   const [flRound, setFlRound] = useState(47);
   const [accuracy, setAccuracy] = useState(94.2);
 
+  const advanceWorkflow = useCallback(() => {
+    setActiveWorkflowStep(p => p < 8 ? p + 1 : 1);
+  }, []);
+
   useEffect(() => {
     const t = setInterval(() => {
       setFlRound(p => p + 1);
       setAccuracy(parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
-    }, 6000);
+    }, 5000);
     return () => clearInterval(t);
   }, []);
 
   const currentWorkflowStep = WORKFLOW_STEPS.find(s => s.id === activeWorkflowStep)!;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white relative overflow-x-hidden">
-      {/* Minimal grid texture */}
-      <div className="fixed inset-0 pointer-events-none z-0" style={{
-        backgroundImage: 'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
-        backgroundSize: '40px 40px',
-      }} />
+    <div className="min-h-screen bg-[#070711] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white overflow-x-hidden">
+
+      {/* Ambient gradient blobs */}
+      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
+        <div className="absolute -top-60 -left-40 w-[600px] h-[600px] rounded-full bg-indigo-900/20 blur-[120px]" />
+        <div className="absolute top-1/3 -right-60 w-[500px] h-[500px] rounded-full bg-purple-900/15 blur-[120px]" />
+        <div className="absolute bottom-0 left-1/3 w-[400px] h-[400px] rounded-full bg-cyan-900/10 blur-[120px]" />
+        {/* grid */}
+        <div className="absolute inset-0" style={{
+          backgroundImage: 'linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px)',
+          backgroundSize: '48px 48px',
+        }} />
+      </div>
 
       <div className="relative z-10">
-        {/* ── HEADER ─────────────────────────────────────────────────────── */}
-        <header className="sticky top-0 z-50 h-14 flex items-center border-b border-slate-800/70 bg-[#0a0a0f]/90 backdrop-blur-xl">
+
+        {/* ── HEADER ──────────────────────────────────────────────────────── */}
+        <header className="sticky top-0 z-50 h-14 flex items-center border-b border-white/5 bg-[#070711]/80 backdrop-blur-xl">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
               <BrandLogo />
@@ -192,12 +325,12 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-500">
               {['Overview', 'Problem', 'Workflow', 'Capabilities', 'Platform', 'Architecture', 'Security', 'API & Docs'].map(label => (
                 <a
                   key={label}
                   href={`#${label === 'API & Docs' ? 'api' : label === 'Architecture' ? 'architecture' : label.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
-                  className="hover:text-slate-100 transition-colors"
+                  className="hover:text-slate-200 transition-colors"
                 >
                   {label}
                 </a>
@@ -212,13 +345,13 @@ export default function LandingPage() {
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100 cursor-pointer"
+                className="lg:hidden p-2 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-slate-100 cursor-pointer"
               >
                 <MenuIcon />
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium text-slate-100 bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.35)]"
               >
                 Launch Demo <ArrowRight />
               </button>
@@ -226,14 +359,14 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── MOBILE NAVIGATION DRAWER ────────────────────────────────────── */}
+        {/* ── MOBILE DRAWER ───────────────────────────────────────────────── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.nav
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="lg:hidden border-b border-slate-800 bg-[#0a0a0f]/95 backdrop-blur-xl px-4 py-4 space-y-1 z-40"
+              exit={{ opacity: 0, y: -8 }}
+              className="lg:hidden border-b border-white/5 bg-[#070711]/95 backdrop-blur-xl px-4 py-4 space-y-1 z-40"
             >
               {[
                 { label: 'Overview (3D Architecture)', href: '#hero' },
@@ -249,57 +382,78 @@ export default function LandingPage() {
                   key={link.label}
                   href={link.href}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className="block px-3 py-2 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-slate-900 rounded-lg transition-colors"
+                  className="block px-3 py-2 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-white/5 rounded-lg transition-colors"
                 >
                   {link.label}
                 </a>
               ))}
-              <div className="pt-2 border-t border-slate-800">
+              <div className="pt-2 border-t border-white/5">
                 <button
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
-                  className="w-full py-2 text-[13px] font-medium text-slate-100 bg-indigo-600 rounded-lg"
+                  className="w-full py-2 text-[13px] font-medium text-white bg-indigo-600 rounded-lg"
                 >
-                  Launch Platform
+                  Launch Live Platform Demo
                 </button>
               </div>
             </motion.nav>
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 1: OVERVIEW (#hero) ─────────────────────────────────── */}
-        <section id="hero" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
+        {/* ── SECTION 1: HERO / OVERVIEW ──────────────────────────────────── */}
+        <section id="hero" className="relative py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
-            {/* Left: Platform introduction */}
-            <div className="lg:col-span-7 space-y-8">
+
+            {/* Left */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              className="lg:col-span-7 space-y-8"
+            >
               <div>
-                <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-xs font-mono mb-4">
-                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono mb-5"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
                   Enterprise Platform — Production Deployment
-                </div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-slate-100 leading-tight tracking-tight mb-4">
-                  Privacy-Preserving<br />Cross-Bank Fraud Detection
+                </motion.div>
+                <h1 className="text-3xl sm:text-5xl font-bold leading-tight tracking-tight mb-4">
+                  <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
+                    Privacy-Preserving
+                  </span>
+                  <br />
+                  <span className="text-slate-100">Cross-Bank Fraud Detection</span>
                 </h1>
                 <p className="text-slate-400 text-[15px] leading-relaxed max-w-xl">
-                  CF-Intelligence is a federated machine learning platform that enables financial institutions to collaboratively train fraud detection models on transaction graph data without exposing raw customer data to any external party.
+                  CF-Intelligence is a federated machine learning platform that enables financial institutions to collaboratively train fraud detection models on transaction graph data — without exposing raw customer data to any external party.
                 </p>
               </div>
 
-              {/* Key characteristics */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Spec grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {[
-                  { label: 'Stack', value: 'Federated Learning + GNN' },
-                  { label: 'Privacy Model', value: '(ε=0.50, δ=1e-5)-DP' },
-                  { label: 'Cryptography', value: 'Paillier HE + Intel SGX TEE' },
-                  { label: 'Transport', value: 'ISO 20022 / pacs.008' },
-                  { label: 'Byzantine Tolerance', value: 'Krum + Trimmed Mean' },
-                  { label: 'Regulatory', value: 'FinCEN SAR Compliant' },
-                  { label: 'Detection Gain', value: '42% → 94.2% accuracy' },
-                  { label: 'Graph Engine', value: 'PyTorch Geometric GATConv' },
-                ].map(row => (
-                  <div key={row.label} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-slate-900/50 border border-slate-800/60">
-                    <span className="text-[11px] font-mono text-slate-500 min-w-[80px] pt-px">{row.label}</span>
-                    <span className="text-[11px] font-mono text-slate-200">{row.value}</span>
-                  </div>
+                  { label: 'Stack',          value: 'Federated Learning + GNN',     accent: 'indigo' },
+                  { label: 'Privacy',        value: '(ε=0.50, δ=1e-5)-DP',          accent: 'purple' },
+                  { label: 'Cryptography',   value: 'Paillier HE + SGX TEE',        accent: 'cyan' },
+                  { label: 'Transport',      value: 'ISO 20022 / pacs.008',          accent: 'emerald' },
+                  { label: 'BFT Tolerance',  value: 'Krum + Trimmed Mean',           accent: 'rose' },
+                  { label: 'Regulatory',     value: 'FinCEN SAR Compliant',          accent: 'amber' },
+                  { label: 'Detection Gain', value: '42% → 94.2% accuracy',         accent: 'green' },
+                  { label: 'Graph Engine',   value: 'GATConv · PyG 2.6',            accent: 'blue' },
+                ].map((row, i) => (
+                  <motion.div
+                    key={row.label}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 + i * 0.04 }}
+                    className="px-3 py-2.5 rounded-lg bg-white/3 border border-white/7 hover:border-white/15 transition-colors"
+                  >
+                    <div className="text-[9px] font-mono text-slate-600 uppercase tracking-wider mb-0.5">{row.label}</div>
+                    <div className="text-[11px] font-mono text-slate-200 leading-snug">{row.value}</div>
+                  </motion.div>
                 ))}
               </div>
 
@@ -307,524 +461,582 @@ export default function LandingPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[13px] font-medium text-white transition-colors cursor-pointer"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[13px] font-semibold text-white transition-all cursor-pointer shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.55)]"
                 >
                   Launch Live Platform Demo <ArrowRight />
                 </button>
                 <a
                   href="#architecture"
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-[13px] font-medium text-slate-300 transition-colors"
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-lg border border-white/10 hover:border-white/25 text-[13px] font-medium text-slate-300 hover:text-slate-100 transition-all"
                 >
-                  System Architecture
+                  System Design
                 </a>
               </div>
-            </div>
+            </motion.div>
 
-            {/* Right: System stats & live telemetry */}
-            <div className="lg:col-span-5 space-y-3">
-              {/* Build status badge */}
-              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] font-mono text-slate-500">Test Coverage</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-emerald-400">14 suites / 28 tests passing</span>
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-600/20 text-emerald-400 border border-emerald-600/20">PASS</span>
+            {/* Right */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.15 }}
+              className="lg:col-span-5 space-y-3"
+            >
+              {/* Network topology SVG */}
+              <div className="rounded-xl bg-white/3 border border-white/7 p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Consortium Network Topology</span>
+                  <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />LIVE
+                  </span>
                 </div>
-              </div>
-              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] font-mono text-slate-500">Deployment</span>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-[11px] font-mono text-emerald-400">Hugging Face Spaces — Live</span>
+                <div className="h-[170px]">
+                  <ConsortiumNetworkSVG />
                 </div>
-              </div>
-              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
-                <span className="text-[11px] font-mono text-slate-500">GitHub</span>
-                <span className="text-[11px] font-mono text-slate-300">yusufcalisir/CF-Intelligence</span>
               </div>
 
               {/* Live Telemetry HUD */}
-              <div className="mt-2 p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-3">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5">
-                  <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Live Consortium Telemetry</span>
+              <div className="p-4 rounded-xl bg-white/3 border border-white/7 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <span className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Live Consortium Telemetry</span>
                   <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />STREAMING
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />STREAMING
                   </span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Active FL Round</div>
-                    <div className="text-xl font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Global Accuracy</div>
-                    <div className="text-xl font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Privacy Budget</div>
-                    <div className="text-xl font-bold font-mono text-purple-400 mt-0.5">ε=0.50</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Stream Speed</div>
-                    <div className="text-xl font-bold font-mono text-blue-400 mt-0.5">1.4 GB/s</div>
-                  </div>
+                  {[
+                    { label: 'Active FL Round',  value: `#${flRound}`,  color: 'text-indigo-400' },
+                    { label: 'Global Accuracy',  value: `${accuracy}%`, color: 'text-emerald-400' },
+                    { label: 'Privacy Budget',   value: 'ε=0.50',       color: 'text-purple-400' },
+                    { label: 'Stream Speed',     value: '1.4 GB/s',     color: 'text-cyan-400' },
+                  ].map(item => (
+                    <div key={item.label}>
+                      <div className="text-[9px] font-mono text-slate-600 uppercase tracking-wider">{item.label}</div>
+                      <motion.div
+                        key={item.value}
+                        initial={{ opacity: 0.6, scale: 0.96 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.3 }}
+                        className={`text-xl font-bold font-mono mt-0.5 ${item.color}`}
+                      >
+                        {item.value}
+                      </motion.div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
-              {/* Node status */}
+              {/* Bank node rows */}
               <div className="space-y-1.5">
-                {Object.values(BANK_NODES).map(bank => (
-                  <div
+                {Object.values(BANK_NODES).map((bank, i) => (
+                  <motion.div
                     key={bank.id}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.3 + i * 0.06 }}
                     onClick={() => setActiveBankDrawer(bank)}
-                    className="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-600 cursor-pointer transition-colors group"
+                    className="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-white/3 border border-white/7 hover:border-indigo-500/40 hover:bg-indigo-600/5 cursor-pointer transition-all group"
                   >
                     <div className="flex items-center gap-2.5">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      <span className="text-[12px] font-medium text-slate-300 group-hover:text-slate-100">{bank.name}</span>
+                      <span className="text-[12px] font-medium text-slate-400 group-hover:text-slate-100 transition-colors">{bank.name}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="text-[11px] font-mono text-slate-500">{bank.latency}</span>
+                      <span className="text-[11px] font-mono text-slate-600">{bank.latency}</span>
                       <ChevronRight />
                     </div>
-                  </div>
+                  </motion.div>
                 ))}
               </div>
-            </div>
-          </div>
-        </section>
 
-        {/* ── SECTION 2: PROBLEM (#problem-solution) ──────────────────────── */}
-        <section id="problem-solution" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-12">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Problem Statement</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">
-              Money Laundering Networks Are Cross-Institutional
-            </h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              Modern financial crime — specifically smurfing and layering — deliberately fragments transactions across multiple regulated banking institutions to stay below detection thresholds at any single bank. Existing AML systems are institution-local and cannot detect this cross-bank pattern.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Traditional approach */}
-            <div className="p-6 rounded-xl bg-slate-900/50 border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[13px] font-semibold text-slate-200">Isolated Bank Detection</h3>
-                <span className="px-2 py-0.5 text-[10px] font-mono text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded">42% detection rate</span>
-              </div>
-              <div className="font-mono text-[11px] text-slate-400 space-y-2 border-t border-slate-800 pt-4">
-                <div className="flex items-start gap-2">
-                  <span className="text-rose-500 mt-px">✗</span>
-                  <span>GNN trained exclusively on local ledger — no cross-institution edges</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-rose-500 mt-px">✗</span>
-                  <span>Smurfing detected at single bank is indistinguishable from normal traffic</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-rose-500 mt-px">✗</span>
-                  <span>GDPR Article 9 & banking secrecy laws prohibit raw data sharing</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-rose-500 mt-px">✗</span>
-                  <span>False positive rate: ~31% — significant investigator burden</span>
-                </div>
-              </div>
-            </div>
-
-            {/* CFI approach */}
-            <div className="p-6 rounded-xl bg-slate-900/50 border border-indigo-600/30 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[13px] font-semibold text-slate-200">Federated Consortium Intelligence</h3>
-                <span className="px-2 py-0.5 text-[10px] font-mono text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded">94.2% detection rate</span>
-              </div>
-              <div className="font-mono text-[11px] text-slate-400 space-y-2 border-t border-slate-800 pt-4">
-                <div className="flex items-start gap-2">
-                  <span className="text-emerald-500 mt-px">✓</span>
-                  <span>Shared GNN embeddings trained on consortium-wide graph topology</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-emerald-500 mt-px">✓</span>
-                  <span>Zero raw transaction data leaves any institution's premises</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-emerald-500 mt-px">✓</span>
-                  <span>(ε=0.50, δ=1e-5)-DP guarantees plausible deniability on gradient updates</span>
-                </div>
-                <div className="flex items-start gap-2">
-                  <span className="text-emerald-500 mt-px">✓</span>
-                  <span>False positive rate: ~6.1% — investigator efficiency 5× improvement</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ── SECTION 3: WORKFLOW (#how-it-works) ─────────────────────────── */}
-        <section id="how-it-works" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Execution Pipeline</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">End-to-End Federated Training Pipeline</h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              Each federated learning round traverses eight stages — from raw ISO 20022 message ingestion through to FinCEN SAR export. Click any stage to inspect its architecture and code reference.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            {/* Step list */}
-            <div className="lg:col-span-4 space-y-1">
-              {WORKFLOW_STEPS.map(step => (
-                <button
-                  key={step.id}
-                  onClick={() => setActiveWorkflowStep(step.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
-                    activeWorkflowStep === step.id
-                      ? 'bg-indigo-600/10 border-indigo-600/40 text-slate-100'
-                      : 'border-transparent hover:bg-slate-900 text-slate-400'
-                  }`}
-                >
-                  <span className={`shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono font-bold border ${
-                    activeWorkflowStep === step.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-500'
-                  }`}>
-                    {step.id}
+              {/* Build badges */}
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { label: '28 tests passing', color: 'emerald' },
+                  { label: 'HF Spaces — Live', color: 'indigo' },
+                  { label: 'yusufcalisir/CF-Intelligence', color: 'slate' },
+                ].map(b => (
+                  <span
+                    key={b.label}
+                    className={`px-2.5 py-1 rounded text-[10px] font-mono border ${
+                      b.color === 'emerald' ? 'bg-emerald-600/10 border-emerald-600/20 text-emerald-400' :
+                      b.color === 'indigo'  ? 'bg-indigo-600/10 border-indigo-600/20 text-indigo-400' :
+                                              'bg-white/5 border-white/10 text-slate-400'
+                    }`}
+                  >
+                    {b.label}
                   </span>
-                  <span className="text-[12px] font-medium">{step.short}</span>
-                </button>
-              ))}
-            </div>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        </section>
 
-            {/* Step detail */}
-            <div className="lg:col-span-8 space-y-4">
-              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
-                <div>
-                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
-                  <h3 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h3>
+        {/* ── SECTION 2: PROBLEM ──────────────────────────────────────────── */}
+        <section id="problem-solution" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="relative border-t border-white/5 pt-16">
+            <FadeSection className="max-w-2xl mb-10">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">Problem Statement</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">
+                Money Laundering Networks Are Cross-Institutional
+              </h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                Modern financial crime deliberately fragments transactions across multiple regulated banking institutions to stay below detection thresholds at any single bank. Existing AML systems are institution-local and structurally blind to this pattern.
+              </p>
+            </FadeSection>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Isolated */}
+              <FadeSection>
+                <div className="h-full p-6 rounded-xl bg-white/3 border border-rose-500/15 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[13px] font-semibold text-slate-200">Isolated Bank Detection</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-mono text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded-full">42% detection</span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-500 space-y-2.5 border-t border-white/5 pt-4">
+                    {[
+                      'GNN trained exclusively on local ledger — no cross-institution edges',
+                      'Smurfing at single bank is indistinguishable from normal traffic',
+                      'GDPR Article 9 & banking secrecy laws prohibit raw data sharing',
+                      'False positive rate: ~31% — significant investigator burden',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <span className="text-rose-500 mt-px shrink-0">✗</span>
+                        <span>{t}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-                <p className="text-[13px] text-slate-400 leading-relaxed border-t border-slate-800 pt-3">
-                  {currentWorkflowStep.description}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {currentWorkflowStep.tech.map(t => (
-                    <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-indigo-300 bg-indigo-600/10 border border-indigo-600/20">{t}</span>
+              </FadeSection>
+
+              {/* CFI */}
+              <FadeSection>
+                <div className="h-full p-6 rounded-xl bg-indigo-600/5 border border-indigo-500/25 space-y-4 shadow-[inset_0_0_40px_rgba(99,102,241,0.05)]">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-[13px] font-semibold text-slate-200">Federated Consortium Intelligence</h3>
+                    <span className="px-2 py-0.5 text-[10px] font-mono text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded-full">94.2% detection</span>
+                  </div>
+                  <div className="font-mono text-[11px] text-slate-400 space-y-2.5 border-t border-white/5 pt-4">
+                    {[
+                      'Shared GNN embeddings trained on consortium-wide graph topology',
+                      'Zero raw transaction data leaves any institution\'s premises',
+                      '(ε=0.50, δ=1e-5)-DP guarantees on gradient updates',
+                      'False positive rate: ~6.1% — investigator efficiency 5× improvement',
+                    ].map(t => (
+                      <div key={t} className="flex items-start gap-2">
+                        <span className="text-emerald-500 mt-px shrink-0">✓</span>
+                        <span>{t}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </FadeSection>
+            </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 3: WORKFLOW ─────────────────────────────────────────── */}
+        <section id="how-it-works" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">Execution Pipeline</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">End-to-End Federated Training Pipeline</h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                Each federated learning round traverses eight stages. Click any stage to inspect its architecture, algorithm, and code reference.
+              </p>
+            </FadeSection>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Step list with connector line */}
+              <div className="lg:col-span-4 relative">
+                <div className="absolute left-[28px] top-0 bottom-0 w-px bg-gradient-to-b from-indigo-600/40 via-purple-600/20 to-transparent pointer-events-none" />
+                <div className="space-y-1">
+                  {WORKFLOW_STEPS.map(step => (
+                    <motion.button
+                      key={step.id}
+                      onClick={() => setActiveWorkflowStep(step.id)}
+                      whileHover={{ x: 3 }}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
+                        activeWorkflowStep === step.id
+                          ? 'bg-indigo-600/12 border-indigo-500/35 shadow-[0_0_20px_rgba(99,102,241,0.12)]'
+                          : 'border-transparent hover:bg-white/4 text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      <span className={`shrink-0 w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-mono font-bold transition-all ${
+                        activeWorkflowStep === step.id
+                          ? 'bg-indigo-600 text-white shadow-[0_0_10px_rgba(99,102,241,0.6)]'
+                          : 'border border-white/10 text-slate-600'
+                      }`}>
+                        {step.id}
+                      </span>
+                      <span className={`text-[12px] font-medium ${activeWorkflowStep === step.id ? 'text-slate-100' : ''}`}>
+                        {step.short}
+                      </span>
+                    </motion.button>
                   ))}
                 </div>
-                <div className="rounded-lg bg-[#0d0d14] border border-slate-800 p-4 overflow-x-auto">
-                  <pre className="text-[11px] font-mono text-indigo-300 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
-                </div>
+              </div>
+
+              {/* Step detail */}
+              <div className="lg:col-span-8">
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeWorkflowStep}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.25 }}
+                    className="p-5 rounded-xl bg-white/3 border border-white/8 space-y-4"
+                  >
+                    <div>
+                      <div className="text-[10px] font-mono text-indigo-500 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
+                      <h3 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h3>
+                    </div>
+                    <p className="text-[13px] text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                      {currentWorkflowStep.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {currentWorkflowStep.tech.map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-indigo-300 bg-indigo-600/10 border border-indigo-500/20">{t}</span>
+                      ))}
+                    </div>
+                    <div className="rounded-lg bg-[#08081a] border border-white/6 p-4 overflow-x-auto">
+                      <pre className="text-[11px] font-mono text-indigo-200/80 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="text-[10px] font-mono text-slate-600">{activeWorkflowStep}/8 stages</span>
+                      <button
+                        onClick={advanceWorkflow}
+                        className="flex items-center gap-1.5 text-[11px] font-mono text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        Next stage <ArrowRight />
+                      </button>
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── SECTION 4: CAPABILITIES (#product) ──────────────────────────── */}
-        <section id="product" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">System Modules</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Platform Engineering Components</h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              Each module represents a discrete engineering component with defined responsibilities, algorithms, I/O contracts, and technology stack.
-            </p>
-          </div>
+        {/* ── SECTION 4: CAPABILITIES ─────────────────────────────────────── */}
+        <section id="product" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">System Modules</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Platform Engineering Components</h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                Each module has defined responsibilities, algorithms, I/O contracts, and technology stack.
+              </p>
+            </FadeSection>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Module list */}
-            <div className="lg:col-span-4 space-y-1">
-              {PLATFORM_MODULES.map(mod => (
-                <button
-                  key={mod.id}
-                  onClick={() => setActiveModule(mod)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all group ${
-                    activeModule?.id === mod.id
-                      ? 'bg-slate-800 border-slate-600 text-slate-100'
-                      : 'border-transparent hover:bg-slate-900/60 text-slate-400'
-                  }`}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-4 space-y-1">
+                {PLATFORM_MODULES.map(mod => (
+                  <motion.button
+                    key={mod.id}
+                    onClick={() => setActiveModule(mod)}
+                    whileHover={{ x: 3 }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all ${
+                      activeModule?.id === mod.id
+                        ? 'bg-indigo-600/10 border-indigo-500/35 shadow-[0_0_20px_rgba(99,102,241,0.12)]'
+                        : 'border-transparent hover:bg-white/4 text-slate-500'
+                    }`}
+                  >
+                    <div>
+                      <div className={`text-[12px] font-medium ${activeModule?.id === mod.id ? 'text-slate-100' : 'text-slate-400'}`}>{mod.name}</div>
+                      <div className="text-[10px] font-mono text-slate-700 mt-0.5">{mod.category}</div>
+                    </div>
+                    <ChevronRight />
+                  </motion.button>
+                ))}
+              </div>
+
+              {activeModule && (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeModule.id}
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.2 }}
+                    className="lg:col-span-8 p-6 rounded-xl bg-white/3 border border-white/8 space-y-5"
+                  >
+                    <div className="flex items-start justify-between border-b border-white/5 pb-4">
+                      <div>
+                        <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">{activeModule.category}</span>
+                        <h3 className="text-lg font-semibold text-slate-100 mt-0.5">{activeModule.name}</h3>
+                      </div>
+                    </div>
+                    <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
+                    <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                      {[
+                        { label: 'Algorithm',  value: activeModule.algorithm },
+                        { label: 'Technology', value: activeModule.tech },
+                        { label: 'Inputs',     value: activeModule.inputs },
+                        { label: 'Outputs',    value: activeModule.outputs },
+                      ].map(row => (
+                        <div key={row.label} className="p-3 rounded-lg bg-[#08081a] border border-white/6">
+                          <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-1">{row.label}</div>
+                          <div className="text-slate-200">{row.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 5: PLATFORM (NODE INSPECTOR) ───────────────────────── */}
+        <section id="platform" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">Consortium Node Registry</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Active Bank Node Inspector</h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                Click any node to inspect hardware configuration, PyTorch runtime, and live ISO 20022 stream activity.
+              </p>
+            </FadeSection>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Object.values(BANK_NODES).map((bank, i) => (
+                <motion.div
+                  key={bank.id}
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.08 }}
+                  whileHover={{ y: -3, transition: { duration: 0.2 } }}
+                  onClick={() => setActiveBankDrawer(bank)}
+                  className="p-5 rounded-xl bg-white/3 border border-white/7 hover:border-indigo-500/40 hover:shadow-[0_0_30px_rgba(99,102,241,0.1)] cursor-pointer transition-all group space-y-3"
                 >
-                  <div>
-                    <div className="text-[12px] font-medium leading-snug">{mod.name}</div>
-                    <div className="text-[10px] font-mono text-slate-600 mt-0.5">{mod.category}</div>
-                  </div>
-                  <ChevronRight />
-                </button>
-              ))}
-            </div>
-
-            {/* Module detail */}
-            {activeModule && (
-              <div className="lg:col-span-8 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
-                <div className="flex items-start justify-between border-b border-slate-800 pb-4">
-                  <div>
-                    <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">{activeModule.category}</span>
-                    <h3 className="text-lg font-semibold text-slate-100 mt-0.5">{activeModule.name}</h3>
-                  </div>
-                </div>
-                <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
-                <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
-                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
-                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Algorithm</div>
-                    <div className="text-slate-200">{activeModule.algorithm}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
-                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Technology</div>
-                    <div className="text-slate-200">{activeModule.tech}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
-                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Inputs</div>
-                    <div className="text-slate-200">{activeModule.inputs}</div>
-                  </div>
-                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
-                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Outputs</div>
-                    <div className="text-slate-200">{activeModule.outputs}</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ── SECTION 5: PLATFORM (#platform) ─────────────────────────────── */}
-        <section id="platform" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Consortium Node Registry</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Active Bank Node Inspector</h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              Each participating institution deploys a lightweight bank node agent. Click any node to inspect its hardware configuration, PyTorch runtime, and live ISO 20022 stream activity.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Object.values(BANK_NODES).map(bank => (
-              <div
-                key={bank.id}
-                onClick={() => setActiveBankDrawer(bank)}
-                className="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 cursor-pointer transition-all group space-y-3"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    <span className="text-[10px] font-mono text-emerald-500">ACTIVE</span>
-                  </div>
-                  <span className="text-[10px] font-mono text-slate-500">{bank.latency}</span>
-                </div>
-                <div>
-                  <div className="text-[13px] font-medium text-slate-200 group-hover:text-slate-100">{bank.name}</div>
-                  <div className="text-[10px] font-mono text-slate-500 mt-0.5">{bank.ticker}</div>
-                </div>
-                <div className="text-[10px] font-mono text-slate-600 border-t border-slate-800 pt-2.5 leading-relaxed">
-                  {bank.hardware}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── SECTION 6: ARCHITECTURE (#architecture-internal) ─────────────────────── */}
-        <section id="architecture" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">System Design</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Service Layer Map</h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              Click any service node to inspect its responsibilities, communication protocols, and technology stack.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            {/* Architecture node list */}
-            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
-              {ARCH_NODES.map(node => (
-                <button
-                  key={node.id}
-                  onClick={() => setActiveArchNode(node)}
-                  className={`p-4 rounded-lg border text-left transition-all ${
-                    activeArchNode?.id === node.id
-                      ? 'bg-indigo-600/10 border-indigo-600/40'
-                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
-                  }`}
-                >
-                  <div className={`text-[12px] font-medium mb-0.5 ${activeArchNode?.id === node.id ? 'text-indigo-300' : 'text-slate-300'}`}>
-                    {node.label}
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-600 leading-snug">{node.tech.slice(0, 2).join(' · ')}</div>
-                </button>
-              ))}
-            </div>
-
-            {/* Architecture node detail */}
-            {activeArchNode && (
-              <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
-                <div className="border-b border-slate-800 pb-4">
-                  <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider mb-0.5">Service Component</div>
-                  <h3 className="text-base font-semibold text-slate-100">{activeArchNode.label}</h3>
-                  <p className="text-[13px] text-slate-400 mt-2 leading-relaxed">{activeArchNode.description}</p>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] font-mono">
-                  <div>
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Responsibilities</div>
-                    <ul className="space-y-1">
-                      {activeArchNode.responsibilities.map(r => (
-                        <li key={r} className="text-slate-300 flex items-center gap-1.5"><span className="text-indigo-500">·</span>{r}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Protocols</div>
-                    <ul className="space-y-1">
-                      {activeArchNode.protocols.map(p => (
-                        <li key={p} className="text-slate-300 flex items-center gap-1.5"><span className="text-purple-500">·</span>{p}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div>
-                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Technology</div>
-                    <ul className="space-y-1">
-                      {activeArchNode.tech.map(t => (
-                        <li key={t} className="text-slate-300 flex items-center gap-1.5"><span className="text-cyan-500">·</span>{t}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </section>
-
-        {/* ── SECTION 7: SECURITY (#security) ─────────────────────────────── */}
-        <section id="security" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Security Model</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Privacy &amp; Trust Boundary Model</h2>
-          </div>
-
-          <div className="flex gap-2 border-b border-slate-800 pb-0 mb-6">
-            {[
-              { id: 'flow', label: 'Data Flow' },
-              { id: 'threat', label: 'Threat Model' },
-              { id: 'compliance', label: 'Compliance' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActivePrivacyTab(tab.id as 'flow' | 'threat' | 'compliance')}
-                className={`px-4 py-2 text-[12px] font-medium border-b-2 transition-colors -mb-px ${
-                  activePrivacyTab === tab.id
-                    ? 'border-indigo-500 text-indigo-300'
-                    : 'border-transparent text-slate-500 hover:text-slate-300'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {activePrivacyTab === 'flow' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Inside Bank Perimeter</div>
-                <div className="space-y-2 font-mono text-[11px] text-slate-400">
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Raw transaction records</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Customer PII</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Account balances</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Local GNN graph</div>
-                </div>
-                <div className="text-[10px] text-rose-500 font-mono">← Never transmitted externally</div>
-              </div>
-              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Transmitted (DP-Noised)</div>
-                <div className="space-y-2 font-mono text-[11px] text-slate-400">
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">DP-noised gradient tensors</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Paillier ciphertexts</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Round participation flags</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">HSM-signed commitments</div>
-                </div>
-                <div className="text-[10px] text-emerald-500 font-mono">← (ε=0.50, δ=1e-5)-DP bounded</div>
-              </div>
-              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
-                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">SGX Enclave (Hardware Isolated)</div>
-                <div className="space-y-2 font-mono text-[11px] text-slate-400">
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">HE aggregation only</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">IAS attestation verified</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Encrypted memory pages</div>
-                  <div className="p-2 rounded bg-slate-950 border border-slate-800">No external network access</div>
-                </div>
-                <div className="text-[10px] text-purple-500 font-mono">← Hardware trust boundary</div>
-              </div>
-            </div>
-          )}
-
-          {activePrivacyTab === 'threat' && (
-            <div className="space-y-3">
-              {[
-                { threat: 'Gradient Inversion Attack', mitigation: 'Gaussian DP noise (σ calibrated to ε=0.50) makes gradient inversion computationally infeasible. Clipping bound C=1.0.', severity: 'Mitigated' },
-                { threat: 'Byzantine Gradient Poisoning', mitigation: 'Krum + Trimmed Mean Byzantine-robust aggregation neutralises up to f < n/2 compromised nodes per round.', severity: 'Mitigated' },
-                { threat: 'Coordinator Compromise', mitigation: 'Intel SGX TEE handles aggregation. Coordinator sees only ciphertexts; plaintext gradients are never accessible outside enclave.', severity: 'Mitigated' },
-                { threat: 'Membership Inference', mitigation: 'RDP accountant tracks cumulative budget. Training halted when ε threshold exceeded. Per-sample clipping prevents memorisation.', severity: 'Mitigated' },
-                { threat: 'Model Extraction', mitigation: 'Global model is distributed only to authenticated bank nodes over mTLS. No external inference endpoint is exposed.', severity: 'Mitigated' },
-              ].map(row => (
-                <div key={row.threat} className="flex items-start gap-4 p-4 rounded-lg bg-slate-900 border border-slate-800">
-                  <div className="w-40 shrink-0">
-                    <div className="text-[11px] font-medium text-rose-400">{row.threat}</div>
-                    <div className="text-[10px] font-mono text-emerald-500 mt-0.5">{row.severity}</div>
-                  </div>
-                  <div className="text-[11px] text-slate-400 font-mono leading-relaxed">{row.mitigation}</div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {activePrivacyTab === 'compliance' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[
-                { standard: 'GDPR Article 25', status: 'Privacy by Design', detail: 'DP guarantees built into training pipeline. No PII ever leaves institution.' },
-                { standard: 'FinCEN SAR Regulation', status: 'Compliant', detail: 'Automated SAR XML generation with cryptographic sign-off and audit trail.' },
-                { standard: 'EU AML Directive 6AMLD', status: 'Compliant', detail: 'Cross-border pattern detection via federated architecture without data transfer.' },
-                { standard: 'NIST SP 800-188', status: 'Aligned', detail: 'De-identification through differential privacy following NIST de-ID standard.' },
-                { standard: 'ISO 20022', status: 'Native', detail: 'pacs.008 and camt.053 message formats parsed natively by Bank Connector.' },
-                { standard: 'SOC 2 Type II', status: 'In Progress', detail: 'Audit logging, access controls, and telemetry pipeline support SOC 2 criteria.' },
-              ].map(row => (
-                <div key={row.standard} className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-mono text-slate-300">{row.standard}</span>
-                    <span className="text-[10px] font-mono text-emerald-400">{row.status}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[10px] font-mono text-emerald-500">ACTIVE</span>
+                    </div>
+                    <span className="text-[10px] font-mono text-slate-600">{bank.latency}</span>
                   </div>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">{row.detail}</p>
-                </div>
+                  <div>
+                    <div className="text-[13px] font-medium text-slate-300 group-hover:text-slate-100 transition-colors">{bank.name}</div>
+                    <div className="text-[10px] font-mono text-slate-600 mt-0.5">{bank.ticker}</div>
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-700 border-t border-white/5 pt-2.5 leading-relaxed">
+                    {bank.hardware}
+                  </div>
+                </motion.div>
               ))}
             </div>
-          )}
+          </div>
         </section>
 
-        {/* ── SECTION 8: API & DOCS (#api, #docs) ─────────────────────────── */}
-        <section id="api" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
-          <div id="docs" className="max-w-2xl">
-            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Developer API</div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">REST API & Connector SDK</h2>
-            <p className="text-slate-400 text-[14px] leading-relaxed">
-              The CF-Intelligence platform exposes a REST API for coordinator control, a WebSocket stream for real-time telemetry, and a Bank Connector SDK for onboarding new institutions.
-            </p>
-          </div>
+        {/* ── SECTION 6: ARCHITECTURE ─────────────────────────────────────── */}
+        <section id="architecture" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">System Design</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Service Layer Map</h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                Click any service node to inspect its responsibilities, communication protocols, and technology stack.
+              </p>
+            </FadeSection>
 
-          {/* API tab switcher */}
-          <div className="flex gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg w-fit">
-            {[
-              { id: 'curl', label: 'cURL' },
-              { id: 'python', label: 'Python' },
-              { id: 'ts', label: 'TypeScript' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveApiTab(tab.id as 'curl' | 'python' | 'ts')}
-                className={`px-4 py-1.5 text-[12px] font-mono rounded-md transition-all ${
-                  activeApiTab === tab.id
-                    ? 'bg-slate-700 text-slate-100'
-                    : 'text-slate-500 hover:text-slate-300'
-                }`}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {ARCH_NODES.map(node => (
+                  <motion.button
+                    key={node.id}
+                    onClick={() => setActiveArchNode(node)}
+                    whileHover={{ scale: 1.02 }}
+                    className={`p-4 rounded-lg border text-left transition-all ${
+                      activeArchNode?.id === node.id
+                        ? 'bg-indigo-600/10 border-indigo-500/35 shadow-[0_0_18px_rgba(99,102,241,0.15)]'
+                        : 'bg-white/3 border-white/7 hover:border-white/15'
+                    }`}
+                  >
+                    <div className={`text-[12px] font-medium mb-0.5 ${activeArchNode?.id === node.id ? 'text-indigo-300' : 'text-slate-400'}`}>
+                      {node.label}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-700 leading-snug">{node.tech.slice(0, 2).join(' · ')}</div>
+                  </motion.button>
+                ))}
+              </div>
+
+              {activeArchNode && (
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={activeArchNode.id}
+                    initial={{ opacity: 0, x: 12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -12 }}
+                    transition={{ duration: 0.2 }}
+                    className="lg:col-span-7 p-6 rounded-xl bg-white/3 border border-white/8 space-y-5"
+                  >
+                    <div className="border-b border-white/5 pb-4">
+                      <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider mb-0.5">Service Component</div>
+                      <h3 className="text-base font-semibold text-slate-100">{activeArchNode.label}</h3>
+                      <p className="text-[13px] text-slate-400 mt-2 leading-relaxed">{activeArchNode.description}</p>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-[11px] font-mono">
+                      {[
+                        { label: 'Responsibilities', items: activeArchNode.responsibilities, dot: 'text-indigo-500' },
+                        { label: 'Protocols',        items: activeArchNode.protocols,       dot: 'text-purple-500' },
+                        { label: 'Technology',       items: activeArchNode.tech,            dot: 'text-cyan-500' },
+                      ].map(col => (
+                        <div key={col.label}>
+                          <div className="text-[9px] text-slate-600 uppercase tracking-wider mb-2">{col.label}</div>
+                          <ul className="space-y-1.5">
+                            {col.items.map(it => (
+                              <li key={it} className="text-slate-300 flex items-center gap-1.5">
+                                <span className={`${col.dot}`}>·</span>{it}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                </AnimatePresence>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* ── SECTION 7: SECURITY ─────────────────────────────────────────── */}
+        <section id="security" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">Security Model</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Privacy & Trust Boundary Model</h2>
+            </FadeSection>
+
+            <div className="flex gap-1 p-1 bg-white/3 border border-white/7 rounded-xl w-fit mb-6">
+              {[{ id: 'flow', label: 'Data Flow' }, { id: 'threat', label: 'Threat Model' }, { id: 'compliance', label: 'Compliance' }].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActivePrivacyTab(tab.id as 'flow' | 'threat' | 'compliance')}
+                  className={`px-4 py-1.5 text-[12px] font-medium rounded-lg transition-all ${
+                    activePrivacyTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-[0_0_14px_rgba(99,102,241,0.4)]'
+                      : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activePrivacyTab}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2 }}
               >
-                {tab.label}
-              </button>
-            ))}
+                {activePrivacyTab === 'flow' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                    {[
+                      { title: 'Inside Bank Perimeter', items: ['Raw transaction records', 'Customer PII', 'Account balances', 'Local GNN graph'], note: '← Never transmitted externally', noteColor: 'text-rose-500' },
+                      { title: 'Transmitted (DP-Noised)', items: ['DP-noised gradient tensors', 'Paillier ciphertexts', 'Round participation flags', 'HSM-signed commitments'], note: '← (ε=0.50, δ=1e-5)-DP bounded', noteColor: 'text-emerald-500' },
+                      { title: 'SGX Enclave (HW Isolated)', items: ['HE aggregation only', 'IAS attestation verified', 'Encrypted memory pages', 'No external network access'], note: '← Hardware trust boundary', noteColor: 'text-purple-500' },
+                    ].map(col => (
+                      <div key={col.title} className="p-5 rounded-xl bg-white/3 border border-white/7 space-y-3">
+                        <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">{col.title}</div>
+                        <div className="space-y-2 font-mono text-[11px] text-slate-400">
+                          {col.items.map(item => (
+                            <div key={item} className="p-2 rounded bg-white/3 border border-white/5">{item}</div>
+                          ))}
+                        </div>
+                        <div className={`text-[10px] font-mono ${col.noteColor}`}>{col.note}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {activePrivacyTab === 'threat' && (
+                  <div className="space-y-3">
+                    {[
+                      { threat: 'Gradient Inversion Attack',    mitigation: 'Gaussian DP noise (σ calibrated to ε=0.50) makes gradient inversion computationally infeasible. Clipping bound C=1.0.' },
+                      { threat: 'Byzantine Gradient Poisoning', mitigation: 'Krum + Trimmed Mean Byzantine-robust aggregation neutralises up to f < n/2 compromised nodes per round.' },
+                      { threat: 'Coordinator Compromise',       mitigation: 'Intel SGX TEE handles aggregation. Coordinator sees only ciphertexts; plaintext gradients never accessible outside enclave.' },
+                      { threat: 'Membership Inference',         mitigation: 'RDP accountant tracks cumulative budget. Training halted when ε threshold exceeded. Per-sample clipping prevents memorisation.' },
+                      { threat: 'Model Extraction',             mitigation: 'Global model distributed only to authenticated bank nodes over mTLS. No external inference endpoint exposed.' },
+                    ].map(row => (
+                      <motion.div
+                        key={row.threat}
+                        whileHover={{ x: 3 }}
+                        className="flex items-start gap-4 p-4 rounded-lg bg-white/3 border border-white/7 hover:border-white/12 transition-all"
+                      >
+                        <div className="w-44 shrink-0">
+                          <div className="text-[11px] font-medium text-rose-400">{row.threat}</div>
+                          <div className="text-[10px] font-mono text-emerald-500 mt-0.5">Mitigated</div>
+                        </div>
+                        <div className="text-[11px] text-slate-400 font-mono leading-relaxed">{row.mitigation}</div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
+                {activePrivacyTab === 'compliance' && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                      { standard: 'GDPR Article 25',         status: 'Privacy by Design', detail: 'DP guarantees built into training pipeline. No PII ever leaves institution.' },
+                      { standard: 'FinCEN SAR Regulation',   status: 'Compliant',          detail: 'Automated SAR XML generation with cryptographic sign-off and audit trail.' },
+                      { standard: 'EU AML Directive 6AMLD',  status: 'Compliant',          detail: 'Cross-border pattern detection via federated architecture without data transfer.' },
+                      { standard: 'NIST SP 800-188',         status: 'Aligned',            detail: 'De-identification through differential privacy following NIST de-ID standard.' },
+                      { standard: 'ISO 20022',               status: 'Native',             detail: 'pacs.008 and camt.053 message formats parsed natively by Bank Connector.' },
+                      { standard: 'SOC 2 Type II',           status: 'In Progress',        detail: 'Audit logging, access controls, and telemetry pipeline support SOC 2 criteria.' },
+                    ].map(row => (
+                      <div key={row.standard} className="p-4 rounded-lg bg-white/3 border border-white/7 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-mono text-slate-300">{row.standard}</span>
+                          <span className="text-[10px] font-mono text-emerald-400">{row.status}</span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 leading-relaxed">{row.detail}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </div>
+        </section>
 
-          <div className="rounded-xl bg-[#0d0d14] border border-slate-800 p-5 overflow-x-auto">
-            <pre className="text-[12px] font-mono text-indigo-200 leading-relaxed whitespace-pre">
-              {activeApiTab === 'curl' && `# Trigger a new federated learning round
+        {/* ── SECTION 8: API & DOCS ───────────────────────────────────────── */}
+        <section id="api" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div id="docs" className="border-t border-white/5 pt-16 space-y-8">
+            <FadeSection className="max-w-2xl">
+              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-3">Developer API</div>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">REST API & Connector SDK</h2>
+              <p className="text-slate-500 text-[14px] leading-relaxed">
+                REST API for coordinator control, WebSocket stream for real-time telemetry, and Bank Connector SDK for onboarding.
+              </p>
+            </FadeSection>
+
+            <div className="flex gap-1 p-1 bg-white/3 border border-white/7 rounded-xl w-fit">
+              {[{ id: 'curl', label: 'cURL' }, { id: 'python', label: 'Python' }, { id: 'ts', label: 'TypeScript' }].map(tab => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveApiTab(tab.id as 'curl' | 'python' | 'ts')}
+                  className={`px-4 py-1.5 text-[12px] font-mono rounded-lg transition-all ${
+                    activeApiTab === tab.id ? 'bg-slate-700 text-slate-100' : 'text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeApiTab}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="rounded-xl bg-[#08081a] border border-white/7 p-5 overflow-x-auto"
+              >
+                <pre className="text-[12px] font-mono text-indigo-200/80 leading-relaxed whitespace-pre">
+                  {activeApiTab === 'curl' && `# Trigger a new federated learning round
 curl -X POST https://api.cfi-platform.com/v1/rounds \\
   -H "Authorization: Bearer cfi_api_key_991823" \\
   -H "Content-Type: application/json" \\
@@ -839,7 +1051,7 @@ curl -X POST https://api.cfi-platform.com/v1/rounds \\
 # Stream live telemetry via WebSocket
 wscat -c wss://api.cfi-platform.com/v1/telemetry \\
   -H "Authorization: Bearer cfi_api_key_991823"`}
-              {activeApiTab === 'python' && `from cfi_sdk import CFIClient
+                  {activeApiTab === 'python' && `from cfi_sdk import CFIClient
 
 client = CFIClient(api_key="cfi_api_key_991823")
 
@@ -859,7 +1071,7 @@ round_ = client.rounds.start(
 
 for event in client.rounds.stream(round_.id):
     print(f"Round {event.round_id}: {event.stage} — {event.accuracy:.3f}")`}
-              {activeApiTab === 'ts' && `import { CFIClient } from '@cfi/sdk';
+                  {activeApiTab === 'ts' && `import { CFIClient } from '@cfi/sdk';
 
 const client = new CFIClient({ apiKey: 'cfi_api_key_991823' });
 
@@ -876,66 +1088,66 @@ const ws = client.telemetry.subscribe(round.id);
 ws.on('round.stage', (event) => {
   console.log(\`Stage: \${event.stage}, Accuracy: \${event.accuracy}\`);
 });`}
-            </pre>
-          </div>
+                </pre>
+              </motion.div>
+            </AnimatePresence>
 
-          {/* API endpoints table */}
-          <div className="rounded-xl border border-slate-800 overflow-hidden">
-            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800">
-              <span className="text-[11px] font-mono text-slate-400">API Endpoints</span>
+            {/* API table */}
+            <div className="rounded-xl border border-white/7 overflow-hidden">
+              <div className="px-4 py-3 bg-white/3 border-b border-white/5">
+                <span className="text-[11px] font-mono text-slate-500">API Endpoints — v1</span>
+              </div>
+              <table className="w-full text-[11px] font-mono">
+                <tbody>
+                  {[
+                    { method: 'POST', path: '/v1/rounds',        desc: 'Trigger a new federated learning round' },
+                    { method: 'GET',  path: '/v1/rounds/:id',    desc: 'Get round status and metrics' },
+                    { method: 'GET',  path: '/v1/nodes',         desc: 'List consortium bank nodes' },
+                    { method: 'POST', path: '/v1/connectors',    desc: 'Register new bank connector' },
+                    { method: 'GET',  path: '/v1/reports/sar',   desc: 'Retrieve FinCEN SAR exports' },
+                    { method: 'WS',   path: '/v1/telemetry',     desc: 'Real-time round telemetry stream' },
+                  ].map(row => (
+                    <tr key={row.path} className="border-b border-white/5 hover:bg-white/3 transition-colors">
+                      <td className="px-4 py-3 w-16">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          row.method === 'GET'  ? 'bg-sky-600/10 text-sky-400' :
+                          row.method === 'POST' ? 'bg-emerald-600/10 text-emerald-400' :
+                                                  'bg-purple-600/10 text-purple-400'
+                        }`}>
+                          {row.method}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-indigo-300">{row.path}</td>
+                      <td className="px-4 py-3 text-slate-600">{row.desc}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-            <table className="w-full text-[11px] font-mono">
-              <tbody>
-                {[
-                  { method: 'POST', path: '/v1/rounds', desc: 'Trigger a new federated learning round' },
-                  { method: 'GET', path: '/v1/rounds/:id', desc: 'Get round status and metrics' },
-                  { method: 'GET', path: '/v1/nodes', desc: 'List consortium bank nodes' },
-                  { method: 'POST', path: '/v1/connectors', desc: 'Register new bank connector' },
-                  { method: 'GET', path: '/v1/reports/sar', desc: 'Retrieve FinCEN SAR exports' },
-                  { method: 'WS', path: '/v1/telemetry', desc: 'Real-time round telemetry stream' },
-                ].map(row => (
-                  <tr key={row.path} className="border-b border-slate-800/60 hover:bg-slate-900/50">
-                    <td className="px-4 py-3 w-16">
-                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                        row.method === 'GET' ? 'bg-sky-600/10 text-sky-400' :
-                        row.method === 'POST' ? 'bg-emerald-600/10 text-emerald-400' :
-                        'bg-purple-600/10 text-purple-400'
-                      }`}>
-                        {row.method}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-indigo-300">{row.path}</td>
-                    <td className="px-4 py-3 text-slate-500">{row.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
           </div>
         </section>
 
         {/* ── FOOTER ──────────────────────────────────────────────────────── */}
-        <footer className="border-t border-slate-800/60 py-10 px-4 sm:px-6">
+        <footer className="border-t border-white/5 py-10 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex items-center gap-3">
               <BrandLogo className="w-7 h-7" />
               <div>
                 <div className="text-[12px] font-semibold text-slate-300">CF-Intelligence v2.4.0</div>
-                <div className="text-[11px] font-mono text-slate-600">Privacy-Preserving Federated Fraud Intelligence</div>
+                <div className="text-[11px] font-mono text-slate-700">Privacy-Preserving Federated Fraud Intelligence</div>
               </div>
             </div>
-            <div className="flex items-center gap-4 text-[11px] font-mono text-slate-600">
-              <span>PyTorch · Intel SGX · ISO 20022 · FinCEN SAR</span>
-            </div>
+            <div className="text-[11px] font-mono text-slate-700">PyTorch · Intel SGX · ISO 20022 · FinCEN SAR</div>
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium text-slate-100 bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.35)]"
             >
               Open Platform <ArrowRight />
             </button>
           </div>
         </footer>
 
-        {/* ── BANK NODE INSPECTOR DRAWER ───────────────────────────────── */}
+        {/* ── BANK NODE INSPECTOR DRAWER ──────────────────────────────────── */}
         <AnimatePresence>
           {activeBankDrawer && (
             <motion.div
@@ -943,25 +1155,25 @@ ws.on('round.stage', (event) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setActiveBankDrawer(null)}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end"
+              className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-end"
             >
               <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 28, stiffness: 200 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 180 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-lg bg-[#0f0f18] border-l border-slate-800 p-6 overflow-y-auto space-y-5"
+                className="w-full max-w-lg bg-[#0a0a16] border-l border-white/7 p-6 overflow-y-auto space-y-5"
               >
-                <div className="flex items-start justify-between border-b border-slate-800 pb-5">
+                <div className="flex items-start justify-between border-b border-white/5 pb-5">
                   <div>
                     <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">Bank Node Inspector</div>
                     <h3 className="text-base font-semibold text-slate-100 mt-1">{activeBankDrawer.name}</h3>
-                    <div className="text-[11px] font-mono text-slate-500 mt-0.5">{activeBankDrawer.location}</div>
+                    <div className="text-[11px] font-mono text-slate-600 mt-0.5">{activeBankDrawer.location}</div>
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
-                    className="px-3 py-1.5 rounded-lg text-[11px] font-mono bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100"
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-mono bg-white/5 border border-white/10 text-slate-500 hover:text-slate-100 transition-colors"
                   >
                     close
                   </button>
@@ -969,14 +1181,14 @@ ws.on('round.stage', (event) => {
 
                 <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
                   {[
-                    { k: 'Ticker', v: activeBankDrawer.ticker },
-                    { k: 'Latency', v: activeBankDrawer.latency },
+                    { k: 'Ticker',   v: activeBankDrawer.ticker },
+                    { k: 'Latency',  v: activeBankDrawer.latency },
                     { k: 'Hardware', v: activeBankDrawer.hardware },
                     { k: 'Host RAM', v: activeBankDrawer.ram },
-                    { k: 'PyTorch', v: activeBankDrawer.pytorch },
-                    { k: 'Status', v: 'ACTIVE — Round Participant' },
+                    { k: 'PyTorch',  v: activeBankDrawer.pytorch },
+                    { k: 'Status',   v: 'ACTIVE — Round Participant' },
                   ].map(row => (
-                    <div key={row.k} className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                    <div key={row.k} className="p-3 rounded-lg bg-white/3 border border-white/7">
                       <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-0.5">{row.k}</div>
                       <div className="text-slate-200 truncate">{row.v}</div>
                     </div>
@@ -984,13 +1196,19 @@ ws.on('round.stage', (event) => {
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2">ISO 20022 Stream Activity</div>
-                  <div className="rounded-lg bg-slate-950 border border-slate-800 p-4 space-y-3 font-mono text-[10px] text-slate-400 overflow-x-auto">
+                  <div className="text-[10px] font-mono text-slate-600 uppercase tracking-wider mb-2">ISO 20022 Stream Activity</div>
+                  <div className="rounded-lg bg-[#08081a] border border-white/6 p-4 space-y-3 font-mono text-[10px] text-slate-400 overflow-x-auto">
                     {activeBankDrawer.xmlLogs.map((log, i) => (
-                      <div key={i} className="flex items-start gap-2 border-b border-slate-900 pb-2 last:border-0 last:pb-0">
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, x: -5 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.1 }}
+                        className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0"
+                      >
                         <span className="text-indigo-600 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
                         <span className="break-all leading-relaxed">{log}</span>
-                      </div>
+                      </motion.div>
                     ))}
                   </div>
                 </div>
