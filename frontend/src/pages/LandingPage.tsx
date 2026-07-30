@@ -40,6 +40,62 @@ const CloseIcon = () => (
   </svg>
 );
 
+// Synchronized Premium Vector SVG Logo Mark (Identical to public/favicon.svg)
+const CfiLogoMark = ({ className = "w-9 h-9" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="cfi-border-grad-component" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stopColor="#6366f1" />
+        <stop offset="50%" stopColor="#a855f7" />
+        <stop offset="100%" stopColor="#10b981" />
+      </linearGradient>
+
+      <linearGradient id="cfi-shield-grad-component" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stopColor="#1e1b4b" stopOpacity="0.9" />
+        <stop offset="100%" stopColor="#020617" stopOpacity="0.95" />
+      </linearGradient>
+
+      <filter id="cfi-glow-component" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur stdDeviation="3" result="blur" />
+        <feComposite in="SourceGraphic" in2="blur" operator="over" />
+      </filter>
+    </defs>
+
+    <rect x="4" y="4" width="112" height="112" rx="28" fill="#030712" stroke="url(#cfi-border-grad-component)" strokeWidth="3" />
+
+    <g stroke="#334155" strokeWidth="1" strokeDasharray="2 3" opacity="0.35">
+      <line x1="60" y1="18" x2="60" y2="102" />
+      <line x1="18" y1="60" x2="102" y2="60" />
+    </g>
+
+    <path d="M 60,22 C 78,22 92,26 94,36 C 94,62 82,88 60,98 C 38,88 26,62 26,36 C 28,26 42,22 60,22 Z"
+          fill="url(#cfi-shield-grad-component)"
+          stroke="url(#cfi-border-grad-component)"
+          strokeWidth="3.5"
+          strokeLinejoin="round"
+          filter="url(#cfi-glow-component)" />
+
+    <g stroke="#818cf8" strokeWidth="2" opacity="0.75">
+      <line x1="60" y1="36" x2="38" y2="54" />
+      <line x1="60" y1="36" x2="82" y2="54" />
+      <line x1="38" y1="54" x2="60" y2="76" />
+      <line x1="82" y1="54" x2="60" y2="76" />
+      <line x1="60" y1="36" x2="60" y2="56" />
+      <line x1="38" y1="54" x2="60" y2="56" />
+      <line x1="82" y1="54" x2="60" y2="56" />
+      <line x1="60" y1="76" x2="60" y2="56" />
+    </g>
+
+    <circle cx="60" cy="36" r="4.5" fill="#38bdf8" />
+    <circle cx="38" cy="54" r="4.5" fill="#6366f1" />
+    <circle cx="82" cy="54" r="4.5" fill="#ec4899" />
+    <circle cx="60" cy="76" r="4.5" fill="#10b981" />
+
+    <circle cx="60" cy="56" r="7.5" fill="#a855f7" stroke="#ffffff" strokeWidth="2" filter="url(#cfi-glow-component)" />
+    <circle cx="60" cy="56" r="3" fill="#ffffff" />
+  </svg>
+);
+
 // Real Global Bank Information Interface for Drawer
 interface BankInfoDetail {
   id: string;
@@ -864,11 +920,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             {/* Logo */}
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20">
-                <div className="h-full w-full bg-slate-950 rounded-[9px] flex items-center justify-center font-black text-white text-base">
-                  🛡️
-                </div>
-              </div>
+              <CfiLogoMark className="w-10 h-10 drop-shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
                   CF-Intelligence
@@ -2038,8 +2090,8 @@ ${apiResponse}`}</pre>
         <footer className="border-t border-slate-800 bg-slate-950/90 py-12 sm:py-16 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="space-y-2 text-center md:text-left">
-              <div className="flex items-center justify-center md:justify-start gap-2">
-                <span className="text-xl">🛡️</span>
+              <div className="flex items-center justify-center md:justify-start gap-2.5">
+                <CfiLogoMark className="w-8 h-8" />
                 <span className="font-extrabold text-base sm:text-lg text-slate-100">Collaborative Fraud Intelligence Platform</span>
               </div>
               <p className="text-xs text-slate-400">
