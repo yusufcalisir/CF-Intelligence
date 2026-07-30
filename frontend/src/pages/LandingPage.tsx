@@ -17,13 +17,6 @@ const CfiLogoMark = ({ className = 'w-10 h-10' }: { className?: string }) => (
   </svg>
 );
 
-const LockIcon = () => (
-  <svg className="w-4 h-4 text-emerald-400 inline-block" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-  </svg>
-);
-
 const ArrowRightIcon = () => (
   <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <line x1="5" y1="12" x2="19" y2="12" />
@@ -178,7 +171,7 @@ export default function LandingPage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setFlRound((prev) => prev + 1);
-      setAccuracy((prev) => parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
+      setAccuracy(parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
     }, 6000);
     return () => clearInterval(interval);
   }, []);
