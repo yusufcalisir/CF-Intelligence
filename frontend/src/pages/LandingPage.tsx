@@ -299,13 +299,13 @@ function Real3DBankScene({
       // System Metrics Grid
       const roundNum = 47 + Math.floor(elapsedTime / 8);
       const txThroughput = (24890 + Math.floor(Math.sin(elapsedTime * 2) * 1200)).toLocaleString();
-      const latency = (1.4 + Math.sin(elapsedTime * 4) * 0.2).toFixed(2);
+      const latencyVal = (1.4 + Math.sin(elapsedTime * 4) * 0.2).toFixed(2);
 
       oledCtx.font = '16px monospace';
       oledCtx.fillStyle = '#94a3b8';
       oledCtx.fillText('Aggregation Round:', 24, 80);
       oledCtx.fillStyle = '#f8fafc';
-      oledCtx.fillText(`#${roundNum}`, 210, 80);
+      oledCtx.fillText(`#${roundNum} (${latencyVal}ms)`, 210, 80);
 
       oledCtx.fillStyle = '#94a3b8';
       oledCtx.fillText('Tx Throughput:', 24, 110);
@@ -441,7 +441,7 @@ function Real3DBankScene({
     ) => {
       const group = new THREE.Group();
       group.position.set(...pos);
-      group.userData = { bankKey };
+      group.userData = { bankKey, rackName };
 
       // 42U Rack Outer Cabinet Frame (Black Anodized Aluminum)
       const cabinetGeo = new THREE.BoxGeometry(2.4, 3.8, 2.4);
@@ -510,7 +510,6 @@ function Real3DBankScene({
     const sgxRack = createEnterpriseServerRack(0xa855f7, [-4.8, 0, 3.8], 'sgx', 'Intel SGX Node');
     const dbRack = createEnterpriseServerRack(0x06b6d4, [4.8, 0, 3.8], 'deutsche', 'Deutsche Bank');
 
-    const bankNodesList = [jpmRack.group, hsbcRack.group, sgxRack.group, dbRack.group];
     const allServerLeds = [...jpmRack.serverLeds, ...hsbcRack.serverLeds, ...sgxRack.serverLeds, ...dbRack.serverLeds];
 
     // ── 5. HEAVY INDUSTRIAL FIBER OPTIC PATCH CABLE CONDUITS ─────────────────
@@ -523,9 +522,9 @@ function Real3DBankScene({
 
       const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.045, 8, false);
       const tubeMat = new THREE.MeshStandardMaterial({
-        color: 0x1e293b,
-        metalness: 0.8,
-        roughness: 0.3,
+        color,
+        metalness: 0.85,
+        roughness: 0.25,
       });
       const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
       scene.add(tubeMesh);
