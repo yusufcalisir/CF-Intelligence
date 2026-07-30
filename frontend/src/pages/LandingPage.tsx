@@ -58,14 +58,14 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'jpmorgan',
     name: 'JPMorgan Chase & Co.',
     ticker: 'NYSE: JPM',
-    location: 'New York, US (3D Node #01)',
+    location: 'New York, US (Node #01)',
     hardware: 'NVIDIA A100 Tensor Core (80GB VRAM)',
     ram: '128 GB Host RAM',
     pytorch: '2.2.1+cu121',
     latency: '0.8 ms',
     xmlLogs: [
       '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'ISO20022 intake parsed: 4,800 transactions/sec. Local PyTorch GNN embeddings generated.',
+      'ISO 20022 intake parsed: 4,800 transactions/sec. Local PyTorch GNN embeddings generated.',
       'Differential Privacy noise injected: Gaussian(0, 0.05). Encrypted gradient uploaded to Enclave.',
     ],
   },
@@ -73,14 +73,14 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'hsbc',
     name: 'HSBC Holdings plc',
     ticker: 'LSE: HSBC',
-    location: 'London, UK (3D Node #02)',
+    location: 'London, UK (Node #02)',
     hardware: 'NVIDIA H100 SXM (80GB VRAM)',
     ram: '64 GB Host RAM',
     pytorch: '2.2.1+cu121',
     latency: '1.4 ms',
     xmlLogs: [
       '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>HSBC-2026-8810</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="GBP">890000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'ISO20022 intake parsed: 3,200 transactions/sec. Local PyTorch GNN embeddings generated.',
+      'ISO 20022 intake parsed: 3,200 transactions/sec. Local PyTorch GNN embeddings generated.',
       'Paillier homomorphic ciphertext generated: [[W_hsbc]]. Ready for federated aggregation.',
     ],
   },
@@ -88,7 +88,7 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'deutsche',
     name: 'Deutsche Bank AG',
     ticker: 'XETRA: DBK',
-    location: 'Frankfurt, DE (3D Node #03)',
+    location: 'Frankfurt, DE (Node #03)',
     hardware: 'Intel Xeon Platinum Cluster (CPU Monolith)',
     ram: '32 GB Host RAM',
     pytorch: '2.1.2+cpu',
@@ -150,7 +150,7 @@ const LIVE_LOG_FEED = [
   'Intel SGX Secure Enclave Memory Shield Active (0.00% Leakage Risk)',
 ];
 
-// ── REAL 3D WEBGL GRAPHICS COMPONENT POWERED BY THREE.JS ─────────────
+// ── REAL 3D WEBGL GRAPHICS SCENE COMPONENT POWERED BY THREE.JS ─────────────
 function Real3DBankScene({
   onSelectBank,
 }: {
@@ -237,7 +237,6 @@ function Real3DBankScene({
     const pinGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
     const pinMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.1 });
     for (let i = -1; i <= 1; i += 0.3) {
-      // Side 1 & 2
       const p1 = new THREE.Mesh(pinGeo, pinMat);
       p1.position.set(i * 1.8, 0, 1.45);
       chipGroup.add(p1);
@@ -246,7 +245,6 @@ function Real3DBankScene({
       p2.position.set(i * 1.8, 0, -1.45);
       chipGroup.add(p2);
 
-      // Side 3 & 4
       const p3 = new THREE.Mesh(pinGeo, pinMat);
       p3.rotation.y = Math.PI / 2;
       p3.position.set(1.45, 0, i * 1.8);
@@ -785,7 +783,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       {/* ── FLOATING QUICK-NAV DOCK (RIGHT SIDEBAR) ───────────── */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
         {[
-          { id: 'hero', label: 'Real 3D WebGL Engine' },
+          { id: 'hero', label: 'Architecture Topology' },
           { id: 'problem-solution', label: 'The Core Problem' },
           { id: 'how-it-works', label: 'How It Works' },
           { id: 'product', label: 'Privacy Engine' },
@@ -939,7 +937,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: HERO WITH REAL 3D WEBGL GRAPHICS SCENE (POWERED BY THREE.JS) ── */}
+        {/* ── SECTION 2: HERO WITH SEAMLESS INTEGRATED 3D WEBGL GRAPHICS CANVA ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -953,7 +951,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 transition={{ duration: 0.5 }}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold"
               >
-                <span>✨ REAL 3D WEBGL GRAPHICS SCENE</span>
+                <span>✨ PRIVACY-PRESERVING COLLABORATIVE AI</span>
                 <span className="text-indigo-500">•</span>
                 <span className="text-emerald-400 font-bold">EU AI Act & FinCEN Compliant</span>
               </motion.div>
@@ -1045,42 +1043,34 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: REAL 3D WEBGL GRAPHICS SCENE POWERED BY THREE.JS ── */}
-            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/40 bg-gradient-to-b from-slate-900/95 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
-              {/* Component Purpose Callout Banner */}
-              <div className="relative z-10 p-2.5 rounded-xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-[10px] text-indigo-200">
-                <span className="font-bold text-indigo-400 block mb-0.5">💡 REAL 3D WEBGL DATACENTER ENGINE (THREE.JS):</span>
-                JPMorgan Chase, HSBC, Deutsche Bank ve Intel SGX Enclave gerçek 3D nesneler olarak WebGL ile çizilir. Fare hareketi ile 3D sahneyi döndürebilir, 3D sunuculara tıklayabilirsiniz.
-              </div>
-
-              {/* Status Header */}
-              <div className="relative z-10 flex items-center justify-between py-1 border-b border-slate-800/80">
+            {/* ── RIGHT COLUMN: SEAMLESS 3D WEBGL ARCHITECTURE VISUALIZATION ── */}
+            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-slate-950/80 p-2 shadow-2xl overflow-hidden flex flex-col justify-between">
+              {/* Header Controls */}
+              <div className="relative z-10 flex items-center justify-between p-3 border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md rounded-t-2xl">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300 uppercase">
-                    REAL 3D WEBGL TOPOLOGY CHASSIS
+                  <span className="text-[11px] font-mono font-bold text-indigo-300 uppercase">
+                    CROSS-BANK FEDERATED TOPOLOGY MESH
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
-                  >
-                    <LockIcon />
-                    <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
-                  </button>
-                </div>
+                <button
+                  onClick={() => setIsDpShieldActive(!isDpShieldActive)}
+                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+                >
+                  <LockIcon />
+                  <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
+                </button>
               </div>
 
-              {/* REAL 3D THREE.JS WEBGL CONTAINER */}
-              <div className="relative z-0 w-full h-[380px] my-auto">
+              {/* SEAMLESS 3D CANVAS */}
+              <div className="relative z-0 w-full h-[430px] my-auto">
                 <Real3DBankScene onSelectBank={(bank) => setActiveBankDrawer(bank)} />
               </div>
 
-              {/* Bottom Subtitle */}
-              <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                <span>Move mouse to tilt 3D WebGL camera</span>
-                <span className="text-indigo-400 font-bold">CLICK 3D SERVER MESH TO INSPECT 🔍</span>
+              {/* Footer Instruction Bar */}
+              <div className="relative z-10 p-2 border-t border-slate-800/60 bg-slate-950/60 backdrop-blur-md rounded-b-2xl flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>Hover & Move mouse to rotate 3D camera view</span>
+                <span className="text-indigo-400 font-bold">CLICK ANY 3D NODE TO INSPECT 🔍</span>
               </div>
             </div>
           </div>
@@ -1338,10 +1328,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
-              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              {productTab === 'dp' && 'Differential Privacy (ε), model güncellemelerine matematiksel gürültü ekleyerek hackerların ortak modelden müşteri kimliğini geri elde etmesini imkansız kılar.'}
-              {productTab === 'negotiator' && 'Farklı donanımlara (A100 GPU vs H100 vs CPU) ve farklı yapay zeka mimarilerine sahip bankalar otomatik olarak tek bir küresel modelde buluşur.'}
-              {productTab === 'sla' && '3 büyük bankanın ortak verisiyle dolandırıcılık tespit oranı %98.42ye yükselir, hatalı alarm oranı %74.6 düşer.'}
+              <span className="font-bold text-indigo-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              {productTab === 'dp' && 'Differential Privacy (ε) injects calibrated Gaussian noise into model gradients, mathematically guaranteeing zero customer identity reconstruction.'}
+              {productTab === 'negotiator' && 'Heterogeneous parameter negotiation aligns model architectures across diverse banking compute infrastructure (A100 GPU vs H100 vs CPU).'}
+              {productTab === 'sla' && 'Consortium cross-bank data increases detection precision to 98.42% while reducing false positive alerts by 74.6%.'}
             </div>
 
             {productTab === 'dp' && (
@@ -1459,8 +1449,8 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
         >
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-8">
             <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-500/30 font-mono text-xs text-purple-200">
-              <span className="font-bold text-purple-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              Suç örgütleri 10.000$ altı paraları 3 farklı bankaya bölerek (smurfing) tespit edilmeyi engeller. Graph Neural Network bankalar arası alt grafikleri birleştirerek çeteyi anında yakalar.
+              <span className="font-bold text-purple-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              Criminal syndicates split funds into sub-$10K transfers across multiple institutions (smurfing/layering). Streaming Graph Neural Networks merge cross-bank subgraphs to detect money mule rings instantly.
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
@@ -1604,7 +1594,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
                     <div className="mt-4 space-y-2 text-[11px]">
                       <div className="p-2 rounded bg-slate-900 flex justify-between">
-                        <span className="text-slate-500">GNN Anomali Score:</span>
+                        <span className="text-slate-500">GNN Anomaly Score:</span>
                         <span className={`font-bold ${selectedGraphNode.riskScore > 0.8 ? 'text-rose-400' : 'text-emerald-400'}`}>
                           {selectedGraphNode.riskScore}
                         </span>
@@ -1667,8 +1657,8 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
-              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              SWIFT ISO 20022 XML ayrıştırmasından Intel SGX donanım şifrelemesine ve FinCEN SAR bildirimine kadar platformun uçtan uca kurumsal veri hattını gösterir.
+              <span className="font-bold text-indigo-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              Demonstrates the end-to-end enterprise pipeline, from SWIFT ISO 20022 XML parsing and Intel SGX hardware encryption to automated FinCEN SAR reporting.
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1756,8 +1746,8 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
         >
           <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
             <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
-              <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              Kötü niyetli hackerların veya sızmış bankaların AI modelinden müşteri verisi çalmasını (MIA/DLG) veya modeli zehirlemesini (Byzantine) engelleyen güvenlik testlerini simüle eder.
+              <span className="font-bold text-emerald-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              Simulates security verification against adversarial vectors (MIA, DLG, Byzantine poisoning), proving zero raw data extraction risks.
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
@@ -1845,8 +1835,8 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
         >
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
-              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              Banka yazılımcıları 3 satır kodla (Python, Go, Node.js, cURL) platformu kendi banka altyapısına kolayca entegre edebilir.
+              <span className="font-bold text-indigo-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              Enables bank software engineering teams to integrate the coordinator platform into existing core banking infrastructure using 3 lines of code.
             </div>
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
@@ -1937,8 +1927,8 @@ ${apiResponse}`}</pre>
         >
           <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
             <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
-              <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
-              Bankaların kendi sunucularında (Kubernetes, Helm, Docker, Terraform) 5 dakikada platformu başlatması için hazır altyapı şablonları sunar.
+              <span className="font-bold text-emerald-400 block mb-1">PROJECT ARCHITECTURE & IMPACT:</span>
+              Provides turn-key infrastructure templates (Kubernetes Helm, Docker Compose, Terraform) for member banks to initialize local nodes within 5 minutes.
             </div>
 
             <div className="text-center max-w-3xl mx-auto space-y-3 mb-6">
