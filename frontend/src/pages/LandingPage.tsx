@@ -932,10 +932,14 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </div>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-8 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-7 py-2.5 backdrop-blur-md shadow-inner">
+            <nav className="hidden lg:flex items-center gap-5 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-6 py-2.5 backdrop-blur-md shadow-inner">
               <a href="#hero" className="hover:text-indigo-400 transition-colors">Overview</a>
+              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">Problem</a>
+              <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">Workflow</a>
+              <a href="#product" className="hover:text-indigo-400 transition-colors">Capabilities</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
+              <a href="#security" className="hover:text-indigo-400 transition-colors">Security</a>
               <a href="#api" className="hover:text-indigo-400 transition-colors">API & Docs</a>
             </nav>
 
@@ -979,17 +983,32 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               className="lg:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
-                <a href="#hero" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Overview
+                <a href="#hero" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  Overview (3D Architecture)
                 </a>
-                <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Platform
+                <a href="#problem-solution" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  The Problem & Solution
                 </a>
-                <a href="#architecture" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Architecture
+                <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  How It Works Workflow
                 </a>
-                <a href="#api" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  API & Docs
+                <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  Privacy Engine & Capabilities
+                </a>
+                <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  Streaming GNN Collusion Simulator
+                </a>
+                <a href="#architecture" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  5-Layer System Architecture
+                </a>
+                <a href="#security" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  Security & Attack Defense Lab
+                </a>
+                <a href="#api" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  API Execution Studio
+                </a>
+                <a href="#docs" onClick={() => setIsMobileMenuOpen(false)} className="p-2 rounded-xl hover:bg-slate-900 text-slate-300">
+                  Deployment Blueprint Wizard
                 </a>
               </nav>
 
