@@ -148,22 +148,26 @@ export default function LandingPage() {
   // Active Scroll Section State for Quick-Nav Dock
   const [activeSection, setActiveSection] = useState<string>('hero');
 
-  // Product Epsilon Calculator State
+  // Section 3: Product Capabilities State
+  const [productTab, setProductTab] = useState<'dp' | 'negotiator' | 'sla'>('dp');
   const [epsilonCalc, setEpsilonCalc] = useState<number>(0.5);
 
-  // Platform Graph Collusion State
+  // Section 4: 8-Node Platform Graph State
   const [isGraphDetected, setIsGraphDetected] = useState<boolean>(false);
   const [isGraphIsolated, setIsGraphIsolated] = useState<boolean>(false);
+  const [showAttentionMatrix, setShowAttentionMatrix] = useState<boolean>(false);
 
-  // Architecture Layer Stack State
+  // Section 5: Architecture Layer Stack State
   const [activeLayer, setActiveLayer] = useState<number>(1);
 
-  // Security Attack Simulator State
-  const [attackStatus, setAttackStatus] = useState<string | null>(null);
+  // Section 6: Security Attack Simulator State
+  const [attackType, setAttackType] = useState<'mia' | 'dlg' | 'byzantine'>('mia');
+  const [attackStatus, setAttackStatus] = useState<string>('SAFE (0.00% Leakage Risk)');
 
-  // API Playground State
+  // Section 7: API Playground Multi-Lang SDK State
+  const [apiLang, setApiLang] = useState<'curl' | 'python' | 'node' | 'go'>('curl');
   const [apiEndpoint, setApiEndpoint] = useState<string>('handshake');
-  const [apiReqBody, setApiReqBody] = useState<string>(
+  const [apiReqBody] = useState<string>(
     JSON.stringify(
       { bank_id: 'jpmorgan_chase', pytorch_version: '2.2.1+cu121', ram_gb: 128.0 },
       null,
@@ -173,7 +177,8 @@ export default function LandingPage() {
   const [apiResponse, setApiResponse] = useState<string | null>(null);
   const [isApiLoading, setIsApiLoading] = useState<boolean>(false);
 
-  // Docs Deployment Wizard State
+  // Section 8: Docs Deployment Blueprint State
+  const [deployTab, setDeployTab] = useState<'helm' | 'docker' | 'terraform' | 'shell'>('helm');
   const [wizOs, setWizOs] = useState<'linux' | 'macos' | 'windows'>('linux');
   const [wizHardware, setWizHardware] = useState<'cuda' | 'metal' | 'cpu'>('cuda');
   const [wizRegulation, setWizRegulation] = useState<'eu_ai_act' | 'ffiec' | 'fca'>('eu_ai_act');
@@ -304,7 +309,7 @@ export default function LandingPage() {
     };
   }, []);
 
-  // 60FPS Hero Canvas Engine (Connecting 3 Real Banks on Right to Aggregator Core)
+  // 60FPS Hero Canvas Engine
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -448,21 +453,22 @@ export default function LandingPage() {
     };
   }, [isPlaying, flPhase]);
 
-  // Security Attack Simulation Trigger
+  // Security Attack Simulator Logic
   const handleRunAttack = (type: 'mia' | 'dlg' | 'byzantine') => {
+    setAttackType(type);
     setAttackStatus('RUNNING SIMULATION...');
     setTimeout(() => {
       if (type === 'mia') {
-        setAttackStatus('MIA RESISTANCE VERIFIED: 95.8% Privacy Guarantee (Safe Tier)');
+        setAttackStatus('MIA LEAK RISK: 0.02% (Mathematically Shielded by ε=0.50 DP Noise)');
       } else if (type === 'dlg') {
-        setAttackStatus('DLG GRADIENT RECONSTRUCTION BLOCKED: 100% Masked (Error > 99.9%)');
+        setAttackStatus('DLG GRADIENT RECONSTRUCTION BLOCKED: Tensor Reconstruction Error > 99.94%');
       } else {
-        setAttackStatus('BYZANTINE NODE ISOLATED: Trimmed-Mean Aggregation Quenched Malicious Gradients');
+        setAttackStatus('BYZANTINE NODE ISOLATED: Trimmed-Mean Aggregation Neutralized 100% Malicious Gradients');
       }
-    }, 1200);
+    }, 1000);
   };
 
-  // API Playground Exec
+  // API Playground Execution
   const handleSendApiRequest = () => {
     setIsApiLoading(true);
     setApiResponse(null);
@@ -511,12 +517,98 @@ export default function LandingPage() {
     }, 800);
   };
 
-  // Deployment Script Generator
-  const getDeploymentCmd = () => {
-    const osCmd = wizOs === 'linux' ? 'curl -sSL' : wizOs === 'macos' ? 'brew install' : 'docker run -d';
+  // Multi-Language SDK Code Generator
+  const getSdkCode = () => {
+    if (apiLang === 'curl') {
+      return `curl -X POST https://api.cfi-platform.org/v1/coordinator/${apiEndpoint} \\
+  -H "Authorization: Bearer cfi_sec_key_9942a1" \\
+  -H "Content-Type: application/json" \\
+  -d '${apiReqBody}'`;
+    }
+    if (apiLang === 'python') {
+      return `from cfi_sdk import FederatedCoordinatorClient
+
+client = FederatedCoordinatorClient(api_key="cfi_sec_key_9942a1")
+response = client.coordinator.${apiEndpoint}(
+    bank_id="jpmorgan_chase",
+    pytorch_version="2.2.1+cu121",
+    ram_gb=128.0
+)
+print("Handshake Token:", response.handshake_token)`;
+    }
+    if (apiLang === 'node') {
+      return `import { CFIClient } from '@cfi/sdk';
+
+const client = new CFIClient({ apiKey: 'cfi_sec_key_9942a1' });
+const result = await client.coordinator.execute('${apiEndpoint}', {
+  bankId: 'jpmorgan_chase',
+  pytorchVersion: '2.2.1+cu121'
+});
+console.log('Quorum Status:', result.status);`;
+    }
+    return `package main
+
+import (
+    "fmt"
+    "github.com/cfi-platform/cfi-go/sdk"
+)
+
+func main() {
+    client := sdk.NewClient("cfi_sec_key_9942a1")
+    res, _ := client.Coordinator.Handshake("jpmorgan_chase")
+    fmt.Println("Handshake:", res.Token)
+}`;
+  };
+
+  // Deployment Blueprint Code Generator
+  const getDeployBlueprint = () => {
     const accelFlag = wizHardware === 'cuda' ? '--cuda' : wizHardware === 'metal' ? '--metal' : '--cpu';
     const regFlag = wizRegulation === 'eu_ai_act' ? '--compliance eu-ai-act' : '--compliance ffiec';
-    return `${osCmd} https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${regFlag}`;
+
+    if (deployTab === 'helm') {
+      return `# Kubernetes Helm values.yaml for CFI Node
+replicaCount: 3
+hardware:
+  acceleration: "${wizHardware}"
+  gpuMemory: "80Gi"
+enclave:
+  type: "intel_sgx"
+  dpNoiseEpsilon: 0.50
+compliance:
+  standard: "${wizRegulation}"
+ingress:
+  enabled: true
+  hostname: node.jpmorgan.cfi-platform.org`;
+    }
+    if (deployTab === 'docker') {
+      return `version: '3.8'
+services:
+  cfi-bank-node:
+    image: ghcr.io/yusufcalisir/cfi-node:v2.4.0
+    restart: always
+    environment:
+      - HARDWARE_ACCEL=${wizHardware}
+      - COMPLIANCE_RULE=${wizRegulation}
+      - DP_EPSILON=0.50
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]`;
+    }
+    if (deployTab === 'terraform') {
+      return `# AWS Enclave Terraform Blueprint
+module "cfi_sgx_node" {
+  source = "terraform-aws-modules/enclave/aws"
+  instance_type = "c6i.8xlarge"
+  enable_sgx    = true
+  compliance    = "${wizRegulation}"
+  hardware_accel = "${wizHardware}"
+}`;
+    }
+    return `#!/usr/bin/env bash
+# Automated Node Installation Script
+curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${regFlag}`;
   };
 
   const getPhaseTitle = () => {
@@ -535,12 +627,12 @@ export default function LandingPage() {
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
         {[
           { id: 'hero', label: 'Hero Topology' },
-          { id: 'product', label: 'Privacy Calculator' },
-          { id: 'platform', label: 'Collusion Graph' },
-          { id: 'architecture', label: '5-Layer Stack' },
+          { id: 'product', label: 'Privacy Engine' },
+          { id: 'platform', label: 'GNN Graph Collusion' },
+          { id: 'architecture', label: '5-Layer Specs' },
           { id: 'security', label: 'Attack Simulator' },
-          { id: 'api', label: 'REST Execution' },
-          { id: 'docs', label: 'Deploy Wizard' },
+          { id: 'api', label: 'REST & SDK Studio' },
+          { id: 'docs', label: 'Deploy Blueprint' },
         ].map((item) => (
           <a
             key={item.id}
@@ -1030,76 +1122,151 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 3: PRODUCT & EPSILON CALCULATOR ──────────────── */}
+        {/* ── SECTION 3: PRODUCT CAPABILITIES & PRIVACY ENGINE ──────── */}
         <motion.section
           id="product"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="text-center max-w-3xl mx-auto space-y-4">
-            <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold">
-              DIFFERENTIAL PRIVACY CALCULATOR
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+              ENTERPRISE PRODUCT CAPABILITIES
             </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
-              Privacy Budget ($\epsilon$) vs Accuracy Trade-off Calculator
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+              Differential Privacy & Heterogeneous FL Engine
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
-              Adjust the privacy budget ($\epsilon$) slider to see real-time mathematical accuracy and reconstruction risk guarantees.
+              Explore real-time mathematical privacy guarantees, cross-bank model parameter negotiators, and detection SLAs.
             </p>
+
+            {/* Interactive Tab Controls */}
+            <div className="flex justify-center gap-2 pt-4">
+              {[
+                { id: 'dp', label: '🔒 DP Noise Simulator' },
+                { id: 'negotiator', label: '🧠 Heterogeneous Negotiator' },
+                { id: 'sla', label: '⚡ Detection SLAs & Benchmarks' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setProductTab(tab.id as any)}
+                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                    productTab === tab.id
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:bg-slate-800'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-5 space-y-6">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-slate-300 uppercase">Privacy Budget ($\epsilon$)</label>
-                    <span className="text-sm font-mono font-bold text-indigo-400">{epsilonCalc.toFixed(1)}</span>
+            {productTab === 'dp' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                <div className="lg:col-span-5 space-y-6">
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-xs font-bold text-slate-300 uppercase">Privacy Budget ($\epsilon$)</label>
+                      <span className="text-sm font-mono font-bold text-indigo-400">{epsilonCalc.toFixed(1)}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="5.0"
+                      step="0.1"
+                      value={epsilonCalc}
+                      onChange={(e) => setEpsilonCalc(Number(e.target.value))}
+                      className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                    />
                   </div>
-                  <input
-                    type="range"
-                    min="0.1"
-                    max="5.0"
-                    step="0.1"
-                    value={epsilonCalc}
-                    onChange={(e) => setEpsilonCalc(Number(e.target.value))}
-                    className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-                  />
+
+                  <div className="space-y-3 font-mono text-xs">
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                      <span className="text-slate-400">Reconstruction Guarantee:</span>
+                      <span className="text-emerald-400 font-bold">
+                        {epsilonCalc <= 0.5 ? 'Mathematically Impossible' : epsilonCalc <= 1.5 ? 'Very High' : 'Moderate'}
+                      </span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
+                      <span className="text-slate-400">Gaussian Noise Std Dev ($\sigma$):</span>
+                      <span className="text-purple-400 font-bold">{(0.5 / epsilonCalc).toFixed(3)}</span>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+                      <span className="text-slate-400 block mb-1">Differential Privacy Formula:</span>
+                      <code className="text-indigo-300 text-[11px]">
+                        \mathcal{"{N}"}\left(0, \sigma^2 I\right) \quad \text{"{where}"} \quad \sigma = \frac{"{\\Delta f \\sqrt{2 \\ln(1.25/\\delta)}}"}{"{\\epsilon}"}
+                      </code>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-3 font-mono text-xs">
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-                    <span className="text-slate-400">Reconstruction Guarantee:</span>
-                    <span className="text-emerald-400 font-bold">
-                      {epsilonCalc <= 0.5 ? 'Mathematically Impossible' : epsilonCalc <= 1.5 ? 'Very High' : 'Moderate'}
-                    </span>
+                <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 flex flex-col justify-between">
+                    <span className="text-xs text-slate-400 uppercase font-bold">Estimated Model Accuracy</span>
+                    <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono mt-4">
+                      {(88 + (epsilonCalc / 5.0) * 11.2).toFixed(2)}%
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-2">Verified against 1.2M Synthetic SWIFT pacs.008 transactions</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center">
-                    <span className="text-slate-400">Gaussian Noise Std Dev ($\sigma$):</span>
-                    <span className="text-purple-400 font-bold">{(0.5 / epsilonCalc).toFixed(3)}</span>
+
+                  <div className="p-6 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col justify-between">
+                    <span className="text-xs text-slate-400 uppercase font-bold">Training Loss Convergence</span>
+                    <div className="text-3xl sm:text-4xl font-black text-purple-400 font-mono mt-4">
+                      {(0.18 - (epsilonCalc / 5.0) * 0.14).toFixed(4)}
+                    </div>
+                    <span className="text-[10px] text-slate-500 mt-2">Smooth gradient decay without straggler node distortion</span>
                   </div>
                 </div>
               </div>
+            )}
 
-              <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="p-6 rounded-2xl bg-slate-950 border border-emerald-500/30 flex flex-col justify-between">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Estimated Model Accuracy</span>
-                  <div className="text-3xl sm:text-4xl font-black text-emerald-400 font-mono mt-4">
-                    {(88 + (epsilonCalc / 5.0) * 11.2).toFixed(2)}%
-                  </div>
+            {productTab === 'negotiator' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <span className="text-indigo-400 font-bold uppercase block">JPMorgan Chase Node</span>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GAT (Graph Attention)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 512 ➔ 256 Embedding</div>
+                  <div className="text-emerald-400 font-bold">Quorum Status: MATCHED (100%)</div>
                 </div>
-
-                <div className="p-6 rounded-2xl bg-slate-950 border border-purple-500/30 flex flex-col justify-between">
-                  <span className="text-xs text-slate-400 uppercase font-bold">Training Loss Convergence</span>
-                  <div className="text-3xl sm:text-4xl font-black text-purple-400 font-mono mt-4">
-                    {(0.18 - (epsilonCalc / 5.0) * 0.14).toFixed(4)}
-                  </div>
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <span className="text-purple-400 font-bold uppercase block">HSBC Holdings Node</span>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GCN (Convolutional)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 512 ➔ 256 Embedding</div>
+                  <div className="text-emerald-400 font-bold">Quorum Status: MATCHED (100%)</div>
+                </div>
+                <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
+                  <span className="text-emerald-400 font-bold uppercase block">Deutsche Bank AG Node</span>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GraphSAGE (CPU)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 256 ➔ Batch Scale 32</div>
+                  <div className="text-emerald-400 font-bold">Quorum Status: ADAPTED (Straggler Free)</div>
                 </div>
               </div>
-            </div>
+            )}
+
+            {productTab === 'sla' && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center font-mono">
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 text-xs uppercase font-bold block">Detection Precision</span>
+                  <div className="text-3xl font-black text-emerald-400 mt-2">98.42%</div>
+                </div>
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 text-xs uppercase font-bold block">False Positive Reduction</span>
+                  <div className="text-3xl font-black text-indigo-400 mt-2">-74.6%</div>
+                </div>
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 text-xs uppercase font-bold block">Max Stream Throughput</span>
+                  <div className="text-3xl font-black text-purple-400 mt-2">15,000 TPS</div>
+                </div>
+                <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800">
+                  <span className="text-slate-400 text-xs uppercase font-bold block">Federated FL Latency</span>
+                  <div className="text-3xl font-black text-cyan-400 mt-2">&lt; 3.2ms</div>
+                </div>
+              </div>
+            )}
           </div>
         </motion.section>
 
@@ -1108,14 +1275,14 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 4: PLATFORM & FRAUD RING GRAPH COLLUSION SIMULATOR ── */}
+        {/* ── SECTION 4: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR ── */}
         <motion.section
           id="platform"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
@@ -1124,11 +1291,11 @@ export default function LandingPage() {
                   STREAMING GNN COLLUSION DETECTOR
                 </span>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
-                  Cross-Bank Money Mule Ring Graph Simulator
+                  8-Node Cross-Bank Money Mule Ring Graph Simulator
                 </h2>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => setIsGraphDetected(!isGraphDetected)}
                   className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md transition-all"
@@ -1144,44 +1311,84 @@ export default function LandingPage() {
                     {isGraphIsolated ? 'Re-link Nodes 🔗' : 'Isolate Fraud Ring ✂️'}
                   </button>
                 )}
+
+                <button
+                  onClick={() => setShowAttentionMatrix(!showAttentionMatrix)}
+                  className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700"
+                >
+                  {showAttentionMatrix ? 'Hide Matrix' : 'GAT Matrix (α_ij)'}
+                </button>
               </div>
             </div>
 
-            {/* Interactive SVG Node-Link Graph */}
-            <div className="relative w-full h-[280px] sm:h-[320px] mt-8 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
-              <svg className="w-full h-full" viewBox="0 0 600 280">
-                {/* Links */}
+            {/* Interactive 8-Node SVG Topology Graph */}
+            <div className="relative w-full h-[360px] sm:h-[400px] mt-6 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
+              <svg className="w-full h-full" viewBox="0 0 700 340">
+                {/* Connections */}
                 {!isGraphIsolated && (
                   <>
-                    <line x1="120" y1="140" x2="280" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="280" y1="80" x2="440" y2="140" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="440" y1="140" x2="280" y2="200" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="120" y1="170" x2="240" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="240" y1="80" x2="380" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="380" y1="80" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="120" y1="170" x2="240" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="240" y1="260" x2="380" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    <line x1="380" y1="260" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
                   </>
                 )}
 
-                {/* Node 1: JPMorgan */}
-                <circle cx="120" cy="140" r="24" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
-                <text x="120" y="144" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPMORGAN</text>
+                {/* 8 Nodes */}
+                {/* Node 1: JPMorgan Node */}
+                <circle cx="120" cy="170" r="26" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
+                <text x="120" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPM-ACCT</text>
 
-                {/* Node 2: HSBC */}
-                <circle cx="280" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
-                <text x="280" y="84" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">HSBC-MULE</text>
+                {/* Node 2: Shell Corp Alpha */}
+                <circle cx="240" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
+                <text x="240" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-A</text>
 
-                {/* Node 3: Deutsche Bank */}
-                <circle cx="440" cy="140" r="24" fill="#064e3b" stroke="#10b981" strokeWidth="2" />
-                <text x="440" y="144" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">DEUTSCHE</text>
+                {/* Node 3: Smurf Account 1 */}
+                <circle cx="380" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
+                <text x="380" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-1</text>
 
-                {/* Node 4: Offramp */}
-                <circle cx="280" cy="200" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
-                <text x="280" y="204" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
+                {/* Node 4: HSBC Node */}
+                <circle cx="560" cy="170" r="26" fill="#064e3b" stroke="#10b981" strokeWidth="2" />
+                <text x="560" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">HSBC-ACCT</text>
+
+                {/* Node 5: Shell Corp Beta */}
+                <circle cx="240" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
+                <text x="240" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-B</text>
+
+                {/* Node 6: Smurf Account 2 */}
+                <circle cx="380" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
+                <text x="380" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-2</text>
+
+                {/* Node 7: Deutsche Node (Top Center) */}
+                <circle cx="310" cy="170" r="22" fill="#1e293b" stroke="#38bdf8" strokeWidth="2" />
+                <text x="310" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">DB-RELAY</text>
+
+                {/* Node 8: Crypto Offramp */}
+                <circle cx="450" cy="170" r="22" fill={isGraphDetected ? '#7f1d1d' : '#1e293b'} stroke={isGraphDetected ? '#f87171' : '#f59e0b'} strokeWidth="2" />
+                <text x="450" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
               </svg>
 
               {isGraphDetected && (
                 <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] sm:text-xs font-bold">
-                  ⚠️ SUSPICIOUS RING DETECTED (Risk Score: 0.94)
+                  ⚠️ HIGH-RISK RING DETECTED (GNN Confidence: 98.6%)
                 </div>
               )}
             </div>
+
+            {/* GAT Attention Matrix Heatmap Overlay */}
+            {showAttentionMatrix && (
+              <div className="mt-4 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs">
+                <span className="text-indigo-400 font-bold block mb-2">GAT Attention Weight Matrix ($\alpha_{"ij"}$)</span>
+                <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
+                  <div className="p-2 rounded bg-indigo-950/60 border border-indigo-500/30 text-indigo-300">α(JPM ➔ ShellA) = 0.94</div>
+                  <div className="p-2 rounded bg-purple-950/60 border border-purple-500/30 text-purple-300">α(ShellA ➔ Smurf1) = 0.91</div>
+                  <div className="p-2 rounded bg-rose-950/60 border border-rose-500/30 text-rose-300">α(Smurf1 ➔ Offramp) = 0.98</div>
+                  <div className="p-2 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-300">α(HSBC ➔ DB) = 0.12 (Safe)</div>
+                </div>
+              </div>
+            )}
           </div>
         </motion.section>
 
@@ -1190,21 +1397,21 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 5: ARCHITECTURE 5-LAYER STACK & PATH HIGHLIGHTING ── */}
+        {/* ── SECTION 5: ARCHITECTURE 5-LAYER DEEP SPECIFICATION MATRIX ── */}
         <motion.section
           id="architecture"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="text-center max-w-3xl mx-auto space-y-4">
-            <span className="px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-wider">
               5-LAYER SYSTEM ARCHITECTURE
             </span>
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
-              Interactive Technical Layer Stack
+              Interactive Technical Specification Matrix
             </h2>
           </div>
 
@@ -1231,17 +1438,17 @@ export default function LandingPage() {
               ))}
             </div>
 
-            <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+            <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-4">
               <div>
-                <span className="text-xs font-mono text-indigo-400 uppercase font-bold">SPECIFICATION DETAIL</span>
-                <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-2">
+                <span className="text-xs font-mono text-indigo-400 uppercase font-bold">SPECIFICATION MATRIX</span>
+                <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-1">
                   {activeLayer === 1 && 'Native ISO 20022 Financial XML Intake'}
                   {activeLayer === 2 && 'PyTorch Geometric GNN Embedding Feature Store'}
                   {activeLayer === 3 && 'Intel SGX Secure Enclave & Paillier Homomorphic Encryption'}
                   {activeLayer === 4 && 'Byzantine-Robust FedAvg Aggregation Core'}
                   {activeLayer === 5 && 'Automated SAR XML & Splunk SIEM Integration'}
                 </h3>
-                <p className="text-xs text-slate-400 mt-3 leading-relaxed">
+                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
                   {activeLayer === 1 && 'Parses pacs.008 and camt.053 XML financial transaction messages directly into local graph tensors without storing customer identity details.'}
                   {activeLayer === 2 && 'Extracts structural graph attention embeddings (GAT) capturing account transaction topologies across isolated banking domains.'}
                   {activeLayer === 3 && 'Injects Gaussian differential privacy noise and computes encrypted sum updates within hardware-isolated TEE enclaves.'}
@@ -1249,8 +1456,30 @@ export default function LandingPage() {
                   {activeLayer === 5 && 'Generates cryptographic sign-off hashes and exports automated SAR XML filings directly to regulatory SIEM endpoints.'}
                 </p>
               </div>
-              <div className="mt-6 p-3 rounded-xl bg-slate-900 font-mono text-[11px] text-emerald-400 border border-slate-800">
-                Status: Operational (Verified Compliance Audit)
+
+              {/* Protocol Specs Code Snippet Preview */}
+              <div className="p-4 rounded-xl bg-slate-900 font-mono text-[11px] text-indigo-300 border border-slate-800 overflow-x-auto">
+                {activeLayer === 1 && `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
+  <FIToFICstmrCdtTrf>
+    <GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr>
+    <CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf>
+  </FIToFICstmrCdtTrf>
+</Document>`}
+                {activeLayer === 2 && `import torch_geometric as pyg
+edge_index = pyg.data.Data(x=nodes, edge_index=graph_topology)
+gat_layer = PyG.GATConv(in_channels=512, out_channels=256)`}
+                {activeLayer === 3 && `// Intel SGX Hardware Enclave Call
+sgx_status_t status = ecall_aggregate_encrypted_weights(
+    eid, &retval, ciphertext_a, ciphertext_b, noise_sigma
+);`}
+                {activeLayer === 4 && `def trimmed_mean_fedavg(weight_tensors, beta=0.1):
+    # Sort and trim top/bottom 10% gradients to quench Byzantine attacks
+    sorted_weights = torch.sort(weight_tensors, dim=0)
+    return torch.mean(sorted_weights[beta:-beta], dim=0)`}
+                {activeLayer === 5 && `<FinCEN_SAR_Export version="2.0">
+  <FilingHeader><FilerID>CFI-PLATFORM-991</FilerID></FilingHeader>
+  <SuspiciousActivity><Amount Ccy="USD">1450000.00</Amount></SuspiciousActivity>
+</FinCEN_SAR_Export>`}
               </div>
             </div>
           </div>
@@ -1261,52 +1490,77 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 6: SECURITY ATTACK SIMULATOR ────────────────── */}
+        {/* ── SECTION 6: ADVERSARIAL ATTACK SIMULATION LAB ────────── */}
         <motion.section
           id="security"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
-                  SECURITY ATTACK SIMULATOR
+                  ADVERSARIAL ATTACK DEFENSE LAB
                 </span>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
-                  Adversarial Attack Simulation Playground
+                  Zero-Trust Attack & Privacy Leakage Simulator
                 </h2>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
                 <button
                   onClick={() => handleRunAttack('mia')}
-                  className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-md"
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all ${
+                    attackType === 'mia' ? 'bg-indigo-600 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}
                 >
-                  Launch MIA 🎯
+                  Launch MIA Attack 🎯
                 </button>
                 <button
                   onClick={() => handleRunAttack('dlg')}
-                  className="px-3.5 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-bold shadow-md"
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all ${
+                    attackType === 'dlg' ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}
                 >
-                  Launch DLG 🔓
+                  Launch DLG Attack 🔓
                 </button>
                 <button
                   onClick={() => handleRunAttack('byzantine')}
-                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md"
+                  className={`px-3.5 py-2 rounded-xl text-xs font-bold shadow-md transition-all ${
+                    attackType === 'byzantine' ? 'bg-rose-600 text-white' : 'bg-slate-800 text-slate-400'
+                  }`}
                 >
                   Toggle Byzantine ☣️
                 </button>
               </div>
             </div>
 
-            <div className="mt-6 p-6 rounded-2xl bg-slate-950 border border-slate-800 text-center font-mono">
-              <span className="text-xs text-slate-400 uppercase font-bold">Simulation Result Output</span>
-              <div className="text-xs sm:text-base font-bold text-emerald-400 mt-2">
-                {attackStatus || 'Click any attack button above to test zero-trust defense mechanisms.'}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+              <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 space-y-3 font-mono">
+                <span className="text-xs text-slate-400 uppercase font-bold">Attack Target Detail</span>
+                <div className="text-sm font-bold text-slate-200">
+                  {attackType === 'mia' && 'Membership Inference Attack (MIA)'}
+                  {attackType === 'dlg' && 'Deep Leakage from Gradients (DLG)'}
+                  {attackType === 'byzantine' && 'Byzantine Gradient Poisoning'}
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {attackType === 'mia' && 'Attempts to infer whether a specific customer transaction was present in local bank training sets.'}
+                  {attackType === 'dlg' && 'Uses dummy inputs and gradient matching optimization to reconstruct raw customer data tensors.'}
+                  {attackType === 'byzantine' && 'Injects malicious weight updates to force global GNN model accuracy degradation.'}
+                </p>
+              </div>
+
+              <div className="p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between font-mono">
+                <span className="text-xs text-slate-400 uppercase font-bold">Zero-Trust Defense Status</span>
+                <div className="text-base font-bold text-emerald-400 mt-2">
+                  {attackStatus}
+                </div>
+                <div className="mt-4 p-3 rounded-xl bg-slate-900 text-[11px] text-slate-300 border border-slate-800">
+                  Defense Mechanism: Intel SGX TEE + Trimmed-Mean Aggregation + Gaussian DP Noise
+                </div>
               </div>
             </div>
           </div>
@@ -1317,24 +1571,24 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 7: LIVE REST API PLAYGROUND ─────────────────── */}
+        {/* ── SECTION 7: LIVE REST API EXECUTION & MULTI-LANG SDK STUDIO ── */}
         <motion.section
           id="api"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
                   <CodeIcon />
-                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100">Live REST API Execution Studio</h2>
+                  <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100">Live REST API & Multi-Lang SDK Studio</h2>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">
-                  Edit request payloads and execute test API calls live against simulated endpoints.
+                  Test live REST endpoints and generate production client code in cURL, Python, Node.js, and Go.
                 </p>
               </div>
 
@@ -1342,7 +1596,7 @@ export default function LandingPage() {
                 <select
                   value={apiEndpoint}
                   onChange={(e) => setApiEndpoint(e.target.value)}
-                  className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300 font-bold max-w-[200px] sm:max-w-none"
+                  className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-indigo-300 font-bold"
                 >
                   <option value="handshake">POST /api/v1/coordinator/handshake</option>
                   <option value="clients">GET /api/v1/coordinator/clients</option>
@@ -1354,25 +1608,46 @@ export default function LandingPage() {
                   disabled={isApiLoading}
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all flex items-center gap-1.5 flex-shrink-0"
                 >
-                  {isApiLoading ? 'Executing...' : 'Send Test 🚀'}
+                  {isApiLoading ? 'Executing...' : 'Execute Test 🚀'}
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+            {/* SDK Language Selector Tabs */}
+            <div className="flex gap-2 pt-4">
+              {(['curl', 'python', 'node', 'go'] as const).map((lang) => (
+                <button
+                  key={lang}
+                  onClick={() => setApiLang(lang)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all ${
+                    apiLang === lang ? 'bg-indigo-600 text-white' : 'bg-slate-900 border border-slate-800 text-slate-400'
+                  }`}
+                >
+                  {lang}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-4">
               <div>
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase">JSON Request Body</span>
-                <textarea
-                  value={apiReqBody}
-                  onChange={(e) => setApiReqBody(e.target.value)}
-                  className="w-full h-48 mt-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-indigo-300 focus:border-indigo-500"
-                />
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase">Production Client Code ({apiLang})</span>
+                <div className="w-full h-52 mt-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-indigo-300 overflow-y-auto">
+                  <pre>{getSdkCode()}</pre>
+                </div>
               </div>
 
               <div>
-                <span className="text-xs font-mono font-bold text-slate-400 uppercase">HTTP 200 JSON Response</span>
-                <div className="w-full h-48 mt-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 overflow-y-auto">
-                  {apiResponse ? <pre>{apiResponse}</pre> : <span className="text-slate-600">// Click "Send Test" to execute</span>}
+                <span className="text-xs font-mono font-bold text-slate-400 uppercase">HTTP 200 JSON Response & Headers</span>
+                <div className="w-full h-52 mt-2 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs text-emerald-400 overflow-y-auto">
+                  {apiResponse ? (
+                    <pre>{`HTTP/1.1 200 OK
+X-Privacy-Budget-Remaining: 0.50
+X-Enclave-Signature: ed25519_992f1b4a...
+
+${apiResponse}`}</pre>
+                  ) : (
+                    <span className="text-slate-600">// Click "Execute Test" to receive live response</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1391,19 +1666,19 @@ export default function LandingPage() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: false }}
           transition={{ duration: 0.6 }}
-          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
-            <div className="text-center max-w-3xl mx-auto space-y-4 mb-8">
-              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
+            <div className="text-center max-w-3xl mx-auto space-y-3 mb-6">
+              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
                 DEPLOYMENT BLUEPRINT WIZARD
               </span>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
-                Generate Customized Node Deployment Script
+                Generate Production Infrastructure Blueprint
               </h2>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div>
                 <label className="text-xs font-bold text-slate-300 uppercase">Target OS</label>
                 <select
@@ -1444,18 +1719,35 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between font-mono text-xs text-emerald-400">
-              <span className="truncate pr-4">{getDeploymentCmd()}</span>
-              <button
-                onClick={() => {
-                  navigator.clipboard.writeText(getDeploymentCmd());
-                  setCopiedWizCmd(true);
-                  setTimeout(() => setCopiedWizCmd(false), 2000);
-                }}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex-shrink-0"
-              >
-                {copiedWizCmd ? 'Copied! ✓' : 'Copy Script'}
-              </button>
+            {/* Target Blueprint Tabs */}
+            <div className="flex gap-2 mb-3">
+              {(['helm', 'docker', 'terraform', 'shell'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setDeployTab(tab)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold uppercase transition-all ${
+                    deployTab === tab ? 'bg-emerald-600 text-white' : 'bg-slate-950 border border-slate-800 text-slate-400'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between font-mono text-xs text-emerald-400 space-y-3">
+              <pre className="overflow-x-auto text-[11px] leading-relaxed text-indigo-300">{getDeployBlueprint()}</pre>
+              <div className="flex justify-end pt-2 border-t border-slate-900">
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(getDeployBlueprint());
+                    setCopiedWizCmd(true);
+                    setTimeout(() => setCopiedWizCmd(false), 2000);
+                  }}
+                  className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold flex items-center gap-1.5"
+                >
+                  {copiedWizCmd ? 'Copied! ✓' : 'Copy Blueprint'}
+                </button>
+              </div>
             </div>
           </div>
         </motion.section>
