@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import * as THREE from 'three';
 
 // SVG Icons
 const CodeIcon = () => (
@@ -39,14 +40,6 @@ const CloseIcon = () => (
   </svg>
 );
 
-const FanSpinner = () => (
-  <svg className="w-4 h-4 text-indigo-400 animate-spin" style={{ animationDuration: '3s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="10" />
-    <path d="M12 2a10 10 0 0 1 10 10" />
-    <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
-  </svg>
-);
-
 // Real Global Bank Information Interface for Drawer
 interface BankInfoDetail {
   id: string;
@@ -65,7 +58,7 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'jpmorgan',
     name: 'JPMorgan Chase & Co.',
     ticker: 'NYSE: JPM',
-    location: 'New York, US (Node #01)',
+    location: 'New York, US (3D Node #01)',
     hardware: 'NVIDIA A100 Tensor Core (80GB VRAM)',
     ram: '128 GB Host RAM',
     pytorch: '2.2.1+cu121',
@@ -80,7 +73,7 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'hsbc',
     name: 'HSBC Holdings plc',
     ticker: 'LSE: HSBC',
-    location: 'London, UK (Node #02)',
+    location: 'London, UK (3D Node #02)',
     hardware: 'NVIDIA H100 SXM (80GB VRAM)',
     ram: '64 GB Host RAM',
     pytorch: '2.2.1+cu121',
@@ -95,7 +88,7 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
     id: 'deutsche',
     name: 'Deutsche Bank AG',
     ticker: 'XETRA: DBK',
-    location: 'Frankfurt, DE (Node #03)',
+    location: 'Frankfurt, DE (3D Node #03)',
     hardware: 'Intel Xeon Platinum Cluster (CPU Monolith)',
     ram: '32 GB Host RAM',
     pytorch: '2.1.2+cpu',
@@ -157,31 +150,325 @@ const LIVE_LOG_FEED = [
   'Intel SGX Secure Enclave Memory Shield Active (0.00% Leakage Risk)',
 ];
 
+// ── REAL 3D WEBGL GRAPHICS COMPONENT POWERED BY THREE.JS ─────────────
+function Real3DBankScene({
+  onSelectBank,
+}: {
+  onSelectBank: (bank: BankInfoDetail) => void;
+}) {
+  const mountRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = mountRef.current;
+    if (!container) return;
+
+    const width = container.clientWidth || 600;
+    const height = container.clientHeight || 480;
+
+    // 1. Three.js Scene, Camera, Renderer
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2('#020617', 0.035);
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+    camera.position.set(0, 10, 12);
+    camera.lookAt(0, 0, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    container.appendChild(renderer.domElement);
+
+    // 2. Lighting Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0x818cf8, 2.5);
+    dirLight.position.set(5, 15, 8);
+    dirLight.castShadow = true;
+    scene.add(dirLight);
+
+    const bluePoint = new THREE.PointLight(0x6366f1, 3, 20);
+    bluePoint.position.set(-4, 3, -3);
+    scene.add(bluePoint);
+
+    const redPoint = new THREE.PointLight(0xef4444, 3, 20);
+    redPoint.position.set(4, 3, -3);
+    scene.add(redPoint);
+
+    const purplePoint = new THREE.PointLight(0xa855f7, 3, 20);
+    purplePoint.position.set(-4, 3, 3);
+    scene.add(purplePoint);
+
+    const cyanPoint = new THREE.PointLight(0x38bdf8, 3, 20);
+    cyanPoint.position.set(4, 3, 3);
+    scene.add(cyanPoint);
+
+    // 3. Central 3D Processor Microchip Mesh Group
+    const chipGroup = new THREE.Group();
+
+    // Metallic Chip Base Body
+    const chipGeo = new THREE.BoxGeometry(2.6, 0.4, 2.6);
+    const chipMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      metalness: 0.9,
+      roughness: 0.2,
+    });
+    const chipMesh = new THREE.Mesh(chipGeo, chipMat);
+    chipMesh.castShadow = true;
+    chipMesh.receiveShadow = true;
+    chipGroup.add(chipMesh);
+
+    // Central Glowing Enclave Core Emblem
+    const coreGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.45, 32);
+    const coreMat = new THREE.MeshStandardMaterial({
+      color: 0x6366f1,
+      emissive: 0x4f46e5,
+      emissiveIntensity: 0.8,
+      metalness: 0.5,
+      roughness: 0.2,
+    });
+    const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+    chipGroup.add(coreMesh);
+
+    // Golden Micro Pins around chip (32 pins)
+    const pinGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
+    const pinMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.1 });
+    for (let i = -1; i <= 1; i += 0.3) {
+      // Side 1 & 2
+      const p1 = new THREE.Mesh(pinGeo, pinMat);
+      p1.position.set(i * 1.8, 0, 1.45);
+      chipGroup.add(p1);
+
+      const p2 = new THREE.Mesh(pinGeo, pinMat);
+      p2.position.set(i * 1.8, 0, -1.45);
+      chipGroup.add(p2);
+
+      // Side 3 & 4
+      const p3 = new THREE.Mesh(pinGeo, pinMat);
+      p3.rotation.y = Math.PI / 2;
+      p3.position.set(1.45, 0, i * 1.8);
+      chipGroup.add(p3);
+
+      const p4 = new THREE.Mesh(pinGeo, pinMat);
+      p4.rotation.y = Math.PI / 2;
+      p4.position.set(-1.45, 0, i * 1.8);
+      chipGroup.add(p4);
+    }
+
+    // Floating Aura Ring
+    const torusGeo = new THREE.TorusGeometry(1.9, 0.03, 16, 100);
+    const torusMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const torusMesh = new THREE.Mesh(torusGeo, torusMat);
+    torusMesh.rotation.x = Math.PI / 2;
+    chipGroup.add(torusMesh);
+
+    scene.add(chipGroup);
+
+    // 4. Helper Function to Create 3D Bank Node Server Meshes
+    const createBankNodeMesh = (
+      color: number,
+      pos: [number, number, number],
+      bankKey: string
+    ) => {
+      const group = new THREE.Group();
+      group.position.set(...pos);
+      group.userData = { bankKey };
+
+      // Glass Platform Base
+      const platGeo = new THREE.BoxGeometry(2.4, 0.18, 2.4);
+      const platMat = new THREE.MeshPhysicalMaterial({
+        color,
+        transmission: 0.6,
+        opacity: 0.9,
+        transparent: true,
+        roughness: 0.1,
+        ior: 1.5,
+      });
+      const platMesh = new THREE.Mesh(platGeo, platMat);
+      platMesh.receiveShadow = true;
+      group.add(platMesh);
+
+      // Metallic Server Rack Tower
+      const rackGeo = new THREE.BoxGeometry(1.6, 2.2, 1.4);
+      const rackMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        metalness: 0.85,
+        roughness: 0.25,
+      });
+      const rackMesh = new THREE.Mesh(rackGeo, rackMat);
+      rackMesh.position.y = 1.15;
+      rackMesh.castShadow = true;
+      rackMesh.receiveShadow = true;
+      group.add(rackMesh);
+
+      // Glowing LED Arrays on Rack
+      const ledGeo = new THREE.BoxGeometry(1.4, 0.1, 0.05);
+      const ledMat = new THREE.MeshBasicMaterial({ color });
+      for (let y = 0.4; y <= 1.9; y += 0.35) {
+        const led = new THREE.Mesh(ledGeo, ledMat);
+        led.position.set(0, y, 0.72);
+        group.add(led);
+      }
+
+      scene.add(group);
+      return group;
+    };
+
+    const jpmMesh = createBankNodeMesh(0x6366f1, [-4.2, 0, -3.2], 'jpmorgan');
+    const hsbcMesh = createBankNodeMesh(0xef4444, [4.2, 0, -3.2], 'hsbc');
+    const sgxMesh = createBankNodeMesh(0xa855f7, [-4.2, 0, 3.2], 'sgx');
+    const dbMesh = createBankNodeMesh(0x38bdf8, [4.2, 0, 3.2], 'deutsche');
+
+    const bankNodesList = [jpmMesh, hsbcMesh, sgxMesh, dbMesh];
+
+    // 5. 3D Volumetric Curved Fiber Cables & Glowing Data Spheres
+    const createFiberTube = (start: [number, number, number], end: [number, number, number], color: number) => {
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(...start),
+        new THREE.Vector3((start[0] + end[0]) * 0.5, 1.8, (start[2] + end[2]) * 0.5),
+        new THREE.Vector3(...end),
+      ]);
+
+      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.04, 8, false);
+      const tubeMat = new THREE.MeshBasicMaterial({ color, wireframe: false });
+      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
+      scene.add(tubeMesh);
+
+      // Animated Glowing Data Sphere on Path
+      const sphereGeo = new THREE.SphereGeometry(0.16, 16, 16);
+      const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
+      scene.add(sphereMesh);
+
+      return { curve, sphereMesh };
+    };
+
+    const fibers = [
+      createFiberTube([-4.2, 1.2, -3.2], [0, 0.2, 0], 0x6366f1),
+      createFiberTube([4.2, 1.2, -3.2], [0, 0.2, 0], 0xef4444),
+      createFiberTube([-4.2, 1.2, 3.2], [0, 0.2, 0], 0xa855f7),
+      createFiberTube([4.2, 1.2, 3.2], [0, 0.2, 0], 0x38bdf8),
+    ];
+
+    // 6. Interactive Mouse Orbit Parallax & 3D Raycasting
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    let targetRotY = 0;
+    let targetRotX = 0;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const rect = container.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      mouse.x = x;
+      mouse.y = y;
+
+      targetRotY = x * 0.35;
+      targetRotX = y * 0.2;
+    };
+
+    const handleClick = () => {
+      raycaster.setFromCamera(mouse, camera);
+      const intersects = raycaster.intersectObjects(scene.children, true);
+
+      for (const hit of intersects) {
+        let parent: THREE.Object3D | null = hit.object;
+        while (parent && !parent.userData.bankKey) {
+          parent = parent.parent;
+        }
+        if (parent && parent.userData.bankKey) {
+          const key = parent.userData.bankKey;
+          if (REAL_BANK_DETAILS[key]) {
+            onSelectBank(REAL_BANK_DETAILS[key]);
+          }
+          break;
+        }
+      }
+    };
+
+    container.addEventListener('mousemove', handleMouseMove);
+    container.addEventListener('click', handleClick);
+
+    const handleResize = () => {
+      if (!container) return;
+      const w = container.clientWidth || 600;
+      const h = container.clientHeight || 480;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    };
+    window.addEventListener('resize', handleResize);
+
+    // 7. Animation Render Loop (60FPS)
+    let animId: number;
+    let clock = new THREE.Clock();
+
+    const animate = () => {
+      const elapsedTime = clock.getElapsedTime();
+
+      // Smooth camera orbit tilt
+      scene.rotation.y += (targetRotY - scene.rotation.y) * 0.05;
+      scene.rotation.x += (targetRotX - scene.rotation.x) * 0.05;
+
+      // Rotate Enclave Central Core & Floating Torus
+      chipGroup.rotation.y = elapsedTime * 0.4;
+      torusMesh.rotation.z = elapsedTime * 0.8;
+
+      // Pulse Central Core Light
+      coreMat.emissiveIntensity = 0.6 + Math.sin(elapsedTime * 4) * 0.3;
+
+      // Animate 3D Data Spheres along curves
+      fibers.forEach((f, idx) => {
+        const t = (elapsedTime * 0.4 + idx * 0.25) % 1;
+        const pt = f.curve.getPoint(t);
+        f.sphereMesh.position.copy(pt);
+      });
+
+      // Hover 3D bank nodes gently
+      bankNodesList.forEach((n, idx) => {
+        n.position.y = Math.sin(elapsedTime * 2 + idx) * 0.08;
+      });
+
+      renderer.render(scene, camera);
+      animId = requestAnimationFrame(animate);
+    };
+
+    animate();
+
+    return () => {
+      container.removeEventListener('mousemove', handleMouseMove);
+      container.removeEventListener('click', handleClick);
+      window.removeEventListener('resize', handleResize);
+      cancelAnimationFrame(animId);
+      if (renderer.domElement.parentNode) {
+        renderer.domElement.parentNode.removeChild(renderer.domElement);
+      }
+      renderer.dispose();
+    };
+  }, [onSelectBank]);
+
+  return <div ref={mountRef} className="w-full h-full cursor-pointer relative" />;
+}
+
 export default function LandingPage() {
   const navigate = useNavigate();
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
   // Responsive Mobile Menu State
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
   // Hero interactive state
-  const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isDpShieldActive, setIsDpShieldActive] = useState<boolean>(true);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
-
-  // FL Cycle Phase State: 0 = Local Training, 1 = Upload, 2 = Aggregation, 3 = Download
-  const [flPhase, setFlPhase] = useState<number>(0);
 
   // Telemetry HUD state
   const [flRound, setFlRound] = useState<number>(42);
   const [accuracy, setAccuracy] = useState<number>(98.42);
   const [logIndex, setLogIndex] = useState<number>(0);
-
-  // Dynamic Fluctuating Code Telemetry Metrics
-  const [cudaJpm, setCudaJpm] = useState<number>(94.2);
-  const [cudaHsbc, setCudaHsbc] = useState<number>(98.1);
-  const [cpuDb, setCpuDb] = useState<number>(87.5);
 
   // Active Scroll Section State for Quick-Nav Dock
   const [activeSection, setActiveSection] = useState<string>('hero');
@@ -246,32 +533,15 @@ export default function LandingPage() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Fluctuating Code Telemetry Metrics
+  // Continuous Telemetry Timer
   useEffect(() => {
     const interval = setInterval(() => {
-      setCudaJpm(Number((93 + Math.random() * 3.5).toFixed(1)));
-      setCudaHsbc(Number((97 + Math.random() * 2.5).toFixed(1)));
-      setCpuDb(Number((85 + Math.random() * 5.0).toFixed(1)));
-    }, 1500);
+      setFlRound((r) => r + 1);
+      setAccuracy((acc) => Number((acc + (Math.random() * 0.06 - 0.03)).toFixed(2)));
+      setLogIndex((prevIndex) => (prevIndex + 1) % LIVE_LOG_FEED.length);
+    }, 3200);
     return () => clearInterval(interval);
   }, []);
-
-  // Continuous 4-Phase Cyclic FL Storytelling Loop
-  useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      setFlPhase((prevPhase) => {
-        const nextPhase = (prevPhase + 1) % 4;
-        if (nextPhase === 2) {
-          setFlRound((r) => r + 1);
-          setAccuracy((acc) => Number((acc + (Math.random() * 0.06 - 0.03)).toFixed(2)));
-        }
-        return nextPhase;
-      });
-      setLogIndex((prevIndex) => (prevIndex + 1) % LIVE_LOG_FEED.length);
-    }, 2800);
-    return () => clearInterval(interval);
-  }, [isPlaying]);
 
   // Living Distributed Background Topology Mesh Canvas
   useEffect(() => {
@@ -348,155 +618,6 @@ export default function LandingPage() {
       cancelAnimationFrame(animId);
     };
   }, []);
-
-  // 60FPS Hero 3D Isometric Packet Cable Canvas Engine
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    let animationFrameId: number;
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 600);
-    let height = (canvas.height = canvas.parentElement?.clientHeight || 520);
-
-    const handleResize = () => {
-      if (!canvas) return;
-      width = canvas.width = canvas.parentElement?.clientWidth || 600;
-      height = canvas.height = canvas.parentElement?.clientHeight || 520;
-    };
-    window.addEventListener('resize', handleResize);
-
-    const isMobile = width < 640;
-    // 3D Isometric Projection Positions for 4 Bank Platforms + Center Enclave Core
-    const center = { x: width * 0.5, y: height * 0.5 };
-    const nodes = {
-      jpm: { x: isMobile ? width * 0.22 : width * 0.22, y: height * 0.25, color: '#6366f1', label: 'pacs.008 ($1.45M)' },
-      hsbc: { x: isMobile ? width * 0.78 : width * 0.78, y: height * 0.25, color: '#ef4444', label: 'pacs.008 (£890K)' },
-      sgx: { x: isMobile ? width * 0.22 : width * 0.22, y: height * 0.75, color: '#a855f7', label: '[[W_sgx]]' },
-      db: { x: isMobile ? width * 0.78 : width * 0.78, y: height * 0.75, color: '#38bdf8', label: 'camt.053 (€650K)' },
-      core: { x: center.x, y: center.y, color: '#ec4899', label: '[[W_global]]' },
-    };
-
-    const particles: Array<{
-      x: number;
-      y: number;
-      startX: number;
-      startY: number;
-      targetX: number;
-      targetY: number;
-      speed: number;
-      progress: number;
-      color: string;
-      label: string;
-    }> = [];
-
-    const createParticle = (from: 'jpm' | 'hsbc' | 'sgx' | 'db', isUpload: boolean) => {
-      const bank = nodes[from];
-      const core = nodes.core;
-
-      const startX = isUpload ? bank.x : core.x;
-      const startY = isUpload ? bank.y : core.y;
-      const targetX = isUpload ? core.x : bank.x;
-      const targetY = isUpload ? core.y : bank.y;
-
-      particles.push({
-        x: startX,
-        y: startY,
-        startX,
-        startY,
-        targetX,
-        targetY,
-        speed: 0.012 + Math.random() * 0.008,
-        progress: 0,
-        color: isUpload ? bank.color : '#38bdf8',
-        label: isUpload ? bank.label : `[[W_${from}]]`,
-      });
-    };
-
-    let tick = 0;
-    const render = () => {
-      ctx.clearRect(0, 0, width, height);
-
-      // 3D Isometric Laser Fiber Connection Lines
-      ctx.lineWidth = 2.5;
-      ctx.setLineDash([8, 8]);
-
-      ['jpm', 'hsbc', 'sgx', 'db'].forEach((key) => {
-        const n = nodes[key as keyof typeof nodes];
-        ctx.strokeStyle = n.color + '80';
-        ctx.beginPath();
-        ctx.moveTo(n.x, n.y);
-        ctx.lineTo(nodes.core.x, nodes.core.y);
-        ctx.stroke();
-      });
-
-      ctx.setLineDash([]);
-
-      // Continuously spawn ISO 20022 XML packet tags
-      if (isPlaying && tick % 16 === 0) {
-        if (flPhase === 1 || flPhase === 0) {
-          createParticle('jpm', true);
-          createParticle('hsbc', true);
-          createParticle('sgx', true);
-          createParticle('db', true);
-        } else {
-          createParticle('jpm', false);
-          createParticle('hsbc', false);
-          createParticle('sgx', false);
-          createParticle('db', false);
-        }
-      }
-
-      // Shockwave in Phase 2
-      if (flPhase === 2) {
-        const shockRadius = (tick % 30) * 3.5;
-        ctx.strokeStyle = '#ec489980';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(nodes.core.x, nodes.core.y, shockRadius, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      // Draw active 3D packet stream tags
-      for (let i = particles.length - 1; i >= 0; i--) {
-        const p = particles[i];
-        if (!p) continue;
-        p.progress += p.speed;
-
-        p.x = (1 - p.progress) * p.startX + p.progress * p.targetX;
-        p.y = (1 - p.progress) * p.startY + p.progress * p.targetY;
-
-        // Render Packet Badge
-        ctx.fillStyle = '#0f172a';
-        ctx.strokeStyle = p.color;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.roundRect(p.x - 42, p.y - 11, 84, 22, 6);
-        ctx.fill();
-        ctx.stroke();
-
-        ctx.fillStyle = p.color;
-        ctx.font = 'bold 9px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(p.label, p.x, p.y + 3);
-
-        if (p.progress >= 1) {
-          particles.splice(i, 1);
-        }
-      }
-
-      tick++;
-      animationFrameId = requestAnimationFrame(render);
-    };
-
-    render();
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      cancelAnimationFrame(animationFrameId);
-    };
-  }, [isPlaying, flPhase]);
 
   // Security Attack Simulator Logic
   const handleRunAttack = (type: 'mia' | 'dlg' | 'byzantine') => {
@@ -656,13 +777,6 @@ module "cfi_sgx_node" {
 curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${regFlag}`;
   };
 
-  const getPhaseTitle = () => {
-    if (flPhase === 0) return 'Phase 1/4: Local Model Training (PyTorch & GNN Subgraphs)';
-    if (flPhase === 1) return 'Phase 2/4: Encrypted Gradient Update Transmission ([[W]])';
-    if (flPhase === 2) return 'Phase 3/4: Secure Enclave Aggregation (Intel SGX + DP Noise)';
-    return 'Phase 4/4: Global Model Deployment Back to Consortium Banks';
-  };
-
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
       {/* ── LIVING DISTRIBUTED BACKGROUND MESH CANVAS ────────── */}
@@ -671,7 +785,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       {/* ── FLOATING QUICK-NAV DOCK (RIGHT SIDEBAR) ───────────── */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
         {[
-          { id: 'hero', label: '3D Architecture Engine' },
+          { id: 'hero', label: 'Real 3D WebGL Engine' },
           { id: 'problem-solution', label: 'The Core Problem' },
           { id: 'how-it-works', label: 'How It Works' },
           { id: 'product', label: 'Privacy Engine' },
@@ -699,7 +813,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       </div>
 
       <div className="relative z-10">
-        {/* ── TOP ULTRA-SLIM TELEMETRY MARQUEE BAR (32px Height) ───── */}
+        {/* ── TOP ULTRA-SLIM TELEMETRY MARQUEE BAR ───── */}
         <div className="h-8 bg-slate-950/90 border-b border-slate-800/60 px-4 sm:px-8 flex items-center justify-between text-xs font-mono text-slate-300">
           <div className="flex items-center gap-3">
             <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold tracking-wider flex items-center gap-1.5 border border-indigo-500/30">
@@ -713,7 +827,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           </div>
         </div>
 
-        {/* ── SECTION 1: GLASSMORPHIC FLOATING NAVBAR (64px Height) ── */}
+        {/* ── SECTION 1: GLASSMORPHIC FLOATING NAVBAR ── */}
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 h-16 flex items-center">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             {/* Logo */}
@@ -825,13 +939,13 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: SCREEN-CENTERED HERO WITH PURE CODE 3D ISOMETRIC TOPOLOGY ENGINE ── */}
+        {/* ── SECTION 2: HERO WITH REAL 3D WEBGL GRAPHICS SCENE (POWERED BY THREE.JS) ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
-            {/* ── LEFT COLUMN: Core Title, Headline, CTAs & Telemetry HUD ── */}
+            {/* ── LEFT COLUMN: Headline, Text & Value Pillars ── */}
             <div className="lg:col-span-6 space-y-6 text-left">
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -839,7 +953,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 transition={{ duration: 0.5 }}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold"
               >
-                <span>✨ Privacy-Preserving Collaborative AI Infrastructure</span>
+                <span>✨ REAL 3D WEBGL GRAPHICS SCENE</span>
                 <span className="text-indigo-500">•</span>
                 <span className="text-emerald-400 font-bold">EU AI Act & FinCEN Compliant</span>
               </motion.div>
@@ -931,15 +1045,12 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: PURE CODE 3D ISOMETRIC NETWORK TOPOLOGY ENGINE (MATCHING USER SCREENSHOT) ── */}
-            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-gradient-to-b from-slate-900/95 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
-              {/* Canvas Physics 3D Laser Overlay */}
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
-
+            {/* ── RIGHT COLUMN: REAL 3D WEBGL GRAPHICS SCENE POWERED BY THREE.JS ── */}
+            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/40 bg-gradient-to-b from-slate-900/95 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
               {/* Component Purpose Callout Banner */}
               <div className="relative z-10 p-2.5 rounded-xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-[10px] text-indigo-200">
-                <span className="font-bold text-indigo-400 block mb-0.5">💡 3D ISOMETRIC TOPOLOGY ENGINE (PROJE AMACI):</span>
-                JPMorgan Chase, HSBC, Deutsche Bank ve Intel SGX Enclave merkezdeki 3D işlemci çipine şifreli model katmanları taşır.
+                <span className="font-bold text-indigo-400 block mb-0.5">💡 REAL 3D WEBGL DATACENTER ENGINE (THREE.JS):</span>
+                JPMorgan Chase, HSBC, Deutsche Bank ve Intel SGX Enclave gerçek 3D nesneler olarak WebGL ile çizilir. Fare hareketi ile 3D sahneyi döndürebilir, 3D sunuculara tıklayabilirsiniz.
               </div>
 
               {/* Status Header */}
@@ -947,7 +1058,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300 uppercase">
-                    3D ISOMETRIC NETWORK CHASSIS (PURE CODE)
+                    REAL 3D WEBGL TOPOLOGY CHASSIS
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -958,129 +1069,18 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                     <LockIcon />
                     <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
                   </button>
-                  <button
-                    onClick={() => setIsPlaying(!isPlaying)}
-                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700"
-                  >
-                    {isPlaying ? 'Pause ⏸️' : 'Play ▶️'}
-                  </button>
                 </div>
               </div>
 
-              {/* PURE CODE 3D ISOMETRIC NETWORK TOPOLOGY CONTAINER (MATCHING USER SCREENSHOT) */}
-              <div className="relative z-10 w-full h-[360px] my-auto flex items-center justify-center">
-                {/* CENTER: 3D ISOMETRIC ENCLAVE PROCESSOR CHIP */}
-                <motion.div
-                  animate={{ scale: [1, 1.05, 1], rotate: [0, 1, 0] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="absolute z-20 w-32 h-32 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border-2 border-indigo-400 p-2 shadow-2xl shadow-indigo-500/50 flex flex-col items-center justify-center cursor-pointer"
-                  style={{
-                    transform: 'rotateX(50deg) rotateZ(-45deg)',
-                    boxShadow: '0 20px 50px rgba(99, 102, 241, 0.4), inset 0 0 20px rgba(99, 102, 241, 0.3)',
-                  }}
-                >
-                  {/* Golden Micro Pins around chip */}
-                  <div className="absolute -inset-1 rounded-2xl border border-amber-400/40 pointer-events-none" />
-                  <div className="w-14 h-14 rounded-xl bg-indigo-600/20 border border-indigo-400 flex items-center justify-center shadow-inner relative">
-                    <span className="text-2xl animate-pulse">🛰️</span>
-                    <div className="absolute inset-0 rounded-xl border border-cyan-400 animate-ping opacity-30" />
-                  </div>
-                  <span className="text-[10px] font-mono font-black text-indigo-300 mt-2 tracking-wider">
-                    ENCLAVE CORE
-                  </span>
-                  <span className="text-[8px] font-mono text-emerald-400 font-bold">Intel SGX TEE</span>
-                </motion.div>
-
-                {/* 4 SURROUNDING 3D ISOMETRIC BANK PLATFORMS (PROJECTION) */}
-                {/* 1. TOP-LEFT: JPMorgan Chase Platform */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => REAL_BANK_DETAILS.jpmorgan && setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan)}
-                  className="absolute top-2 left-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-indigo-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-indigo-400 transition-all"
-                  style={{
-                    transform: 'rotateX(40deg) rotateZ(-30deg)',
-                    boxShadow: '0 15px 30px rgba(99, 102, 241, 0.25)',
-                  }}
-                >
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
-                    <div className="flex items-center gap-1">
-                      <FanSpinner />
-                      <span className="text-[10px] font-mono font-bold text-indigo-400">JPMORGAN CHASE 🗽</span>
-                    </div>
-                    <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-300">NVIDIA A100 (80GB)</div>
-                  <div className="text-[9px] font-mono text-indigo-300">CUDA: {cudaJpm}%</div>
-                </motion.div>
-
-                {/* 2. TOP-RIGHT: HSBC Holdings Platform */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => REAL_BANK_DETAILS.hsbc && setActiveBankDrawer(REAL_BANK_DETAILS.hsbc)}
-                  className="absolute top-2 right-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-rose-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-rose-400 transition-all"
-                  style={{
-                    transform: 'rotateX(40deg) rotateZ(30deg)',
-                    boxShadow: '0 15px 30px rgba(239, 68, 68, 0.25)',
-                  }}
-                >
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs">🔴</span>
-                      <span className="text-[10px] font-mono font-bold text-rose-400">HSBC HOLDINGS 🏛️</span>
-                    </div>
-                    <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping" />
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-300">NVIDIA H100 SXM</div>
-                  <div className="text-[9px] font-mono text-rose-300">CUDA: {cudaHsbc}%</div>
-                </motion.div>
-
-                {/* 3. BOTTOM-LEFT: Intel SGX Vault Platform */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => REAL_BANK_DETAILS.sgx && setActiveBankDrawer(REAL_BANK_DETAILS.sgx)}
-                  className="absolute bottom-2 left-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-purple-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-purple-400 transition-all"
-                  style={{
-                    transform: 'rotateX(40deg) rotateZ(30deg)',
-                    boxShadow: '0 15px 30px rgba(168, 85, 247, 0.25)',
-                  }}
-                >
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
-                    <div className="flex items-center gap-1">
-                      <LockIcon />
-                      <span className="text-[10px] font-mono font-bold text-purple-400">SGX TEE VAULT 🔒</span>
-                    </div>
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-300">Hardware Vault Shield</div>
-                  <div className="text-[9px] font-mono text-emerald-400">100% Protected</div>
-                </motion.div>
-
-                {/* 4. BOTTOM-RIGHT: Deutsche Bank Platform */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  onClick={() => REAL_BANK_DETAILS.deutsche && setActiveBankDrawer(REAL_BANK_DETAILS.deutsche)}
-                  className="absolute bottom-2 right-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-cyan-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-cyan-400 transition-all"
-                  style={{
-                    transform: 'rotateX(40deg) rotateZ(-30deg)',
-                    boxShadow: '0 15px 30px rgba(56, 189, 248, 0.25)',
-                  }}
-                >
-                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
-                    <div className="flex items-center gap-1">
-                      <FanSpinner />
-                      <span className="text-[10px] font-mono font-bold text-cyan-400">DEUTSCHE BANK 🏢</span>
-                    </div>
-                    <span className="h-2 w-2 rounded-full bg-teal-400 animate-ping" />
-                  </div>
-                  <div className="text-[10px] font-mono text-slate-300">Intel Xeon Cluster</div>
-                  <div className="text-[9px] font-mono text-cyan-300">CPU Load: {cpuDb}%</div>
-                </motion.div>
+              {/* REAL 3D THREE.JS WEBGL CONTAINER */}
+              <div className="relative z-0 w-full h-[380px] my-auto">
+                <Real3DBankScene onSelectBank={(bank) => setActiveBankDrawer(bank)} />
               </div>
 
               {/* Bottom Subtitle */}
               <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
-                <span>{getPhaseTitle()}</span>
-                <span className="text-indigo-400 font-bold">CLICK 3D NODE TO INSPECT 🔍</span>
+                <span>Move mouse to tilt 3D WebGL camera</span>
+                <span className="text-indigo-400 font-bold">CLICK 3D SERVER MESH TO INSPECT 🔍</span>
               </div>
             </div>
           </div>
@@ -1155,7 +1155,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── NEW SECTION: THE CROSS-BANK FRAUD BLIND SPOT (THE PROBLEM & SOLUTION) ── */}
+        {/* ── SECTION: THE CROSS-BANK FRAUD BLIND SPOT (THE PROBLEM & SOLUTION) ── */}
         <motion.section
           id="problem-solution"
           initial={{ opacity: 0, y: 30 }}
@@ -1177,7 +1177,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Left Card: The Problem */}
             <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-rose-500/30 space-y-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">⚠️</span>
@@ -1199,7 +1198,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </ul>
             </div>
 
-            {/* Right Card: The Solution */}
             <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-emerald-500/30 space-y-4">
               <div className="flex items-center gap-3">
                 <span className="text-2xl">🛡️</span>
@@ -1228,7 +1226,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── NEW SECTION: HOW IT WORKS 4-STEP INTERACTIVE WORKFLOW ── */}
+        {/* ── SECTION: HOW IT WORKS 4-STEP INTERACTIVE WORKFLOW ── */}
         <motion.section
           id="how-it-works"
           initial={{ opacity: 0, y: 30 }}
@@ -1317,7 +1315,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               Explore real-time mathematical privacy guarantees, cross-bank model parameter negotiators, and detection SLAs.
             </p>
 
-            {/* Interactive Tab Controls */}
             <div className="flex justify-center gap-2 pt-4">
               {[
                 { id: 'dp', label: '🔒 DP Noise Simulator' },
@@ -1340,7 +1337,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           </div>
 
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
               <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               {productTab === 'dp' && 'Differential Privacy (ε), model güncellemelerine matematiksel gürültü ekleyerek hackerların ortak modelden müşteri kimliğini geri elde etmesini imkansız kılar.'}
@@ -1378,12 +1374,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                       <span className="text-slate-400">Gaussian Noise Std Dev ($\sigma$):</span>
                       <span className="text-purple-400 font-bold">{(0.5 / epsilonCalc).toFixed(3)}</span>
                     </div>
-                    <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800">
-                      <span className="text-slate-400 block mb-1">Differential Privacy Formula:</span>
-                      <code className="text-indigo-300 text-[11px]">
-                        \mathcal{"{N}"}\left(0, \sigma^2 I\right) \quad \text{"{where}"} \quad \sigma = \frac{"{\\Delta f \\sqrt{2 \\ln(1.25/\\delta)}}"}{"{\\epsilon}"}
-                      </code>
-                    </div>
                   </div>
                 </div>
 
@@ -1411,21 +1401,21 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 font-mono text-xs">
                 <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <span className="text-indigo-400 font-bold uppercase block">JPMorgan Chase Node</span>
-                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GAT (Graph Attention)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GAT</div>
                   <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 512 ➔ 256 Embedding</div>
                   <div className="text-emerald-400 font-bold">Quorum Status: MATCHED (100%)</div>
                 </div>
                 <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <span className="text-purple-400 font-bold uppercase block">HSBC Holdings Node</span>
-                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GCN (Convolutional)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GCN</div>
                   <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 512 ➔ 256 Embedding</div>
                   <div className="text-emerald-400 font-bold">Quorum Status: MATCHED (100%)</div>
                 </div>
                 <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
                   <span className="text-emerald-400 font-bold uppercase block">Deutsche Bank AG Node</span>
-                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GraphSAGE (CPU)</div>
+                  <div className="p-2.5 rounded bg-slate-900 text-slate-300">Arch: PyTorch GraphSAGE</div>
                   <div className="p-2.5 rounded bg-slate-900 text-slate-300">Layer Align: 256 ➔ Batch Scale 32</div>
-                  <div className="text-emerald-400 font-bold">Quorum Status: ADAPTED (Straggler Free)</div>
+                  <div className="text-emerald-400 font-bold">Quorum Status: ADAPTED</div>
                 </div>
               </div>
             )}
@@ -1458,7 +1448,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 5: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR WITH EXPLANATION WALKTHROUGH ── */}
+        {/* ── SECTION 5: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR ── */}
         <motion.section
           id="platform"
           initial={{ opacity: 0, y: 30 }}
@@ -1468,7 +1458,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-8">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-500/30 font-mono text-xs text-purple-200">
               <span className="font-bold text-purple-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               Suç örgütleri 10.000$ altı paraları 3 farklı bankaya bölerek (smurfing) tespit edilmeyi engeller. Graph Neural Network bankalar arası alt grafikleri birleştirerek çeteyi anında yakalar.
@@ -1537,11 +1526,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               ))}
             </div>
 
-            {/* Interactive 8-Node SVG Topology Graph & Node Inspector */}
+            {/* Interactive 8-Node SVG Topology Graph */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
               <div className="lg:col-span-8 relative w-full h-[360px] sm:h-[380px] bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
                 <svg className="w-full h-full" viewBox="0 0 700 340">
-                  {/* Connections */}
                   {!isGraphIsolated && (
                     <>
                       <line x1="120" y1="170" x2="240" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
@@ -1553,7 +1541,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                     </>
                   )}
 
-                  {/* 8 Nodes with Click Inspector Handlers */}
                   <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.jpm ?? null)} className="cursor-pointer">
                     <circle cx="120" cy="170" r="26" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
                     <text x="120" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPM-ACCT</text>
@@ -1649,33 +1636,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 </div>
               </div>
             </div>
-
-            {/* GNN Mathematical Formula & Comparison Matrix */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
-              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-3">
-                <span className="text-indigo-400 font-bold uppercase block">Graph Attention Layer Equation</span>
-                <code className="text-indigo-300 text-[11px] block p-3 bg-slate-900 rounded-xl border border-slate-800">
-                  h_i^(l+1) = \sigma \left( \sum \alpha_ij W^(l) h_j^(l) \right)
-                </code>
-                <p className="text-[11px] text-slate-400 leading-relaxed">
-                  Computes structural attention weights (\alpha_ij) between accounts across isolated banks, measuring structural transaction similarity without exposing PII.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-3">
-                <span className="text-emerald-400 font-bold uppercase block">Normal Accounts vs. Money Mule Rings</span>
-                <div className="grid grid-cols-2 gap-2 text-[10px]">
-                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
-                    <span className="text-emerald-400 font-bold">Consumer Accounts</span>
-                    <span className="block text-slate-400">Regular salary intake, local merchant spend, low fan-out ratio.</span>
-                  </div>
-                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
-                    <span className="text-rose-400 font-bold">Mule Syndicates</span>
-                    <span className="block text-slate-400">Rapid sub-threshold layering, zero retention, high graph centrality.</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         </motion.section>
 
@@ -1706,7 +1666,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           </div>
 
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
               <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               SWIFT ISO 20022 XML ayrıştırmasından Intel SGX donanım şifrelemesine ve FinCEN SAR bildirimine kadar platformun uçtan uca kurumsal veri hattını gösterir.
@@ -1754,7 +1713,6 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                   </p>
                 </div>
 
-                {/* Protocol Specs Code Snippet Preview */}
                 <div className="p-4 rounded-xl bg-slate-900 font-mono text-[11px] text-indigo-300 border border-slate-800 overflow-x-auto">
                   {activeLayer === 1 && `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
   <FIToFICstmrCdtTrf>
@@ -1770,7 +1728,6 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
     eid, &retval, ciphertext_a, ciphertext_b, noise_sigma
 );`}
                   {activeLayer === 4 && `def trimmed_mean_fedavg(weight_tensors, beta=0.1):
-    # Sort and trim top/bottom 10% gradients to quench Byzantine attacks
     sorted_weights = torch.sort(weight_tensors, dim=0)
     return torch.mean(sorted_weights[beta:-beta], dim=0)`}
                   {activeLayer === 5 && `<FinCEN_SAR_Export version="2.0">
@@ -1798,7 +1755,6 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
               <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               Kötü niyetli hackerların veya sızmış bankaların AI modelinden müşteri verisi çalmasını (MIA/DLG) veya modeli zehirlemesini (Byzantine) engelleyen güvenlik testlerini simüle eder.
@@ -1888,7 +1844,6 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
               <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               Banka yazılımcıları 3 satır kodla (Python, Go, Node.js, cURL) platformu kendi banka altyapısına kolayca entegre edebilir.
@@ -1926,7 +1881,6 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
               </div>
             </div>
 
-            {/* SDK Language Selector Tabs */}
             <div className="flex gap-2 pt-4">
               {(['curl', 'python', 'node', 'go'] as const).map((lang) => (
                 <button
@@ -1982,7 +1936,6 @@ ${apiResponse}`}</pre>
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
-            {/* Component Purpose Callout Banner */}
             <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
               <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
               Bankaların kendi sunucularında (Kubernetes, Helm, Docker, Terraform) 5 dakikada platformu başlatması için hazır altyapı şablonları sunar.
@@ -2041,7 +1994,6 @@ ${apiResponse}`}</pre>
               </div>
             </div>
 
-            {/* Target Blueprint Tabs */}
             <div className="flex gap-2 mb-3">
               {(['helm', 'docker', 'terraform', 'shell'] as const).map((tab) => (
                 <button
