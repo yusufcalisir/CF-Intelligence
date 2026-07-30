@@ -139,17 +139,6 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// Live Telemetry Log Feed Items
-const LIVE_LOG_FEED = [
-  'JPMorgan Chase Node completed Local Epoch 3/3 (Loss: 0.0381)',
-  'HSBC Holdings Node generated Paillier Homomorphic Ciphertext [[W_hsbc]]',
-  'CFI Aggregator Core: Quorum Reached (3/3 Real Banks) - Aggregating Round',
-  'Cross-Bank Streaming GNN: Zero High-Risk Collusion Rings Detected',
-  'Deutsche Bank AG Node synchronized Global Model Weight Vector (v2.4.0)',
-  'Zero-Trust ABAC Policy Evaluated: Clearance Level 4 Verified (SAR Export Granted)',
-  'Intel SGX Secure Enclave Memory Shield Active (0.00% Leakage Risk)',
-];
-
 // ── REFERENCE-ACCURATE 3D WEBGL GRAPHICS SCENE COMPONENT (THREE.JS) ─────────────
 function Real3DBankScene({
   onSelectBank,
@@ -181,7 +170,7 @@ function Real3DBankScene({
 
     container.appendChild(renderer.domElement);
 
-    // 2. Lighting Setup (Neon Cybernetic Ambient & Point Lights matching Reference Image)
+    // 2. Lighting Setup
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
@@ -206,10 +195,9 @@ function Real3DBankScene({
     cyanPoint.position.set(4.5, 4, 3.5);
     scene.add(cyanPoint);
 
-    // 3. Central 3D Processor Microchip Mesh Group (Golden Microchip matching Reference Image)
+    // 3. Central 3D Processor Microchip Mesh Group
     const chipGroup = new THREE.Group();
 
-    // Metallic Chip Base Body
     const chipGeo = new THREE.BoxGeometry(2.6, 0.4, 2.6);
     const chipMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
@@ -221,7 +209,6 @@ function Real3DBankScene({
     chipMesh.receiveShadow = true;
     chipGroup.add(chipMesh);
 
-    // Central Glowing Enclave Core Emblem
     const coreGeo = new THREE.CylinderGeometry(0.75, 0.75, 0.45, 32);
     const coreMat = new THREE.MeshStandardMaterial({
       color: 0x38bdf8,
@@ -256,7 +243,6 @@ function Real3DBankScene({
       chipGroup.add(p4);
     }
 
-    // Floating Ring
     const torusGeo = new THREE.TorusGeometry(2.0, 0.03, 16, 100);
     const torusMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const torusMesh = new THREE.Mesh(torusGeo, torusMat);
@@ -265,7 +251,7 @@ function Real3DBankScene({
 
     scene.add(chipGroup);
 
-    // 4. Glass-Enclosed Cubic Pedestals & Custom 3D Bank Architecture (Matching Reference Image)
+    // 4. Glass-Enclosed Cubic Pedestals & Custom 3D Bank Architecture
     const createBankPedestalMesh = (
       color: number,
       pos: [number, number, number],
@@ -276,7 +262,6 @@ function Real3DBankScene({
       group.position.set(...pos);
       group.userData = { bankKey };
 
-      // Base Pedestal Platform with Glowing Neon Rim
       const platGeo = new THREE.BoxGeometry(2.8, 0.22, 2.8);
       const platMat = new THREE.MeshPhysicalMaterial({
         color: 0x0f172a,
@@ -287,14 +272,12 @@ function Real3DBankScene({
       platMesh.receiveShadow = true;
       group.add(platMesh);
 
-      // Glowing Rim Border
       const rimGeo = new THREE.BoxGeometry(2.86, 0.05, 2.86);
       const rimMat = new THREE.MeshBasicMaterial({ color });
       const rimMesh = new THREE.Mesh(rimGeo, rimMat);
       rimMesh.position.y = 0.12;
       group.add(rimMesh);
 
-      // Translucent Cubic Glass Enclosure (Matching Reference Screenshot Glass Cubes)
       const glassGeo = new THREE.BoxGeometry(2.4, 2.4, 2.4);
       const glassMat = new THREE.MeshPhysicalMaterial({
         color,
@@ -308,9 +291,7 @@ function Real3DBankScene({
       glassMesh.position.y = 1.35;
       group.add(glassMesh);
 
-      // Custom Inner 3D Geometry depending on type
       if (type === 'server_rack' || type === 'server_cluster') {
-        // Metallic Server Chassis inside glass cube
         const rackGeo = new THREE.BoxGeometry(1.5, 1.8, 1.3);
         const rackMat = new THREE.MeshStandardMaterial({
           color: 0x1e293b,
@@ -322,7 +303,6 @@ function Real3DBankScene({
         rackMesh.castShadow = true;
         group.add(rackMesh);
 
-        // Blinking LED Arrays
         const ledGeo = new THREE.BoxGeometry(1.3, 0.08, 0.04);
         const ledMat = new THREE.MeshBasicMaterial({ color });
         for (let y = 0.4; y <= 1.6; y += 0.3) {
@@ -331,14 +311,12 @@ function Real3DBankScene({
           group.add(led);
         }
       } else if (type === 'bank_building') {
-        // Deutsche Bank Architectural 3D Bank Building (Columns + Roof + Server Base)
         const bldgBaseGeo = new THREE.BoxGeometry(1.7, 0.8, 1.5);
         const bldgMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
         const bldgBase = new THREE.Mesh(bldgBaseGeo, bldgMat);
         bldgBase.position.y = 0.6;
         group.add(bldgBase);
 
-        // 4 Architectural Columns
         const colGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.9, 16);
         const colMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9 });
         [-0.6, -0.2, 0.2, 0.6].forEach((x) => {
@@ -347,13 +325,11 @@ function Real3DBankScene({
           group.add(col);
         });
 
-        // Roof Pediment
         const roofGeo = new THREE.BoxGeometry(1.8, 0.25, 1.6);
         const roofMesh = new THREE.Mesh(roofGeo, bldgMat);
         roofMesh.position.y = 1.85;
         group.add(roofMesh);
       } else {
-        // Intel SGX Cybernetic Hardware Vault
         const vaultGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
         const vaultMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, metalness: 0.95, roughness: 0.1 });
         const vaultMesh = new THREE.Mesh(vaultGeo, vaultMat);
@@ -372,7 +348,7 @@ function Real3DBankScene({
 
     const bankNodesList = [jpmMesh, hsbcMesh, sgxMesh, dbMesh];
 
-    // 5. Curved Dual-Color Laser Fiber Lines & Animated 3D Arrow Cones (Matching Reference Screenshot)
+    // 5. Curved Dual-Color Laser Lines & Animated 3D Arrow Cones
     const createFiberWith3DArrows = (start: [number, number, number], end: [number, number, number], color: number) => {
       const curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(...start),
@@ -385,7 +361,6 @@ function Real3DBankScene({
       const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
       scene.add(tubeMesh);
 
-      // 3D Directional Cone Arrow Mesh
       const arrowGeo = new THREE.ConeGeometry(0.18, 0.45, 12);
       const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
@@ -458,16 +433,13 @@ function Real3DBankScene({
     const animate = () => {
       const elapsedTime = clock.getElapsedTime();
 
-      // Smooth camera orbit tilt
       scene.rotation.y += (targetRotY - scene.rotation.y) * 0.05;
       scene.rotation.x += (targetRotX - scene.rotation.x) * 0.05;
 
-      // Rotate central microchip & torus
       chipGroup.rotation.y = elapsedTime * 0.45;
       torusMesh.rotation.z = elapsedTime * 0.9;
       coreMat.emissiveIntensity = 0.7 + Math.sin(elapsedTime * 4) * 0.3;
 
-      // Animate 3D Directional Arrow Packets along curves
       fibers.forEach((f, idx) => {
         const t = (elapsedTime * 0.35 + idx * 0.25) % 1;
         const pt = f.curve.getPoint(t);
@@ -477,7 +449,6 @@ function Real3DBankScene({
         f.arrowMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
       });
 
-      // Gentle floating hover for bank pedestals
       bankNodesList.forEach((n, idx) => {
         n.position.y = Math.sin(elapsedTime * 2 + idx) * 0.06;
       });
@@ -502,32 +473,27 @@ function Real3DBankScene({
 
   return (
     <div ref={mountRef} className="w-full h-full cursor-pointer relative">
-      {/* FLOATING 3D ARCHITECTURAL BADGES (MATCHING REFERENCE IMAGE SCREENSHOT) */}
-      {/* 1. Top-Left: JPMorgan Chase Badge */}
+      {/* FLOATING 3D ARCHITECTURAL BADGES */}
       <div className="absolute top-10 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
         <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
         JPMorgan Chase 🗽
       </div>
 
-      {/* 2. Top-Right: HSBC Badge with Red HSBC Icon */}
       <div className="absolute top-10 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-500/60 text-rose-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
         <span className="text-rose-500">🔴</span>
         HSBC 🏛️
       </div>
 
-      {/* 3. Center: Floating Enclave Speech Bubble Badge */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-20 pointer-events-none px-4 py-2 rounded-2xl bg-indigo-950/90 border-2 border-indigo-400 text-white text-xs font-mono font-extrabold shadow-2xl backdrop-blur-md flex flex-col items-center">
         <span>Enclave</span>
         <div className="w-2 h-2 bg-indigo-400 rotate-45 -mb-3 mt-1" />
       </div>
 
-      {/* 4. Bottom-Left: Intel SGX Enclave Vault Badge */}
       <div className="absolute bottom-12 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-purple-500/60 text-purple-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
         <LockIcon />
         Intel SGX TEE 🔒
       </div>
 
-      {/* 5. Bottom-Right: Deutsche Bank Badge with DB Square Icon */}
       <div className="absolute bottom-12 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
         <span className="px-1 bg-blue-600 text-white text-[9px] font-bold rounded">DB</span>
         Deutsche Bank 🏢
@@ -550,7 +516,6 @@ export default function LandingPage() {
   // Telemetry HUD state
   const [flRound, setFlRound] = useState<number>(42);
   const [accuracy, setAccuracy] = useState<number>(98.42);
-  const [logIndex, setLogIndex] = useState<number>(0);
 
   // Active Scroll Section State for Quick-Nav Dock
   const [activeSection, setActiveSection] = useState<string>('hero');
@@ -620,7 +585,6 @@ export default function LandingPage() {
     const interval = setInterval(() => {
       setFlRound((r) => r + 1);
       setAccuracy((acc) => Number((acc + (Math.random() * 0.06 - 0.03)).toFixed(2)));
-      setLogIndex((prevIndex) => (prevIndex + 1) % LIVE_LOG_FEED.length);
     }, 3200);
     return () => clearInterval(interval);
   }, []);
@@ -895,21 +859,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       </div>
 
       <div className="relative z-10">
-        {/* ── TOP ULTRA-SLIM TELEMETRY MARQUEE BAR ───── */}
-        <div className="h-8 bg-slate-950/90 border-b border-slate-800/60 px-4 sm:px-8 flex items-center justify-between text-xs font-mono text-slate-300">
-          <div className="flex items-center gap-3">
-            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold tracking-wider flex items-center gap-1.5 border border-indigo-500/30">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              LIVE TELEMETRY LOG
-            </span>
-            <span className="text-emerald-400 font-bold">[{new Date().toLocaleTimeString()}]</span>
-          </div>
-          <div className="truncate text-slate-300 font-mono text-[11px] max-w-2xl text-right">
-            {LIVE_LOG_FEED[logIndex]}
-          </div>
-        </div>
-
-        {/* ── SECTION 1: GLASSMORPHIC FLOATING NAVBAR ── */}
+        {/* ── SECTION 1: SLEEK UNCLUTTERED FLOATING NAVBAR ── */}
         <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 h-16 flex items-center">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             {/* Logo */}
@@ -930,7 +880,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </div>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-5 py-2 backdrop-blur-md shadow-inner">
+            <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-6 py-2.5 backdrop-blur-md shadow-inner">
               <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">The Problem</a>
               <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">How It Works</a>
               <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
@@ -1021,8 +971,8 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: HERO WITH REFERENCE-ACCURATE 3D WEBGL GRAPHICS CANVA ── */}
-        <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
+        {/* ── SECTION 2: HERO WITH REFERENCE-ACCURATE 3D WEBGL GRAPHICS CANVAS ── */}
+        <section id="hero" className="min-h-[calc(100vh-5rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -1188,7 +1138,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
-                    className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold"
+                    className="px-3 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
                   >
                     Close ✖
                   </button>
@@ -1563,7 +1513,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                     onClick={() => setIsGraphIsolated(!isGraphIsolated)}
                     className="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-md transition-all"
                   >
-                    {isGraphIsolated ? 'Re-link Nodes 🔗' : 'Isolate Fraud Ring ✂️'}
+                    {isGraphIsolated ? 'Reconnect Subgraphs 🔗' : 'Isolate Fraud Ring ✂️'}
                   </button>
                 )}
 
@@ -1706,7 +1656,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 )}
 
                 <div className="p-2.5 rounded-xl bg-slate-900 text-[10px] text-slate-400 border border-slate-800 text-center">
-                  Tip: Click "Run GNN Detection" to isolate suspicious money mule rings in real time.
+                  Note: Click "Run GNN Detection" to isolate suspicious money mule rings in real time.
                 </div>
               </div>
             </div>
