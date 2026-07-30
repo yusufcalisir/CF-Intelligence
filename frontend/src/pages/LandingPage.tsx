@@ -881,7 +881,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-8 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-7 py-2.5 backdrop-blur-md shadow-inner">
-              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">Overview</a>
+              <a href="#hero" className="hover:text-indigo-400 transition-colors">Overview</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
               <a href="#api" className="hover:text-indigo-400 transition-colors">API & Docs</a>
@@ -927,7 +927,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               className="lg:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
-                <a href="#problem-solution" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
+                <a href="#hero" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Overview
                 </a>
                 <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
