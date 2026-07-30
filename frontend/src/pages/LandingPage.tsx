@@ -150,7 +150,7 @@ const LIVE_LOG_FEED = [
   'Intel SGX Secure Enclave Memory Shield Active (0.00% Leakage Risk)',
 ];
 
-// ── REAL 3D WEBGL GRAPHICS SCENE COMPONENT POWERED BY THREE.JS ─────────────
+// ── REFERENCE-ACCURATE 3D WEBGL GRAPHICS SCENE COMPONENT (THREE.JS) ─────────────
 function Real3DBankScene({
   onSelectBank,
 }: {
@@ -170,7 +170,7 @@ function Real3DBankScene({
     scene.fog = new THREE.FogExp2('#020617', 0.035);
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 10, 12);
+    camera.position.set(0, 11, 13);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -181,8 +181,8 @@ function Real3DBankScene({
 
     container.appendChild(renderer.domElement);
 
-    // 2. Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // 2. Lighting Setup (Neon Cybernetic Ambient & Point Lights matching Reference Image)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
     const dirLight = new THREE.DirectionalLight(0x818cf8, 2.5);
@@ -190,31 +190,31 @@ function Real3DBankScene({
     dirLight.castShadow = true;
     scene.add(dirLight);
 
-    const bluePoint = new THREE.PointLight(0x6366f1, 3, 20);
-    bluePoint.position.set(-4, 3, -3);
+    const bluePoint = new THREE.PointLight(0x38bdf8, 4, 25);
+    bluePoint.position.set(-4.5, 4, -3.5);
     scene.add(bluePoint);
 
-    const redPoint = new THREE.PointLight(0xef4444, 3, 20);
-    redPoint.position.set(4, 3, -3);
-    scene.add(redPoint);
+    const magentaPoint = new THREE.PointLight(0xec4899, 4, 25);
+    magentaPoint.position.set(4.5, 4, -3.5);
+    scene.add(magentaPoint);
 
-    const purplePoint = new THREE.PointLight(0xa855f7, 3, 20);
-    purplePoint.position.set(-4, 3, 3);
+    const purplePoint = new THREE.PointLight(0xa855f7, 4, 25);
+    purplePoint.position.set(-4.5, 4, 3.5);
     scene.add(purplePoint);
 
-    const cyanPoint = new THREE.PointLight(0x38bdf8, 3, 20);
-    cyanPoint.position.set(4, 3, 3);
+    const cyanPoint = new THREE.PointLight(0x06b6d4, 4, 25);
+    cyanPoint.position.set(4.5, 4, 3.5);
     scene.add(cyanPoint);
 
-    // 3. Central 3D Processor Microchip Mesh Group
+    // 3. Central 3D Processor Microchip Mesh Group (Golden Microchip matching Reference Image)
     const chipGroup = new THREE.Group();
 
     // Metallic Chip Base Body
     const chipGeo = new THREE.BoxGeometry(2.6, 0.4, 2.6);
     const chipMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
-      metalness: 0.9,
-      roughness: 0.2,
+      metalness: 0.95,
+      roughness: 0.15,
     });
     const chipMesh = new THREE.Mesh(chipGeo, chipMat);
     chipMesh.castShadow = true;
@@ -222,20 +222,20 @@ function Real3DBankScene({
     chipGroup.add(chipMesh);
 
     // Central Glowing Enclave Core Emblem
-    const coreGeo = new THREE.CylinderGeometry(0.7, 0.7, 0.45, 32);
+    const coreGeo = new THREE.CylinderGeometry(0.75, 0.75, 0.45, 32);
     const coreMat = new THREE.MeshStandardMaterial({
-      color: 0x6366f1,
-      emissive: 0x4f46e5,
-      emissiveIntensity: 0.8,
-      metalness: 0.5,
-      roughness: 0.2,
+      color: 0x38bdf8,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.9,
+      metalness: 0.6,
+      roughness: 0.1,
     });
     const coreMesh = new THREE.Mesh(coreGeo, coreMat);
     chipGroup.add(coreMesh);
 
-    // Golden Micro Pins around chip (32 pins)
+    // 32 Golden Pins around Microchip
     const pinGeo = new THREE.BoxGeometry(0.12, 0.08, 0.45);
-    const pinMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.95, roughness: 0.1 });
+    const pinMat = new THREE.MeshStandardMaterial({ color: 0xd97706, metalness: 0.95, roughness: 0.1 });
     for (let i = -1; i <= 1; i += 0.3) {
       const p1 = new THREE.Mesh(pinGeo, pinMat);
       p1.position.set(i * 1.8, 0, 1.45);
@@ -256,8 +256,8 @@ function Real3DBankScene({
       chipGroup.add(p4);
     }
 
-    // Floating Aura Ring
-    const torusGeo = new THREE.TorusGeometry(1.9, 0.03, 16, 100);
+    // Floating Ring
+    const torusGeo = new THREE.TorusGeometry(2.0, 0.03, 16, 100);
     const torusMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
     const torusMesh = new THREE.Mesh(torusGeo, torusMat);
     torusMesh.rotation.x = Math.PI / 2;
@@ -265,93 +265,143 @@ function Real3DBankScene({
 
     scene.add(chipGroup);
 
-    // 4. Helper Function to Create 3D Bank Node Server Meshes
-    const createBankNodeMesh = (
+    // 4. Glass-Enclosed Cubic Pedestals & Custom 3D Bank Architecture (Matching Reference Image)
+    const createBankPedestalMesh = (
       color: number,
       pos: [number, number, number],
-      bankKey: string
+      bankKey: string,
+      type: 'server_rack' | 'server_cluster' | 'vault' | 'bank_building'
     ) => {
       const group = new THREE.Group();
       group.position.set(...pos);
       group.userData = { bankKey };
 
-      // Glass Platform Base
-      const platGeo = new THREE.BoxGeometry(2.4, 0.18, 2.4);
+      // Base Pedestal Platform with Glowing Neon Rim
+      const platGeo = new THREE.BoxGeometry(2.8, 0.22, 2.8);
       const platMat = new THREE.MeshPhysicalMaterial({
-        color,
-        transmission: 0.6,
-        opacity: 0.9,
-        transparent: true,
-        roughness: 0.1,
-        ior: 1.5,
+        color: 0x0f172a,
+        metalness: 0.9,
+        roughness: 0.2,
       });
       const platMesh = new THREE.Mesh(platGeo, platMat);
       platMesh.receiveShadow = true;
       group.add(platMesh);
 
-      // Metallic Server Rack Tower
-      const rackGeo = new THREE.BoxGeometry(1.6, 2.2, 1.4);
-      const rackMat = new THREE.MeshStandardMaterial({
-        color: 0x1e293b,
-        metalness: 0.85,
-        roughness: 0.25,
-      });
-      const rackMesh = new THREE.Mesh(rackGeo, rackMat);
-      rackMesh.position.y = 1.15;
-      rackMesh.castShadow = true;
-      rackMesh.receiveShadow = true;
-      group.add(rackMesh);
+      // Glowing Rim Border
+      const rimGeo = new THREE.BoxGeometry(2.86, 0.05, 2.86);
+      const rimMat = new THREE.MeshBasicMaterial({ color });
+      const rimMesh = new THREE.Mesh(rimGeo, rimMat);
+      rimMesh.position.y = 0.12;
+      group.add(rimMesh);
 
-      // Glowing LED Arrays on Rack
-      const ledGeo = new THREE.BoxGeometry(1.4, 0.1, 0.05);
-      const ledMat = new THREE.MeshBasicMaterial({ color });
-      for (let y = 0.4; y <= 1.9; y += 0.35) {
-        const led = new THREE.Mesh(ledGeo, ledMat);
-        led.position.set(0, y, 0.72);
-        group.add(led);
+      // Translucent Cubic Glass Enclosure (Matching Reference Screenshot Glass Cubes)
+      const glassGeo = new THREE.BoxGeometry(2.4, 2.4, 2.4);
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color,
+        transmission: 0.85,
+        opacity: 0.45,
+        transparent: true,
+        roughness: 0.1,
+        ior: 1.4,
+      });
+      const glassMesh = new THREE.Mesh(glassGeo, glassMat);
+      glassMesh.position.y = 1.35;
+      group.add(glassMesh);
+
+      // Custom Inner 3D Geometry depending on type
+      if (type === 'server_rack' || type === 'server_cluster') {
+        // Metallic Server Chassis inside glass cube
+        const rackGeo = new THREE.BoxGeometry(1.5, 1.8, 1.3);
+        const rackMat = new THREE.MeshStandardMaterial({
+          color: 0x1e293b,
+          metalness: 0.9,
+          roughness: 0.2,
+        });
+        const rackMesh = new THREE.Mesh(rackGeo, rackMat);
+        rackMesh.position.y = 1.15;
+        rackMesh.castShadow = true;
+        group.add(rackMesh);
+
+        // Blinking LED Arrays
+        const ledGeo = new THREE.BoxGeometry(1.3, 0.08, 0.04);
+        const ledMat = new THREE.MeshBasicMaterial({ color });
+        for (let y = 0.4; y <= 1.6; y += 0.3) {
+          const led = new THREE.Mesh(ledGeo, ledMat);
+          led.position.set(0, y, 0.67);
+          group.add(led);
+        }
+      } else if (type === 'bank_building') {
+        // Deutsche Bank Architectural 3D Bank Building (Columns + Roof + Server Base)
+        const bldgBaseGeo = new THREE.BoxGeometry(1.7, 0.8, 1.5);
+        const bldgMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+        const bldgBase = new THREE.Mesh(bldgBaseGeo, bldgMat);
+        bldgBase.position.y = 0.6;
+        group.add(bldgBase);
+
+        // 4 Architectural Columns
+        const colGeo = new THREE.CylinderGeometry(0.08, 0.08, 0.9, 16);
+        const colMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9 });
+        [-0.6, -0.2, 0.2, 0.6].forEach((x) => {
+          const col = new THREE.Mesh(colGeo, colMat);
+          col.position.set(x, 1.35, 0.6);
+          group.add(col);
+        });
+
+        // Roof Pediment
+        const roofGeo = new THREE.BoxGeometry(1.8, 0.25, 1.6);
+        const roofMesh = new THREE.Mesh(roofGeo, bldgMat);
+        roofMesh.position.y = 1.85;
+        group.add(roofMesh);
+      } else {
+        // Intel SGX Cybernetic Hardware Vault
+        const vaultGeo = new THREE.BoxGeometry(1.6, 1.6, 1.6);
+        const vaultMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, metalness: 0.95, roughness: 0.1 });
+        const vaultMesh = new THREE.Mesh(vaultGeo, vaultMat);
+        vaultMesh.position.y = 1.15;
+        group.add(vaultMesh);
       }
 
       scene.add(group);
       return group;
     };
 
-    const jpmMesh = createBankNodeMesh(0x6366f1, [-4.2, 0, -3.2], 'jpmorgan');
-    const hsbcMesh = createBankNodeMesh(0xef4444, [4.2, 0, -3.2], 'hsbc');
-    const sgxMesh = createBankNodeMesh(0xa855f7, [-4.2, 0, 3.2], 'sgx');
-    const dbMesh = createBankNodeMesh(0x38bdf8, [4.2, 0, 3.2], 'deutsche');
+    const jpmMesh = createBankPedestalMesh(0x38bdf8, [-4.5, 0, -3.5], 'jpmorgan', 'server_rack');
+    const hsbcMesh = createBankPedestalMesh(0xec4899, [4.5, 0, -3.5], 'hsbc', 'server_cluster');
+    const sgxMesh = createBankPedestalMesh(0xa855f7, [-4.5, 0, 3.5], 'sgx', 'vault');
+    const dbMesh = createBankPedestalMesh(0x06b6d4, [4.5, 0, 3.5], 'deutsche', 'bank_building');
 
     const bankNodesList = [jpmMesh, hsbcMesh, sgxMesh, dbMesh];
 
-    // 5. 3D Volumetric Curved Fiber Cables & Glowing Data Spheres
-    const createFiberTube = (start: [number, number, number], end: [number, number, number], color: number) => {
+    // 5. Curved Dual-Color Laser Fiber Lines & Animated 3D Arrow Cones (Matching Reference Screenshot)
+    const createFiberWith3DArrows = (start: [number, number, number], end: [number, number, number], color: number) => {
       const curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(...start),
-        new THREE.Vector3((start[0] + end[0]) * 0.5, 1.8, (start[2] + end[2]) * 0.5),
+        new THREE.Vector3((start[0] + end[0]) * 0.5, 1.9, (start[2] + end[2]) * 0.5),
         new THREE.Vector3(...end),
       ]);
 
-      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.04, 8, false);
-      const tubeMat = new THREE.MeshBasicMaterial({ color, wireframe: false });
+      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.045, 8, false);
+      const tubeMat = new THREE.MeshBasicMaterial({ color });
       const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
       scene.add(tubeMesh);
 
-      // Animated Glowing Data Sphere on Path
-      const sphereGeo = new THREE.SphereGeometry(0.16, 16, 16);
-      const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const sphereMesh = new THREE.Mesh(sphereGeo, sphereMat);
-      scene.add(sphereMesh);
+      // 3D Directional Cone Arrow Mesh
+      const arrowGeo = new THREE.ConeGeometry(0.18, 0.45, 12);
+      const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const arrowMesh = new THREE.Mesh(arrowGeo, arrowMat);
+      scene.add(arrowMesh);
 
-      return { curve, sphereMesh };
+      return { curve, arrowMesh };
     };
 
     const fibers = [
-      createFiberTube([-4.2, 1.2, -3.2], [0, 0.2, 0], 0x6366f1),
-      createFiberTube([4.2, 1.2, -3.2], [0, 0.2, 0], 0xef4444),
-      createFiberTube([-4.2, 1.2, 3.2], [0, 0.2, 0], 0xa855f7),
-      createFiberTube([4.2, 1.2, 3.2], [0, 0.2, 0], 0x38bdf8),
+      createFiberWith3DArrows([-4.5, 1.3, -3.5], [0, 0.2, 0], 0x38bdf8),
+      createFiberWith3DArrows([4.5, 1.3, -3.5], [0, 0.2, 0], 0xec4899),
+      createFiberWith3DArrows([-4.5, 1.3, 3.5], [0, 0.2, 0], 0xa855f7),
+      createFiberWith3DArrows([4.5, 1.3, 3.5], [0, 0.2, 0], 0x06b6d4),
     ];
 
-    // 6. Interactive Mouse Orbit Parallax & 3D Raycasting
+    // 6. Interactive Mouse Orbit & Raycaster
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let targetRotY = 0;
@@ -365,8 +415,8 @@ function Real3DBankScene({
       mouse.x = x;
       mouse.y = y;
 
-      targetRotY = x * 0.35;
-      targetRotX = y * 0.2;
+      targetRotY = x * 0.3;
+      targetRotX = y * 0.15;
     };
 
     const handleClick = () => {
@@ -401,7 +451,7 @@ function Real3DBankScene({
     };
     window.addEventListener('resize', handleResize);
 
-    // 7. Animation Render Loop (60FPS)
+    // 7. Render Loop (60FPS)
     let animId: number;
     let clock = new THREE.Clock();
 
@@ -412,23 +462,24 @@ function Real3DBankScene({
       scene.rotation.y += (targetRotY - scene.rotation.y) * 0.05;
       scene.rotation.x += (targetRotX - scene.rotation.x) * 0.05;
 
-      // Rotate Enclave Central Core & Floating Torus
-      chipGroup.rotation.y = elapsedTime * 0.4;
-      torusMesh.rotation.z = elapsedTime * 0.8;
+      // Rotate central microchip & torus
+      chipGroup.rotation.y = elapsedTime * 0.45;
+      torusMesh.rotation.z = elapsedTime * 0.9;
+      coreMat.emissiveIntensity = 0.7 + Math.sin(elapsedTime * 4) * 0.3;
 
-      // Pulse Central Core Light
-      coreMat.emissiveIntensity = 0.6 + Math.sin(elapsedTime * 4) * 0.3;
-
-      // Animate 3D Data Spheres along curves
+      // Animate 3D Directional Arrow Packets along curves
       fibers.forEach((f, idx) => {
-        const t = (elapsedTime * 0.4 + idx * 0.25) % 1;
+        const t = (elapsedTime * 0.35 + idx * 0.25) % 1;
         const pt = f.curve.getPoint(t);
-        f.sphereMesh.position.copy(pt);
+        const tangent = f.curve.getTangent(t);
+
+        f.arrowMesh.position.copy(pt);
+        f.arrowMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
       });
 
-      // Hover 3D bank nodes gently
+      // Gentle floating hover for bank pedestals
       bankNodesList.forEach((n, idx) => {
-        n.position.y = Math.sin(elapsedTime * 2 + idx) * 0.08;
+        n.position.y = Math.sin(elapsedTime * 2 + idx) * 0.06;
       });
 
       renderer.render(scene, camera);
@@ -449,7 +500,40 @@ function Real3DBankScene({
     };
   }, [onSelectBank]);
 
-  return <div ref={mountRef} className="w-full h-full cursor-pointer relative" />;
+  return (
+    <div ref={mountRef} className="w-full h-full cursor-pointer relative">
+      {/* FLOATING 3D ARCHITECTURAL BADGES (MATCHING REFERENCE IMAGE SCREENSHOT) */}
+      {/* 1. Top-Left: JPMorgan Chase Badge */}
+      <div className="absolute top-10 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
+        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
+        JPMorgan Chase 🗽
+      </div>
+
+      {/* 2. Top-Right: HSBC Badge with Red HSBC Icon */}
+      <div className="absolute top-10 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-500/60 text-rose-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
+        <span className="text-rose-500">🔴</span>
+        HSBC 🏛️
+      </div>
+
+      {/* 3. Center: Floating Enclave Speech Bubble Badge */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-20 pointer-events-none px-4 py-2 rounded-2xl bg-indigo-950/90 border-2 border-indigo-400 text-white text-xs font-mono font-extrabold shadow-2xl backdrop-blur-md flex flex-col items-center">
+        <span>Enclave</span>
+        <div className="w-2 h-2 bg-indigo-400 rotate-45 -mb-3 mt-1" />
+      </div>
+
+      {/* 4. Bottom-Left: Intel SGX Enclave Vault Badge */}
+      <div className="absolute bottom-12 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-purple-500/60 text-purple-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
+        <LockIcon />
+        Intel SGX TEE 🔒
+      </div>
+
+      {/* 5. Bottom-Right: Deutsche Bank Badge with DB Square Icon */}
+      <div className="absolute bottom-12 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
+        <span className="px-1 bg-blue-600 text-white text-[9px] font-bold rounded">DB</span>
+        Deutsche Bank 🏢
+      </div>
+    </div>
+  );
 }
 
 export default function LandingPage() {
@@ -937,7 +1021,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: HERO WITH SEAMLESS INTEGRATED 3D WEBGL GRAPHICS CANVA ── */}
+        {/* ── SECTION 2: HERO WITH REFERENCE-ACCURATE 3D WEBGL GRAPHICS CANVA ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -1043,7 +1127,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: SEAMLESS 3D WEBGL ARCHITECTURE VISUALIZATION ── */}
+            {/* ── RIGHT COLUMN: REFERENCE-ACCURATE 3D WEBGL ARCHITECTURE VISUALIZATION ── */}
             <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-slate-950/80 p-2 shadow-2xl overflow-hidden flex flex-col justify-between">
               {/* Header Controls */}
               <div className="relative z-10 flex items-center justify-between p-3 border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md rounded-t-2xl">
@@ -1062,7 +1146,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 </button>
               </div>
 
-              {/* SEAMLESS 3D CANVAS */}
+              {/* REFERENCE-ACCURATE 3D CANVAS */}
               <div className="relative z-0 w-full h-[430px] my-auto">
                 <Real3DBankScene onSelectBank={(bank) => setActiveBankDrawer(bank)} />
               </div>
