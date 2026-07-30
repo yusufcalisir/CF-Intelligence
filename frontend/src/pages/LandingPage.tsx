@@ -1329,6 +1329,18 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                   </button>
                 </div>
 
+                <div className="relative w-full h-44 rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
+                  <img
+                    src="/assets/enterprise_server_rack.png"
+                    alt="Enterprise Server Rack Hardware"
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                  <div className="absolute bottom-2 left-3 text-[10px] font-mono text-emerald-400 font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-emerald-500/30">
+                    NVIDIA DGX / Dell PowerEdge 42U Server Rack
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-3 text-xs font-mono">
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
                     <span className="text-slate-500">Hardware Accelerator:</span>
@@ -1943,6 +1955,49 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
   <FilingHeader><FilerID>CFI-PLATFORM-991</FilerID></FilingHeader>
   <SuspiciousActivity><Amount Ccy="USD">1450000.00</Amount></SuspiciousActivity>
 </FinCEN_SAR_Export>`}
+                </div>
+              </div>
+            </div>
+
+            {/* PHOTOREALISTIC ENTERPRISE HARDWARE APPLIANCE SHOWCASE GRID */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-slate-800/80">
+              <div className="group relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-4 space-y-3 hover:border-indigo-500/50 transition-all shadow-2xl">
+                <div className="relative h-48 rounded-xl overflow-hidden">
+                  <img
+                    src="/assets/federation_appliance_4u.png"
+                    alt="4U Enterprise Federation Appliance Hardware"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                  <span className="absolute bottom-2 left-3 px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/30">
+                    Cisco Nexus / NVIDIA DGX 4U Aggregator Appliance
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-100">4U On-Premises Aggregation Appliance</h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Custom-machined CNC anodized aluminum chassis featuring QSFP28 fiber patch bay, integrated OLED telemetry display, and hardware-enclosed dual GPU acceleration modules.
+                  </p>
+                </div>
+              </div>
+
+              <div className="group relative rounded-2xl overflow-hidden border border-slate-800 bg-slate-950 p-4 space-y-3 hover:border-emerald-500/50 transition-all shadow-2xl">
+                <div className="relative h-48 rounded-xl overflow-hidden">
+                  <img
+                    src="/assets/datacenter_network_mesh.png"
+                    alt="Financial Data Center Network Mesh"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                  <span className="absolute bottom-2 left-3 px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono text-[10px] font-bold border border-emerald-500/30">
+                    High-Speed Encrypted Fiber Optic Mesh
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-slate-100">Financial Institution Data Center Mesh</h4>
+                  <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                    Direct interconnect cables linking isolated bank server racks across global financial hubs with sub-millisecond encrypted model gradient transmission.
+                  </p>
                 </div>
               </div>
             </div>
