@@ -194,141 +194,113 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// ── SLEEK LIGHTWEIGHT ANIMATED SVG TOPOLOGY NETWORK COMPONENT ──────────────
+// ── SEAMLESS BORDERLESS ANIMATED SVG TOPOLOGY NETWORK ILLUSTRATION ──────────────
 function SmallTopologyAnimation({
   onSelectBank,
-  isDpShieldActive,
-  setIsDpShieldActive,
 }: {
   onSelectBank: (bank: BankInfoDetail) => void;
-  isDpShieldActive: boolean;
-  setIsDpShieldActive: (active: boolean) => void;
 }) {
   return (
-    <div className="relative w-full h-[460px] rounded-3xl border border-indigo-500/20 bg-slate-950/70 p-4 sm:p-5 backdrop-blur-xl flex flex-col justify-between shadow-2xl overflow-hidden">
-      {/* Header Bar */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-800/60 font-mono">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
-            FEDERATED TOPOLOGY MESH
-          </span>
-        </div>
-        <button
-          onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 hover:bg-emerald-500/20 transition-all cursor-pointer"
-        >
-          <LockIcon />
-          <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
-        </button>
-      </div>
-
+    <div className="relative w-full h-[440px] flex items-center justify-center pointer-events-auto">
       {/* SVG Interactive Topology Diagram */}
-      <div className="relative w-full h-[340px] my-auto flex items-center justify-center">
-        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 500 340" fill="none">
-          <defs>
-            <linearGradient id="laserGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="laserGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="laserGrad3" x1="0%" y1="100%" x2="100%" y2="0%">
-              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
-            </linearGradient>
-            <linearGradient id="laserGrad4" x1="100%" y1="100%" x2="0%" y2="0%">
-              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.8" />
-              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
-            </linearGradient>
-          </defs>
+      <svg className="absolute inset-0 w-full h-full" viewBox="0 0 500 360" fill="none">
+        <defs>
+          <linearGradient id="laserGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+          </linearGradient>
+          <linearGradient id="laserGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+          </linearGradient>
+          <linearGradient id="laserGrad3" x1="0%" y1="100%" x2="100%" y2="0%">
+            <stop offset="0%" stopColor="#a855f7" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+          </linearGradient>
+          <linearGradient id="laserGrad4" x1="100%" y1="100%" x2="0%" y2="0%">
+            <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.9" />
+            <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+          </linearGradient>
+        </defs>
 
-          {/* Animated Connecting Laser Beams */}
-          <path d="M 90 70 Q 250 170 250 170" stroke="url(#laserGrad1)" strokeWidth="2" strokeDasharray="6 4" />
-          <path d="M 410 70 Q 250 170 250 170" stroke="url(#laserGrad2)" strokeWidth="2" strokeDasharray="6 4" />
-          <path d="M 90 270 Q 250 170 250 170" stroke="url(#laserGrad3)" strokeWidth="2" strokeDasharray="6 4" />
-          <path d="M 410 270 Q 250 170 250 170" stroke="url(#laserGrad4)" strokeWidth="2" strokeDasharray="6 4" />
+        {/* Animated Connecting Laser Beams */}
+        <path d="M 90 80 Q 250 180 250 180" stroke="url(#laserGrad1)" strokeWidth="2.5" strokeDasharray="6 4" />
+        <path d="M 410 80 Q 250 180 250 180" stroke="url(#laserGrad2)" strokeWidth="2.5" strokeDasharray="6 4" />
+        <path d="M 90 280 Q 250 180 250 180" stroke="url(#laserGrad3)" strokeWidth="2.5" strokeDasharray="6 4" />
+        <path d="M 410 280 Q 250 180 250 180" stroke="url(#laserGrad4)" strokeWidth="2.5" strokeDasharray="6 4" />
 
-          {/* Central Pulsing Energy Ring */}
-          <circle cx="250" cy="170" r="42" fill="#0f172a" stroke="#6366f1" strokeWidth="2" />
-          <circle cx="250" cy="170" r="54" fill="none" stroke="#818cf8" strokeWidth="1.5" opacity="0.4" className="animate-ping" />
-        </svg>
+        {/* Central Pulsing Energy Core */}
+        <circle cx="250" cy="180" r="46" fill="#090d16" stroke="#6366f1" strokeWidth="2" />
+        <circle cx="250" cy="180" r="60" fill="none" stroke="#818cf8" strokeWidth="1.5" opacity="0.35" className="animate-ping" />
+      </svg>
 
-        {/* Central Aggregator Enclave Label */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none space-y-0.5">
-          <div className="text-[10px] font-mono font-extrabold text-indigo-300">FEDERATION</div>
-          <div className="text-[9px] font-mono text-emerald-400 font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-emerald-500/30">
-            28.4k tx/s
-          </div>
+      {/* Central Aggregator Enclave Hub Label */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none space-y-1">
+        <div className="text-[10px] font-mono font-extrabold text-indigo-300 tracking-wider">SECURE ENCLAVE</div>
+        <div className="text-[9px] font-mono text-emerald-400 font-bold bg-slate-900/90 px-2 py-0.5 rounded-full border border-emerald-500/30">
+          FedAvg + DP
         </div>
-
-        {/* Top-Left: JPMorgan Chase */}
-        {REAL_BANK_DETAILS.jpmorgan && (
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan!)}
-            className="absolute top-4 left-4 p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
-          >
-            <span>🗽</span>
-            <div>
-              <div className="font-bold text-slate-100">JPMorgan</div>
-              <div className="text-[9px] text-cyan-400">1.2ms</div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Top-Right: HSBC */}
-        {REAL_BANK_DETAILS.hsbc && (
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc!)}
-            className="absolute top-4 right-4 p-2.5 rounded-xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
-          >
-            <span>🏛️</span>
-            <div>
-              <div className="font-bold text-slate-100">HSBC</div>
-              <div className="text-[9px] text-rose-400">1.8ms</div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Bottom-Left: Intel SGX */}
-        {REAL_BANK_DETAILS.sgx && (
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx!)}
-            className="absolute bottom-4 left-4 p-2.5 rounded-xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
-          >
-            <span>🔒</span>
-            <div>
-              <div className="font-bold text-slate-100">Intel SGX TEE</div>
-              <div className="text-[9px] text-purple-400">0.2ms</div>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Bottom-Right: Deutsche Bank */}
-        {REAL_BANK_DETAILS.deutsche && (
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche!)}
-            className="absolute bottom-4 right-4 p-2.5 rounded-xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
-          >
-            <span>🏢</span>
-            <div>
-              <div className="font-bold text-slate-100">Deutsche Bank</div>
-              <div className="text-[9px] text-blue-400">2.9ms</div>
-            </div>
-          </motion.div>
-        )}
       </div>
 
-      {/* Footer Info */}
-      <div className="pt-2 border-t border-slate-800/60 text-center font-mono text-[10px] text-slate-400">
-        Click any node to inspect enclave telemetry 🔍
-      </div>
+      {/* Floating Interactive Node 1: JPMorgan */}
+      {REAL_BANK_DETAILS.jpmorgan && (
+        <motion.div
+          whileHover={{ scale: 1.08 }}
+          onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan!)}
+          className="absolute top-6 left-6 p-3 rounded-2xl bg-slate-900/80 border border-cyan-500/40 hover:border-cyan-300 cursor-pointer shadow-xl backdrop-blur-md flex items-center gap-2.5 font-mono text-xs"
+        >
+          <span className="text-base">🗽</span>
+          <div>
+            <div className="font-bold text-slate-100">JPMorgan</div>
+            <div className="text-[10px] text-cyan-400 font-semibold">Node #01 • 1.2ms</div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Floating Interactive Node 2: HSBC */}
+      {REAL_BANK_DETAILS.hsbc && (
+        <motion.div
+          whileHover={{ scale: 1.08 }}
+          onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc!)}
+          className="absolute top-6 right-6 p-3 rounded-2xl bg-slate-900/80 border border-rose-500/40 hover:border-rose-300 cursor-pointer shadow-xl backdrop-blur-md flex items-center gap-2.5 font-mono text-xs"
+        >
+          <span className="text-base">🏛️</span>
+          <div>
+            <div className="font-bold text-slate-100">HSBC Vault</div>
+            <div className="text-[10px] text-rose-400 font-semibold">Node #02 • 1.8ms</div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Floating Interactive Node 3: Intel SGX */}
+      {REAL_BANK_DETAILS.sgx && (
+        <motion.div
+          whileHover={{ scale: 1.08 }}
+          onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx!)}
+          className="absolute bottom-6 left-6 p-3 rounded-2xl bg-slate-900/80 border border-purple-500/40 hover:border-purple-300 cursor-pointer shadow-xl backdrop-blur-md flex items-center gap-2.5 font-mono text-xs"
+        >
+          <span className="text-base">🔒</span>
+          <div>
+            <div className="font-bold text-slate-100">Intel SGX TEE</div>
+            <div className="text-[10px] text-purple-400 font-semibold">Enclave • 0.2ms</div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Floating Interactive Node 4: Deutsche Bank */}
+      {REAL_BANK_DETAILS.deutsche && (
+        <motion.div
+          whileHover={{ scale: 1.08 }}
+          onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche!)}
+          className="absolute bottom-6 right-6 p-3 rounded-2xl bg-slate-900/80 border border-blue-500/40 hover:border-blue-300 cursor-pointer shadow-xl backdrop-blur-md flex items-center gap-2.5 font-mono text-xs"
+        >
+          <span className="text-base">🏢</span>
+          <div>
+            <div className="font-bold text-slate-100">Deutsche Bank</div>
+            <div className="text-[10px] text-blue-400 font-semibold">Node #03 • 2.9ms</div>
+          </div>
+        </motion.div>
+      )}
     </div>
   );
 }
@@ -907,12 +879,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: SLEEK SMALL ANIMATED SVG TOPOLOGY COMPONENT ── */}
+            {/* ── RIGHT COLUMN: SEAMLESS FLOATING ANIMATED TOPOLOGY ILLUSTRATION ── */}
             <div className="lg:col-span-6">
               <SmallTopologyAnimation
                 onSelectBank={(bank) => setActiveBankDrawer(bank)}
-                isDpShieldActive={isDpShieldActive}
-                setIsDpShieldActive={setIsDpShieldActive}
               />
             </div>
           </div>
