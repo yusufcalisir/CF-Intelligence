@@ -22,6 +22,7 @@ describe('FeatureImportance Chart Component Test Suite', () => {
         confusion_matrix: [[4700, 50], [30, 220]],
         roc_fpr: [0, 0.1, 1],
         roc_tpr: [0, 0.9, 1],
+        roc_thresholds: [1, 0.5, 0],
         feature_importance: {
           transaction_amount: 0.35,
           velocity_1h: 0.25,

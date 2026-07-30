@@ -23,6 +23,8 @@ describe('MetricsRadar Component Test Suite', () => {
           confusion_matrix: [[4700, 50], [30, 220]],
           roc_fpr: [0, 1],
           roc_tpr: [0, 1],
+          roc_thresholds: [1, 0],
+          feature_importance: { transaction_amount: 0.35, velocity_1h: 0.25 },
         },
         federated_metrics: {
           accuracy: 0.98,
@@ -34,6 +36,8 @@ describe('MetricsRadar Component Test Suite', () => {
           confusion_matrix: [[4730, 20], [10, 240]],
           roc_fpr: [0, 1],
           roc_tpr: [0, 1],
+          roc_thresholds: [1, 0],
+          feature_importance: { transaction_amount: 0.40, velocity_1h: 0.30 },
         },
         improvement: null,
         data_profile: null,
