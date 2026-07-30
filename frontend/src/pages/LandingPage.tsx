@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
@@ -64,7 +64,7 @@ function ConsortiumNetworkSVG({ compact = false }: { compact?: boolean }) {
         ))}
       </defs>
       {edges.map(([a,b],i) => {
-        const from = banks[a], to = banks[b];
+        const from = banks[a]!; const to = banks[b]!;
         const off = ((tick*2)+i*40)%120;
         return (
           <g key={`e${i}`}>
@@ -83,10 +83,11 @@ function ConsortiumNetworkSVG({ compact = false }: { compact?: boolean }) {
         </g>
       ))}
       {edges.map(([a,b],i) => {
-        const from = banks[a], to = banks[b];
+        const from = banks[a]!; const to = banks[b]!;
         const t = ((tick+i*25)%80)/80;
         const px = from.x+(to.x-from.x)*t, py = from.y+(to.y-from.y)*t;
-        return <circle key={`pkt${i}`} cx={px} cy={py} r="2" fill={banks[i].color} opacity={t>0.08&&t<0.92?0.9:0}/>;
+        const color = banks[i]?.color ?? '#6366f1';
+        return <circle key={`pkt${i}`} cx={px} cy={py} r="2" fill={color} opacity={t>0.08&&t<0.92?0.9:0}/>;
       })}
     </svg>
   );
@@ -239,11 +240,7 @@ const ArrowRight = () => (
     <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
   </svg>
 );
-const ChevronRight = () => (
-  <svg className="w-4 h-4 text-slate-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polyline points="9 18 15 12 9 6"/>
-  </svg>
-);
+
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
