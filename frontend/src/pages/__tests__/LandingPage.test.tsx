@@ -3,25 +3,29 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LandingPage from '../LandingPage';
 
-// Mock Three.js WebGL canvas context for headless testing
-vi.mock('three', async () => {
-  const actual = await vi.importActual<typeof import('three')>('three');
+// Hoisted Mock for Three.js WebGLRenderer in headless Vitest runner
+vi.mock('three', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('three')>();
+
+  class MockWebGLRenderer {
+    domElement = document.createElement('canvas');
+    shadowMap = { enabled: false, type: 0 };
+
+    setSize() {}
+    setPixelRatio() {}
+    render() {}
+    dispose() {}
+    clear() {}
+  }
+
   return {
     ...actual,
-    WebGLRenderer: vi.fn().mockImplementation(() => ({
-      setSize: vi.fn(),
-      setPixelRatio: vi.fn(),
-      render: vi.fn(),
-      dispose: vi.fn(),
-      domElement: document.createElement('canvas'),
-      shadowMap: { enabled: false, type: 0 },
-    })),
+    WebGLRenderer: MockWebGLRenderer,
   };
 });
 
 describe('LandingPage Architecture & Navigation Component Tests', () => {
   beforeEach(() => {
-    // Reset window scroll & resize listeners mock
     vi.restoreAllMocks();
   });
 

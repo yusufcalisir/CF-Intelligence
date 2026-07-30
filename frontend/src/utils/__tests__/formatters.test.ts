@@ -1,27 +1,28 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatPercent, formatTimestamp, formatBytes } from '../formatters';
+import { formatPercent, formatDelta, formatNumber, formatDuration, formatMs, classNames } from '../formatters';
 
 describe('Utility Formatters Test Suite', () => {
-  it('formats currency correctly in USD and EUR', () => {
-    expect(formatCurrency(1450000)).toContain('1,450,000');
-    expect(formatCurrency(0)).toContain('0');
+  it('formats numbers with locale separators', () => {
+    expect(formatNumber(1450000)).toBe('1,450,000');
+    expect(formatNumber(0)).toBe('0');
   });
 
   it('formats percentage values with decimal precision', () => {
-    expect(formatPercent(98.42)).toBe('98.42%');
-    expect(formatPercent(0.5, 1)).toBe('0.5%');
+    expect(formatPercent(0.9842)).toBe('98.4%');
+    expect(formatPercent(0.5)).toBe('50.0%');
   });
 
-  it('formats ISO timestamps into human-readable strings', () => {
-    const isoString = '2026-07-30T12:00:00.000Z';
-    const formatted = formatTimestamp(isoString);
-    expect(typeof formatted).toBe('string');
-    expect(formatted.length).toBeGreaterThan(0);
+  it('formats delta change values with +/- signs', () => {
+    expect(formatDelta(0.052)).toBe('+5.20%');
+    expect(formatDelta(-0.021)).toBe('-2.10%');
   });
 
-  it('formats data byte sizes into KB, MB, and GB', () => {
-    expect(formatBytes(1024)).toContain('1.0 KB');
-    expect(formatBytes(1048576)).toContain('1.0 MB');
-    expect(formatBytes(1073741824)).toContain('1.0 GB');
+  it('formats duration in seconds and milliseconds', () => {
+    expect(formatDuration(45)).toBe('45.0s');
+    expect(formatMs(120)).toBe('120ms');
+  });
+
+  it('combines truthy CSS class names', () => {
+    expect(classNames('px-4', false, 'py-2', null, 'bg-slate-900')).toBe('px-4 py-2 bg-slate-900');
   });
 });
