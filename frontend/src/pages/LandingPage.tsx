@@ -507,11 +507,11 @@ function Real3DBankScene({
 
     // 5. Dual-Color Fiber Laser Paths & Animated Data Energy Packets
     const createFiberWithFlowingPackets = (start: [number, number, number], end: [number, number, number], color: number) => {
-      const curve = new THREE.CatmullRomCurve3([
+      const curve = new THREE.QuadraticBezierCurve3(
         new THREE.Vector3(...start),
         new THREE.Vector3((start[0] + end[0]) * 0.5, 2.2, (start[2] + end[2]) * 0.5),
         new THREE.Vector3(...end),
-      ]);
+      );
 
       const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.05, 8, false);
       const tubeMat = new THREE.MeshBasicMaterial({ color, opacity: 0.85, transparent: true });
@@ -615,8 +615,8 @@ function Real3DBankScene({
         const t1 = (totalElapsedTime * 0.45 + idx * 0.25) % 1;
         const t2 = (totalElapsedTime * 0.45 + idx * 0.25 + 0.5) % 1;
 
-        f.packet1.position.copy(f.curve.getPoint(t1));
-        f.packet2.position.copy(f.curve.getPoint(t2));
+        f.curve.getPoint(t1, f.packet1.position);
+        f.curve.getPoint(t2, f.packet2.position);
       });
 
       // Floating Bank Pedestals
