@@ -48,7 +48,7 @@ function ConsortiumNetworkSVG({ compact = false }: { compact?: boolean }) {
     { id: 'DBK', x: 140, y: 90,  color: '#06b6d4' },
     { id: 'SGX', x: 90,  y: 55,  color: '#10b981' },
   ];
-  const edges = [[0,3],[1,3],[2,3]];
+  const edges: [number, number][] = [[0,3],[1,3],[2,3]];
   const [tick, setTick] = useState(0);
   useEffect(() => { const t = setInterval(() => setTick(p => p+1), 80); return () => clearInterval(t); }, []);
   const vb = compact ? '0 0 180 110' : '0 0 180 110';
