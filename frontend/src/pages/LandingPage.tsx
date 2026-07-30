@@ -108,6 +108,29 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
   },
 };
 
+// Graph Node Telemetry Inspector Interface
+interface GraphNodeDetail {
+  id: string;
+  name: string;
+  bank: string;
+  riskScore: number;
+  velocity: string;
+  anomalyIndex: string;
+  status: string;
+  description: string;
+}
+
+const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
+  jpm: { id: 'JPM-ACCT-01', name: 'JPMorgan Source Account', bank: 'JPMorgan Chase (US)', riskScore: 0.12, velocity: '14 tx/min', anomalyIndex: 'Low (0.04)', status: 'CLEARED', description: 'Legitimate corporate originator initiating international settlement.' },
+  shell_a: { id: 'SHELL-CORP-A', name: 'Shell Corp Alpha', bank: 'Santander UK', riskScore: 0.94, velocity: '340 tx/min', anomalyIndex: 'CRITICAL (0.92)', status: 'FLAGGED', description: 'Rapid layering shell account splitting funds into sub-threshold amounts.' },
+  smurf_1: { id: 'SMURF-ACCT-1', name: 'Money Mule Smurf 1', bank: 'Barclays UK', riskScore: 0.96, velocity: '120 tx/min', anomalyIndex: 'CRITICAL (0.95)', status: 'FLAGGED', description: 'Intermediary mule account forwarding funds across borders.' },
+  hsbc: { id: 'HSBC-ACCT-02', name: 'HSBC Destination Account', bank: 'HSBC Holdings (UK)', riskScore: 0.15, velocity: '8 tx/min', anomalyIndex: 'Low (0.05)', status: 'CLEARED', description: 'Target commercial recipient account.' },
+  shell_b: { id: 'SHELL-CORP-B', name: 'Shell Corp Beta', bank: 'BNP Paribas', riskScore: 0.92, velocity: '280 tx/min', anomalyIndex: 'HIGH (0.88)', status: 'FLAGGED', description: 'Secondary layering entity attempting to obfuscate audit trails.' },
+  smurf_2: { id: 'SMURF-ACCT-2', name: 'Money Mule Smurf 2', bank: 'Credit Agricole', riskScore: 0.95, velocity: '160 tx/min', anomalyIndex: 'CRITICAL (0.94)', status: 'FLAGGED', description: 'Intermediary mule account fanning out transactions.' },
+  db: { id: 'DB-RELAY-03', name: 'Deutsche Bank Relay Node', bank: 'Deutsche Bank (DE)', riskScore: 0.18, velocity: '45 tx/min', anomalyIndex: 'Normal (0.12)', status: 'CLEARED', description: 'High-volume euro clearing node.' },
+  offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
+};
+
 // Live Palantir/CrowdStrike Telemetry Log Feed Items
 const LIVE_LOG_FEED = [
   'JPMorgan Chase Node completed Local Epoch 3/3 (Loss: 0.0381)',
@@ -153,9 +176,11 @@ export default function LandingPage() {
   const [epsilonCalc, setEpsilonCalc] = useState<number>(0.5);
 
   // Section 4: 8-Node Platform Graph State
+  const [graphStep, setGraphStep] = useState<number>(1);
   const [isGraphDetected, setIsGraphDetected] = useState<boolean>(false);
   const [isGraphIsolated, setIsGraphIsolated] = useState<boolean>(false);
   const [showAttentionMatrix, setShowAttentionMatrix] = useState<boolean>(false);
+  const [selectedGraphNode, setSelectedGraphNode] = useState<GraphNodeDetail | null>(null);
 
   // Section 5: Architecture Layer Stack State
   const [activeLayer, setActiveLayer] = useState<number>(1);
@@ -187,7 +212,7 @@ export default function LandingPage() {
   // Track active section on scroll
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'product', 'platform', 'architecture', 'security', 'api', 'docs'];
+      const sections = ['hero', 'how-it-works', 'product', 'platform', 'architecture', 'security', 'api', 'docs'];
       const scrollPosition = window.scrollY + 200;
 
       for (const sectionId of sections) {
@@ -626,7 +651,8 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       {/* ── FLOATING QUICK-NAV DOCK (RIGHT SIDEBAR) ───────────── */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
         {[
-          { id: 'hero', label: 'Hero Topology' },
+          { id: 'hero', label: 'Hero Overview' },
+          { id: 'how-it-works', label: 'How It Works' },
           { id: 'product', label: 'Privacy Engine' },
           { id: 'platform', label: 'GNN Graph Collusion' },
           { id: 'architecture', label: '5-Layer Specs' },
@@ -688,6 +714,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-5 py-2 backdrop-blur-md shadow-inner">
+              <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">How It Works</a>
               <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
@@ -736,6 +763,9 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               className="lg:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
+                <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
+                  How It Works
+                </a>
                 <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Product Capabilities
                 </a>
@@ -770,7 +800,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: SCREEN-CENTERED SPLIT HERO (PURE CODE HARDWARE RACKS) ── */}
+        {/* ── SECTION 2: SCREEN-CENTERED HERO WITH CRYSTAL-CLEAR STORYTELLING ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -784,9 +814,9 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 transition={{ duration: 0.5 }}
                 className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold"
               >
-                <span>✨ Privacy-Preserving Collaborative Machine Learning</span>
+                <span>✨ Privacy-Preserving Collaborative AI Infrastructure</span>
                 <span className="text-indigo-500">•</span>
-                <span className="text-emerald-400 font-bold">GDPR & EU AI Act</span>
+                <span className="text-emerald-400 font-bold">EU AI Act & FinCEN Compliant</span>
               </motion.div>
 
               <motion.h1
@@ -795,17 +825,38 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 transition={{ duration: 0.5, delay: 0.1 }}
                 className="text-3xl sm:text-5xl lg:text-5xl font-black tracking-tight leading-tight text-slate-100"
               >
-                Detect Cross-Bank Fraud Rings Without Sharing Raw Customer Data
+                Stop Cross-Bank Money Laundering Syndicates with Federated AI
               </motion.h1>
 
               <motion.p
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: 0.2 }}
-                className="text-xs sm:text-base text-slate-400 leading-relaxed"
+                className="text-xs sm:text-base text-slate-300 leading-relaxed"
               >
-                Leverage Heterogeneous Federated Learning, Secure Enclaves (Intel SGX TEE), and Streaming Graph Neural Networks to stop multi-institutional money laundering syndicates in real time.
+                JPMorgan Chase, HSBC, and Deutsche Bank train a joint Graph Neural Network model to detect money mule rings <strong className="text-emerald-400">without sharing raw customer data, PII, or internal transaction logs</strong>.
               </motion.p>
+
+              {/* 3 Core Value Pillars */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.22 }}
+                className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1"
+              >
+                <div className="p-3 rounded-xl bg-slate-900/60 border border-indigo-500/20">
+                  <span className="text-xs font-bold text-indigo-300 block">🔒 100% Data Privacy</span>
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">Differential Privacy ($\epsilon=0.50$) guarantees zero raw data leakage.</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-900/60 border border-purple-500/20">
+                  <span className="text-xs font-bold text-purple-300 block">⚡ 98.4% Ring Accuracy</span>
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">Streaming GNN pinpoints cross-bank money mule rings in &lt; 3.2ms.</span>
+                </div>
+                <div className="p-3 rounded-xl bg-slate-900/60 border border-emerald-500/20">
+                  <span className="text-xs font-bold text-emerald-300 block">🏛️ Full Compliance</span>
+                  <span className="text-[11px] text-slate-400 mt-0.5 block">Native ISO 20022 XML parsing and automated FinCEN SAR reporting.</span>
+                </div>
+              </motion.div>
 
               {/* CTA Buttons */}
               <motion.div
@@ -822,10 +873,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                   <ArrowRightIcon />
                 </button>
                 <a
-                  href="#architecture"
+                  href="#how-it-works"
                   className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition-all"
                 >
-                  Explore Architecture ↓
+                  How It Works ↓
                 </a>
               </motion.div>
 
@@ -1122,6 +1173,75 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
+        {/* ── NEW SECTION: HOW IT WORKS 4-STEP INTERACTIVE WORKFLOW ── */}
+        <motion.section
+          id="how-it-works"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
+        >
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+              ENTERPRISE FEDERATED ARCHITECTURE
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+              How Collaborative Fraud Detection Works
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              A 4-step privacy-preserving workflow operating across JPMorgan Chase, HSBC, and Deutsche Bank.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/40 transition-all space-y-4">
+              <div className="h-10 w-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center font-mono font-bold text-indigo-400 text-sm">
+                01
+              </div>
+              <h3 className="text-base font-bold text-slate-100">Local ISO 20022 Data Intake</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Each member bank parses SWIFT <code className="text-indigo-300">pacs.008</code> and <code className="text-indigo-300">camt.053</code> transaction XML files within its own secure firewall. Raw customer identity never leaves the bank.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-purple-500/40 transition-all space-y-4">
+              <div className="h-10 w-10 rounded-2xl bg-purple-500/20 border border-purple-500/30 flex items-center justify-center font-mono font-bold text-purple-400 text-sm">
+                02
+              </div>
+              <h3 className="text-base font-bold text-slate-100">PyTorch GNN Local Training</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Local Graph Attention Networks (GAT) convert account transaction topology into high-dimensional embedding vectors (h_v), isolating local smurfing behavior.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-emerald-500/40 transition-all space-y-4">
+              <div className="h-10 w-10 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center font-mono font-bold text-emerald-400 text-sm">
+                03
+              </div>
+              <h3 className="text-base font-bold text-slate-100">Intel SGX Enclave Aggregation</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Encrypted model weights are uploaded into an Intel SGX Hardware TEE Enclave. Differential Privacy noise ($\epsilon=0.50$) is injected during FedAvg consensus.
+              </p>
+            </div>
+
+            <div className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-cyan-500/40 transition-all space-y-4">
+              <div className="h-10 w-10 rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center font-mono font-bold text-cyan-400 text-sm">
+                04
+              </div>
+              <h3 className="text-base font-bold text-slate-100">Global Ring Isolation & SAR</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                The updated global model is pushed back to all member banks. High-risk cross-bank money mule rings are instantly frozen and exported as FinCEN SAR XML filings.
+              </p>
+            </div>
+          </div>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
+        </div>
+
         {/* ── SECTION 3: PRODUCT CAPABILITIES & PRIVACY ENGINE ──────── */}
         <motion.section
           id="product"
@@ -1275,7 +1395,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 4: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR ── */}
+        {/* ── SECTION 4: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR WITH EXPLANATION WALKTHROUGH ── */}
         <motion.section
           id="platform"
           initial={{ opacity: 0, y: 30 }}
@@ -1284,15 +1404,18 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           transition={{ duration: 0.6 }}
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
+          <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-purple-400 uppercase tracking-wider">
                   STREAMING GNN COLLUSION DETECTOR
                 </span>
-                <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
-                  8-Node Cross-Bank Money Mule Ring Graph Simulator
+                <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 mt-1">
+                  Cross-Bank Money Laundering Ring Detection Engine
                 </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  How Streaming Graph Neural Networks detect multi-institutional smurfing and layering rings in zero-trust environments.
+                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1321,74 +1444,169 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </div>
             </div>
 
-            {/* Interactive 8-Node SVG Topology Graph */}
-            <div className="relative w-full h-[360px] sm:h-[400px] mt-6 bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
-              <svg className="w-full h-full" viewBox="0 0 700 340">
-                {/* Connections */}
-                {!isGraphIsolated && (
-                  <>
-                    <line x1="120" y1="170" x2="240" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="240" y1="80" x2="380" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="380" y1="80" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="120" y1="170" x2="240" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="240" y1="260" x2="380" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                    <line x1="380" y1="260" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
-                  </>
-                )}
-
-                {/* 8 Nodes */}
-                {/* Node 1: JPMorgan Node */}
-                <circle cx="120" cy="170" r="26" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
-                <text x="120" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPM-ACCT</text>
-
-                {/* Node 2: Shell Corp Alpha */}
-                <circle cx="240" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
-                <text x="240" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-A</text>
-
-                {/* Node 3: Smurf Account 1 */}
-                <circle cx="380" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
-                <text x="380" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-1</text>
-
-                {/* Node 4: HSBC Node */}
-                <circle cx="560" cy="170" r="26" fill="#064e3b" stroke="#10b981" strokeWidth="2" />
-                <text x="560" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">HSBC-ACCT</text>
-
-                {/* Node 5: Shell Corp Beta */}
-                <circle cx="240" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
-                <text x="240" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-B</text>
-
-                {/* Node 6: Smurf Account 2 */}
-                <circle cx="380" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
-                <text x="380" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-2</text>
-
-                {/* Node 7: Deutsche Node (Top Center) */}
-                <circle cx="310" cy="170" r="22" fill="#1e293b" stroke="#38bdf8" strokeWidth="2" />
-                <text x="310" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">DB-RELAY</text>
-
-                {/* Node 8: Crypto Offramp */}
-                <circle cx="450" cy="170" r="22" fill={isGraphDetected ? '#7f1d1d' : '#1e293b'} stroke={isGraphDetected ? '#f87171' : '#f59e0b'} strokeWidth="2" />
-                <text x="450" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
-              </svg>
-
-              {isGraphDetected && (
-                <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] sm:text-xs font-bold">
-                  ⚠️ HIGH-RISK RING DETECTED (GNN Confidence: 98.6%)
+            {/* 4-Step Narrative Timeline Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[
+                { step: 1, title: '1. Multi-Bank Layering', desc: 'Organized crime rings split funds below $10K AML thresholds across JPMorgan, HSBC, and Deutsche Bank.' },
+                { step: 2, title: '2. Local GAT Embeddings', desc: 'Each bank computes local PyTorch GNN node feature vectors without exposing PII.' },
+                { step: 3, title: '3. Enclave Subgraph Match', desc: 'Intel SGX TEE reconstructs cross-bank adjacency edges using zero-knowledge proofs.' },
+                { step: 4, title: '4. Edge Severance & SAR', desc: 'Mule accounts are isolated across all member banks simultaneously with FinCEN SAR XML filings.' },
+              ].map((s) => (
+                <div
+                  key={s.step}
+                  onClick={() => setGraphStep(s.step)}
+                  className={`p-4 rounded-2xl border cursor-pointer transition-all ${
+                    graphStep === s.step
+                      ? 'bg-indigo-950/60 border-indigo-500 text-slate-100 shadow-lg shadow-indigo-500/20 ring-1 ring-indigo-500/40'
+                      : 'bg-slate-950/50 border-slate-800 text-slate-400 hover:border-slate-700'
+                  }`}
+                >
+                  <span className="text-[10px] font-mono font-bold text-indigo-400 uppercase block">STEP {s.step}</span>
+                  <h4 className="text-xs font-extrabold text-slate-200 mt-1">{s.title}</h4>
+                  <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">{s.desc}</p>
                 </div>
-              )}
+              ))}
             </div>
 
-            {/* GAT Attention Matrix Heatmap Overlay */}
-            {showAttentionMatrix && (
-              <div className="mt-4 p-4 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs">
-                <span className="text-indigo-400 font-bold block mb-2">GAT Attention Weight Matrix ($\alpha_{"ij"}$)</span>
-                <div className="grid grid-cols-4 gap-2 text-center text-[10px]">
-                  <div className="p-2 rounded bg-indigo-950/60 border border-indigo-500/30 text-indigo-300">α(JPM ➔ ShellA) = 0.94</div>
-                  <div className="p-2 rounded bg-purple-950/60 border border-purple-500/30 text-purple-300">α(ShellA ➔ Smurf1) = 0.91</div>
-                  <div className="p-2 rounded bg-rose-950/60 border border-rose-500/30 text-rose-300">α(Smurf1 ➔ Offramp) = 0.98</div>
-                  <div className="p-2 rounded bg-emerald-950/60 border border-emerald-500/30 text-emerald-300">α(HSBC ➔ DB) = 0.12 (Safe)</div>
+            {/* Interactive 8-Node SVG Topology Graph & Node Inspector */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
+              <div className="lg:col-span-8 relative w-full h-[360px] sm:h-[380px] bg-slate-950 rounded-2xl border border-slate-800 flex items-center justify-center overflow-hidden">
+                <svg className="w-full h-full" viewBox="0 0 700 340">
+                  {/* Connections */}
+                  {!isGraphIsolated && (
+                    <>
+                      <line x1="120" y1="170" x2="240" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                      <line x1="240" y1="80" x2="380" y2="80" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                      <line x1="380" y1="80" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                      <line x1="120" y1="170" x2="240" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                      <line x1="240" y1="260" x2="380" y2="260" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                      <line x1="380" y1="260" x2="560" y2="170" stroke={isGraphDetected ? '#ef4444' : '#475569'} strokeWidth={isGraphDetected ? '3' : '1.5'} strokeDasharray={isGraphDetected ? '4 4' : 'none'} />
+                    </>
+                  )}
+
+                  {/* 8 Nodes with Click Inspector Handlers */}
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.jpm ?? null)} className="cursor-pointer">
+                    <circle cx="120" cy="170" r="26" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
+                    <text x="120" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPM-ACCT</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.shell_a ?? null)} className="cursor-pointer">
+                    <circle cx="240" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
+                    <text x="240" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-A</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.smurf_1 ?? null)} className="cursor-pointer">
+                    <circle cx="380" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
+                    <text x="380" y="84" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-1</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.hsbc ?? null)} className="cursor-pointer">
+                    <circle cx="560" cy="170" r="26" fill="#064e3b" stroke="#10b981" strokeWidth="2" />
+                    <text x="560" y="174" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">HSBC-ACCT</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.shell_b ?? null)} className="cursor-pointer">
+                    <circle cx="240" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
+                    <text x="240" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SHELL-B</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.smurf_2 ?? null)} className="cursor-pointer">
+                    <circle cx="380" cy="260" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
+                    <text x="380" y="264" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">SMURF-2</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.db ?? null)} className="cursor-pointer">
+                    <circle cx="310" cy="170" r="22" fill="#1e293b" stroke="#38bdf8" strokeWidth="2" />
+                    <text x="310" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">DB-RELAY</text>
+                  </g>
+
+                  <g onClick={() => setSelectedGraphNode(GRAPH_NODES_DATA.offramp ?? null)} className="cursor-pointer">
+                    <circle cx="450" cy="170" r="22" fill={isGraphDetected ? '#7f1d1d' : '#1e293b'} stroke={isGraphDetected ? '#f87171' : '#f59e0b'} strokeWidth="2" />
+                    <text x="450" y="174" fill="#ffffff" fontSize="8" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
+                  </g>
+                </svg>
+
+                {isGraphDetected && (
+                  <div className="absolute top-4 right-4 px-3 py-1.5 rounded-xl bg-rose-500/20 border border-rose-500/40 text-rose-300 font-mono text-[10px] sm:text-xs font-bold">
+                    ⚠️ HIGH-RISK RING DETECTED (GNN Confidence: 98.6%)
+                  </div>
+                )}
+              </div>
+
+              {/* Node Inspector Sidebar Panel */}
+              <div className="lg:col-span-4 p-5 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-4 h-[360px] sm:h-[380px] flex flex-col justify-between">
+                {selectedGraphNode ? (
+                  <div>
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                      <span className="text-[10px] font-bold text-indigo-400 uppercase">NODE TELEMETRY INSPECTOR</span>
+                      <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${selectedGraphNode.riskScore > 0.8 ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'}`}>
+                        {selectedGraphNode.status}
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-extrabold text-slate-100 mt-2">{selectedGraphNode.name}</h3>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{selectedGraphNode.bank}</p>
+
+                    <div className="mt-4 space-y-2 text-[11px]">
+                      <div className="p-2 rounded bg-slate-900 flex justify-between">
+                        <span className="text-slate-500">GNN Anomali Score:</span>
+                        <span className={`font-bold ${selectedGraphNode.riskScore > 0.8 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {selectedGraphNode.riskScore}
+                        </span>
+                      </div>
+                      <div className="p-2 rounded bg-slate-900 flex justify-between">
+                        <span className="text-slate-500">Transaction Velocity:</span>
+                        <span className="text-indigo-300 font-bold">{selectedGraphNode.velocity}</span>
+                      </div>
+                      <div className="p-2 rounded bg-slate-900 flex justify-between">
+                        <span className="text-slate-500">Layering Index:</span>
+                        <span className="text-purple-300 font-bold">{selectedGraphNode.anomalyIndex}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 mt-3 leading-relaxed border-t border-slate-900 pt-2">
+                      {selectedGraphNode.description}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="my-auto text-center space-y-2">
+                    <span className="text-2xl">🔍</span>
+                    <h4 className="text-xs font-bold text-slate-300">Click Any Graph Node</h4>
+                    <p className="text-[11px] text-slate-500">Select any node on the topology map to inspect GNN risk metrics and transaction velocity.</p>
+                  </div>
+                )}
+
+                <div className="p-2.5 rounded-xl bg-slate-900 text-[10px] text-slate-400 border border-slate-800 text-center">
+                  Tip: Click "Run GNN Detection" to isolate suspicious money mule rings in real time.
                 </div>
               </div>
-            )}
+            </div>
+
+            {/* GNN Mathematical Formula & Comparison Matrix */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-slate-800">
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-3">
+                <span className="text-indigo-400 font-bold uppercase block">Graph Attention Layer Equation</span>
+                <code className="text-indigo-300 text-[11px] block p-3 bg-slate-900 rounded-xl border border-slate-800">
+                  h_i^(l+1) = \sigma \left( \sum \alpha_ij W^(l) h_j^(l) \right)
+                </code>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Computes structural attention weights (\alpha_ij) between accounts across isolated banks, measuring structural transaction similarity without exposing PII.
+                </p>
+              </div>
+
+              <div className="p-5 rounded-2xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-3">
+                <span className="text-emerald-400 font-bold uppercase block">Normal Accounts vs. Money Mule Rings</span>
+                <div className="grid grid-cols-2 gap-2 text-[10px]">
+                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <span className="text-emerald-400 font-bold">Consumer Accounts</span>
+                    <span className="block text-slate-400">Regular salary intake, local merchant spend, low fan-out ratio.</span>
+                  </div>
+                  <div className="p-3 rounded bg-slate-900 border border-slate-800 space-y-1">
+                    <span className="text-rose-400 font-bold">Mule Syndicates</span>
+                    <span className="block text-slate-400">Rapid sub-threshold layering, zero retention, high graph centrality.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </motion.section>
 
@@ -1413,6 +1631,9 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
               Interactive Technical Specification Matrix
             </h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Deep dive into every technical layer from raw SWIFT intake to automated SAR export.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -1508,6 +1729,9 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
                 <h2 className="text-xl sm:text-2xl font-extrabold text-slate-100 mt-1">
                   Zero-Trust Attack & Privacy Leakage Simulator
                 </h2>
+                <p className="text-xs text-slate-400 mt-1">
+                  Simulate state-of-the-art adversarial AI attacks and verify zero-trust defenses.
+                </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-2">
@@ -1676,6 +1900,9 @@ ${apiResponse}`}</pre>
               <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
                 Generate Production Infrastructure Blueprint
               </h2>
+              <p className="text-xs text-slate-400">
+                Configure customized deployment templates for Kubernetes, Docker Compose, Terraform, or bare metal shell scripts.
+              </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
