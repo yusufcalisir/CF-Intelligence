@@ -210,13 +210,13 @@ function Real3DBankScene({
     const width = container.clientWidth || 600;
     const height = container.clientHeight || 480;
 
-    // 1. Three.js Scene, Camera, Renderer
+    // 1. Three.js Scene, Camera, Renderer (No pitch black fog)
     const scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2('#020617', 0.025);
+    scene.fog = null;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 10.5, 13.5);
-    camera.lookAt(0, 0, 0);
+    camera.position.set(0, 7.8, 12.2);
+    camera.lookAt(0, 0.4, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
@@ -227,27 +227,27 @@ function Real3DBankScene({
     container.appendChild(renderer.domElement);
 
     // 2. High-Tech Multi-Point Studio Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.85);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
     scene.add(ambientLight);
 
-    const mainSpot = new THREE.SpotLight(0x818cf8, 4, 40, Math.PI / 4, 0.5);
-    mainSpot.position.set(0, 18, 10);
+    const mainSpot = new THREE.DirectionalLight(0xffffff, 3.0);
+    mainSpot.position.set(0, 15, 10);
     mainSpot.castShadow = true;
     scene.add(mainSpot);
 
-    const bluePoint = new THREE.PointLight(0x38bdf8, 5, 25);
+    const bluePoint = new THREE.PointLight(0x00f0ff, 6, 30);
     bluePoint.position.set(-5, 5, -4);
     scene.add(bluePoint);
 
-    const magentaPoint = new THREE.PointLight(0xec4899, 5, 25);
+    const magentaPoint = new THREE.PointLight(0xff007f, 6, 30);
     magentaPoint.position.set(5, 5, -4);
     scene.add(magentaPoint);
 
-    const purplePoint = new THREE.PointLight(0xa855f7, 5, 25);
+    const purplePoint = new THREE.PointLight(0xa000ff, 6, 30);
     purplePoint.position.set(-5, 5, 4);
     scene.add(purplePoint);
 
-    const cyanPoint = new THREE.PointLight(0x06b6d4, 5, 25);
+    const cyanPoint = new THREE.PointLight(0x00f0ff, 6, 30);
     cyanPoint.position.set(5, 5, 4);
     scene.add(cyanPoint);
 
@@ -576,15 +576,19 @@ function Real3DBankScene({
     container.addEventListener('mousemove', handleMouseMove);
     container.addEventListener('click', handleClick);
 
-    const handleResize = () => {
+    const updateDimensions = () => {
       if (!container) return;
       const w = container.clientWidth || 600;
-      const h = container.clientHeight || 480;
+      const h = container.clientHeight || 450;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     };
-    window.addEventListener('resize', handleResize);
+
+    const resizeObserver = new ResizeObserver(() => updateDimensions());
+    resizeObserver.observe(container);
+    window.addEventListener('resize', updateDimensions);
+    updateDimensions();
 
     // 7. Continuous Uninterrupted Delta Animation Loop (60FPS Always-Running Ticker)
     let animId: number;
@@ -629,7 +633,8 @@ function Real3DBankScene({
     return () => {
       container.removeEventListener('mousemove', handleMouseMove);
       container.removeEventListener('click', handleClick);
-      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('resize', updateDimensions);
+      resizeObserver.disconnect();
       cancelAnimationFrame(animId);
       if (renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
@@ -1355,10 +1360,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider">
-              THE CORE FINANCIAL PROBLEM
+            <span className="inline-block px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider mb-3">
+              Cross-Bank Fraud & Privacy Bottlenecks
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
               The Cross-Bank Money Laundering Blind Spot
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
@@ -1426,10 +1431,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-              ENTERPRISE FEDERATED ARCHITECTURE
+            <span className="inline-block px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-3">
+              Collaborative Federated Workflow
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
               How Collaborative Fraud Detection Works
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
@@ -1495,10 +1500,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-              ENTERPRISE PRODUCT CAPABILITIES
+            <span className="inline-block px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-wider mb-3">
+              Privacy Engine & Compliance Matrix
             </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
               Differential Privacy & Heterogeneous FL Engine
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
@@ -1844,10 +1849,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-wider">
-              5-LAYER SYSTEM ARCHITECTURE
+            <span className="inline-block px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold uppercase tracking-wider mb-3">
+              Multi-Layered Security Infrastructure
             </span>
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100">
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
               Interactive Technical Specification Matrix
             </h2>
             <p className="text-xs sm:text-sm text-slate-400">
@@ -2132,10 +2137,10 @@ ${apiResponse}`}</pre>
             </div>
 
             <div className="text-center max-w-3xl mx-auto space-y-3 mb-6">
-              <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-                DEPLOYMENT BLUEPRINT WIZARD
+              <span className="inline-block px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-3">
+                Enterprise Deployment Studio
               </span>
-              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100">
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-100 leading-tight">
                 Generate Production Infrastructure Blueprint
               </h2>
               <p className="text-xs text-slate-400">
