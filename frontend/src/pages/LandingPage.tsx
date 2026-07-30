@@ -194,8 +194,8 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// ── CLEAN INTERACTIVE BASIC FEDERATED TOPOLOGY MESH ────────────────────────
-function BasicFederatedTopologyMesh({
+// ── SLEEK LIGHTWEIGHT ANIMATED SVG TOPOLOGY NETWORK COMPONENT ──────────────
+function SmallTopologyAnimation({
   onSelectBank,
   isDpShieldActive,
   setIsDpShieldActive,
@@ -205,155 +205,129 @@ function BasicFederatedTopologyMesh({
   setIsDpShieldActive: (active: boolean) => void;
 }) {
   return (
-    <div className="relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-slate-950/90 p-5 shadow-2xl overflow-hidden flex flex-col justify-between">
-      {/* Header Controls */}
-      <div className="relative z-10 flex items-center justify-between pb-3 border-b border-slate-800/80">
+    <div className="relative w-full h-[460px] rounded-3xl border border-indigo-500/20 bg-slate-950/70 p-4 sm:p-5 backdrop-blur-xl flex flex-col justify-between shadow-2xl overflow-hidden">
+      {/* Header Bar */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800/60 font-mono">
         <div className="flex items-center gap-2">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-          <span className="text-xs font-mono font-extrabold text-indigo-300 uppercase tracking-wider">
-            CROSS-BANK FEDERATED TOPOLOGY MESH
+          <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+          <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
+            FEDERATED TOPOLOGY MESH
           </span>
         </div>
         <button
           onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 hover:bg-emerald-500/20 transition-all cursor-pointer"
+          className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1 hover:bg-emerald-500/20 transition-all cursor-pointer"
         >
           <LockIcon />
-          <span>DP Shield: {isDpShieldActive ? 'ON (ε=0.50)' : 'OFF'}</span>
+          <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
         </button>
       </div>
 
-      {/* Main Interactive Grid Topology */}
-      <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 items-center my-auto py-2">
-        {/* Left Column: Bank Nodes (JPMorgan & Intel SGX) */}
-        <div className="space-y-3">
-          {REAL_BANK_DETAILS.jpmorgan && (
-            <div
-              onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan!)}
-              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-lg">
-                  🗽
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
-                    JPMorgan Chase
-                  </h4>
-                  <p className="text-[10px] font-mono text-slate-400">Node #01 • 128GB RAM</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                1.2ms
-              </span>
-            </div>
-          )}
+      {/* SVG Interactive Topology Diagram */}
+      <div className="relative w-full h-[340px] my-auto flex items-center justify-center">
+        <svg className="absolute inset-0 w-full h-full" viewBox="0 0 500 340" fill="none">
+          <defs>
+            <linearGradient id="laserGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+            </linearGradient>
+            <linearGradient id="laserGrad2" x1="100%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stopColor="#f43f5e" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+            </linearGradient>
+            <linearGradient id="laserGrad3" x1="0%" y1="100%" x2="100%" y2="0%">
+              <stop offset="0%" stopColor="#a855f7" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+            </linearGradient>
+            <linearGradient id="laserGrad4" x1="100%" y1="100%" x2="0%" y2="0%">
+              <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.8" />
+              <stop offset="100%" stopColor="#6366f1" stopOpacity="0.2" />
+            </linearGradient>
+          </defs>
 
-          {REAL_BANK_DETAILS.sgx && (
-            <div
-              onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx!)}
-              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-lg">
-                  🔒
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
-                    Intel SGX TEE Vault
-                  </h4>
-                  <p className="text-[10px] font-mono text-slate-400">TEE Enclave v2 • 256GB EPC</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
-                0.2ms
-              </span>
-            </div>
-          )}
-        </div>
+          {/* Animated Connecting Laser Beams */}
+          <path d="M 90 70 Q 250 170 250 170" stroke="url(#laserGrad1)" strokeWidth="2" strokeDasharray="6 4" />
+          <path d="M 410 70 Q 250 170 250 170" stroke="url(#laserGrad2)" strokeWidth="2" strokeDasharray="6 4" />
+          <path d="M 90 270 Q 250 170 250 170" stroke="url(#laserGrad3)" strokeWidth="2" strokeDasharray="6 4" />
+          <path d="M 410 270 Q 250 170 250 170" stroke="url(#laserGrad4)" strokeWidth="2" strokeDasharray="6 4" />
 
-        {/* Center Column: 4U Federation Coordinator Appliance */}
-        <div className="relative p-4 rounded-2xl bg-slate-900 border-2 border-indigo-500/50 shadow-2xl text-center space-y-3">
-          <div className="relative h-28 rounded-xl overflow-hidden border border-slate-800">
-            <img
-              src="/assets/federation_appliance_4u.png"
-              alt="4U Federation Appliance"
-              className="w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
-            <span className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-indigo-950/90 text-indigo-300 font-mono text-[9px] font-bold border border-indigo-500/40">
-              4U AGGREGATION APPLIANCE
-            </span>
-          </div>
+          {/* Central Pulsing Energy Ring */}
+          <circle cx="250" cy="170" r="42" fill="#0f172a" stroke="#6366f1" strokeWidth="2" />
+          <circle cx="250" cy="170" r="54" fill="none" stroke="#818cf8" strokeWidth="1.5" opacity="0.4" className="animate-ping" />
+        </svg>
 
-          <div className="space-y-1 font-mono text-[11px]">
-            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span className="text-slate-400">Algorithm:</span>
-              <span className="font-bold text-indigo-300">FedAvg + Krum</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span className="text-slate-400">Throughput:</span>
-              <span className="font-bold text-emerald-400">28,490 tx/sec</span>
-            </div>
-            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
-              <span className="text-slate-400">Enclave Attestation:</span>
-              <span className="font-bold text-yellow-400">PASSED</span>
-            </div>
+        {/* Central Aggregator Enclave Label */}
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none space-y-0.5">
+          <div className="text-[10px] font-mono font-extrabold text-indigo-300">FEDERATION</div>
+          <div className="text-[9px] font-mono text-emerald-400 font-bold bg-slate-900/80 px-2 py-0.5 rounded border border-emerald-500/30">
+            28.4k tx/s
           </div>
         </div>
 
-        {/* Right Column: Bank Nodes (HSBC & Deutsche Bank) */}
-        <div className="space-y-3">
-          {REAL_BANK_DETAILS.hsbc && (
-            <div
-              onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc!)}
-              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-lg">
-                  🏛️
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-rose-300 transition-colors">
-                    HSBC Holdings
-                  </h4>
-                  <p className="text-[10px] font-mono text-slate-400">Node #02 • 64GB RAM</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                1.8ms
-              </span>
+        {/* Top-Left: JPMorgan Chase */}
+        {REAL_BANK_DETAILS.jpmorgan && (
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan!)}
+            className="absolute top-4 left-4 p-2.5 rounded-xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
+          >
+            <span>🗽</span>
+            <div>
+              <div className="font-bold text-slate-100">JPMorgan</div>
+              <div className="text-[9px] text-cyan-400">1.2ms</div>
             </div>
-          )}
+          </motion.div>
+        )}
 
-          {REAL_BANK_DETAILS.deutsche && (
-            <div
-              onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche!)}
-              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-lg">
-                  🏢
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
-                    Deutsche Bank AG
-                  </h4>
-                  <p className="text-[10px] font-mono text-slate-400">Node #03 • 32GB RAM</p>
-                </div>
-              </div>
-              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-                2.9ms
-              </span>
+        {/* Top-Right: HSBC */}
+        {REAL_BANK_DETAILS.hsbc && (
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc!)}
+            className="absolute top-4 right-4 p-2.5 rounded-xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
+          >
+            <span>🏛️</span>
+            <div>
+              <div className="font-bold text-slate-100">HSBC</div>
+              <div className="text-[9px] text-rose-400">1.8ms</div>
             </div>
-          )}
-        </div>
+          </motion.div>
+        )}
+
+        {/* Bottom-Left: Intel SGX */}
+        {REAL_BANK_DETAILS.sgx && (
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx!)}
+            className="absolute bottom-4 left-4 p-2.5 rounded-xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
+          >
+            <span>🔒</span>
+            <div>
+              <div className="font-bold text-slate-100">Intel SGX TEE</div>
+              <div className="text-[9px] text-purple-400">0.2ms</div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Bottom-Right: Deutsche Bank */}
+        {REAL_BANK_DETAILS.deutsche && (
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche!)}
+            className="absolute bottom-4 right-4 p-2.5 rounded-xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer shadow-lg flex items-center gap-2 font-mono text-[11px]"
+          >
+            <span>🏢</span>
+            <div>
+              <div className="font-bold text-slate-100">Deutsche Bank</div>
+              <div className="text-[9px] text-blue-400">2.9ms</div>
+            </div>
+          </motion.div>
+        )}
       </div>
 
-      {/* Footer Info Bar */}
-      <div className="relative z-10 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
-        <span>🔒 Zero raw transaction logs shared between consortium members</span>
-        <span className="text-indigo-400 font-bold hidden sm:inline cursor-pointer">CLICK ANY BANK CARD TO INSPECT 🔍</span>
+      {/* Footer Info */}
+      <div className="pt-2 border-t border-slate-800/60 text-center font-mono text-[10px] text-slate-400">
+        Click any node to inspect enclave telemetry 🔍
       </div>
     </div>
   );
@@ -933,9 +907,9 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: CLEAN INTERACTIVE FEDERATED TOPOLOGY MESH ── */}
+            {/* ── RIGHT COLUMN: SLEEK SMALL ANIMATED SVG TOPOLOGY COMPONENT ── */}
             <div className="lg:col-span-6">
-              <BasicFederatedTopologyMesh
+              <SmallTopologyAnimation
                 onSelectBank={(bank) => setActiveBankDrawer(bank)}
                 isDpShieldActive={isDpShieldActive}
                 setIsDpShieldActive={setIsDpShieldActive}
