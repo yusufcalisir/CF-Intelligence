@@ -195,494 +195,158 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// ── REFERENCE-ACCURATE LIVE ENTERPRISE HARDWARE APPLIANCE 3D WEBGL SCENE (THREE.JS) ──
-function Real3DBankScene({
+// ── CLEAN INTERACTIVE BASIC FEDERATED TOPOLOGY MESH ────────────────────────
+function BasicFederatedTopologyMesh({
   onSelectBank,
+  isDpShieldActive,
+  setIsDpShieldActive,
 }: {
   onSelectBank: (bank: BankInfoDetail) => void;
+  isDpShieldActive: boolean;
+  setIsDpShieldActive: (active: boolean) => void;
 }) {
-  const mountRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const container = mountRef.current;
-    if (!container) return;
-
-    const width = container.clientWidth || 600;
-    const height = container.clientHeight || 480;
-
-    // 1. Three.js Scene & Studio Lighting Setup
-    const scene = new THREE.Scene();
-    scene.fog = null;
-
-    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 8.5, 13.5);
-    camera.lookAt(0, 0.5, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
-    renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
-
-    container.appendChild(renderer.domElement);
-
-    // Studio Lighting setup (NVIDIA DGX / Apple Product Photography style)
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
-    scene.add(ambientLight);
-
-    const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.5);
-    mainKeyLight.position.set(4, 18, 12);
-    mainKeyLight.castShadow = true;
-    mainKeyLight.shadow.mapSize.width = 2048;
-    mainKeyLight.shadow.mapSize.height = 2048;
-    mainKeyLight.shadow.bias = -0.0001;
-    scene.add(mainKeyLight);
-
-    const rimLightBlue = new THREE.DirectionalLight(0x0284c7, 1.8);
-    rimLightBlue.position.set(-10, 8, -10);
-    scene.add(rimLightBlue);
-
-    const rimLightMagenta = new THREE.DirectionalLight(0xbe185d, 1.5);
-    rimLightMagenta.position.set(10, 8, -10);
-    scene.add(rimLightMagenta);
-
-    // Metallic Datacenter Raised Floor & Floor Grid
-    const floorGeo = new THREE.PlaneGeometry(32, 32);
-    const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x090d16,
-      metalness: 0.92,
-      roughness: 0.18,
-    });
-    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
-    floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.y = -0.1;
-    floorMesh.receiveShadow = true;
-    scene.add(floorMesh);
-
-    const gridHelper = new THREE.GridHelper(32, 32, 0x1e293b, 0x0f172a);
-    gridHelper.position.y = -0.09;
-    scene.add(gridHelper);
-
-    // ── 2. DYNAMIC OLED TELEMETRY DISPLAY CANVAS TEXTURE ─────────────────────
-    const oledCanvas = document.createElement('canvas');
-    oledCanvas.width = 512;
-    oledCanvas.height = 256;
-    const oledCtx = oledCanvas.getContext('2d')!;
-
-    const oledTexture = new THREE.CanvasTexture(oledCanvas);
-    oledTexture.minFilter = THREE.LinearFilter;
-    oledTexture.magFilter = THREE.LinearFilter;
-
-    const drawOledTelemetry = (elapsedTime: number) => {
-      if (!oledCtx) return;
-
-      oledCtx.fillStyle = '#020617';
-      oledCtx.fillRect(0, 0, 512, 256);
-
-      // OLED Border Header
-      oledCtx.strokeStyle = '#0284c7';
-      oledCtx.lineWidth = 4;
-      oledCtx.strokeRect(6, 6, 500, 244);
-
-      // Header Bar
-      oledCtx.fillStyle = '#0f172a';
-      oledCtx.fillRect(10, 10, 492, 40);
-
-      oledCtx.font = 'bold 18px monospace';
-      oledCtx.fillStyle = '#38bdf8';
-      oledCtx.fillText('CROSS-BANK FEDERATION APPLIANCE', 24, 36);
-
-      oledCtx.font = 'bold 14px monospace';
-      oledCtx.fillStyle = '#22c55e';
-      oledCtx.fillText('STATUS: ONLINE [LIVE]', 330, 36);
-
-      // System Metrics Grid
-      const roundNum = 47 + Math.floor(elapsedTime / 8);
-      const txThroughput = (24890 + Math.floor(Math.sin(elapsedTime * 2) * 1200)).toLocaleString();
-      const latencyVal = (1.4 + Math.sin(elapsedTime * 4) * 0.2).toFixed(2);
-
-      oledCtx.font = '16px monospace';
-      oledCtx.fillStyle = '#94a3b8';
-      oledCtx.fillText('Aggregation Round:', 24, 80);
-      oledCtx.fillStyle = '#f8fafc';
-      oledCtx.fillText(`#${roundNum} (${latencyVal}ms)`, 210, 80);
-
-      oledCtx.fillStyle = '#94a3b8';
-      oledCtx.fillText('Tx Throughput:', 24, 110);
-      oledCtx.fillStyle = '#38bdf8';
-      oledCtx.fillText(`${txThroughput} tx/sec`, 210, 110);
-
-      oledCtx.fillStyle = '#94a3b8';
-      oledCtx.fillText('Differential Privacy:', 24, 140);
-      oledCtx.fillStyle = '#a855f7';
-      oledCtx.fillText('ACTIVE (ε=0.8, δ=1e-5)', 210, 140);
-
-      oledCtx.fillStyle = '#94a3b8';
-      oledCtx.fillText('BFT Consensus:', 24, 170);
-      oledCtx.fillStyle = '#22c55e';
-      oledCtx.fillText('FedAvg + Krum (OK)', 210, 170);
-
-      oledCtx.fillStyle = '#94a3b8';
-      oledCtx.fillText('Hardware Enclave:', 24, 200);
-      oledCtx.fillStyle = '#eab308';
-      oledCtx.fillText('Intel SGX TEE ATTESTED', 210, 200);
-
-      // Footer Pulse Meter
-      oledCtx.fillStyle = '#0284c7';
-      oledCtx.fillRect(24, 222, 464 * ((elapsedTime * 0.3) % 1), 6);
-
-      oledTexture.needsUpdate = true;
-    };
-
-    drawOledTelemetry(0);
-
-    // ── 3. CENTRAL 4U ENTERPRISE FEDERATION APPLIANCE ───────────────────────
-    const masterMachineGroup = new THREE.Group();
-
-    // 4U Anodized CNC Aluminum Chassis
-    const chassisGeo = new THREE.BoxGeometry(4.4, 1.4, 3.4);
-    const chassisMat = new THREE.MeshStandardMaterial({
-      color: 0x0a0f1d,
-      metalness: 0.95,
-      roughness: 0.12,
-    });
-    const chassisMesh = new THREE.Mesh(chassisGeo, chassisMat);
-    chassisMesh.position.y = 0.7;
-    chassisMesh.castShadow = true;
-    chassisMesh.receiveShadow = true;
-    masterMachineGroup.add(chassisMesh);
-
-    // Rackmount Front Bezel & Rack Handles
-    const handleGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.1, 16);
-    const handleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.95, roughness: 0.1 });
-    const handleLeft = new THREE.Mesh(handleGeo, handleMat);
-    handleLeft.position.set(-2.15, 0.7, 1.72);
-    masterMachineGroup.add(handleLeft);
-
-    const handleRight = new THREE.Mesh(handleGeo, handleMat);
-    handleRight.position.set(2.15, 0.7, 1.72);
-    masterMachineGroup.add(handleRight);
-
-    // Front Panel OLED Screen Frame & Display Plate
-    const oledFrameGeo = new THREE.BoxGeometry(2.4, 1.0, 0.05);
-    const oledMat = new THREE.MeshBasicMaterial({ map: oledTexture });
-    const oledMesh = new THREE.Mesh(oledFrameGeo, oledMat);
-    oledMesh.position.set(-0.7, 0.75, 1.72);
-    masterMachineGroup.add(oledMesh);
-
-    // High-Density QSFP28 Fiber Patch Port Bay (Cisco Nexus style)
-    const patchBayGroup = new THREE.Group();
-    patchBayGroup.position.set(1.2, 0.75, 1.72);
-
-    const portGeo = new THREE.BoxGeometry(0.18, 0.12, 0.08);
-    const portMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.9, roughness: 0.1 });
-
-    const portLedGeo = new THREE.BoxGeometry(0.05, 0.05, 0.04);
-    const portLedGreen = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 2.0 });
-    const portLedAmber = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 2.0 });
-
-    const activeLedsList: THREE.Mesh[] = [];
-
-    for (let r = 0; r < 3; r++) {
-      for (let c = 0; c < 8; c++) {
-        const px = c * 0.22 - 0.75;
-        const py = r * 0.22 - 0.22;
-        const port = new THREE.Mesh(portGeo, portMat);
-        port.position.set(px, py, 0);
-        patchBayGroup.add(port);
-
-        const led = new THREE.Mesh(portLedGeo, (r + c) % 2 === 0 ? portLedGreen : portLedAmber);
-        led.position.set(px, py + 0.08, 0.02);
-        patchBayGroup.add(led);
-        activeLedsList.push(led);
-      }
-    }
-    masterMachineGroup.add(patchBayGroup);
-
-    // Smoked Translucent Top Window (NVIDIA DGX Style - Internal GPU Blades & Copper Heat Pipes)
-    const topWindowGeo = new THREE.BoxGeometry(3.6, 0.04, 2.6);
-    const topWindowMat = new THREE.MeshPhysicalMaterial({
-      color: 0x0f172a,
-      transmission: 0.7,
-      opacity: 0.85,
-      transparent: true,
-      roughness: 0.1,
-      metalness: 0.8,
-    });
-    const topWindow = new THREE.Mesh(topWindowGeo, topWindowMat);
-    topWindow.position.set(0, 1.41, 0);
-    masterMachineGroup.add(topWindow);
-
-    // Internal Dual GPU Blades & Copper Coolers
-    const gpuBladeGeo = new THREE.BoxGeometry(3.2, 0.35, 0.9);
-    const gpuBladeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
-    const copperPipeGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.8, 12);
-    const copperPipeMat = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.95, roughness: 0.1 });
-
-    [-0.65, 0.65].forEach((z) => {
-      const gpu = new THREE.Mesh(gpuBladeGeo, gpuBladeMat);
-      gpu.position.set(0, 1.15, z);
-      masterMachineGroup.add(gpu);
-
-      const pipe = new THREE.Mesh(copperPipeGeo, copperPipeMat);
-      pipe.rotation.z = Math.PI / 2;
-      pipe.position.set(0, 1.35, z);
-      masterMachineGroup.add(pipe);
-    });
-
-    scene.add(masterMachineGroup);
-
-    // ── 4. ENTERPRISE DATACENTER 42U SERVER RACKS FOR BANK PARTICIPANTS ───────
-    const createEnterpriseServerRack = (
-      themeColor: number,
-      pos: [number, number, number],
-      bankKey: string,
-      rackName: string
-    ) => {
-      const group = new THREE.Group();
-      group.position.set(...pos);
-      group.userData = { bankKey, rackName };
-
-      // 42U Rack Outer Cabinet Frame (Black Anodized Aluminum)
-      const cabinetGeo = new THREE.BoxGeometry(2.4, 3.8, 2.4);
-      const cabinetMat = new THREE.MeshStandardMaterial({
-        color: 0x0b0f19,
-        metalness: 0.95,
-        roughness: 0.15,
-      });
-      const cabinet = new THREE.Mesh(cabinetGeo, cabinetMat);
-      cabinet.position.y = 1.9;
-      cabinet.castShadow = true;
-      cabinet.receiveShadow = true;
-      group.add(cabinet);
-
-      // Aluminum Rack Corner Posts & Base Trim
-      const trimGeo = new THREE.BoxGeometry(2.46, 0.12, 2.46);
-      const trimMat = new THREE.MeshBasicMaterial({ color: themeColor });
-      const topTrim = new THREE.Mesh(trimGeo, trimMat);
-      topTrim.position.y = 3.81;
-      group.add(topTrim);
-
-      const botTrim = new THREE.Mesh(trimGeo, trimMat);
-      botTrim.position.y = 0.06;
-      group.add(botTrim);
-
-      // Stack of 6x Server Blades (Dell PowerEdge / HPE Blade Server Style)
-      const bladeGeo = new THREE.BoxGeometry(2.1, 0.48, 2.1);
-      const bladeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
-
-      const serverLeds: THREE.Mesh[] = [];
-
-      for (let i = 0; i < 6; i++) {
-        const bladeY = 0.4 + i * 0.58;
-        const blade = new THREE.Mesh(bladeGeo, bladeMat);
-        blade.position.set(0, bladeY, 0.05);
-        group.add(blade);
-
-        // Server Drive Tray Handles & Ventilation Grille Strips
-        const handleGeo = new THREE.BoxGeometry(1.9, 0.04, 0.06);
-        const handleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 });
-        const handle = new THREE.Mesh(handleGeo, handleMat);
-        handle.position.set(0, bladeY - 0.15, 1.11);
-        group.add(handle);
-
-        // High-Frequency Blinking Status LEDs (Green/Amber/Cyan)
-        for (let l = 0; l < 4; l++) {
-          const ledGeo = new THREE.BoxGeometry(0.06, 0.06, 0.05);
-          const ledMat = new THREE.MeshStandardMaterial({
-            color: themeColor,
-            emissive: themeColor,
-            emissiveIntensity: 2.0,
-          });
-          const led = new THREE.Mesh(ledGeo, ledMat);
-          led.position.set(-0.75 + l * 0.2, bladeY + 0.1, 1.11);
-          group.add(led);
-          serverLeds.push(led);
-        }
-      }
-
-      scene.add(group);
-      return { group, serverLeds };
-    };
-
-    const jpmRack = createEnterpriseServerRack(0x38bdf8, [-4.8, 0, -3.8], 'jpmorgan', 'JPMorgan Chase');
-    const hsbcRack = createEnterpriseServerRack(0xf43f5e, [4.8, 0, -3.8], 'hsbc', 'HSBC Vault');
-    const sgxRack = createEnterpriseServerRack(0xa855f7, [-4.8, 0, 3.8], 'sgx', 'Intel SGX Node');
-    const dbRack = createEnterpriseServerRack(0x06b6d4, [4.8, 0, 3.8], 'deutsche', 'Deutsche Bank');
-
-    const allServerLeds = [...jpmRack.serverLeds, ...hsbcRack.serverLeds, ...sgxRack.serverLeds, ...dbRack.serverLeds];
-
-    // ── 5. HEAVY INDUSTRIAL FIBER OPTIC PATCH CABLE CONDUITS ─────────────────
-    const createFiberConduit = (start: [number, number, number], end: [number, number, number], color: number) => {
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(...start),
-        new THREE.Vector3((start[0] + end[0]) * 0.5, 0.6, (start[2] + end[2]) * 0.5),
-        new THREE.Vector3(...end)
-      );
-
-      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.045, 8, false);
-      const tubeMat = new THREE.MeshStandardMaterial({
-        color,
-        metalness: 0.85,
-        roughness: 0.25,
-      });
-      const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
-      scene.add(tubeMesh);
-
-      // Optical Data Packet Pulses
-      const packetGeo = new THREE.SphereGeometry(0.12, 12, 12);
-      const packetMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-      const packet1 = new THREE.Mesh(packetGeo, packetMat);
-      const packet2 = new THREE.Mesh(packetGeo, packetMat);
-      scene.add(packet1);
-      scene.add(packet2);
-
-      return { curve, packet1, packet2 };
-    };
-
-    const fibers = [
-      createFiberConduit([-4.8, 1.2, -3.8], [0, 0.75, 1.6], 0x38bdf8),
-      createFiberConduit([4.8, 1.2, -3.8], [0, 0.75, 1.6], 0xf43f5e),
-      createFiberConduit([-4.8, 1.2, 3.8], [0, 0.75, 1.6], 0xa855f7),
-      createFiberConduit([4.8, 1.2, 3.8], [0, 0.75, 1.6], 0x06b6d4),
-    ];
-
-    // ── 6. INTERACTIVE PARALLAX & CONTINUOUS 60FPS TICKER ─────────────────────
-    const raycaster = new THREE.Raycaster();
-    const mouse = new THREE.Vector2();
-    let targetRotY = 0;
-    let targetRotX = 0;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = container.getBoundingClientRect();
-      const x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      const y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      mouse.x = x;
-      mouse.y = y;
-
-      targetRotY = x * 0.32;
-      targetRotX = y * 0.18;
-    };
-
-    const handleClick = () => {
-      raycaster.setFromCamera(mouse, camera);
-      const intersects = raycaster.intersectObjects(scene.children, true);
-
-      for (const hit of intersects) {
-        let parent: THREE.Object3D | null = hit.object;
-        while (parent && !parent.userData.bankKey) {
-          parent = parent.parent;
-        }
-        if (parent && parent.userData.bankKey) {
-          const key = parent.userData.bankKey;
-          if (REAL_BANK_DETAILS[key]) {
-            onSelectBank(REAL_BANK_DETAILS[key]);
-          }
-          break;
-        }
-      }
-    };
-
-    container.addEventListener('mousemove', handleMouseMove);
-    container.addEventListener('click', handleClick);
-
-    const updateDimensions = () => {
-      if (!container) return;
-      const w = container.clientWidth || 600;
-      const h = container.clientHeight || 450;
-      camera.aspect = w / h;
-      camera.updateProjectionMatrix();
-      renderer.setSize(w, h);
-    };
-
-    const resizeObserver = new ResizeObserver(() => updateDimensions());
-    resizeObserver.observe(container);
-    window.addEventListener('resize', updateDimensions);
-    updateDimensions();
-
-    // 7. Continuous Uninterrupted Animation Ticker
-    let animId: number;
-    let lastTime = performance.now();
-    let totalElapsedTime = 0;
-
-    const animate = (currentTime: number) => {
-      const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
-      lastTime = currentTime;
-      totalElapsedTime += delta;
-
-      // Camera Parallax Inertia
-      scene.rotation.y += (targetRotY - scene.rotation.y) * 0.05;
-      scene.rotation.x += (targetRotX - scene.rotation.x) * 0.05;
-
-      // Update Live OLED Screen Telemetry Texture
-      drawOledTelemetry(totalElapsedTime);
-
-      // Asynchronous Network Activity LEDs (Flicker RX/TX activity)
-      activeLedsList.forEach((led, idx) => {
-        const mat = led.material as THREE.MeshStandardMaterial;
-        mat.emissiveIntensity = Math.sin(totalElapsedTime * 15 + idx) > 0 ? 2.5 : 0.4;
-      });
-
-      allServerLeds.forEach((led, idx) => {
-        const mat = led.material as THREE.MeshStandardMaterial;
-        mat.emissiveIntensity = Math.cos(totalElapsedTime * 12 + idx * 3) > -0.2 ? 2.2 : 0.3;
-      });
-
-      // Fiber Encrypted Data Packet Transmission
-      fibers.forEach((f, idx) => {
-        const t1 = (totalElapsedTime * 0.5 + idx * 0.25) % 1;
-        const t2 = (totalElapsedTime * 0.5 + idx * 0.25 + 0.5) % 1;
-
-        f.curve.getPoint(t1, f.packet1.position);
-        f.curve.getPoint(t2, f.packet2.position);
-      });
-
-      renderer.render(scene, camera);
-      animId = requestAnimationFrame(animate);
-    };
-
-    animId = requestAnimationFrame(animate);
-
-    return () => {
-      container.removeEventListener('mousemove', handleMouseMove);
-      container.removeEventListener('click', handleClick);
-      window.removeEventListener('resize', updateDimensions);
-      resizeObserver.disconnect();
-      cancelAnimationFrame(animId);
-      if (renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-    };
-  }, [onSelectBank]);
-
   return (
-    <div ref={mountRef} className="w-full h-full cursor-pointer relative">
-      {/* FLOATING 3D ARCHITECTURAL BADGES */}
-      <div className="absolute top-10 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
-        <span className="h-2 w-2 rounded-full bg-cyan-400 animate-pulse" />
-        JPMorgan Chase 🗽
+    <div className="relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-slate-950/90 p-5 shadow-2xl overflow-hidden flex flex-col justify-between">
+      {/* Header Controls */}
+      <div className="relative z-10 flex items-center justify-between pb-3 border-b border-slate-800/80">
+        <div className="flex items-center gap-2">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+          <span className="text-xs font-mono font-extrabold text-indigo-300 uppercase tracking-wider">
+            CROSS-BANK FEDERATED TOPOLOGY MESH
+          </span>
+        </div>
+        <button
+          onClick={() => setIsDpShieldActive(!isDpShieldActive)}
+          className="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5 hover:bg-emerald-500/20 transition-all cursor-pointer"
+        >
+          <LockIcon />
+          <span>DP Shield: {isDpShieldActive ? 'ON (ε=0.50)' : 'OFF'}</span>
+        </button>
       </div>
 
-      <div className="absolute top-10 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-rose-500/60 text-rose-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
-        <span className="text-rose-500">🔴</span>
-        HSBC 🏛️
+      {/* Main Interactive Grid Topology */}
+      <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 items-center my-auto py-2">
+        {/* Left Column: Bank Nodes (JPMorgan & Intel SGX) */}
+        <div className="space-y-3">
+          <div
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan)}
+            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-lg">
+                🗽
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
+                  JPMorgan Chase
+                </h4>
+                <p className="text-[10px] font-mono text-slate-400">Node #01 • 128GB RAM</p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+              1.2ms
+            </span>
+          </div>
+
+          <div
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx)}
+            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-lg">
+                🔒
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
+                  Intel SGX TEE Vault
+                </h4>
+                <p className="text-[10px] font-mono text-slate-400">TEE Enclave v2 • 256GB EPC</p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
+              0.2ms
+            </span>
+          </div>
+        </div>
+
+        {/* Center Column: 4U Federation Coordinator Appliance */}
+        <div className="relative p-4 rounded-2xl bg-slate-900 border-2 border-indigo-500/50 shadow-2xl text-center space-y-3">
+          <div className="relative h-28 rounded-xl overflow-hidden border border-slate-800">
+            <img
+              src="/assets/federation_appliance_4u.png"
+              alt="4U Federation Appliance"
+              className="w-full h-full object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+            <span className="absolute bottom-1.5 left-2 px-2 py-0.5 rounded bg-indigo-950/90 text-indigo-300 font-mono text-[9px] font-bold border border-indigo-500/40">
+              4U AGGREGATION APPLIANCE
+            </span>
+          </div>
+
+          <div className="space-y-1 font-mono text-[11px]">
+            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span className="text-slate-400">Algorithm:</span>
+              <span className="font-bold text-indigo-300">FedAvg + Krum</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span className="text-slate-400">Throughput:</span>
+              <span className="font-bold text-emerald-400">28,490 tx/sec</span>
+            </div>
+            <div className="flex items-center justify-between text-slate-300 bg-slate-950 px-2.5 py-1 rounded-lg border border-slate-800">
+              <span className="text-slate-400">Enclave Attestation:</span>
+              <span className="font-bold text-yellow-400">PASSED</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column: Bank Nodes (HSBC & Deutsche Bank) */}
+        <div className="space-y-3">
+          <div
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc)}
+            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-lg">
+                🏛️
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-100 group-hover:text-rose-300 transition-colors">
+                  HSBC Holdings
+                </h4>
+                <p className="text-[10px] font-mono text-slate-400">Node #02 • 64GB RAM</p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+              1.8ms
+            </span>
+          </div>
+
+          <div
+            onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche)}
+            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-lg">
+                🏢
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                  Deutsche Bank AG
+                </h4>
+                <p className="text-[10px] font-mono text-slate-400">Node #03 • 32GB RAM</p>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+              2.9ms
+            </span>
+          </div>
+        </div>
       </div>
 
-      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-20 pointer-events-none px-4 py-2 rounded-2xl bg-indigo-950/90 border-2 border-indigo-400 text-white text-xs font-mono font-extrabold shadow-2xl backdrop-blur-md flex flex-col items-center">
-        <span>Enclave</span>
-        <div className="w-2 h-2 bg-indigo-400 rotate-45 -mb-3 mt-1" />
-      </div>
-
-      <div className="absolute bottom-12 left-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-purple-500/60 text-purple-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
-        <LockIcon />
-        Intel SGX TEE 🔒
-      </div>
-
-      <div className="absolute bottom-12 right-10 pointer-events-none px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-cyan-500/60 text-cyan-300 text-xs font-mono font-bold shadow-lg backdrop-blur-md flex items-center gap-1.5">
-        <span className="px-1 bg-blue-600 text-white text-[9px] font-bold rounded">DB</span>
-        Deutsche Bank 🏢
+      {/* Footer Info Bar */}
+      <div className="relative z-10 pt-3 border-t border-slate-800/80 flex items-center justify-between text-[11px] font-mono text-slate-400">
+        <span>🔒 Zero raw transaction logs shared between consortium members</span>
+        <span className="text-indigo-400 font-bold hidden sm:inline cursor-pointer">CLICK ANY BANK CARD TO INSPECT 🔍</span>
       </div>
     </div>
   );
@@ -1262,35 +926,13 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: REFERENCE-ACCURATE 3D WEBGL ARCHITECTURE VISUALIZATION ── */}
-            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-slate-950/80 p-2 shadow-2xl overflow-hidden flex flex-col justify-between">
-              {/* Header Controls */}
-              <div className="relative z-10 flex items-center justify-between p-3 border-b border-slate-800/60 bg-slate-950/60 backdrop-blur-md rounded-t-2xl">
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-[11px] font-mono font-bold text-indigo-300 uppercase">
-                    CROSS-BANK FEDERATED TOPOLOGY MESH
-                  </span>
-                </div>
-                <button
-                  onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-                  className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
-                >
-                  <LockIcon />
-                  <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
-                </button>
-              </div>
-
-              {/* REFERENCE-ACCURATE 3D CANVAS */}
-              <div className="relative z-0 w-full h-[430px] my-auto">
-                <Real3DBankScene onSelectBank={(bank) => setActiveBankDrawer(bank)} />
-              </div>
-
-              {/* Footer Instruction Bar */}
-              <div className="relative z-10 p-2 border-t border-slate-800/60 bg-slate-950/60 backdrop-blur-md rounded-b-2xl flex items-center justify-between text-[10px] font-mono text-slate-400">
-                <span>Hover & Move mouse to rotate 3D camera view</span>
-                <span className="text-indigo-400 font-bold">CLICK ANY 3D NODE TO INSPECT 🔍</span>
-              </div>
+            {/* ── RIGHT COLUMN: CLEAN INTERACTIVE FEDERATED TOPOLOGY MESH ── */}
+            <div className="lg:col-span-6">
+              <BasicFederatedTopologyMesh
+                onSelectBank={(bank) => setActiveBankDrawer(bank)}
+                isDpShieldActive={isDpShieldActive}
+                setIsDpShieldActive={setIsDpShieldActive}
+              />
             </div>
           </div>
         </section>
