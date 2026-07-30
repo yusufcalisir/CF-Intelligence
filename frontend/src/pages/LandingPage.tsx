@@ -39,6 +39,14 @@ const CloseIcon = () => (
   </svg>
 );
 
+const FanSpinner = () => (
+  <svg className="w-4 h-4 text-indigo-400 animate-spin" style={{ animationDuration: '3s' }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M12 2a10 10 0 0 1 10 10" />
+    <path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
+  </svg>
+);
+
 // Real Global Bank Information Interface for Drawer
 interface BankInfoDetail {
   id: string;
@@ -132,6 +140,11 @@ export default function LandingPage() {
   const [accuracy, setAccuracy] = useState<number>(98.42);
   const [logIndex, setLogIndex] = useState<number>(0);
 
+  // Dynamic Fluctuating Code Telemetry Metrics
+  const [cudaJpm, setCudaJpm] = useState<number>(94.2);
+  const [cudaHsbc, setCudaHsbc] = useState<number>(98.1);
+  const [cpuDb, setCpuDb] = useState<number>(87.5);
+
   // Active Scroll Section State for Quick-Nav Dock
   const [activeSection, setActiveSection] = useState<string>('hero');
 
@@ -186,6 +199,16 @@ export default function LandingPage() {
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Fluctuating Code Telemetry Metrics
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCudaJpm(Number((93 + Math.random() * 3.5).toFixed(1)));
+      setCudaHsbc(Number((97 + Math.random() * 2.5).toFixed(1)));
+      setCpuDb(Number((85 + Math.random() * 5.0).toFixed(1)));
+    }, 1500);
+    return () => clearInterval(interval);
   }, []);
 
   // Continuous 4-Phase Cyclic FL Storytelling Loop
@@ -399,7 +422,7 @@ export default function LandingPage() {
         ctx.strokeStyle = p.color;
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(p.x - 36, p.y - 10, 72, 20, 6);
+        ctx.roundRect(p.x - 38, p.y - 10, 76, 20, 6);
         ctx.fill();
         ctx.stroke();
 
@@ -655,7 +678,7 @@ export default function LandingPage() {
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: SCREEN-CENTERED SPLIT HERO (REAL SERVER HARDWARE) ── */}
+        {/* ── SECTION 2: SCREEN-CENTERED SPLIT HERO (PURE CODE HARDWARE RACKS) ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -740,7 +763,7 @@ export default function LandingPage() {
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: REAL DATACENTER SERVER HARDWARE CHASSIS ── */}
+            {/* ── RIGHT COLUMN: PURE CODE-DRIVEN SERVER HARDWARE CHASSIS ── */}
             <div className="lg:col-span-6 relative w-full h-[520px] rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
               {/* Canvas Physics Overlay */}
               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
@@ -750,7 +773,7 @@ export default function LandingPage() {
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300">
-                    REAL BANK SERVER HARDWARE (3/3 ACTIVE)
+                    REAL BANK SERVER HARDWARE CHASSIS (PURE CODE)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -770,118 +793,159 @@ export default function LandingPage() {
                 </div>
               </div>
 
-              {/* Real Server Hardware Chassis Grid */}
+              {/* Pure Code Hardware Grid */}
               <div className="relative z-10 w-full h-full flex items-center justify-between gap-4">
-                {/* Left: Intel SGX Hardware Enclave Vault */}
+                {/* Left: Intel SGX Hardware Enclave Vault (Pure Code) */}
                 <motion.div
                   whileHover={{ scale: 1.03 }}
-                  className={`relative p-3 rounded-2xl bg-slate-950 border-2 transition-all duration-300 text-center w-44 z-10 flex flex-col items-center justify-between h-72 ${
+                  className={`relative p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 transition-all duration-300 text-center w-48 z-10 flex flex-col justify-between h-[340px] shadow-2xl ${
                     flPhase === 2
                       ? 'border-emerald-400 shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
                       : 'border-indigo-500/60 shadow-xl shadow-indigo-500/30'
                   }`}
                 >
-                  <div className="w-full h-28 rounded-xl overflow-hidden relative bg-slate-900 border border-slate-800">
-                    <img
-                      src="/assets/enclave_vault.png"
-                      alt="Intel SGX Enclave Vault"
-                      className="w-full h-full object-cover"
-                    />
-                    <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[9px] font-black">
-                      Intel SGX
+                  {/* Vault Header Bar */}
+                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
+                    <div className="flex items-center gap-1">
+                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
+                      <span className="text-[9px] font-mono font-bold text-emerald-400">SGX TEE SHIELD</span>
+                    </div>
+                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-black border border-emerald-500/30">
+                      SECURE
+                    </span>
+                  </div>
+
+                  {/* Rotating Cybernetic Shield Core (SVG) */}
+                  <div className="my-auto py-2 relative flex items-center justify-center">
+                    <div className="w-24 h-24 rounded-full border-2 border-indigo-500/40 flex items-center justify-center relative bg-indigo-950/20">
+                      <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400 animate-spin" style={{ animationDuration: '12s' }} />
+                      <div className="h-16 w-16 rounded-full bg-indigo-500/10 border border-indigo-400 flex items-center justify-center text-2xl shadow-inner">
+                        🛰️
+                      </div>
                     </div>
                   </div>
-                  <div className="text-left w-full mt-2 space-y-1">
-                    <h4 className="text-xs font-black text-slate-100">CFI Enclave Vault</h4>
-                    <p className="text-[9px] text-slate-400">Hardware TEE Shield Active</p>
-                    <div className="py-1 px-2 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[9px] font-bold text-center">
-                      {flPhase === 2 ? '⚡ Aggregating...' : 'FedAvg Active'}
+
+                  {/* Enclave Hardware Telemetry */}
+                  <div className="text-left w-full space-y-1.5 font-mono text-[9px]">
+                    <div className="flex justify-between text-slate-400">
+                      <span>Memory Vault Shield</span>
+                      <span className="text-emerald-400 font-bold">100% Protected</span>
+                    </div>
+                    <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                      <div className="h-full bg-emerald-400 w-full" />
+                    </div>
+                    <div className="py-1 px-2 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold text-center mt-1">
+                      {flPhase === 2 ? '⚡ Aggregating Tensors...' : 'FedAvg Core Active'}
                     </div>
                   </div>
                 </motion.div>
 
-                {/* Right: Stack of 3 Real Bank Datacenter Hardware Blades */}
+                {/* Right: Stack of 3 Pure Code Datacenter Server Blades */}
                 <div className="flex flex-col justify-between h-full py-1 space-y-2 w-56 sm:w-64 z-10">
-                  {/* Real Server 1: JPMorgan Chase */}
+                  {/* Real Code Server Blade 1: JPMorgan Chase */}
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     onClick={() => REAL_BANK_DETAILS.jpmorgan && setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan)}
-                    className={`p-2.5 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 flex items-center gap-3 ${
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
                       flPhase === 0
-                        ? 'bg-indigo-500/30 border-indigo-400 shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-500/50'
-                        : 'bg-slate-900/80 border-indigo-500/40 hover:border-indigo-400'
+                        ? 'border-indigo-400 shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-500/50'
+                        : 'border-indigo-500/40 hover:border-indigo-400'
                     }`}
                   >
-                    <img
-                      src="/assets/jpmorgan_server.png"
-                      alt="JPMorgan Server Node"
-                      className="w-12 h-12 rounded-xl object-cover border border-indigo-500/40 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <FanSpinner />
                         <span className="text-[9px] font-mono font-bold text-indigo-400 truncate">JPMORGAN CHASE 🗽</span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                       </div>
-                      <div className="text-xs font-bold text-slate-100 truncate">NVIDIA A100 (80GB)</div>
-                      <div className="text-[9px] text-slate-400 flex items-center justify-between mt-0.5">
-                        <span>CUDA: 94%</span>
-                        <span className="text-indigo-300 font-mono">0.8ms</span>
+                      <div className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
+                      <span>NVIDIA A100 (80GB)</span>
+                      <span className="text-indigo-300 font-mono text-[9px]">0.8ms</span>
+                    </div>
+                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
+                      <div className="flex justify-between text-slate-400">
+                        <span>CUDA Utilization</span>
+                        <span className="text-indigo-400 font-bold">{cudaJpm}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500" style={{ width: `${cudaJpm}%` }} />
                       </div>
                     </div>
                   </motion.div>
 
-                  {/* Real Server 2: HSBC Holdings */}
+                  {/* Real Code Server Blade 2: HSBC Holdings */}
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     onClick={() => REAL_BANK_DETAILS.hsbc && setActiveBankDrawer(REAL_BANK_DETAILS.hsbc)}
-                    className={`p-2.5 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 flex items-center gap-3 ${
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
                       flPhase === 0
-                        ? 'bg-purple-500/30 border-purple-400 shadow-lg shadow-purple-500/30 ring-2 ring-purple-500/50'
-                        : 'bg-slate-900/80 border-purple-500/40 hover:border-purple-400'
+                        ? 'border-purple-400 shadow-lg shadow-purple-500/30 ring-2 ring-purple-500/50'
+                        : 'border-purple-500/40 hover:border-purple-400'
                     }`}
                   >
-                    <img
-                      src="/assets/hsbc_server.png"
-                      alt="HSBC Server Node"
-                      className="w-12 h-12 rounded-xl object-cover border border-purple-500/40 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <FanSpinner />
                         <span className="text-[9px] font-mono font-bold text-purple-400 truncate">HSBC HOLDINGS 🏛️</span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                       </div>
-                      <div className="text-xs font-bold text-slate-100 truncate">NVIDIA H100 SXM</div>
-                      <div className="text-[9px] text-slate-400 flex items-center justify-between mt-0.5">
-                        <span>CUDA: 98%</span>
-                        <span className="text-purple-300 font-mono">1.4ms</span>
+                      <div className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
+                      <span>NVIDIA H100 SXM</span>
+                      <span className="text-purple-300 font-mono text-[9px]">1.4ms</span>
+                    </div>
+                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
+                      <div className="flex justify-between text-slate-400">
+                        <span>CUDA Utilization</span>
+                        <span className="text-purple-400 font-bold">{cudaHsbc}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-purple-500 to-pink-400 transition-all duration-500" style={{ width: `${cudaHsbc}%` }} />
                       </div>
                     </div>
                   </motion.div>
 
-                  {/* Real Server 3: Deutsche Bank */}
+                  {/* Real Code Server Blade 3: Deutsche Bank */}
                   <motion.div
                     whileHover={{ scale: 1.03 }}
                     onClick={() => REAL_BANK_DETAILS.deutsche && setActiveBankDrawer(REAL_BANK_DETAILS.deutsche)}
-                    className={`p-2.5 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 flex items-center gap-3 ${
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
                       flPhase === 0
-                        ? 'bg-emerald-500/30 border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-500/50'
-                        : 'bg-slate-900/80 border-emerald-500/40 hover:border-emerald-400'
+                        ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-500/50'
+                        : 'border-emerald-500/40 hover:border-emerald-400'
                     }`}
                   >
-                    <img
-                      src="/assets/deutsche_server.png"
-                      alt="Deutsche Bank Server Node"
-                      className="w-12 h-12 rounded-xl object-cover border border-emerald-500/40 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-0.5">
+                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
+                      <div className="flex items-center gap-1.5">
+                        <FanSpinner />
                         <span className="text-[9px] font-mono font-bold text-emerald-400 truncate">DEUTSCHE BANK 🏢</span>
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                       </div>
-                      <div className="text-xs font-bold text-slate-100 truncate">Intel Xeon Cluster</div>
-                      <div className="text-[9px] text-slate-400 flex items-center justify-between mt-0.5">
-                        <span>Threads: 32</span>
-                        <span className="text-emerald-300 font-mono">2.9ms</span>
+                      <div className="flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
+                      <span>Intel Xeon Cluster</span>
+                      <span className="text-emerald-300 font-mono text-[9px]">2.9ms</span>
+                    </div>
+                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
+                      <div className="flex justify-between text-slate-400">
+                        <span>CPU Thread Load</span>
+                        <span className="text-emerald-400 font-bold">{cpuDb}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style={{ width: `${cpuDb}%` }} />
                       </div>
                     </div>
                   </motion.div>
@@ -891,7 +955,7 @@ export default function LandingPage() {
               {/* Bottom Subtitle */}
               <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
                 <span>{getPhaseTitle()}</span>
-                <span className="text-indigo-400 font-bold">CLICK SERVER TO INSPECT 🔍</span>
+                <span className="text-indigo-400 font-bold">CLICK BLADE TO INSPECT 🔍</span>
               </div>
             </div>
           </div>
