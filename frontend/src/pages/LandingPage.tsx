@@ -546,32 +546,42 @@ export default function LandingPage() {
       </div>
 
       <div className="relative z-10">
-        {/* ── SECTION 1: GLASSMORPHIC TOP NAVBAR ─────────────────── */}
-        <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
+        {/* ── TOP ULTRA-SLIM TELEMETRY MARQUEE BAR (32px Height) ───── */}
+        <div className="h-8 bg-slate-950/90 border-b border-slate-800/60 px-4 sm:px-8 flex items-center justify-between text-xs font-mono text-slate-300">
+          <div className="flex items-center gap-3">
+            <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold tracking-wider flex items-center gap-1.5 border border-indigo-500/30">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE TELEMETRY LOG
+            </span>
+            <span className="text-emerald-400 font-bold">[{new Date().toLocaleTimeString()}]</span>
+          </div>
+          <div className="truncate text-slate-300 font-mono text-[11px] max-w-2xl text-right">
+            {LIVE_LOG_FEED[logIndex]}
+          </div>
+        </div>
+
+        {/* ── SECTION 1: GLASSMORPHIC FLOATING NAVBAR (64px Height) ── */}
+        <header className="sticky top-0 z-50 backdrop-blur-xl bg-slate-950/80 border-b border-slate-800/80 h-16 flex items-center">
+          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+            {/* Logo */}
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20">
-                <div className="h-full w-full bg-slate-950 rounded-[10px] flex items-center justify-center font-black text-white text-lg">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-emerald-500 p-0.5 shadow-lg shadow-indigo-500/20">
+                <div className="h-full w-full bg-slate-950 rounded-[9px] flex items-center justify-center font-black text-white text-base">
                   🛡️
                 </div>
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-extrabold text-base sm:text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
-                    CF-Intelligence
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/30">
-                    v2.4.0
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 hidden sm:block">
-                  Federated Cross-Bank Anti-Fraud Platform
-                </p>
+              <div className="flex items-center gap-2">
+                <span className="font-extrabold text-base tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+                  CF-Intelligence
+                </span>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/30">
+                  v2.4.0
+                </span>
               </div>
             </div>
 
-            {/* Desktop Navigation Anchors */}
-            <nav className="hidden md:flex items-center gap-6 lg:gap-8 text-xs font-semibold text-slate-300">
+            {/* Desktop Navigation Links (Floating Glass Pill Container) */}
+            <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-5 py-2 backdrop-blur-md shadow-inner">
               <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
@@ -580,9 +590,9 @@ export default function LandingPage() {
               <a href="#docs" className="hover:text-indigo-400 transition-colors">Deploy Wizard</a>
             </nav>
 
-            {/* Actions & Mobile Menu Button */}
+            {/* Actions */}
             <div className="flex items-center gap-3">
-              <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
+              <div className="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
                 <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
                 Quorum Active (3/3 Synced)
               </div>
@@ -592,7 +602,7 @@ export default function LandingPage() {
                 className="hidden sm:inline-flex group relative items-center justify-center p-0.5 overflow-hidden rounded-xl font-bold text-xs shadow-lg shadow-indigo-500/25 transition-all duration-300 hover:scale-105"
               >
                 <span className="absolute inset-0 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 animate-gradient" />
-                <span className="relative px-5 py-2.5 rounded-[10px] bg-slate-950 text-white flex items-center gap-2 group-hover:bg-slate-900 transition-all">
+                <span className="relative px-4 py-2 rounded-[10px] bg-slate-950 text-white flex items-center gap-2 group-hover:bg-slate-900 transition-all">
                   <span>Launch Demo</span>
                   <ArrowRightIcon />
                 </span>
@@ -601,7 +611,7 @@ export default function LandingPage() {
               {/* Mobile Hamburger Toggle Button */}
               <button
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="md:hidden p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none"
+                className="lg:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-200 focus:outline-none"
                 aria-label="Toggle Navigation Menu"
               >
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
@@ -617,7 +627,7 @@ export default function LandingPage() {
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="md:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
+              className="lg:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
                 <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
@@ -654,19 +664,8 @@ export default function LandingPage() {
           )}
         </AnimatePresence>
 
-        {/* ── PALANTIR/CROWDSTRIKE STYLE LIVE LOG TICKER BAR ───── */}
-        <div className="bg-slate-900/90 border-b border-slate-800/80 px-4 sm:px-6 py-2 overflow-hidden flex items-center gap-3 text-xs font-mono">
-          <span className="px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider flex-shrink-0">
-            LIVE TELEMETRY LOG
-          </span>
-          <div className="truncate text-slate-300 flex-1">
-            <span className="text-emerald-400 font-bold">[{new Date().toLocaleTimeString()}]</span>{' '}
-            {LIVE_LOG_FEED[logIndex]}
-          </div>
-        </div>
-
         {/* ── SECTION 2: SCREEN-CENTERED SPLIT HERO (3 REAL BANKS ON RIGHT) ── */}
-        <section id="hero" className="min-h-[calc(100vh-5rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
+        <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
