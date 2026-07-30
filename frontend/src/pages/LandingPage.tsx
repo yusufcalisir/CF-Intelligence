@@ -195,7 +195,7 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// ── REFERENCE-ACCURATE HYPER-REALISTIC 3D WEBGL GRAPHICS SCENE (THREE.JS) ─────────────
+// ── REFERENCE-ACCURATE LIVE ENTERPRISE HARDWARE APPLIANCE 3D WEBGL SCENE (THREE.JS) ──
 function Real3DBankScene({
   onSelectBank,
 }: {
@@ -210,13 +210,13 @@ function Real3DBankScene({
     const width = container.clientWidth || 600;
     const height = container.clientHeight || 480;
 
-    // 1. Three.js Scene, Camera, Renderer (No pitch black fog)
+    // 1. Three.js Scene & Studio Lighting Setup
     const scene = new THREE.Scene();
     scene.fog = null;
 
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    camera.position.set(0, 7.8, 12.2);
-    camera.lookAt(0, 0.4, 0);
+    camera.position.set(0, 8.5, 13.5);
+    camera.lookAt(0, 0.5, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
     renderer.setSize(width, height);
@@ -226,382 +226,312 @@ function Real3DBankScene({
 
     container.appendChild(renderer.domElement);
 
-    // 2. High-Tech Multi-Point Studio Lighting & Datacenter Floor Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+    // Studio Lighting setup (NVIDIA DGX / Apple Product Photography style)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.4);
     scene.add(ambientLight);
 
-    const mainSpot = new THREE.DirectionalLight(0xffffff, 2.8);
-    mainSpot.position.set(0, 16, 12);
-    mainSpot.castShadow = true;
-    mainSpot.shadow.mapSize.width = 2048;
-    mainSpot.shadow.mapSize.height = 2048;
-    scene.add(mainSpot);
+    const mainKeyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+    mainKeyLight.position.set(4, 18, 12);
+    mainKeyLight.castShadow = true;
+    mainKeyLight.shadow.mapSize.width = 2048;
+    mainKeyLight.shadow.mapSize.height = 2048;
+    mainKeyLight.shadow.bias = -0.0001;
+    scene.add(mainKeyLight);
 
-    const bluePoint = new THREE.PointLight(0x0284c7, 4, 30);
-    bluePoint.position.set(-6, 6, -4);
-    scene.add(bluePoint);
+    const rimLightBlue = new THREE.DirectionalLight(0x0284c7, 1.8);
+    rimLightBlue.position.set(-10, 8, -10);
+    scene.add(rimLightBlue);
 
-    const magentaPoint = new THREE.PointLight(0xdb2777, 4, 30);
-    magentaPoint.position.set(6, 6, -4);
-    scene.add(magentaPoint);
+    const rimLightMagenta = new THREE.DirectionalLight(0xbe185d, 1.5);
+    rimLightMagenta.position.set(10, 8, -10);
+    scene.add(rimLightMagenta);
 
-    const purplePoint = new THREE.PointLight(0x9333ea, 4, 30);
-    purplePoint.position.set(-6, 6, 4);
-    scene.add(purplePoint);
-
-    const cyanPoint = new THREE.PointLight(0x06b6d4, 4, 30);
-    cyanPoint.position.set(6, 6, 4);
-    scene.add(cyanPoint);
-
-    // Metallic Datacenter Reflective Ground Grid
-    const floorGeo = new THREE.PlaneGeometry(28, 28);
+    // Metallic Datacenter Raised Floor & Floor Grid
+    const floorGeo = new THREE.PlaneGeometry(32, 32);
     const floorMat = new THREE.MeshStandardMaterial({
-      color: 0x070b14,
-      metalness: 0.9,
-      roughness: 0.25,
+      color: 0x090d16,
+      metalness: 0.92,
+      roughness: 0.18,
     });
     const floorMesh = new THREE.Mesh(floorGeo, floorMat);
     floorMesh.rotation.x = -Math.PI / 2;
-    floorMesh.position.y = -0.15;
+    floorMesh.position.y = -0.1;
     floorMesh.receiveShadow = true;
     scene.add(floorMesh);
 
-    const gridHelper = new THREE.GridHelper(28, 28, 0x1e293b, 0x0f172a);
-    gridHelper.position.y = -0.14;
+    const gridHelper = new THREE.GridHelper(32, 32, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -0.09;
     scene.add(gridHelper);
 
-    // 3. Central Master Hardware Processor & TEE Enclave Machine (Hyper-Realistic Monolith)
+    // ── 2. DYNAMIC OLED TELEMETRY DISPLAY CANVAS TEXTURE ─────────────────────
+    const oledCanvas = document.createElement('canvas');
+    oledCanvas.width = 512;
+    oledCanvas.height = 256;
+    const oledCtx = oledCanvas.getContext('2d')!;
+
+    const oledTexture = new THREE.CanvasTexture(oledCanvas);
+    oledTexture.minFilter = THREE.LinearFilter;
+    oledTexture.magFilter = THREE.LinearFilter;
+
+    const drawOledTelemetry = (elapsedTime: number) => {
+      if (!oledCtx) return;
+
+      oledCtx.fillStyle = '#020617';
+      oledCtx.fillRect(0, 0, 512, 256);
+
+      // OLED Border Header
+      oledCtx.strokeStyle = '#0284c7';
+      oledCtx.lineWidth = 4;
+      oledCtx.strokeRect(6, 6, 500, 244);
+
+      // Header Bar
+      oledCtx.fillStyle = '#0f172a';
+      oledCtx.fillRect(10, 10, 492, 40);
+
+      oledCtx.font = 'bold 18px monospace';
+      oledCtx.fillStyle = '#38bdf8';
+      oledCtx.fillText('CROSS-BANK FEDERATION APPLIANCE', 24, 36);
+
+      oledCtx.font = 'bold 14px monospace';
+      oledCtx.fillStyle = '#22c55e';
+      oledCtx.fillText('STATUS: ONLINE [LIVE]', 330, 36);
+
+      // System Metrics Grid
+      const roundNum = 47 + Math.floor(elapsedTime / 8);
+      const txThroughput = (24890 + Math.floor(Math.sin(elapsedTime * 2) * 1200)).toLocaleString();
+      const latency = (1.4 + Math.sin(elapsedTime * 4) * 0.2).toFixed(2);
+
+      oledCtx.font = '16px monospace';
+      oledCtx.fillStyle = '#94a3b8';
+      oledCtx.fillText('Aggregation Round:', 24, 80);
+      oledCtx.fillStyle = '#f8fafc';
+      oledCtx.fillText(`#${roundNum}`, 210, 80);
+
+      oledCtx.fillStyle = '#94a3b8';
+      oledCtx.fillText('Tx Throughput:', 24, 110);
+      oledCtx.fillStyle = '#38bdf8';
+      oledCtx.fillText(`${txThroughput} tx/sec`, 210, 110);
+
+      oledCtx.fillStyle = '#94a3b8';
+      oledCtx.fillText('Differential Privacy:', 24, 140);
+      oledCtx.fillStyle = '#a855f7';
+      oledCtx.fillText('ACTIVE (ε=0.8, δ=1e-5)', 210, 140);
+
+      oledCtx.fillStyle = '#94a3b8';
+      oledCtx.fillText('BFT Consensus:', 24, 170);
+      oledCtx.fillStyle = '#22c55e';
+      oledCtx.fillText('FedAvg + Krum (OK)', 210, 170);
+
+      oledCtx.fillStyle = '#94a3b8';
+      oledCtx.fillText('Hardware Enclave:', 24, 200);
+      oledCtx.fillStyle = '#eab308';
+      oledCtx.fillText('Intel SGX TEE ATTESTED', 210, 200);
+
+      // Footer Pulse Meter
+      oledCtx.fillStyle = '#0284c7';
+      oledCtx.fillRect(24, 222, 464 * ((elapsedTime * 0.3) % 1), 6);
+
+      oledTexture.needsUpdate = true;
+    };
+
+    drawOledTelemetry(0);
+
+    // ── 3. CENTRAL 4U ENTERPRISE FEDERATION APPLIANCE ───────────────────────
     const masterMachineGroup = new THREE.Group();
 
-    // Multi-tier server chassis base (Brushed Titanium Metal)
-    const baseChassisGeo = new THREE.BoxGeometry(3.6, 0.35, 3.6);
-    const baseChassisMat = new THREE.MeshStandardMaterial({
-      color: 0x090d16,
+    // 4U Anodized CNC Aluminum Chassis
+    const chassisGeo = new THREE.BoxGeometry(4.4, 1.4, 3.4);
+    const chassisMat = new THREE.MeshStandardMaterial({
+      color: 0x0a0f1d,
       metalness: 0.95,
-      roughness: 0.15,
+      roughness: 0.12,
     });
-    const baseChassisMesh = new THREE.Mesh(baseChassisGeo, baseChassisMat);
-    baseChassisMesh.castShadow = true;
-    baseChassisMesh.receiveShadow = true;
-    masterMachineGroup.add(baseChassisMesh);
+    const chassisMesh = new THREE.Mesh(chassisGeo, chassisMat);
+    chassisMesh.position.y = 0.7;
+    chassisMesh.castShadow = true;
+    chassisMesh.receiveShadow = true;
+    masterMachineGroup.add(chassisMesh);
 
-    // Metallic Heat-Sink Fins
-    const finGeo = new THREE.BoxGeometry(3.4, 0.15, 0.06);
-    const finMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
-    for (let z = -1.5; z <= 1.5; z += 0.28) {
-      const fin = new THREE.Mesh(finGeo, finMat);
-      fin.position.set(0, 0.22, z);
-      masterMachineGroup.add(fin);
+    // Rackmount Front Bezel & Rack Handles
+    const handleGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.1, 16);
+    const handleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.95, roughness: 0.1 });
+    const handleLeft = new THREE.Mesh(handleGeo, handleMat);
+    handleLeft.position.set(-2.15, 0.7, 1.72);
+    masterMachineGroup.add(handleLeft);
+
+    const handleRight = new THREE.Mesh(handleGeo, handleMat);
+    handleRight.position.set(2.15, 0.7, 1.72);
+    masterMachineGroup.add(handleRight);
+
+    // Front Panel OLED Screen Frame & Display Plate
+    const oledFrameGeo = new THREE.BoxGeometry(2.4, 1.0, 0.05);
+    const oledMat = new THREE.MeshBasicMaterial({ map: oledTexture });
+    const oledMesh = new THREE.Mesh(oledFrameGeo, oledMat);
+    oledMesh.position.set(-0.7, 0.75, 1.72);
+    masterMachineGroup.add(oledMesh);
+
+    // High-Density QSFP28 Fiber Patch Port Bay (Cisco Nexus style)
+    const patchBayGroup = new THREE.Group();
+    patchBayGroup.position.set(1.2, 0.75, 1.72);
+
+    const portGeo = new THREE.BoxGeometry(0.18, 0.12, 0.08);
+    const portMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.9, roughness: 0.1 });
+
+    const portLedGeo = new THREE.BoxGeometry(0.05, 0.05, 0.04);
+    const portLedGreen = new THREE.MeshStandardMaterial({ color: 0x22c55e, emissive: 0x22c55e, emissiveIntensity: 2.0 });
+    const portLedAmber = new THREE.MeshStandardMaterial({ color: 0xf59e0b, emissive: 0xf59e0b, emissiveIntensity: 2.0 });
+
+    const activeLedsList: THREE.Mesh[] = [];
+
+    for (let r = 0; r < 3; r++) {
+      for (let c = 0; c < 8; c++) {
+        const px = c * 0.22 - 0.75;
+        const py = r * 0.22 - 0.22;
+        const port = new THREE.Mesh(portGeo, portMat);
+        port.position.set(px, py, 0);
+        patchBayGroup.add(port);
+
+        const led = new THREE.Mesh(portLedGeo, (r + c) % 2 === 0 ? portLedGreen : portLedAmber);
+        led.position.set(px, py + 0.08, 0.02);
+        patchBayGroup.add(led);
+        activeLedsList.push(led);
+      }
     }
+    masterMachineGroup.add(patchBayGroup);
 
-    // CPU Socket Plate
-    const socketGeo = new THREE.BoxGeometry(2.5, 0.18, 2.5);
-    const socketMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.8, roughness: 0.3 });
-    const socketMesh = new THREE.Mesh(socketGeo, socketMat);
-    socketMesh.position.y = 0.35;
-    masterMachineGroup.add(socketMesh);
-
-    // Dual Microchip Processor Core
-    const cpuDieGeo = new THREE.BoxGeometry(1.7, 0.25, 1.7);
-    const cpuDieMat = new THREE.MeshStandardMaterial({
+    // Smoked Translucent Top Window (NVIDIA DGX Style - Internal GPU Blades & Copper Heat Pipes)
+    const topWindowGeo = new THREE.BoxGeometry(3.6, 0.04, 2.6);
+    const topWindowMat = new THREE.MeshPhysicalMaterial({
       color: 0x0f172a,
-      metalness: 0.95,
-      roughness: 0.1,
-    });
-    const cpuDieMesh = new THREE.Mesh(cpuDieGeo, cpuDieMat);
-    cpuDieMesh.position.y = 0.52;
-    masterMachineGroup.add(cpuDieMesh);
-
-    // Glowing Core Crystal
-    const crystalGeo = new THREE.CylinderGeometry(0.55, 0.55, 0.35, 32);
-    const crystalMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x0284c7,
-      emissiveIntensity: 1.2,
-      metalness: 0.5,
-      roughness: 0.1,
-    });
-    const crystalMesh = new THREE.Mesh(crystalGeo, crystalMat);
-    crystalMesh.position.y = 0.65;
-    masterMachineGroup.add(crystalMesh);
-
-    // Gold PGA Contact Pins
-    const pgaPinGeo = new THREE.BoxGeometry(0.14, 0.1, 0.5);
-    const pgaPinMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.98, roughness: 0.05 });
-    for (let offset = -1.2; offset <= 1.2; offset += 0.4) {
-      const p1 = new THREE.Mesh(pgaPinGeo, pgaPinMat);
-      p1.position.set(offset, 0.28, 1.4);
-      masterMachineGroup.add(p1);
-
-      const p2 = new THREE.Mesh(pgaPinGeo, pgaPinMat);
-      p2.position.set(offset, 0.28, -1.4);
-      masterMachineGroup.add(p2);
-
-      const p3 = new THREE.Mesh(pgaPinGeo, pgaPinMat);
-      p3.rotation.y = Math.PI / 2;
-      p3.position.set(1.4, 0.28, offset);
-      masterMachineGroup.add(p3);
-
-      const p4 = new THREE.Mesh(pgaPinGeo, pgaPinMat);
-      p4.rotation.y = Math.PI / 2;
-      p4.position.set(-1.4, 0.28, offset);
-      masterMachineGroup.add(p4);
-    }
-
-    // Transparent TEE Enclave Glass Security Dome
-    const domeGeo = new THREE.SphereGeometry(1.55, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.5);
-    const domeMat = new THREE.MeshPhysicalMaterial({
-      color: 0x38bdf8,
-      transmission: 0.9,
-      opacity: 0.4,
+      transmission: 0.7,
+      opacity: 0.85,
       transparent: true,
-      roughness: 0.05,
-      ior: 1.5,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.1,
+      roughness: 0.1,
+      metalness: 0.8,
     });
-    const domeMesh = new THREE.Mesh(domeGeo, domeMat);
-    domeMesh.position.y = 0.4;
-    masterMachineGroup.add(domeMesh);
+    const topWindow = new THREE.Mesh(topWindowGeo, topWindowMat);
+    topWindow.position.set(0, 1.41, 0);
+    masterMachineGroup.add(topWindow);
 
-    // Dual Counter-Rotating Coaxial Encryption Orbit Rings
-    const ringGeo1 = new THREE.TorusGeometry(2.1, 0.035, 16, 100);
-    const ringMat1 = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const ring1 = new THREE.Mesh(ringGeo1, ringMat1);
-    ring1.rotation.x = Math.PI / 2;
-    masterMachineGroup.add(ring1);
+    // Internal Dual GPU Blades & Copper Coolers
+    const gpuBladeGeo = new THREE.BoxGeometry(3.2, 0.35, 0.9);
+    const gpuBladeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
+    const copperPipeGeo = new THREE.CylinderGeometry(0.05, 0.05, 2.8, 12);
+    const copperPipeMat = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.95, roughness: 0.1 });
 
-    const ringGeo2 = new THREE.TorusGeometry(2.35, 0.025, 16, 100);
-    const ringMat2 = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
-    const ring2 = new THREE.Mesh(ringGeo2, ringMat2);
-    ring2.rotation.x = Math.PI / 3;
-    ring2.rotation.y = Math.PI / 6;
-    masterMachineGroup.add(ring2);
+    [-0.65, 0.65].forEach((z) => {
+      const gpu = new THREE.Mesh(gpuBladeGeo, gpuBladeMat);
+      gpu.position.set(0, 1.15, z);
+      masterMachineGroup.add(gpu);
+
+      const pipe = new THREE.Mesh(copperPipeGeo, copperPipeMat);
+      pipe.rotation.z = Math.PI / 2;
+      pipe.position.set(0, 1.35, z);
+      masterMachineGroup.add(pipe);
+    });
 
     scene.add(masterMachineGroup);
 
-    // 4. Realistic 3D Bank Architectural & Hardware Node Models
-    const createDetailedBankModel = (
+    // ── 4. ENTERPRISE DATACENTER 42U SERVER RACKS FOR BANK PARTICIPANTS ───────
+    const createEnterpriseServerRack = (
       themeColor: number,
       pos: [number, number, number],
       bankKey: string,
-      archType: 'jpm_tower' | 'hsbc_vault' | 'db_skyscraper' | 'sgx_tee'
+      rackName: string
     ) => {
       const group = new THREE.Group();
       group.position.set(...pos);
       group.userData = { bankKey };
 
-      // Dark Titanium Pedestal Base
-      const baseGeo = new THREE.BoxGeometry(3.2, 0.25, 3.2);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.15 });
-      const baseMesh = new THREE.Mesh(baseGeo, baseMat);
-      baseMesh.receiveShadow = true;
-      group.add(baseMesh);
-
-      // Sleek LED Rim Accent Line
-      const rimGeo = new THREE.BoxGeometry(3.24, 0.05, 3.24);
-      const rimMat = new THREE.MeshBasicMaterial({ color: themeColor });
-      const rimMesh = new THREE.Mesh(rimGeo, rimMat);
-      rimMesh.position.y = 0.13;
-      group.add(rimMesh);
-
-      // Corner Metal Support Pillars (Replacing heavy cartoon glass boxes)
-      const postGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.6, 12);
-      const postMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
-      [
-        [-1.4, -1.4],
-        [1.4, -1.4],
-        [-1.4, 1.4],
-        [1.4, 1.4],
-      ].forEach(([cx, cz]) => {
-        const post = new THREE.Mesh(postGeo, postMat);
-        post.position.set(cx, 1.3, cz);
-        group.add(post);
+      // 42U Rack Outer Cabinet Frame (Black Anodized Aluminum)
+      const cabinetGeo = new THREE.BoxGeometry(2.4, 3.8, 2.4);
+      const cabinetMat = new THREE.MeshStandardMaterial({
+        color: 0x0b0f19,
+        metalness: 0.95,
+        roughness: 0.15,
       });
+      const cabinet = new THREE.Mesh(cabinetGeo, cabinetMat);
+      cabinet.position.y = 1.9;
+      cabinet.castShadow = true;
+      cabinet.receiveShadow = true;
+      group.add(cabinet);
 
-      // Custom Photorealistic Architectural & Server 3D Models
-      if (archType === 'jpm_tower') {
-        // JPMorgan Chase Multi-Tiered Modern Skyscraper
-        const b1Geo = new THREE.BoxGeometry(1.5, 1.2, 1.5);
-        const b1Mat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.15 });
-        const b1 = new THREE.Mesh(b1Geo, b1Mat);
-        b1.position.y = 0.75;
-        b1.castShadow = true;
-        group.add(b1);
+      // Aluminum Rack Corner Posts & Base Trim
+      const trimGeo = new THREE.BoxGeometry(2.46, 0.12, 2.46);
+      const trimMat = new THREE.MeshBasicMaterial({ color: themeColor });
+      const topTrim = new THREE.Mesh(trimGeo, trimMat);
+      topTrim.position.y = 3.81;
+      group.add(topTrim);
 
-        // Glass Curtain Window Tier 1
-        const glass1Geo = new THREE.BoxGeometry(1.52, 0.9, 1.52);
-        const glass1Mat = new THREE.MeshPhysicalMaterial({
-          color: 0x0284c7,
-          transmission: 0.5,
-          opacity: 0.75,
-          transparent: true,
-          roughness: 0.1,
-        });
-        const glass1 = new THREE.Mesh(glass1Geo, glass1Mat);
-        glass1.position.y = 0.75;
-        group.add(glass1);
+      const botTrim = new THREE.Mesh(trimGeo, trimMat);
+      botTrim.position.y = 0.06;
+      group.add(botTrim);
 
-        // Tier 2 Inset Setback
-        const b2Geo = new THREE.BoxGeometry(1.2, 0.9, 1.2);
-        const b2 = new THREE.Mesh(b2Geo, b1Mat);
-        b2.position.y = 1.8;
-        b2.castShadow = true;
-        group.add(b2);
+      // Stack of 6x Server Blades (Dell PowerEdge / HPE Blade Server Style)
+      const bladeGeo = new THREE.BoxGeometry(2.1, 0.48, 2.1);
+      const bladeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
 
-        // Tier 3 Spire Tower Top
-        const b3Geo = new THREE.BoxGeometry(0.9, 0.6, 0.9);
-        const b3Mat = new THREE.MeshStandardMaterial({
-          color: 0x38bdf8,
-          emissive: 0x0284c7,
-          emissiveIntensity: 0.4,
-          metalness: 0.95,
-        });
-        const b3 = new THREE.Mesh(b3Geo, b3Mat);
-        b3.position.y = 2.55;
-        group.add(b3);
+      const serverLeds: THREE.Mesh[] = [];
 
-        // Rooftop Communications Mast & Antenna
-        const mastGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.7, 12);
-        const mastMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.98 });
-        const mast = new THREE.Mesh(mastGeo, mastMat);
-        mast.position.set(0, 3.2, 0);
-        group.add(mast);
+      for (let i = 0; i < 6; i++) {
+        const bladeY = 0.4 + i * 0.58;
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        blade.position.set(0, bladeY, 0.05);
+        group.add(blade);
 
-      } else if (archType === 'hsbc_vault') {
-        // HSBC Headquarters Neo-Classical Banking Hall
-        const hallBodyGeo = new THREE.BoxGeometry(1.9, 1.4, 1.7);
-        const hallBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.3 });
-        const hallBody = new THREE.Mesh(hallBodyGeo, hallBodyMat);
-        hallBody.position.y = 0.95;
-        hallBody.castShadow = true;
-        group.add(hallBody);
+        // Server Drive Tray Handles & Ventilation Grille Strips
+        const handleGeo = new THREE.BoxGeometry(1.9, 0.04, 0.06);
+        const handleMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.9 });
+        const handle = new THREE.Mesh(handleGeo, handleMat);
+        handle.position.set(0, bladeY - 0.15, 1.11);
+        group.add(handle);
 
-        // Classical Fluted Entrance Columns
-        const colGeo = new THREE.CylinderGeometry(0.07, 0.07, 1.3, 16);
-        const colMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, metalness: 0.85, roughness: 0.2 });
-        [-0.75, -0.45, -0.15, 0.15, 0.45, 0.75].forEach((x) => {
-          const col = new THREE.Mesh(colGeo, colMat);
-          col.position.set(x, 0.9, 0.88);
-          group.add(col);
-        });
-
-        // Triangular Roof Pediment
-        const pedimentGeo = new THREE.ConeGeometry(1.35, 0.6, 4);
-        const pedimentMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
-        const pediment = new THREE.Mesh(pedimentGeo, pedimentMat);
-        pediment.rotation.y = Math.PI / 4;
-        pediment.position.y = 1.95;
-        group.add(pediment);
-
-        // Illuminated Bronze Vault Portal Entrance
-        const doorGeo = new THREE.BoxGeometry(0.5, 0.75, 0.1);
-        const doorMat = new THREE.MeshStandardMaterial({
-          color: 0x92400e,
-          emissive: 0xeab308,
-          emissiveIntensity: 0.5,
-          metalness: 0.9,
-        });
-        const door = new THREE.Mesh(doorGeo, doorMat);
-        door.position.set(0, 0.62, 0.86);
-        group.add(door);
-
-      } else if (archType === 'db_skyscraper') {
-        // Deutsche Bank Frankfurt Reflective Twin Towers
-        const towerGeo = new THREE.BoxGeometry(0.7, 2.5, 0.85);
-        const glassFacadeMat = new THREE.MeshPhysicalMaterial({
-          color: 0x0369a1,
-          metalness: 0.95,
-          roughness: 0.08,
-          clearcoat: 1.0,
-          clearcoatRoughness: 0.05,
-        });
-
-        const towerLeft = new THREE.Mesh(towerGeo, glassFacadeMat);
-        towerLeft.position.set(-0.48, 1.5, 0);
-        towerLeft.castShadow = true;
-        group.add(towerLeft);
-
-        const towerRight = new THREE.Mesh(towerGeo, glassFacadeMat);
-        towerRight.position.set(0.48, 1.5, 0);
-        towerRight.castShadow = true;
-        group.add(towerRight);
-
-        // Dark Chrome Skybridge Connectors (Mid & Top)
-        const bridgeGeo = new THREE.BoxGeometry(0.95, 0.22, 0.75);
-        const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, metalness: 0.9, roughness: 0.1 });
-
-        const bridgeLower = new THREE.Mesh(bridgeGeo, bridgeMat);
-        bridgeLower.position.set(0, 1.3, 0);
-        group.add(bridgeLower);
-
-        const bridgeUpper = new THREE.Mesh(bridgeGeo, bridgeMat);
-        bridgeUpper.position.set(0, 2.2, 0);
-        group.add(bridgeUpper);
-
-      } else {
-        // Intel SGX TEE Enterprise Server Hardware Blade Rack
-        const rackGeo = new THREE.BoxGeometry(2.0, 1.9, 2.0);
-        const rackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.92, roughness: 0.15 });
-        const rack = new THREE.Mesh(rackGeo, rackMat);
-        rack.position.y = 1.2;
-        rack.castShadow = true;
-        group.add(rack);
-
-        // 8 Hot-Swap SAS Drive Bay Trays with LED Activity Lights
-        const bayGeo = new THREE.BoxGeometry(1.8, 0.16, 0.05);
-        const bayMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
-        const ledGeo = new THREE.BoxGeometry(0.08, 0.08, 0.06);
-        const ledMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0xa855f7, emissiveIntensity: 2.0 });
-
-        for (let i = 0; i < 8; i++) {
-          const bayY = 0.45 + i * 0.21;
-          const bay = new THREE.Mesh(bayGeo, bayMat);
-          bay.position.set(0, bayY, 1.01);
-          group.add(bay);
-
+        // High-Frequency Blinking Status LEDs (Green/Amber/Cyan)
+        for (let l = 0; l < 4; l++) {
+          const ledGeo = new THREE.BoxGeometry(0.06, 0.06, 0.05);
+          const ledMat = new THREE.MeshStandardMaterial({
+            color: themeColor,
+            emissive: themeColor,
+            emissiveIntensity: 2.0,
+          });
           const led = new THREE.Mesh(ledGeo, ledMat);
-          led.position.set(0.78, bayY, 1.02);
+          led.position.set(-0.75 + l * 0.2, bladeY + 0.1, 1.11);
           group.add(led);
+          serverLeds.push(led);
         }
-
-        // Copper Cooling Heatpipes Assembly on Top
-        const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.6, 12);
-        const pipeMat = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.95, roughness: 0.1 });
-        [-0.4, 0.4].forEach((px) => {
-          const pipe = new THREE.Mesh(pipeGeo, pipeMat);
-          pipe.rotation.z = Math.PI / 2;
-          pipe.position.set(0, 2.25, px);
-          group.add(pipe);
-        });
       }
 
       scene.add(group);
-      return group;
+      return { group, serverLeds };
     };
 
-    const jpmNode = createDetailedBankModel(0x38bdf8, [-4.6, 0, -3.6], 'jpmorgan', 'jpm_tower');
-    const hsbcNode = createDetailedBankModel(0xec4899, [4.6, 0, -3.6], 'hsbc', 'hsbc_vault');
-    const sgxNode = createDetailedBankModel(0xa855f7, [-4.6, 0, 3.6], 'sgx', 'sgx_tee');
-    const dbNode = createDetailedBankModel(0x06b6d4, [4.6, 0, 3.6], 'deutsche', 'db_skyscraper');
+    const jpmRack = createEnterpriseServerRack(0x38bdf8, [-4.8, 0, -3.8], 'jpmorgan', 'JPMorgan Chase');
+    const hsbcRack = createEnterpriseServerRack(0xf43f5e, [4.8, 0, -3.8], 'hsbc', 'HSBC Vault');
+    const sgxRack = createEnterpriseServerRack(0xa855f7, [-4.8, 0, 3.8], 'sgx', 'Intel SGX Node');
+    const dbRack = createEnterpriseServerRack(0x06b6d4, [4.8, 0, 3.8], 'deutsche', 'Deutsche Bank');
 
-    const bankNodesList = [jpmNode, hsbcNode, sgxNode, dbNode];
+    const bankNodesList = [jpmRack.group, hsbcRack.group, sgxRack.group, dbRack.group];
+    const allServerLeds = [...jpmRack.serverLeds, ...hsbcRack.serverLeds, ...sgxRack.serverLeds, ...dbRack.serverLeds];
 
-    // 5. Dual-Color Fiber Laser Paths & Animated Data Energy Packets
-    const createFiberWithFlowingPackets = (start: [number, number, number], end: [number, number, number], color: number) => {
+    // ── 5. HEAVY INDUSTRIAL FIBER OPTIC PATCH CABLE CONDUITS ─────────────────
+    const createFiberConduit = (start: [number, number, number], end: [number, number, number], color: number) => {
       const curve = new THREE.QuadraticBezierCurve3(
         new THREE.Vector3(...start),
-        new THREE.Vector3((start[0] + end[0]) * 0.5, 2.2, (start[2] + end[2]) * 0.5),
-        new THREE.Vector3(...end),
+        new THREE.Vector3((start[0] + end[0]) * 0.5, 0.6, (start[2] + end[2]) * 0.5),
+        new THREE.Vector3(...end)
       );
 
-      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.05, 8, false);
-      const tubeMat = new THREE.MeshBasicMaterial({ color, opacity: 0.85, transparent: true });
+      const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.045, 8, false);
+      const tubeMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        metalness: 0.8,
+        roughness: 0.3,
+      });
       const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
       scene.add(tubeMesh);
 
-      // Flowing Energy Spheres (Data Packets)
-      const packetGeo = new THREE.SphereGeometry(0.16, 16, 16);
+      // Optical Data Packet Pulses
+      const packetGeo = new THREE.SphereGeometry(0.12, 12, 12);
       const packetMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
       const packet1 = new THREE.Mesh(packetGeo, packetMat);
       const packet2 = new THREE.Mesh(packetGeo, packetMat);
@@ -612,13 +542,13 @@ function Real3DBankScene({
     };
 
     const fibers = [
-      createFiberWithFlowingPackets([-4.6, 1.5, -3.6], [0, 0.4, 0], 0x38bdf8),
-      createFiberWithFlowingPackets([4.6, 1.5, -3.6], [0, 0.4, 0], 0xec4899),
-      createFiberWithFlowingPackets([-4.6, 1.5, 3.6], [0, 0.4, 0], 0xa855f7),
-      createFiberWithFlowingPackets([4.6, 1.5, 3.6], [0, 0.4, 0], 0x06b6d4),
+      createFiberConduit([-4.8, 1.2, -3.8], [0, 0.75, 1.6], 0x38bdf8),
+      createFiberConduit([4.8, 1.2, -3.8], [0, 0.75, 1.6], 0xf43f5e),
+      createFiberConduit([-4.8, 1.2, 3.8], [0, 0.75, 1.6], 0xa855f7),
+      createFiberConduit([4.8, 1.2, 3.8], [0, 0.75, 1.6], 0x06b6d4),
     ];
 
-    // 6. Interactive Parallax Orbit & Raycaster
+    // ── 6. INTERACTIVE PARALLAX & CONTINUOUS 60FPS TICKER ─────────────────────
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
     let targetRotY = 0;
@@ -632,8 +562,8 @@ function Real3DBankScene({
       mouse.x = x;
       mouse.y = y;
 
-      targetRotY = x * 0.35;
-      targetRotX = y * 0.2;
+      targetRotY = x * 0.32;
+      targetRotX = y * 0.18;
     };
 
     const handleClick = () => {
@@ -672,7 +602,7 @@ function Real3DBankScene({
     window.addEventListener('resize', updateDimensions);
     updateDimensions();
 
-    // 7. Continuous Uninterrupted Delta Animation Loop (60FPS Always-Running Ticker)
+    // 7. Continuous Uninterrupted Animation Ticker
     let animId: number;
     let lastTime = performance.now();
     let totalElapsedTime = 0;
@@ -682,28 +612,31 @@ function Real3DBankScene({
       lastTime = currentTime;
       totalElapsedTime += delta;
 
-      // Smooth camera parallax inertia
-      scene.rotation.y += (targetRotY - scene.rotation.y) * 0.06;
-      scene.rotation.x += (targetRotX - scene.rotation.x) * 0.06;
+      // Camera Parallax Inertia
+      scene.rotation.y += (targetRotY - scene.rotation.y) * 0.05;
+      scene.rotation.x += (targetRotX - scene.rotation.x) * 0.05;
 
-      // Master Machine Core Animations
-      masterMachineGroup.rotation.y = totalElapsedTime * 0.35;
-      ring1.rotation.z = totalElapsedTime * 0.8;
-      ring2.rotation.z = -totalElapsedTime * 1.1;
-      crystalMat.emissiveIntensity = 0.9 + Math.sin(totalElapsedTime * 5) * 0.4;
+      // Update Live OLED Screen Telemetry Texture
+      drawOledTelemetry(totalElapsedTime);
 
-      // Flowing Laser Data Packet Motion
+      // Asynchronous Network Activity LEDs (Flicker RX/TX activity)
+      activeLedsList.forEach((led, idx) => {
+        const mat = led.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = Math.sin(totalElapsedTime * 15 + idx) > 0 ? 2.5 : 0.4;
+      });
+
+      allServerLeds.forEach((led, idx) => {
+        const mat = led.material as THREE.MeshStandardMaterial;
+        mat.emissiveIntensity = Math.cos(totalElapsedTime * 12 + idx * 3) > -0.2 ? 2.2 : 0.3;
+      });
+
+      // Fiber Encrypted Data Packet Transmission
       fibers.forEach((f, idx) => {
-        const t1 = (totalElapsedTime * 0.45 + idx * 0.25) % 1;
-        const t2 = (totalElapsedTime * 0.45 + idx * 0.25 + 0.5) % 1;
+        const t1 = (totalElapsedTime * 0.5 + idx * 0.25) % 1;
+        const t2 = (totalElapsedTime * 0.5 + idx * 0.25 + 0.5) % 1;
 
         f.curve.getPoint(t1, f.packet1.position);
         f.curve.getPoint(t2, f.packet2.position);
-      });
-
-      // Floating Bank Pedestals
-      bankNodesList.forEach((n, idx) => {
-        n.position.y = Math.sin(totalElapsedTime * 2.2 + idx * 1.5) * 0.08;
       });
 
       renderer.render(scene, camera);
