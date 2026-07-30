@@ -6,6 +6,7 @@ import type { SimulationDetail } from '../../../api/types';
 describe('StreamingGNNPanel Component Test Suite', () => {
   it('renders streaming graph neural network risk score metrics', () => {
     const mockSimulation: SimulationDetail = {
+      id: 'sim_test_01',
       config: {
         num_rounds: 10,
         local_epochs: 3,
@@ -37,21 +38,20 @@ describe('StreamingGNNPanel Component Test Suite', () => {
       status: 'completed',
       current_round: 10,
       total_rounds: 10,
-      global_accuracy: 0.984,
-      global_loss: 0.042,
-      accuracy_history: [0.88, 0.92, 0.984],
-      loss_history: [0.18, 0.08, 0.042],
-      clients: [],
+      progress_pct: 100,
+      created_at: '2026-07-30T12:00:00Z',
+      started_at: '2026-07-30T12:00:00Z',
+      completed_at: '2026-07-30T12:05:00Z',
+      duration_seconds: 300,
+      error_message: null,
+      banks: [],
       rounds: [],
       streaming_gnn_node_count: 50,
       streaming_gnn_edge_count: 120,
       streaming_gnn_loss_history: [0.2, 0.1, 0.05],
-      hardware_enclave_status: {
-        attestation_verified: true,
-        enclave_type: 'intel_sgx',
-        epc_size_mb: 256,
-        page_faults: 0,
-      },
+      tee_mrenclave: '0x99a8b1c4',
+      tee_mrsigner: '0x12b4f5a6',
+      tee_attestation_signature: 'ed25519_verified_signature',
     };
 
     render(<StreamingGNNPanel simulation={mockSimulation} />);
