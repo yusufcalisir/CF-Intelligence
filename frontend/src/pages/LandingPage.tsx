@@ -222,40 +222,59 @@ function Real3DBankScene({
     renderer.setSize(width, height);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.shadowMap.type = THREE.PCFShadowMap;
 
     container.appendChild(renderer.domElement);
 
-    // 2. High-Tech Multi-Point Studio Lighting Setup
-    const ambientLight = new THREE.AmbientLight(0xffffff, 1.8);
+    // 2. High-Tech Multi-Point Studio Lighting & Datacenter Floor Setup
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
     scene.add(ambientLight);
 
-    const mainSpot = new THREE.DirectionalLight(0xffffff, 3.0);
-    mainSpot.position.set(0, 15, 10);
+    const mainSpot = new THREE.DirectionalLight(0xffffff, 2.8);
+    mainSpot.position.set(0, 16, 12);
     mainSpot.castShadow = true;
+    mainSpot.shadow.mapSize.width = 2048;
+    mainSpot.shadow.mapSize.height = 2048;
     scene.add(mainSpot);
 
-    const bluePoint = new THREE.PointLight(0x00f0ff, 6, 30);
-    bluePoint.position.set(-5, 5, -4);
+    const bluePoint = new THREE.PointLight(0x0284c7, 4, 30);
+    bluePoint.position.set(-6, 6, -4);
     scene.add(bluePoint);
 
-    const magentaPoint = new THREE.PointLight(0xff007f, 6, 30);
-    magentaPoint.position.set(5, 5, -4);
+    const magentaPoint = new THREE.PointLight(0xdb2777, 4, 30);
+    magentaPoint.position.set(6, 6, -4);
     scene.add(magentaPoint);
 
-    const purplePoint = new THREE.PointLight(0xa000ff, 6, 30);
-    purplePoint.position.set(-5, 5, 4);
+    const purplePoint = new THREE.PointLight(0x9333ea, 4, 30);
+    purplePoint.position.set(-6, 6, 4);
     scene.add(purplePoint);
 
-    const cyanPoint = new THREE.PointLight(0x00f0ff, 6, 30);
-    cyanPoint.position.set(5, 5, 4);
+    const cyanPoint = new THREE.PointLight(0x06b6d4, 4, 30);
+    cyanPoint.position.set(6, 6, 4);
     scene.add(cyanPoint);
+
+    // Metallic Datacenter Reflective Ground Grid
+    const floorGeo = new THREE.PlaneGeometry(28, 28);
+    const floorMat = new THREE.MeshStandardMaterial({
+      color: 0x070b14,
+      metalness: 0.9,
+      roughness: 0.25,
+    });
+    const floorMesh = new THREE.Mesh(floorGeo, floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.position.y = -0.15;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const gridHelper = new THREE.GridHelper(28, 28, 0x1e293b, 0x0f172a);
+    gridHelper.position.y = -0.14;
+    scene.add(gridHelper);
 
     // 3. Central Master Hardware Processor & TEE Enclave Machine (Hyper-Realistic Monolith)
     const masterMachineGroup = new THREE.Group();
 
     // Multi-tier server chassis base (Brushed Titanium Metal)
-    const baseChassisGeo = new THREE.BoxGeometry(3.4, 0.35, 3.4);
+    const baseChassisGeo = new THREE.BoxGeometry(3.6, 0.35, 3.6);
     const baseChassisMat = new THREE.MeshStandardMaterial({
       color: 0x090d16,
       metalness: 0.95,
@@ -267,23 +286,23 @@ function Real3DBankScene({
     masterMachineGroup.add(baseChassisMesh);
 
     // Metallic Heat-Sink Fins
-    const finGeo = new THREE.BoxGeometry(3.2, 0.15, 0.06);
+    const finGeo = new THREE.BoxGeometry(3.4, 0.15, 0.06);
     const finMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
-    for (let z = -1.4; z <= 1.4; z += 0.28) {
+    for (let z = -1.5; z <= 1.5; z += 0.28) {
       const fin = new THREE.Mesh(finGeo, finMat);
       fin.position.set(0, 0.22, z);
       masterMachineGroup.add(fin);
     }
 
     // CPU Socket Plate
-    const socketGeo = new THREE.BoxGeometry(2.4, 0.18, 2.4);
+    const socketGeo = new THREE.BoxGeometry(2.5, 0.18, 2.5);
     const socketMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.8, roughness: 0.3 });
     const socketMesh = new THREE.Mesh(socketGeo, socketMat);
     socketMesh.position.y = 0.35;
     masterMachineGroup.add(socketMesh);
 
     // Dual Microchip Processor Core
-    const cpuDieGeo = new THREE.BoxGeometry(1.6, 0.25, 1.6);
+    const cpuDieGeo = new THREE.BoxGeometry(1.7, 0.25, 1.7);
     const cpuDieMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
       metalness: 0.95,
@@ -306,7 +325,7 @@ function Real3DBankScene({
     crystalMesh.position.y = 0.65;
     masterMachineGroup.add(crystalMesh);
 
-    // 32 Gold PGA Contact Pins
+    // Gold PGA Contact Pins
     const pgaPinGeo = new THREE.BoxGeometry(0.14, 0.1, 0.5);
     const pgaPinMat = new THREE.MeshStandardMaterial({ color: 0xf59e0b, metalness: 0.98, roughness: 0.05 });
     for (let offset = -1.2; offset <= 1.2; offset += 0.4) {
@@ -330,11 +349,11 @@ function Real3DBankScene({
     }
 
     // Transparent TEE Enclave Glass Security Dome
-    const domeGeo = new THREE.SphereGeometry(1.45, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    const domeGeo = new THREE.SphereGeometry(1.55, 32, 24, 0, Math.PI * 2, 0, Math.PI * 0.5);
     const domeMat = new THREE.MeshPhysicalMaterial({
       color: 0x38bdf8,
-      transmission: 0.88,
-      opacity: 0.55,
+      transmission: 0.9,
+      opacity: 0.4,
       transparent: true,
       roughness: 0.05,
       ior: 1.5,
@@ -361,7 +380,7 @@ function Real3DBankScene({
 
     scene.add(masterMachineGroup);
 
-    // 4. Realistic 3D Bank Pedestal Architectural Models
+    // 4. Realistic 3D Bank Architectural & Hardware Node Models
     const createDetailedBankModel = (
       themeColor: number,
       pos: [number, number, number],
@@ -372,126 +391,189 @@ function Real3DBankScene({
       group.position.set(...pos);
       group.userData = { bankKey };
 
-      // Base Pedestal
-      const baseGeo = new THREE.BoxGeometry(3.0, 0.25, 3.0);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.2 });
+      // Dark Titanium Pedestal Base
+      const baseGeo = new THREE.BoxGeometry(3.2, 0.25, 3.2);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.95, roughness: 0.15 });
       const baseMesh = new THREE.Mesh(baseGeo, baseMat);
       baseMesh.receiveShadow = true;
       group.add(baseMesh);
 
-      // Neon LED Rim
-      const rimGeo = new THREE.BoxGeometry(3.06, 0.06, 3.06);
+      // Sleek LED Rim Accent Line
+      const rimGeo = new THREE.BoxGeometry(3.24, 0.05, 3.24);
       const rimMat = new THREE.MeshBasicMaterial({ color: themeColor });
       const rimMesh = new THREE.Mesh(rimGeo, rimMat);
-      rimMesh.position.y = 0.14;
+      rimMesh.position.y = 0.13;
       group.add(rimMesh);
 
-      // Glass Enclosure Box
-      const glassBoxGeo = new THREE.BoxGeometry(2.6, 2.7, 2.6);
-      const glassBoxMat = new THREE.MeshPhysicalMaterial({
-        color: themeColor,
-        transmission: 0.85,
-        opacity: 0.4,
-        transparent: true,
-        roughness: 0.1,
-        ior: 1.4,
+      // Corner Metal Support Pillars (Replacing heavy cartoon glass boxes)
+      const postGeo = new THREE.CylinderGeometry(0.04, 0.04, 2.6, 12);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.2 });
+      [
+        [-1.4, -1.4],
+        [1.4, -1.4],
+        [-1.4, 1.4],
+        [1.4, 1.4],
+      ].forEach(([cx, cz]) => {
+        const post = new THREE.Mesh(postGeo, postMat);
+        post.position.set(cx, 1.3, cz);
+        group.add(post);
       });
-      const glassBox = new THREE.Mesh(glassBoxGeo, glassBoxMat);
-      glassBox.position.y = 1.5;
-      group.add(glassBox);
 
-      // Custom Architectural 3D Geometry
+      // Custom Photorealistic Architectural & Server 3D Models
       if (archType === 'jpm_tower') {
-        // JPMorgan Skyscraper Tower
-        const towerGeo = new THREE.BoxGeometry(1.4, 2.2, 1.4);
-        const towerMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.85, roughness: 0.2 });
-        const tower = new THREE.Mesh(towerGeo, towerMat);
-        tower.position.y = 1.35;
-        tower.castShadow = true;
-        group.add(tower);
+        // JPMorgan Chase Multi-Tiered Modern Skyscraper
+        const b1Geo = new THREE.BoxGeometry(1.5, 1.2, 1.5);
+        const b1Mat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.15 });
+        const b1 = new THREE.Mesh(b1Geo, b1Mat);
+        b1.position.y = 0.75;
+        b1.castShadow = true;
+        group.add(b1);
 
-        // Glass Curtain Windows
-        const windowGeo = new THREE.BoxGeometry(1.42, 1.8, 1.42);
-        const windowMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8, wireframe: true });
-        const windows = new THREE.Mesh(windowGeo, windowMat);
-        windows.position.y = 1.35;
-        group.add(windows);
+        // Glass Curtain Window Tier 1
+        const glass1Geo = new THREE.BoxGeometry(1.52, 0.9, 1.52);
+        const glass1Mat = new THREE.MeshPhysicalMaterial({
+          color: 0x0284c7,
+          transmission: 0.5,
+          opacity: 0.75,
+          transparent: true,
+          roughness: 0.1,
+        });
+        const glass1 = new THREE.Mesh(glass1Geo, glass1Mat);
+        glass1.position.y = 0.75;
+        group.add(glass1);
 
-        // Rooftop Microwave Dish Antenna
-        const dishGeo = new THREE.CylinderGeometry(0.3, 0.05, 0.12, 16);
-        const dishMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.9 });
-        const dish = new THREE.Mesh(dishGeo, dishMat);
-        dish.rotation.x = Math.PI / 4;
-        dish.position.set(0, 2.65, 0);
-        group.add(dish);
+        // Tier 2 Inset Setback
+        const b2Geo = new THREE.BoxGeometry(1.2, 0.9, 1.2);
+        const b2 = new THREE.Mesh(b2Geo, b1Mat);
+        b2.position.y = 1.8;
+        b2.castShadow = true;
+        group.add(b2);
+
+        // Tier 3 Spire Tower Top
+        const b3Geo = new THREE.BoxGeometry(0.9, 0.6, 0.9);
+        const b3Mat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          emissive: 0x0284c7,
+          emissiveIntensity: 0.4,
+          metalness: 0.95,
+        });
+        const b3 = new THREE.Mesh(b3Geo, b3Mat);
+        b3.position.y = 2.55;
+        group.add(b3);
+
+        // Rooftop Communications Mast & Antenna
+        const mastGeo = new THREE.CylinderGeometry(0.02, 0.04, 0.7, 12);
+        const mastMat = new THREE.MeshStandardMaterial({ color: 0x38bdf8, metalness: 0.98 });
+        const mast = new THREE.Mesh(mastGeo, mastMat);
+        mast.position.set(0, 3.2, 0);
+        group.add(mast);
 
       } else if (archType === 'hsbc_vault') {
-        // HSBC Neo-classical Bank Vault Building
-        const vaultBodyGeo = new THREE.BoxGeometry(1.8, 1.4, 1.6);
-        const vaultBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
-        const vaultBody = new THREE.Mesh(vaultBodyGeo, vaultBodyMat);
-        vaultBody.position.y = 0.95;
-        group.add(vaultBody);
+        // HSBC Headquarters Neo-Classical Banking Hall
+        const hallBodyGeo = new THREE.BoxGeometry(1.9, 1.4, 1.7);
+        const hallBodyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.75, roughness: 0.3 });
+        const hallBody = new THREE.Mesh(hallBodyGeo, hallBodyMat);
+        hallBody.position.y = 0.95;
+        hallBody.castShadow = true;
+        group.add(hallBody);
 
-        // Classical Pillars
-        const colGeo = new THREE.CylinderGeometry(0.09, 0.09, 1.3, 16);
-        const colMat = new THREE.MeshStandardMaterial({ color: 0xec4899, metalness: 0.9 });
-        [-0.7, -0.23, 0.23, 0.7].forEach((x) => {
+        // Classical Fluted Entrance Columns
+        const colGeo = new THREE.CylinderGeometry(0.07, 0.07, 1.3, 16);
+        const colMat = new THREE.MeshStandardMaterial({ color: 0xf43f5e, metalness: 0.85, roughness: 0.2 });
+        [-0.75, -0.45, -0.15, 0.15, 0.45, 0.75].forEach((x) => {
           const col = new THREE.Mesh(colGeo, colMat);
-          col.position.set(x, 1.0, 0.75);
+          col.position.set(x, 0.9, 0.88);
           group.add(col);
         });
 
-        // Triangular Pediment Roof
-        const roofGeo = new THREE.ConeGeometry(1.3, 0.6, 4);
-        const roofMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
-        const roof = new THREE.Mesh(roofGeo, roofMat);
-        roof.rotation.y = Math.PI / 4;
-        roof.position.y = 1.95;
-        group.add(roof);
+        // Triangular Roof Pediment
+        const pedimentGeo = new THREE.ConeGeometry(1.35, 0.6, 4);
+        const pedimentMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8, roughness: 0.2 });
+        const pediment = new THREE.Mesh(pedimentGeo, pedimentMat);
+        pediment.rotation.y = Math.PI / 4;
+        pediment.position.y = 1.95;
+        group.add(pediment);
+
+        // Illuminated Bronze Vault Portal Entrance
+        const doorGeo = new THREE.BoxGeometry(0.5, 0.75, 0.1);
+        const doorMat = new THREE.MeshStandardMaterial({
+          color: 0x92400e,
+          emissive: 0xeab308,
+          emissiveIntensity: 0.5,
+          metalness: 0.9,
+        });
+        const door = new THREE.Mesh(doorGeo, doorMat);
+        door.position.set(0, 0.62, 0.86);
+        group.add(door);
 
       } else if (archType === 'db_skyscraper') {
-        // Deutsche Bank Frankfurt Twin Towers Architecture
-        const t1Geo = new THREE.BoxGeometry(0.7, 2.3, 0.9);
-        const t2Geo = new THREE.BoxGeometry(0.7, 2.3, 0.9);
-        const bldgMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.9, roughness: 0.1 });
+        // Deutsche Bank Frankfurt Reflective Twin Towers
+        const towerGeo = new THREE.BoxGeometry(0.7, 2.5, 0.85);
+        const glassFacadeMat = new THREE.MeshPhysicalMaterial({
+          color: 0x0369a1,
+          metalness: 0.95,
+          roughness: 0.08,
+          clearcoat: 1.0,
+          clearcoatRoughness: 0.05,
+        });
 
-        const t1 = new THREE.Mesh(t1Geo, bldgMat);
-        t1.position.set(-0.45, 1.4, 0);
-        group.add(t1);
+        const towerLeft = new THREE.Mesh(towerGeo, glassFacadeMat);
+        towerLeft.position.set(-0.48, 1.5, 0);
+        towerLeft.castShadow = true;
+        group.add(towerLeft);
 
-        const t2 = new THREE.Mesh(t2Geo, bldgMat);
-        t2.position.set(0.45, 1.4, 0);
-        group.add(t2);
+        const towerRight = new THREE.Mesh(towerGeo, glassFacadeMat);
+        towerRight.position.set(0.48, 1.5, 0);
+        towerRight.castShadow = true;
+        group.add(towerRight);
 
-        // Connecting Skybridge & Cyan Glass Edges
-        const bridgeGeo = new THREE.BoxGeometry(0.9, 0.25, 0.7);
-        const bridgeMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-        const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
-        bridge.position.set(0, 1.8, 0);
-        group.add(bridge);
+        // Dark Chrome Skybridge Connectors (Mid & Top)
+        const bridgeGeo = new THREE.BoxGeometry(0.95, 0.22, 0.75);
+        const bridgeMat = new THREE.MeshStandardMaterial({ color: 0x06b6d4, metalness: 0.9, roughness: 0.1 });
+
+        const bridgeLower = new THREE.Mesh(bridgeGeo, bridgeMat);
+        bridgeLower.position.set(0, 1.3, 0);
+        group.add(bridgeLower);
+
+        const bridgeUpper = new THREE.Mesh(bridgeGeo, bridgeMat);
+        bridgeUpper.position.set(0, 2.2, 0);
+        group.add(bridgeUpper);
 
       } else {
-        // Intel SGX Heavy Armored Hardware Vault
-        const armorGeo = new THREE.BoxGeometry(1.7, 1.7, 1.7);
-        const armorMat = new THREE.MeshStandardMaterial({ color: 0x1e1b4b, metalness: 0.95, roughness: 0.15 });
-        const armor = new THREE.Mesh(armorGeo, armorMat);
-        armor.position.y = 1.15;
-        group.add(armor);
+        // Intel SGX TEE Enterprise Server Hardware Blade Rack
+        const rackGeo = new THREE.BoxGeometry(2.0, 1.9, 2.0);
+        const rackMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.92, roughness: 0.15 });
+        const rack = new THREE.Mesh(rackGeo, rackMat);
+        rack.position.y = 1.2;
+        rack.castShadow = true;
+        group.add(rack);
 
-        // Rotating Cryptographic Lock Gear
-        const gearGeo = new THREE.TorusGeometry(0.5, 0.08, 12, 24);
-        const gearMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, metalness: 0.9, roughness: 0.1 });
-        const gear = new THREE.Mesh(gearGeo, gearMat);
-        gear.position.set(0, 1.15, 0.88);
-        group.add(gear);
+        // 8 Hot-Swap SAS Drive Bay Trays with LED Activity Lights
+        const bayGeo = new THREE.BoxGeometry(1.8, 0.16, 0.05);
+        const bayMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.9, roughness: 0.2 });
+        const ledGeo = new THREE.BoxGeometry(0.08, 0.08, 0.06);
+        const ledMat = new THREE.MeshStandardMaterial({ color: 0xa855f7, emissive: 0xa855f7, emissiveIntensity: 2.0 });
 
-        // Purple Laser Attestation Beacon
-        const beaconGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.2, 16);
-        const beaconMat = new THREE.MeshBasicMaterial({ color: 0xa855f7 });
-        const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-        beacon.position.y = 2.4;
-        group.add(beacon);
+        for (let i = 0; i < 8; i++) {
+          const bayY = 0.45 + i * 0.21;
+          const bay = new THREE.Mesh(bayGeo, bayMat);
+          bay.position.set(0, bayY, 1.01);
+          group.add(bay);
+
+          const led = new THREE.Mesh(ledGeo, ledMat);
+          led.position.set(0.78, bayY, 1.02);
+          group.add(led);
+        }
+
+        // Copper Cooling Heatpipes Assembly on Top
+        const pipeGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.6, 12);
+        const pipeMat = new THREE.MeshStandardMaterial({ color: 0xb45309, metalness: 0.95, roughness: 0.1 });
+        [-0.4, 0.4].forEach((px) => {
+          const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+          pipe.rotation.z = Math.PI / 2;
+          pipe.position.set(0, 2.25, px);
+          group.add(pipe);
+        });
       }
 
       scene.add(group);
