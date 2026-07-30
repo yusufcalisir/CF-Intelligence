@@ -880,15 +880,11 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </div>
 
             {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-6 py-2.5 backdrop-blur-md shadow-inner">
-              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">The Problem</a>
-              <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">How It Works</a>
-              <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
+            <nav className="hidden lg:flex items-center gap-8 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-7 py-2.5 backdrop-blur-md shadow-inner">
+              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">Overview</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
               <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
-              <a href="#security" className="hover:text-indigo-400 transition-colors">Security</a>
-              <a href="#api" className="hover:text-indigo-400 transition-colors">API Playground</a>
-              <a href="#docs" className="hover:text-indigo-400 transition-colors">Deploy Wizard</a>
+              <a href="#api" className="hover:text-indigo-400 transition-colors">API & Docs</a>
             </nav>
 
             {/* Actions */}
@@ -932,28 +928,16 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
                 <a href="#problem-solution" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  The Problem & Solution
-                </a>
-                <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  How It Works
-                </a>
-                <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Product Capabilities
+                  Overview
                 </a>
                 <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Platform Simulator
+                  Platform
                 </a>
                 <a href="#architecture" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  System Architecture
-                </a>
-                <a href="#security" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Security Playground
+                  Architecture
                 </a>
                 <a href="#api" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  API Execution Studio
-                </a>
-                <a href="#docs" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
-                  Deployment Wizard
+                  API & Docs
                 </a>
               </nav>
 
