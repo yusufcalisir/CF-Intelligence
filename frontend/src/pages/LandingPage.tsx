@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import * as THREE from 'three';
 
 // SVG Icons
 const CodeIcon = () => (
@@ -228,45 +227,49 @@ function BasicFederatedTopologyMesh({
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-4 items-center my-auto py-2">
         {/* Left Column: Bank Nodes (JPMorgan & Intel SGX) */}
         <div className="space-y-3">
-          <div
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan)}
-            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-lg">
-                🗽
+          {REAL_BANK_DETAILS.jpmorgan && (
+            <div
+              onClick={() => onSelectBank(REAL_BANK_DETAILS.jpmorgan!)}
+              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-cyan-500/40 hover:border-cyan-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-lg">
+                  🗽
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
+                    JPMorgan Chase
+                  </h4>
+                  <p className="text-[10px] font-mono text-slate-400">Node #01 • 128GB RAM</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-100 group-hover:text-cyan-300 transition-colors">
-                  JPMorgan Chase
-                </h4>
-                <p className="text-[10px] font-mono text-slate-400">Node #01 • 128GB RAM</p>
-              </div>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+                1.2ms
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-              1.2ms
-            </span>
-          </div>
+          )}
 
-          <div
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx)}
-            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-lg">
-                🔒
+          {REAL_BANK_DETAILS.sgx && (
+            <div
+              onClick={() => onSelectBank(REAL_BANK_DETAILS.sgx!)}
+              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-purple-500/40 hover:border-purple-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-lg">
+                  🔒
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
+                    Intel SGX TEE Vault
+                  </h4>
+                  <p className="text-[10px] font-mono text-slate-400">TEE Enclave v2 • 256GB EPC</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors">
-                  Intel SGX TEE Vault
-                </h4>
-                <p className="text-[10px] font-mono text-slate-400">TEE Enclave v2 • 256GB EPC</p>
-              </div>
+              <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
+                0.2ms
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-mono font-bold">
-              0.2ms
-            </span>
-          </div>
+          )}
         </div>
 
         {/* Center Column: 4U Federation Coordinator Appliance */}
@@ -301,45 +304,49 @@ function BasicFederatedTopologyMesh({
 
         {/* Right Column: Bank Nodes (HSBC & Deutsche Bank) */}
         <div className="space-y-3">
-          <div
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc)}
-            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-lg">
-                🏛️
+          {REAL_BANK_DETAILS.hsbc && (
+            <div
+              onClick={() => onSelectBank(REAL_BANK_DETAILS.hsbc!)}
+              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-rose-500/40 hover:border-rose-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-lg">
+                  🏛️
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-rose-300 transition-colors">
+                    HSBC Holdings
+                  </h4>
+                  <p className="text-[10px] font-mono text-slate-400">Node #02 • 64GB RAM</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-100 group-hover:text-rose-300 transition-colors">
-                  HSBC Holdings
-                </h4>
-                <p className="text-[10px] font-mono text-slate-400">Node #02 • 64GB RAM</p>
-              </div>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+                1.8ms
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-              1.8ms
-            </span>
-          </div>
+          )}
 
-          <div
-            onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche)}
-            className="group p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-lg">
-                🏢
+          {REAL_BANK_DETAILS.deutsche && (
+            <div
+              onClick={() => onSelectBank(REAL_BANK_DETAILS.deutsche!)}
+              className="group p-3.5 rounded-2xl bg-slate-900/90 border border-blue-500/40 hover:border-blue-400 cursor-pointer transition-all hover:scale-102 shadow-lg flex items-center justify-between"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/30 flex items-center justify-center text-lg">
+                  🏢
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
+                    Deutsche Bank AG
+                  </h4>
+                  <p className="text-[10px] font-mono text-slate-400">Node #03 • 32GB RAM</p>
+                </div>
               </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-100 group-hover:text-blue-300 transition-colors">
-                  Deutsche Bank AG
-                </h4>
-                <p className="text-[10px] font-mono text-slate-400">Node #03 • 32GB RAM</p>
-              </div>
+              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
+                2.9ms
+              </span>
             </div>
-            <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 text-[10px] font-mono font-bold">
-              2.9ms
-            </span>
-          </div>
+          )}
         </div>
       </div>
 
