@@ -2,38 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
-// ── BRAND LOGO & ICON ASSETS ────────────────────────────────────────────────
-const CfiBrandLogo = ({ className = 'w-10 h-10' }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 44 44" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <rect width="44" height="44" rx="12" fill="url(#cfiGrad)" />
-    <path d="M14 22L20 28L30 16" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
-    <circle cx="22" cy="22" r="16" stroke="white" strokeWidth="2" strokeDasharray="4 4" opacity="0.5" />
-    <defs>
-      <linearGradient id="cfiGrad" x1="0" y1="0" x2="44" y2="44" gradientUnits="userSpaceOnUse">
-        <stop stopColor="#6366F1" />
-        <stop offset="0.5" stopColor="#8B5CF6" />
-        <stop offset="1" stopColor="#EC4899" />
-      </linearGradient>
-    </defs>
-  </svg>
-);
-
-const ArrowRightIcon = () => (
-  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="5" y1="12" x2="19" y2="12" />
-    <polyline points="12 5 19 12 12 19" />
-  </svg>
-);
-
-const MenuIcon = () => (
-  <svg className="w-6 h-6 text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <line x1="3" y1="12" x2="21" y2="12" />
-    <line x1="3" y1="6" x2="21" y2="6" />
-    <line x1="3" y1="18" x2="21" y2="18" />
-  </svg>
-);
-
-// ── REAL BANK HARDWARE DATA SCHEMAS ──────────────────────────────────────────
+// ── TYPE DEFINITIONS ────────────────────────────────────────────────────────
 export interface BankInfoDetail {
   id: string;
   name: string;
@@ -46,699 +15,927 @@ export interface BankInfoDetail {
   xmlLogs: string[];
 }
 
-const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
+interface Module {
+  id: string;
+  name: string;
+  category: string;
+  purpose: string;
+  algorithm: string;
+  inputs: string;
+  outputs: string;
+  tech: string;
+}
+
+interface ArchNode {
+  id: string;
+  label: string;
+  description: string;
+  tech: string[];
+  responsibilities: string[];
+  protocols: string[];
+}
+
+// ── DATA ────────────────────────────────────────────────────────────────────
+const BANK_NODES: Record<string, BankInfoDetail> = {
   jpmorgan: {
-    id: 'jpmorgan',
-    name: 'JPMorgan Chase & Co.',
-    ticker: 'NYSE: JPM',
+    id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM',
     location: 'New York Data Center, US (Node #01)',
-    hardware: 'NVIDIA DGX H100 (8x Tensor Core GPUs)',
-    ram: '128 GB Host RAM',
-    pytorch: '2.2.0+cu121',
-    latency: '1.2 ms',
+    hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM',
+    pytorch: '2.2.0+cu121', latency: '1.2 ms',
     xmlLogs: [
       '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'Local PyTorch Geometric GATConv embedding generated: 512-dim tensor.',
-      'Differential Privacy Gaussian noise injected (ε=0.50, δ=1e-5). Update signed by HSM key 0x99F1.',
+      'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.',
+      'DP Gaussian noise σ=0.031 injected. ε=0.50, δ=1e-5. HSM-signed: 0x99F1.',
     ],
   },
   hsbc: {
-    id: 'hsbc',
-    name: 'HSBC Holdings plc',
-    ticker: 'LSE: HSBA',
+    id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA',
     location: 'London Canary Wharf, UK (Node #02)',
-    hardware: 'Dell PowerEdge R760 (4x NVIDIA A100 GPUs)',
-    ram: '64 GB Host RAM',
-    pytorch: '2.1.2+cu118',
-    latency: '1.8 ms',
+    hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM',
+    pytorch: '2.1.2+cu118', latency: '1.8 ms',
     xmlLogs: [
       '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>',
-      'Extracted subgraph node features for SWIFT BACS clearing queue.',
-      'Paillier homomorphic ciphertext generated: [[W_hsbc]]. Ready for federated aggregation.',
+      'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.',
+      'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.',
     ],
   },
   deutsche: {
-    id: 'deutsche',
-    name: 'Deutsche Bank AG',
-    ticker: 'XETRA: DBK',
+    id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK',
     location: 'Frankfurt, DE (Node #03)',
-    hardware: 'Intel Xeon Platinum Cluster (CPU Monolith)',
-    ram: '32 GB Host RAM',
-    pytorch: '2.1.2+cpu',
-    latency: '2.9 ms',
+    hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM',
+    pytorch: '2.1.2+cpu', latency: '2.9 ms',
     xmlLogs: [
       '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="EUR">650000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'Heterogeneous parameter negotiator applied: Batch size scaled to 32.',
-      'CPU threadpool gradient accumulation steps = 2. Straggler delay quenched.',
+      'Heterogeneous negotiator: batch_size scaled to 32. grad_accum_steps=2.',
+      'CPU threadpool straggler quenched. Round latency 342ms.',
     ],
   },
   sgx: {
-    id: 'sgx',
-    name: 'Intel SGX Hardware TEE Enclave',
-    ticker: 'HARDWARE TEE',
+    id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE',
     location: 'Consortium Secure Vault Node',
-    hardware: 'Intel SGX Enclave v2 (Hardware Isolation)',
-    ram: '256 GB Enclave Page Cache (EPC)',
-    pytorch: 'C++ Native LibTorch Enclave Runtime',
-    latency: '0.2 ms',
+    hardware: 'Intel SGX Enclave v2 (Hardware Isolation)', ram: '256 GB Enclave Page Cache (EPC)',
+    pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms',
     xmlLogs: [
-      'Intel SGX Attestation Verification: SUCCESS (Cryptographic Proof Verified).',
-      'Homomorphic Sum Aggregation executed: [[W_global]] = Sum([[W_jpm]], [[W_hsbc]], [[W_db]]).',
-      'Differential Privacy Gaussian noise injected (ε=0.50, δ=1e-5). Model parameters published.',
+      'Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.',
+      'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])',
+      'DP Gaussian noise injected (ε=0.50, δ=1e-5). [[W_global]] published to consortium.',
     ],
   },
 };
 
-// ── MAIN RADICAL NEW LANDING PAGE COMPONENT ──────────────────────────────────
+const PLATFORM_MODULES: Module[] = [
+  { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Engine', purpose: 'Orchestrates distributed training rounds across heterogeneous bank nodes using FedAvg with asynchronous straggler tolerance.', algorithm: 'FedAvg, FedProx, asynchronous SGD', inputs: 'Local gradients from bank nodes', outputs: 'Aggregated global model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
+  { id: 'dp-engine', name: 'Differential Privacy Engine', category: 'Privacy Layer', purpose: 'Applies calibrated Gaussian noise to local gradient updates before they leave bank premises, providing (ε, δ)-DP guarantees.', algorithm: 'Gaussian Mechanism, RDP Accountant', inputs: 'Raw local gradients, sensitivity bounds', outputs: 'Noise-perturbed gradient tensors', tech: 'Opacus 1.4, Rényi DP' },
+  { id: 'secure-agg', name: 'Secure Aggregation', category: 'Cryptography', purpose: 'Aggregates model updates using Paillier homomorphic encryption so the coordinator never sees individual institution gradients in plaintext.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically aggregated ciphertext', tech: 'Intel SGX Enclave v2, python-phe' },
+  { id: 'bft-agg', name: 'Byzantine-Robust Aggregation', category: 'BFT Defense', purpose: 'Detects and neutralises gradient poisoning attacks from compromised bank nodes before global model update.', algorithm: 'Krum, Trimmed Mean, Flame', inputs: 'Set of gradient updates from all nodes', outputs: 'Byzantine-filtered aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
+  { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'ML Runtime', purpose: 'Builds heterogeneous transaction graphs from ISO 20022 feeds and computes multi-hop structural embeddings for fraud pattern detection.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 / camt.053', outputs: '512-dim node embeddings, risk scores', tech: 'PyTorch Geometric 2.6, DGL' },
+  { id: 'risk-engine', name: 'Risk Scoring Engine', category: 'Intelligence', purpose: 'Combines GNN embeddings with tabular features and velocity metrics to produce calibrated transaction risk scores with SHAP explanations.', algorithm: 'XGBoost + GNN ensemble, SHAP, LIME', inputs: 'GNN embeddings, transaction features', outputs: 'Risk score [0-1], SHAP attributions', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
+  { id: 'telemetry', name: 'Telemetry & Monitoring', category: 'Observability', purpose: 'Streams real-time FL round metrics, gradient norms, privacy budget consumption, and node health to the Coordinator dashboard.', algorithm: 'EWMA smoothing, anomaly detection', inputs: 'Node heartbeats, round metrics', outputs: 'Prometheus metrics, InfluxDB time-series', tech: 'Prometheus, Grafana, OpenTelemetry' },
+  { id: 'bank-connector', name: 'Bank Connector Framework', category: 'Integration', purpose: 'Standardises ingestion of ISO 20022 XML financial message streams from heterogeneous bank core banking systems into the FL data plane.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008, camt.053 XML streams', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
+];
+
+const ARCH_NODES: ArchNode[] = [
+  { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 18', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
+  { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
+  { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.11', 'gRPC', 'Celery', 'Redis'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
+  { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms (FedAvg, FedProx) and gradient aggregation.', tech: ['PyTorch 2.2', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
+  { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies calibrated Gaussian noise and manages cumulative (ε, δ) privacy budget via RDP accountant.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'ε audit'], protocols: ['Internal API'] },
+  { id: 'sgx-enclave', label: 'SGX Enclave', description: 'Hardware-isolated trusted execution environment for homomorphic aggregation of encrypted gradients.', tech: ['Intel SGX SDK', 'LibTorch (C++)', 'OpenEnclave'], responsibilities: ['HE aggregation', 'Remote attestation', 'Enclave verification', 'Key management'], protocols: ['Enclave-to-Enclave', 'ECALL/OCALL'] },
+  { id: 'graph-engine', label: 'Graph Engine', description: 'PyTorch Geometric runtime for transaction graph construction and GNN inference from ISO 20022 feeds.', tech: ['PyTorch Geometric 2.6', 'DGL', 'NetworkX'], responsibilities: ['Graph construction', 'GATConv inference', 'Subgraph sampling', 'Embedding store'], protocols: ['Internal gRPC'] },
+  { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
+];
+
+const WORKFLOW_STEPS = [
+  { id: 1, label: 'ISO 20022 Ingestion', short: 'Ingestion', description: 'Each bank node ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 statements) via the Bank Connector Framework. Messages are validated against XSD schemas, normalised, and streamed into the local transaction graph store.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser\nfrom lxml import etree\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\ngraph_builder.ingest(msg)` },
+  { id: 2, label: 'Local GNN Training', short: 'Local Training', description: 'The local PyTorch Geometric GAT model is trained exclusively on data stored within the bank premises. The model learns multi-hop transaction graph embeddings capturing structural patterns associated with money laundering networks without ever transmitting raw data externally.', tech: ['PyTorch Geometric 2.6', 'GATConv', 'GraphSAGE', 'Adam optimiser'], code: `# Local GATConv Training\nfrom torch_geometric.nn import GATConv\n\nmodel = GATConv(in_channels=512,\n                out_channels=256,\n                heads=8, dropout=0.1)\noptimiser = Adam(model.parameters(), lr=3e-4)\n\nfor batch in local_loader:\n    loss = criterion(model(batch.x, batch.edge_index), batch.y)\n    loss.backward()` },
+  { id: 3, label: 'Differential Privacy', short: 'Diff. Privacy', description: 'Before any gradient leaves the bank, Opacus injects calibrated Gaussian noise proportional to the gradient L2-sensitivity. The (ε, δ)-DP guarantee is tracked by the Rényi Differential Privacy accountant. Only after budget verification is the noised gradient forwarded.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'Gradient Clipping'], code: `# Opacus DP Training\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimiser, loader = privacy_engine.make_private_with_epsilon(\n    module=model,\n    optimizer=optimiser,\n    data_loader=loader,\n    epochs=10, target_epsilon=0.50,\n    target_delta=1e-5, max_grad_norm=1.0,\n)` },
+  { id: 4, label: 'Secure Aggregation', short: 'Sec. Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and transmitted to the Intel SGX hardware enclave. The enclave performs homomorphic summation without decrypting individual bank contributions, providing cryptographic isolation guarantees.', tech: ['Paillier HE', 'Intel SGX v2', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// SGX Enclave Aggregation (C++)\nsgx_status_t ecall_homomorphic_aggregate(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_a, size_t len_a,\n    const uint8_t* cipher_b, size_t len_b,\n    uint8_t* cipher_sum, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_a, cipher_b);\n    memcpy(cipher_sum, sum.data(), sum.size());\n}` },
+  { id: 5, label: 'Byzantine Aggregation', short: 'BFT Filter', description: 'The FL Coordinator applies Byzantine-robust aggregation using the Krum algorithm and Trimmed Mean to neutralise adversarial gradient poisoning attacks from any compromised bank node before updating the global model.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine similarity'], code: `# Krum Byzantine Filtering\ndef krum(gradients: list[Tensor], f: int) -> Tensor:\n    """Select gradient maximally close to all others, excluding f adversaries.\"\"\"\n    n = len(gradients)\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2 for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:n - f - 2]))\n    return gradients[scores.index(min(scores))]` },
+  { id: 6, label: 'Global Model Update', short: 'Global Update', description: 'The aggregated and validated global model weights are committed to the Model Registry. All bank nodes receive the updated weights for the next training round. A Coordinator audit log records the cryptographic hash of each round\'s aggregated model.', tech: ['FedAvg', 'Model Registry', 'SHA-256 audit', 'gRPC broadcast'], code: `# FedAvg Global Aggregation\ndef fedavg(updates: list[dict], weights: list[int]) -> dict:\n    total = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(\n            w * u[key] for w, u in zip(weights, updates)\n        ) / total\n    return global_state` },
+  { id: 7, label: 'Risk Scoring', short: 'Risk Intelligence', description: 'The global GNN model produces 512-dimensional transaction embeddings which are passed to the Risk Scoring Engine. XGBoost ensemble classifier scores each transaction [0-1], with SHAP value decomposition providing interpretable feature attributions for each risk decision.', tech: ['XGBoost 2.0', 'SHAP', 'Platt Calibration', 'LIME'], code: `# Risk Score + SHAP Explanation\nimport shap\n\nrisk_model = xgboost.XGBClassifier()\nrisk_score = risk_model.predict_proba(embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_values = explainer.shap_values(embedding)\n# → interpretable feature attributions` },
+  { id: 8, label: 'SAR Export', short: 'SAR Export', description: 'Transactions crossing the configured risk threshold automatically trigger SAR (Suspicious Activity Report) generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM or regulatory submission.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
+];
+
+// ── ICON PRIMITIVES ──────────────────────────────────────────────────────────
+const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 44 44" fill="none">
+    <rect width="44" height="44" rx="10" fill="#1e1b4b" />
+    <rect x="1" y="1" width="42" height="42" rx="9" stroke="#4f46e5" strokeWidth="1.5" strokeOpacity="0.6" />
+    <path d="M14 22L20 28L30 16" stroke="#818cf8" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+    <circle cx="22" cy="22" r="14" stroke="#4f46e5" strokeWidth="1" strokeDasharray="3 3" strokeOpacity="0.5" />
+  </svg>
+);
+
+const MenuIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <line x1="3" y1="12" x2="21" y2="12" />
+    <line x1="3" y1="6" x2="21" y2="6" />
+    <line x1="3" y1="18" x2="21" y2="18" />
+  </svg>
+);
+
+const ArrowRight = () => (
+  <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="5" y1="12" x2="19" y2="12" />
+    <polyline points="12 5 19 12 12 19" />
+  </svg>
+);
+
+const ChevronRight = () => (
+  <svg className="w-4 h-4 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+);
+
+
+
+// ── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
-
-  // State Management
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
-  const [activeLayer, setActiveLayer] = useState<number>(1);
+  const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
+  const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
-  const [flRound, setFlRound] = useState<number>(47);
-  const [accuracy, setAccuracy] = useState<number>(94.2);
-  const [activeGraphTab, setActiveGraphTab] = useState<'topology' | 'matrix'>('topology');
+  const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
+  const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
+  const [flRound, setFlRound] = useState(47);
+  const [accuracy, setAccuracy] = useState(94.2);
 
-  // Live telemetry ticker
   useEffect(() => {
-    const interval = setInterval(() => {
-      setFlRound((prev) => prev + 1);
+    const t = setInterval(() => {
+      setFlRound(p => p + 1);
       setAccuracy(parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
     }, 6000);
-    return () => clearInterval(interval);
+    return () => clearInterval(t);
   }, []);
 
+  const currentWorkflowStep = WORKFLOW_STEPS.find(s => s.id === activeWorkflowStep)!;
+
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
-      {/* Background Mesh Gradients */}
-      <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
-        <div className="absolute top-0 left-1/4 w-[600px] h-[600px] bg-gradient-to-br from-indigo-600/20 via-purple-600/10 to-transparent rounded-full blur-[120px]" />
-        <div className="absolute top-1/2 right-10 w-[500px] h-[500px] bg-gradient-to-bl from-pink-600/15 via-rose-600/10 to-transparent rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 left-1/3 w-[600px] h-[600px] bg-gradient-to-tr from-cyan-600/15 via-blue-600/10 to-transparent rounded-full blur-[120px]" />
-      </div>
+    <div className="min-h-screen bg-[#0a0a0f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white relative overflow-x-hidden">
+      {/* Minimal grid texture */}
+      <div className="fixed inset-0 pointer-events-none z-0" style={{
+        backgroundImage: 'linear-gradient(rgba(99,102,241,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.03) 1px, transparent 1px)',
+        backgroundSize: '40px 40px',
+      }} />
 
       <div className="relative z-10">
-        {/* ── STICKY ENTERPRISE HEADER ────────────────────────────────────── */}
-        <header className="sticky top-0 z-50 backdrop-blur-2xl bg-slate-950/85 border-b border-slate-800/80 h-16 flex items-center">
+        {/* ── HEADER ─────────────────────────────────────────────────────── */}
+        <header className="sticky top-0 z-50 h-14 flex items-center border-b border-slate-800/70 bg-[#0a0a0f]/90 backdrop-blur-xl">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
-            {/* Brand Logo & Version Badge */}
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
-              <CfiBrandLogo className="w-9 h-9 drop-shadow-[0_0_15px_rgba(99,102,241,0.6)]" />
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
-                  CF-Intelligence
-                </span>
-                <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-mono text-[10px] font-bold border border-indigo-500/40">
-                  v2.4.0
-                </span>
+              <BrandLogo />
+              <div className="flex items-baseline gap-2">
+                <span className="font-semibold text-sm text-slate-100 tracking-tight">CF-Intelligence</span>
+                <span className="text-xs text-slate-500 font-mono">v2.4.0</span>
               </div>
             </div>
 
-            {/* Desktop Navigation Links */}
-            <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/70 border border-slate-800/80 rounded-full px-6 py-2 backdrop-blur-xl shadow-xl">
-              <a href="#hero" className="hover:text-indigo-400 transition-colors">Overview</a>
-              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">Problem</a>
-              <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">Workflow</a>
-              <a href="#product" className="hover:text-indigo-400 transition-colors">Capabilities</a>
-              <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
-              <a href="#architecture" className="hover:text-indigo-400 transition-colors">Architecture</a>
-              <a href="#security" className="hover:text-indigo-400 transition-colors">Security</a>
-              <a href="#api" className="hover:text-indigo-400 transition-colors">API & Docs</a>
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
+              {['Overview', 'Problem', 'Workflow', 'Capabilities', 'Platform', 'Architecture', 'Security', 'API & Docs'].map(label => (
+                <a
+                  key={label}
+                  href={`#${label === 'API & Docs' ? 'api' : label === 'Architecture' ? 'architecture' : label.toLowerCase().replace(/ & /g, '-').replace(/ /g, '-')}`}
+                  className="hover:text-slate-100 transition-colors"
+                >
+                  {label}
+                </a>
+              ))}
             </nav>
 
-            {/* Header Right Action Group */}
             <div className="flex items-center gap-3">
-              <div className="hidden xl:flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-semibold">
-                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                Quorum Active (3/3 Synced)
+              <div className="hidden xl:flex items-center gap-1.5 text-[11px] font-mono text-emerald-500">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                3/3 nodes synced
               </div>
-
-              {/* Mobile Menu Toggle Button */}
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800"
+                className="lg:hidden p-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100 cursor-pointer"
               >
                 <MenuIcon />
               </button>
-
               <button
                 onClick={() => navigate('/dashboard')}
-                className="hidden sm:inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                className="hidden sm:flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[13px] font-medium text-slate-100 bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer"
               >
-                <span>Launch Live Platform Demo</span>
-                <ArrowRightIcon />
+                Launch Demo <ArrowRight />
               </button>
             </div>
           </div>
         </header>
 
-        {/* ── MOBILE NAVIGATION OVERLAY DRAWER ───────────────────────────── */}
+        {/* ── MOBILE NAVIGATION DRAWER ────────────────────────────────────── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="lg:hidden bg-slate-950/95 border-b border-slate-800 backdrop-blur-xl px-4 py-6 space-y-3 text-sm font-semibold font-mono text-slate-300 z-40"
+            <motion.nav
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="lg:hidden border-b border-slate-800 bg-[#0a0a0f]/95 backdrop-blur-xl px-4 py-4 space-y-1 z-40"
             >
-              <a href="#hero" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                Overview (3D Architecture)
-              </a>
-              <a href="#problem-solution" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                The Problem & Solution
-              </a>
-              <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                Streaming GNN Collusion Simulator
-              </a>
-              <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                Privacy Engine & Capabilities
-              </a>
-              <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                Deployment Blueprint Wizard
-              </a>
-              <a href="#security" onClick={() => setIsMobileMenuOpen(false)} className="block p-2.5 rounded-xl hover:bg-slate-900 hover:text-indigo-400">
-                Security & Attack Defense Lab
-              </a>
-              <div className="pt-3 border-t border-slate-900">
+              {[
+                { label: 'Overview (3D Architecture)', href: '#hero' },
+                { label: 'The Problem & Solution', href: '#problem-solution' },
+                { label: 'Streaming GNN Collusion Simulator', href: '#how-it-works' },
+                { label: 'Privacy Engine & Capabilities', href: '#product' },
+                { label: 'Deployment Blueprint Wizard', href: '#platform' },
+                { label: 'System Architecture', href: '#architecture' },
+                { label: 'Security & Attack Defense Lab', href: '#security' },
+                { label: 'API & Docs', href: '#api' },
+              ].map(link => (
+                <a
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className="block px-3 py-2 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-slate-900 rounded-lg transition-colors"
+                >
+                  {link.label}
+                </a>
+              ))}
+              <div className="pt-2 border-t border-slate-800">
                 <button
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 text-white font-bold text-xs shadow-lg"
+                  className="w-full py-2 text-[13px] font-medium text-slate-100 bg-indigo-600 rounded-lg"
                 >
-                  Launch Demo
+                  Launch Platform
                 </button>
               </div>
-            </motion.div>
+            </motion.nav>
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 1: HERO SHOWCASE (#hero) ────────────────────────────── */}
-        <section id="hero" className="py-12 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-            {/* Left Hero Copy */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-gradient-to-r from-indigo-500/15 via-purple-500/15 to-pink-500/15 border border-indigo-500/30 text-indigo-300 text-xs font-mono font-bold">
-                <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse" />
-                FEDERATED GRAPH INTELLIGENCE ARCHITECTURE
+        {/* ── SECTION 1: OVERVIEW (#hero) ─────────────────────────────────── */}
+        <section id="hero" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
+            {/* Left: Platform introduction */}
+            <div className="lg:col-span-7 space-y-8">
+              <div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded bg-indigo-600/10 border border-indigo-600/20 text-indigo-400 text-xs font-mono mb-4">
+                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-400" />
+                  Enterprise Platform — Production Deployment
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-slate-100 leading-tight tracking-tight mb-4">
+                  Privacy-Preserving<br />Cross-Bank Fraud Detection
+                </h1>
+                <p className="text-slate-400 text-[15px] leading-relaxed max-w-xl">
+                  CF-Intelligence is a federated machine learning platform that enables financial institutions to collaboratively train fraud detection models on transaction graph data without exposing raw customer data to any external party.
+                </p>
               </div>
 
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-black text-slate-100 leading-[1.1] tracking-tight">
-                Stop Cross-Border Money Laundering
-                <span className="block mt-2 bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
-                  In Real-Time Without Sharing Customer Data
-                </span>
-              </h1>
+              {/* Key characteristics */}
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { label: 'Stack', value: 'Federated Learning + GNN' },
+                  { label: 'Privacy Model', value: '(ε=0.50, δ=1e-5)-DP' },
+                  { label: 'Cryptography', value: 'Paillier HE + Intel SGX TEE' },
+                  { label: 'Transport', value: 'ISO 20022 / pacs.008' },
+                  { label: 'Byzantine Tolerance', value: 'Krum + Trimmed Mean' },
+                  { label: 'Regulatory', value: 'FinCEN SAR Compliant' },
+                  { label: 'Detection Gain', value: '42% → 94.2% accuracy' },
+                  { label: 'Graph Engine', value: 'PyTorch Geometric GATConv' },
+                ].map(row => (
+                  <div key={row.label} className="flex items-start gap-3 px-3 py-2.5 rounded-lg bg-slate-900/50 border border-slate-800/60">
+                    <span className="text-[11px] font-mono text-slate-500 min-w-[80px] pt-px">{row.label}</span>
+                    <span className="text-[11px] font-mono text-slate-200">{row.value}</span>
+                  </div>
+                ))}
+              </div>
 
-              <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-2xl">
-                Collaborative Fraud Intelligence (CFI) connects financial institution ledgers via PyTorch Geometric GNN embeddings, Intel SGX Hardware Enclaves, and Differential Privacy (ε=0.50) to catch money mule smurfing rings across bank silos.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 pt-2">
+              {/* CTAs */}
+              <div className="flex flex-wrap items-center gap-3">
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="px-7 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-500 hover:to-pink-500 text-white font-bold text-sm shadow-xl shadow-indigo-600/30 transition-all flex items-center gap-2.5 cursor-pointer"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-[13px] font-medium text-white transition-colors cursor-pointer"
                 >
-                  <span>Launch Demo</span>
-                  <ArrowRightIcon />
+                  Launch Live Platform Demo <ArrowRight />
                 </button>
                 <a
-                  href="#problem-solution"
-                  className="px-6 py-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-300 font-semibold text-sm transition-all"
+                  href="#architecture"
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-slate-700 hover:border-slate-500 text-[13px] font-medium text-slate-300 transition-colors"
                 >
-                  View Architecture ↓
+                  System Architecture
                 </a>
               </div>
-
-              {/* Real-Time Telemetry HUD Bar */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-5 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-2xl">
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Active FL Round</span>
-                  <div className="text-xl font-black text-indigo-400 font-mono mt-0.5">#{flRound}</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Global Accuracy</span>
-                  <div className="text-xl font-black text-emerald-400 font-mono mt-0.5">{accuracy}%</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Privacy Noise</span>
-                  <div className="text-xl font-black text-purple-400 font-mono mt-0.5">ε = 0.50</div>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">Stream Speed</span>
-                  <div className="text-xl font-black text-cyan-400 font-mono mt-0.5">1.4 GB/s</div>
-                </div>
-              </div>
             </div>
 
-            {/* Right Hero Interactive Consortium Mesh Node Visualizer */}
-            <div className="lg:col-span-5 relative">
-              <div className="p-6 rounded-3xl bg-slate-900/70 border border-slate-800/90 shadow-2xl backdrop-blur-2xl space-y-4">
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <div className="flex items-center gap-2">
-                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                    <span className="text-xs font-mono font-bold text-slate-200">INTERACTIVE CONSORTIUM TOPOLOGY</span>
+            {/* Right: System stats & live telemetry */}
+            <div className="lg:col-span-5 space-y-3">
+              {/* Build status badge */}
+              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] font-mono text-slate-500">Test Coverage</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-emerald-400">14 suites / 28 tests passing</span>
+                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-emerald-600/20 text-emerald-400 border border-emerald-600/20">PASS</span>
+                </div>
+              </div>
+              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] font-mono text-slate-500">Deployment</span>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-[11px] font-mono text-emerald-400">Hugging Face Spaces — Live</span>
+                </div>
+              </div>
+              <div className="px-4 py-3 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-between">
+                <span className="text-[11px] font-mono text-slate-500">GitHub</span>
+                <span className="text-[11px] font-mono text-slate-300">yusufcalisir/CF-Intelligence</span>
+              </div>
+
+              {/* Live Telemetry HUD */}
+              <div className="mt-2 p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-2.5 mb-2.5">
+                  <span className="text-[11px] font-mono text-slate-500 uppercase tracking-wider">Live Consortium Telemetry</span>
+                  <span className="flex items-center gap-1.5 text-[10px] font-mono text-emerald-500">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />STREAMING
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Active FL Round</div>
+                    <div className="text-xl font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      onClick={() => setActiveGraphTab('topology')}
-                      className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
-                        activeGraphTab === 'topology'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Graph Mesh
-                    </button>
-                    <button
-                      onClick={() => setActiveGraphTab('matrix')}
-                      className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition-all ${
-                        activeGraphTab === 'matrix'
-                          ? 'bg-indigo-600 text-white'
-                          : 'bg-slate-800 text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      Enclave Stream
-                    </button>
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Global Accuracy</div>
+                    <div className="text-xl font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Privacy Budget</div>
+                    <div className="text-xl font-bold font-mono text-purple-400 mt-0.5">ε=0.50</div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Stream Speed</div>
+                    <div className="text-xl font-bold font-mono text-blue-400 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
+              </div>
 
-                {activeGraphTab === 'topology' ? (
-                  <div className="relative h-[280px] w-full flex items-center justify-center">
-                    <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 280">
-                      <path d="M 70 60 Q 200 140 200 140" stroke="#38bdf8" strokeWidth="2" strokeDasharray="4 4" />
-                      <path d="M 330 60 Q 200 140 200 140" stroke="#f43f5e" strokeWidth="2" strokeDasharray="4 4" />
-                      <path d="M 70 220 Q 200 140 200 140" stroke="#a855f7" strokeWidth="2" strokeDasharray="4 4" />
-                      <path d="M 330 220 Q 200 140 200 140" stroke="#06b6d4" strokeWidth="2" strokeDasharray="4 4" />
-                      <circle cx="200" cy="140" r="38" fill="#090d16" stroke="#6366f1" strokeWidth="2" />
-                    </svg>
-
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center pointer-events-none">
-                      <div className="text-[10px] font-mono font-black text-indigo-300">INTEL SGX</div>
-                      <div className="text-[9px] font-mono text-emerald-400 font-bold">TEE Enclave</div>
+              {/* Node status */}
+              <div className="space-y-1.5">
+                {Object.values(BANK_NODES).map(bank => (
+                  <div
+                    key={bank.id}
+                    onClick={() => setActiveBankDrawer(bank)}
+                    className="flex items-center justify-between px-3.5 py-2.5 rounded-lg bg-slate-900 border border-slate-800 hover:border-slate-600 cursor-pointer transition-colors group"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-[12px] font-medium text-slate-300 group-hover:text-slate-100">{bank.name}</span>
                     </div>
-
-                    {REAL_BANK_DETAILS.jpmorgan && (
-                      <div
-                        onClick={() => setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan!)}
-                        className="absolute top-2 left-2 p-2.5 rounded-xl bg-slate-950 border border-cyan-500/40 hover:border-cyan-300 cursor-pointer text-xs font-mono"
-                      >
-                        <span className="font-bold text-slate-100">🗽 JPMorgan</span>
-                        <div className="text-[9px] text-cyan-400">1.2ms</div>
-                      </div>
-                    )}
-
-                    {REAL_BANK_DETAILS.hsbc && (
-                      <div
-                        onClick={() => setActiveBankDrawer(REAL_BANK_DETAILS.hsbc!)}
-                        className="absolute top-2 right-2 p-2.5 rounded-xl bg-slate-950 border border-rose-500/40 hover:border-rose-300 cursor-pointer text-xs font-mono"
-                      >
-                        <span className="font-bold text-slate-100">🏛️ HSBC</span>
-                        <div className="text-[9px] text-rose-400">1.8ms</div>
-                      </div>
-                    )}
-
-                    {REAL_BANK_DETAILS.sgx && (
-                      <div
-                        onClick={() => setActiveBankDrawer(REAL_BANK_DETAILS.sgx!)}
-                        className="absolute bottom-2 left-2 p-2.5 rounded-xl bg-slate-950 border border-purple-500/40 hover:border-purple-300 cursor-pointer text-xs font-mono"
-                      >
-                        <span className="font-bold text-slate-100">🔒 SGX Vault</span>
-                        <div className="text-[9px] text-purple-400">0.2ms</div>
-                      </div>
-                    )}
-
-                    {REAL_BANK_DETAILS.deutsche && (
-                      <div
-                        onClick={() => setActiveBankDrawer(REAL_BANK_DETAILS.deutsche!)}
-                        className="absolute bottom-2 right-2 p-2.5 rounded-xl bg-slate-950 border border-blue-500/40 hover:border-blue-300 cursor-pointer text-xs font-mono"
-                      >
-                        <span className="font-bold text-slate-100">🏢 Deutsche</span>
-                        <div className="text-[9px] text-blue-400">2.9ms</div>
-                      </div>
-                    )}
+                    <div className="flex items-center gap-3">
+                      <span className="text-[11px] font-mono text-slate-500">{bank.latency}</span>
+                      <ChevronRight />
+                    </div>
                   </div>
-                ) : (
-                  <div className="h-[280px] overflow-y-auto font-mono text-[11px] p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-2 text-indigo-300">
-                    <div>[00:01.02] JPM-Node #01: Local PyTorch GATConv 512-dim embedding computed.</div>
-                    <div>[00:01.08] HSBC-Node #02: Paillier ciphertext [[W_hsbc]] emitted.</div>
-                    <div>[00:01.14] DBK-Node #03: CPU threadpool straggler quenched (batch_size=32).</div>
-                    <div>[00:01.20] SGX-TEE Enclave: Attestation Verified. Homomorphic Sum [[W_global]] published.</div>
-                    <div>[00:01.25] Privacy Engine: Gaussian DP Noise (ε=0.50) bound verified.</div>
-                  </div>
-                )}
+                ))}
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── SECTION 2: THE PROBLEM & SOLUTION (#problem-solution) ───────── */}
-        <section id="problem-solution" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-mono font-bold uppercase tracking-wider">
-              Cross-Bank Blind Spot Analysis
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              Why Single-Bank Anti-Money Laundering Systems Fail
+        {/* ── SECTION 2: PROBLEM (#problem-solution) ──────────────────────── */}
+        <section id="problem-solution" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-12">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Problem Statement</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">
+              Money Laundering Networks Are Cross-Institutional
             </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Modern money laundering smurfing networks split transactions under $10,000 across multiple different banks. Single-bank ML models are blind to cross-institutional graph edges.
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              Modern financial crime — specifically smurfing and layering — deliberately fragments transactions across multiple regulated banking institutions to stay below detection thresholds at any single bank. Existing AML systems are institution-local and cannot detect this cross-bank pattern.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="p-8 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <h3 className="text-lg font-bold text-rose-400 flex items-center gap-2">
-                  <span>❌</span> Traditional Isolated Bank Silos
-                </h3>
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-rose-500/20 text-rose-300">
-                  42% Detection Rate
-                </span>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Traditional approach */}
+            <div className="p-6 rounded-xl bg-slate-900/50 border border-slate-800 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-slate-200">Isolated Bank Detection</h3>
+                <span className="px-2 py-0.5 text-[10px] font-mono text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded">42% detection rate</span>
               </div>
-              <ul className="space-y-3 text-xs sm:text-sm text-slate-300 font-mono">
-                <li className="flex items-start gap-2">
-                  <span className="text-rose-400 font-bold">•</span>
-                  <span>Each bank trains standalone GNN on local ledger data only.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-rose-400 font-bold">•</span>
-                  <span>Cross-border layering transactions under $10,000 evade SAR triggers.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-rose-400 font-bold">•</span>
-                  <span>GDPR / Banking Secrecy laws strictly forbid sharing customer PII.</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="p-8 rounded-3xl bg-slate-900/60 border border-indigo-500/40 shadow-xl space-y-4">
-              <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-                <h3 className="text-lg font-bold text-emerald-400 flex items-center gap-2">
-                  <span>✅</span> Collaborative Federated Consortium (CFI)
-                </h3>
-                <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300">
-                  94.2% Detection Rate
-                </span>
-              </div>
-              <ul className="space-y-3 text-xs sm:text-sm text-slate-300 font-mono">
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 font-bold">•</span>
-                  <span>PyTorch Geometric GATConv extracts structural embeddings locally.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 font-bold">•</span>
-                  <span>Only encrypted model gradient weights are aggregated in Intel SGX TEE.</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-emerald-400 font-bold">•</span>
-                  <span>Mathematical privacy guarantee: Zero raw transaction logs exchanged.</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        {/* ── SECTION 3: HOW IT WORKS PIPELINE (#how-it-works) ─────────────── */}
-        <section id="how-it-works" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider">
-              End-to-End Execution Pipeline
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              4-Step Privacy-Preserving Architecture
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            {[
-              { step: '01', title: 'ISO 20022 Data Intake', desc: 'Parses raw pacs.008 & camt.053 XML feeds into memory graph tensors.', badge: 'XML Parser' },
-              { step: '02', title: 'GNN Subgraph Store', desc: 'Computes GAT structural embeddings capturing transaction velocity.', badge: 'PyTorch PyG' },
-              { step: '03', title: 'SGX Enclave & DP Shield', desc: 'Injects Gaussian differential privacy noise (ε=0.50) inside TEE.', badge: 'Intel SGX' },
-              { step: '04', title: 'BFT Aggregation & SAR', desc: 'Executes FedAvg + Krum to neutralize updates and auto-exports FinCEN SAR.', badge: 'FinCEN SAR' },
-            ].map((item, idx) => (
-              <div
-                key={idx}
-                onClick={() => setActiveWorkflowStep(idx + 1)}
-                className={`p-6 rounded-2xl border cursor-pointer transition-all space-y-3 ${
-                  activeWorkflowStep === idx + 1
-                    ? 'bg-slate-900 border-indigo-500 shadow-xl shadow-indigo-500/10'
-                    : 'bg-slate-900/40 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-3xl font-black font-mono text-indigo-400">{item.step}</span>
-                  <span className="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300">
-                    {item.badge}
-                  </span>
+              <div className="font-mono text-[11px] text-slate-400 space-y-2 border-t border-slate-800 pt-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-rose-500 mt-px">✗</span>
+                  <span>GNN trained exclusively on local ledger — no cross-institution edges</span>
                 </div>
-                <h3 className="text-base font-bold text-slate-100">{item.title}</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">{item.desc}</p>
+                <div className="flex items-start gap-2">
+                  <span className="text-rose-500 mt-px">✗</span>
+                  <span>Smurfing detected at single bank is indistinguishable from normal traffic</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-rose-500 mt-px">✗</span>
+                  <span>GDPR Article 9 & banking secrecy laws prohibit raw data sharing</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-rose-500 mt-px">✗</span>
+                  <span>False positive rate: ~31% — significant investigator burden</span>
+                </div>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── SECTION 4: CORE CAPABILITIES (#product) ─────────────────────── */}
-        <section id="product" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-300 text-xs font-mono font-bold uppercase tracking-wider">
-              Enterprise System Capabilities
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              Production-Grade Security & Machine Learning Features
-            </h2>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-center font-bold text-indigo-400 text-xl">
-                🛡️
-              </div>
-              <h3 className="text-lg font-bold text-slate-100">Byzantine Fault Tolerance (Krum)</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Automatically detects and quenches adversarial model gradient poisoning attacks from compromised consortium nodes.
-              </p>
             </div>
 
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center font-bold text-purple-400 text-xl">
-                🔒
+            {/* CFI approach */}
+            <div className="p-6 rounded-xl bg-slate-900/50 border border-indigo-600/30 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-[13px] font-semibold text-slate-200">Federated Consortium Intelligence</h3>
+                <span className="px-2 py-0.5 text-[10px] font-mono text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded">94.2% detection rate</span>
               </div>
-              <h3 className="text-lg font-bold text-slate-100">Hardware TEE Attestation</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Hardware-isolated enclave execution environment verified via Intel Remote Attestation cryptographic signatures.
-              </p>
-            </div>
-
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-3">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center font-bold text-emerald-400 text-xl">
-                📜
+              <div className="font-mono text-[11px] text-slate-400 space-y-2 border-t border-slate-800 pt-4">
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-500 mt-px">✓</span>
+                  <span>Shared GNN embeddings trained on consortium-wide graph topology</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-500 mt-px">✓</span>
+                  <span>Zero raw transaction data leaves any institution's premises</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-500 mt-px">✓</span>
+                  <span>(ε=0.50, δ=1e-5)-DP guarantees plausible deniability on gradient updates</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-emerald-500 mt-px">✓</span>
+                  <span>False positive rate: ~6.1% — investigator efficiency 5× improvement</span>
+                </div>
               </div>
-              <h3 className="text-lg font-bold text-slate-100">Automated FinCEN SAR Filing</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Generates validated XML Suspicious Activity Reports (SAR) with cryptographic sign-off for direct SIEM integration.
-              </p>
             </div>
           </div>
         </section>
 
-        {/* ── SECTION 5: BANK CONSORTIUM PLATFORM MATRIX (#platform) ───────── */}
-        <section id="platform" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-mono font-bold uppercase tracking-wider">
-              Consortium Node Matrix
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              Live Bank Hardware Node Inspector
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-400">
-              Click any consortium bank node below to inspect real-time CPU/GPU hardware specifications and ISO 20022 XML stream logs.
+        {/* ── SECTION 3: WORKFLOW (#how-it-works) ─────────────────────────── */}
+        <section id="how-it-works" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Execution Pipeline</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">End-to-End Federated Training Pipeline</h2>
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              Each federated learning round traverses eight stages — from raw ISO 20022 message ingestion through to FinCEN SAR export. Click any stage to inspect its architecture and code reference.
             </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {Object.values(REAL_BANK_DETAILS).map((bank) => (
-              <div
-                key={bank.id}
-                onClick={() => setActiveBankDrawer(bank)}
-                className="p-6 rounded-3xl bg-slate-900/60 border border-slate-800 hover:border-indigo-500/60 cursor-pointer transition-all space-y-4 group shadow-lg"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-indigo-400">{bank.ticker}</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400">
-                    {bank.latency}
-                  </span>
-                </div>
-                <h3 className="text-base font-bold text-slate-100 group-hover:text-indigo-300 transition-colors">
-                  {bank.name}
-                </h3>
-                <p className="text-xs text-slate-400">{bank.location}</p>
-                <div className="pt-3 border-t border-slate-800/80 text-xs font-mono text-slate-400">
-                  Hardware: <span className="text-slate-200">{bank.hardware}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* ── SECTION 6: TECHNICAL SPECIFICATION MATRIX (#architecture) ───── */}
-        <section id="architecture" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-300 text-xs font-mono font-bold uppercase tracking-wider">
-              System Specification Matrix
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              5-Layer Deep Technical Specification Matrix
-            </h2>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <div className="lg:col-span-5 space-y-3">
-              {[
-                { id: 1, name: 'Layer 1: ISO 20022 XML Intake Engine' },
-                { id: 2, name: 'Layer 2: GNN Subgraph Feature Store' },
-                { id: 3, name: 'Layer 3: Intel SGX & DP Shield' },
-                { id: 4, name: 'Layer 4: Federated Aggregation Core' },
-                { id: 5, name: 'Layer 5: Automated Regulatory SAR Exporter' },
-              ].map((layer) => (
-                <div
-                  key={layer.id}
-                  onClick={() => setActiveLayer(layer.id)}
-                  className={`p-5 rounded-2xl border cursor-pointer transition-all ${
-                    activeLayer === layer.id
-                      ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white border-indigo-500 font-bold shadow-xl shadow-indigo-600/20'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+            {/* Step list */}
+            <div className="lg:col-span-4 space-y-1">
+              {WORKFLOW_STEPS.map(step => (
+                <button
+                  key={step.id}
+                  onClick={() => setActiveWorkflowStep(step.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg border text-left transition-all ${
+                    activeWorkflowStep === step.id
+                      ? 'bg-indigo-600/10 border-indigo-600/40 text-slate-100'
+                      : 'border-transparent hover:bg-slate-900 text-slate-400'
                   }`}
                 >
-                  <span className="text-xs font-mono">{layer.name}</span>
-                </div>
+                  <span className={`shrink-0 w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono font-bold border ${
+                    activeWorkflowStep === step.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'border-slate-700 text-slate-500'
+                  }`}>
+                    {step.id}
+                  </span>
+                  <span className="text-[12px] font-medium">{step.short}</span>
+                </button>
               ))}
             </div>
 
-            <div className="lg:col-span-7 p-7 rounded-3xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-xs font-mono text-indigo-400 uppercase font-bold">LIVE CODE & SPECIFICATION</span>
-                <h3 className="text-lg font-bold text-slate-100 mt-1">
-                  {activeLayer === 1 && 'Native ISO 20022 Financial XML Intake'}
-                  {activeLayer === 2 && 'PyTorch Geometric GNN Embedding Feature Store'}
-                  {activeLayer === 3 && 'Intel SGX Secure Enclave & Paillier Homomorphic Encryption'}
-                  {activeLayer === 4 && 'Byzantine-Robust FedAvg Aggregation Core'}
-                  {activeLayer === 5 && 'Automated SAR XML & Splunk SIEM Integration'}
-                </h3>
-              </div>
-
-              <div className="p-5 rounded-2xl bg-slate-900 font-mono text-xs text-indigo-300 border border-slate-800 overflow-x-auto">
-                {activeLayer === 1 && `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
-  <FIToFICstmrCdtTrf>
-    <GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr>
-    <CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf>
-  </FIToFICstmrCdtTrf>
-</Document>`}
-                {activeLayer === 2 && `import torch_geometric as pyg
-edge_index = pyg.data.Data(x=nodes, edge_index=graph_topology)
-gat_layer = PyG.GATConv(in_channels=512, out_channels=256)`}
-                {activeLayer === 3 && `// Intel SGX Hardware Enclave Call
-sgx_status_t status = ecall_aggregate_encrypted_weights(
-    eid, &retval, ciphertext_a, ciphertext_b, noise_sigma
-);`}
-                {activeLayer === 4 && `def trimmed_mean_fedavg(weight_tensors, beta=0.1):
-    sorted_weights = torch.sort(weight_tensors, dim=0)
-    return torch.mean(sorted_weights[beta:-beta], dim=0)`}
-                {activeLayer === 5 && `<FinCEN_SAR_Export version="2.0">
-  <FilingHeader><FilerID>CFI-PLATFORM-991</FilerID></FilingHeader>
-  <SuspiciousActivity><Amount Ccy="USD">1450000.00</Amount></SuspiciousActivity>
-</FinCEN_SAR_Export>`}
+            {/* Step detail */}
+            <div className="lg:col-span-8 space-y-4">
+              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-4">
+                <div>
+                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
+                  <h3 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h3>
+                </div>
+                <p className="text-[13px] text-slate-400 leading-relaxed border-t border-slate-800 pt-3">
+                  {currentWorkflowStep.description}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {currentWorkflowStep.tech.map(t => (
+                    <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-indigo-300 bg-indigo-600/10 border border-indigo-600/20">{t}</span>
+                  ))}
+                </div>
+                <div className="rounded-lg bg-[#0d0d14] border border-slate-800 p-4 overflow-x-auto">
+                  <pre className="text-[11px] font-mono text-indigo-300 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* ── SECTION 7: HARDWARE SECURITY & PROOFS (#security) ─────────────── */}
-        <section id="security" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-mono font-bold uppercase tracking-wider">
-              Cryptographic Security Guarantees
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              Hardware Security & Differential Privacy Compliance
-            </h2>
+        {/* ── SECTION 4: CAPABILITIES (#product) ──────────────────────────── */}
+        <section id="product" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">System Modules</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Platform Engineering Components</h2>
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              Each module represents a discrete engineering component with defined responsibilities, algorithms, I/O contracts, and technology stack.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-2 font-mono text-xs">
-              <span className="text-slate-500 uppercase font-bold">Enclave Attestation:</span>
-              <div className="text-emerald-400 font-bold text-base">Intel SGX Hardware Verified</div>
-              <p className="text-slate-400 text-xs font-sans">Remote attestation quote validated by Intel Attestation Service (IAS).</p>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Module list */}
+            <div className="lg:col-span-4 space-y-1">
+              {PLATFORM_MODULES.map(mod => (
+                <button
+                  key={mod.id}
+                  onClick={() => setActiveModule(mod)}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border text-left transition-all group ${
+                    activeModule?.id === mod.id
+                      ? 'bg-slate-800 border-slate-600 text-slate-100'
+                      : 'border-transparent hover:bg-slate-900/60 text-slate-400'
+                  }`}
+                >
+                  <div>
+                    <div className="text-[12px] font-medium leading-snug">{mod.name}</div>
+                    <div className="text-[10px] font-mono text-slate-600 mt-0.5">{mod.category}</div>
+                  </div>
+                  <ChevronRight />
+                </button>
+              ))}
             </div>
 
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-2 font-mono text-xs">
-              <span className="text-slate-500 uppercase font-bold">Differential Privacy:</span>
-              <div className="text-purple-400 font-bold text-base">ε = 0.50 (Strict Privacy)</div>
-              <p className="text-slate-400 text-xs font-sans">Gaussian mechanism noise calibrated to bound membership inference attacks.</p>
-            </div>
-
-            <div className="p-7 rounded-3xl bg-slate-900/60 border border-slate-800 space-y-2 font-mono text-xs">
-              <span className="text-slate-500 uppercase font-bold">Regulatory Sign-Off:</span>
-              <div className="text-indigo-400 font-bold text-base">FinCEN SAR Compliant</div>
-              <p className="text-slate-400 text-xs font-sans">Automatic SAR XML export formatted for regulatory compliance endpoints.</p>
-            </div>
+            {/* Module detail */}
+            {activeModule && (
+              <div className="lg:col-span-8 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
+                <div className="flex items-start justify-between border-b border-slate-800 pb-4">
+                  <div>
+                    <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">{activeModule.category}</span>
+                    <h3 className="text-lg font-semibold text-slate-100 mt-0.5">{activeModule.name}</h3>
+                  </div>
+                </div>
+                <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
+                <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
+                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Algorithm</div>
+                    <div className="text-slate-200">{activeModule.algorithm}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
+                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Technology</div>
+                    <div className="text-slate-200">{activeModule.tech}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
+                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Inputs</div>
+                    <div className="text-slate-200">{activeModule.inputs}</div>
+                  </div>
+                  <div className="p-3 rounded-lg bg-[#0d0d14] border border-slate-800">
+                    <div className="text-slate-500 uppercase tracking-wider text-[9px] mb-1">Outputs</div>
+                    <div className="text-slate-200">{activeModule.outputs}</div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </section>
 
-        {/* ── SECTION 8: DEVELOPER API & DOCS (#api, #docs) ────────────────── */}
-        <section id="api" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto space-y-10 border-t border-slate-900">
-          <div id="docs" className="text-center max-w-3xl mx-auto space-y-3">
-            <span className="inline-block px-4 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-mono font-bold uppercase tracking-wider">
-              Developer Documentation & API
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100 leading-tight">
-              Enterprise REST & gRPC API Endpoints
-            </h2>
+        {/* ── SECTION 5: PLATFORM (#platform) ─────────────────────────────── */}
+        <section id="platform" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Consortium Node Registry</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Active Bank Node Inspector</h2>
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              Each participating institution deploys a lightweight bank node agent. Click any node to inspect its hardware configuration, PyTorch runtime, and live ISO 20022 stream activity.
+            </p>
           </div>
 
-          <div className="p-8 rounded-3xl bg-slate-950 border border-slate-800 font-mono text-xs space-y-4 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-4">
-              <span className="text-slate-400 font-bold">cURL REST Endpoint Request:</span>
-              <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold">POST /v1/federation/aggregate</span>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {Object.values(BANK_NODES).map(bank => (
+              <div
+                key={bank.id}
+                onClick={() => setActiveBankDrawer(bank)}
+                className="p-5 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-600 cursor-pointer transition-all group space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    <span className="text-[10px] font-mono text-emerald-500">ACTIVE</span>
+                  </div>
+                  <span className="text-[10px] font-mono text-slate-500">{bank.latency}</span>
+                </div>
+                <div>
+                  <div className="text-[13px] font-medium text-slate-200 group-hover:text-slate-100">{bank.name}</div>
+                  <div className="text-[10px] font-mono text-slate-500 mt-0.5">{bank.ticker}</div>
+                </div>
+                <div className="text-[10px] font-mono text-slate-600 border-t border-slate-800 pt-2.5 leading-relaxed">
+                  {bank.hardware}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── SECTION 6: ARCHITECTURE (#architecture-internal) ─────────────────────── */}
+        <section id="architecture" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">System Design</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Service Layer Map</h2>
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              Click any service node to inspect its responsibilities, communication protocols, and technology stack.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Architecture node list */}
+            <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {ARCH_NODES.map(node => (
+                <button
+                  key={node.id}
+                  onClick={() => setActiveArchNode(node)}
+                  className={`p-4 rounded-lg border text-left transition-all ${
+                    activeArchNode?.id === node.id
+                      ? 'bg-indigo-600/10 border-indigo-600/40'
+                      : 'bg-slate-900/50 border-slate-800 hover:border-slate-600'
+                  }`}
+                >
+                  <div className={`text-[12px] font-medium mb-0.5 ${activeArchNode?.id === node.id ? 'text-indigo-300' : 'text-slate-300'}`}>
+                    {node.label}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-600 leading-snug">{node.tech.slice(0, 2).join(' · ')}</div>
+                </button>
+              ))}
             </div>
-            <pre className="text-indigo-300 overflow-x-auto leading-relaxed">
-{`curl -X POST https://api.cfi-platform.com/v1/federation/aggregate \\
-  -H "Authorization: Bearer cfi_sec_key_991823" \\
+
+            {/* Architecture node detail */}
+            {activeArchNode && (
+              <div className="lg:col-span-7 p-6 rounded-xl bg-slate-900 border border-slate-800 space-y-5">
+                <div className="border-b border-slate-800 pb-4">
+                  <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider mb-0.5">Service Component</div>
+                  <h3 className="text-base font-semibold text-slate-100">{activeArchNode.label}</h3>
+                  <p className="text-[13px] text-slate-400 mt-2 leading-relaxed">{activeArchNode.description}</p>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-[11px] font-mono">
+                  <div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Responsibilities</div>
+                    <ul className="space-y-1">
+                      {activeArchNode.responsibilities.map(r => (
+                        <li key={r} className="text-slate-300 flex items-center gap-1.5"><span className="text-indigo-500">·</span>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Protocols</div>
+                    <ul className="space-y-1">
+                      {activeArchNode.protocols.map(p => (
+                        <li key={p} className="text-slate-300 flex items-center gap-1.5"><span className="text-purple-500">·</span>{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-2">Technology</div>
+                    <ul className="space-y-1">
+                      {activeArchNode.tech.map(t => (
+                        <li key={t} className="text-slate-300 flex items-center gap-1.5"><span className="text-cyan-500">·</span>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* ── SECTION 7: SECURITY (#security) ─────────────────────────────── */}
+        <section id="security" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Security Model</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">Privacy &amp; Trust Boundary Model</h2>
+          </div>
+
+          <div className="flex gap-2 border-b border-slate-800 pb-0 mb-6">
+            {[
+              { id: 'flow', label: 'Data Flow' },
+              { id: 'threat', label: 'Threat Model' },
+              { id: 'compliance', label: 'Compliance' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActivePrivacyTab(tab.id as 'flow' | 'threat' | 'compliance')}
+                className={`px-4 py-2 text-[12px] font-medium border-b-2 transition-colors -mb-px ${
+                  activePrivacyTab === tab.id
+                    ? 'border-indigo-500 text-indigo-300'
+                    : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activePrivacyTab === 'flow' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Inside Bank Perimeter</div>
+                <div className="space-y-2 font-mono text-[11px] text-slate-400">
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Raw transaction records</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Customer PII</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Account balances</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Local GNN graph</div>
+                </div>
+                <div className="text-[10px] text-rose-500 font-mono">← Never transmitted externally</div>
+              </div>
+              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">Transmitted (DP-Noised)</div>
+                <div className="space-y-2 font-mono text-[11px] text-slate-400">
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">DP-noised gradient tensors</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Paillier ciphertexts</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Round participation flags</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">HSM-signed commitments</div>
+                </div>
+                <div className="text-[10px] text-emerald-500 font-mono">← (ε=0.50, δ=1e-5)-DP bounded</div>
+              </div>
+              <div className="p-5 rounded-xl bg-slate-900 border border-slate-800 space-y-3">
+                <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider">SGX Enclave (Hardware Isolated)</div>
+                <div className="space-y-2 font-mono text-[11px] text-slate-400">
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">HE aggregation only</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">IAS attestation verified</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">Encrypted memory pages</div>
+                  <div className="p-2 rounded bg-slate-950 border border-slate-800">No external network access</div>
+                </div>
+                <div className="text-[10px] text-purple-500 font-mono">← Hardware trust boundary</div>
+              </div>
+            </div>
+          )}
+
+          {activePrivacyTab === 'threat' && (
+            <div className="space-y-3">
+              {[
+                { threat: 'Gradient Inversion Attack', mitigation: 'Gaussian DP noise (σ calibrated to ε=0.50) makes gradient inversion computationally infeasible. Clipping bound C=1.0.', severity: 'Mitigated' },
+                { threat: 'Byzantine Gradient Poisoning', mitigation: 'Krum + Trimmed Mean Byzantine-robust aggregation neutralises up to f < n/2 compromised nodes per round.', severity: 'Mitigated' },
+                { threat: 'Coordinator Compromise', mitigation: 'Intel SGX TEE handles aggregation. Coordinator sees only ciphertexts; plaintext gradients are never accessible outside enclave.', severity: 'Mitigated' },
+                { threat: 'Membership Inference', mitigation: 'RDP accountant tracks cumulative budget. Training halted when ε threshold exceeded. Per-sample clipping prevents memorisation.', severity: 'Mitigated' },
+                { threat: 'Model Extraction', mitigation: 'Global model is distributed only to authenticated bank nodes over mTLS. No external inference endpoint is exposed.', severity: 'Mitigated' },
+              ].map(row => (
+                <div key={row.threat} className="flex items-start gap-4 p-4 rounded-lg bg-slate-900 border border-slate-800">
+                  <div className="w-40 shrink-0">
+                    <div className="text-[11px] font-medium text-rose-400">{row.threat}</div>
+                    <div className="text-[10px] font-mono text-emerald-500 mt-0.5">{row.severity}</div>
+                  </div>
+                  <div className="text-[11px] text-slate-400 font-mono leading-relaxed">{row.mitigation}</div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activePrivacyTab === 'compliance' && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {[
+                { standard: 'GDPR Article 25', status: 'Privacy by Design', detail: 'DP guarantees built into training pipeline. No PII ever leaves institution.' },
+                { standard: 'FinCEN SAR Regulation', status: 'Compliant', detail: 'Automated SAR XML generation with cryptographic sign-off and audit trail.' },
+                { standard: 'EU AML Directive 6AMLD', status: 'Compliant', detail: 'Cross-border pattern detection via federated architecture without data transfer.' },
+                { standard: 'NIST SP 800-188', status: 'Aligned', detail: 'De-identification through differential privacy following NIST de-ID standard.' },
+                { standard: 'ISO 20022', status: 'Native', detail: 'pacs.008 and camt.053 message formats parsed natively by Bank Connector.' },
+                { standard: 'SOC 2 Type II', status: 'In Progress', detail: 'Audit logging, access controls, and telemetry pipeline support SOC 2 criteria.' },
+              ].map(row => (
+                <div key={row.standard} className="p-4 rounded-lg bg-slate-900 border border-slate-800 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-mono text-slate-300">{row.standard}</span>
+                    <span className="text-[10px] font-mono text-emerald-400">{row.status}</span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">{row.detail}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* ── SECTION 8: API & DOCS (#api, #docs) ─────────────────────────── */}
+        <section id="api" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-slate-800/60 space-y-8">
+          <div id="docs" className="max-w-2xl">
+            <div className="text-[11px] font-mono text-slate-500 uppercase tracking-widest mb-3">Developer API</div>
+            <h2 className="text-2xl sm:text-3xl font-bold text-slate-100 leading-tight mb-4">REST API & Connector SDK</h2>
+            <p className="text-slate-400 text-[14px] leading-relaxed">
+              The CF-Intelligence platform exposes a REST API for coordinator control, a WebSocket stream for real-time telemetry, and a Bank Connector SDK for onboarding new institutions.
+            </p>
+          </div>
+
+          {/* API tab switcher */}
+          <div className="flex gap-1 p-1 bg-slate-900 border border-slate-800 rounded-lg w-fit">
+            {[
+              { id: 'curl', label: 'cURL' },
+              { id: 'python', label: 'Python' },
+              { id: 'ts', label: 'TypeScript' },
+            ].map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveApiTab(tab.id as 'curl' | 'python' | 'ts')}
+                className={`px-4 py-1.5 text-[12px] font-mono rounded-md transition-all ${
+                  activeApiTab === tab.id
+                    ? 'bg-slate-700 text-slate-100'
+                    : 'text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="rounded-xl bg-[#0d0d14] border border-slate-800 p-5 overflow-x-auto">
+            <pre className="text-[12px] font-mono text-indigo-200 leading-relaxed whitespace-pre">
+              {activeApiTab === 'curl' && `# Trigger a new federated learning round
+curl -X POST https://api.cfi-platform.com/v1/rounds \\
+  -H "Authorization: Bearer cfi_api_key_991823" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "round_id": 47,
-    "enclave_quote": "0x98F1A2...",
-    "gradient_tensor_hash": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-  }'`}
+    "consortium_id": "cfi-prod-001",
+    "node_ids": ["jpmorgan-01", "hsbc-02", "deutsche-03"],
+    "privacy_config": {"epsilon": 0.50, "delta": 1e-5},
+    "aggregation": "krum",
+    "max_round_duration_s": 300
+  }'
+
+# Stream live telemetry via WebSocket
+wscat -c wss://api.cfi-platform.com/v1/telemetry \\
+  -H "Authorization: Bearer cfi_api_key_991823"`}
+              {activeApiTab === 'python' && `from cfi_sdk import CFIClient
+
+client = CFIClient(api_key="cfi_api_key_991823")
+
+# Configure a bank connector
+connector = client.connectors.create(
+    bank_id="jpmorgan-01",
+    iso20022_endpoint="kafka://jpm-kafka:9092/pacs008",
+    privacy={"epsilon": 0.50, "delta": 1e-5},
+    hardware="nvidia-h100",
+)
+
+# Trigger federated round and stream results
+round_ = client.rounds.start(
+    consortium_id="cfi-prod-001",
+    node_ids=["jpmorgan-01", "hsbc-02", "deutsche-03"],
+)
+
+for event in client.rounds.stream(round_.id):
+    print(f"Round {event.round_id}: {event.stage} — {event.accuracy:.3f}")`}
+              {activeApiTab === 'ts' && `import { CFIClient } from '@cfi/sdk';
+
+const client = new CFIClient({ apiKey: 'cfi_api_key_991823' });
+
+// Start federated round
+const round = await client.rounds.start({
+  consortiumId: 'cfi-prod-001',
+  nodeIds: ['jpmorgan-01', 'hsbc-02', 'deutsche-03'],
+  privacyConfig: { epsilon: 0.50, delta: 1e-5 },
+  aggregation: 'krum',
+});
+
+// Listen to real-time events
+const ws = client.telemetry.subscribe(round.id);
+ws.on('round.stage', (event) => {
+  console.log(\`Stage: \${event.stage}, Accuracy: \${event.accuracy}\`);
+});`}
             </pre>
+          </div>
+
+          {/* API endpoints table */}
+          <div className="rounded-xl border border-slate-800 overflow-hidden">
+            <div className="px-4 py-3 bg-slate-900 border-b border-slate-800">
+              <span className="text-[11px] font-mono text-slate-400">API Endpoints</span>
+            </div>
+            <table className="w-full text-[11px] font-mono">
+              <tbody>
+                {[
+                  { method: 'POST', path: '/v1/rounds', desc: 'Trigger a new federated learning round' },
+                  { method: 'GET', path: '/v1/rounds/:id', desc: 'Get round status and metrics' },
+                  { method: 'GET', path: '/v1/nodes', desc: 'List consortium bank nodes' },
+                  { method: 'POST', path: '/v1/connectors', desc: 'Register new bank connector' },
+                  { method: 'GET', path: '/v1/reports/sar', desc: 'Retrieve FinCEN SAR exports' },
+                  { method: 'WS', path: '/v1/telemetry', desc: 'Real-time round telemetry stream' },
+                ].map(row => (
+                  <tr key={row.path} className="border-b border-slate-800/60 hover:bg-slate-900/50">
+                    <td className="px-4 py-3 w-16">
+                      <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                        row.method === 'GET' ? 'bg-sky-600/10 text-sky-400' :
+                        row.method === 'POST' ? 'bg-emerald-600/10 text-emerald-400' :
+                        'bg-purple-600/10 text-purple-400'
+                      }`}>
+                        {row.method}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-indigo-300">{row.path}</td>
+                    <td className="px-4 py-3 text-slate-500">{row.desc}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </section>
 
-        {/* ── FOOTER & CALL TO ACTION ────────────────────────────────────── */}
-        <footer className="py-14 border-t border-slate-900 bg-slate-950/80 backdrop-blur-2xl">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 flex flex-col md:flex-row items-center justify-between gap-6 text-xs text-slate-400 font-mono">
+        {/* ── FOOTER ──────────────────────────────────────────────────────── */}
+        <footer className="border-t border-slate-800/60 py-10 px-4 sm:px-6">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <CfiBrandLogo className="w-8 h-8" />
-              <span className="font-bold text-slate-200">Collaborative Fraud Intelligence (CFI) Simulator v2.4.0</span>
+              <BrandLogo className="w-7 h-7" />
+              <div>
+                <div className="text-[12px] font-semibold text-slate-300">CF-Intelligence v2.4.0</div>
+                <div className="text-[11px] font-mono text-slate-600">Privacy-Preserving Federated Fraud Intelligence</div>
+              </div>
             </div>
-            <div>
-              <span>© 2026 CFI Consortium • Privacy-Preserving Financial Machine Learning</span>
+            <div className="flex items-center gap-4 text-[11px] font-mono text-slate-600">
+              <span>PyTorch · Intel SGX · ISO 20022 · FinCEN SAR</span>
             </div>
-            <div>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-pink-600 text-white font-bold text-xs transition-all cursor-pointer shadow-lg"
-              >
-                Launch Live Platform Demo
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[12px] font-medium text-slate-100 bg-indigo-600 hover:bg-indigo-500 transition-colors cursor-pointer"
+            >
+              Open Platform <ArrowRight />
+            </button>
           </div>
         </footer>
 
-        {/* ── BANK INSPECTOR DRAWER (SLIDING OVERLAY) ──────────────── */}
+        {/* ── BANK NODE INSPECTOR DRAWER ───────────────────────────────── */}
         <AnimatePresence>
           {activeBankDrawer && (
             <motion.div
@@ -746,53 +943,53 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setActiveBankDrawer(null)}
-              className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex justify-end"
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-end"
             >
               <motion.div
                 initial={{ x: '100%' }}
                 animate={{ x: 0 }}
                 exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 25 }}
-                onClick={(e) => e.stopPropagation()}
-                className="w-full sm:max-w-xl bg-slate-900 border-l border-slate-800 p-6 sm:p-8 overflow-y-auto space-y-6"
+                transition={{ type: 'spring', damping: 28, stiffness: 200 }}
+                onClick={e => e.stopPropagation()}
+                className="w-full max-w-lg bg-[#0f0f18] border-l border-slate-800 p-6 overflow-y-auto space-y-5"
               >
-                <div className="flex items-center justify-between border-b border-slate-800 pb-4">
+                <div className="flex items-start justify-between border-b border-slate-800 pb-5">
                   <div>
-                    <span className="text-xs font-mono font-bold text-indigo-400 uppercase">
-                      REAL BANK HARDWARE NODE • {activeBankDrawer.ticker}
-                    </span>
-                    <h3 className="text-lg sm:text-xl font-bold text-slate-100">{activeBankDrawer.name}</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">{activeBankDrawer.location}</p>
+                    <div className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">Bank Node Inspector</div>
+                    <h3 className="text-base font-semibold text-slate-100 mt-1">{activeBankDrawer.name}</h3>
+                    <div className="text-[11px] font-mono text-slate-500 mt-0.5">{activeBankDrawer.location}</div>
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
-                    className="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-bold text-slate-300"
+                    className="px-3 py-1.5 rounded-lg text-[11px] font-mono bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-100"
                   >
-                    Close ✖
+                    close
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 text-xs font-mono">
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500">Hardware Accelerator:</span>
-                    <div className="text-indigo-300 font-bold mt-1 truncate">{activeBankDrawer.hardware}</div>
-                  </div>
-                  <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500">Host Memory & Latency:</span>
-                    <div className="text-emerald-300 font-bold mt-1">
-                      {activeBankDrawer.ram} ({activeBankDrawer.latency})
+                <div className="grid grid-cols-2 gap-2 font-mono text-[11px]">
+                  {[
+                    { k: 'Ticker', v: activeBankDrawer.ticker },
+                    { k: 'Latency', v: activeBankDrawer.latency },
+                    { k: 'Hardware', v: activeBankDrawer.hardware },
+                    { k: 'Host RAM', v: activeBankDrawer.ram },
+                    { k: 'PyTorch', v: activeBankDrawer.pytorch },
+                    { k: 'Status', v: 'ACTIVE — Round Participant' },
+                  ].map(row => (
+                    <div key={row.k} className="p-3 rounded-lg bg-slate-950 border border-slate-800">
+                      <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-0.5">{row.k}</div>
+                      <div className="text-slate-200 truncate">{row.v}</div>
                     </div>
-                  </div>
+                  ))}
                 </div>
 
                 <div>
-                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">
-                    Live ISO 20022 Stream Logs
-                  </h4>
-                  <div className="p-4 rounded-2xl bg-slate-950 font-mono text-[11px] text-slate-300 border border-slate-800 space-y-2 overflow-x-auto">
-                    {activeBankDrawer.xmlLogs.map((log, idx) => (
-                      <div key={idx} className="leading-relaxed border-b border-slate-900 pb-2">
-                        <span className="text-indigo-400 font-bold">[LOG-{idx + 1}]</span> {log}
+                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2">ISO 20022 Stream Activity</div>
+                  <div className="rounded-lg bg-slate-950 border border-slate-800 p-4 space-y-3 font-mono text-[10px] text-slate-400 overflow-x-auto">
+                    {activeBankDrawer.xmlLogs.map((log, i) => (
+                      <div key={i} className="flex items-start gap-2 border-b border-slate-900 pb-2 last:border-0 last:pb-0">
+                        <span className="text-indigo-600 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
+                        <span className="break-all leading-relaxed">{log}</span>
                       </div>
                     ))}
                   </div>
