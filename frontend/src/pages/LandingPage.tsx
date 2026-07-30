@@ -106,6 +106,21 @@ const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
       'CPU threadpool gradient accumulation steps = 2. Straggler delay quenched.',
     ],
   },
+  sgx: {
+    id: 'sgx',
+    name: 'Intel SGX Hardware TEE Enclave',
+    ticker: 'HARDWARE TEE',
+    location: 'Consortium Secure Vault Node',
+    hardware: 'Intel SGX Enclave v2 (Hardware Isolation)',
+    ram: '256 GB Enclave Page Cache (EPC)',
+    pytorch: 'C++ Native LibTorch Enclave Runtime',
+    latency: '0.2 ms',
+    xmlLogs: [
+      'Intel SGX Attestation Verification: SUCCESS (Cryptographic Proof Verified).',
+      'Homomorphic Sum Aggregation executed: [[W_global]] = Sum([[W_jpm]], [[W_hsbc]], [[W_db]]).',
+      'Differential Privacy Gaussian noise injected (ε=0.50, δ=1e-5). Model parameters published.',
+    ],
+  },
 };
 
 // Graph Node Telemetry Inspector Interface
@@ -131,7 +146,7 @@ const GRAPH_NODES_DATA: Record<string, GraphNodeDetail> = {
   offramp: { id: 'CRYPTO-OFFRAMP', name: 'Crypto Exchange Offramp', bank: 'Unregulated Offramp', riskScore: 0.98, velocity: '890 tx/min', anomalyIndex: 'SEVERE (0.99)', status: 'ISOLATED', description: 'Ultimate illicit exit node converting fiat to unhosted wallets.' },
 };
 
-// Live Palantir/CrowdStrike Telemetry Log Feed Items
+// Live Telemetry Log Feed Items
 const LIVE_LOG_FEED = [
   'JPMorgan Chase Node completed Local Epoch 3/3 (Loss: 0.0381)',
   'HSBC Holdings Node generated Paillier Homomorphic Ciphertext [[W_hsbc]]',
@@ -212,7 +227,7 @@ export default function LandingPage() {
   // Track active section on scroll
   useEffect(() => {
     const handleScroll = () => {
-      const sections = ['hero', 'how-it-works', 'product', 'platform', 'architecture', 'security', 'api', 'docs'];
+      const sections = ['hero', 'problem-solution', 'how-it-works', 'product', 'platform', 'architecture', 'security', 'api', 'docs'];
       const scrollPosition = window.scrollY + 200;
 
       for (const sectionId of sections) {
@@ -334,7 +349,7 @@ export default function LandingPage() {
     };
   }, []);
 
-  // 60FPS Hero Canvas Engine
+  // 60FPS Hero 3D Isometric Packet Cable Canvas Engine
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -343,21 +358,24 @@ export default function LandingPage() {
 
     let animationFrameId: number;
     let width = (canvas.width = canvas.parentElement?.clientWidth || 600);
-    let height = (canvas.height = canvas.parentElement?.clientHeight || 480);
+    let height = (canvas.height = canvas.parentElement?.clientHeight || 520);
 
     const handleResize = () => {
       if (!canvas) return;
       width = canvas.width = canvas.parentElement?.clientWidth || 600;
-      height = canvas.height = canvas.parentElement?.clientHeight || 480;
+      height = canvas.height = canvas.parentElement?.clientHeight || 520;
     };
     window.addEventListener('resize', handleResize);
 
     const isMobile = width < 640;
+    // 3D Isometric Projection Positions for 4 Bank Platforms + Center Enclave Core
+    const center = { x: width * 0.5, y: height * 0.5 };
     const nodes = {
-      jpm: { x: isMobile ? width * 0.8 : width * 0.78, y: 70, color: '#6366f1', label: 'pacs.008 ($1.45M)' },
-      hsbc: { x: isMobile ? width * 0.8 : width * 0.78, y: 240, color: '#a855f7', label: 'pacs.008 (£890K)' },
-      db: { x: isMobile ? width * 0.8 : width * 0.78, y: 410, color: '#10b981', label: 'camt.053 (€650K)' },
-      core: { x: isMobile ? width * 0.22 : width * 0.22, y: 240, color: '#ec4899', label: '[[W_global]]' },
+      jpm: { x: isMobile ? width * 0.22 : width * 0.22, y: height * 0.25, color: '#6366f1', label: 'pacs.008 ($1.45M)' },
+      hsbc: { x: isMobile ? width * 0.78 : width * 0.78, y: height * 0.25, color: '#ef4444', label: 'pacs.008 (£890K)' },
+      sgx: { x: isMobile ? width * 0.22 : width * 0.22, y: height * 0.75, color: '#a855f7', label: '[[W_sgx]]' },
+      db: { x: isMobile ? width * 0.78 : width * 0.78, y: height * 0.75, color: '#38bdf8', label: 'camt.053 (€650K)' },
+      core: { x: center.x, y: center.y, color: '#ec4899', label: '[[W_global]]' },
     };
 
     const particles: Array<{
@@ -373,7 +391,7 @@ export default function LandingPage() {
       label: string;
     }> = [];
 
-    const createParticle = (from: 'jpm' | 'hsbc' | 'db', isUpload: boolean) => {
+    const createParticle = (from: 'jpm' | 'hsbc' | 'sgx' | 'db', isUpload: boolean) => {
       const bank = nodes[from];
       const core = nodes.core;
 
@@ -400,13 +418,13 @@ export default function LandingPage() {
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // Connection Bezier Fiber Cables
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 6]);
+      // 3D Isometric Laser Fiber Connection Lines
+      ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 8]);
 
-      ['jpm', 'hsbc', 'db'].forEach((key) => {
+      ['jpm', 'hsbc', 'sgx', 'db'].forEach((key) => {
         const n = nodes[key as keyof typeof nodes];
-        ctx.strokeStyle = n.color + '70';
+        ctx.strokeStyle = n.color + '80';
         ctx.beginPath();
         ctx.moveTo(n.x, n.y);
         ctx.lineTo(nodes.core.x, nodes.core.y);
@@ -416,21 +434,23 @@ export default function LandingPage() {
       ctx.setLineDash([]);
 
       // Continuously spawn ISO 20022 XML packet tags
-      if (isPlaying && tick % 14 === 0) {
+      if (isPlaying && tick % 16 === 0) {
         if (flPhase === 1 || flPhase === 0) {
           createParticle('jpm', true);
           createParticle('hsbc', true);
+          createParticle('sgx', true);
           createParticle('db', true);
         } else {
           createParticle('jpm', false);
           createParticle('hsbc', false);
+          createParticle('sgx', false);
           createParticle('db', false);
         }
       }
 
       // Shockwave in Phase 2
       if (flPhase === 2) {
-        const shockRadius = (tick % 30) * 3;
+        const shockRadius = (tick % 30) * 3.5;
         ctx.strokeStyle = '#ec489980';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -438,7 +458,7 @@ export default function LandingPage() {
         ctx.stroke();
       }
 
-      // Draw active packet stream tags
+      // Draw active 3D packet stream tags
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         if (!p) continue;
@@ -450,9 +470,9 @@ export default function LandingPage() {
         // Render Packet Badge
         ctx.fillStyle = '#0f172a';
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.roundRect(p.x - 38, p.y - 10, 76, 20, 6);
+        ctx.roundRect(p.x - 42, p.y - 11, 84, 22, 6);
         ctx.fill();
         ctx.stroke();
 
@@ -651,7 +671,8 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
       {/* ── FLOATING QUICK-NAV DOCK (RIGHT SIDEBAR) ───────────── */}
       <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
         {[
-          { id: 'hero', label: 'Hero Overview' },
+          { id: 'hero', label: '3D Architecture Engine' },
+          { id: 'problem-solution', label: 'The Core Problem' },
           { id: 'how-it-works', label: 'How It Works' },
           { id: 'product', label: 'Privacy Engine' },
           { id: 'platform', label: 'GNN Graph Collusion' },
@@ -714,6 +735,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
 
             {/* Desktop Navigation Links */}
             <nav className="hidden lg:flex items-center gap-6 text-xs font-semibold text-slate-300 bg-slate-900/60 border border-slate-800/80 rounded-full px-5 py-2 backdrop-blur-md shadow-inner">
+              <a href="#problem-solution" className="hover:text-indigo-400 transition-colors">The Problem</a>
               <a href="#how-it-works" className="hover:text-indigo-400 transition-colors">How It Works</a>
               <a href="#product" className="hover:text-indigo-400 transition-colors">Product</a>
               <a href="#platform" className="hover:text-indigo-400 transition-colors">Platform</a>
@@ -763,6 +785,9 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               className="lg:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
+                <a href="#problem-solution" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
+                  The Problem & Solution
+                </a>
                 <a href="#how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   How It Works
                 </a>
@@ -800,7 +825,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           )}
         </AnimatePresence>
 
-        {/* ── SECTION 2: SCREEN-CENTERED HERO WITH CRYSTAL-CLEAR STORYTELLING ── */}
+        {/* ── SECTION 2: SCREEN-CENTERED HERO WITH PURE CODE 3D ISOMETRIC TOPOLOGY ENGINE ── */}
         <section id="hero" className="min-h-[calc(100vh-6rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
@@ -873,10 +898,10 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                   <ArrowRightIcon />
                 </button>
                 <a
-                  href="#how-it-works"
+                  href="#problem-solution"
                   className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition-all"
                 >
-                  How It Works ↓
+                  The Problem & Solution ↓
                 </a>
               </motion.div>
 
@@ -906,23 +931,23 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </motion.div>
             </div>
 
-            {/* ── RIGHT COLUMN: PURE CODE-DRIVEN SERVER HARDWARE CHASSIS ── */}
-            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
-              {/* Canvas Physics Overlay */}
+            {/* ── RIGHT COLUMN: PURE CODE 3D ISOMETRIC NETWORK TOPOLOGY ENGINE (MATCHING USER SCREENSHOT) ── */}
+            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/30 bg-gradient-to-b from-slate-900/95 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
+              {/* Canvas Physics 3D Laser Overlay */}
               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
 
               {/* Component Purpose Callout Banner */}
               <div className="relative z-10 p-2.5 rounded-xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-[10px] text-indigo-200">
-                <span className="font-bold text-indigo-400 block mb-0.5">💡 PROJE AMACI (PROJECT IMPACT):</span>
-                JPMorgan Chase, HSBC ve Deutsche Bank kendi sunucularında yerel model eğitir. Müşteri verileri kesinlikle banka dışına çıkmaz.
+                <span className="font-bold text-indigo-400 block mb-0.5">💡 3D ISOMETRIC TOPOLOGY ENGINE (PROJE AMACI):</span>
+                JPMorgan Chase, HSBC, Deutsche Bank ve Intel SGX Enclave merkezdeki 3D işlemci çipine şifreli model katmanları taşır.
               </div>
 
               {/* Status Header */}
-              <div className="relative z-10 flex items-center justify-between py-2 border-b border-slate-800/80">
+              <div className="relative z-10 flex items-center justify-between py-1 border-b border-slate-800/80">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300">
-                    REAL BANK SERVER HARDWARE CHASSIS (PURE CODE)
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300 uppercase">
+                    3D ISOMETRIC NETWORK CHASSIS (PURE CODE)
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -942,169 +967,120 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
                 </div>
               </div>
 
-              {/* Pure Code Hardware Grid */}
-              <div className="relative z-10 w-full h-full flex items-center justify-between gap-4 my-2">
-                {/* Left: Intel SGX Hardware Enclave Vault (Pure Code) */}
+              {/* PURE CODE 3D ISOMETRIC NETWORK TOPOLOGY CONTAINER (MATCHING USER SCREENSHOT) */}
+              <div className="relative z-10 w-full h-[360px] my-auto flex items-center justify-center">
+                {/* CENTER: 3D ISOMETRIC ENCLAVE PROCESSOR CHIP */}
                 <motion.div
-                  whileHover={{ scale: 1.03 }}
-                  className={`relative p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 transition-all duration-300 text-center w-48 z-10 flex flex-col justify-between h-[320px] shadow-2xl ${
-                    flPhase === 2
-                      ? 'border-emerald-400 shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
-                      : 'border-indigo-500/60 shadow-xl shadow-indigo-500/30'
-                  }`}
+                  animate={{ scale: [1, 1.05, 1], rotate: [0, 1, 0] }}
+                  transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute z-20 w-32 h-32 rounded-2xl bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-950 border-2 border-indigo-400 p-2 shadow-2xl shadow-indigo-500/50 flex flex-col items-center justify-center cursor-pointer"
+                  style={{
+                    transform: 'rotateX(50deg) rotateZ(-45deg)',
+                    boxShadow: '0 20px 50px rgba(99, 102, 241, 0.4), inset 0 0 20px rgba(99, 102, 241, 0.3)',
+                  }}
                 >
-                  {/* Vault Header Bar */}
-                  <div className="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <div className="flex items-center gap-1">
-                      <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-                      <span className="text-[9px] font-mono font-bold text-emerald-400">SGX TEE SHIELD</span>
-                    </div>
-                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[8px] font-mono font-black border border-emerald-500/30">
-                      SECURE
-                    </span>
+                  {/* Golden Micro Pins around chip */}
+                  <div className="absolute -inset-1 rounded-2xl border border-amber-400/40 pointer-events-none" />
+                  <div className="w-14 h-14 rounded-xl bg-indigo-600/20 border border-indigo-400 flex items-center justify-center shadow-inner relative">
+                    <span className="text-2xl animate-pulse">🛰️</span>
+                    <div className="absolute inset-0 rounded-xl border border-cyan-400 animate-ping opacity-30" />
                   </div>
-
-                  {/* Rotating Cybernetic Shield Core (SVG) */}
-                  <div className="my-auto py-2 relative flex items-center justify-center">
-                    <div className="w-24 h-24 rounded-full border-2 border-indigo-500/40 flex items-center justify-center relative bg-indigo-950/20">
-                      <div className="absolute inset-0 rounded-full border-2 border-dashed border-cyan-400 animate-spin" style={{ animationDuration: '12s' }} />
-                      <div className="h-16 w-16 rounded-full bg-indigo-500/10 border border-indigo-400 flex items-center justify-center text-2xl shadow-inner">
-                        🛰️
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Enclave Hardware Telemetry */}
-                  <div className="text-left w-full space-y-1.5 font-mono text-[9px]">
-                    <div className="flex justify-between text-slate-400">
-                      <span>Memory Vault Shield</span>
-                      <span className="text-emerald-400 font-bold">100% Protected</span>
-                    </div>
-                    <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                      <div className="h-full bg-emerald-400 w-full" />
-                    </div>
-                    <div className="py-1 px-2 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-bold text-center mt-1">
-                      {flPhase === 2 ? '⚡ Aggregating Tensors...' : 'FedAvg Core Active'}
-                    </div>
-                  </div>
+                  <span className="text-[10px] font-mono font-black text-indigo-300 mt-2 tracking-wider">
+                    ENCLAVE CORE
+                  </span>
+                  <span className="text-[8px] font-mono text-emerald-400 font-bold">Intel SGX TEE</span>
                 </motion.div>
 
-                {/* Right: Stack of 3 Pure Code Datacenter Server Blades */}
-                <div className="flex flex-col justify-between h-full py-1 space-y-2 w-56 sm:w-64 z-10">
-                  {/* Real Code Server Blade 1: JPMorgan Chase */}
-                  <motion.div
-                    whileHover={{ scale: 1.03 }}
-                    onClick={() => REAL_BANK_DETAILS.jpmorgan && setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan)}
-                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
-                      flPhase === 0
-                        ? 'border-indigo-400 shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-500/50'
-                        : 'border-indigo-500/40 hover:border-indigo-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <FanSpinner />
-                        <span className="text-[9px] font-mono font-bold text-indigo-400 truncate">JPMORGAN CHASE 🗽</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      </div>
+                {/* 4 SURROUNDING 3D ISOMETRIC BANK PLATFORMS (PROJECTION) */}
+                {/* 1. TOP-LEFT: JPMorgan Chase Platform */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => REAL_BANK_DETAILS.jpmorgan && setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan)}
+                  className="absolute top-2 left-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-indigo-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-indigo-400 transition-all"
+                  style={{
+                    transform: 'rotateX(40deg) rotateZ(-30deg)',
+                    boxShadow: '0 15px 30px rgba(99, 102, 241, 0.25)',
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                    <div className="flex items-center gap-1">
+                      <FanSpinner />
+                      <span className="text-[10px] font-mono font-bold text-indigo-400">JPMORGAN CHASE 🗽</span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
-                      <span>NVIDIA A100 (80GB)</span>
-                      <span className="text-indigo-300 font-mono text-[9px]">0.8ms</span>
-                    </div>
-                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
-                      <div className="flex justify-between text-slate-400">
-                        <span>CUDA Utilization</span>
-                        <span className="text-indigo-400 font-bold">{cudaJpm}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-indigo-500 to-cyan-400 transition-all duration-500" style={{ width: `${cudaJpm}%` }} />
-                      </div>
-                    </div>
-                  </motion.div>
+                    <span className="h-2 w-2 rounded-full bg-cyan-400 animate-ping" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-300">NVIDIA A100 (80GB)</div>
+                  <div className="text-[9px] font-mono text-indigo-300">CUDA: {cudaJpm}%</div>
+                </motion.div>
 
-                  {/* Real Code Server Blade 2: HSBC Holdings */}
-                  <motion.div
-                    whileHover={{ scale: 1.03 }}
-                    onClick={() => REAL_BANK_DETAILS.hsbc && setActiveBankDrawer(REAL_BANK_DETAILS.hsbc)}
-                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
-                      flPhase === 0
-                        ? 'border-purple-400 shadow-lg shadow-purple-500/30 ring-2 ring-purple-500/50'
-                        : 'border-purple-500/40 hover:border-purple-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <FanSpinner />
-                        <span className="text-[9px] font-mono font-bold text-purple-400 truncate">HSBC HOLDINGS 🏛️</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-purple-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-pink-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      </div>
+                {/* 2. TOP-RIGHT: HSBC Holdings Platform */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => REAL_BANK_DETAILS.hsbc && setActiveBankDrawer(REAL_BANK_DETAILS.hsbc)}
+                  className="absolute top-2 right-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-rose-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-rose-400 transition-all"
+                  style={{
+                    transform: 'rotateX(40deg) rotateZ(30deg)',
+                    boxShadow: '0 15px 30px rgba(239, 68, 68, 0.25)',
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-xs">🔴</span>
+                      <span className="text-[10px] font-mono font-bold text-rose-400">HSBC HOLDINGS 🏛️</span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
-                      <span>NVIDIA H100 SXM</span>
-                      <span className="text-purple-300 font-mono text-[9px]">1.4ms</span>
-                    </div>
-                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
-                      <div className="flex justify-between text-slate-400">
-                        <span>CUDA Utilization</span>
-                        <span className="text-purple-400 font-bold">{cudaHsbc}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-purple-500 to-pink-400 transition-all duration-500" style={{ width: `${cudaHsbc}%` }} />
-                      </div>
-                    </div>
-                  </motion.div>
+                    <span className="h-2 w-2 rounded-full bg-rose-400 animate-ping" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-300">NVIDIA H100 SXM</div>
+                  <div className="text-[9px] font-mono text-rose-300">CUDA: {cudaHsbc}%</div>
+                </motion.div>
 
-                  {/* Real Code Server Blade 3: Deutsche Bank */}
-                  <motion.div
-                    whileHover={{ scale: 1.03 }}
-                    onClick={() => REAL_BANK_DETAILS.deutsche && setActiveBankDrawer(REAL_BANK_DETAILS.deutsche)}
-                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 ${
-                      flPhase === 0
-                        ? 'border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-500/50'
-                        : 'border-emerald-500/40 hover:border-emerald-400'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1.5 pb-1.5 border-b border-slate-800">
-                      <div className="flex items-center gap-1.5">
-                        <FanSpinner />
-                        <span className="text-[9px] font-mono font-bold text-emerald-400 truncate">DEUTSCHE BANK 🏢</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-teal-400 animate-pulse" />
-                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      </div>
+                {/* 3. BOTTOM-LEFT: Intel SGX Vault Platform */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => REAL_BANK_DETAILS.sgx && setActiveBankDrawer(REAL_BANK_DETAILS.sgx)}
+                  className="absolute bottom-2 left-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-purple-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-purple-400 transition-all"
+                  style={{
+                    transform: 'rotateX(40deg) rotateZ(30deg)',
+                    boxShadow: '0 15px 30px rgba(168, 85, 247, 0.25)',
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                    <div className="flex items-center gap-1">
+                      <LockIcon />
+                      <span className="text-[10px] font-mono font-bold text-purple-400">SGX TEE VAULT 🔒</span>
                     </div>
-                    <div className="text-[11px] font-bold text-slate-100 flex justify-between items-center">
-                      <span>Intel Xeon Cluster</span>
-                      <span className="text-emerald-300 font-mono text-[9px]">2.9ms</span>
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-300">Hardware Vault Shield</div>
+                  <div className="text-[9px] font-mono text-emerald-400">100% Protected</div>
+                </motion.div>
+
+                {/* 4. BOTTOM-RIGHT: Deutsche Bank Platform */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => REAL_BANK_DETAILS.deutsche && setActiveBankDrawer(REAL_BANK_DETAILS.deutsche)}
+                  className="absolute bottom-2 right-2 z-10 w-44 p-3 rounded-2xl bg-slate-900/90 border-2 border-cyan-500/60 backdrop-blur-xl shadow-xl cursor-pointer hover:border-cyan-400 transition-all"
+                  style={{
+                    transform: 'rotateX(40deg) rotateZ(-30deg)',
+                    boxShadow: '0 15px 30px rgba(56, 189, 248, 0.25)',
+                  }}
+                >
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-1 mb-1">
+                    <div className="flex items-center gap-1">
+                      <FanSpinner />
+                      <span className="text-[10px] font-mono font-bold text-cyan-400">DEUTSCHE BANK 🏢</span>
                     </div>
-                    <div className="mt-1.5 space-y-1 font-mono text-[9px]">
-                      <div className="flex justify-between text-slate-400">
-                        <span>CPU Thread Load</span>
-                        <span className="text-emerald-400 font-bold">{cpuDb}%</span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 transition-all duration-500" style={{ width: `${cpuDb}%` }} />
-                      </div>
-                    </div>
-                  </motion.div>
-                </div>
+                    <span className="h-2 w-2 rounded-full bg-teal-400 animate-ping" />
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-300">Intel Xeon Cluster</div>
+                  <div className="text-[9px] font-mono text-cyan-300">CPU Load: {cpuDb}%</div>
+                </motion.div>
               </div>
 
               {/* Bottom Subtitle */}
               <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
                 <span>{getPhaseTitle()}</span>
-                <span className="text-indigo-400 font-bold">CLICK BLADE TO INSPECT 🔍</span>
+                <span className="text-indigo-400 font-bold">CLICK 3D NODE TO INSPECT 🔍</span>
               </div>
             </div>
           </div>
@@ -1173,6 +1149,79 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
+        </div>
+
+        {/* ── NEW SECTION: THE CROSS-BANK FRAUD BLIND SPOT (THE PROBLEM & SOLUTION) ── */}
+        <motion.section
+          id="problem-solution"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
+        >
+          <div className="text-center max-w-3xl mx-auto space-y-3">
+            <span className="px-3.5 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-wider">
+              THE CORE FINANCIAL PROBLEM
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-100">
+              The Cross-Bank Money Laundering Blind Spot
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-400">
+              Why traditional single-bank fraud systems are blind to modern organized crime rings.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Left Card: The Problem */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-rose-500/30 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">⚠️</span>
+                <h3 className="text-xl font-bold text-rose-300">The Problem: Institutional Blindness</h3>
+              </div>
+              <ul className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-400 font-bold">1.</span>
+                  <span><strong>Multi-Bank Smurfing:</strong> Criminal syndicates split $10M illicit funds into $9,500 transfers across JPMorgan, HSBC, and Deutsche Bank.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-400 font-bold">2.</span>
+                  <span><strong>Isolated Datasets:</strong> Each bank only sees its own internal transaction slice and marks the transfer as "normal retail behavior".</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-rose-400 font-bold">3.</span>
+                  <span><strong>Legal Data Sharing Ban:</strong> GDPR, CCPA, and Banking Secrecy laws strictly forbid banks from pooling raw customer records.</span>
+                </li>
+              </ul>
+            </div>
+
+            {/* Right Card: The Solution */}
+            <div className="p-6 sm:p-8 rounded-3xl bg-slate-900/60 border border-emerald-500/30 space-y-4">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl">🛡️</span>
+                <h3 className="text-xl font-bold text-emerald-300">The Solution: CFI Federated AI</h3>
+              </div>
+              <ul className="space-y-3 text-xs sm:text-sm text-slate-300 leading-relaxed">
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold">1.</span>
+                  <span><strong>Privacy-Preserving Federated Learning:</strong> AI model comes to the bank's local server. Customer PII never leaves the firewall.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold">2.</span>
+                  <span><strong>Streaming Graph Neural Networks:</strong> Connects account topology subgraphs across banks to pinpoint money mule rings in &lt; 3.2ms.</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-emerald-400 font-bold">3.</span>
+                  <span><strong>Intel SGX TEE & Differential Privacy:</strong> Encrypted model weights are aggregated in hardware enclaves with zero data reconstruction risk.</span>
+                </li>
+              </ul>
+            </div>
+          </div>
+        </motion.section>
 
         {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
         <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent">
@@ -1248,7 +1297,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 3: PRODUCT CAPABILITIES & PRIVACY ENGINE ──────── */}
+        {/* ── SECTION 4: PRODUCT CAPABILITIES & PRIVACY ENGINE ──────── */}
         <motion.section
           id="product"
           initial={{ opacity: 0, y: 30 }}
@@ -1409,7 +1458,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 4: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR WITH EXPLANATION WALKTHROUGH ── */}
+        {/* ── SECTION 5: PLATFORM & 8-NODE GNN GRAPH COLLUSION SIMULATOR WITH EXPLANATION WALKTHROUGH ── */}
         <motion.section
           id="platform"
           initial={{ opacity: 0, y: 30 }}
@@ -1635,7 +1684,7 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 5: ARCHITECTURE 5-LAYER DEEP SPECIFICATION MATRIX ── */}
+        {/* ── SECTION 6: ARCHITECTURE 5-LAYER DEEP SPECIFICATION MATRIX ── */}
         <motion.section
           id="architecture"
           initial={{ opacity: 0, y: 30 }}
@@ -1739,7 +1788,7 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 6: ADVERSARIAL ATTACK SIMULATION LAB ────────── */}
+        {/* ── SECTION 7: ADVERSARIAL ATTACK SIMULATION LAB ────────── */}
         <motion.section
           id="security"
           initial={{ opacity: 0, y: 30 }}
@@ -1829,7 +1878,7 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 7: LIVE REST API EXECUTION & MULTI-LANG SDK STUDIO ── */}
+        {/* ── SECTION 8: LIVE REST API EXECUTION & MULTI-LANG SDK STUDIO ── */}
         <motion.section
           id="api"
           initial={{ opacity: 0, y: 30 }}
@@ -1923,7 +1972,7 @@ ${apiResponse}`}</pre>
           <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-75 blur-sm" />
         </div>
 
-        {/* ── SECTION 8: CUSTOMIZED DEPLOYMENT WIZARD ────────────── */}
+        {/* ── SECTION 9: CUSTOMIZED DEPLOYMENT WIZARD ────────────── */}
         <motion.section
           id="docs"
           initial={{ opacity: 0, y: 30 }}
@@ -2025,7 +2074,7 @@ ${apiResponse}`}</pre>
           </div>
         </motion.section>
 
-        {/* ── SECTION 9: ENTERPRISE FOOTER ────────────────────────── */}
+        {/* ── SECTION 10: ENTERPRISE FOOTER ────────────────────────── */}
         <footer className="border-t border-slate-800 bg-slate-950/90 py-12 sm:py-16 px-4 sm:px-6">
           <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="space-y-2 text-center md:text-left">
