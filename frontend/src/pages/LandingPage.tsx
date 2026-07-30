@@ -4,13 +4,13 @@ import { useNavigate } from 'react-router-dom';
 
 // SVG Icons
 const ZapIcon = () => (
-  <svg className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-4 h-4 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
   </svg>
 );
 
 const CpuIcon = () => (
-  <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="4" y="4" width="16" height="16" rx="2" />
     <rect x="9" y="9" width="6" height="6" />
     <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
@@ -32,7 +32,7 @@ const ArrowRightIcon = () => (
 );
 
 const LockIcon = () => (
-  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
     <path d="M7 11V7a5 5 0 0 1 10 0v4" />
   </svg>
@@ -53,10 +53,12 @@ const CloseIcon = () => (
   </svg>
 );
 
-// Bank Detail Interface for Drawer
+// Real Global Bank Information Interface for Drawer
 interface BankInfoDetail {
   id: string;
   name: string;
+  ticker: string;
+  location: string;
   hardware: string;
   ram: string;
   pytorch: string;
@@ -64,55 +66,61 @@ interface BankInfoDetail {
   xmlLogs: string[];
 }
 
-const BANK_DETAILS: Record<string, BankInfoDetail> = {
-  bank_alpha: {
-    id: 'bank_alpha',
-    name: 'Santander UK Node',
-    hardware: 'NVIDIA RTX 4090 (24GB VRAM)',
+const REAL_BANK_DETAILS: Record<string, BankInfoDetail> = {
+  jpmorgan: {
+    id: 'jpmorgan',
+    name: 'JPMorgan Chase & Co.',
+    ticker: 'NYSE: JPM',
+    location: 'New York, US (Node #01)',
+    hardware: 'NVIDIA A100 Tensor Core (80GB VRAM)',
+    ram: '128 GB Host RAM',
+    pytorch: '2.2.1+cu121',
+    latency: '0.8 ms',
+    xmlLogs: [
+      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
+      'ISO20022 intake parsed: 4,800 transactions/sec. Local PyTorch GNN embeddings generated.',
+      'Differential Privacy noise injected: Gaussian(0, 0.05). Encrypted gradient uploaded to Enclave.',
+    ],
+  },
+  hsbc: {
+    id: 'hsbc',
+    name: 'HSBC Holdings plc',
+    ticker: 'LSE: HSBC',
+    location: 'London, UK (Node #02)',
+    hardware: 'NVIDIA H100 SXM (80GB VRAM)',
     ram: '64 GB Host RAM',
-    pytorch: '2.2.0+cu121',
-    latency: '1.2 ms',
+    pytorch: '2.2.1+cu121',
+    latency: '1.4 ms',
     xmlLogs: [
-      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>SNT-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="GBP">45000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'ISO20022 intake parsed: 1,420 transactions/sec. Local GNN embeddings generated.',
-      'Differential Privacy noise injected: Gaussian(0, 0.05). Local weights encrypted.',
+      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>HSBC-2026-8810</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="GBP">890000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
+      'ISO20022 intake parsed: 3,200 transactions/sec. Local PyTorch GNN embeddings generated.',
+      'Paillier homomorphic ciphertext generated: [[W_hsbc]]. Ready for federated aggregation.',
     ],
   },
-  bank_beta: {
-    id: 'bank_beta',
-    name: 'BNP Paribas Node',
-    hardware: 'NVIDIA A100 (40GB VRAM)',
+  deutsche: {
+    id: 'deutsche',
+    name: 'Deutsche Bank AG',
+    ticker: 'XETRA: DBK',
+    location: 'Frankfurt, DE (Node #03)',
+    hardware: 'Intel Xeon Platinum Cluster (CPU Monolith)',
     ram: '32 GB Host RAM',
-    pytorch: '2.2.0+cu121',
-    latency: '2.8 ms',
-    xmlLogs: [
-      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>BNP-2026-8810</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="EUR">120000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'ISO20022 intake parsed: 2,100 transactions/sec. Local GNN embeddings generated.',
-      'Paillier homomorphic ciphertext generated: [[w_i]]. Ready for enclave upload.',
-    ],
-  },
-  bank_gamma: {
-    id: 'bank_gamma',
-    name: 'Deutsche Bank Node',
-    hardware: 'CPU Monolith Cluster',
-    ram: '16 GB Host RAM',
     pytorch: '2.1.2+cpu',
-    latency: '4.1 ms',
+    latency: '2.9 ms',
     xmlLogs: [
-      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="EUR">3800.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
-      'Heterogeneous parameter negotiator applied: Batch size scaled down to 32.',
-      'CPU threadpool gradient accumulation steps = 2. Straggler delay prevented.',
+      '<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="EUR">650000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>',
+      'Heterogeneous parameter negotiator applied: Batch size scaled to 32.',
+      'CPU threadpool gradient accumulation steps = 2. Straggler delay quenched.',
     ],
   },
 };
 
 // Live Palantir/CrowdStrike Telemetry Log Feed Items
 const LIVE_LOG_FEED = [
-  'Santander UK Node completed Local Epoch 3/3 (Loss: 0.0412)',
-  'BNP Paribas Node generated Paillier Homomorphic Ciphertext [[W]]',
-  'CFI Aggregator Core: Quorum Reached (3/3 Nodes) - Aggregating Round',
+  'JPMorgan Chase Node completed Local Epoch 3/3 (Loss: 0.0381)',
+  'HSBC Holdings Node generated Paillier Homomorphic Ciphertext [[W_hsbc]]',
+  'CFI Aggregator Core: Quorum Reached (3/3 Real Banks) - Aggregating Round',
   'Cross-Bank Streaming GNN: Zero High-Risk Collusion Rings Detected',
-  'Deutsche Bank Node synchronized Global Model Weight Vector (v2.4.0)',
+  'Deutsche Bank AG Node synchronized Global Model Weight Vector (v2.4.0)',
   'Zero-Trust ABAC Policy Evaluated: Clearance Level 4 Verified (SAR Export Granted)',
   'Intel SGX Secure Enclave Memory Shield Active (0.00% Leakage Risk)',
 ];
@@ -128,7 +136,6 @@ export default function LandingPage() {
   // Hero interactive state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [isDpShieldActive, setIsDpShieldActive] = useState<boolean>(true);
-  const [fraudWaveCount, setFraudWaveCount] = useState<number>(0);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
 
   // FL Cycle Phase State: 0 = Local Training, 1 = Upload, 2 = Aggregation, 3 = Download
@@ -138,6 +145,9 @@ export default function LandingPage() {
   const [flRound, setFlRound] = useState<number>(42);
   const [accuracy, setAccuracy] = useState<number>(98.42);
   const [logIndex, setLogIndex] = useState<number>(0);
+
+  // Active Scroll Section State for Quick-Nav Dock
+  const [activeSection, setActiveSection] = useState<string>('hero');
 
   // Product Epsilon Calculator State
   const [epsilonCalc, setEpsilonCalc] = useState<number>(0.5);
@@ -156,7 +166,7 @@ export default function LandingPage() {
   const [apiEndpoint, setApiEndpoint] = useState<string>('handshake');
   const [apiReqBody, setApiReqBody] = useState<string>(
     JSON.stringify(
-      { bank_id: 'bank_alpha', pytorch_version: '2.2.0+cu121', ram_gb: 64.0 },
+      { bank_id: 'jpmorgan_chase', pytorch_version: '2.2.1+cu121', ram_gb: 128.0 },
       null,
       2
     )
@@ -170,7 +180,29 @@ export default function LandingPage() {
   const [wizRegulation, setWizRegulation] = useState<'eu_ai_act' | 'ffiec' | 'fca'>('eu_ai_act');
   const [copiedWizCmd, setCopiedWizCmd] = useState<boolean>(false);
 
-  // Increment FL round periodically
+  // Track active section on scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      const sections = ['hero', 'product', 'platform', 'architecture', 'security', 'api', 'docs'];
+      const scrollPosition = window.scrollY + 200;
+
+      for (const sectionId of sections) {
+        const el = document.getElementById(sectionId);
+        if (el) {
+          const top = el.offsetTop;
+          const height = el.offsetHeight;
+          if (scrollPosition >= top && scrollPosition < top + height) {
+            setActiveSection(sectionId);
+            break;
+          }
+        }
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Continuous 4-Phase Cyclic FL Storytelling Loop
   useEffect(() => {
     if (!isPlaying) return;
     const interval = setInterval(() => {
@@ -263,7 +295,7 @@ export default function LandingPage() {
     };
   }, []);
 
-  // 60FPS Hero Canvas Topology Render Engine
+  // 60FPS Hero Canvas Engine (Connecting 3 Real Banks on Right to Aggregator Core)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -271,22 +303,23 @@ export default function LandingPage() {
     if (!ctx) return;
 
     let animationFrameId: number;
-    let width = (canvas.width = canvas.parentElement?.clientWidth || 800);
-    let height = (canvas.height = width < 640 ? 360 : 420);
+    let width = (canvas.width = canvas.parentElement?.clientWidth || 600);
+    let height = (canvas.height = canvas.parentElement?.clientHeight || 480);
 
     const handleResize = () => {
       if (!canvas) return;
-      width = canvas.width = canvas.parentElement?.clientWidth || 800;
-      height = canvas.height = width < 640 ? 360 : 420;
+      width = canvas.width = canvas.parentElement?.clientWidth || 600;
+      height = canvas.height = canvas.parentElement?.clientHeight || 480;
     };
     window.addEventListener('resize', handleResize);
 
+    // Node coordinates inside the hero right container
     const isMobile = width < 640;
     const nodes = {
-      alpha: { x: isMobile ? width * 0.25 : width * 0.2, y: isMobile ? 80 : 100, color: '#6366f1' },
-      beta: { x: isMobile ? width * 0.75 : width * 0.8, y: isMobile ? 80 : 100, color: '#a855f7' },
-      gamma: { x: width * 0.5, y: isMobile ? 300 : 340, color: '#10b981' },
-      core: { x: width * 0.5, y: isMobile ? 180 : 200, color: '#ec4899' },
+      jpm: { x: isMobile ? width * 0.8 : width * 0.78, y: 70, color: '#6366f1' },
+      hsbc: { x: isMobile ? width * 0.8 : width * 0.78, y: 240, color: '#a855f7' },
+      db: { x: isMobile ? width * 0.8 : width * 0.78, y: 410, color: '#10b981' },
+      core: { x: isMobile ? width * 0.22 : width * 0.22, y: 240, color: '#ec4899' },
     };
 
     const particles: Array<{
@@ -302,7 +335,7 @@ export default function LandingPage() {
       radius: number;
     }> = [];
 
-    const createParticle = (from: 'alpha' | 'beta' | 'gamma', isUpload: boolean) => {
+    const createParticle = (from: 'jpm' | 'hsbc' | 'db', isUpload: boolean) => {
       const bank = nodes[from];
       const core = nodes.core;
 
@@ -318,7 +351,7 @@ export default function LandingPage() {
         startY,
         targetX,
         targetY,
-        speed: 0.012 + Math.random() * 0.01,
+        speed: 0.014 + Math.random() * 0.01,
         progress: 0,
         color: isUpload ? bank.color : '#38bdf8',
         radius: isUpload ? 4 : 5,
@@ -329,11 +362,11 @@ export default function LandingPage() {
     const render = () => {
       ctx.clearRect(0, 0, width, height);
 
-      // Connection lines
+      // Connection Bezier Curves
       ctx.lineWidth = 1.5;
       ctx.setLineDash([4, 4]);
 
-      ['alpha', 'beta', 'gamma'].forEach((key) => {
+      ['jpm', 'hsbc', 'db'].forEach((key) => {
         const n = nodes[key as keyof typeof nodes];
         ctx.strokeStyle = n.color + '60';
         ctx.beginPath();
@@ -344,24 +377,22 @@ export default function LandingPage() {
 
       ctx.setLineDash([]);
 
-      // Spawn particles depending on FL Phase
-      if (isPlaying && tick % 12 === 0) {
-        if (flPhase === 1) {
-          // Encrypted Upload Phase
-          createParticle('alpha', true);
-          createParticle('beta', true);
-          createParticle('gamma', true);
-        } else if (flPhase === 3) {
-          // Global Model Download Phase
-          createParticle('alpha', false);
-          createParticle('beta', false);
-          createParticle('gamma', false);
+      // Continuously spawn particles
+      if (isPlaying && tick % 10 === 0) {
+        if (flPhase === 1 || flPhase === 0) {
+          createParticle('jpm', true);
+          createParticle('hsbc', true);
+          createParticle('db', true);
+        } else {
+          createParticle('jpm', false);
+          createParticle('hsbc', false);
+          createParticle('db', false);
         }
       }
 
-      // Aggregator Shockwave in Phase 2
+      // Shockwave in Phase 2
       if (flPhase === 2) {
-        const shockRadius = (tick % 30) * 2.5;
+        const shockRadius = (tick % 30) * 2.8;
         ctx.strokeStyle = '#ec489980';
         ctx.lineWidth = 2;
         ctx.beginPath();
@@ -429,8 +460,8 @@ export default function LandingPage() {
             {
               registered: true,
               status: 'COMPATIBLE',
-              handshake_token: 'hs_tok_89a2f10b42',
-              assigned_quorum: 'cluster_eu_west_1',
+              handshake_token: 'hs_tok_jpm89a2f10b42',
+              assigned_quorum: 'cluster_global_tier1',
               timestamp: new Date().toISOString(),
             },
             null,
@@ -441,9 +472,9 @@ export default function LandingPage() {
         setApiResponse(
           JSON.stringify(
             [
-              { bank_id: 'bank_alpha', status: 'ONLINE', ram_gb: 64.0, hardware: 'cuda' },
-              { bank_id: 'bank_beta', status: 'ONLINE', ram_gb: 32.0, hardware: 'cuda' },
-              { bank_id: 'bank_gamma', status: 'ONLINE', ram_gb: 16.0, hardware: 'cpu' },
+              { bank: 'JPMorgan Chase', status: 'ONLINE', ram_gb: 128.0, hardware: 'NVIDIA A100' },
+              { bank: 'HSBC Holdings', status: 'ONLINE', ram_gb: 64.0, hardware: 'NVIDIA H100' },
+              { bank: 'Deutsche Bank', status: 'ONLINE', ram_gb: 32.0, hardware: 'CPU Cluster' },
             ],
             null,
             2
@@ -485,6 +516,34 @@ export default function LandingPage() {
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans selection:bg-indigo-500 selection:text-white relative overflow-x-hidden">
       {/* ── LIVING DISTRIBUTED BACKGROUND MESH CANVAS ────────── */}
       <canvas ref={bgCanvasRef} className="fixed inset-0 w-full h-full pointer-events-none z-0 opacity-20" />
+
+      {/* ── FLOATING QUICK-NAV DOCK (RIGHT SIDEBAR) ───────────── */}
+      <div className="fixed right-4 top-1/2 -translate-y-1/2 z-40 hidden lg:flex flex-col items-center gap-3 p-2.5 rounded-full bg-slate-900/70 border border-slate-800/80 backdrop-blur-md shadow-2xl">
+        {[
+          { id: 'hero', label: 'Hero Topology' },
+          { id: 'product', label: 'Privacy Calculator' },
+          { id: 'platform', label: 'Collusion Graph' },
+          { id: 'architecture', label: '5-Layer Stack' },
+          { id: 'security', label: 'Attack Simulator' },
+          { id: 'api', label: 'REST Execution' },
+          { id: 'docs', label: 'Deploy Wizard' },
+        ].map((item) => (
+          <a
+            key={item.id}
+            href={`#${item.id}`}
+            title={item.label}
+            className={`group relative h-3 w-3 rounded-full transition-all duration-300 flex items-center justify-center ${
+              activeSection === item.id
+                ? 'bg-indigo-400 ring-4 ring-indigo-500/30 scale-125'
+                : 'bg-slate-700 hover:bg-slate-400'
+            }`}
+          >
+            <span className="absolute right-6 px-2.5 py-1 rounded-md bg-slate-900 border border-slate-800 text-slate-200 text-[10px] font-mono font-bold whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg">
+              {item.label}
+            </span>
+          </a>
+        ))}
+      </div>
 
       <div className="relative z-10">
         {/* ── SECTION 1: GLASSMORPHIC TOP NAVBAR ─────────────────── */}
@@ -561,46 +620,22 @@ export default function LandingPage() {
               className="md:hidden border-b border-slate-800 bg-slate-950/95 backdrop-blur-2xl px-6 py-6 space-y-4"
             >
               <nav className="flex flex-col space-y-3 font-semibold text-sm text-slate-200">
-                <a
-                  href="#product"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#product" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Product Capabilities
                 </a>
-                <a
-                  href="#platform"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#platform" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Platform Simulator
                 </a>
-                <a
-                  href="#architecture"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#architecture" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   System Architecture
                 </a>
-                <a
-                  href="#security"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#security" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Security Playground
                 </a>
-                <a
-                  href="#api"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#api" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   API Execution Studio
                 </a>
-                <a
-                  href="#docs"
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300"
-                >
+                <a href="#docs" onClick={() => setIsMobileMenuOpen(false)} className="p-2.5 rounded-xl hover:bg-slate-900 text-slate-300">
                   Deployment Wizard
                 </a>
               </nav>
@@ -630,213 +665,222 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* ── SECTION 2: HERO SECTION WITH CONTINUOUS FL LIFECYCLE ── */}
-        <section className="relative pt-10 sm:pt-16 pb-16 sm:pb-24 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
+        {/* ── SECTION 2: SCREEN-CENTERED SPLIT HERO (3 REAL BANKS ON RIGHT) ── */}
+        <section id="hero" className="min-h-[calc(100vh-5rem)] flex items-center justify-center relative py-8 px-4 sm:px-6 max-w-7xl mx-auto overflow-hidden">
           {/* Glowing Background Radial Orbs */}
-          <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[500px] bg-gradient-to-tr from-indigo-500/10 via-purple-500/10 to-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-          <div className="text-center max-w-4xl mx-auto space-y-4 sm:space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="inline-flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] sm:text-xs font-semibold"
-            >
-              <span>✨ Privacy-Preserving Collaborative Machine Learning</span>
-              <span className="text-indigo-500 hidden sm:inline">•</span>
-              <span className="text-emerald-400 font-bold hidden sm:inline">GDPR & EU AI Act Compliant</span>
-            </motion.div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center w-full">
+            {/* ── LEFT COLUMN: Core Title, Headline, CTAs & Telemetry HUD ── */}
+            <div className="lg:col-span-6 space-y-6 text-left">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-semibold"
+              >
+                <span>✨ Privacy-Preserving Collaborative Machine Learning</span>
+                <span className="text-indigo-500">•</span>
+                <span className="text-emerald-400 font-bold">GDPR & EU AI Act</span>
+              </motion.div>
 
-            <motion.h1
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="text-3xl sm:text-5xl lg:text-6xl font-black tracking-tight leading-tight text-slate-100"
-            >
-              Detect Cross-Bank Fraud Rings Without Sharing Raw Customer Data
-            </motion.h1>
+              <motion.h1
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+                className="text-3xl sm:text-5xl lg:text-5xl font-black tracking-tight leading-tight text-slate-100"
+              >
+                Detect Cross-Bank Fraud Rings Without Sharing Raw Customer Data
+              </motion.h1>
 
-            <motion.p
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="text-xs sm:text-base lg:text-lg text-slate-400 max-w-3xl mx-auto leading-relaxed"
-            >
-              Leverage Heterogeneous Federated Learning, Secure Enclaves, and Streaming Graph Neural Networks to stop multi-institutional money laundering and fraud syndicates in real time.
-            </motion.p>
-          </div>
+              <motion.p
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="text-xs sm:text-base text-slate-400 leading-relaxed"
+              >
+                Leverage Heterogeneous Federated Learning, Secure Enclaves (Intel SGX), and Streaming Graph Neural Networks to stop multi-institutional money laundering syndicates in real time.
+              </motion.p>
 
-          {/* Live Telemetry HUD Bar */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.3 }}
-            className="mt-8 sm:mt-10 max-w-4xl mx-auto grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl"
-          >
-            <div className="text-center">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Active FL Round</span>
-              <div className="text-lg sm:text-xl font-black text-indigo-400 font-mono mt-0.5">#{flRound}</div>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Global GNN Accuracy</span>
-              <div className="text-lg sm:text-xl font-black text-emerald-400 font-mono mt-0.5">{accuracy}%</div>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Privacy Budget (ε)</span>
-              <div className="text-lg sm:text-xl font-black text-purple-400 font-mono mt-0.5">0.50 (Strict)</div>
-            </div>
-            <div className="text-center">
-              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase tracking-wider">Stream Bandwidth</span>
-              <div className="text-lg sm:text-xl font-black text-blue-400 font-mono mt-0.5">1.4 GB/s</div>
-            </div>
-          </motion.div>
+              {/* CTA Buttons */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.25 }}
+                className="flex flex-wrap items-center gap-4 pt-2"
+              >
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="px-6 py-3 rounded-xl bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 text-white font-bold text-xs shadow-lg shadow-indigo-500/25 hover:scale-105 transition-all flex items-center gap-2"
+                >
+                  <span>Launch Live Platform Demo</span>
+                  <ArrowRightIcon />
+                </button>
+                <a
+                  href="#architecture"
+                  className="px-5 py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 font-bold text-xs border border-slate-800 transition-all"
+                >
+                  Explore Architecture ↓
+                </a>
+              </motion.div>
 
-          {/* ── 4-PHASE STORYTELLING TOPOLOGY CANVAS ─────────────── */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.6, delay: 0.4 }}
-            className="mt-8 sm:mt-10 rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-8 lg:p-10 shadow-2xl relative overflow-hidden"
-          >
-            {/* Phase Indicator Header Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-800/80">
-              <div className="flex items-center gap-3">
-                <span className="h-3 w-3 rounded-full bg-emerald-400 animate-ping" />
+              {/* Live Telemetry HUD Bar */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.3 }}
+                className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-4 rounded-2xl bg-slate-900/60 border border-slate-800/80 backdrop-blur-xl"
+              >
                 <div>
-                  <span className="text-[10px] sm:text-[11px] font-mono text-indigo-400 font-bold uppercase tracking-wider">
-                    FEDERATION CYCLE IN PROGRESS
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active FL Round</span>
+                  <div className="text-lg font-black text-indigo-400 font-mono mt-0.5">#{flRound}</div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Global Accuracy</span>
+                  <div className="text-lg font-black text-emerald-400 font-mono mt-0.5">{accuracy}%</div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Privacy (ε)</span>
+                  <div className="text-lg font-black text-purple-400 font-mono mt-0.5">0.50 (Strict)</div>
+                </div>
+                <div>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Stream Speed</span>
+                  <div className="text-lg font-black text-blue-400 font-mono mt-0.5">1.4 GB/s</div>
+                </div>
+              </motion.div>
+            </div>
+
+            {/* ── RIGHT COLUMN: 3 REAL BANKS STACKED + CONTINUOUS CANVAS FLOW ── */}
+            <div className="lg:col-span-6 relative w-full h-[480px] rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
+              {/* Canvas Physics Overlay */}
+              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
+
+              {/* Status Header */}
+              <div className="relative z-10 flex items-center justify-between pb-3 border-b border-slate-800/80">
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300">
+                    REAL BANK CONSORTIUM (3/3 ONLINE)
                   </span>
-                  <h3 className="text-xs sm:text-base font-bold text-slate-100">{getPhaseTitle()}</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setIsDpShieldActive(!isDpShieldActive)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1"
+                  >
+                    <LockIcon />
+                    <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
+                  </button>
+                  <button
+                    onClick={() => setIsPlaying(!isPlaying)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-slate-800 text-slate-300 border border-slate-700"
+                  >
+                    {isPlaying ? 'Pause ⏸️' : 'Play ▶️'}
+                  </button>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  onClick={() => setFraudWaveCount((prev) => prev + 1)}
-                  className="px-3 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/30 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm"
-                >
-                  <span>Inject Fraud Wave 🚨</span>
-                  {fraudWaveCount > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-rose-500 text-white text-[10px]">
-                      +{fraudWaveCount}
-                    </span>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => setIsDpShieldActive(!isDpShieldActive)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                    isDpShieldActive
-                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
-                      : 'bg-slate-800 text-slate-400 border-slate-700'
+              {/* 3 Real Global Banks (Right Side Stack) + Central Core (Left Side Hub) */}
+              <div className="relative z-10 w-full h-full flex items-center justify-between">
+                {/* Left Side: Central Aggregator Hub */}
+                <div
+                  className={`p-4 rounded-2xl bg-slate-950 border-2 transition-all duration-300 text-center w-40 sm:w-44 ${
+                    flPhase === 2
+                      ? 'border-emerald-400 shadow-xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
+                      : 'border-indigo-500 shadow-xl shadow-indigo-500/30'
                   }`}
                 >
-                  <LockIcon />
-                  <span>DP Shield: {isDpShieldActive ? 'ON' : 'OFF'}</span>
-                </button>
-
-                <button
-                  onClick={() => setIsPlaying(!isPlaying)}
-                  className="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold border border-slate-700 transition-all"
-                >
-                  {isPlaying ? 'Pause ⏸️' : 'Play ▶️'}
-                </button>
-              </div>
-            </div>
-
-            {/* HTML5 Canvas Topology Element */}
-            <div className="relative w-full h-[360px] sm:h-[420px] mt-6 flex items-center justify-center">
-              <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-
-              {/* Bank Alpha Node (Top Left) */}
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                onClick={() => BANK_DETAILS.bank_alpha && setActiveBankDrawer(BANK_DETAILS.bank_alpha)}
-                className={`absolute top-2 left-2 sm:top-4 sm:left-16 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
-                  flPhase === 0
-                    ? 'bg-indigo-500/30 border-indigo-400 shadow-xl shadow-indigo-500/30 ring-2 ring-indigo-500/50'
-                    : 'bg-indigo-500/15 border-indigo-500/40 hover:border-indigo-400'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-400">BANK ALPHA</span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                </div>
-                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">Santander UK</div>
-                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                  <ZapIcon />
-                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'RTX 4090'}</span>
-                </div>
-              </motion.div>
-
-              {/* Bank Beta Node (Top Right) */}
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                onClick={() => BANK_DETAILS.bank_beta && setActiveBankDrawer(BANK_DETAILS.bank_beta)}
-                className={`absolute top-2 right-2 sm:top-4 sm:right-16 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
-                  flPhase === 0
-                    ? 'bg-purple-500/30 border-purple-400 shadow-xl shadow-purple-500/30 ring-2 ring-purple-500/50'
-                    : 'bg-purple-500/15 border-purple-500/40 hover:border-purple-400'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-purple-400">BANK BETA</span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                </div>
-                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">BNP Paribas</div>
-                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                  <ZapIcon />
-                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'NVIDIA A100'}</span>
-                </div>
-              </motion.div>
-
-              {/* Central Aggregator Core (Center) */}
-              <div
-                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-4 sm:p-6 rounded-3xl bg-slate-950 border-2 transition-all duration-300 text-center w-52 sm:w-64 z-10 ${
-                  flPhase === 2
-                    ? 'border-emerald-400 shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
-                    : 'border-indigo-500 shadow-2xl shadow-indigo-500/30'
-                }`}
-              >
-                <div className="relative inline-block">
-                  <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-2xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto text-xl sm:text-2xl mb-1.5">
-                    🛰️
-                  </div>
-                  {isDpShieldActive && (
-                    <div className="absolute -top-1 -right-1 h-4 w-4 sm:h-5 sm:w-5 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[9px] sm:text-[10px] font-black">
-                      🔒
+                  <div className="relative inline-block">
+                    <div className="h-10 w-10 rounded-xl bg-indigo-500/20 border border-indigo-500/40 text-indigo-400 flex items-center justify-center mx-auto text-xl mb-1">
+                      🛰️
                     </div>
-                  )}
+                    {isDpShieldActive && (
+                      <div className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-emerald-500 text-slate-950 flex items-center justify-center text-[9px] font-black">
+                        🔒
+                      </div>
+                    )}
+                  </div>
+                  <h4 className="text-xs font-extrabold text-slate-100">CFI Aggregator</h4>
+                  <p className="text-[9px] text-slate-400 mt-0.5">Intel SGX Enclave</p>
+                  <div className="mt-2 py-0.5 px-1.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[9px] font-bold truncate">
+                    {flPhase === 2 ? '⚡ Aggregating...' : 'FedAvg Active'}
+                  </div>
                 </div>
-                <h4 className="text-xs sm:text-sm font-extrabold text-slate-100">CFI Aggregator Core</h4>
-                <p className="text-[10px] sm:text-[11px] text-slate-400 mt-0.5">Secure Enclave (Intel SGX)</p>
-                <div className="mt-2.5 py-1 px-2 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 font-mono text-[9px] sm:text-[10px] font-bold truncate">
-                  {flPhase === 2 ? '⚡ Aggregating...' : 'FedAvg + Differential Privacy'}
+
+                {/* Right Side: Stack of 3 Real Global Banks */}
+                <div className="flex flex-col justify-between h-full py-2 space-y-3 w-48 sm:w-56">
+                  {/* Real Bank 1: JPMorgan Chase */}
+                  <motion.div
+                    whileHover={{ scale: 1.04 }}
+                    onClick={() => REAL_BANK_DETAILS.jpmorgan && setActiveBankDrawer(REAL_BANK_DETAILS.jpmorgan)}
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 ${
+                      flPhase === 0
+                        ? 'bg-indigo-500/30 border-indigo-400 shadow-lg shadow-indigo-500/30 ring-2 ring-indigo-500/50'
+                        : 'bg-indigo-500/15 border-indigo-500/40 hover:border-indigo-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] font-mono font-bold text-indigo-400">JPMORGAN CHASE 🏛️</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-100 truncate">JPMorgan Chase & Co.</div>
+                    <div className="text-[9px] text-slate-400 mt-0.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><ZapIcon /> NVIDIA A100</span>
+                      <span className="text-indigo-300 font-mono">0.8ms</span>
+                    </div>
+                  </motion.div>
+
+                  {/* Real Bank 2: HSBC Holdings */}
+                  <motion.div
+                    whileHover={{ scale: 1.04 }}
+                    onClick={() => REAL_BANK_DETAILS.hsbc && setActiveBankDrawer(REAL_BANK_DETAILS.hsbc)}
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 ${
+                      flPhase === 0
+                        ? 'bg-purple-500/30 border-purple-400 shadow-lg shadow-purple-500/30 ring-2 ring-purple-500/50'
+                        : 'bg-purple-500/15 border-purple-500/40 hover:border-purple-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] font-mono font-bold text-purple-400">HSBC HOLDINGS 🏦</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-100 truncate">HSBC Holdings plc</div>
+                    <div className="text-[9px] text-slate-400 mt-0.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><ZapIcon /> NVIDIA H100</span>
+                      <span className="text-purple-300 font-mono">1.4ms</span>
+                    </div>
+                  </motion.div>
+
+                  {/* Real Bank 3: Deutsche Bank */}
+                  <motion.div
+                    whileHover={{ scale: 1.04 }}
+                    onClick={() => REAL_BANK_DETAILS.deutsche && setActiveBankDrawer(REAL_BANK_DETAILS.deutsche)}
+                    className={`p-3 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 ${
+                      flPhase === 0
+                        ? 'bg-emerald-500/30 border-emerald-400 shadow-lg shadow-emerald-500/30 ring-2 ring-emerald-500/50'
+                        : 'bg-emerald-500/15 border-emerald-500/40 hover:border-emerald-400'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="text-[9px] font-mono font-bold text-emerald-400">DEUTSCHE BANK 🏦</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    </div>
+                    <div className="text-xs font-bold text-slate-100 truncate">Deutsche Bank AG</div>
+                    <div className="text-[9px] text-slate-400 mt-0.5 flex items-center justify-between">
+                      <span className="flex items-center gap-1"><CpuIcon /> CPU Cluster</span>
+                      <span className="text-emerald-300 font-mono">2.9ms</span>
+                    </div>
+                  </motion.div>
                 </div>
               </div>
 
-              {/* Bank Gamma Node (Bottom Center) */}
-              <motion.div
-                whileHover={{ scale: 1.05 }}
-                onClick={() => BANK_DETAILS.bank_gamma && setActiveBankDrawer(BANK_DETAILS.bank_gamma)}
-                className={`absolute bottom-2 sm:bottom-4 left-1/2 -translate-x-1/2 p-3 sm:p-4 rounded-2xl border backdrop-blur-xl cursor-pointer transition-all duration-300 w-44 sm:w-56 ${
-                  flPhase === 0
-                    ? 'bg-emerald-500/30 border-emerald-400 shadow-xl shadow-emerald-500/30 ring-2 ring-emerald-500/50'
-                    : 'bg-emerald-500/15 border-emerald-500/40 hover:border-emerald-400'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[10px] sm:text-xs font-mono font-bold text-emerald-400">BANK GAMMA</span>
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" />
-                </div>
-                <div className="text-xs sm:text-sm font-bold text-slate-100 truncate">Deutsche Bank</div>
-                <div className="text-[10px] sm:text-[11px] text-slate-400 mt-1 flex items-center gap-1">
-                  <CpuIcon />
-                  <span className="truncate">{flPhase === 0 ? '🧠 Training...' : 'CPU Cluster'}</span>
-                </div>
-              </motion.div>
+              {/* Bottom Phase Subtitle */}
+              <div className="relative z-10 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] font-mono text-slate-400">
+                <span>{getPhaseTitle()}</span>
+                <span className="text-indigo-400 font-bold">CLICK BANK CARD TO INSPECT 🔍</span>
+              </div>
             </div>
-          </motion.div>
+          </div>
         </section>
 
         {/* ── BANK INSPECTOR DRAWER (SLIDING OVERLAY) ──────────────── */}
@@ -859,8 +903,11 @@ export default function LandingPage() {
               >
                 <div className="flex items-center justify-between border-b border-slate-800 pb-4">
                   <div>
-                    <span className="text-xs font-mono font-bold text-indigo-400 uppercase">INSPECTING NODE</span>
+                    <span className="text-xs font-mono font-bold text-indigo-400 uppercase">
+                      REAL BANK NODE • {activeBankDrawer.ticker}
+                    </span>
                     <h3 className="text-lg sm:text-xl font-bold text-slate-100">{activeBankDrawer.name}</h3>
+                    <p className="text-xs text-slate-400 mt-0.5">{activeBankDrawer.location}</p>
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
@@ -872,12 +919,14 @@ export default function LandingPage() {
 
                 <div className="grid grid-cols-2 gap-3 text-xs font-mono">
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500">Hardware:</span>
+                    <span className="text-slate-500">Hardware Accelerator:</span>
                     <div className="text-indigo-300 font-bold mt-0.5 truncate">{activeBankDrawer.hardware}</div>
                   </div>
                   <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
-                    <span className="text-slate-500">RAM Allocation:</span>
-                    <div className="text-emerald-300 font-bold mt-0.5">{activeBankDrawer.ram}</div>
+                    <span className="text-slate-500">Host Memory & Latency:</span>
+                    <div className="text-emerald-300 font-bold mt-0.5">
+                      {activeBankDrawer.ram} ({activeBankDrawer.latency})
+                    </div>
                   </div>
                 </div>
 
@@ -898,8 +947,20 @@ export default function LandingPage() {
           )}
         </AnimatePresence>
 
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
+        </div>
+
         {/* ── SECTION 3: PRODUCT & EPSILON CALCULATOR ──────────────── */}
-        <section id="product" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="product"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold">
               DIFFERENTIAL PRIVACY CALCULATOR
@@ -962,10 +1023,22 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
+        </div>
 
         {/* ── SECTION 4: PLATFORM & FRAUD RING GRAPH COLLUSION SIMULATOR ── */}
-        <section id="platform" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="platform"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
@@ -1008,21 +1081,21 @@ export default function LandingPage() {
                   </>
                 )}
 
-                {/* Node 1: Santander UK */}
+                {/* Node 1: JPMorgan */}
                 <circle cx="120" cy="140" r="24" fill="#1e1b4b" stroke="#6366f1" strokeWidth="2" />
-                <text x="120" y="144" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">ACCT-A</text>
+                <text x="120" y="144" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">JPMORGAN</text>
 
-                {/* Node 2: BNP Paribas */}
+                {/* Node 2: HSBC */}
                 <circle cx="280" cy="80" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#a855f7'} strokeWidth="2" />
-                <text x="280" y="84" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">MULE-1</text>
+                <text x="280" y="84" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">HSBC-MULE</text>
 
                 {/* Node 3: Deutsche Bank */}
                 <circle cx="440" cy="140" r="24" fill="#064e3b" stroke="#10b981" strokeWidth="2" />
-                <text x="440" y="144" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">ACCT-C</text>
+                <text x="440" y="144" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">DEUTSCHE</text>
 
                 {/* Node 4: Offramp */}
                 <circle cx="280" cy="200" r="24" fill={isGraphDetected ? '#450a0a' : '#1e1b4b'} stroke={isGraphDetected ? '#ef4444' : '#ec4899'} strokeWidth="2" />
-                <text x="280" y="204" fill="#ffffff" fontSize="10" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
+                <text x="280" y="204" fill="#ffffff" fontSize="9" fontWeight="bold" textAnchor="middle">OFFRAMP</text>
               </svg>
 
               {isGraphDetected && (
@@ -1032,10 +1105,22 @@ export default function LandingPage() {
               )}
             </div>
           </div>
-        </section>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-75 blur-sm" />
+        </div>
 
         {/* ── SECTION 5: ARCHITECTURE 5-LAYER STACK & PATH HIGHLIGHTING ── */}
-        <section id="architecture" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="architecture"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="text-center max-w-3xl mx-auto space-y-4">
             <span className="px-3.5 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 text-purple-400 text-xs font-bold">
               5-LAYER SYSTEM ARCHITECTURE
@@ -1091,10 +1176,22 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-indigo-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-75 blur-sm" />
+        </div>
 
         {/* ── SECTION 6: SECURITY ATTACK SIMULATOR ────────────────── */}
-        <section id="security" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="security"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
@@ -1135,10 +1232,22 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-purple-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-purple-500 to-emerald-500 opacity-75 blur-sm" />
+        </div>
 
         {/* ── SECTION 7: LIVE REST API PLAYGROUND ─────────────────── */}
-        <section id="api" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="api"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
@@ -1190,10 +1299,22 @@ export default function LandingPage() {
               </div>
             </div>
           </div>
-        </section>
+        </motion.section>
+
+        {/* ── ANIMATED LASER DIVIDER BEAM ─────────────────────────── */}
+        <div className="relative w-full max-w-7xl mx-auto h-px my-4 bg-gradient-to-r from-transparent via-emerald-500/50 to-transparent">
+          <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 to-indigo-500 opacity-75 blur-sm" />
+        </div>
 
         {/* ── SECTION 8: CUSTOMIZED DEPLOYMENT WIZARD ────────────── */}
-        <section id="docs" className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12">
+        <motion.section
+          id="docs"
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false }}
+          transition={{ duration: 0.6 }}
+          className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8 sm:space-y-12"
+        >
           <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
             <div className="text-center max-w-3xl mx-auto space-y-4 mb-8">
               <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold">
@@ -1259,7 +1380,7 @@ export default function LandingPage() {
               </button>
             </div>
           </div>
-        </section>
+        </motion.section>
 
         {/* ── SECTION 9: ENTERPRISE FOOTER ────────────────────────── */}
         <footer className="border-t border-slate-800 bg-slate-950/90 py-12 sm:py-16 px-4 sm:px-6">
