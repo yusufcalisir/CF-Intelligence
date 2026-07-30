@@ -907,12 +907,18 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </div>
 
             {/* ── RIGHT COLUMN: PURE CODE-DRIVEN SERVER HARDWARE CHASSIS ── */}
-            <div className="lg:col-span-6 relative w-full h-[520px] rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
+            <div className="lg:col-span-6 relative w-full h-[540px] rounded-3xl border border-indigo-500/20 bg-gradient-to-b from-slate-900/90 via-slate-950/95 to-slate-950 p-4 sm:p-6 shadow-2xl overflow-hidden flex flex-col justify-between">
               {/* Canvas Physics Overlay */}
               <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none z-0" />
 
+              {/* Component Purpose Callout Banner */}
+              <div className="relative z-10 p-2.5 rounded-xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-[10px] text-indigo-200">
+                <span className="font-bold text-indigo-400 block mb-0.5">💡 PROJE AMACI (PROJECT IMPACT):</span>
+                JPMorgan Chase, HSBC ve Deutsche Bank kendi sunucularında yerel model eğitir. Müşteri verileri kesinlikle banka dışına çıkmaz.
+              </div>
+
               {/* Status Header */}
-              <div className="relative z-10 flex items-center justify-between pb-3 border-b border-slate-800/80">
+              <div className="relative z-10 flex items-center justify-between py-2 border-b border-slate-800/80">
                 <div className="flex items-center gap-2">
                   <span className="h-2.5 w-2.5 rounded-full bg-emerald-400 animate-ping" />
                   <span className="text-[10px] sm:text-xs font-mono font-bold text-indigo-300">
@@ -937,11 +943,11 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
               </div>
 
               {/* Pure Code Hardware Grid */}
-              <div className="relative z-10 w-full h-full flex items-center justify-between gap-4">
+              <div className="relative z-10 w-full h-full flex items-center justify-between gap-4 my-2">
                 {/* Left: Intel SGX Hardware Enclave Vault (Pure Code) */}
                 <motion.div
                   whileHover={{ scale: 1.03 }}
-                  className={`relative p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 transition-all duration-300 text-center w-48 z-10 flex flex-col justify-between h-[340px] shadow-2xl ${
+                  className={`relative p-4 rounded-2xl bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 border-2 transition-all duration-300 text-center w-48 z-10 flex flex-col justify-between h-[320px] shadow-2xl ${
                     flPhase === 2
                       ? 'border-emerald-400 shadow-2xl shadow-emerald-500/40 ring-4 ring-emerald-500/20'
                       : 'border-indigo-500/60 shadow-xl shadow-indigo-500/30'
@@ -1284,7 +1290,15 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </div>
           </div>
 
-          <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
+          <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
+              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              {productTab === 'dp' && 'Differential Privacy (ε), model güncellemelerine matematiksel gürültü ekleyerek hackerların ortak modelden müşteri kimliğini geri elde etmesini imkansız kılar.'}
+              {productTab === 'negotiator' && 'Farklı donanımlara (A100 GPU vs H100 vs CPU) ve farklı yapay zeka mimarilerine sahip bankalar otomatik olarak tek bir küresel modelde buluşur.'}
+              {productTab === 'sla' && '3 büyük bankanın ortak verisiyle dolandırıcılık tespit oranı %98.42ye yükselir, hatalı alarm oranı %74.6 düşer.'}
+            </div>
+
             {productTab === 'dp' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 <div className="lg:col-span-5 space-y-6">
@@ -1405,6 +1419,12 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
           <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-8">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-purple-950/80 border border-purple-500/30 font-mono text-xs text-purple-200">
+              <span className="font-bold text-purple-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              Suç örgütleri 10.000$ altı paraları 3 farklı bankaya bölerek (smurfing) tespit edilmeyi engeller. Graph Neural Network bankalar arası alt grafikleri birleştirerek çeteyi anında yakalar.
+            </div>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-purple-400 uppercase tracking-wider">
@@ -1636,71 +1656,79 @@ curl -sSL https://get.cfi-platform.org/install.sh | bash -s -- ${accelFlag} ${re
             </p>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-            <div className="lg:col-span-5 space-y-3">
-              {[
-                { id: 1, name: 'Layer 1: ISO 20022 Data Intake Engine' },
-                { id: 2, name: 'Layer 2: GNN Subgraph Feature Store' },
-                { id: 3, name: 'Layer 3: Secure Enclave & DP Shield' },
-                { id: 4, name: 'Layer 4: Federated Aggregation Core' },
-                { id: 5, name: 'Layer 5: Automated Regulatory SIEM Exporter' },
-              ].map((layer) => (
-                <div
-                  key={layer.id}
-                  onClick={() => setActiveLayer(layer.id)}
-                  className={`p-4 rounded-xl border cursor-pointer transition-all ${
-                    activeLayer === layer.id
-                      ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-lg shadow-indigo-600/20'
-                      : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
-                  }`}
-                >
-                  <span className="text-xs font-mono">{layer.name}</span>
-                </div>
-              ))}
+          <div className="glass-card border border-purple-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
+              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              SWIFT ISO 20022 XML ayrıştırmasından Intel SGX donanım şifrelemesine ve FinCEN SAR bildirimine kadar platformun uçtan uca kurumsal veri hattını gösterir.
             </div>
 
-            <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-4">
-              <div>
-                <span className="text-xs font-mono text-indigo-400 uppercase font-bold">SPECIFICATION MATRIX</span>
-                <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-1">
-                  {activeLayer === 1 && 'Native ISO 20022 Financial XML Intake'}
-                  {activeLayer === 2 && 'PyTorch Geometric GNN Embedding Feature Store'}
-                  {activeLayer === 3 && 'Intel SGX Secure Enclave & Paillier Homomorphic Encryption'}
-                  {activeLayer === 4 && 'Byzantine-Robust FedAvg Aggregation Core'}
-                  {activeLayer === 5 && 'Automated SAR XML & Splunk SIEM Integration'}
-                </h3>
-                <p className="text-xs text-slate-400 mt-2 leading-relaxed">
-                  {activeLayer === 1 && 'Parses pacs.008 and camt.053 XML financial transaction messages directly into local graph tensors without storing customer identity details.'}
-                  {activeLayer === 2 && 'Extracts structural graph attention embeddings (GAT) capturing account transaction topologies across isolated banking domains.'}
-                  {activeLayer === 3 && 'Injects Gaussian differential privacy noise and computes encrypted sum updates within hardware-isolated TEE enclaves.'}
-                  {activeLayer === 4 && 'Aggregates multi-bank gradient weights using Trimmed-Mean to automatically neutralize malicious or corrupted node updates.'}
-                  {activeLayer === 5 && 'Generates cryptographic sign-off hashes and exports automated SAR XML filings directly to regulatory SIEM endpoints.'}
-                </p>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-5 space-y-3">
+                {[
+                  { id: 1, name: 'Layer 1: ISO 20022 Data Intake Engine' },
+                  { id: 2, name: 'Layer 2: GNN Subgraph Feature Store' },
+                  { id: 3, name: 'Layer 3: Secure Enclave & DP Shield' },
+                  { id: 4, name: 'Layer 4: Federated Aggregation Core' },
+                  { id: 5, name: 'Layer 5: Automated Regulatory SIEM Exporter' },
+                ].map((layer) => (
+                  <div
+                    key={layer.id}
+                    onClick={() => setActiveLayer(layer.id)}
+                    className={`p-4 rounded-xl border cursor-pointer transition-all ${
+                      activeLayer === layer.id
+                        ? 'bg-indigo-600 text-white border-indigo-500 font-bold shadow-lg shadow-indigo-600/20'
+                        : 'bg-slate-900/60 border-slate-800 text-slate-300 hover:bg-slate-800/60'
+                    }`}
+                  >
+                    <span className="text-xs font-mono">{layer.name}</span>
+                  </div>
+                ))}
               </div>
 
-              {/* Protocol Specs Code Snippet Preview */}
-              <div className="p-4 rounded-xl bg-slate-900 font-mono text-[11px] text-indigo-300 border border-slate-800 overflow-x-auto">
-                {activeLayer === 1 && `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
+              <div className="lg:col-span-7 p-6 rounded-2xl bg-slate-950 border border-slate-800 flex flex-col justify-between space-y-4">
+                <div>
+                  <span className="text-xs font-mono text-indigo-400 uppercase font-bold">SPECIFICATION MATRIX</span>
+                  <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-1">
+                    {activeLayer === 1 && 'Native ISO 20022 Financial XML Intake'}
+                    {activeLayer === 2 && 'PyTorch Geometric GNN Embedding Feature Store'}
+                    {activeLayer === 3 && 'Intel SGX Secure Enclave & Paillier Homomorphic Encryption'}
+                    {activeLayer === 4 && 'Byzantine-Robust FedAvg Aggregation Core'}
+                    {activeLayer === 5 && 'Automated SAR XML & Splunk SIEM Integration'}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-2 leading-relaxed">
+                    {activeLayer === 1 && 'Parses pacs.008 and camt.053 XML financial transaction messages directly into local graph tensors without storing customer identity details.'}
+                    {activeLayer === 2 && 'Extracts structural graph attention embeddings (GAT) capturing account transaction topologies across isolated banking domains.'}
+                    {activeLayer === 3 && 'Injects Gaussian differential privacy noise and computes encrypted sum updates within hardware-isolated TEE enclaves.'}
+                    {activeLayer === 4 && 'Aggregates multi-bank gradient weights using Trimmed-Mean to automatically neutralize malicious or corrupted node updates.'}
+                    {activeLayer === 5 && 'Generates cryptographic sign-off hashes and exports automated SAR XML filings directly to regulatory SIEM endpoints.'}
+                  </p>
+                </div>
+
+                {/* Protocol Specs Code Snippet Preview */}
+                <div className="p-4 rounded-xl bg-slate-900 font-mono text-[11px] text-indigo-300 border border-slate-800 overflow-x-auto">
+                  {activeLayer === 1 && `<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08">
   <FIToFICstmrCdtTrf>
     <GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr>
     <CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf>
   </FIToFICstmrCdtTrf>
 </Document>`}
-                {activeLayer === 2 && `import torch_geometric as pyg
+                  {activeLayer === 2 && `import torch_geometric as pyg
 edge_index = pyg.data.Data(x=nodes, edge_index=graph_topology)
 gat_layer = PyG.GATConv(in_channels=512, out_channels=256)`}
-                {activeLayer === 3 && `// Intel SGX Hardware Enclave Call
+                  {activeLayer === 3 && `// Intel SGX Hardware Enclave Call
 sgx_status_t status = ecall_aggregate_encrypted_weights(
     eid, &retval, ciphertext_a, ciphertext_b, noise_sigma
 );`}
-                {activeLayer === 4 && `def trimmed_mean_fedavg(weight_tensors, beta=0.1):
+                  {activeLayer === 4 && `def trimmed_mean_fedavg(weight_tensors, beta=0.1):
     # Sort and trim top/bottom 10% gradients to quench Byzantine attacks
     sorted_weights = torch.sort(weight_tensors, dim=0)
     return torch.mean(sorted_weights[beta:-beta], dim=0)`}
-                {activeLayer === 5 && `<FinCEN_SAR_Export version="2.0">
+                  {activeLayer === 5 && `<FinCEN_SAR_Export version="2.0">
   <FilingHeader><FilerID>CFI-PLATFORM-991</FilerID></FilingHeader>
   <SuspiciousActivity><Amount Ccy="USD">1450000.00</Amount></SuspiciousActivity>
 </FinCEN_SAR_Export>`}
+                </div>
               </div>
             </div>
           </div>
@@ -1720,7 +1748,13 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           transition={{ duration: 0.6 }}
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
+          <div className="glass-card border border-emerald-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
+              <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              Kötü niyetli hackerların veya sızmış bankaların AI modelinden müşteri verisi çalmasını (MIA/DLG) veya modeli zehirlemesini (Byzantine) engelleyen güvenlik testlerini simüle eder.
+            </div>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <span className="text-xs font-mono font-bold text-emerald-400 uppercase tracking-wider">
@@ -1804,7 +1838,13 @@ sgx_status_t status = ecall_aggregate_encrypted_weights(
           transition={{ duration: 0.6 }}
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
+          <div className="glass-card border border-indigo-500/20 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-indigo-950/80 border border-indigo-500/30 font-mono text-xs text-indigo-200">
+              <span className="font-bold text-indigo-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              Banka yazılımcıları 3 satır kodla (Python, Go, Node.js, cURL) platformu kendi banka altyapısına kolayca entegre edebilir.
+            </div>
+
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-800">
               <div>
                 <div className="flex items-center gap-2">
@@ -1892,7 +1932,13 @@ ${apiResponse}`}</pre>
           transition={{ duration: 0.6 }}
           className="py-12 sm:py-16 px-4 sm:px-6 max-w-7xl mx-auto space-y-8"
         >
-          <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl">
+          <div className="glass-card border border-slate-800 rounded-3xl bg-slate-900/50 p-6 sm:p-10 backdrop-blur-xl space-y-6">
+            {/* Component Purpose Callout Banner */}
+            <div className="p-3.5 rounded-2xl bg-emerald-950/80 border border-emerald-500/30 font-mono text-xs text-emerald-200">
+              <span className="font-bold text-emerald-400 block mb-1">💡 PROJE AMACI & ÇALIŞMA PRENSİBİ:</span>
+              Bankaların kendi sunucularında (Kubernetes, Helm, Docker, Terraform) 5 dakikada platformu başlatması için hazır altyapı şablonları sunar.
+            </div>
+
             <div className="text-center max-w-3xl mx-auto space-y-3 mb-6">
               <span className="px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
                 DEPLOYMENT BLUEPRINT WIZARD
