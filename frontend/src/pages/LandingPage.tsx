@@ -40,15 +40,88 @@ const ARCH_NODES: ArchNode[] = [
   { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
 ];
 
-const WORKFLOW_STEPS = [
-  { id: 1, short: 'Ingestion', label: 'ISO 20022 Ingestion Pipeline', description: 'Each bank node agent ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 bank statements) from core banking ledgers. Messages are validated against official XSD schemas, normalized, and converted into dynamic transaction graph tensors.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser & Graph Tensor Builder\nfrom lxml import etree\nimport torch_geometric as pyg\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\n\n# Construct local node features & edge indices\ngraph_data = builder.build_subgraph(msg)` },
-  { id: 2, short: 'Local Training', label: 'Local Graph Attention Training', description: 'PyTorch Geometric GAT models train exclusively inside the bank data perimeter on private ledger transactions. The 8-head GATConv layers compute 512-dimensional structural embeddings capturing multi-hop laundering chains without sending any record externally.', tech: ['PyTorch Geometric 2.6', 'GATConv (8 heads)', 'GraphSAGE', 'AdamW'], code: `# On-Premise Local GATConv Training Loop\nfrom torch_geometric.nn import GATConv\n\nclass LocalFraudGNN(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.gat1 = GATConv(512, 256, heads=8, dropout=0.1)\n        self.gat2 = GATConv(2048, 512, heads=1)\n\n    def forward(self, x, edge_index):\n        return self.gat2(self.gat1(x, edge_index), edge_index)` },
-  { id: 3, short: 'Diff. Privacy', label: 'Differential Privacy Injection', description: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi Differential Privacy (RDP) accountant tracks total (ε=0.50, δ=1e-5) privacy budget consumption.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'L2 Clipping'], code: `# Opacus Differential Privacy Guarantee\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimizer, loader = privacy_engine.make_private_with_epsilon(\n    module=local_model,\n    optimizer=local_optimizer,\n    data_loader=train_loader,\n    target_epsilon=0.50,\n    target_delta=1e-5,\n    max_grad_norm=1.0,\n)` },
-  { id: 4, short: 'Sec. Aggregation', label: 'Homomorphic Enclave Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and sent to the Intel SGX hardware TEE enclave. The hardware enclave computes encrypted gradient sums without ever decrypting individual institution contributions.', tech: ['Paillier HE', 'Intel SGX v2 TEE', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// Intel SGX TEE Homomorphic Aggregation (C++ Enclave)\nsgx_status_t ecall_homomorphic_sum(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_jpm, size_t len_jpm,\n    const uint8_t* cipher_hsbc, size_t len_hsbc,\n    uint8_t* cipher_out, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_jpm, cipher_hsbc);\n    memcpy(cipher_out, sum.data(), sum.size());\n}` },
-  { id: 5, short: 'BFT Defense', label: 'Byzantine-Robust Filtering', description: 'The FL Coordinator executes Byzantine-robust aggregation (Krum algorithm + Trimmed Mean) to evaluate incoming gradient vectors. Any poisoned or adversarial update from a compromised node is isolated and quenched before global model updating.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine Distance'], code: `# Krum Byzantine Poisoning Defense\ndef krum_filter(gradients: list[Tensor], f_byzantine: int) -> Tensor:\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2 for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:len(gradients) - f_byzantine - 2]))\n    return gradients[scores.index(min(scores))]` },
-  { id: 6, short: 'Global Update', label: 'Global Model Distribution', description: 'The aggregated global model weights are committed to the Model Registry with SHA-256 cryptographic audit signatures. Updated model parameters are broadcast back to all bank nodes via mutual TLS (mTLS) for the next training round.', tech: ['FedAvg', 'Model Registry', 'SHA-256 Audit Trail', 'gRPC mTLS'], code: `# FedAvg Global Weight Synthesis & Distribution\ndef broadcast_global_weights(updates: list[dict], weights: list[int]):\n    total_samples = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(w * u[key] for w, u in zip(weights, updates)) / total_samples\n    registry.commit(global_state, sha256=compute_hash(global_state))` },
-  { id: 7, short: 'Risk Intelligence', label: 'Calibrated Risk Scoring', description: 'The updated global GNN model generates 512-dimensional node embeddings fed into the Risk Scoring Engine. An XGBoost ensemble produces calibrated transaction risk scores [0-1], with SHAP tree explainer computing interpretable feature attributions.', tech: ['XGBoost 2.0', 'SHAP TreeExplainer', 'Platt Calibration', 'LIME'], code: `# Risk Scoring & SHAP Attribution Generator\nimport shap\nimport xgboost as xgb\n\nrisk_model = xgb.XGBClassifier()\nrisk_score = risk_model.predict_proba(gnn_embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_attributions = explainer.shap_values(gnn_embedding)` },
-  { id: 8, short: 'SAR Export', label: 'Automated SAR XML Filing', description: 'Transactions crossing the risk threshold automatically trigger SAR filing packages formatted according to FinCEN XML specifications. Filings bundle SHAP evidence, transaction paths, and cryptographic signatures for direct SIEM export.', tech: ['FinCEN SAR XML 2.0', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Automated Regulatory Package -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-CONSORTIUM-991</FilerID>\n    <FilingType>ELECTRONIC</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <ProofHash>sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</ProofHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
+// PRESENTATION-FRIENDLY WORKFLOW STEPS (No raw code bloat, clean executive cards)
+const PRESENTATION_WORKFLOW = [
+  {
+    id: 1,
+    short: 'Ingestion',
+    label: 'ISO 20022 Message Stream Ingestion',
+    summary: 'Core banking ledgers stream pacs.008 (credit transfers) and camt.053 (account statements) into the bank node data plane. Messages are validated against XSD schemas and converted into normalized transaction graph tensors.',
+    highlights: ['Automatic XSD schema validation against ISO 20022 standards', 'Zero PII leaves local bank storage', 'Graph construction in under 15ms per transaction batch'],
+    input: 'Raw XML pacs.008 / camt.053',
+    output: 'Normalized local graph tensor',
+    badge: 'Stage 01'
+  },
+  {
+    id: 2,
+    short: 'Local GNN',
+    label: 'On-Premise Graph Attention Neural Training',
+    summary: 'Local PyTorch Geometric GAT models train exclusively inside the bank perimeter. Multi-head attention layers extract 512-dimensional structural embeddings capturing multi-hop laundering topologies.',
+    highlights: ['8-head Graph Attention Networks (GATConv)', 'Deep structural pattern discovery across local ledger', 'Zero raw transaction data sharing'],
+    input: 'Graph node & edge tensors',
+    output: 'Local GNN weight updates',
+    badge: 'Stage 02'
+  },
+  {
+    id: 3,
+    short: 'Diff. Privacy',
+    label: 'Differential Privacy Noise Calibration',
+    summary: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi DP accountant enforces mathematical (ε=0.50, δ=1e-5) privacy bounds.',
+    highlights: ['Mathematically provable (ε=0.50, δ=1e-5)-DP guarantee', 'Rényi DP cumulative privacy accountant', 'Gradient clipping prevents sample memorization'],
+    input: 'Raw model gradients',
+    output: 'Differentially private gradient tensors',
+    badge: 'Stage 03'
+  },
+  {
+    id: 4,
+    short: 'Sec. Aggregation',
+    label: 'Intel SGX Hardware TEE Enclave Summation',
+    summary: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and sent to the Intel SGX hardware enclave. The enclave performs encrypted summation without decrypting individual bank updates.',
+    highlights: ['Intel SGX hardware-isolated Enclave v2', 'Paillier additive homomorphic encryption', 'Intel IAS Remote Attestation cryptographic verification'],
+    input: 'Encrypted gradient ciphertexts',
+    output: 'Homomorphically summed global ciphertext',
+    badge: 'Stage 04'
+  },
+  {
+    id: 5,
+    short: 'BFT Defense',
+    label: 'Byzantine-Robust Adversarial Poisoning Filter',
+    summary: 'The FL Coordinator runs Byzantine-robust aggregation (Krum algorithm + Trimmed Mean) to evaluate incoming gradient vectors. Poisoned or malicious updates from compromised nodes are isolated and quenched.',
+    highlights: ['Krum & Trimmed Mean Byzantine resilience', 'Quenches up to f < n/2 malicious node attacks', 'Gradient cosine distance anomaly detection'],
+    input: 'Node gradient vectors',
+    output: 'Verified, filtered global update',
+    badge: 'Stage 05'
+  },
+  {
+    id: 6,
+    short: 'Global Update',
+    label: 'Global Model Distribution & Registry Commit',
+    summary: 'The aggregated global model weights are committed to the Model Registry with SHA-256 cryptographic audit signatures. Updated model parameters are broadcast back to all bank nodes via mutual TLS (mTLS).',
+    highlights: ['FedAvg global weight synthesis', 'SHA-256 immutable audit trail', 'Secure gRPC mTLS broadcast to consortium'],
+    input: 'Filtered global gradient',
+    output: 'Updated global model weights',
+    badge: 'Stage 06'
+  },
+  {
+    id: 7,
+    short: 'Risk Engine',
+    label: 'Calibrated Risk Scoring & SHAP Explanations',
+    summary: 'Global GNN embeddings are passed into an XGBoost ensemble classifier to generate calibrated risk scores [0-1]. The SHAP TreeExplainer computes human-interpretable feature attributions for fraud analysts.',
+    highlights: ['Ensemble GNN + XGBoost classifier', 'SHAP TreeExplainer for full decision transparency', 'False Positive Rate reduced by 5× (31% → 6.1%)'],
+    input: '512-dim GNN embeddings',
+    output: 'Risk Score [0-1] + SHAP breakdown',
+    badge: 'Stage 07'
+  },
+  {
+    id: 8,
+    short: 'SAR Filing',
+    label: 'Automated FinCEN SAR XML Package Export',
+    summary: 'Transactions crossing the risk threshold automatically trigger SAR filing packages formatted according to FinCEN XML specifications. Filings bundle SHAP evidence, transaction paths, and cryptographic signatures for direct SIEM export.',
+    highlights: ['Automated FinCEN SAR XML 2.0 filing generation', 'XMLSec cryptographic digital signature sign-off', 'Direct integration with Splunk HEC & enterprise SIEM'],
+    input: 'High-risk transaction flag',
+    output: 'Cryptographically signed FinCEN SAR XML',
+    badge: 'Stage 08'
+  },
 ];
 
 // Helper for smooth scrolling to sections
@@ -186,7 +259,7 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
 
       {/* Main Body */}
       <div className="flex min-h-[360px]">
-        {/* INTERACTIVE SIDEBAR NAV (RED RECTANGLE BUTTONS) */}
+        {/* INTERACTIVE SIDEBAR NAV */}
         <div className="w-11 shrink-0 border-r border-white/6 bg-[#08081b] py-3 flex flex-col items-center gap-3.5">
           {sidebarButtons.map(btn => (
             <button
@@ -209,7 +282,6 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
           <AnimatePresence mode="wait">
             {activeTab === 'home' && (
               <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-                {/* Stat HUD Cards (Preserves test assertions: Active FL Round, Global Accuracy, Stream Speed) */}
                 <div className="grid grid-cols-2 gap-2">
                   <div className="p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
                     <div className="text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
@@ -229,7 +301,6 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
                   </div>
                 </div>
 
-                {/* Risk Alert Feed */}
                 <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2">
                   <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 bg-white/3">
                     <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
@@ -249,7 +320,6 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
                   </div>
                 </div>
 
-                {/* 2026 Futuristic High-End Consortium Network */}
                 <div className="rounded-xl border border-white/6 bg-white/2 p-2">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
@@ -356,7 +426,7 @@ function FadeSection({ children, className = '', delay = 0 }: { children: React.
   );
 }
 
-// ── ICONS ────────────────────────────────────────────────────────────────────
+// ── 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT ────────────────────────
 const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 120 120" fill="none">
     <defs>
@@ -391,6 +461,7 @@ const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
     <circle cx="60" cy="60" r="2.5" fill="#38bdf8" />
   </svg>
 );
+
 const MenuIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
     <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
@@ -442,7 +513,7 @@ export default function LandingPage() {
     setIsCapabilitiesDropdownOpen(false);
   };
 
-  const currentWorkflowStep = WORKFLOW_STEPS.find(s => s.id === activeWorkflowStep)!;
+  const currentWorkflowStep = PRESENTATION_WORKFLOW.find(s => s.id === activeWorkflowStep)!;
 
   return (
     <div className="min-h-screen bg-[#05050f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white overflow-x-hidden">
@@ -618,7 +689,7 @@ export default function LandingPage() {
         </AnimatePresence>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 1 — HERO / OVERVIEW
+            SECTION 1 — HERO / OVERVIEW (#hero)
         ══════════════════════════════════════════════════════════ */}
         <section id="hero" className="relative py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
@@ -730,21 +801,22 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 3 — WORKFLOW PIPELINE (#how-it-works)
+            SECTION 3 — PRESENTATION-FRIENDLY WORKFLOW PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
         <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Execution Pipeline</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Pipeline</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Architecture</h2>
               <p className="text-slate-400 text-base mt-3 leading-relaxed">
-                Click any stage below to inspect production implementations, cryptography, and code references.
+                Click any pipeline stage below to view the architectural overview, data input/output specifications, and cryptographic guarantees.
               </p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+              {/* Left Selector List */}
               <div className="lg:col-span-4 space-y-2">
-                {WORKFLOW_STEPS.map(step => (
+                {PRESENTATION_WORKFLOW.map(step => (
                   <button
                     key={step.id}
                     onClick={() => setActiveWorkflowStep(step.id)}
@@ -764,20 +836,48 @@ export default function LandingPage() {
                 ))}
               </div>
 
+              {/* Right Executive Presentation Card (Clean, visual, no code bloat) */}
               <div className="lg:col-span-8">
-                <div className="p-6 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-5">
-                  <div className="border-b border-white/6 pb-4">
-                    <span className="text-[10px] font-mono text-purple-400 uppercase tracking-wider">Stage {currentWorkflowStep.id} of 8</span>
-                    <h3 className="text-lg font-bold text-slate-100 mt-1">{currentWorkflowStep.label}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-2">{currentWorkflowStep.description}</p>
+                <div className="p-7 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-6">
+                  <div className="flex items-center justify-between border-b border-white/6 pb-4">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest">
+                        {currentWorkflowStep.badge} of 08
+                      </span>
+                      <h3 className="text-xl font-bold text-slate-100 mt-1">{currentWorkflowStep.label}</h3>
+                    </div>
+                    <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                      Production Pipeline
+                    </span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {currentWorkflowStep.tech.map(t => (
-                      <span key={t} className="px-2.5 py-1 rounded-lg text-[10px] font-mono text-purple-300 bg-purple-600/10 border border-purple-500/20">{t}</span>
-                    ))}
+
+                  <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                    {currentWorkflowStep.summary}
+                  </p>
+
+                  {/* Highlights Bullet List */}
+                  <div className="space-y-2.5 pt-2">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
+                    <div className="space-y-2 font-sans text-xs text-slate-300">
+                      {currentWorkflowStep.highlights.map(hl => (
+                        <div key={hl} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/3 border border-white/5">
+                          <span className="text-purple-400 font-bold">✓</span>
+                          <span>{hl}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                  <div className="rounded-2xl bg-[#03030c] border border-white/8 p-4 font-mono text-xs text-purple-200/90 overflow-x-auto leading-relaxed">
-                    <pre>{currentWorkflowStep.code}</pre>
+
+                  {/* Data Input/Output Specifications */}
+                  <div className="grid grid-cols-2 gap-3 pt-2">
+                    <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Data Input</div>
+                      <div className="text-purple-300 font-semibold">{currentWorkflowStep.input}</div>
+                    </div>
+                    <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs">
+                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Data Output</div>
+                      <div className="text-emerald-400 font-semibold">{currentWorkflowStep.output}</div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1037,26 +1137,43 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 8 — REST API & SDK (#api, #docs)
+            SECTION 8 — EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
         <section id="api" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
           <div id="docs">
             <FadeSection>
               <div className="max-w-3xl mb-8">
-                <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer Integration</div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">REST API & Bank Connector SDK</h2>
+                <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
+                <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise REST API & SDK Specs</h2>
                 <p className="text-slate-400 text-base mt-3 leading-relaxed">
-                  FastAPI REST endpoints for round scheduling, WebSocket streams for live telemetry, and python SDK for connector agents.
+                  CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.0 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
               </div>
 
-              <div className="flex gap-1.5 p-1.5 bg-white/3 border border-white/8 rounded-2xl w-fit mb-6">
-                {[{id:'curl',label:'cURL'},{id:'python',label:'Python'},{id:'ts',label:'TypeScript'}].map(tab => (
+              {/* Integration Features Banner */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20">
+                  <div className="text-xs font-mono font-bold text-indigo-400 uppercase mb-1">mTLS & API Keys</div>
+                  <p className="text-xs text-slate-400">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
+                </div>
+                <div className="p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20">
+                  <div className="text-xs font-mono font-bold text-purple-400 uppercase mb-1">WebSocket Telemetry</div>
+                  <p className="text-xs text-slate-400">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
+                </div>
+                <div className="p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20">
+                  <div className="text-xs font-mono font-bold text-cyan-400 uppercase mb-1">SDK & WebHooks</div>
+                  <p className="text-xs text-slate-400">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
+                </div>
+              </div>
+
+              {/* Interactive Code Console Tabs */}
+              <div className="flex gap-1.5 p-1.5 bg-white/3 border border-white/8 rounded-2xl w-fit mb-4">
+                {[{id:'curl',label:'cURL'},{id:'python',label:'Python SDK'},{id:'ts',label:'TypeScript SDK'}].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveApiTab(tab.id as 'curl'|'python'|'ts')}
                     className={`px-4 py-1.5 text-xs font-mono rounded-xl transition-all cursor-pointer ${
-                      activeApiTab === tab.id ? 'bg-slate-700 text-white font-bold' : 'text-slate-400 hover:text-slate-200'
+                      activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
                     {tab.label}
@@ -1064,62 +1181,84 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              <div className="rounded-3xl bg-[#03030c] border border-white/8 p-6 overflow-x-auto mb-8 shadow-2xl">
+              {/* Code Display Window */}
+              <div className="rounded-3xl bg-[#03030c] border border-white/8 p-6 overflow-x-auto mb-10 shadow-2xl">
                 <pre className="text-xs font-mono text-indigo-200/90 leading-relaxed whitespace-pre">
-                  {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium
+                  {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium bank nodes
 curl -X POST https://api.cfi-platform.com/v1/rounds \\
   -H "Authorization: Bearer cfi_api_key_991823" \\
   -H "Content-Type: application/json" \\
   -d '{
     "consortium_id": "cfi-prod-001",
     "node_ids": ["jpmorgan-01", "hsbc-02", "deutsche-03"],
-    "privacy_config": {"epsilon": 0.50, "delta": 1e-5},
-    "aggregation": "krum"
+    "privacy_config": {
+      "target_epsilon": 0.50,
+      "target_delta": 1e-5,
+      "max_grad_norm": 1.0
+    },
+    "byzantine_defense": "krum"
   }'`}
-                  {activeApiTab === 'python' && `from cfi_sdk import CFIClient
+                  {activeApiTab === 'python' && `# Install SDK: pip install cfi-sdk
+from cfi_sdk import CFIClient
 
-client = CFIClient(api_key="cfi_api_key_991823")
-
-round_ = client.rounds.start(
-    consortium_id="cfi-prod-001",
-    node_ids=["jpmorgan-01", "hsbc-02", "deutsche-03"],
-    privacy={"epsilon": 0.50, "delta": 1e-5},
+client = CFIClient(
+    api_key="cfi_api_key_991823",
+    environment="production"
 )
 
-for event in client.rounds.stream(round_.id):
-    print(f"Round {event.round_id}: {event.stage} — {event.accuracy:.3f}")`}
-                  {activeApiTab === 'ts' && `import { CFIClient } from '@cfi/sdk';
+# Start federated training round
+round_session = client.rounds.start(
+    consortium_id="cfi-prod-001",
+    node_ids=["jpmorgan-01", "hsbc-02", "deutsche-03"],
+    privacy={"target_epsilon": 0.50, "target_delta": 1e-5},
+    byzantine_defense="krum"
+)
 
-const client = new CFIClient({ apiKey: 'cfi_api_key_991823' });
+# Stream live telemetry updates
+for event in client.rounds.stream_telemetry(round_session.id):
+    print(f"Round #{event.round_id} [{event.stage}]: Accuracy={event.accuracy:.3f}")`}
+                  {activeApiTab === 'ts' && `// Install SDK: npm install @cfi/sdk
+import { CFIClient } from '@cfi/sdk';
 
-const round = await client.rounds.start({
-  consortiumId: 'cfi-prod-001',
-  nodeIds: ['jpmorgan-01', 'hsbc-02', 'deutsche-03'],
-  privacyConfig: { epsilon: 0.50, delta: 1e-5 },
+const client = new CFIClient({
+  apiKey: 'cfi_api_key_991823',
+  baseUrl: 'https://api.cfi-platform.com'
 });
 
-const ws = client.telemetry.subscribe(round.id);
-ws.on('round.stage', (e) => console.log(e.stage, e.accuracy));`}
+// Trigger training round
+const session = await client.rounds.start({
+  consortiumId: 'cfi-prod-001',
+  nodeIds: ['jpmorgan-01', 'hsbc-02', 'deutsche-03'],
+  privacyConfig: { targetEpsilon: 0.50, targetDelta: 1e-5 },
+  byzantineDefense: 'krum',
+});
+
+// Listen to WebSocket telemetry
+const telemetry = client.telemetry.connect(session.id);
+telemetry.on('round.stage', (evt) => {
+  console.log(\`Round \${evt.roundId}: Accuracy \${evt.accuracy}%\`);
+});`}
                 </pre>
               </div>
 
-              {/* Endpoint Table */}
-              <div className="rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl">
-                <div className="px-6 py-4 bg-white/2 border-b border-white/6">
-                  <span className="text-xs font-mono text-slate-400 font-semibold">API Endpoint Reference — v1</span>
+              {/* Endpoint Detailed Table */}
+              <div className="rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl space-y-0">
+                <div className="px-6 py-4 bg-white/3 border-b border-white/6 flex items-center justify-between">
+                  <span className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
+                  <span className="text-[10px] font-mono text-indigo-400">OpenAPI 3.0 Spec Compatible</span>
                 </div>
-                <table className="w-full text-xs font-mono">
-                  <tbody>
-                    {[
-                      { method: 'POST', path: '/v1/rounds',        desc: 'Trigger a new federated learning round' },
-                      { method: 'GET',  path: '/v1/rounds/:id',    desc: 'Get round status, accuracy and gradient norms' },
-                      { method: 'GET',  path: '/v1/nodes',         desc: 'List active bank node connector statuses' },
-                      { method: 'POST', path: '/v1/connectors',    desc: 'Register new bank node connector' },
-                      { method: 'GET',  path: '/v1/reports/sar',   desc: 'Retrieve FinCEN SAR XML export packages' },
-                      { method: 'WS',   path: '/v1/telemetry',     desc: 'Stream real-time round metrics via WebSocket' },
-                    ].map(row => (
-                      <tr key={row.path} className="border-b border-white/5 hover:bg-white/3 transition-colors">
-                        <td className="px-6 py-3.5 w-20">
+                <div className="divide-y divide-white/5 font-mono text-xs">
+                  {[
+                    { method: 'POST', path: '/v1/rounds',        desc: 'Trigger a new federated training round across authenticated bank nodes', req: 'consortium_id, node_ids, privacy_config', res: 'round_id, status: STARTED' },
+                    { method: 'GET',  path: '/v1/rounds/:id',    desc: 'Fetch real-time round metrics, global accuracy, and L2 gradient norms', req: 'round_id (path parameter)', res: 'accuracy, epsilon_used, node_statuses' },
+                    { method: 'GET',  path: '/v1/nodes',         desc: 'List active bank node connector statuses, hardware specs, and latencies', req: 'none', res: 'array of BankNode objects' },
+                    { method: 'POST', path: '/v1/connectors',    desc: 'Register a new core-banking ISO 20022 message stream connector', req: 'bank_id, xsd_schema_url, mtls_cert', res: 'connector_id, status: ACTIVE' },
+                    { method: 'GET',  path: '/v1/reports/sar',   desc: 'Retrieve cryptographically signed FinCEN SAR XML export packages', req: 'risk_threshold (optional)', res: 'FinCEN_SAR XML + SHA-256 signature' },
+                    { method: 'WS',   path: '/v1/telemetry',     desc: 'Bi-directional WebSocket streaming live training rounds & risk alerts', req: 'jwt_token', res: 'JSON event telemetry stream' },
+                  ].map(row => (
+                    <div key={row.path} className="p-5 hover:bg-white/3 transition-colors space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
                           <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                             row.method === 'GET'  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
                             row.method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
@@ -1127,13 +1266,18 @@ ws.on('round.stage', (e) => console.log(e.stage, e.accuracy));`}
                           }`}>
                             {row.method}
                           </span>
-                        </td>
-                        <td className="px-6 py-3.5 text-indigo-300 font-semibold">{row.path}</td>
-                        <td className="px-6 py-3.5 text-slate-500">{row.desc}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                          <span className="text-indigo-300 font-bold text-sm">{row.path}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-500 font-mono">v1 endpoint</span>
+                      </div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed">{row.desc}</p>
+                      <div className="flex flex-wrap gap-4 text-[10px] text-slate-500 pt-1 border-t border-white/4">
+                        <div><span className="text-slate-600">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
+                        <div><span className="text-slate-600">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </FadeSection>
           </div>
