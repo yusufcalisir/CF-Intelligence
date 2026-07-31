@@ -100,8 +100,8 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
       </BrowserRouter>
     );
 
-    // Default view includes telemetry
-    expect(screen.getByText('FL Consortium Telemetry & Alerts')).toBeDefined();
+    // Default view includes telemetry & consortium topology
+    expect(screen.getByText('Consortium Topology')).toBeDefined();
 
     // Click GNN Graph button (⬡)
     const gnnBtn = screen.getByTitle('GNN Graph Node Topology');
