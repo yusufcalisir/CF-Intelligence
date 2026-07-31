@@ -51,8 +51,6 @@ const WORKFLOW_STEPS = [
   { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
 ];
 
-
-
 // Helper for smooth scrolling to sections
 const scrollToSection = (id: string) => {
   const element = document.getElementById(id);
@@ -63,119 +61,293 @@ const scrollToSection = (id: string) => {
   }
 };
 
-// ── 2026 MODERN INTERACTIVE SIMULATOR GRAPH SVG ──────────────────────────────
-function InteractiveGraphSimulator() {
-  const [activeTab, setActiveTab] = useState<'federated' | 'isolated'>('federated');
+// ── 2026 HIGH-END FUTURISTIC CONSORTIUM NETWORK SVG ──────────────────────────
+function HighEndConsortiumSVG() {
   const [pulseTick, setPulseTick] = useState(0);
-
   useEffect(() => {
-    const interval = setInterval(() => setPulseTick(p => p + 1), 60);
-    return () => clearInterval(interval);
+    const t = setInterval(() => setPulseTick(p => p + 1), 50);
+    return () => clearInterval(t);
   }, []);
 
-  const nodes = [
-    { id: 'Bank A', x: 50,  y: 40,  color: '#6366f1' },
-    { id: 'Bank B', x: 210, y: 30,  color: '#a855f7' },
-    { id: 'Bank C', x: 210, y: 120, color: '#06b6d4' },
-    { id: 'TEE Vault', x: 130, y: 75, color: '#10b981' },
+  const banks = [
+    { id: 'JPM', name: 'JPMorgan', x: 45,  y: 65,  color: '#6366f1', glow: '#818cf8' },
+    { id: 'HSB', name: 'HSBC',     x: 185, y: 30,  color: '#a855f7', glow: '#c084fc' },
+    { id: 'DBK', name: 'Deutsche', x: 185, y: 100, color: '#06b6d4', glow: '#38bdf8' },
+    { id: 'SGX', name: 'Intel TEE',x: 115, y: 65,  color: '#10b981', glow: '#34d399' },
   ];
+  const edges: [number, number][] = [[0,3],[1,3],[2,3]];
 
   return (
-    <div className="relative rounded-3xl bg-[#08081a]/90 border border-white/10 p-6 backdrop-blur-2xl shadow-[0_0_80px_rgba(99,102,241,0.18)] space-y-4">
-      {/* Visual Header bar */}
-      <div className="flex items-center justify-between border-b border-white/6 pb-3.5">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-          <span className="text-xs font-mono font-semibold text-slate-200">Consortium Graph Engine Simulator</span>
-        </div>
+    <div className="relative w-full h-[125px] flex items-center justify-center">
+      <svg viewBox="0 0 230 120" className="w-full h-full">
+        <defs>
+          <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3" result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+          {banks.map(b => (
+            <radialGradient key={b.id} id={`radial-${b.id}`} cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stopColor={b.color} stopOpacity="0.4" />
+              <stop offset="100%" stopColor={b.color} stopOpacity="0" />
+            </radialGradient>
+          ))}
+        </defs>
 
-        {/* Mode Switcher */}
-        <div className="flex items-center p-0.5 rounded-xl bg-white/4 border border-white/8">
-          <button
-            onClick={() => setActiveTab('federated')}
-            className={`px-3 py-1 rounded-lg text-[10px] font-mono transition-all cursor-pointer ${
-              activeTab === 'federated'
-                ? 'bg-indigo-600 text-white font-bold shadow-[0_0_12px_rgba(99,102,241,0.5)]'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Federated Mode
-          </button>
-          <button
-            onClick={() => setActiveTab('isolated')}
-            className={`px-3 py-1 rounded-lg text-[10px] font-mono transition-all cursor-pointer ${
-              activeTab === 'isolated'
-                ? 'bg-rose-600/80 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.5)]'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Isolated Mode
-          </button>
-        </div>
-      </div>
+        {/* Dynamic Curved Connection Beams with Particles */}
+        {edges.map(([a, b], i) => {
+          const from = banks[a]!;
+          const to = banks[b]!;
+          const offset = ((pulseTick * 2.2) + i * 35) % 110;
+          return (
+            <g key={`beam-${i}`}>
+              <line x1={from.x} y1={from.y} x2={to.x} y2={to.y} stroke="#171738" strokeWidth="2.5" />
+              <line
+                x1={from.x} y1={from.y} x2={to.x} y2={to.y}
+                stroke={from.color} strokeWidth="1.5"
+                strokeDasharray="8 35" strokeDashoffset={-offset} strokeOpacity="0.9"
+                filter="url(#glow-filter)"
+              />
+            </g>
+          );
+        })}
 
-      {/* SVG Container */}
-      <div className="h-[140px] relative">
-        <svg viewBox="0 0 260 140" className="w-full h-full">
-          {/* Edge lines */}
-          {activeTab === 'federated' ? (
-            <>
-              {( [ [0,3], [1,3], [2,3] ] as [number, number][]).map(([a, b], idx) => {
-                const n1 = nodes[a]!;
-                const n2 = nodes[b]!;
-                const offset = ((pulseTick * 2.5) + idx * 30) % 100;
-                return (
-                  <g key={idx}>
-                    <line x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y} stroke="#1e1b4e" strokeWidth="2" />
-                    <line
-                      x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y}
-                      stroke={n1.color} strokeWidth="1.5"
-                      strokeDasharray="10 40" strokeDashoffset={-offset} strokeOpacity="0.85"
-                    />
-                  </g>
-                );
-              })}
-            </>
-          ) : (
-            <>
-              {( [ [0,3], [1,3], [2,3] ] as [number, number][]).map(([a, b], idx) => {
-                const n1 = nodes[a]!;
-                const n2 = nodes[b]!;
-                return (
-                  <line key={idx} x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y} stroke="#ef4444" strokeWidth="1" strokeDasharray="3 4" strokeOpacity="0.4" />
-                );
-              })}
-            </>
-          )}
+        {/* Central Intel SGX Orbit Ring */}
+        <circle cx={115} cy={65} r="22" fill="none" stroke="#10b981" strokeWidth="0.8" strokeDasharray="3 4" strokeOpacity="0.5" />
 
-          {/* Render Nodes */}
-          {nodes.map((node, i) => (
-            <g key={node.id}>
-              <circle cx={node.x} cy={node.y} r="14" fill="#090919" stroke={activeTab === 'isolated' && i !== 3 ? '#ef4444' : node.color} strokeWidth="1.5" />
-              <circle cx={node.x} cy={node.y} r="4" fill={activeTab === 'isolated' && i !== 3 ? '#ef4444' : node.color} />
-              <text x={node.x} y={node.y + 22} textAnchor="middle" fontSize="7.5" fill="#94a3b8" fontFamily="monospace" fontWeight="600">
-                {node.id}
+        {/* Nodes */}
+        {banks.map((b, i) => {
+          const isCentral = b.id === 'SGX';
+          const r = isCentral ? 11 : 9;
+          const radarRadius = r + ((pulseTick + i * 25) % 50) / 3.5;
+          const opacity = 1 - ((pulseTick + i * 25) % 50) / 50;
+
+          return (
+            <g key={b.id}>
+              {/* Outer Glow Circle */}
+              <circle cx={b.x} cy={b.y} r={r * 2.2} fill={`url(#radial-${b.id})`} />
+
+              {/* Pulsing Radar Ring */}
+              <circle cx={b.x} cy={b.y} r={radarRadius} fill="none" stroke={b.glow} strokeWidth="0.8" strokeOpacity={opacity} />
+
+              {/* Core Solid Node */}
+              <circle cx={b.x} cy={b.y} r={r} fill="#060614" stroke={b.color} strokeWidth="1.8" filter="url(#glow-filter)" />
+              <circle cx={b.x} cy={b.y} r={r * 0.35} fill={b.glow} />
+
+              {/* Label */}
+              <text x={b.x} y={b.y + r + 10} textAnchor="middle" fontSize="6.5" fill="#94a3b8" fontFamily="monospace" fontWeight="700">
+                {b.id}
               </text>
             </g>
-          ))}
-        </svg>
-      </div>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
 
-      {/* Simulator Metrics Box */}
-      <div className="grid grid-cols-3 gap-2.5 border-t border-white/6 pt-3 text.5 font-mono">
-        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
-          <div className="text-[9px] text-slate-500 uppercase tracking-wider">Active FL Round</div>
-          <div className="text-sm font-bold text-indigo-400 mt-0.5">#47</div>
-        </div>
-        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
-          <div className="text-[9px] text-slate-500 uppercase tracking-wider">Global Accuracy</div>
-          <div className={`text-sm font-bold mt-0.5 ${activeTab === 'federated' ? 'text-emerald-400' : 'text-rose-400'}`}>
-            {activeTab === 'federated' ? '94.2%' : '42.0%'}
+// ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
+function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
+  const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar'>('home');
+  const [alertTick, setAlertTick] = useState(0);
+
+  useEffect(() => {
+    const t = setInterval(() => setAlertTick(p => p + 1), 3200);
+    return () => clearInterval(t);
+  }, []);
+
+  const alerts = [
+    { id: 'JPM-9912', bank: 'JPM', amount: '1,450,000', score: 0.94, high: true },
+    { id: 'HSBC-8812', bank: 'HSB', amount: '87,400',   score: 0.31, high: false },
+    { id: 'DBK-7734', bank: 'DBK', amount: '650,000',   score: 0.87, high: true },
+    { id: 'JPM-9913', bank: 'JPM', amount: '12,200',    score: 0.11, high: false },
+  ];
+
+  const sidebarButtons = [
+    { id: 'home',    symbol: 'C', title: 'FL Consortium Telemetry & Alerts', color: 'bg-indigo-600' },
+    { id: 'gnn',     symbol: '⬡', title: 'GNN Graph Node Topology',          color: 'bg-purple-600' },
+    { id: 'privacy', symbol: '◎', title: 'Differential Privacy & SGX Vault',  color: 'bg-emerald-600' },
+    { id: 'bft',     symbol: '△', title: 'Byzantine Attack Defense Lab',     color: 'bg-cyan-600' },
+    { id: 'sar',     symbol: '▦', title: 'FinCEN SAR XML Generator',          color: 'bg-amber-600' },
+  ];
+
+  const currentTabInfo = sidebarButtons.find(b => b.id === activeTab)!;
+
+  return (
+    <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-[#070718]">
+      {/* Browser Chrome Header */}
+      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#0b0b20] border-b border-white/8">
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1.5 shrink-0">
+            <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
+            <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
+          </div>
+          <div className="px-3 py-0.5 rounded-md bg-white/4 text-[10px] font-mono text-slate-400 flex items-center gap-2 border border-white/5">
+            <span className="text-slate-600">🔒</span>
+            cfi-platform.com/dashboard/{activeTab}
           </div>
         </div>
-        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
-          <div className="text-[9px] text-slate-500 uppercase tracking-wider">Stream Speed</div>
-          <div className="text-sm font-bold text-cyan-400 mt-0.5">1.4 GB/s</div>
+        <div className="flex items-center gap-1.5">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
+        </div>
+      </div>
+
+      {/* Main Body */}
+      <div className="flex min-h-[360px]">
+        {/* INTERACTIVE SIDEBAR NAV (RED RECTANGLE BUTTONS) */}
+        <div className="w-11 shrink-0 border-r border-white/6 bg-[#08081b] py-3 flex flex-col items-center gap-3.5">
+          {sidebarButtons.map(btn => (
+            <button
+              key={btn.id}
+              onClick={() => setActiveTab(btn.id as any)}
+              title={btn.title}
+              className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-mono font-bold transition-all cursor-pointer ${
+                activeTab === btn.id
+                  ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
+                  : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
+              }`}
+            >
+              {btn.symbol}
+            </button>
+          ))}
+        </div>
+
+        {/* DYNAMIC TAB VIEW CONTENT */}
+        <div className="flex-1 p-3.5 min-w-0 flex flex-col justify-between">
+          <AnimatePresence mode="wait">
+            {activeTab === 'home' && (
+              <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
+                {/* Stat HUD Cards (Preserves test assertions: Active FL Round, Global Accuracy, Stream Speed) */}
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
+                    <div className="text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
+                    <div className="text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
+                    <div className="text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
+                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
+                    <div className="text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
+                    <div className="text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
+                  </div>
+                  <div className="p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
+                    <div className="text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
+                    <div className="text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
+                  </div>
+                </div>
+
+                {/* Risk Alert Feed */}
+                <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2">
+                  <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 bg-white/3">
+                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400">
+                      <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
+                    </span>
+                  </div>
+                  <div className="divide-y divide-white/4">
+                    {alerts.map((a, i) => (
+                      <div key={`${a.id}-${alertTick}`} className="flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-mono">
+                        <span className={`w-1 h-3.5 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                        <span className="text-slate-400 w-12">{a.bank} TX</span>
+                        <span className="text-slate-300 flex-1 truncate">${a.amount}</span>
+                        <span className={`font-bold ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 2026 Futuristic High-End Consortium Network */}
+                <div className="rounded-xl border border-white/6 bg-white/2 p-2">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
+                  </div>
+                  <HighEndConsortiumSVG />
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'gnn' && (
+              <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
+                <div className="p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-1">
+                  <div className="text-purple-300 font-bold">GNN Subgraph Inspection</div>
+                  <div className="text-slate-400 text-[9px]">Multi-hop transaction graph attention embeddings (PyG 2.6)</div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 space-y-2">
+                  <div className="text-slate-500 text-[9px]">GATConv Layer Attentions:</div>
+                  <div className="text-purple-300 font-mono text-[9px]">head_0: [0.842, 0.191, 0.428, 0.912]</div>
+                  <div className="text-purple-300 font-mono text-[9px]">head_1: [0.311, 0.774, 0.109, 0.881]</div>
+                </div>
+                <div className="p-3 rounded-xl bg-white/3 border border-white/6">
+                  <div className="text-slate-400 font-semibold mb-1">Detected Circular Smurfing Path:</div>
+                  <div className="text-rose-400 font-bold">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'privacy' && (
+              <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
+                <div className="p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-1">
+                  <div className="text-emerald-300 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
+                  <div className="text-slate-400 text-[9px]">Opacus RDP Accountant & Paillier Cryptography</div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[9px]">
+                  <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Noise Scale (σ)</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">0.031 (L2 Clip = 1.0)</div>
+                  </div>
+                  <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">SGX Attestation</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">VERIFIED BY IAS</div>
+                  </div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[9px] text-slate-400 truncate">
+                  Homomorphic Ciphertext: 0x99F188A2...FE01
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'bft' && (
+              <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
+                <div className="p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-1">
+                  <div className="text-cyan-300 font-bold">Byzantine Resilience Monitor</div>
+                  <div className="text-slate-400 text-[9px]">Krum & Trimmed Mean Poisoning Defense</div>
+                </div>
+                <div className="space-y-1.5 text-[9px]">
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                    <span>JPMorgan Node #01</span>
+                    <span>100% HONEST</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                    <span>HSBC Node #02</span>
+                    <span>100% HONEST</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-400">
+                    <span>Adversary Node</span>
+                    <span>POISONED (QUENCHED BY KRUM)</span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'sar' && (
+              <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
+                <div className="p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-1">
+                  <div className="text-amber-300 font-bold">FinCEN SAR Automated Compliance</div>
+                  <div className="text-slate-400 text-[9px]">SHAP Feature Attributions & Signed XML Export</div>
+                </div>
+                <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[9px] text-amber-200/90 leading-relaxed font-mono">
+                  &lt;FinCEN_SAR&gt;&lt;Amount Ccy="USD"&gt;1450000.00&lt;/Amount&gt;&lt;RiskScore&gt;0.94&lt;/RiskScore&gt;&lt;/FinCEN_SAR&gt;
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-2">
+            Click sidebar icons ({sidebarButtons.map(b=>b.symbol).join(' · ')}) to inspect engine components
+          </div>
         </div>
       </div>
     </div>
@@ -235,6 +407,17 @@ export default function LandingPage() {
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
   const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
   const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
+
+  const [flRound, setFlRound] = useState(47);
+  const [accuracy, setAccuracy] = useState(94.2);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setFlRound(p => p + 1);
+      setAccuracy(parseFloat((94.0 + Math.random() * 0.4).toFixed(1)));
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
 
   const handleNavClick = (id: string) => {
     scrollToSection(id);
@@ -481,9 +664,9 @@ export default function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Right Interactive Simulator Preview */}
+            {/* Right Interactive Dashboard Preview (WITH FULLY INTERACTIVE SIDEBAR BUTTONS) */}
             <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.15}} className="lg:col-span-5">
-              <InteractiveGraphSimulator />
+              <InteractiveDashboardPreview flRound={flRound} accuracy={accuracy} />
             </motion.div>
           </div>
         </section>
