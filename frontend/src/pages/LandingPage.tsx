@@ -238,7 +238,7 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
                     </span>
                   </div>
                   <div className="divide-y divide-white/4">
-                    {alerts.map((a, i) => (
+                    {alerts.map((a) => (
                       <div key={`${a.id}-${alertTick}`} className="flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-mono">
                         <span className={`w-1 h-3.5 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
                         <span className="text-slate-400 w-12">{a.bank} TX</span>
