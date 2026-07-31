@@ -535,7 +535,6 @@ export default function LandingPage() {
             <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
               <BrandLogo />
               <span className="font-bold text-base text-slate-100 tracking-tight">CF-Intelligence</span>
-              <span className="text-[10px] font-mono text-slate-500/70 font-normal">v2.4.0</span>
             </div>
 
             {/* Desktop Navigation */}

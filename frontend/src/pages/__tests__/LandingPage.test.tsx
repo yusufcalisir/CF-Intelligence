@@ -29,7 +29,7 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders CF-Intelligence brand header with logo and version badge', () => {
+  it('renders CF-Intelligence brand header with logo', () => {
     render(
       <BrowserRouter>
         <LandingPage />
@@ -37,7 +37,6 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     );
 
     expect(screen.getByText('CF-Intelligence')).toBeDefined();
-    expect(screen.getByText('v2.4.0')).toBeDefined();
   });
 
   it('contains all 8 required section anchor targets for complete component access', () => {
