@@ -93,7 +93,7 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     expect(launchDemoButtons.length).toBeGreaterThan(0);
   });
 
-  it('switches views dynamically when clicking interactive dashboard preview sidebar buttons (C, ⬡, ◎, △, ▦)', () => {
+  it('switches views dynamically when clicking interactive dashboard preview sidebar buttons (C, ⬡, ◎, △, ▦)', async () => {
     render(
       <BrowserRouter>
         <LandingPage />
@@ -106,22 +106,22 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     // Click GNN Graph button (⬡)
     const gnnBtn = screen.getByTitle('GNN Graph Node Topology');
     fireEvent.click(gnnBtn);
-    expect(screen.getByText('GNN Subgraph Inspection')).toBeDefined();
+    expect(await screen.findByText('GNN Subgraph Inspection')).toBeDefined();
 
     // Click Differential Privacy button (◎)
     const privacyBtn = screen.getByTitle('Differential Privacy & SGX Vault');
     fireEvent.click(privacyBtn);
-    expect(screen.getByText('Intel SGX & (ε, δ)-DP Engine')).toBeDefined();
+    expect(await screen.findByText('Intel SGX & (ε, δ)-DP Engine')).toBeDefined();
 
     // Click Byzantine Defense button (△)
     const bftBtn = screen.getByTitle('Byzantine Attack Defense Lab');
     fireEvent.click(bftBtn);
-    expect(screen.getByText('Byzantine Resilience Monitor')).toBeDefined();
+    expect(await screen.findByText('Byzantine Resilience Monitor')).toBeDefined();
 
     // Click FinCEN SAR button (▦)
     const sarBtn = screen.getByTitle('FinCEN SAR XML Generator');
     fireEvent.click(sarBtn);
-    expect(screen.getByText('FinCEN SAR Automated Compliance')).toBeDefined();
+    expect(await screen.findByText('FinCEN SAR Automated Compliance')).toBeDefined();
   });
 
   it('opens bank node detail drawer when clicking a consortium institution card', () => {
