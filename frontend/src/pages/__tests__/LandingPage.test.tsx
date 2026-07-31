@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LandingPage from '../LandingPage';
 
@@ -91,5 +91,66 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
 
     const launchDemoButtons = screen.getAllByText(/Launch Demo|Launch Live Platform Demo/i);
     expect(launchDemoButtons.length).toBeGreaterThan(0);
+  });
+
+  it('switches views dynamically when clicking interactive dashboard preview sidebar buttons (C, ⬡, ◎, △, ▦)', () => {
+    render(
+      <BrowserRouter>
+        <LandingPage />
+      </BrowserRouter>
+    );
+
+    // Default view includes telemetry
+    expect(screen.getByText('FL Consortium Telemetry & Alerts')).toBeDefined();
+
+    // Click GNN Graph button (⬡)
+    const gnnBtn = screen.getByTitle('GNN Graph Node Topology');
+    fireEvent.click(gnnBtn);
+    expect(screen.getByText('GNN Subgraph Inspection')).toBeDefined();
+
+    // Click Differential Privacy button (◎)
+    const privacyBtn = screen.getByTitle('Differential Privacy & SGX Vault');
+    fireEvent.click(privacyBtn);
+    expect(screen.getByText('Intel SGX & (ε, δ)-DP Engine')).toBeDefined();
+
+    // Click Byzantine Defense button (△)
+    const bftBtn = screen.getByTitle('Byzantine Attack Defense Lab');
+    fireEvent.click(bftBtn);
+    expect(screen.getByText('Byzantine Resilience Monitor')).toBeDefined();
+
+    // Click FinCEN SAR button (▦)
+    const sarBtn = screen.getByTitle('FinCEN SAR XML Generator');
+    fireEvent.click(sarBtn);
+    expect(screen.getByText('FinCEN SAR Automated Compliance')).toBeDefined();
+  });
+
+  it('toggles graph engine simulator mode between Federated and Isolated mode', () => {
+    render(
+      <BrowserRouter>
+        <LandingPage />
+      </BrowserRouter>
+    );
+
+    const isolatedBtn = screen.getByText('Isolated Mode');
+    fireEvent.click(isolatedBtn);
+    expect(screen.getByText('42.0%')).toBeDefined();
+
+    const federatedBtn = screen.getByText('Federated Mode');
+    fireEvent.click(federatedBtn);
+    expect(screen.getByText('94.2%')).toBeDefined();
+  });
+
+  it('opens bank node detail drawer when clicking a consortium institution card', () => {
+    render(
+      <BrowserRouter>
+        <LandingPage />
+      </BrowserRouter>
+    );
+
+    const jpmCard = screen.getByText('JPMorgan Chase & Co.');
+    fireEvent.click(jpmCard);
+
+    expect(screen.getByText('Institution Node Detail')).toBeDefined();
+    expect(screen.getByText('New York Data Center, US (Node #01)')).toBeDefined();
   });
 });
