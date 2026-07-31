@@ -67,11 +67,13 @@ describe('Mobile, Tablet & Desktop Responsive Layout Test Suite', () => {
     // Click hamburger button to expand mobile drawer
     fireEvent.click(menuToggleBtn);
 
-    // Verify mobile drawer overlay renders all section navigation links
-    expect(screen.getByText('Overview (3D Architecture)')).toBeDefined();
-    expect(screen.getByText('The Problem & Solution')).toBeDefined();
-    expect(screen.getByText('Streaming GNN Collusion Simulator')).toBeDefined();
-    expect(screen.getByText('Deployment Blueprint Wizard')).toBeDefined();
+    // Verify mobile drawer overlay renders all section navigation links matching desktop
+    const overviewElements = screen.getAllByText('Overview');
+    expect(overviewElements.length).toBeGreaterThan(0);
+    const capabilitiesElements = screen.getAllByText('Capabilities');
+    expect(capabilitiesElements.length).toBeGreaterThan(0);
+    const platformElements = screen.getAllByText('Platform');
+    expect(platformElements.length).toBeGreaterThan(0);
   });
 
   it('renders tablet layout (768px) with responsive card grids and telemetry HUD', () => {

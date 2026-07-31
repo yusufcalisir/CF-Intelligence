@@ -553,7 +553,7 @@ export default function LandingPage() {
                 onMouseLeave={() => setIsCapabilitiesDropdownOpen(false)}
               >
                 <button
-                  onClick={() => handleNavClick('product')}
+                  onClick={() => handleNavClick('problem-solution')}
                   className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
                 >
                   <span>Capabilities</span>
@@ -592,7 +592,7 @@ export default function LandingPage() {
                     className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
                   >
                     <div>
-                      <div className="font-semibold">Engine Modules</div>
+                      <div className="font-semibold">Engine Specs</div>
                       <div className="text-[10px] text-slate-500">Platform engine specs</div>
                     </div>
                   </a>
@@ -633,40 +633,107 @@ export default function LandingPage() {
               transition={{ duration: 0.2, ease: 'easeOut' }}
               className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-[#05050f]/95 backdrop-blur-3xl p-4 sm:p-6 overflow-y-auto flex flex-col justify-between border-b border-white/10 shadow-2xl w-full max-w-full"
             >
-              <div className="space-y-5 min-w-0">
+              <div className="space-y-4 min-w-0">
                 <div className="flex items-center justify-between border-b border-white/8 pb-3 min-w-0">
                   <div className="text-xs font-mono font-bold uppercase tracking-widest text-indigo-400 truncate">Navigation Menu</div>
                   <span className="text-[10px] font-mono text-slate-500 shrink-0">CF-Intelligence</span>
                 </div>
 
-                {/* Mobile Menu Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
-                  {[
-                    { label: 'Overview (3D Architecture)',    targetId: 'hero',              badge: 'Overview',      desc: 'System introduction & stats' },
-                    { label: 'The Problem & Solution',        targetId: 'problem-solution',  badge: 'Problem',       desc: 'Cross-bank fraud analysis' },
-                    { label: 'Streaming GNN Collusion Simulator', targetId: 'how-it-works',  badge: 'Workflow',      desc: '8-stage pipeline runner' },
-                    { label: 'Privacy Engine & Capabilities', targetId: 'product',           badge: 'Capabilities',  desc: 'Engine specifications' },
-                    { label: 'Deployment Blueprint Wizard',   targetId: 'platform',          badge: 'Consortium',    desc: 'Bank node inspector' },
-                    { label: 'System Architecture',           targetId: 'architecture',      badge: 'Architecture',  desc: 'Service layer mesh' },
-                    { label: 'Security & Attack Defense Lab', targetId: 'security',          badge: 'Security',      desc: 'DP & trust boundaries' },
-                    { label: 'API & Docs',                    targetId: 'api',               badge: 'Developer SDK', desc: 'REST API & TypeScript SDK' },
-                  ].map(link => (
-                    <a
-                      key={link.label}
-                      href={`#${link.targetId}`}
-                      onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
-                      className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block min-w-0"
+                {/* Mobile Menu Matching Desktop Headers Exactly */}
+                <div className="space-y-3 min-w-0">
+                  {/* Overview */}
+                  <a
+                    href="#hero"
+                    onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
+                    className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer block min-w-0"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">Overview</span>
+                      <ArrowRight />
+                    </div>
+                    <div className="text-xs font-bold text-slate-200 mt-1">Overview</div>
+                    <div className="text-[10px] font-mono text-slate-500">System introduction & stats</div>
+                  </a>
+
+                  {/* Capabilities Group (Desktop Dropdown mirror) */}
+                  <div className="p-3.5 rounded-2xl bg-white/3 border border-indigo-500/20 space-y-2.5 min-w-0">
+                    <button
+                      onClick={() => handleNavClick('problem-solution')}
+                      className="w-full flex items-center justify-between text-left cursor-pointer group"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md truncate">
-                          {link.badge}
-                        </span>
-                        <ArrowRight />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md">Capabilities</span>
+                          <span className="text-[9px] font-mono text-slate-500">(3 Sections)</span>
+                        </div>
+                        <div className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors mt-1">Capabilities</div>
                       </div>
-                      <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate">{link.label}</div>
-                      <div className="text-[10px] font-mono text-slate-500 truncate">{link.desc}</div>
-                    </a>
-                  ))}
+                      <ArrowRight />
+                    </button>
+
+                    {/* 3 Capabilities Sub-items */}
+                    <div className="grid grid-cols-1 gap-1.5 pt-1 border-t border-white/6 font-mono text-xs">
+                      <a
+                        href="#problem-solution"
+                        onClick={(e) => { e.preventDefault(); handleNavClick('problem-solution'); }}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-200 text-xs">Problem</div>
+                          <div className="text-[9.5px] text-slate-500">Cross-bank fraud analysis</div>
+                        </div>
+                        <span className="text-[10px] text-purple-400">#01</span>
+                      </a>
+                      <a
+                        href="#how-it-works"
+                        onClick={(e) => { e.preventDefault(); handleNavClick('how-it-works'); }}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-200 text-xs">Workflow</div>
+                          <div className="text-[9.5px] text-slate-500">8-stage federated pipeline</div>
+                        </div>
+                        <span className="text-[10px] text-purple-400">#02</span>
+                      </a>
+                      <a
+                        href="#product"
+                        onClick={(e) => { e.preventDefault(); handleNavClick('product'); }}
+                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
+                      >
+                        <div>
+                          <div className="font-semibold text-slate-200 text-xs">Engine Specs</div>
+                          <div className="text-[9.5px] text-slate-500">Platform engine specs</div>
+                        </div>
+                        <span className="text-[10px] text-purple-400">#03</span>
+                      </a>
+                    </div>
+                  </div>
+
+                  {/* Other Desktop Headers */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
+                    {[
+                      { label: 'Platform',      targetId: 'platform',     badge: 'Consortium',   desc: 'Bank node inspector' },
+                      { label: 'Architecture',  targetId: 'architecture', badge: 'Architecture', desc: 'Service layer mesh' },
+                      { label: 'Security',      targetId: 'security',     badge: 'Security',     desc: 'DP & trust boundaries' },
+                      { label: 'API & Docs',    targetId: 'api',          badge: 'SDK & API',    desc: 'REST API & TypeScript SDK' },
+                    ].map(link => (
+                      <a
+                        key={link.label}
+                        href={`#${link.targetId}`}
+                        onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
+                        className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block min-w-0"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md truncate">
+                            {link.badge}
+                          </span>
+                          <ArrowRight />
+                        </div>
+                        <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate">{link.label}</div>
+                        <div className="text-[10px] font-mono text-slate-500 truncate">{link.desc}</div>
+                      </a>
+                    ))}
+                  </div>
                 </div>
               </div>
 

@@ -93,9 +93,12 @@ describe('Mobile Viewport Component Fit, Overflow & Drawer Test Suite', () => {
     const hamburgerBtn = screen.getByLabelText('Toggle Navigation Menu');
     fireEvent.click(hamburgerBtn);
 
-    // Mobile overlay should display section navigation items
-    expect(screen.getByText('Overview (3D Architecture)')).toBeDefined();
-    expect(screen.getByText('Privacy Engine & Capabilities')).toBeDefined();
-    expect(screen.getByText('Security & Attack Defense Lab')).toBeDefined();
+    // Mobile overlay should display section navigation items mirroring desktop exactly
+    const overviewElements = screen.getAllByText('Overview');
+    expect(overviewElements.length).toBeGreaterThan(0);
+    const capabilitiesElements = screen.getAllByText('Capabilities');
+    expect(capabilitiesElements.length).toBeGreaterThan(0);
+    const problemElements = screen.getAllByText('Problem');
+    expect(problemElements.length).toBeGreaterThan(0);
   });
 });
