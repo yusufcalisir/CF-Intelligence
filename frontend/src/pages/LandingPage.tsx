@@ -379,8 +379,8 @@ export default function LandingPage() {
                     className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors group/item"
                   >
                     <div>
-                      <div className="font-semibold">Capabilities</div>
-                      <div className="text-[10px] text-slate-500">Engine specs & modules</div>
+                      <div className="font-semibold">Engine Modules</div>
+                      <div className="text-[10px] text-slate-500">Platform engine specs</div>
                     </div>
                   </a>
                 </div>
