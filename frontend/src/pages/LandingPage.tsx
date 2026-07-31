@@ -90,19 +90,19 @@ function InteractiveGraphSimulator() {
   ];
 
   return (
-    <div className="relative rounded-2xl bg-[#090919]/90 border border-white/10 p-5 backdrop-blur-2xl shadow-[0_0_60px_rgba(99,102,241,0.15)] space-y-4">
+    <div className="relative rounded-3xl bg-[#08081a]/90 border border-white/10 p-6 backdrop-blur-2xl shadow-[0_0_80px_rgba(99,102,241,0.18)] space-y-4">
       {/* Visual Header bar */}
-      <div className="flex items-center justify-between border-b border-white/6 pb-3">
+      <div className="flex items-center justify-between border-b border-white/6 pb-3.5">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping" />
-          <span className="text-[11px] font-mono font-semibold text-slate-200">Consortium Graph Engine Simulator</span>
+          <span className="text-xs font-mono font-semibold text-slate-200">Consortium Graph Engine Simulator</span>
         </div>
 
         {/* Mode Switcher */}
-        <div className="flex items-center p-0.5 rounded-lg bg-white/4 border border-white/8">
+        <div className="flex items-center p-0.5 rounded-xl bg-white/4 border border-white/8">
           <button
             onClick={() => setActiveTab('federated')}
-            className={`px-2.5 py-1 rounded-md text-[10px] font-mono transition-all ${
+            className={`px-3 py-1 rounded-lg text-[10px] font-mono transition-all cursor-pointer ${
               activeTab === 'federated'
                 ? 'bg-indigo-600 text-white font-bold shadow-[0_0_12px_rgba(99,102,241,0.5)]'
                 : 'text-slate-400 hover:text-slate-200'
@@ -112,7 +112,7 @@ function InteractiveGraphSimulator() {
           </button>
           <button
             onClick={() => setActiveTab('isolated')}
-            className={`px-2.5 py-1 rounded-md text-[10px] font-mono transition-all ${
+            className={`px-3 py-1 rounded-lg text-[10px] font-mono transition-all cursor-pointer ${
               activeTab === 'isolated'
                 ? 'bg-rose-600/80 text-white font-bold shadow-[0_0_12px_rgba(244,63,94,0.5)]'
                 : 'text-slate-400 hover:text-slate-200'
@@ -147,7 +147,6 @@ function InteractiveGraphSimulator() {
             </>
           ) : (
             <>
-              {/* Broken/isolated lines in red */}
               {[ [0,3], [1,3], [2,3] ].map(([a, b], idx) => {
                 const n1 = nodes[a];
                 const n2 = nodes[b];
@@ -171,19 +170,19 @@ function InteractiveGraphSimulator() {
         </svg>
       </div>
 
-      {/* Simulator Metrics Box (Serves Telemetry HUD tests) */}
-      <div className="grid grid-cols-3 gap-2 border-t border-white/6 pt-3 text-[11px] font-mono">
-        <div className="p-2 rounded-xl bg-white/3 border border-white/5">
+      {/* Simulator Metrics Box */}
+      <div className="grid grid-cols-3 gap-2.5 border-t border-white/6 pt-3 text.5 font-mono">
+        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
           <div className="text-[9px] text-slate-500 uppercase tracking-wider">Active FL Round</div>
           <div className="text-sm font-bold text-indigo-400 mt-0.5">#47</div>
         </div>
-        <div className="p-2 rounded-xl bg-white/3 border border-white/5">
+        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
           <div className="text-[9px] text-slate-500 uppercase tracking-wider">Global Accuracy</div>
           <div className={`text-sm font-bold mt-0.5 ${activeTab === 'federated' ? 'text-emerald-400' : 'text-rose-400'}`}>
             {activeTab === 'federated' ? '94.2%' : '42.0%'}
           </div>
         </div>
-        <div className="p-2 rounded-xl bg-white/3 border border-white/5">
+        <div className="p-2.5 rounded-xl bg-white/3 border border-white/5">
           <div className="text-[9px] text-slate-500 uppercase tracking-wider">Stream Speed</div>
           <div className="text-sm font-bold text-cyan-400 mt-0.5">1.4 GB/s</div>
         </div>
@@ -215,6 +214,12 @@ const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
 const MenuIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
     <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+);
+const CloseIcon = () => (
+  <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <line x1="18" y1="6" x2="6" y2="18" />
+    <line x1="6" y1="6" x2="18" y2="18" />
   </svg>
 );
 const ArrowRight = () => (
@@ -344,9 +349,9 @@ export default function LandingPage() {
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-slate-400 hover:text-slate-100 cursor-pointer"
+                className="lg:hidden p-2 rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white cursor-pointer transition-colors"
               >
-                <MenuIcon />
+                {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
@@ -358,31 +363,64 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── MOBILE DRAWER ───────────────────────────────────────── */}
+        {/* ── 2026 MODERN ULTRA-FLUID MOBILE OVERLAY DRAWER ────────── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
-            <motion.nav initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
-              className="lg:hidden border-b border-white/5 bg-[#05050f]/95 backdrop-blur-2xl px-4 py-4 space-y-1 z-40">
-              {[
-                {label:'Overview (3D Architecture)',    targetId:'hero'},
-                {label:'The Problem & Solution',        targetId:'problem-solution'},
-                {label:'Streaming GNN Collusion Simulator', targetId:'how-it-works'},
-                {label:'Privacy Engine & Capabilities', targetId:'product'},
-                {label:'Deployment Blueprint Wizard',   targetId:'platform'},
-                {label:'System Architecture',           targetId:'architecture'},
-                {label:'Security & Attack Defense Lab', targetId:'security'},
-                {label:'API & Docs',                    targetId:'api'},
-              ].map(link => (
-                <a key={link.label} href={`#${link.targetId}`} onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
-                  className="block px-3.5 py-2.5 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-white/5 rounded-xl transition-colors">
-                  {link.label}
-                </a>
-              ))}
-              <div className="pt-3 border-t border-white/5">
-                <button onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
-                  className="w-full py-2.5 text-[13px] font-medium text-white bg-indigo-600 rounded-xl">
-                  Launch Live Platform Demo
+            <motion.nav
+              initial={{ opacity: 0, scale: 0.98, y: -10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: -10 }}
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-[#05050f]/95 backdrop-blur-3xl p-6 overflow-y-auto flex flex-col justify-between border-b border-white/10 shadow-2xl"
+            >
+              <div className="space-y-6">
+                <div className="flex items-center justify-between border-b border-white/8 pb-3">
+                  <div className="text-xs font-mono font-bold uppercase tracking-widest text-indigo-400">Navigation Menu</div>
+                  <span className="text-[10px] font-mono text-slate-500">CF-Intelligence Platform</span>
+                </div>
+
+                {/* Mobile Menu Cards Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    { label: 'Overview (3D Architecture)',    targetId: 'hero',              badge: 'Overview',      desc: 'System introduction & stats' },
+                    { label: 'The Problem & Solution',        targetId: 'problem-solution',  badge: 'Problem',       desc: 'Cross-bank fraud analysis' },
+                    { label: 'Streaming GNN Collusion Simulator', targetId: 'how-it-works',  badge: 'Workflow',      desc: '8-stage pipeline runner' },
+                    { label: 'Privacy Engine & Capabilities', targetId: 'product',           badge: 'Capabilities',  desc: 'Engine specifications' },
+                    { label: 'Deployment Blueprint Wizard',   targetId: 'platform',          badge: 'Consortium',    desc: 'Bank node inspector' },
+                    { label: 'System Architecture',           targetId: 'architecture',      badge: 'Architecture',  desc: 'Service layer mesh' },
+                    { label: 'Security & Attack Defense Lab', targetId: 'security',          badge: 'Security',      desc: 'DP & trust boundaries' },
+                    { label: 'API & Docs',                    targetId: 'api',               badge: 'Developer SDK', desc: 'REST API & TypeScript SDK' },
+                  ].map(link => (
+                    <a
+                      key={link.label}
+                      href={`#${link.targetId}`}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
+                      className="p-4 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                          {link.badge}
+                        </span>
+                        <ArrowRight />
+                      </div>
+                      <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">{link.label}</div>
+                      <div className="text-[10px] font-mono text-slate-500">{link.desc}</div>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* Bottom Mobile Action */}
+              <div className="pt-6 border-t border-white/8 space-y-3">
+                <button
+                  onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
+                  className="w-full py-3.5 px-6 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2"
+                >
+                  Launch Live Platform Demo <ArrowRight />
                 </button>
+                <div className="text-center text-[10px] font-mono text-slate-600">
+                  Privacy-Preserving Federated Intelligence Network
+                </div>
               </div>
             </motion.nav>
           )}
