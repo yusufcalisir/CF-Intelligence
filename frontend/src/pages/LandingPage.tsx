@@ -227,12 +227,72 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
     { id: 'JPM-9913', bank: 'JPM', amount: '12,200',    score: 0.11, high: false },
   ];
 
+  const tabUrlPaths: Record<string, string> = {
+    home: 'dashboard',
+    gnn: 'dashboard/gnn-topology',
+    privacy: 'dashboard/privacy-engine',
+    bft: 'dashboard/bft-defense',
+    sar: 'dashboard/sar-filings',
+  };
+
   const sidebarButtons = [
-    { id: 'home',    symbol: 'C', title: 'FL Consortium Telemetry & Alerts', color: 'bg-indigo-600' },
-    { id: 'gnn',     symbol: '⬡', title: 'GNN Graph Node Topology',          color: 'bg-purple-600' },
-    { id: 'privacy', symbol: '◎', title: 'Differential Privacy & SGX Vault',  color: 'bg-emerald-600' },
-    { id: 'bft',     symbol: '△', title: 'Byzantine Attack Defense Lab',     color: 'bg-cyan-600' },
-    { id: 'sar',     symbol: '▦', title: 'FinCEN SAR XML Generator',          color: 'bg-amber-600' },
+    {
+      id: 'home',
+      label: 'Telemetry',
+      title: 'FL Consortium Telemetry & Alerts',
+      color: 'bg-indigo-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 3v18h18" /><path d="M18 17V9" /><path d="M13 17V5" /><path d="M8 17v-3" />
+        </svg>
+      )
+    },
+    {
+      id: 'gnn',
+      label: 'GNN',
+      title: 'GNN Graph Node Topology',
+      color: 'bg-purple-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6" r="2.5" /><circle cx="12" cy="18" r="2.5" />
+          <line x1="8.5" y1="6" x2="15.5" y2="6" /><line x1="7.5" y1="8" x2="10.5" y2="16" /><line x1="16.5" y1="8" x2="13.5" y2="16" />
+        </svg>
+      )
+    },
+    {
+      id: 'privacy',
+      label: 'Privacy',
+      title: 'Differential Privacy & SGX Vault',
+      color: 'bg-emerald-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><circle cx="12" cy="12" r="2.5" />
+        </svg>
+      )
+    },
+    {
+      id: 'bft',
+      label: 'BFT',
+      title: 'Byzantine Attack Defense Lab',
+      color: 'bg-cyan-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="9" /><path d="m9 12 2 2 4-4" />
+        </svg>
+      )
+    },
+    {
+      id: 'sar',
+      label: 'SAR',
+      title: 'FinCEN SAR XML Generator',
+      color: 'bg-amber-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      )
+    },
   ];
 
   return (
@@ -247,7 +307,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
           </div>
           <div className="px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1.5 border border-white/5 truncate">
             <span className="text-slate-600">🔒</span>
-            cfi-platform.com/{activeTab}
+            cfi-platform.com/{tabUrlPaths[activeTab]}
           </div>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -265,13 +325,13 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               key={btn.id}
               onClick={() => setActiveTab(btn.id as any)}
               title={btn.title}
-              className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeTab === btn.id
                   ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
                   : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
               }`}
             >
-              {btn.symbol}
+              {btn.icon}
             </button>
           ))}
         </div>
@@ -406,7 +466,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
           </AnimatePresence>
 
           <div className="text-[8px] sm:text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-1.5">
-            Click sidebar icons ({sidebarButtons.map(b=>b.symbol).join(' · ')}) to inspect engine components
+            Click sidebar icons ({sidebarButtons.map(b => b.label).join(' · ')}) to inspect live platform modules
           </div>
         </div>
       </div>

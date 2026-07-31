@@ -92,7 +92,7 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     expect(launchDemoButtons.length).toBeGreaterThan(0);
   });
 
-  it('switches views dynamically when clicking interactive dashboard preview sidebar buttons (C, ⬡, ◎, △, ▦)', async () => {
+  it('switches views dynamically when clicking interactive dashboard preview sidebar buttons', async () => {
     render(
       <BrowserRouter>
         <LandingPage />
