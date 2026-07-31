@@ -836,7 +836,7 @@ export default function LandingPage() {
                   </span>
                 </h1>
                 <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
-                  CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies — discovering multi-bank money laundering rings with zero raw data sharing.
+                  CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies to detect multi-bank money laundering networks without raw customer data exposure.
                 </p>
               </div>
 
@@ -917,7 +917,7 @@ export default function LandingPage() {
                 </div>
                 <ul className="space-y-2.5 text-xs font-mono text-slate-300 break-words">
                   <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> Collaborative model optimization over consortium transaction topology</li>
-                  <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> Zero PII leaves bank perimeter — mathematical (ε=0.50, δ=1e-5)-DP guarantee</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> Zero PII exits bank boundary with provable (ε=0.50, δ=1e-5)-differential privacy</li>
                   <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> False positive rate reduced to 6.1% (5× investigator bandwidth improvement)</li>
                 </ul>
               </div>
@@ -1469,7 +1469,7 @@ telemetry.on('round.stage', (evt) => {
                     { k: 'Hardware', v: activeBankDrawer.hardware },
                     { k: 'Host RAM', v: activeBankDrawer.ram },
                     { k: 'PyTorch',  v: activeBankDrawer.pytorch },
-                    { k: 'Status',   v: 'READY — On-Prem Agent' },
+                    { k: 'Status',   v: 'READY (On-Premises Agent)' },
                   ].map(row => (
                     <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
                       <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">{row.k}</div>
