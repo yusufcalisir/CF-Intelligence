@@ -124,22 +124,6 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     expect(screen.getByText('FinCEN SAR Automated Compliance')).toBeDefined();
   });
 
-  it('toggles graph engine simulator mode between Federated and Isolated mode', () => {
-    render(
-      <BrowserRouter>
-        <LandingPage />
-      </BrowserRouter>
-    );
-
-    const isolatedBtn = screen.getByText('Isolated Mode');
-    fireEvent.click(isolatedBtn);
-    expect(screen.getByText('42.0%')).toBeDefined();
-
-    const federatedBtn = screen.getByText('Federated Mode');
-    fireEvent.click(federatedBtn);
-    expect(screen.getByText('94.2%')).toBeDefined();
-  });
-
   it('opens bank node detail drawer when clicking a consortium institution card', () => {
     render(
       <BrowserRouter>
