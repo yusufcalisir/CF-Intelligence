@@ -40,7 +40,6 @@ const ARCH_NODES: ArchNode[] = [
   { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
 ];
 
-// PRESENTATION-FRIENDLY WORKFLOW STEPS (No raw code bloat, clean executive cards)
 const PRESENTATION_WORKFLOW = [
   {
     id: 1,
@@ -135,10 +134,10 @@ const scrollToSection = (id: string) => {
 };
 
 // ── 2026 HIGH-END FUTURISTIC CONSORTIUM NETWORK SVG ──────────────────────────
-function HighEndConsortiumSVG() {
+const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
   const [pulseTick, setPulseTick] = useState(0);
   useEffect(() => {
-    const t = setInterval(() => setPulseTick(p => p + 1), 50);
+    const t = setInterval(() => setPulseTick(p => p + 1), 60);
     return () => clearInterval(t);
   }, []);
 
@@ -151,8 +150,8 @@ function HighEndConsortiumSVG() {
   const edges: [number, number][] = [[0,3],[1,3],[2,3]];
 
   return (
-    <div className="relative w-full h-[125px] flex items-center justify-center">
-      <svg viewBox="0 0 230 120" className="w-full h-full">
+    <div className="relative w-full h-[125px] flex items-center justify-center overflow-hidden">
+      <svg viewBox="0 0 230 120" className="w-full h-full max-w-full preserve-3d" preserveAspectRatio="xMidYMid meet">
         <defs>
           <filter id="glow-filter" x="-20%" y="-20%" width="140%" height="140%">
             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -209,10 +208,10 @@ function HighEndConsortiumSVG() {
       </svg>
     </div>
   );
-}
+});
 
 // ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
-function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
+const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
   const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar'>('home');
   const [alertTick, setAlertTick] = useState(0);
 
@@ -237,36 +236,36 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
   ];
 
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-[#070718]">
+    <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-[#070718] w-full max-w-full min-w-0">
       {/* Browser Chrome Header */}
-      <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#0b0b20] border-b border-white/8">
-        <div className="flex items-center gap-2">
-          <div className="flex gap-1.5 shrink-0">
+      <div className="flex items-center justify-between px-2.5 sm:px-3.5 py-2.5 bg-[#0b0b20] border-b border-white/8 min-w-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+          <div className="flex gap-1 shrink-0">
             <div className="w-2.5 h-2.5 rounded-full bg-rose-500/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
           </div>
-          <div className="px-3 py-0.5 rounded-md bg-white/4 text-[10px] font-mono text-slate-400 flex items-center gap-2 border border-white/5">
+          <div className="px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1.5 border border-white/5 truncate">
             <span className="text-slate-600">🔒</span>
-            cfi-platform.com/dashboard/{activeTab}
+            cfi-platform.com/{activeTab}
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
+          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
         </div>
       </div>
 
       {/* Main Body */}
-      <div className="flex min-h-[360px]">
+      <div className="flex min-h-[340px] sm:min-h-[360px] w-full min-w-0">
         {/* INTERACTIVE SIDEBAR NAV */}
-        <div className="w-11 shrink-0 border-r border-white/6 bg-[#08081b] py-3 flex flex-col items-center gap-3.5">
+        <div className="w-9 sm:w-11 shrink-0 border-r border-white/6 bg-[#08081b] py-2.5 flex flex-col items-center gap-3">
           {sidebarButtons.map(btn => (
             <button
               key={btn.id}
               onClick={() => setActiveTab(btn.id as any)}
               title={btn.title}
-              className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-mono font-bold transition-all cursor-pointer ${
+              className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold transition-all cursor-pointer ${
                 activeTab === btn.id
                   ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
                   : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
@@ -278,52 +277,52 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
         </div>
 
         {/* DYNAMIC TAB VIEW CONTENT */}
-        <div className="flex-1 p-3.5 min-w-0 flex flex-col justify-between">
+        <div className="flex-1 p-2.5 sm:p-3.5 min-w-0 flex flex-col justify-between overflow-x-hidden">
           <AnimatePresence mode="wait">
             {activeTab === 'home' && (
-              <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
-                    <div className="text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
-                    <div className="text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
+              <motion.div key="home" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 min-w-0">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-indigo-600/10 border border-indigo-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Active FL Round</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-indigo-400 mt-0.5">#{flRound}</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
-                    <div className="text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
-                    <div className="text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-emerald-600/10 border border-emerald-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Global Accuracy</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-emerald-400 mt-0.5">{accuracy}%</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
-                    <div className="text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
-                    <div className="text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-purple-600/10 border border-purple-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Privacy Budget</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-purple-400 mt-0.5">ε = 0.50</div>
                   </div>
-                  <div className="p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
-                    <div className="text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
-                    <div className="text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
+                  <div className="p-1.5 sm:p-2 rounded-xl bg-cyan-600/10 border border-cyan-500/20">
+                    <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
+                    <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2">
-                  <div className="flex items-center justify-between px-2.5 py-1.5 border-b border-white/5 bg-white/3">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
-                    <span className="flex items-center gap-1 text-[9px] font-mono text-emerald-400">
+                <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2 min-w-0">
+                  <div className="flex items-center justify-between px-2 py-1 border-b border-white/5 bg-white/3">
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Risk Alert Feed</span>
+                    <span className="flex items-center gap-1 text-[8.5px] sm:text-[9px] font-mono text-emerald-400">
                       <span className="h-1 w-1 rounded-full bg-emerald-400 animate-ping" />streaming
                     </span>
                   </div>
                   <div className="divide-y divide-white/4">
                     {alerts.map((a) => (
-                      <div key={`${a.id}-${alertTick}`} className="flex items-center gap-2 px-2.5 py-1.5 text-[9px] font-mono">
-                        <span className={`w-1 h-3.5 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
-                        <span className="text-slate-400 w-12">{a.bank} TX</span>
+                      <div key={`${a.id}-${alertTick}`} className="flex items-center gap-1.5 sm:gap-2 px-2 py-1 text-[8.5px] sm:text-[9px] font-mono min-w-0">
+                        <span className={`w-1 h-3 rounded-full shrink-0 ${a.high ? 'bg-rose-500' : 'bg-emerald-500'}`} />
+                        <span className="text-slate-400 shrink-0 w-10 sm:w-12">{a.bank} TX</span>
                         <span className="text-slate-300 flex-1 truncate">${a.amount}</span>
-                        <span className={`font-bold ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
+                        <span className={`font-bold shrink-0 ${a.high ? 'text-rose-400' : 'text-emerald-400'}`}>{a.score.toFixed(2)}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-white/6 bg-white/2 p-2">
+                <div className="rounded-xl border border-white/6 bg-white/2 p-1.5 sm:p-2 min-w-0">
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
-                    <span className="text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-slate-400 uppercase tracking-wider">Consortium Topology</span>
+                    <span className="text-[8.5px] sm:text-[9px] font-mono text-emerald-400">3/3 Nodes Synced</span>
                   </div>
                   <HighEndConsortiumSVG />
                 </div>
@@ -331,89 +330,89 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
             )}
 
             {activeTab === 'gnn' && (
-              <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
-                <div className="p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-1">
+              <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-0.5">
                   <div className="text-purple-300 font-bold">GNN Subgraph Inspection</div>
-                  <div className="text-slate-400 text-[9px]">Multi-hop transaction graph attention embeddings (PyG 2.6)</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Multi-hop transaction graph attention embeddings (PyG 2.6)</div>
                 </div>
-                <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 space-y-2">
-                  <div className="text-slate-500 text-[9px]">GATConv Layer Attentions:</div>
-                  <div className="text-purple-300 font-mono text-[9px]">head_0: [0.842, 0.191, 0.428, 0.912]</div>
-                  <div className="text-purple-300 font-mono text-[9px]">head_1: [0.311, 0.774, 0.109, 0.881]</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-[#03030c] border border-white/6 space-y-1.5">
+                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">GATConv Layer Attentions:</div>
+                  <div className="text-purple-300 font-mono text-[8.5px] sm:text-[9px] truncate">head_0: [0.842, 0.191, 0.428, 0.912]</div>
+                  <div className="text-purple-300 font-mono text-[8.5px] sm:text-[9px] truncate">head_1: [0.311, 0.774, 0.109, 0.881]</div>
                 </div>
-                <div className="p-3 rounded-xl bg-white/3 border border-white/6">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/6">
                   <div className="text-slate-400 font-semibold mb-1">Detected Circular Smurfing Path:</div>
-                  <div className="text-rose-400 font-bold">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
+                  <div className="text-rose-400 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'privacy' && (
-              <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
-                <div className="p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-1">
+              <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-0.5">
                   <div className="text-emerald-300 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
-                  <div className="text-slate-400 text-[9px]">Opacus RDP Accountant & Paillier Cryptography</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Opacus RDP Accountant & Paillier Cryptography</div>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-[9px]">
-                  <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
                     <div className="text-slate-500">Noise Scale (σ)</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">0.031 (L2 Clip = 1.0)</div>
+                    <div className="text-emerald-400 font-bold mt-0.5 truncate">0.031 (C=1.0)</div>
                   </div>
-                  <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
                     <div className="text-slate-500">SGX Attestation</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">VERIFIED BY IAS</div>
+                    <div className="text-emerald-400 font-bold mt-0.5 truncate">VERIFIED IAS</div>
                   </div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[9px] text-slate-400 truncate">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
                   Homomorphic Ciphertext: 0x99F188A2...FE01
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'bft' && (
-              <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
-                <div className="p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-1">
+              <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-0.5">
                   <div className="text-cyan-300 font-bold">Byzantine Resilience Monitor</div>
-                  <div className="text-slate-400 text-[9px]">Krum & Trimmed Mean Poisoning Defense</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Krum & Trimmed Mean Poisoning Defense</div>
                 </div>
-                <div className="space-y-1.5 text-[9px]">
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
-                    <span>JPMorgan Node #01</span>
-                    <span>100% HONEST</span>
+                <div className="space-y-1 text-[8.5px] sm:text-[9px]">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                    <span className="truncate">JPMorgan Node #01</span>
+                    <span className="shrink-0 font-bold">100% HONEST</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
-                    <span>HSBC Node #02</span>
-                    <span>100% HONEST</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
+                    <span className="truncate">HSBC Node #02</span>
+                    <span className="shrink-0 font-bold">100% HONEST</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-400">
-                    <span>Adversary Node</span>
-                    <span>POISONED (QUENCHED BY KRUM)</span>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-400">
+                    <span className="truncate">Adversary Node</span>
+                    <span className="shrink-0 font-bold">POISONED (KRUM)</span>
                   </div>
                 </div>
               </motion.div>
             )}
 
             {activeTab === 'sar' && (
-              <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3 text-[10px] font-mono">
-                <div className="p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-1">
+              <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-0.5">
                   <div className="text-amber-300 font-bold">FinCEN SAR Automated Compliance</div>
-                  <div className="text-slate-400 text-[9px]">SHAP Feature Attributions & Signed XML Export</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">SHAP Feature Attributions & Signed XML Export</div>
                 </div>
-                <div className="p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[9px] text-amber-200/90 leading-relaxed font-mono">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-amber-200/90 leading-relaxed font-mono break-all max-h-24 overflow-y-auto">
                   &lt;FinCEN_SAR&gt;&lt;Amount Ccy="USD"&gt;1450000.00&lt;/Amount&gt;&lt;RiskScore&gt;0.94&lt;/RiskScore&gt;&lt;/FinCEN_SAR&gt;
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          <div className="text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-2">
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-1.5">
             Click sidebar icons ({sidebarButtons.map(b=>b.symbol).join(' · ')}) to inspect engine components
           </div>
         </div>
       </div>
     </div>
   );
-}
+});
 
 // ── FADE WRAPPER ─────────────────────────────────────────────────────────────
 const FadeSection = memo(function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
@@ -516,7 +515,7 @@ export default function LandingPage() {
   const currentWorkflowStep = PRESENTATION_WORKFLOW.find(s => s.id === activeWorkflowStep)!;
 
   return (
-    <div className="min-h-screen bg-[#05050f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white overflow-x-hidden">
+    <div className="min-h-screen bg-[#05050f] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white w-full max-w-full overflow-x-hidden min-w-0">
 
       {/* 2026 Ambient Fluid Glow background */}
       <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden">
@@ -526,15 +525,15 @@ export default function LandingPage() {
         <div className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px)', backgroundSize: '64px 64px' }} />
       </div>
 
-      <div className="relative z-10">
+      <div className="relative z-10 w-full max-w-full min-w-0">
 
         {/* ── HEADER NAVBAR ────────────────────────────────────────── */}
-        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-white/6 bg-[#05050f]/80 backdrop-blur-2xl">
-          <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
+        <header className="sticky top-0 z-50 h-16 flex items-center border-b border-white/6 bg-[#05050f]/80 backdrop-blur-2xl w-full max-w-full">
+          <div className="w-full max-w-7xl mx-auto px-3.5 sm:px-6 flex items-center justify-between min-w-0">
             {/* Brand Logo & Clean Name */}
-            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
-              <BrandLogo />
-              <span className="font-bold text-base text-slate-100 tracking-tight">CF-Intelligence</span>
+            <div className="flex items-center gap-2 cursor-pointer min-w-0" onClick={() => navigate('/')}>
+              <BrandLogo className="w-8 h-8 sm:w-9 sm:h-9 shrink-0" />
+              <span className="font-bold text-sm sm:text-base text-slate-100 tracking-tight truncate">CF-Intelligence</span>
             </div>
 
             {/* Desktop Navigation */}
@@ -606,7 +605,7 @@ export default function LandingPage() {
               <a href="#api" onClick={(e) => { e.preventDefault(); handleNavClick('api'); }} className="hover:text-slate-100 transition-colors">API & Docs</a>
             </nav>
 
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
               <button
                 aria-label="Toggle Navigation Menu"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -616,7 +615,7 @@ export default function LandingPage() {
               </button>
               <button
                 onClick={() => navigate('/dashboard')}
-                className="hidden sm:flex items-center gap-2 px-5 py-2 rounded-xl text-[13px] font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 transition-all cursor-pointer shadow-[0_0_25px_rgba(99,102,241,0.4)]"
+                className="hidden sm:flex items-center gap-2 px-5 py-2 rounded-xl text-[13px] font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 transition-all cursor-pointer shadow-[0_0_25px_rgba(99,102,241,0.4)] shrink-0"
               >
                 Launch Demo <ArrowRight />
               </button>
@@ -632,16 +631,16 @@ export default function LandingPage() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.98, y: -10 }}
               transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-[#05050f]/95 backdrop-blur-3xl p-6 overflow-y-auto flex flex-col justify-between border-b border-white/10 shadow-2xl"
+              className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-[#05050f]/95 backdrop-blur-3xl p-4 sm:p-6 overflow-y-auto flex flex-col justify-between border-b border-white/10 shadow-2xl w-full max-w-full"
             >
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-white/8 pb-3">
-                  <div className="text-xs font-mono font-bold uppercase tracking-widest text-indigo-400">Navigation Menu</div>
-                  <span className="text-[10px] font-mono text-slate-500">CF-Intelligence Platform</span>
+              <div className="space-y-5 min-w-0">
+                <div className="flex items-center justify-between border-b border-white/8 pb-3 min-w-0">
+                  <div className="text-xs font-mono font-bold uppercase tracking-widest text-indigo-400 truncate">Navigation Menu</div>
+                  <span className="text-[10px] font-mono text-slate-500 shrink-0">CF-Intelligence</span>
                 </div>
 
                 {/* Mobile Menu Cards Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
                   {[
                     { label: 'Overview (3D Architecture)',    targetId: 'hero',              badge: 'Overview',      desc: 'System introduction & stats' },
                     { label: 'The Problem & Solution',        targetId: 'problem-solution',  badge: 'Problem',       desc: 'Cross-bank fraud analysis' },
@@ -656,30 +655,30 @@ export default function LandingPage() {
                       key={link.label}
                       href={`#${link.targetId}`}
                       onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
-                      className="p-4 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block"
+                      className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block min-w-0"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">
+                        <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md truncate">
                           {link.badge}
                         </span>
                         <ArrowRight />
                       </div>
-                      <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors">{link.label}</div>
-                      <div className="text-[10px] font-mono text-slate-500">{link.desc}</div>
+                      <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate">{link.label}</div>
+                      <div className="text-[10px] font-mono text-slate-500 truncate">{link.desc}</div>
                     </a>
                   ))}
                 </div>
               </div>
 
               {/* Bottom Mobile Action */}
-              <div className="pt-6 border-t border-white/8 space-y-3">
+              <div className="pt-4 border-t border-white/8 space-y-2.5 min-w-0 mt-4">
                 <button
                   onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
-                  className="w-full py-3.5 px-6 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2"
                 >
                   Launch Live Platform Demo <ArrowRight />
                 </button>
-                <div className="text-center text-[10px] font-mono text-slate-600">
+                <div className="text-center text-[9.5px] font-mono text-slate-600 truncate">
                   Privacy-Preserving Federated Intelligence Network
                 </div>
               </div>
@@ -690,17 +689,17 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 1 — HERO / OVERVIEW (#hero)
         ══════════════════════════════════════════════════════════ */}
-        <section id="hero" className="relative py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
+        <section id="hero" className="relative py-10 sm:py-20 px-3.5 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center min-w-0">
 
             {/* Left Hero Content */}
-            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6}} className="lg:col-span-7 space-y-8">
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                  Privacy-Preserving Federated Intelligence Infrastructure
+            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6}} className="lg:col-span-7 space-y-6 sm:space-y-8 min-w-0">
+              <div className="space-y-3 sm:space-y-4 min-w-0">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] sm:text-xs font-mono max-w-full truncate">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+                  <span className="truncate">Privacy-Preserving Federated Infrastructure</span>
                 </div>
-                <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] break-words">
                   <span className="bg-gradient-to-r from-slate-100 via-indigo-200 to-slate-300 bg-clip-text text-transparent">
                     Collaborative Cross-Bank
                   </span>
@@ -709,42 +708,42 @@ export default function LandingPage() {
                     Fraud Detection Platform
                   </span>
                 </h1>
-                <p className="text-slate-400 text-base leading-relaxed max-w-xl">
+                <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
                   CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies — discovering multi-bank money laundering rings with zero raw data sharing.
                 </p>
               </div>
 
               {/* High impact feature highlights */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl">
-                  <div className="text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-1">Detection Gain</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Detection Gain</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">vs. 42% isolated</div>
                 </div>
-                <div className="p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl">
-                  <div className="text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 0.50</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-1">Differential Privacy</div>
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 0.50</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">(ε, δ)-DP bounded</div>
                 </div>
-                <div className="p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl">
-                  <div className="text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-1">FPR Reduction</div>
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">FPR Reduction</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">31% → 6.1% FPR</div>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="flex flex-wrap items-center gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0">
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="flex items-center gap-2.5 px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-sm font-semibold text-white transition-all cursor-pointer shadow-[0_0_35px_rgba(99,102,241,0.45)] hover:shadow-[0_0_50px_rgba(99,102,241,0.6)]"
+                  className="flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-semibold text-white transition-all cursor-pointer shadow-[0_0_35px_rgba(99,102,241,0.45)] hover:shadow-[0_0_50px_rgba(99,102,241,0.6)] w-full sm:w-auto text-center"
                 >
                   Launch Live Platform Demo <ArrowRight />
                 </button>
                 <a
                   href="#architecture"
                   onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
-                  className="flex items-center gap-2 px-6 py-3.5 rounded-2xl border border-white/10 hover:border-white/25 text-sm font-medium text-slate-300 hover:text-white transition-all backdrop-blur-lg"
+                  className="flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 rounded-2xl border border-white/10 hover:border-white/25 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-all backdrop-blur-lg w-full sm:w-auto text-center"
                 >
                   Explore System Design
                 </a>
@@ -752,7 +751,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Right Interactive Dashboard Preview */}
-            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.15}} className="lg:col-span-5">
+            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.15}} className="lg:col-span-5 w-full min-w-0">
               <InteractiveDashboardPreview flRound={flRound} accuracy={accuracy} />
             </motion.div>
           </div>
@@ -761,38 +760,38 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 — PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
-        <section id="problem-solution" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="problem-solution" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-10">
-              <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Problem Statement</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Cross-Bank Money Laundering Fragmentation</h2>
-              <p className="text-slate-400 text-base mt-3 leading-relaxed">
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Problem Statement</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Cross-Bank Money Laundering Fragmentation</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Sophisticated financial crime syndicates structure transaction paths across multiple banks to bypass institution-local AML rules. Single-bank GNN models only see internal legs, leaving cross-border networks invisible.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="p-7 rounded-3xl bg-white/2 border border-rose-500/20 backdrop-blur-xl space-y-4">
-                <div className="flex items-center justify-between border-b border-white/6 pb-4">
-                  <h3 className="text-base font-bold text-slate-200">Traditional Bank-Isolated AML Systems</h3>
-                  <span className="px-3 py-1 rounded-full text-xs font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20">42% Detection</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 w-full min-w-0">
+              <div className="p-5 sm:p-7 rounded-3xl bg-white/2 border border-rose-500/20 backdrop-blur-xl space-y-4 min-w-0">
+                <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-200">Traditional Bank-Isolated AML Systems</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20">42% Detection</span>
                 </div>
-                <ul className="space-y-3 text-xs font-mono text-slate-400">
-                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Graph Neural Networks isolated to single institution ledgers</li>
-                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Smurfing across multiple banks stays hidden below local thresholds</li>
-                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> High false positive rate (~31%) overwhelms fraud investigation teams</li>
+                <ul className="space-y-2.5 text-xs font-mono text-slate-400 break-words">
+                  <li className="flex items-start gap-2"><span className="text-rose-500 shrink-0">✕</span> Graph Neural Networks isolated to single institution ledgers</li>
+                  <li className="flex items-start gap-2"><span className="text-rose-500 shrink-0">✕</span> Smurfing across multiple banks stays hidden below local thresholds</li>
+                  <li className="flex items-start gap-2"><span className="text-rose-500 shrink-0">✕</span> High false positive rate (~31%) overwhelms fraud investigation teams</li>
                 </ul>
               </div>
 
-              <div className="p-7 rounded-3xl bg-indigo-600/5 border border-indigo-500/30 backdrop-blur-xl space-y-4 shadow-[inset_0_0_50px_rgba(99,102,241,0.08)]">
-                <div className="flex items-center justify-between border-b border-white/6 pb-4">
-                  <h3 className="text-base font-bold text-slate-100">CFI Federated Consortium Network</h3>
-                  <span className="px-3 py-1 rounded-full text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">94.2% Detection</span>
+              <div className="p-5 sm:p-7 rounded-3xl bg-indigo-600/5 border border-indigo-500/30 backdrop-blur-xl space-y-4 shadow-[inset_0_0_50px_rgba(99,102,241,0.08)] min-w-0">
+                <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2">
+                  <h3 className="text-sm sm:text-base font-bold text-slate-100">CFI Federated Consortium Network</h3>
+                  <span className="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">94.2% Detection</span>
                 </div>
-                <ul className="space-y-3 text-xs font-mono text-slate-300">
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 mt-0.5">✓</span> Collaborative model optimization over consortium transaction topology</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 mt-0.5">✓</span> Zero PII leaves bank perimeter — mathematical (ε=0.50, δ=1e-5)-DP guarantee</li>
-                  <li className="flex items-start gap-2.5"><span className="text-emerald-400 mt-0.5">✓</span> False positive rate reduced to 6.1% (5× investigator bandwidth improvement)</li>
+                <ul className="space-y-2.5 text-xs font-mono text-slate-300 break-words">
+                  <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> Collaborative model optimization over consortium transaction topology</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> Zero PII leaves bank perimeter — mathematical (ε=0.50, δ=1e-5)-DP guarantee</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-400 shrink-0">✓</span> False positive rate reduced to 6.1% (5× investigator bandwidth improvement)</li>
                 </ul>
               </div>
             </div>
@@ -802,80 +801,80 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 3 — PRESENTATION-FRIENDLY WORKFLOW PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="how-it-works" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-10">
-              <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Execution Pipeline</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Architecture</h2>
-              <p className="text-slate-400 text-base mt-3 leading-relaxed">
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Execution Pipeline</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Architecture</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any pipeline stage below to view the architectural overview, data input/output specifications, and cryptographic guarantees.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
               {/* Left Selector List */}
-              <div className="lg:col-span-4 space-y-2">
+              <div className="lg:col-span-4 space-y-1.5 w-full min-w-0">
                 {PRESENTATION_WORKFLOW.map(step => (
                   <button
                     key={step.id}
                     onClick={() => setActiveWorkflowStep(step.id)}
-                    className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeWorkflowStep === step.id
                         ? 'bg-purple-600/15 border-purple-500/40 text-slate-100 shadow-[0_0_20px_rgba(168,85,247,0.2)]'
                         : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
                     }`}
                   >
-                    <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-xs font-mono font-bold ${
+                    <span className={`w-5 sm:w-6 h-5 sm:h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
                       activeWorkflowStep === step.id ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-500'
                     }`}>
                       {step.id}
                     </span>
-                    <span className="text-xs font-semibold">{step.short}</span>
+                    <span className="text-xs font-semibold truncate">{step.short}</span>
                   </button>
                 ))}
               </div>
 
-              {/* Right Executive Presentation Card (Clean, visual, no code bloat) */}
-              <div className="lg:col-span-8">
-                <div className="p-7 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-6">
-                  <div className="flex items-center justify-between border-b border-white/6 pb-4">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest">
+              {/* Right Executive Presentation Card */}
+              <div className="lg:col-span-8 w-full min-w-0">
+                <div className="p-4 sm:p-7 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
+                  <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2 min-w-0">
+                    <div className="min-w-0">
+                      <span className="text-[9px] sm:text-[10px] font-mono font-bold text-purple-400 uppercase tracking-widest">
                         {currentWorkflowStep.badge} of 08
                       </span>
-                      <h3 className="text-xl font-bold text-slate-100 mt-1">{currentWorkflowStep.label}</h3>
+                      <h3 className="text-base sm:text-xl font-bold text-slate-100 mt-0.5 truncate">{currentWorkflowStep.label}</h3>
                     </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-mono font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-300">
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-purple-500/10 border border-purple-500/20 text-purple-300 shrink-0">
                       Production Pipeline
                     </span>
                   </div>
 
-                  <p className="text-sm text-slate-300 leading-relaxed font-sans">
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
                     {currentWorkflowStep.summary}
                   </p>
 
                   {/* Highlights Bullet List */}
-                  <div className="space-y-2.5 pt-2">
-                    <div className="text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
-                    <div className="space-y-2 font-sans text-xs text-slate-300">
+                  <div className="space-y-2 pt-1 min-w-0">
+                    <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
+                    <div className="space-y-1.5 font-sans text-xs text-slate-300 min-w-0">
                       {currentWorkflowStep.highlights.map(hl => (
-                        <div key={hl} className="flex items-start gap-2.5 p-3 rounded-xl bg-white/3 border border-white/5">
-                          <span className="text-purple-400 font-bold">✓</span>
-                          <span>{hl}</span>
+                        <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/5 min-w-0">
+                          <span className="text-purple-400 font-bold shrink-0">✓</span>
+                          <span className="break-words">{hl}</span>
                         </div>
                       ))}
                     </div>
                   </div>
 
                   {/* Data Input/Output Specifications */}
-                  <div className="grid grid-cols-2 gap-3 pt-2">
-                    <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs">
-                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Data Input</div>
-                      <div className="text-purple-300 font-semibold">{currentWorkflowStep.input}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
+                    <div className="p-3 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
+                      <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
+                      <div className="text-purple-300 font-semibold truncate">{currentWorkflowStep.input}</div>
                     </div>
-                    <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs">
-                      <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1">Data Output</div>
-                      <div className="text-emerald-400 font-semibold">{currentWorkflowStep.output}</div>
+                    <div className="p-3 rounded-2xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
+                      <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
+                      <div className="text-emerald-400 font-semibold truncate">{currentWorkflowStep.output}</div>
                     </div>
                   </div>
                 </div>
@@ -887,53 +886,53 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 — ENGINE CAPABILITIES (#product)
         ══════════════════════════════════════════════════════════ */}
-        <section id="product" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-10">
-              <div className="text-[11px] font-mono font-semibold text-cyan-400 uppercase tracking-widest mb-2">Engine Specifications</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Platform Engineering Capabilities</h2>
-              <p className="text-slate-400 text-base mt-3 leading-relaxed">
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-cyan-400 uppercase tracking-widest mb-2">Engine Specifications</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Platform Engineering Capabilities</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Inspect platform component specifications, algorithms, input/output tensors, and stack requirements.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-4 space-y-2">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
+              <div className="lg:col-span-4 space-y-1.5 w-full min-w-0">
                 {PLATFORM_MODULES.map(mod => (
                   <button
                     key={mod.id}
                     onClick={() => setActiveModule(mod)}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeModule?.id === mod.id
                         ? 'bg-cyan-600/15 border-cyan-500/40 text-slate-100 shadow-[0_0_20px_rgba(6,182,212,0.2)]'
                         : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
                     }`}
                   >
-                    <div>
-                      <div className="text-xs font-semibold">{mod.name}</div>
-                      <div className="text-[10px] font-mono text-slate-600">{mod.category}</div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold truncate">{mod.name}</div>
+                      <div className="text-[9.5px] font-mono text-slate-600 truncate">{mod.category}</div>
                     </div>
                   </button>
                 ))}
               </div>
 
               {activeModule && (
-                <div className="lg:col-span-8 p-6 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-5">
-                  <div className="border-b border-white/6 pb-4">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">{activeModule.category}</span>
-                    <h3 className="text-lg font-bold text-slate-100 mt-1">{activeModule.name}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-2">{activeModule.purpose}</p>
+                <div className="lg:col-span-8 p-4 sm:p-6 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden">
+                  <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
+                    <span className="text-[9.5px] font-mono text-cyan-400 uppercase tracking-wider">{activeModule.category}</span>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeModule.name}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{activeModule.purpose}</p>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-xs font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-mono w-full min-w-0">
                     {[
                       { label: 'Algorithm',  value: activeModule.algorithm },
                       { label: 'Technology', value: activeModule.tech },
                       { label: 'Inputs',     value: activeModule.inputs },
                       { label: 'Outputs',    value: activeModule.outputs },
                     ].map(row => (
-                      <div key={row.label} className="p-3.5 rounded-xl bg-[#03030c] border border-white/6">
-                        <div className="text-slate-500 text-[9px] uppercase tracking-wider mb-1">{row.label}</div>
-                        <div className="text-slate-200">{row.value}</div>
+                      <div key={row.label} className="p-3 rounded-xl bg-[#03030c] border border-white/6 min-w-0">
+                        <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">{row.label}</div>
+                        <div className="text-slate-200 break-words">{row.value}</div>
                       </div>
                     ))}
                   </div>
@@ -946,34 +945,34 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 — PLATFORM / NODE INSPECTOR (#platform)
         ══════════════════════════════════════════════════════════ */}
-        <section id="platform" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="platform" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-10">
-              <div className="text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2">Consortium Architecture</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Active Bank Node Inspector</h2>
-              <p className="text-slate-400 text-base mt-3 leading-relaxed">
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2">Consortium Architecture</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Active Bank Node Inspector</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any institution node to inspect hardware specs, PyTorch execution runtime, and ISO 20022 message streams.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-5 w-full min-w-0">
               {Object.values(BANK_NODES).map((bank, i) => (
                 <motion.div
                   key={bank.id}
                   initial={{opacity:0,y:15}} animate={{opacity:1,y:0}} transition={{delay:i*0.08}}
                   whileHover={{y:-4}}
                   onClick={() => setActiveBankDrawer(bank)}
-                  className="p-5 rounded-2xl bg-white/2 border border-white/8 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] cursor-pointer transition-all space-y-3"
+                  className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 hover:border-emerald-500/40 hover:shadow-[0_0_30px_rgba(16,185,129,0.15)] cursor-pointer transition-all space-y-2.5 sm:space-y-3 min-w-0"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
-                    <span className="text-[10px] font-mono text-slate-500">{bank.latency}</span>
+                    <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-500">{bank.latency}</span>
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-200">{bank.name}</h3>
-                    <div className="text-[10px] font-mono text-slate-600 mt-0.5">{bank.ticker}</div>
+                    <h3 className="text-xs sm:text-sm font-bold text-slate-200 truncate">{bank.name}</h3>
+                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-600 mt-0.5 truncate">{bank.ticker}</div>
                   </div>
-                  <div className="text-[11px] font-mono text-slate-500 border-t border-white/6 pt-2.5 leading-snug">
+                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-500 border-t border-white/6 pt-2 leading-snug break-words">
                     {bank.hardware}
                   </div>
                 </motion.div>
@@ -985,52 +984,52 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 — ARCHITECTURE (#architecture)
         ══════════════════════════════════════════════════════════ */}
-        <section id="architecture" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="architecture" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-10">
-              <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Service Mesh Design</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">System Service Topology</h2>
-              <p className="text-slate-400 text-base mt-3 leading-relaxed">
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Service Mesh Design</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">System Service Topology</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                 Click any service layer node to inspect internal responsibilities, communication protocols, and technology stack.
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-              <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
+              <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full min-w-0">
                 {ARCH_NODES.map(node => (
                   <button
                     key={node.id}
                     onClick={() => setActiveArchNode(node)}
-                    className={`p-4 rounded-xl border text-left transition-all cursor-pointer ${
+                    className={`p-3 sm:p-4 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                       activeArchNode?.id === node.id
                         ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
                         : 'bg-white/2 border-white/7 hover:border-white/15'
                     }`}
                   >
-                    <div className="text-xs font-semibold mb-1">{node.label}</div>
-                    <div className="text-[10px] font-mono text-slate-600 leading-snug">{node.tech.slice(0, 2).join(' · ')}</div>
+                    <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
+                    <div className="text-[9.5px] font-mono text-slate-600 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                   </button>
                 ))}
               </div>
 
               {activeArchNode && (
-                <div className="lg:col-span-7 p-6 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-5">
-                  <div className="border-b border-white/6 pb-4">
-                    <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
-                    <h3 className="text-lg font-bold text-slate-100 mt-1">{activeArchNode.label}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-2">{activeArchNode.description}</p>
+                <div className="lg:col-span-7 p-4 sm:p-6 rounded-3xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden">
+                  <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
+                    <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeArchNode.label}</h3>
+                    <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{activeArchNode.description}</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs font-mono">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
                     {[
                       { label: 'Responsibilities', items: activeArchNode.responsibilities, dot: 'text-indigo-400' },
                       { label: 'Protocols',        items: activeArchNode.protocols,       dot: 'text-purple-400' },
                       { label: 'Technology',       items: activeArchNode.tech,            dot: 'text-cyan-400' },
                     ].map(col => (
-                      <div key={col.label}>
-                        <div className="text-[10px] text-slate-500 uppercase tracking-wider mb-2">{col.label}</div>
-                        <ul className="space-y-1.5">
+                      <div key={col.label} className="min-w-0">
+                        <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
+                        <ul className="space-y-1">
                           {col.items.map(it => (
-                            <li key={it} className="text-slate-300 flex items-center gap-1.5"><span className={col.dot}>•</span>{it}</li>
+                            <li key={it} className="text-slate-300 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
                           ))}
                         </ul>
                       </div>
@@ -1045,19 +1044,19 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 — SECURITY & PRIVACY (#security)
         ══════════════════════════════════════════════════════════ */}
-        <section id="security" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
+        <section id="security" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-8">
-              <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Cryptographic Boundaries</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Privacy & Trust Boundary Model</h2>
+            <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Cryptographic Boundaries</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Privacy & Trust Boundary Model</h2>
             </div>
 
-            <div className="flex gap-1.5 p-1.5 bg-white/3 border border-white/8 rounded-2xl w-fit mb-8">
+            <div className="flex gap-1 p-1 bg-white/3 border border-white/8 rounded-2xl w-full sm:w-fit mb-6 sm:mb-8 overflow-x-auto min-w-0">
               {[{id:'flow',label:'Data Flow'},{id:'threat',label:'Threat Model'},{id:'compliance',label:'Compliance'}].map(tab=>(
                 <button
                   key={tab.id}
                   onClick={() => setActivePrivacyTab(tab.id as 'flow'|'threat'|'compliance')}
-                  className={`px-5 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  className={`px-4 sm:px-5 py-1.5 sm:py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer shrink-0 ${
                     activePrivacyTab === tab.id
                       ? 'bg-indigo-600 text-white shadow-[0_0_16px_rgba(99,102,241,0.5)]'
                       : 'text-slate-400 hover:text-slate-200'
@@ -1069,29 +1068,29 @@ export default function LandingPage() {
             </div>
 
             <AnimatePresence mode="wait">
-              <motion.div key={activePrivacyTab} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}}>
+              <motion.div key={activePrivacyTab} initial={{opacity:0,y:8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}} transition={{duration:0.2}} className="w-full min-w-0">
                 {activePrivacyTab === 'flow' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
                     {[
                       {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'← Strict non-export policy',noteColor:'text-rose-400'},
                       {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=0.50, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
                       {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-400'},
                     ].map(col => (
-                      <div key={col.title} className="p-6 rounded-3xl bg-white/2 border border-white/8 space-y-4">
-                        <div className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider">{col.title}</div>
-                        <div className="space-y-2 font-mono text-xs text-slate-400">
+                      <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-white/2 border border-white/8 space-y-3 sm:space-y-4 min-w-0">
+                        <div className="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider truncate">{col.title}</div>
+                        <div className="space-y-1.5 sm:space-y-2 font-mono text-xs text-slate-400 min-w-0">
                           {col.items.map(item => (
-                            <div key={item} className="p-2.5 rounded-xl bg-[#03030c] border border-white/6">{item}</div>
+                            <div key={item} className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 break-words">{item}</div>
                           ))}
                         </div>
-                        <div className={`text-[10px] font-mono ${col.noteColor}`}>{col.note}</div>
+                        <div className={`text-[10px] font-mono ${col.noteColor} truncate`}>{col.note}</div>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {activePrivacyTab === 'threat' && (
-                  <div className="space-y-3">
+                  <div className="space-y-2.5 sm:space-y-3 w-full min-w-0">
                     {[
                       {threat:'Gradient Inversion Attack',    mitigation:'Gaussian DP noise (σ calibrated to ε=0.50) makes gradient inversion mathematically infeasible. Clipping bound C=1.0.'},
                       {threat:'Byzantine Gradient Poisoning', mitigation:'Krum + Trimmed Mean Byzantine-robust aggregation neutralises up to f < n/2 adversarial bank nodes per round.'},
@@ -1099,19 +1098,19 @@ export default function LandingPage() {
                       {threat:'Membership Inference',         mitigation:'RDP accountant bounds cumulative budget. Training halts if ε limit is reached. Per-sample clipping prevents memorisation.'},
                       {threat:'Model Extraction',             mitigation:'Global model weights are distributed exclusively to authenticated bank nodes via mutual TLS (mTLS).' },
                     ].map(row => (
-                      <div key={row.threat} className="flex items-start gap-5 p-5 rounded-2xl bg-white/2 border border-white/8">
-                        <div className="w-48 shrink-0">
-                          <div className="text-xs font-bold text-rose-400">{row.threat}</div>
-                          <div className="text-[10px] font-mono text-emerald-400 mt-0.5">Mitigated</div>
+                      <div key={row.threat} className="flex flex-col sm:flex-row items-start gap-2.5 sm:gap-5 p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 w-full min-w-0">
+                        <div className="w-full sm:w-48 shrink-0">
+                          <div className="text-xs font-bold text-rose-400 break-words">{row.threat}</div>
+                          <div className="text-[9.5px] font-mono text-emerald-400 mt-0.5">Mitigated</div>
                         </div>
-                        <div className="text-xs text-slate-400 font-mono leading-relaxed">{row.mitigation}</div>
+                        <div className="text-xs text-slate-400 font-mono leading-relaxed break-words flex-1 min-w-0">{row.mitigation}</div>
                       </div>
                     ))}
                   </div>
                 )}
 
                 {activePrivacyTab === 'compliance' && (
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 w-full min-w-0">
                     {[
                       {standard:'GDPR Article 25',        status:'Privacy by Design',detail:'DP guarantees built into tensor aggregation. Zero customer PII ever exits bank boundary.'},
                       {standard:'FinCEN SAR Regulation',  status:'Compliant',        detail:'Automated SAR XML filing generation with cryptographic evidence sign-off.'},
@@ -1120,12 +1119,12 @@ export default function LandingPage() {
                       {standard:'ISO 20022',              status:'Native Integration',detail:'Parses pacs.008 and camt.053 XML messages natively in the bank data plane.'},
                       {standard:'SOC 2 Type II',          status:'In Audit',         detail:'Full immutable audit trail logging, HSM keys, and telemetry controls.'},
                     ].map(row => (
-                      <div key={row.standard} className="p-5 rounded-2xl bg-white/2 border border-white/8 space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-mono font-bold text-slate-200">{row.standard}</span>
-                          <span className="text-[10px] font-mono font-bold text-emerald-400">{row.status}</span>
+                      <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 space-y-2 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-mono font-bold text-slate-200 truncate">{row.standard}</span>
+                          <span className="text-[9.5px] font-mono font-bold text-emerald-400 shrink-0">{row.status}</span>
                         </div>
-                        <p className="text-xs text-slate-500 leading-relaxed">{row.detail}</p>
+                        <p className="text-xs text-slate-500 leading-relaxed font-sans">{row.detail}</p>
                       </div>
                     ))}
                   </div>
@@ -1138,40 +1137,40 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 8 — EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
-        <section id="api" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
-          <div id="docs">
+        <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+          <div id="docs" className="w-full min-w-0">
             <FadeSection>
-              <div className="max-w-3xl mb-8">
-                <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
-                <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise REST API & SDK Specs</h2>
-                <p className="text-slate-400 text-base mt-3 leading-relaxed">
+              <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise REST API & SDK Specs</h2>
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
                   CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.0 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
               </div>
 
               {/* Integration Features Banner */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-                <div className="p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8 w-full min-w-0">
+                <div className="p-4 sm:p-5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-indigo-400 uppercase mb-1">mTLS & API Keys</div>
-                  <p className="text-xs text-slate-400">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Mutual TLS authentication for all gRPC bank agent channels, with scoped API keys for REST management.</p>
                 </div>
-                <div className="p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20">
+                <div className="p-4 sm:p-5 rounded-2xl bg-purple-600/10 border border-purple-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-purple-400 uppercase mb-1">WebSocket Telemetry</div>
-                  <p className="text-xs text-slate-400">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Real-time bi-directional WebSocket event stream for round progress, gradient norms, and risk alerts.</p>
                 </div>
-                <div className="p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20">
+                <div className="p-4 sm:p-5 rounded-2xl bg-cyan-600/10 border border-cyan-500/20 min-w-0">
                   <div className="text-xs font-mono font-bold text-cyan-400 uppercase mb-1">SDK & WebHooks</div>
-                  <p className="text-xs text-slate-400">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">Official Python (`cfi-sdk`) and TypeScript (`@cfi/sdk`) packages with automated WebHook alert dispatchers.</p>
                 </div>
               </div>
 
               {/* Interactive Code Console Tabs */}
-              <div className="flex gap-1.5 p-1.5 bg-white/3 border border-white/8 rounded-2xl w-fit mb-4">
+              <div className="flex gap-1 p-1 bg-white/3 border border-white/8 rounded-2xl w-full sm:w-fit mb-4 overflow-x-auto min-w-0">
                 {[{id:'curl',label:'cURL'},{id:'python',label:'Python SDK'},{id:'ts',label:'TypeScript SDK'}].map(tab => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveApiTab(tab.id as 'curl'|'python'|'ts')}
-                    className={`px-4 py-1.5 text-xs font-mono rounded-xl transition-all cursor-pointer ${
+                    className={`px-3.5 sm:px-4 py-1.5 text-xs font-mono rounded-xl transition-all cursor-pointer shrink-0 ${
                       activeApiTab === tab.id ? 'bg-indigo-600 text-white font-bold shadow-[0_0_15px_rgba(99,102,241,0.5)]' : 'text-slate-400 hover:text-slate-200'
                     }`}
                   >
@@ -1181,8 +1180,8 @@ export default function LandingPage() {
               </div>
 
               {/* Code Display Window */}
-              <div className="rounded-3xl bg-[#03030c] border border-white/8 p-6 overflow-x-auto mb-10 shadow-2xl">
-                <pre className="text-xs font-mono text-indigo-200/90 leading-relaxed whitespace-pre">
+              <div className="rounded-2xl sm:rounded-3xl bg-[#03030c] border border-white/8 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
+                <pre className="text-[11px] sm:text-xs font-mono text-indigo-200/90 leading-relaxed whitespace-pre min-w-0">
                   {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium bank nodes
 curl -X POST https://api.cfi-platform.com/v1/rounds \\
   -H "Authorization: Bearer cfi_api_key_991823" \\
@@ -1241,12 +1240,12 @@ telemetry.on('round.stage', (evt) => {
               </div>
 
               {/* Endpoint Detailed Table */}
-              <div className="rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl space-y-0">
-                <div className="px-6 py-4 bg-white/3 border-b border-white/6 flex items-center justify-between">
+              <div className="rounded-2xl sm:rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl w-full min-w-0">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-white/3 border-b border-white/6 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
-                  <span className="text-[10px] font-mono text-indigo-400">OpenAPI 3.0 Spec Compatible</span>
+                  <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.0 Spec</span>
                 </div>
-                <div className="divide-y divide-white/5 font-mono text-xs">
+                <div className="divide-y divide-white/5 font-mono text-xs min-w-0">
                   {[
                     { method: 'POST', path: '/v1/rounds',        desc: 'Trigger a new federated training round across authenticated bank nodes', req: 'consortium_id, node_ids, privacy_config', res: 'round_id, status: STARTED' },
                     { method: 'GET',  path: '/v1/rounds/:id',    desc: 'Fetch real-time round metrics, global accuracy, and L2 gradient norms', req: 'round_id (path parameter)', res: 'accuracy, epsilon_used, node_statuses' },
@@ -1255,24 +1254,24 @@ telemetry.on('round.stage', (evt) => {
                     { method: 'GET',  path: '/v1/reports/sar',   desc: 'Retrieve cryptographically signed FinCEN SAR XML export packages', req: 'risk_threshold (optional)', res: 'FinCEN_SAR XML + SHA-256 signature' },
                     { method: 'WS',   path: '/v1/telemetry',     desc: 'Bi-directional WebSocket streaming live training rounds & risk alerts', req: 'jwt_token', res: 'JSON event telemetry stream' },
                   ].map(row => (
-                    <div key={row.path} className="p-5 hover:bg-white/3 transition-colors space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                    <div key={row.path} className="p-4 sm:p-5 hover:bg-white/3 transition-colors space-y-2 w-full min-w-0">
+                      <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+                          <span className={`px-2 py-0.5 rounded text-[9.5px] font-bold shrink-0 ${
                             row.method === 'GET'  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20' :
                             row.method === 'POST' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' :
                                                     'bg-purple-500/10 text-purple-400 border border-purple-500/20'
                           }`}>
                             {row.method}
                           </span>
-                          <span className="text-indigo-300 font-bold text-sm">{row.path}</span>
+                          <span className="text-indigo-300 font-bold text-xs sm:text-sm break-all">{row.path}</span>
                         </div>
-                        <span className="text-[10px] text-slate-500 font-mono">v1 endpoint</span>
+                        <span className="text-[9.5px] text-slate-500 font-mono shrink-0">v1 endpoint</span>
                       </div>
-                      <p className="text-xs text-slate-400 font-sans leading-relaxed">{row.desc}</p>
-                      <div className="flex flex-wrap gap-4 text-[10px] text-slate-500 pt-1 border-t border-white/4">
-                        <div><span className="text-slate-600">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
-                        <div><span className="text-slate-600">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
+                      <p className="text-xs text-slate-400 font-sans leading-relaxed break-words">{row.desc}</p>
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-500 pt-1.5 border-t border-white/4 min-w-0">
+                        <div className="truncate"><span className="text-slate-600">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
+                        <div className="truncate"><span className="text-slate-600">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
                       </div>
                     </div>
                   ))}
@@ -1283,23 +1282,23 @@ telemetry.on('round.stage', (evt) => {
         </section>
 
         {/* ── FOOTER ──────────────────────────────────────────────── */}
-        <footer className="border-t border-white/6 py-12 px-4 sm:px-6">
-          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-            <div className="flex items-center gap-3">
-              <BrandLogo className="w-8 h-8" />
-              <div>
-                <div className="text-sm font-bold text-slate-200">Federated Intelligence Network</div>
-                <div className="text-xs font-mono text-slate-600">Privacy-Preserving Fraud Intelligence Platform</div>
+        <footer className="border-t border-white/6 py-10 sm:py-12 px-3.5 sm:px-6 w-full min-w-0">
+          <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-start md:items-center justify-between gap-6 min-w-0">
+            <div className="flex items-center gap-3 min-w-0">
+              <BrandLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
+              <div className="min-w-0">
+                <div className="text-xs sm:text-sm font-bold text-slate-200 truncate">Federated Intelligence Network</div>
+                <div className="text-[10.5px] sm:text-xs font-mono text-slate-600 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
               </div>
             </div>
 
-            <div className="text-xs font-mono text-slate-500">
+            <div className="text-[10.5px] sm:text-xs font-mono text-slate-500 break-words">
               PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.4)]"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.4)] w-full sm:w-auto justify-center"
             >
               Open Platform Demo <ArrowRight />
             </button>
@@ -1314,29 +1313,29 @@ telemetry.on('round.stage', (evt) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setActiveBankDrawer(null)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end"
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end w-full max-w-full"
             >
               <motion.div
                 initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
                 transition={{ type: 'spring', damping: 28, stiffness: 200 }}
                 onClick={e => e.stopPropagation()}
-                className="w-full max-w-lg bg-[#070714] border-l border-white/10 p-7 overflow-y-auto space-y-6"
+                className="w-full max-w-lg bg-[#070714] border-l border-white/10 p-5 sm:p-7 overflow-y-auto space-y-6 max-w-full"
               >
-                <div className="flex items-start justify-between border-b border-white/6 pb-5">
-                  <div>
-                    <span className="text-[10px] font-mono text-emerald-400 uppercase tracking-wider">Institution Node Detail</span>
-                    <h3 className="text-lg font-bold text-slate-100 mt-1">{activeBankDrawer.name}</h3>
-                    <div className="text-xs font-mono text-slate-500 mt-0.5">{activeBankDrawer.location}</div>
+                <div className="flex items-start justify-between border-b border-white/6 pb-4 sm:pb-5 gap-2">
+                  <div className="min-w-0">
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">Institution Node Detail</span>
+                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeBankDrawer.name}</h3>
+                    <div className="text-xs font-mono text-slate-500 mt-0.5 truncate">{activeBankDrawer.location}</div>
                   </div>
                   <button
                     onClick={() => setActiveBankDrawer(null)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors"
+                    className="px-3 py-1.5 rounded-xl text-xs font-mono bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-colors shrink-0"
                   >
                     Close
                   </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 font-mono text-xs">
+                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 font-mono text-xs min-w-0">
                   {[
                     { k: 'Ticker',   v: activeBankDrawer.ticker },
                     { k: 'Latency',  v: activeBankDrawer.latency },
@@ -1345,18 +1344,18 @@ telemetry.on('round.stage', (evt) => {
                     { k: 'PyTorch',  v: activeBankDrawer.pytorch },
                     { k: 'Status',   v: 'READY — On-Prem Agent' },
                   ].map(row => (
-                    <div key={row.k} className="p-3.5 rounded-xl bg-white/3 border border-white/8">
-                      <div className="text-slate-500 text-[9px] uppercase tracking-wider mb-1">{row.k}</div>
+                    <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
+                      <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">{row.k}</div>
                       <div className="text-slate-200 truncate">{row.v}</div>
                     </div>
                   ))}
                 </div>
 
-                <div>
-                  <div className="text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-3">ISO 20022 Stream Log</div>
-                  <div className="rounded-2xl bg-[#03030c] border border-white/8 p-4 space-y-3 font-mono text-[11px] text-slate-400 overflow-x-auto">
+                <div className="min-w-0">
+                  <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">ISO 20022 Stream Log</div>
+                  <div className="rounded-2xl bg-[#03030c] border border-white/8 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
                     {activeBankDrawer.xmlLogs.map((log, i) => (
-                      <div key={i} className="flex items-start gap-2.5 border-b border-white/5 pb-2.5 last:border-0 last:pb-0">
+                      <div key={i} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0 min-w-0">
                         <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
                         <span className="break-all leading-relaxed">{log}</span>
                       </div>
