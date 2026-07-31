@@ -51,16 +51,7 @@ const WORKFLOW_STEPS = [
   { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
 ];
 
-const NAV_TARGETS: Record<string, string> = {
-  'Overview': 'hero',
-  'Problem': 'problem-solution',
-  'Workflow': 'how-it-works',
-  'Capabilities': 'product',
-  'Platform': 'platform',
-  'Architecture': 'architecture',
-  'Security': 'security',
-  'API & Docs': 'api',
-};
+
 
 // Helper for smooth scrolling to sections
 const scrollToSection = (id: string) => {
@@ -129,9 +120,9 @@ function InteractiveGraphSimulator() {
           {/* Edge lines */}
           {activeTab === 'federated' ? (
             <>
-              {[ [0,3], [1,3], [2,3] ].map(([a, b], idx) => {
-                const n1 = nodes[a];
-                const n2 = nodes[b];
+              {( [ [0,3], [1,3], [2,3] ] as [number, number][]).map(([a, b], idx) => {
+                const n1 = nodes[a]!;
+                const n2 = nodes[b]!;
                 const offset = ((pulseTick * 2.5) + idx * 30) % 100;
                 return (
                   <g key={idx}>
@@ -147,9 +138,9 @@ function InteractiveGraphSimulator() {
             </>
           ) : (
             <>
-              {[ [0,3], [1,3], [2,3] ].map(([a, b], idx) => {
-                const n1 = nodes[a];
-                const n2 = nodes[b];
+              {( [ [0,3], [1,3], [2,3] ] as [number, number][]).map(([a, b], idx) => {
+                const n1 = nodes[a]!;
+                const n2 = nodes[b]!;
                 return (
                   <line key={idx} x1={n1.x} y1={n1.y} x2={n2.x} y2={n2.y} stroke="#ef4444" strokeWidth="1" strokeDasharray="3 4" strokeOpacity="0.4" />
                 );
