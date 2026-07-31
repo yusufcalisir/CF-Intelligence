@@ -393,15 +393,28 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="gnn" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-purple-600/10 border border-purple-500/20 space-y-0.5">
                   <div className="text-purple-300 font-bold">GNN Subgraph Inspection</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Multi-hop transaction graph attention embeddings (PyG 2.6)</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">AML Investigation Dashboard (/investigation)</div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-xl bg-[#03030c] border border-white/6 space-y-1.5">
-                  <div className="text-slate-500 text-[8.5px] sm:text-[9px]">GATConv Layer Attentions:</div>
-                  <div className="text-purple-300 font-mono text-[8.5px] sm:text-[9px] truncate">head_0: [0.842, 0.191, 0.428, 0.912]</div>
-                  <div className="text-purple-300 font-mono text-[8.5px] sm:text-[9px] truncate">head_1: [0.311, 0.774, 0.109, 0.881]</div>
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Total Alerts</div>
+                    <div className="text-amber-400 font-bold mt-0.5">48 (12 Critical)</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Open Cases</div>
+                    <div className="text-indigo-400 font-bold mt-0.5">8 Active Cases</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Entities</div>
+                    <div className="text-teal-400 font-bold mt-0.5">142 Network Nodes</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Graph Clusters</div>
+                    <div className="text-pink-400 font-bold mt-0.5">5 High-Risk Subgraphs</div>
+                  </div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/6">
-                  <div className="text-slate-400 font-semibold mb-1">Detected Circular Smurfing Path:</div>
+                <div className="p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/6 space-y-1">
+                  <div className="text-slate-400 font-semibold">Detected Circular Smurfing Path:</div>
                   <div className="text-rose-400 font-bold break-all">JPM-01 ($1.45M) → HSBC-02 → SGX TEE → DBK-03</div>
                 </div>
               </motion.div>
@@ -411,20 +424,24 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="privacy" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-emerald-600/10 border border-emerald-500/20 space-y-0.5">
                   <div className="text-emerald-300 font-bold">Intel SGX & (ε, δ)-DP Engine</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Opacus RDP Accountant & Paillier Cryptography</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Privacy Defense & Security Suite (/privacy-defense)</div>
                 </div>
-                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Noise Scale (σ)</div>
-                    <div className="text-emerald-400 font-bold mt-0.5 truncate">0.031 (C=1.0)</div>
+                <div className="space-y-1 text-[8.5px] sm:text-[9px]">
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
+                    <span className="text-slate-400">Deep Leakage Audit (DLG)</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.021)</span>
                   </div>
-                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">SGX Attestation</div>
-                    <div className="text-emerald-400 font-bold mt-0.5 truncate">VERIFIED IAS</div>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
+                    <span className="text-slate-400">Membership Inference (MIA)</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.048)</span>
+                  </div>
+                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6">
+                    <span className="text-slate-400">Model Inversion Attack</span>
+                    <span className="text-emerald-400 font-bold">🟢 Safe (0.015)</span>
                   </div>
                 </div>
                 <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
-                  Homomorphic Ciphertext: 0x99F188A2...FE01
+                  Privacy Accountant: ε = 0.50, δ = 1e-5 (Opacus RDP Bounded)
                 </div>
               </motion.div>
             )}
@@ -433,20 +450,26 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="bft" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-cyan-600/10 border border-cyan-500/20 space-y-0.5">
                   <div className="text-cyan-300 font-bold">Byzantine Resilience Monitor</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Krum & Trimmed Mean Poisoning Defense</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Operations & Consortium Monitor (/operations)</div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Live FL Round</div>
+                    <div className="text-cyan-400 font-bold mt-0.5">Round #5 / 10</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Champion Model AUC</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">0.885 ROC-AUC</div>
+                  </div>
                 </div>
                 <div className="space-y-1 text-[8.5px] sm:text-[9px]">
                   <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
                     <span className="truncate">JPMorgan Node #01</span>
-                    <span className="shrink-0 font-bold">100% HONEST</span>
+                    <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
                   <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-emerald-600/10 border border-emerald-500/20 text-emerald-400">
                     <span className="truncate">HSBC Node #02</span>
-                    <span className="shrink-0 font-bold">100% HONEST</span>
-                  </div>
-                  <div className="flex items-center justify-between p-1.5 sm:p-2 rounded-lg bg-rose-600/10 border border-rose-500/20 text-rose-400">
-                    <span className="truncate">Adversary Node</span>
-                    <span className="shrink-0 font-bold">POISONED (KRUM)</span>
+                    <span className="shrink-0 font-bold">VERIFIED HONEST</span>
                   </div>
                 </div>
               </motion.div>
@@ -456,10 +479,23 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               <motion.div key="sar" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
                 <div className="p-2.5 sm:p-3 rounded-xl bg-amber-600/10 border border-amber-500/20 space-y-0.5">
                   <div className="text-amber-300 font-bold">FinCEN SAR Automated Compliance</div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">SHAP Feature Attributions & Signed XML Export</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Case Management & SAR Filings (/cases)</div>
                 </div>
-                <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-amber-200/90 leading-relaxed font-mono break-all max-h-24 overflow-y-auto">
-                  &lt;FinCEN_SAR&gt;&lt;Amount Ccy="USD"&gt;1450000.00&lt;/Amount&gt;&lt;RiskScore&gt;0.94&lt;/RiskScore&gt;&lt;/FinCEN_SAR&gt;
+                <div className="space-y-1 text-[8.5px] sm:text-[9px]">
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-200 font-bold">
+                      <span>CASE-2026-004</span>
+                      <span className="text-rose-400">P1 Critical</span>
+                    </div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">High-Volume Cross-Bank Smurfing Ring — In Review</div>
+                  </div>
+                  <div className="p-1.5 sm:p-2 rounded-lg bg-[#03030c] border border-white/6 space-y-0.5">
+                    <div className="flex items-center justify-between text-slate-200 font-bold">
+                      <span>CASE-2026-001</span>
+                      <span className="text-emerald-400">SAR Filed</span>
+                    </div>
+                    <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion — FinCEN SAR XML Exported</div>
+                  </div>
                 </div>
               </motion.div>
             )}
