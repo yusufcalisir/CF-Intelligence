@@ -19,26 +19,58 @@ const BANK_NODES: Record<string, BankInfoDetail> = {
 };
 
 const PLATFORM_MODULES: Module[] = [
-  { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Engine', purpose: 'Orchestrates distributed training rounds with FedAvg and straggler tolerance.', algorithm: 'FedAvg, FedProx, async SGD', inputs: 'Local gradients from bank nodes', outputs: 'Aggregated global model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
-  { id: 'dp-engine', name: 'Differential Privacy Engine', category: 'Privacy Layer', purpose: 'Applies Gaussian noise to local gradients providing (ε, δ)-DP guarantees.', algorithm: 'Gaussian Mechanism, RDP Accountant', inputs: 'Raw local gradients, sensitivity bounds', outputs: 'Noise-perturbed gradient tensors', tech: 'Opacus 1.4, Rényi DP' },
-  { id: 'secure-agg', name: 'Secure Aggregation', category: 'Cryptography', purpose: 'Paillier homomorphic encryption ensures no raw gradient is seen by the coordinator.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically aggregated ciphertext', tech: 'Intel SGX Enclave v2, python-phe' },
-  { id: 'bft-agg', name: 'Byzantine-Robust Aggregation', category: 'BFT Defense', purpose: 'Neutralises gradient poisoning attacks from compromised bank nodes.', algorithm: 'Krum, Trimmed Mean, Flame', inputs: 'Gradient updates from all nodes', outputs: 'Byzantine-filtered aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
-  { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'ML Runtime', purpose: 'Builds transaction graphs from ISO 20022 feeds and computes GNN embeddings.', algorithm: 'GAT, GraphSAGE', inputs: 'ISO 20022 XML pacs.008 / camt.053', outputs: '512-dim node embeddings, risk scores', tech: 'PyTorch Geometric 2.6, DGL' },
-  { id: 'risk-engine', name: 'Risk Scoring Engine', category: 'Intelligence', purpose: 'XGBoost + GNN ensemble with SHAP interpretability per transaction.', algorithm: 'XGBoost + GNN ensemble, SHAP, LIME', inputs: 'GNN embeddings, transaction features', outputs: 'Risk score [0-1], SHAP attributions', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
-  { id: 'telemetry', name: 'Telemetry & Monitoring', category: 'Observability', purpose: 'Streams real-time FL round metrics and node health to the dashboard.', algorithm: 'EWMA smoothing, anomaly detection', inputs: 'Node heartbeats, round metrics', outputs: 'Prometheus metrics, InfluxDB time-series', tech: 'Prometheus, Grafana, OpenTelemetry' },
-  { id: 'bank-connector', name: 'Bank Connector Framework', category: 'Integration', purpose: 'Normalises ISO 20022 XML streams from heterogeneous bank core banking systems.', algorithm: 'Schema validation, normalisation', inputs: 'Raw pacs.008, camt.053 XML streams', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
+  { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Engine', purpose: 'Orchestrates distributed training rounds across heterogeneous bank nodes using FedAvg with asynchronous straggler tolerance.', algorithm: 'FedAvg, FedProx, asynchronous SGD', inputs: 'Local gradients from bank nodes', outputs: 'Aggregated global model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
+  { id: 'dp-engine', name: 'Differential Privacy Engine', category: 'Privacy Layer', purpose: 'Applies calibrated Gaussian noise to local gradient updates before they leave bank premises, providing (ε, δ)-DP guarantees.', algorithm: 'Gaussian Mechanism, RDP Accountant', inputs: 'Raw local gradients, sensitivity bounds', outputs: 'Noise-perturbed gradient tensors', tech: 'Opacus 1.4, Rényi DP' },
+  { id: 'secure-agg', name: 'Secure Aggregation', category: 'Cryptography', purpose: 'Aggregates model updates using Paillier homomorphic encryption so the coordinator never sees individual institution gradients in plaintext.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically aggregated ciphertext', tech: 'Intel SGX Enclave v2, python-phe' },
+  { id: 'bft-agg', name: 'Byzantine-Robust Aggregation', category: 'BFT Defense', purpose: 'Detects and neutralises gradient poisoning attacks from compromised bank nodes before global model update.', algorithm: 'Krum, Trimmed Mean, Flame', inputs: 'Set of gradient updates from all nodes', outputs: 'Byzantine-filtered aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
+  { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'ML Runtime', purpose: 'Builds heterogeneous transaction graphs from ISO 20022 feeds and computes multi-hop structural embeddings for fraud pattern detection.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 / camt.053', outputs: '512-dim node embeddings, risk scores', tech: 'PyTorch Geometric 2.6, DGL' },
+  { id: 'risk-engine', name: 'Risk Scoring Engine', category: 'Intelligence', purpose: 'Combines GNN embeddings with tabular features and velocity metrics to produce calibrated transaction risk scores with SHAP explanations.', algorithm: 'XGBoost + GNN ensemble, SHAP, LIME', inputs: 'GNN embeddings, transaction features', outputs: 'Risk score [0-1], SHAP attributions', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
+  { id: 'telemetry', name: 'Telemetry & Monitoring', category: 'Observability', purpose: 'Streams real-time FL round metrics, gradient norms, privacy budget consumption, and node health to the Coordinator dashboard.', algorithm: 'EWMA smoothing, anomaly detection', inputs: 'Node heartbeats, round metrics', outputs: 'Prometheus metrics, InfluxDB time-series', tech: 'Prometheus, Grafana, OpenTelemetry' },
+  { id: 'bank-connector', name: 'Bank Connector Framework', category: 'Integration', purpose: 'Standardises ingestion of ISO 20022 XML financial message streams from heterogeneous bank core banking systems into the FL data plane.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008, camt.053 XML streams', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
 ];
 
 const ARCH_NODES: ArchNode[] = [
   { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 18', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
   { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
   { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.11', 'gRPC', 'Celery', 'Redis'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
-  { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms and gradient aggregation.', tech: ['PyTorch 2.2', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
-  { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies Gaussian noise and manages cumulative (ε, δ) privacy budget.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'ε audit'], protocols: ['Internal API'] },
-  { id: 'sgx-enclave', label: 'SGX Enclave', description: 'Hardware-isolated trusted execution environment for homomorphic aggregation.', tech: ['Intel SGX SDK', 'LibTorch (C++)', 'OpenEnclave'], responsibilities: ['HE aggregation', 'Remote attestation', 'Enclave verification', 'Key management'], protocols: ['Enclave-to-Enclave', 'ECALL/OCALL'] },
-  { id: 'graph-engine', label: 'Graph Engine', description: 'PyTorch Geometric runtime for transaction graph construction and GNN inference.', tech: ['PyTorch Geometric 2.6', 'DGL', 'NetworkX'], responsibilities: ['Graph construction', 'GATConv inference', 'Subgraph sampling', 'Embedding store'], protocols: ['Internal gRPC'] },
-  { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
+  { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms (FedAvg, FedProx) and gradient aggregation.', tech: ['PyTorch 2.2', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
+  { id: 'privacy-engine', label: 'Privacy Engine', description: 'Applies calibrated Gaussian noise and manages cumulative (ε, δ) privacy budget via RDP accountant.', tech: ['Opacus 1.4', 'python-phe', 'RDP'], responsibilities: ['Gradient clipping', 'Noise injection', 'Budget tracking', 'ε audit'], protocols: ['Internal API'] },
+  { id: 'sgx-enclave', label: 'SGX Enclave', description: 'Hardware-isolated trusted execution environment for homomorphic aggregation of encrypted gradients.', tech: ['Intel SGX SDK', 'LibTorch (C++)', 'OpenEnclave'], responsibilities: ['HE aggregation', 'Remote attestation', 'Enclave verification', 'Key management'], protocols: ['Enclave-to-Enclave', 'ECALL/OCALL'] },
+  { id: 'graph-engine', label: 'Graph Engine', description: 'PyTorch Geometric runtime for transaction graph construction and GNN inference from ISO 20022 feeds.', tech: ['PyTorch Geometric 2.6', 'DGL', 'NetworkX'], responsibilities: ['Graph construction', 'GATConv inference', 'Subgraph sampling', 'Embedding store'], protocols: ['Internal gRPC'] },
+  { id: 'bank-nodes', label: 'Bank Node Agents', description: 'Lightweight Python agents deployed at each bank performing local training on private ledger data.', tech: ['PyTorch', 'gRPC client', 'HSM SDK'], responsibilities: ['Local training', 'DP noise injection', 'Gradient encryption', 'Heartbeat'], protocols: ['gRPC (mTLS)', 'ISO 20022 XML'] },
 ];
+
+const WORKFLOW_STEPS = [
+  { id: 1, short: 'Ingestion', label: 'ISO 20022 Ingestion', description: 'Each bank node ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 statements) via the Bank Connector Framework. Messages are validated against XSD schemas, normalised, and streamed into the local transaction graph store.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser\nfrom lxml import etree\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\ngraph_builder.ingest(msg)` },
+  { id: 2, short: 'Local Training', label: 'Local GNN Training', description: 'The local PyTorch Geometric GAT model is trained exclusively on data stored within the bank premises. The model learns multi-hop transaction graph embeddings capturing structural patterns associated with money laundering networks without ever transmitting raw data externally.', tech: ['PyTorch Geometric 2.6', 'GATConv', 'GraphSAGE', 'Adam optimiser'], code: `# Local GATConv Training\nfrom torch_geometric.nn import GATConv\n\nmodel = GATConv(in_channels=512,\n                out_channels=256,\n                heads=8, dropout=0.1)\noptimiser = Adam(model.parameters(), lr=3e-4)\n\nfor batch in local_loader:\n    loss = criterion(model(batch.x, batch.edge_index), batch.y)\n    loss.backward()` },
+  { id: 3, short: 'Diff. Privacy', label: 'Differential Privacy', description: 'Before any gradient leaves the bank, Opacus injects calibrated Gaussian noise proportional to the gradient L2-sensitivity. The (ε, δ)-DP guarantee is tracked by the Rényi Differential Privacy accountant.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'Gradient Clipping'], code: `# Opacus DP Training\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimiser, loader = privacy_engine.make_private_with_epsilon(\n    module=model,\n    optimizer=optimiser,\n    data_loader=loader,\n    epochs=10, target_epsilon=0.50,\n    target_delta=1e-5, max_grad_norm=1.0,\n)` },
+  { id: 4, short: 'Sec. Aggregation', label: 'Secure Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and transmitted to the Intel SGX hardware enclave. The enclave performs homomorphic summation without decrypting individual bank contributions.', tech: ['Paillier HE', 'Intel SGX v2', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// SGX Enclave Aggregation (C++)\nsgx_status_t ecall_homomorphic_aggregate(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_a, size_t len_a,\n    const uint8_t* cipher_b, size_t len_b,\n    uint8_t* cipher_sum, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_a, cipher_b);\n    memcpy(cipher_sum, sum.data(), sum.size());\n}` },
+  { id: 5, short: 'BFT Filter', label: 'Byzantine Aggregation', description: 'The FL Coordinator applies Byzantine-robust aggregation using the Krum algorithm and Trimmed Mean to neutralise adversarial gradient poisoning attacks from any compromised bank node before updating the global model.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine similarity'], code: `# Krum Byzantine Filtering\ndef krum(gradients: list[Tensor], f: int) -> Tensor:\n    n = len(gradients)\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2\n                       for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:n - f - 2]))\n    return gradients[scores.index(min(scores))]` },
+  { id: 6, short: 'Global Update', label: 'Global Model Update', description: 'The aggregated and validated global model weights are committed to the Model Registry. All bank nodes receive the updated weights for the next training round. A Coordinator audit log records the cryptographic hash of each round.', tech: ['FedAvg', 'Model Registry', 'SHA-256 audit', 'gRPC broadcast'], code: `# FedAvg Global Aggregation\ndef fedavg(updates: list[dict], weights: list[int]) -> dict:\n    total = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(\n            w * u[key] for w, u in zip(weights, updates)\n        ) / total\n    return global_state` },
+  { id: 7, short: 'Risk Intelligence', label: 'Risk Scoring', description: 'The global GNN model produces 512-dimensional transaction embeddings passed to the Risk Scoring Engine. XGBoost ensemble classifier scores each transaction [0-1], with SHAP value decomposition providing interpretable feature attributions.', tech: ['XGBoost 2.0', 'SHAP', 'Platt Calibration', 'LIME'], code: `# Risk Score + SHAP Explanation\nimport shap\n\nrisk_model = xgboost.XGBClassifier()\nrisk_score = risk_model.predict_proba(embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_values = explainer.shap_values(embedding)\n# → interpretable feature attributions` },
+  { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
+];
+
+const NAV_TARGETS: Record<string, string> = {
+  'Overview': 'hero',
+  'Problem': 'problem-solution',
+  'Workflow': 'how-it-works',
+  'Capabilities': 'product',
+  'Platform': 'platform',
+  'Architecture': 'architecture',
+  'Security': 'security',
+  'API & Docs': 'api',
+};
+
+// Helper for smooth scrolling to sections
+const scrollToSection = (id: string) => {
+  const element = document.getElementById(id);
+  if (element) {
+    const yOffset = -70; // Header height offset
+    const y = element.getBoundingClientRect().top + window.pageYOffset + yOffset;
+    window.scrollTo({ top: y, behavior: 'smooth' });
+  }
+};
 
 // ── ANIMATED NETWORK SVG ─────────────────────────────────────────────────────
 function ConsortiumNetworkSVG({ compact = false }: { compact?: boolean }) {
@@ -241,7 +273,6 @@ const ArrowRight = () => (
   </svg>
 );
 
-
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -249,6 +280,7 @@ export default function LandingPage() {
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
   const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
+  const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
   const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
   const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
   const [flRound, setFlRound] = useState(47);
@@ -261,6 +293,15 @@ export default function LandingPage() {
     }, 5000);
     return () => clearInterval(t);
   }, []);
+
+  const handleNavClick = (e: React.MouseEvent, label: string) => {
+    e.preventDefault();
+    const targetId = NAV_TARGETS[label] || label.toLowerCase();
+    scrollToSection(targetId);
+    setIsMobileMenuOpen(false);
+  };
+
+  const currentWorkflowStep = WORKFLOW_STEPS.find(s => s.id === activeWorkflowStep)!;
 
   return (
     <div className="min-h-screen bg-[#070711] text-slate-300 font-sans antialiased selection:bg-indigo-600 selection:text-white overflow-x-hidden">
@@ -288,9 +329,14 @@ export default function LandingPage() {
 
             <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-500">
               {['Overview','Problem','Workflow','Capabilities','Platform','Architecture','Security','API & Docs'].map(label => (
-                <a key={label}
-                  href={`#${label==='API & Docs'?'api':label==='Architecture'?'architecture':label.toLowerCase().replace(/ & /g,'-').replace(/ /g,'-')}`}
-                  className="hover:text-slate-200 transition-colors">{label}</a>
+                <a
+                  key={label}
+                  href={`#${NAV_TARGETS[label] || 'hero'}`}
+                  onClick={(e) => handleNavClick(e, label)}
+                  className="hover:text-slate-200 transition-colors"
+                >
+                  {label}
+                </a>
               ))}
             </nav>
 
@@ -318,16 +364,16 @@ export default function LandingPage() {
             <motion.nav initial={{opacity:0,y:-8}} animate={{opacity:1,y:0}} exit={{opacity:0,y:-8}}
               className="lg:hidden border-b border-white/5 bg-[#070711]/95 backdrop-blur-xl px-4 py-4 space-y-1 z-40">
               {[
-                {label:'Overview (3D Architecture)',    href:'#hero'},
-                {label:'The Problem & Solution',        href:'#problem-solution'},
-                {label:'Streaming GNN Collusion Simulator', href:'#how-it-works'},
-                {label:'Privacy Engine & Capabilities', href:'#product'},
-                {label:'Deployment Blueprint Wizard',   href:'#platform'},
-                {label:'System Architecture',           href:'#architecture'},
-                {label:'Security & Attack Defense Lab', href:'#security'},
-                {label:'API & Docs',                    href:'#api'},
+                {label:'Overview (3D Architecture)',    targetId:'hero'},
+                {label:'The Problem & Solution',        targetId:'problem-solution'},
+                {label:'Streaming GNN Collusion Simulator', targetId:'how-it-works'},
+                {label:'Privacy Engine & Capabilities', targetId:'product'},
+                {label:'Deployment Blueprint Wizard',   targetId:'platform'},
+                {label:'System Architecture',           targetId:'architecture'},
+                {label:'Security & Attack Defense Lab', targetId:'security'},
+                {label:'API & Docs',                    targetId:'api'},
               ].map(link => (
-                <a key={link.label} href={link.href} onClick={() => setIsMobileMenuOpen(false)}
+                <a key={link.label} href={`#${link.targetId}`} onClick={(e) => { e.preventDefault(); scrollToSection(link.targetId); setIsMobileMenuOpen(false); }}
                   className="block px-3 py-2 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-white/5 rounded-lg transition-colors">
                   {link.label}
                 </a>
@@ -399,7 +445,7 @@ export default function LandingPage() {
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[13px] font-semibold text-white transition-all cursor-pointer shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.55)]">
                   Launch Live Platform Demo <ArrowRight/>
                 </button>
-                <a href="#architecture"
+                <a href="#architecture" onClick={(e) => { e.preventDefault(); scrollToSection('architecture'); }}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-white/25 text-[13px] font-medium text-slate-300 hover:text-slate-100 transition-all">
                   System Design
                 </a>
@@ -414,81 +460,203 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 2 — PROBLEM (#problem-solution)  [compact]
+            UNIFIED CAPABILITIES MASTER SECTION
+            Combines Problem, Workflow & Capabilities under ONE Heading
+            Stacked Vertically (Alt Alta)
         ══════════════════════════════════════════════════════════ */}
-        <section id="problem-solution" className="py-12 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
-          <FadeSection>
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-              <div className="max-w-sm">
-                <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest mb-2">The Problem</div>
-                <h2 className="text-xl font-bold text-slate-100 leading-snug">Money laundering spans institutions. Existing AML is institution-local.</h2>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="text-center px-5 py-4 rounded-xl bg-rose-600/5 border border-rose-500/15">
-                  <div className="text-3xl font-bold font-mono text-rose-400">42%</div>
-                  <div className="text-[10px] font-mono text-slate-500 mt-1">Isolated Detection</div>
-                </div>
-                <div className="text-slate-600 font-mono text-lg">→</div>
-                <div className="text-center px-5 py-4 rounded-xl bg-emerald-600/5 border border-emerald-500/20 shadow-[0_0_30px_rgba(16,185,129,0.06)]">
-                  <div className="text-3xl font-bold font-mono text-emerald-400">94.2%</div>
-                  <div className="text-[10px] font-mono text-slate-500 mt-1">Federated Detection</div>
-                </div>
-              </div>
-              <div className="max-w-xs text-[12px] text-slate-500 font-mono leading-relaxed">
-                Zero raw transaction data leaves any institution. (ε=0.50, δ=1e-5)-DP guaranteed per gradient update.
-              </div>
+        <section id="capabilities-unified" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5 space-y-16">
+
+          {/* Unified Section Master Header */}
+          <FadeSection className="max-w-3xl">
+            <div className="text-[11px] font-mono text-indigo-400 uppercase tracking-widest mb-3">
+              Platform Capabilities & Execution Engine
+            </div>
+            <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 leading-tight mb-4">
+              Capabilities, Problem Analysis & Workflow
+            </h2>
+            <p className="text-slate-400 text-[15px] leading-relaxed">
+              Explore the cross-bank money laundering problem, the 8-stage federated training pipeline, and the core ML engine capabilities below.
+            </p>
+
+            {/* Quick jump tabs inside the unified section */}
+            <div className="flex flex-wrap items-center gap-2 mt-6 p-1.5 bg-white/3 border border-white/8 rounded-xl w-fit">
+              <button
+                onClick={() => scrollToSection('problem-solution')}
+                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition-all cursor-pointer"
+              >
+                1. Problem Statement
+              </button>
+              <button
+                onClick={() => scrollToSection('how-it-works')}
+                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition-all cursor-pointer"
+              >
+                2. Execution Workflow
+              </button>
+              <button
+                onClick={() => scrollToSection('product')}
+                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30 transition-all cursor-pointer"
+              >
+                3. System Capabilities
+              </button>
             </div>
           </FadeSection>
-        </section>
 
-        {/* ══════════════════════════════════════════════════════════
-            SECTION 3 — WORKFLOW (#how-it-works)  [compact pipeline]
-        ══════════════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-12 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
-          <FadeSection>
-            <div className="flex items-center justify-between mb-5">
-              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest">Federated Pipeline — 8 Stages</div>
-              <a href="#platform" className="text-[11px] font-mono text-slate-500 hover:text-slate-300 transition-colors">See full docs →</a>
-            </div>
-            <div className="relative flex items-start gap-0 overflow-x-auto pb-2">
-              {['ISO 20022\nIngestion','Local GNN\nTraining','Differential\nPrivacy','Secure\nAggregation','Byzantine\nFilter','Global\nUpdate','Risk\nScoring','SAR\nExport'].map((label, i) => (
-                <div key={i} className="flex items-center shrink-0">
-                  <div className="flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full border flex items-center justify-center text-[10px] font-mono font-bold shrink-0 ${
-                      i < 4 ? 'border-indigo-500/40 bg-indigo-600/10 text-indigo-400' : 'border-white/10 bg-white/4 text-slate-500'
-                    }`}>{i+1}</div>
-                    <div className="text-[9px] font-mono text-slate-600 text-center mt-1.5 leading-tight whitespace-pre-line w-14">{label}</div>
+          {/* ── 1. SUB-SECTION: PROBLEM STATEMENT (#problem-solution) ── */}
+          <div id="problem-solution" className="scroll-mt-24 pt-4 border-t border-white/5 space-y-6">
+            <FadeSection>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-indigo-400 bg-indigo-600/10 border border-indigo-500/20 rounded-full">Part 1</span>
+                <h3 className="text-xl font-bold text-slate-100">Cross-Bank Fraud & Detection Gain</h3>
+              </div>
+              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
+                Modern financial crime fragments transactions across multiple banking institutions to stay below local threshold limits. CFI solves this without sharing raw ledger data.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {/* Isolated Bank Detection */}
+                <div className="p-6 rounded-xl bg-white/3 border border-rose-500/15 space-y-4">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <h4 className="text-[14px] font-semibold text-slate-200">Isolated Bank AML Systems</h4>
+                    <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded-full">42% Detection</span>
                   </div>
-                  {i < 7 && <div className="w-6 h-px bg-white/8 shrink-0 mt-[-10px]"/>}
+                  <ul className="space-y-2.5 text-[12px] font-mono text-slate-400">
+                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> GNN trained exclusively on local ledger — zero cross-bank visibility</li>
+                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> Smurfing across multiple banks is indistinguishable from normal traffic</li>
+                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> High false positive rate (~31%), overwhelming compliance investigators</li>
+                  </ul>
                 </div>
-              ))}
-            </div>
-          </FadeSection>
-        </section>
 
-        {/* ══════════════════════════════════════════════════════════
-            SECTION 4 — CAPABILITIES (#product)  [feature grid]
-        ══════════════════════════════════════════════════════════ */}
-        <section id="product" className="py-12 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
-          <FadeSection>
-            <div className="flex items-center justify-between mb-5">
-              <div className="text-[11px] font-mono text-indigo-500 uppercase tracking-widest">Platform Modules</div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {PLATFORM_MODULES.map(mod => (
-                <motion.div key={mod.id} whileHover={{y:-2}} onClick={() => setActiveModule(mod)}
-                  className={`p-3 rounded-xl border cursor-pointer transition-all ${
-                    activeModule?.id===mod.id
-                      ? 'bg-indigo-600/10 border-indigo-500/30 shadow-[0_0_18px_rgba(99,102,241,0.12)]'
-                      : 'bg-white/3 border-white/7 hover:border-white/15'
-                  }`}>
-                  <div className="text-[10px] font-mono text-slate-700 mb-0.5">{mod.category}</div>
-                  <div className="text-[12px] font-medium text-slate-300">{mod.name}</div>
-                  <div className="text-[10px] text-slate-600 mt-1 leading-snug">{mod.algorithm.split(',')[0]}</div>
-                </motion.div>
-              ))}
-            </div>
-          </FadeSection>
+                {/* CFI Federated Consortium */}
+                <div className="p-6 rounded-xl bg-indigo-600/5 border border-indigo-500/25 space-y-4 shadow-[inset_0_0_40px_rgba(99,102,241,0.05)]">
+                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                    <h4 className="text-[14px] font-semibold text-slate-200">CFI Federated Consortium</h4>
+                    <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded-full">94.2% Detection</span>
+                  </div>
+                  <ul className="space-y-2.5 text-[12px] font-mono text-slate-300">
+                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Collaborative model learning over consortium-wide transaction graph</li>
+                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Zero raw transaction records leave bank perimeter — strict (ε=0.50)-DP</li>
+                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> False positive rate drops to ~6.1% (5× investigator efficiency improvement)</li>
+                  </ul>
+                </div>
+              </div>
+            </FadeSection>
+          </div>
+
+          {/* ── 2. SUB-SECTION: WORKFLOW PIPELINE (#how-it-works) ── */}
+          <div id="how-it-works" className="scroll-mt-24 pt-8 border-t border-white/5 space-y-6">
+            <FadeSection>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-purple-400 bg-purple-600/10 border border-purple-500/20 rounded-full">Part 2</span>
+                <h3 className="text-xl font-bold text-slate-100">8-Stage Federated Training Pipeline</h3>
+              </div>
+              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
+                Each training round executes across eight stages. Click any step below to inspect code snippets and technical parameters.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                {/* Steps selector list */}
+                <div className="lg:col-span-4 space-y-1">
+                  {WORKFLOW_STEPS.map(step => (
+                    <button
+                      key={step.id}
+                      onClick={() => setActiveWorkflowStep(step.id)}
+                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        activeWorkflowStep === step.id
+                          ? 'bg-purple-600/12 border-purple-500/35 text-slate-100 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                          : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
+                      }`}
+                    >
+                      <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono font-bold ${
+                        activeWorkflowStep === step.id ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-500'
+                      }`}>
+                        {step.id}
+                      </span>
+                      <span className="text-[12px] font-medium">{step.short}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Step details panel */}
+                <div className="lg:col-span-8">
+                  <div className="p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
+                    <div>
+                      <div className="text-[10px] font-mono text-purple-400 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
+                      <h4 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h4>
+                    </div>
+                    <p className="text-[13px] text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                      {currentWorkflowStep.description}
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {currentWorkflowStep.tech.map(t => (
+                        <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-purple-300 bg-purple-600/10 border border-purple-500/20">{t}</span>
+                      ))}
+                    </div>
+                    <div className="rounded-lg bg-[#08081a] border border-white/6 p-4 overflow-x-auto">
+                      <pre className="text-[11px] font-mono text-purple-200/80 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </FadeSection>
+          </div>
+
+          {/* ── 3. SUB-SECTION: SYSTEM CAPABILITIES (#product) ── */}
+          <div id="product" className="scroll-mt-24 pt-8 border-t border-white/5 space-y-6">
+            <FadeSection>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-cyan-400 bg-cyan-600/10 border border-cyan-500/20 rounded-full">Part 3</span>
+                <h3 className="text-xl font-bold text-slate-100">Platform Engineering Capabilities</h3>
+              </div>
+              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
+                Modular architecture designed for secure bank deployment. Select a component module to inspect algorithms, inputs, and tech stack.
+              </p>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="lg:col-span-4 space-y-1">
+                  {PLATFORM_MODULES.map(mod => (
+                    <button
+                      key={mod.id}
+                      onClick={() => setActiveModule(mod)}
+                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                        activeModule?.id === mod.id
+                          ? 'bg-cyan-600/10 border-cyan-500/35 text-slate-100 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                          : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
+                      }`}
+                    >
+                      <div>
+                        <div className="text-[12px] font-medium">{mod.name}</div>
+                        <div className="text-[10px] font-mono text-slate-600">{mod.category}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+
+                {activeModule && (
+                  <div className="lg:col-span-8 p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
+                    <div className="border-b border-white/5 pb-3">
+                      <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">{activeModule.category}</span>
+                      <h4 className="text-base font-semibold text-slate-100 mt-0.5">{activeModule.name}</h4>
+                    </div>
+                    <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
+                    <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                      {[
+                        { label: 'Algorithm',  value: activeModule.algorithm },
+                        { label: 'Technology', value: activeModule.tech },
+                        { label: 'Inputs',     value: activeModule.inputs },
+                        { label: 'Outputs',    value: activeModule.outputs },
+                      ].map(row => (
+                        <div key={row.label} className="p-2.5 rounded-lg bg-[#08081a] border border-white/6">
+                          <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-1">{row.label}</div>
+                          <div className="text-slate-200">{row.value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </FadeSection>
+          </div>
+
         </section>
 
         {/* ══════════════════════════════════════════════════════════
