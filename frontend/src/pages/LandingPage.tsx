@@ -554,6 +554,13 @@ export default function LandingPage() {
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
   const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
   const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopyEmail = () => {
+    navigator.clipboard.writeText('ysfcals@gmail.com');
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
 
   const [flRound, setFlRound] = useState(47);
   const [accuracy, setAccuracy] = useState(94.2);
@@ -663,6 +670,7 @@ export default function LandingPage() {
               <a href="#architecture" onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }} className="hover:text-slate-100 transition-colors">Architecture</a>
               <a href="#security" onClick={(e) => { e.preventDefault(); handleNavClick('security'); }} className="hover:text-slate-100 transition-colors">Security</a>
               <a href="#api" onClick={(e) => { e.preventDefault(); handleNavClick('api'); }} className="hover:text-slate-100 transition-colors">API & Docs</a>
+              <a href="#contact" onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }} className="hover:text-slate-100 transition-colors">Contact & Setup</a>
             </nav>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -772,10 +780,11 @@ export default function LandingPage() {
                   {/* Other Desktop Headers */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
                     {[
-                      { label: 'Platform',      targetId: 'platform',     badge: 'Consortium',   desc: 'Bank node inspector' },
-                      { label: 'Architecture',  targetId: 'architecture', badge: 'Architecture', desc: 'Service layer mesh' },
-                      { label: 'Security',      targetId: 'security',     badge: 'Security',     desc: 'DP & trust boundaries' },
-                      { label: 'API & Docs',    targetId: 'api',          badge: 'SDK & API',    desc: 'REST API & TypeScript SDK' },
+                      { label: 'Platform',        targetId: 'platform',     badge: 'Consortium',   desc: 'Bank node inspector' },
+                      { label: 'Architecture',    targetId: 'architecture', badge: 'Architecture', desc: 'Service layer mesh' },
+                      { label: 'Security',        targetId: 'security',     badge: 'Security',     desc: 'DP & trust boundaries' },
+                      { label: 'API & Docs',      targetId: 'api',          badge: 'SDK & API',    desc: 'REST API & TypeScript SDK' },
+                      { label: 'Contact & Setup', targetId: 'contact',      badge: 'Integration',  desc: 'Direct onboarding & setup' },
                     ].map(link => (
                       <a
                         key={link.label}
@@ -1406,6 +1415,101 @@ telemetry.on('round.stage', (evt) => {
               </div>
             </FadeSection>
           </div>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════════
+            SECTION 9 — ENTERPRISE DEPLOYMENT & ONBOARDING / CONTACT (#contact)
+        ══════════════════════════════════════════════════════════ */}
+        <section id="contact" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+          <FadeSection>
+            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
+              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2">Consortium Onboarding & Deployment</div>
+              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise Setup & Integration Services</h2>
+              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                The live platform demo showcases an active 3-bank federated learning environment with SGX TEE hardware aggregation. For custom banking institution deployment, node hardware configuration, and core ledger integration, contact our engineering team.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start w-full min-w-0">
+              {/* Left Contact Card */}
+              <div className="lg:col-span-5 p-5 sm:p-7 rounded-3xl bg-gradient-to-br from-indigo-950/40 via-purple-950/20 to-[#07071a] border border-indigo-500/30 backdrop-blur-2xl space-y-5 shadow-[0_0_50px_rgba(99,102,241,0.15)] min-w-0">
+                <div className="space-y-2 min-w-0">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">
+                    DIRECT ENGINEERING CONTACT
+                  </span>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-100">Institutional Integration Lead</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed font-sans">
+                    Reach out directly for custom ISO 20022 connector setup, local HSM key configuration, and production node deployment assistance.
+                  </p>
+                </div>
+
+                {/* Email Address Display Box */}
+                <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/8 space-y-2.5 font-mono min-w-0">
+                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">Official Inquiries & Support</div>
+                  <div className="flex items-center justify-between gap-2 min-w-0">
+                    <span className="text-indigo-300 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
+                    <button
+                      onClick={handleCopyEmail}
+                      className="px-2.5 py-1 rounded-lg text-[10px] font-mono font-semibold bg-white/5 hover:bg-white/10 text-slate-300 transition-colors border border-white/10 shrink-0 cursor-pointer"
+                    >
+                      {isCopied ? 'Copied!' : 'Copy Email'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Direct Mailto Button */}
+                <a
+                  href="mailto:ysfcals@gmail.com?subject=CF-Intelligence%20Enterprise%20Integration%20Inquiry"
+                  className="w-full py-3.5 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2 transition-all block text-center"
+                >
+                  Send Direct Inquiry <ArrowRight />
+                </a>
+
+                <div className="text-[10px] font-mono text-slate-500 text-center">
+                  Guaranteed response within 24 hours for banking inquiries & architecture reviews.
+                </div>
+              </div>
+
+              {/* Right 3-Step Onboarding Roadmap */}
+              <div className="lg:col-span-7 space-y-3.5 sm:space-y-4 min-w-0">
+                {[
+                  {
+                    step: '01',
+                    title: 'Live Simulator Inspection & Audit',
+                    desc: 'Explore the live platform demo to inspect real-time FL training rounds, GNN collusion detection, and FinCEN SAR XML filing generation.',
+                    badge: 'Interactive Audit'
+                  },
+                  {
+                    step: '02',
+                    title: 'Node Architecture & Security Scoping',
+                    desc: 'Define local node hardware parameters (NVIDIA DGX GPU or Intel SGX TEE), select differential privacy noise budgets (ε, δ), and validate HSM key signing modules.',
+                    badge: 'Security Review'
+                  },
+                  {
+                    step: '03',
+                    title: 'Custom Bank Connector & Production Setup',
+                    desc: 'Contact ysfcals@gmail.com to receive bank connector SDK packages, configure mTLS certificates, connect ISO 20022 message streams, and launch pilot consortium training.',
+                    badge: 'Onboarding & Deployment'
+                  },
+                ].map(s => (
+                  <div key={s.step} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 hover:border-indigo-500/30 transition-all space-y-2 min-w-0">
+                    <div className="flex flex-wrap items-center justify-between gap-2 min-w-0">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-indigo-600/20 border border-indigo-500/30 text-indigo-400 text-xs font-mono font-bold flex items-center justify-center shrink-0">
+                          {s.step}
+                        </span>
+                        <h4 className="text-xs sm:text-sm font-bold text-slate-200 truncate">{s.title}</h4>
+                      </div>
+                      <span className="text-[9px] font-mono font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md shrink-0">
+                        {s.badge}
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-400 leading-relaxed font-sans pl-8 break-words">{s.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </FadeSection>
         </section>
 
         {/* ── FOOTER ──────────────────────────────────────────────── */}

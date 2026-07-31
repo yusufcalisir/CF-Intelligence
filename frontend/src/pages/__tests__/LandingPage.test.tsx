@@ -56,6 +56,7 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
       'security',
       'api',
       'docs',
+      'contact',
     ];
 
     requiredSectionIds.forEach((id) => {
