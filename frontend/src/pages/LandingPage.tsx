@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 
@@ -416,18 +416,18 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
 }
 
 // ── FADE WRAPPER ─────────────────────────────────────────────────────────────
-function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+const FadeSection = memo(function FadeSection({ children, className = '', delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: '-60px' });
   return (
-    <motion.div ref={ref} initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay, ease: 'easeOut' }} className={className}>
+    <motion.div ref={ref} initial={{ opacity: 0, y: 20 }} animate={inView ? { opacity: 1, y: 0 } : {}} transition={{ duration: 0.5, delay, ease: 'easeOut' }} className={`will-change-transform transform-gpu ${className}`}>
       {children}
     </motion.div>
   );
-}
+});
 
 // ── 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT ────────────────────────
-const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
+const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => (
   <svg className={className} viewBox="0 0 120 120" fill="none">
     <defs>
       <linearGradient id="brand-border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -460,7 +460,7 @@ const BrandLogo = ({ className = 'w-9 h-9' }: { className?: string }) => (
     <circle cx="60" cy="60" r="6.5" fill="#060616" stroke="url(#brand-border-grad)" strokeWidth="2" />
     <circle cx="60" cy="60" r="2.5" fill="#38bdf8" />
   </svg>
-);
+));
 
 const MenuIcon = () => (
   <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
@@ -761,7 +761,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 2 — PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
-        <section id="problem-solution" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="problem-solution" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Problem Statement</div>
@@ -802,7 +802,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 3 — PRESENTATION-FRIENDLY WORKFLOW PIPELINE (#how-it-works)
         ══════════════════════════════════════════════════════════ */}
-        <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="how-it-works" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Execution Pipeline</div>
@@ -887,7 +887,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 4 — ENGINE CAPABILITIES (#product)
         ══════════════════════════════════════════════════════════ */}
-        <section id="product" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="product" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-cyan-400 uppercase tracking-widest mb-2">Engine Specifications</div>
@@ -946,7 +946,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 — PLATFORM / NODE INSPECTOR (#platform)
         ══════════════════════════════════════════════════════════ */}
-        <section id="platform" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="platform" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2">Consortium Architecture</div>
@@ -985,7 +985,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 6 — ARCHITECTURE (#architecture)
         ══════════════════════════════════════════════════════════ */}
-        <section id="architecture" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="architecture" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Service Mesh Design</div>
@@ -1045,7 +1045,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 7 — SECURITY & PRIVACY (#security)
         ══════════════════════════════════════════════════════════ */}
-        <section id="security" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="security" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <FadeSection>
             <div className="max-w-3xl mb-8">
               <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Cryptographic Boundaries</div>
@@ -1138,7 +1138,7 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 8 — EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
-        <section id="api" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6">
+        <section id="api" className="py-16 sm:py-24 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px]">
           <div id="docs">
             <FadeSection>
               <div className="max-w-3xl mb-8">
