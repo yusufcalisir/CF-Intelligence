@@ -51,17 +51,6 @@ const WORKFLOW_STEPS = [
   { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
 ];
 
-const NAV_TARGETS: Record<string, string> = {
-  'Overview': 'hero',
-  'Problem': 'problem-solution',
-  'Workflow': 'how-it-works',
-  'Capabilities': 'product',
-  'Platform': 'platform',
-  'Architecture': 'architecture',
-  'Security': 'security',
-  'API & Docs': 'api',
-};
-
 // Helper for smooth scrolling to sections
 const scrollToSection = (id: string) => {
   const element = document.getElementById(id);
@@ -272,11 +261,17 @@ const ArrowRight = () => (
     <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
   </svg>
 );
+const ChevronDown = () => (
+  <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
 
 // ── MAIN ─────────────────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCapabilitiesDropdownOpen, setIsCapabilitiesDropdownOpen] = useState(false);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
   const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
@@ -294,11 +289,10 @@ export default function LandingPage() {
     return () => clearInterval(t);
   }, []);
 
-  const handleNavClick = (e: React.MouseEvent, label: string) => {
-    e.preventDefault();
-    const targetId = NAV_TARGETS[label] || label.toLowerCase();
-    scrollToSection(targetId);
+  const handleNavClick = (id: string) => {
+    scrollToSection(id);
     setIsMobileMenuOpen(false);
+    setIsCapabilitiesDropdownOpen(false);
   };
 
   const currentWorkflowStep = WORKFLOW_STEPS.find(s => s.id === activeWorkflowStep)!;
@@ -316,7 +310,7 @@ export default function LandingPage() {
 
       <div className="relative z-10">
 
-        {/* ── HEADER ──────────────────────────────────────────────── */}
+        {/* ── HEADER NAVBAR ────────────────────────────────────────── */}
         <header className="sticky top-0 z-50 h-14 flex items-center border-b border-white/5 bg-[#070711]/85 backdrop-blur-xl">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
@@ -327,17 +321,106 @@ export default function LandingPage() {
               </div>
             </div>
 
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-500">
-              {['Overview','Problem','Workflow','Capabilities','Platform','Architecture','Security','API & Docs'].map(label => (
-                <a
-                  key={label}
-                  href={`#${NAV_TARGETS[label] || 'hero'}`}
-                  onClick={(e) => handleNavClick(e, label)}
-                  className="hover:text-slate-200 transition-colors"
+            {/* Desktop Navigation Links */}
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
+              {/* 1. Overview */}
+              <a
+                href="#hero"
+                onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
+                className="hover:text-slate-100 transition-colors"
+              >
+                Overview
+              </a>
+
+              {/* 2. Combined CAPABILITIES Dropdown / Mega-Menu in Nav Bar */}
+              <div
+                className="relative group py-2"
+                onMouseEnter={() => setIsCapabilitiesDropdownOpen(true)}
+                onMouseLeave={() => setIsCapabilitiesDropdownOpen(false)}
+              >
+                <button
+                  onClick={() => handleNavClick('product')}
+                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
                 >
-                  {label}
-                </a>
-              ))}
+                  <span>Capabilities</span>
+                  <ChevronDown />
+                </button>
+
+                {/* Dropdown Menu Popup containing Problem, Workflow, and Capabilities sub-links */}
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-64 p-2 bg-[#0c0c1e]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl transition-all duration-200 ${
+                  isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
+                }`}>
+                  <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest px-2 py-1 mb-1 border-b border-white/5">
+                    Platform Features
+                  </div>
+                  <a
+                    href="#problem-solution"
+                    onClick={(e) => { e.preventDefault(); handleNavClick('problem-solution'); }}
+                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors group/item"
+                  >
+                    <div>
+                      <div className="font-semibold">Problem</div>
+                      <div className="text-[10px] text-slate-500">Cross-bank fraud analysis</div>
+                    </div>
+                  </a>
+                  <a
+                    href="#how-it-works"
+                    onClick={(e) => { e.preventDefault(); handleNavClick('how-it-works'); }}
+                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors group/item"
+                  >
+                    <div>
+                      <div className="font-semibold">Workflow</div>
+                      <div className="text-[10px] text-slate-500">8-stage federated pipeline</div>
+                    </div>
+                  </a>
+                  <a
+                    href="#product"
+                    onClick={(e) => { e.preventDefault(); handleNavClick('product'); }}
+                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors group/item"
+                  >
+                    <div>
+                      <div className="font-semibold">Capabilities</div>
+                      <div className="text-[10px] text-slate-500">Engine specs & modules</div>
+                    </div>
+                  </a>
+                </div>
+              </div>
+
+              {/* 3. Platform */}
+              <a
+                href="#platform"
+                onClick={(e) => { e.preventDefault(); handleNavClick('platform'); }}
+                className="hover:text-slate-100 transition-colors"
+              >
+                Platform
+              </a>
+
+              {/* 4. Architecture */}
+              <a
+                href="#architecture"
+                onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
+                className="hover:text-slate-100 transition-colors"
+              >
+                Architecture
+              </a>
+
+              {/* 5. Security */}
+              <a
+                href="#security"
+                onClick={(e) => { e.preventDefault(); handleNavClick('security'); }}
+                className="hover:text-slate-100 transition-colors"
+              >
+                Security
+              </a>
+
+              {/* 6. API & Docs */}
+              <a
+                href="#api"
+                onClick={(e) => { e.preventDefault(); handleNavClick('api'); }}
+                className="hover:text-slate-100 transition-colors"
+              >
+                API & Docs
+              </a>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -373,7 +456,7 @@ export default function LandingPage() {
                 {label:'Security & Attack Defense Lab', targetId:'security'},
                 {label:'API & Docs',                    targetId:'api'},
               ].map(link => (
-                <a key={link.label} href={`#${link.targetId}`} onClick={(e) => { e.preventDefault(); scrollToSection(link.targetId); setIsMobileMenuOpen(false); }}
+                <a key={link.label} href={`#${link.targetId}`} onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
                   className="block px-3 py-2 text-[13px] text-slate-400 hover:text-slate-100 hover:bg-white/5 rounded-lg transition-colors">
                   {link.label}
                 </a>
@@ -445,7 +528,7 @@ export default function LandingPage() {
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-[13px] font-semibold text-white transition-all cursor-pointer shadow-[0_0_30px_rgba(99,102,241,0.4)] hover:shadow-[0_0_40px_rgba(99,102,241,0.55)]">
                   Launch Live Platform Demo <ArrowRight/>
                 </button>
-                <a href="#architecture" onClick={(e) => { e.preventDefault(); scrollToSection('architecture'); }}
+                <a href="#architecture" onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl border border-white/10 hover:border-white/25 text-[13px] font-medium text-slate-300 hover:text-slate-100 transition-all">
                   System Design
                 </a>
@@ -460,203 +543,165 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            UNIFIED CAPABILITIES MASTER SECTION
-            Combines Problem, Workflow & Capabilities under ONE Heading
-            Stacked Vertically (Alt Alta)
+            SECTION 2 — PROBLEM STATEMENT (#problem-solution)
         ══════════════════════════════════════════════════════════ */}
-        <section id="capabilities-unified" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5 space-y-16">
-
-          {/* Unified Section Master Header */}
-          <FadeSection className="max-w-3xl">
-            <div className="text-[11px] font-mono text-indigo-400 uppercase tracking-widest mb-3">
-              Platform Capabilities & Execution Engine
+        <section id="problem-solution" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
+          <FadeSection>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-indigo-400 bg-indigo-600/10 border border-indigo-500/20 rounded-full">Problem Analysis</span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100">Cross-Bank Money Laundering Problem</h2>
             </div>
-            <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 leading-tight mb-4">
-              Capabilities, Problem Analysis & Workflow
-            </h2>
-            <p className="text-slate-400 text-[15px] leading-relaxed">
-              Explore the cross-bank money laundering problem, the 8-stage federated training pipeline, and the core ML engine capabilities below.
+            <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-8">
+              Modern financial crime fragments transactions across multiple banking institutions to stay below local threshold limits. Isolated AML models miss these multi-bank patterns.
             </p>
 
-            {/* Quick jump tabs inside the unified section */}
-            <div className="flex flex-wrap items-center gap-2 mt-6 p-1.5 bg-white/3 border border-white/8 rounded-xl w-fit">
-              <button
-                onClick={() => scrollToSection('problem-solution')}
-                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition-all cursor-pointer"
-              >
-                1. Problem Statement
-              </button>
-              <button
-                onClick={() => scrollToSection('how-it-works')}
-                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-purple-600/20 text-purple-300 border border-purple-500/30 hover:bg-purple-600/30 transition-all cursor-pointer"
-              >
-                2. Execution Workflow
-              </button>
-              <button
-                onClick={() => scrollToSection('product')}
-                className="px-4 py-1.5 text-[12px] font-mono rounded-lg bg-cyan-600/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-600/30 transition-all cursor-pointer"
-              >
-                3. System Capabilities
-              </button>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Isolated Bank Detection */}
+              <div className="p-6 rounded-xl bg-white/3 border border-rose-500/15 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <h4 className="text-[14px] font-semibold text-slate-200">Isolated Bank AML Systems</h4>
+                  <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded-full">42% Detection</span>
+                </div>
+                <ul className="space-y-2.5 text-[12px] font-mono text-slate-400">
+                  <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> GNN trained exclusively on local ledger — zero cross-bank visibility</li>
+                  <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> Smurfing across multiple banks is indistinguishable from normal traffic</li>
+                  <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> High false positive rate (~31%), overwhelming compliance investigators</li>
+                </ul>
+              </div>
+
+              {/* CFI Federated Consortium */}
+              <div className="p-6 rounded-xl bg-indigo-600/5 border border-indigo-500/25 space-y-4 shadow-[inset_0_0_40px_rgba(99,102,241,0.05)]">
+                <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                  <h4 className="text-[14px] font-semibold text-slate-200">CFI Federated Consortium</h4>
+                  <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded-full">94.2% Detection</span>
+                </div>
+                <ul className="space-y-2.5 text-[12px] font-mono text-slate-300">
+                  <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Collaborative model learning over consortium-wide transaction graph</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Zero raw transaction records leave bank perimeter — strict (ε=0.50)-DP</li>
+                  <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> False positive rate drops to ~6.1% (5× investigator efficiency improvement)</li>
+                </ul>
+              </div>
             </div>
           </FadeSection>
+        </section>
 
-          {/* ── 1. SUB-SECTION: PROBLEM STATEMENT (#problem-solution) ── */}
-          <div id="problem-solution" className="scroll-mt-24 pt-4 border-t border-white/5 space-y-6">
-            <FadeSection>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-indigo-400 bg-indigo-600/10 border border-indigo-500/20 rounded-full">Part 1</span>
-                <h3 className="text-xl font-bold text-slate-100">Cross-Bank Fraud & Detection Gain</h3>
+        {/* ══════════════════════════════════════════════════════════
+            SECTION 3 — WORKFLOW PIPELINE (#how-it-works)
+        ══════════════════════════════════════════════════════════ */}
+        <section id="how-it-works" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
+          <FadeSection>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-purple-400 bg-purple-600/10 border border-purple-500/20 rounded-full">Execution Pipeline</span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100">8-Stage Federated Training Pipeline</h2>
+            </div>
+            <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-8">
+              Each training round executes across eight stages. Click any step below to inspect code snippets and technical parameters.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Steps selector list */}
+              <div className="lg:col-span-4 space-y-1">
+                {WORKFLOW_STEPS.map(step => (
+                  <button
+                    key={step.id}
+                    onClick={() => setActiveWorkflowStep(step.id)}
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                      activeWorkflowStep === step.id
+                        ? 'bg-purple-600/12 border-purple-500/35 text-slate-100 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
+                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
+                    }`}
+                  >
+                    <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono font-bold ${
+                      activeWorkflowStep === step.id ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-500'
+                    }`}>
+                      {step.id}
+                    </span>
+                    <span className="text-[12px] font-medium">{step.short}</span>
+                  </button>
+                ))}
               </div>
-              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
-                Modern financial crime fragments transactions across multiple banking institutions to stay below local threshold limits. CFI solves this without sharing raw ledger data.
-              </p>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                {/* Isolated Bank Detection */}
-                <div className="p-6 rounded-xl bg-white/3 border border-rose-500/15 space-y-4">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                    <h4 className="text-[14px] font-semibold text-slate-200">Isolated Bank AML Systems</h4>
-                    <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-rose-400 bg-rose-600/10 border border-rose-600/20 rounded-full">42% Detection</span>
+              {/* Step details panel */}
+              <div className="lg:col-span-8">
+                <div className="p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
+                  <div>
+                    <div className="text-[10px] font-mono text-purple-400 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
+                    <h4 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h4>
                   </div>
-                  <ul className="space-y-2.5 text-[12px] font-mono text-slate-400">
-                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> GNN trained exclusively on local ledger — zero cross-bank visibility</li>
-                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> Smurfing across multiple banks is indistinguishable from normal traffic</li>
-                    <li className="flex items-start gap-2"><span className="text-rose-500">✗</span> High false positive rate (~31%), overwhelming compliance investigators</li>
-                  </ul>
-                </div>
-
-                {/* CFI Federated Consortium */}
-                <div className="p-6 rounded-xl bg-indigo-600/5 border border-indigo-500/25 space-y-4 shadow-[inset_0_0_40px_rgba(99,102,241,0.05)]">
-                  <div className="flex items-center justify-between border-b border-white/5 pb-3">
-                    <h4 className="text-[14px] font-semibold text-slate-200">CFI Federated Consortium</h4>
-                    <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-emerald-400 bg-emerald-600/10 border border-emerald-600/20 rounded-full">94.2% Detection</span>
+                  <p className="text-[13px] text-slate-400 leading-relaxed border-t border-white/5 pt-3">
+                    {currentWorkflowStep.description}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {currentWorkflowStep.tech.map(t => (
+                      <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-purple-300 bg-purple-600/10 border border-purple-500/20">{t}</span>
+                    ))}
                   </div>
-                  <ul className="space-y-2.5 text-[12px] font-mono text-slate-300">
-                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Collaborative model learning over consortium-wide transaction graph</li>
-                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> Zero raw transaction records leave bank perimeter — strict (ε=0.50)-DP</li>
-                    <li className="flex items-start gap-2"><span className="text-emerald-400">✓</span> False positive rate drops to ~6.1% (5× investigator efficiency improvement)</li>
-                  </ul>
+                  <div className="rounded-lg bg-[#08081a] border border-white/6 p-4 overflow-x-auto">
+                    <pre className="text-[11px] font-mono text-purple-200/80 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
+                  </div>
                 </div>
               </div>
-            </FadeSection>
-          </div>
+            </div>
+          </FadeSection>
+        </section>
 
-          {/* ── 2. SUB-SECTION: WORKFLOW PIPELINE (#how-it-works) ── */}
-          <div id="how-it-works" className="scroll-mt-24 pt-8 border-t border-white/5 space-y-6">
-            <FadeSection>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-purple-400 bg-purple-600/10 border border-purple-500/20 rounded-full">Part 2</span>
-                <h3 className="text-xl font-bold text-slate-100">8-Stage Federated Training Pipeline</h3>
-              </div>
-              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
-                Each training round executes across eight stages. Click any step below to inspect code snippets and technical parameters.
-              </p>
+        {/* ══════════════════════════════════════════════════════════
+            SECTION 4 — CAPABILITIES (#product)
+        ══════════════════════════════════════════════════════════ */}
+        <section id="product" className="py-16 sm:py-20 px-4 sm:px-6 max-w-7xl mx-auto border-t border-white/5">
+          <FadeSection>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-cyan-400 bg-cyan-600/10 border border-cyan-500/20 rounded-full">System Engine</span>
+              <h2 className="text-2xl sm:text-3xl font-bold text-slate-100">Platform Engineering Capabilities</h2>
+            </div>
+            <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-8">
+              Modular architecture designed for secure bank deployment. Select a component module to inspect algorithms, inputs, and tech stack.
+            </p>
 
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* Steps selector list */}
-                <div className="lg:col-span-4 space-y-1">
-                  {WORKFLOW_STEPS.map(step => (
-                    <button
-                      key={step.id}
-                      onClick={() => setActiveWorkflowStep(step.id)}
-                      className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        activeWorkflowStep === step.id
-                          ? 'bg-purple-600/12 border-purple-500/35 text-slate-100 shadow-[0_0_15px_rgba(168,85,247,0.15)]'
-                          : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
-                      }`}
-                    >
-                      <span className={`w-5 h-5 rounded flex items-center justify-center text-[10px] font-mono font-bold ${
-                        activeWorkflowStep === step.id ? 'bg-purple-600 text-white' : 'bg-white/5 text-slate-500'
-                      }`}>
-                        {step.id}
-                      </span>
-                      <span className="text-[12px] font-medium">{step.short}</span>
-                    </button>
-                  ))}
-                </div>
-
-                {/* Step details panel */}
-                <div className="lg:col-span-8">
-                  <div className="p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              <div className="lg:col-span-4 space-y-1">
+                {PLATFORM_MODULES.map(mod => (
+                  <button
+                    key={mod.id}
+                    onClick={() => setActiveModule(mod)}
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                      activeModule?.id === mod.id
+                        ? 'bg-cyan-600/10 border-cyan-500/35 text-slate-100 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                        : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
+                    }`}
+                  >
                     <div>
-                      <div className="text-[10px] font-mono text-purple-400 uppercase tracking-wider mb-1">Stage {currentWorkflowStep.id} of 8</div>
-                      <h4 className="text-base font-semibold text-slate-100">{currentWorkflowStep.label}</h4>
+                      <div className="text-[12px] font-medium">{mod.name}</div>
+                      <div className="text-[10px] font-mono text-slate-600">{mod.category}</div>
                     </div>
-                    <p className="text-[13px] text-slate-400 leading-relaxed border-t border-white/5 pt-3">
-                      {currentWorkflowStep.description}
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {currentWorkflowStep.tech.map(t => (
-                        <span key={t} className="px-2 py-0.5 rounded text-[10px] font-mono text-purple-300 bg-purple-600/10 border border-purple-500/20">{t}</span>
-                      ))}
-                    </div>
-                    <div className="rounded-lg bg-[#08081a] border border-white/6 p-4 overflow-x-auto">
-                      <pre className="text-[11px] font-mono text-purple-200/80 leading-relaxed whitespace-pre-wrap">{currentWorkflowStep.code}</pre>
-                    </div>
+                  </button>
+                ))}
+              </div>
+
+              {activeModule && (
+                <div className="lg:col-span-8 p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
+                  <div className="border-b border-white/5 pb-3">
+                    <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">{activeModule.category}</span>
+                    <h4 className="text-base font-semibold text-slate-100 mt-0.5">{activeModule.name}</h4>
                   </div>
-                </div>
-              </div>
-            </FadeSection>
-          </div>
-
-          {/* ── 3. SUB-SECTION: SYSTEM CAPABILITIES (#product) ── */}
-          <div id="product" className="scroll-mt-24 pt-8 border-t border-white/5 space-y-6">
-            <FadeSection>
-              <div className="flex items-center gap-2 mb-3">
-                <span className="px-2.5 py-0.5 text-[10px] font-mono font-bold text-cyan-400 bg-cyan-600/10 border border-cyan-500/20 rounded-full">Part 3</span>
-                <h3 className="text-xl font-bold text-slate-100">Platform Engineering Capabilities</h3>
-              </div>
-              <p className="text-slate-400 text-[14px] leading-relaxed max-w-3xl mb-6">
-                Modular architecture designed for secure bank deployment. Select a component module to inspect algorithms, inputs, and tech stack.
-              </p>
-
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                <div className="lg:col-span-4 space-y-1">
-                  {PLATFORM_MODULES.map(mod => (
-                    <button
-                      key={mod.id}
-                      onClick={() => setActiveModule(mod)}
-                      className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-lg border text-left transition-all cursor-pointer ${
-                        activeModule?.id === mod.id
-                          ? 'bg-cyan-600/10 border-cyan-500/35 text-slate-100 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
-                          : 'border-transparent text-slate-500 hover:text-slate-300 hover:bg-white/4'
-                      }`}
-                    >
-                      <div>
-                        <div className="text-[12px] font-medium">{mod.name}</div>
-                        <div className="text-[10px] font-mono text-slate-600">{mod.category}</div>
+                  <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
+                  <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
+                    {[
+                      { label: 'Algorithm',  value: activeModule.algorithm },
+                      { label: 'Technology', value: activeModule.tech },
+                      { label: 'Inputs',     value: activeModule.inputs },
+                      { label: 'Outputs',    value: activeModule.outputs },
+                    ].map(row => (
+                      <div key={row.label} className="p-2.5 rounded-lg bg-[#08081a] border border-white/6">
+                        <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-1">{row.label}</div>
+                        <div className="text-slate-200">{row.value}</div>
                       </div>
-                    </button>
-                  ))}
-                </div>
-
-                {activeModule && (
-                  <div className="lg:col-span-8 p-5 rounded-xl bg-white/3 border border-white/8 space-y-4">
-                    <div className="border-b border-white/5 pb-3">
-                      <span className="text-[10px] font-mono text-cyan-400 uppercase tracking-wider">{activeModule.category}</span>
-                      <h4 className="text-base font-semibold text-slate-100 mt-0.5">{activeModule.name}</h4>
-                    </div>
-                    <p className="text-[13px] text-slate-400 leading-relaxed">{activeModule.purpose}</p>
-                    <div className="grid grid-cols-2 gap-3 text-[11px] font-mono">
-                      {[
-                        { label: 'Algorithm',  value: activeModule.algorithm },
-                        { label: 'Technology', value: activeModule.tech },
-                        { label: 'Inputs',     value: activeModule.inputs },
-                        { label: 'Outputs',    value: activeModule.outputs },
-                      ].map(row => (
-                        <div key={row.label} className="p-2.5 rounded-lg bg-[#08081a] border border-white/6">
-                          <div className="text-slate-600 text-[9px] uppercase tracking-wider mb-1">{row.label}</div>
-                          <div className="text-slate-200">{row.value}</div>
-                        </div>
-                      ))}
-                    </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            </FadeSection>
-          </div>
-
+                </div>
+              )}
+            </div>
+          </FadeSection>
         </section>
 
         {/* ══════════════════════════════════════════════════════════
