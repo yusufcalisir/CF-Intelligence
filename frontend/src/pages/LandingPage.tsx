@@ -19,14 +19,14 @@ const BANK_NODES: Record<string, BankInfoDetail> = {
 };
 
 const PLATFORM_MODULES: Module[] = [
-  { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Engine', purpose: 'Orchestrates distributed training rounds across bank nodes using FedAvg with asynchronous straggler tolerance.', algorithm: 'FedAvg, FedProx, asynchronous SGD', inputs: 'Local gradients from bank nodes', outputs: 'Aggregated global model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
-  { id: 'dp-engine', name: 'Differential Privacy Engine', category: 'Privacy Layer', purpose: 'Applies calibrated Gaussian noise to local gradient updates before transmission, providing provable (ε, δ)-DP guarantees.', algorithm: 'Gaussian Mechanism, RDP Accountant', inputs: 'Raw local gradients, sensitivity bounds', outputs: 'Noise-perturbed gradient tensors', tech: 'Opacus 1.4, Rényi DP' },
-  { id: 'secure-agg', name: 'Secure Aggregation', category: 'Cryptography', purpose: 'Aggregates model updates using Paillier homomorphic encryption so no single node ever accesses raw gradients.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically aggregated ciphertext', tech: 'Intel SGX Enclave v2, python-phe' },
-  { id: 'bft-agg', name: 'Byzantine-Robust Aggregation', category: 'BFT Defense', purpose: 'Detects and neutralises gradient poisoning attacks from compromised nodes before global model updates.', algorithm: 'Krum, Trimmed Mean, Flame', inputs: 'Gradient updates from all nodes', outputs: 'Byzantine-filtered aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
-  { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'ML Runtime', purpose: 'Builds transaction graphs from ISO 20022 message streams and computes multi-hop structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 / camt.053', outputs: '512-dim node embeddings, risk scores', tech: 'PyTorch Geometric 2.6, DGL' },
-  { id: 'risk-engine', name: 'Risk Scoring Engine', category: 'Intelligence', purpose: 'Combines GNN embeddings with tabular features to produce calibrated transaction risk scores with SHAP explanations.', algorithm: 'XGBoost + GNN ensemble, SHAP, LIME', inputs: 'GNN embeddings, transaction features', outputs: 'Risk score [0-1], SHAP attributions', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
-  { id: 'telemetry', name: 'Telemetry & Monitoring', category: 'Observability', purpose: 'Streams real-time training round metrics, privacy budget consumption, and node status to the monitoring plane.', algorithm: 'EWMA smoothing, anomaly detection', inputs: 'Node heartbeats, round metrics', outputs: 'Prometheus metrics, InfluxDB time-series', tech: 'Prometheus, Grafana, OpenTelemetry' },
-  { id: 'bank-connector', name: 'Bank Connector Framework', category: 'Integration', purpose: 'Standardises ingestion of ISO 20022 XML financial message streams from heterogeneous core banking systems.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008, camt.053 XML streams', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
+  { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Orchestration', purpose: 'Coordinates distributed GNN model optimization across banking institutions using FedAvg and FedProx with straggler mitigation.', algorithm: 'FedAvg, FedProx, Asynchronous SGD', inputs: 'Local gradient tensors from node agents', outputs: 'Aggregated global GNN model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
+  { id: 'dp-engine', name: 'Differential Privacy Engine', category: 'Mathematical Privacy', purpose: 'Applies L2 gradient clipping and calibrated Gaussian noise injection to ensure mathematical (ε, δ)-differential privacy bounds.', algorithm: 'Gaussian Mechanism, RDP Accountant', inputs: 'Raw local model gradients, clipping bound C=1.0', outputs: 'Differentially private gradient tensors', tech: 'Opacus 1.4, Rényi DP' },
+  { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Hardware Cryptography', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
+  { id: 'bft-agg', name: 'Byzantine-Robust Defense Filter', category: 'Adversarial Defense', purpose: 'Detects and neutralises gradient poisoning, model replacement, and backdoor attacks from compromised bank nodes.', algorithm: 'Krum, Trimmed Mean, Flame, Cosine Dist', inputs: 'Gradient updates from all consortium nodes', outputs: 'Filtered, verified aggregated gradient', tech: 'Custom PyTorch, scikit-learn' },
+  { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'ML Topology Engine', purpose: 'Constructs dynamic multi-hop transaction graphs from ISO 20022 message streams and computes 512-dim structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 & camt.053 feeds', outputs: '512-dimensional node embeddings', tech: 'PyTorch Geometric 2.6, DGL' },
+  { id: 'risk-engine', name: 'Calibrated Risk Scoring Engine', category: 'Fraud Intelligence', purpose: 'Combines GNN graph embeddings with tabular transaction velocity features to generate calibrated risk scores with SHAP attributions.', algorithm: 'XGBoost + GNN ensemble, SHAP, LIME', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
+  { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Platform Observability', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
+  { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Banking Ingestion', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
 ];
 
 const ARCH_NODES: ArchNode[] = [
@@ -41,14 +41,14 @@ const ARCH_NODES: ArchNode[] = [
 ];
 
 const WORKFLOW_STEPS = [
-  { id: 1, short: 'Ingestion', label: 'ISO 20022 Ingestion', description: 'Each bank node ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 statements) via the Bank Connector Framework. Messages are validated against XSD schemas, normalised, and streamed into the local transaction graph store.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser\nfrom lxml import etree\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\ngraph_builder.ingest(msg)` },
-  { id: 2, short: 'Local Training', label: 'Local GNN Training', description: 'The local PyTorch Geometric GAT model is trained exclusively on data stored within the bank premises. The model learns multi-hop transaction graph embeddings capturing structural patterns associated with money laundering networks without ever transmitting raw data externally.', tech: ['PyTorch Geometric 2.6', 'GATConv', 'GraphSAGE', 'Adam optimiser'], code: `# Local GATConv Training\nfrom torch_geometric.nn import GATConv\n\nmodel = GATConv(in_channels=512,\n                out_channels=256,\n                heads=8, dropout=0.1)\noptimiser = Adam(model.parameters(), lr=3e-4)\n\nfor batch in local_loader:\n    loss = criterion(model(batch.x, batch.edge_index), batch.y)\n    loss.backward()` },
-  { id: 3, short: 'Diff. Privacy', label: 'Differential Privacy', description: 'Before any gradient leaves the bank, Opacus injects calibrated Gaussian noise proportional to the gradient L2-sensitivity. The (ε, δ)-DP guarantee is tracked by the Rényi Differential Privacy accountant.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'Gradient Clipping'], code: `# Opacus DP Training\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimiser, loader = privacy_engine.make_private_with_epsilon(\n    module=model,\n    optimizer=optimiser,\n    data_loader=loader,\n    epochs=10, target_epsilon=0.50,\n    target_delta=1e-5, max_grad_norm=1.0,\n)` },
-  { id: 4, short: 'Sec. Aggregation', label: 'Secure Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and transmitted to the Intel SGX hardware enclave. The enclave performs homomorphic summation without decrypting individual bank contributions.', tech: ['Paillier HE', 'Intel SGX v2', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// SGX Enclave Aggregation (C++)\nsgx_status_t ecall_homomorphic_aggregate(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_a, size_t len_a,\n    const uint8_t* cipher_b, size_t len_b,\n    uint8_t* cipher_sum, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_a, cipher_b);\n    memcpy(cipher_sum, sum.data(), sum.size());\n}` },
-  { id: 5, short: 'BFT Filter', label: 'Byzantine Aggregation', description: 'The FL Coordinator applies Byzantine-robust aggregation using the Krum algorithm and Trimmed Mean to neutralise adversarial gradient poisoning attacks from any compromised bank node before updating the global model.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine similarity'], code: `# Krum Byzantine Filtering\ndef krum(gradients: list[Tensor], f: int) -> Tensor:\n    n = len(gradients)\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2\n                       for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:n - f - 2]))\n    return gradients[scores.index(min(scores))]` },
-  { id: 6, short: 'Global Update', label: 'Global Model Update', description: 'The aggregated and validated global model weights are committed to the Model Registry. All bank nodes receive the updated weights for the next training round. A Coordinator audit log records the cryptographic hash of each round.', tech: ['FedAvg', 'Model Registry', 'SHA-256 audit', 'gRPC broadcast'], code: `# FedAvg Global Aggregation\ndef fedavg(updates: list[dict], weights: list[int]) -> dict:\n    total = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(\n            w * u[key] for w, u in zip(weights, updates)\n        ) / total\n    return global_state` },
-  { id: 7, short: 'Risk Intelligence', label: 'Risk Scoring', description: 'The global GNN model produces 512-dimensional transaction embeddings passed to the Risk Scoring Engine. XGBoost ensemble classifier scores each transaction [0-1], with SHAP value decomposition providing interpretable feature attributions.', tech: ['XGBoost 2.0', 'SHAP', 'Platt Calibration', 'LIME'], code: `# Risk Score + SHAP Explanation\nimport shap\n\nrisk_model = xgboost.XGBClassifier()\nrisk_score = risk_model.predict_proba(embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_values = explainer.shap_values(embedding)\n# → interpretable feature attributions` },
-  { id: 8, short: 'SAR Export', label: 'SAR Export', description: 'Transactions crossing the risk threshold automatically trigger SAR generation in FinCEN-compliant XML format. Reports include SHAP explanations, evidence chains, and are cryptographically signed before export to SIEM.', tech: ['FinCEN SAR XML', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Export -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-PLATFORM-991</FilerID>\n    <FilingType>COMPLETE</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <EvidenceHash>sha256:e3b0c...</EvidenceHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
+  { id: 1, short: 'Ingestion', label: 'ISO 20022 Ingestion Pipeline', description: 'Each bank node agent ingests raw ISO 20022 XML financial messages (pacs.008 credit transfers, camt.053 bank statements) from core banking ledgers. Messages are validated against official XSD schemas, normalized, and converted into dynamic transaction graph tensors.', tech: ['Apache Kafka', 'lxml', 'xmlschema', 'Protocol Buffers'], code: `# ISO 20022 XML Parser & Graph Tensor Builder\nfrom lxml import etree\nimport torch_geometric as pyg\n\nschema = etree.XMLSchema(etree.parse("pacs.008.001.08.xsd"))\nmsg = etree.parse("transaction.xml")\nassert schema.validate(msg)\n\n# Construct local node features & edge indices\ngraph_data = builder.build_subgraph(msg)` },
+  { id: 2, short: 'Local Training', label: 'Local Graph Attention Training', description: 'PyTorch Geometric GAT models train exclusively inside the bank data perimeter on private ledger transactions. The 8-head GATConv layers compute 512-dimensional structural embeddings capturing multi-hop laundering chains without sending any record externally.', tech: ['PyTorch Geometric 2.6', 'GATConv (8 heads)', 'GraphSAGE', 'AdamW'], code: `# On-Premise Local GATConv Training Loop\nfrom torch_geometric.nn import GATConv\n\nclass LocalFraudGNN(torch.nn.Module):\n    def __init__(self):\n        super().__init__()\n        self.gat1 = GATConv(512, 256, heads=8, dropout=0.1)\n        self.gat2 = GATConv(2048, 512, heads=1)\n\n    def forward(self, x, edge_index):\n        return self.gat2(self.gat1(x, edge_index), edge_index)` },
+  { id: 3, short: 'Diff. Privacy', label: 'Differential Privacy Injection', description: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi Differential Privacy (RDP) accountant tracks total (ε=0.50, δ=1e-5) privacy budget consumption.', tech: ['Opacus 1.4', 'Gaussian Mechanism', 'RDP Accountant', 'L2 Clipping'], code: `# Opacus Differential Privacy Guarantee\nfrom opacus import PrivacyEngine\n\nprivacy_engine = PrivacyEngine()\nmodel, optimizer, loader = privacy_engine.make_private_with_epsilon(\n    module=local_model,\n    optimizer=local_optimizer,\n    data_loader=train_loader,\n    target_epsilon=0.50,\n    target_delta=1e-5,\n    max_grad_norm=1.0,\n)` },
+  { id: 4, short: 'Sec. Aggregation', label: 'Homomorphic Enclave Aggregation', description: 'Noised gradient tensors are encrypted using Paillier additive homomorphic encryption and sent to the Intel SGX hardware TEE enclave. The hardware enclave computes encrypted gradient sums without ever decrypting individual institution contributions.', tech: ['Paillier HE', 'Intel SGX v2 TEE', 'Shamir Secret Sharing', 'LibTorch C++'], code: `// Intel SGX TEE Homomorphic Aggregation (C++ Enclave)\nsgx_status_t ecall_homomorphic_sum(\n    sgx_enclave_id_t eid,\n    const uint8_t* cipher_jpm, size_t len_jpm,\n    const uint8_t* cipher_hsbc, size_t len_hsbc,\n    uint8_t* cipher_out, size_t* out_len\n) {\n    auto sum = paillier_add(cipher_jpm, cipher_hsbc);\n    memcpy(cipher_out, sum.data(), sum.size());\n}` },
+  { id: 5, short: 'BFT Defense', label: 'Byzantine-Robust Filtering', description: 'The FL Coordinator executes Byzantine-robust aggregation (Krum algorithm + Trimmed Mean) to evaluate incoming gradient vectors. Any poisoned or adversarial update from a compromised node is isolated and quenched before global model updating.', tech: ['Krum Algorithm', 'Trimmed Mean', 'Flame', 'Cosine Distance'], code: `# Krum Byzantine Poisoning Defense\ndef krum_filter(gradients: list[Tensor], f_byzantine: int) -> Tensor:\n    scores = []\n    for i, g_i in enumerate(gradients):\n        dists = sorted(torch.norm(g_i - g_j)**2 for j, g_j in enumerate(gradients) if i != j)\n        scores.append(sum(dists[:len(gradients) - f_byzantine - 2]))\n    return gradients[scores.index(min(scores))]` },
+  { id: 6, short: 'Global Update', label: 'Global Model Distribution', description: 'The aggregated global model weights are committed to the Model Registry with SHA-256 cryptographic audit signatures. Updated model parameters are broadcast back to all bank nodes via mutual TLS (mTLS) for the next training round.', tech: ['FedAvg', 'Model Registry', 'SHA-256 Audit Trail', 'gRPC mTLS'], code: `# FedAvg Global Weight Synthesis & Distribution\ndef broadcast_global_weights(updates: list[dict], weights: list[int]):\n    total_samples = sum(weights)\n    global_state = {}\n    for key in updates[0]:\n        global_state[key] = sum(w * u[key] for w, u in zip(weights, updates)) / total_samples\n    registry.commit(global_state, sha256=compute_hash(global_state))` },
+  { id: 7, short: 'Risk Intelligence', label: 'Calibrated Risk Scoring', description: 'The updated global GNN model generates 512-dimensional node embeddings fed into the Risk Scoring Engine. An XGBoost ensemble produces calibrated transaction risk scores [0-1], with SHAP tree explainer computing interpretable feature attributions.', tech: ['XGBoost 2.0', 'SHAP TreeExplainer', 'Platt Calibration', 'LIME'], code: `# Risk Scoring & SHAP Attribution Generator\nimport shap\nimport xgboost as xgb\n\nrisk_model = xgb.XGBClassifier()\nrisk_score = risk_model.predict_proba(gnn_embedding)[0][1]\n\nexplainer = shap.TreeExplainer(risk_model)\nshap_attributions = explainer.shap_values(gnn_embedding)` },
+  { id: 8, short: 'SAR Export', label: 'Automated SAR XML Filing', description: 'Transactions crossing the risk threshold automatically trigger SAR filing packages formatted according to FinCEN XML specifications. Filings bundle SHAP evidence, transaction paths, and cryptographic signatures for direct SIEM export.', tech: ['FinCEN SAR XML 2.0', 'XMLSec', 'SIEM Integration', 'Splunk HEC'], code: `<!-- FinCEN SAR Automated Regulatory Package -->\n<FinCEN_SAR version="2.0">\n  <FilingHeader>\n    <FilerID>CFI-CONSORTIUM-991</FilerID>\n    <FilingType>ELECTRONIC</FilingType>\n  </FilingHeader>\n  <SuspiciousActivity>\n    <Amount Ccy="USD">1450000.00</Amount>\n    <RiskScore>0.94</RiskScore>\n    <ProofHash>sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</ProofHash>\n  </SuspiciousActivity>\n</FinCEN_SAR>` },
 ];
 
 // Helper for smooth scrolling to sections
@@ -123,17 +123,10 @@ function HighEndConsortiumSVG() {
 
           return (
             <g key={b.id}>
-              {/* Outer Glow Circle */}
               <circle cx={b.x} cy={b.y} r={r * 2.2} fill={`url(#radial-${b.id})`} />
-
-              {/* Pulsing Radar Ring */}
               <circle cx={b.x} cy={b.y} r={radarRadius} fill="none" stroke={b.glow} strokeWidth="0.8" strokeOpacity={opacity} />
-
-              {/* Core Solid Node */}
               <circle cx={b.x} cy={b.y} r={r} fill="#060614" stroke={b.color} strokeWidth="1.8" filter="url(#glow-filter)" />
               <circle cx={b.x} cy={b.y} r={r * 0.35} fill={b.glow} />
-
-              {/* Label */}
               <text x={b.x} y={b.y + r + 10} textAnchor="middle" fontSize="6.5" fill="#94a3b8" fontFamily="monospace" fontWeight="700">
                 {b.id}
               </text>
@@ -169,8 +162,6 @@ function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; a
     { id: 'bft',     symbol: '△', title: 'Byzantine Attack Defense Lab',     color: 'bg-cyan-600' },
     { id: 'sar',     symbol: '▦', title: 'FinCEN SAR XML Generator',          color: 'bg-amber-600' },
   ];
-
-  const currentTabInfo = sidebarButtons.find(b => b.id === activeTab)!;
 
   return (
     <div className="relative rounded-2xl overflow-hidden border border-white/10 shadow-[0_0_90px_rgba(99,102,241,0.2)] bg-[#070718]">
@@ -611,7 +602,7 @@ export default function LandingPage() {
               <div className="space-y-4">
                 <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-mono">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-                  Privacy-Preserving Federated Intelligence Architecture
+                  Privacy-Preserving Federated Intelligence Infrastructure
                 </div>
                 <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight leading-[1.1]">
                   <span className="bg-gradient-to-r from-slate-100 via-indigo-200 to-slate-300 bg-clip-text text-transparent">
@@ -619,11 +610,11 @@ export default function LandingPage() {
                   </span>
                   <br />
                   <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-cyan-400 bg-clip-text text-transparent">
-                    Fraud Detection Network
+                    Fraud Detection Platform
                   </span>
                 </h1>
                 <p className="text-slate-400 text-base leading-relaxed max-w-xl">
-                  CF-Intelligence enables banking institutions to train Graph Neural Networks collectively on transaction graph topologies — preserving total data sovereignty with zero raw data sharing.
+                  CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies — discovering multi-bank money laundering rings with zero raw data sharing.
                 </p>
               </div>
 
@@ -664,7 +655,7 @@ export default function LandingPage() {
               </div>
             </motion.div>
 
-            {/* Right Interactive Dashboard Preview (WITH FULLY INTERACTIVE SIDEBAR BUTTONS) */}
+            {/* Right Interactive Dashboard Preview */}
             <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.15}} className="lg:col-span-5">
               <InteractiveDashboardPreview flRound={flRound} accuracy={accuracy} />
             </motion.div>
@@ -678,21 +669,21 @@ export default function LandingPage() {
           <FadeSection>
             <div className="max-w-3xl mb-10">
               <div className="text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Problem Statement</div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Cross-Bank Financial Crime Networks</h2>
+              <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">Cross-Bank Money Laundering Fragmentation</h2>
               <p className="text-slate-400 text-base mt-3 leading-relaxed">
-                Money laundering networks deliberately divide transaction paths across multiple banks to bypass institution-local AML rules. CFI detects multi-hop graph patterns while keeping all ledger data strictly on-premise.
+                Sophisticated financial crime syndicates structure transaction paths across multiple banks to bypass institution-local AML rules. Single-bank GNN models only see internal legs, leaving cross-border networks invisible.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="p-7 rounded-3xl bg-white/2 border border-rose-500/20 backdrop-blur-xl space-y-4">
                 <div className="flex items-center justify-between border-b border-white/6 pb-4">
-                  <h3 className="text-base font-bold text-slate-200">Traditional Bank-Isolated AML</h3>
+                  <h3 className="text-base font-bold text-slate-200">Traditional Bank-Isolated AML Systems</h3>
                   <span className="px-3 py-1 rounded-full text-xs font-mono font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20">42% Detection</span>
                 </div>
                 <ul className="space-y-3 text-xs font-mono text-slate-400">
-                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Graph Neural Networks isolated to single institution ledger</li>
-                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Smurfing across multiple banks stays hidden below individual thresholds</li>
+                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Graph Neural Networks isolated to single institution ledgers</li>
+                  <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> Smurfing across multiple banks stays hidden below local thresholds</li>
                   <li className="flex items-start gap-2.5"><span className="text-rose-500 mt-0.5">✕</span> High false positive rate (~31%) overwhelms fraud investigation teams</li>
                 </ul>
               </div>
@@ -721,7 +712,7 @@ export default function LandingPage() {
               <div className="text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">Execution Pipeline</div>
               <h2 className="text-3xl sm:text-4xl font-bold text-slate-100 tracking-tight">8-Stage Federated Training Pipeline</h2>
               <p className="text-slate-400 text-base mt-3 leading-relaxed">
-                Click any stage below to inspect the production implementation, cryptography, and code references.
+                Click any stage below to inspect production implementations, cryptography, and code references.
               </p>
             </div>
 
