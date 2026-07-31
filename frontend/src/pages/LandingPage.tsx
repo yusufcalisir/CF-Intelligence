@@ -229,10 +229,10 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
 
   const tabUrlPaths: Record<string, string> = {
     home: 'dashboard',
-    gnn: 'dashboard/gnn-topology',
-    privacy: 'dashboard/privacy-engine',
-    bft: 'dashboard/bft-defense',
-    sar: 'dashboard/sar-filings',
+    gnn: 'investigation',
+    privacy: 'privacy-defense',
+    bft: 'operations',
+    sar: 'cases',
   };
 
   const sidebarButtons = [
