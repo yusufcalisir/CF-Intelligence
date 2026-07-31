@@ -265,9 +265,10 @@ export default function LandingPage() {
         <header className="sticky top-0 z-50 h-16 flex items-center border-b border-white/6 bg-[#05050f]/80 backdrop-blur-2xl">
           <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between">
             {/* Brand Logo & Clean Name */}
-            <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+            <div className="flex items-center gap-2.5 cursor-pointer" onClick={() => navigate('/')}>
               <BrandLogo />
               <span className="font-bold text-base text-slate-100 tracking-tight">CF-Intelligence</span>
+              <span className="text-[10px] font-mono text-slate-500/70 font-normal">v2.4.0</span>
             </div>
 
             {/* Desktop Navigation */}
@@ -915,15 +916,13 @@ ws.on('round.stage', (e) => console.log(e.stage, e.accuracy));`}
             <div className="flex items-center gap-3">
               <BrandLogo className="w-8 h-8" />
               <div>
-                <div className="text-sm font-bold text-slate-200">CF-Intelligence</div>
-                <div className="text-xs font-mono text-slate-600">Privacy-Preserving Federated Fraud Intelligence</div>
+                <div className="text-sm font-bold text-slate-200">Federated Intelligence Network</div>
+                <div className="text-xs font-mono text-slate-600">Privacy-Preserving Fraud Intelligence Platform</div>
               </div>
             </div>
 
-            {/* Version Badge for test compliance */}
-            <div className="text-xs font-mono text-slate-500 flex items-center gap-2">
-              <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">v2.4.0</span>
-              <span>PyTorch · Intel SGX · ISO 20022 · FinCEN SAR</span>
+            <div className="text-xs font-mono text-slate-500">
+              PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
             <button
