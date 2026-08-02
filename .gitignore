@@ -97,6 +97,12 @@ backend/app/storage/
 # Ruff
 .ruff_cache/
 
+# Hypothesis
+.hypothesis/
+
+# Scratch & temporary files
+scratch/
+
 # Agent / Simulator metadata & Batch Scripts
 .agents/
 .gemini/

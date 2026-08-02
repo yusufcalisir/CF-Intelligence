@@ -358,12 +358,29 @@ Exports audit events in Syslog CEF (`CEF:0|CFI|...`), Splunk HEC, and Datadog JS
 | **SLA/SLO Contract Engine** | 99.9% Uptime SLA + Billing Credits | Enterprise SLA | `sla_contract_engine.py` | `PASS` |
 | **SRE Incident Triage Engine** | SEV1-SEV4 Severity Classification | SRE Incident Management | `incident_triage.py` | `PASS` |
 | **Zero-Downtime Deployer** | Graceful Draining + 48h Dual Window | High Availability | `zero_downtime_deployer.py` | `PASS` |
-| **Multi-Role Web Console** | Live Operations Dashboard (real-time WebSocket FL round tracking) | Enterprise Management | `admin_console.py` | `PASS` |
+| **Multi-Role Web Console** | Live Operations Dashboard | Enterprise Management | `admin_console.py` | `PASS` |
 | **Official CLI Tooling** | `cfi-cli` Terminal Subcommands | Operator Tooling | `cfi_cli.py` | `PASS` |
 | **Edge Security WAF** | SQLi / XSS / IP Whitelisting | Perimeter Security | `perimeter_waf.py` | `PASS` |
-| **Air-Gapped Bundle Builder** | Offline Deployment Tarball + SHA-256 Manifest | Isolated Data Centers | `airgap_installer.py` | `PASS` |
+| **Air-Gapped Bundle Builder** | Offline Deployment Tarball | Isolated Data Centers | `airgap_installer.py` | `PASS` |
 | **Security Controls Auditor** | SOC2 Type II, ISO 27001, GDPR | Enterprise Security | `security_compliance.py` | `PASS` |
 | **SIEM Log Exporter** | Syslog CEF / Splunk HEC / Datadog JSON | SIEM Integration | `siem_exporter.py` | `PASS` |
+
+### 13.1 Subsystem Scientific Audit Reports (`verification/`)
+
+| Subsystem Module | Target Component Scope | Verification Report | Audit Status |
+| :--- | :--- | :--- | :---: |
+| **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py`, `async_fl_engine.py` | [`verification/federated_learning/scientific_audit_report.md`](verification/federated_learning/scientific_audit_report.md) | `AUDITED` |
+| **Differential Privacy** | `privacy_service.py`, `label_privacy_guard.py`, `psi_service.py` | [`verification/differential_privacy/scientific_audit_report.md`](verification/differential_privacy/scientific_audit_report.md) | `AUDITED` |
+| **Secure Aggregation** | `tee_driver.py`, `kms_service.py`, `security_evaluator.py` | [`verification/secure_aggregation/scientific_audit_report.md`](verification/secure_aggregation/scientific_audit_report.md) | `AUDITED` |
+| **AML Risk Scoring** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [`verification/risk_scoring/scientific_audit_report.md`](verification/risk_scoring/scientific_audit_report.md) | `AUDITED` |
+| **Graph Intelligence (FedGNN)** | `graph_embedding_model.py`, `graph_embedding_service.py` | [`verification/graph_intelligence/scientific_audit_report.md`](verification/graph_intelligence/scientific_audit_report.md) | `AUDITED` |
+| **Model Drift Detection** | `drift_service.py`, `retraining_trigger_engine.py`, `auto_rollback.py` | [`verification/drift_detection/scientific_audit_report.md`](verification/drift_detection/scientific_audit_report.md) | `AUDITED` |
+| **Explainability (XAI)** | `explainability_service.py`, `realtime_explainer.py` | [`verification/explainability/scientific_audit_report.md`](verification/explainability/scientific_audit_report.md) | `AUDITED` |
+| **Federation Coordinator** | `coordinator_service.py`, `grpc/servicer.py`, `region_failover.py` | [`verification/federation_coordinator/scientific_audit_report.md`](verification/federation_coordinator/scientific_audit_report.md) | `AUDITED` |
+| **Telemetry & Monitoring** | `telemetry/`, `sla_monitor.py`, `tenant_metering.py` | [`verification/telemetry/scientific_audit_report.md`](verification/telemetry/scientific_audit_report.md) | `AUDITED` |
+| **Bank Connectors** | `bank_connector.py`, `connectors/*`, `bank_onboarding_service.py` | [`verification/connectors/scientific_audit_report.md`](verification/connectors/scientific_audit_report.md) | `AUDITED` |
+| **REST API Layer** | `routers/*`, `gateway.py`, `perimeter_waf.py` | [`verification/api/scientific_audit_report.md`](verification/api/scientific_audit_report.md) | `AUDITED` |
+| **Audit Logging & Compliance** | `immutable_audit_chain.py`, `siem_exporter.py`, `ai_act_compliance.py` | [`verification/audit_logging/scientific_audit_report.md`](verification/audit_logging/scientific_audit_report.md) | `AUDITED` |
 
 ---
 
@@ -372,160 +389,139 @@ Exports audit events in Syslog CEF (`CEF:0|CFI|...`), Splunk HEC, and Datadog JS
 ```
 CF-Intelligence/
 ├── pyproject.toml                                   # Python packaging & cfi-cli entrypoint
-├── backend/
-│   ├── app/
-│   │   ├── __init__.py
-│   │   ├── config.py                                # Platform configuration settings
-│   │   ├── dependencies.py                          # FastAPI Dependency Injection
-│   │   ├── main.py                                  # Application entrypoint & lifespan router
-│   │   ├── application/
-│   │   │   └── services/
-│   │   │       ├── adversarial_service.py           # Adversarial attack & robustness evaluator
-│   │   │       ├── alert_service.py                 # Real-time alert dispatching service
-│   │   │       ├── auto_rollback.py                 # Automatic performance rollback manager
-│   │   │       ├── automated_retraining.py          # PSI drift-triggered retraining pipeline
-│   │   │       ├── case_service.py                  # Core case service
-│   │   │       ├── case_workbench.py                # 6-stage case management workbench service
-│   │   │       ├── consortium_service.py            # Consortium lifecycle service
-│   │   │       ├── coordinator_service.py           # FL Coordinator service
-│   │   │       ├── data_generator.py                # Synthetic financial data generator
-│   │   │       ├── data_validator.py                # Schema & distribution data validator
-│   │   │       ├── dataloader.py                    # PyTorch DataLoader pipeline
-│   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift service
-│   │   │       ├── entity_resolution.py             # Cross-bank entity resolution service
-│   │   │       ├── explainability_service.py        # SHAP Kernel Explainer service
-│   │   │       ├── feature_store_service.py         # Offline & online feature store
-│   │   │       ├── financial_message_parser.py      # ISO 20022 message parser
-│   │   │       ├── fl_engine.py                     # Federated Learning training engine
-│   │   │       ├── flower_engine.py                 # Flower FL framework engine
-│   │   │       ├── graph_analytics_service.py       # Graph analytics service
-│   │   │       ├── graph_embedding_model.py         # PyTorch GNN Graph Embedding model
-│   │   │       ├── graph_embedding_service.py       # Graph Embedding generation service
-│   │   │       ├── graph_engine.py                  # NetworkX entity graph engine
-│   │   │       ├── incident_triage.py               # SEV1-SEV4 SRE incident triage engine
-│   │   │       ├── kms_service.py                   # Key Management System (KMS) service
-│   │   │       ├── label_feedback_pipeline.py       # DP noise-protected label feedback loop
-│   │   │       ├── metrics_service.py               # System metrics service
-│   │   │       ├── model_registry.py                # Versioned model registry service
-│   │   │       ├── model_service.py                 # Model lifecycle service
-│   │   │       ├── policy_engine.py                 # Governance policy engine
-│   │   │       ├── privacy_audit_service.py         # Privacy budget audit logger
-│   │   │       ├── privacy_service.py               # Opacus Differential Privacy service
-│   │   │       ├── psi_service.py                   # Population Stability Index service
-│   │   │       ├── regulatory_reporter.py           # Regulatory SAR report compiler
-│   │   │       ├── retention_engine.py              # Automated data retention & GDPR Art. 17
-│   │   │       ├── retraining_trigger_engine.py     # Drift trigger evaluator engine
-│   │   │       ├── risk_engine.py                   # 9-Signal composite risk scoring engine
-│   │   │       ├── scenario_service.py              # Typology simulation scenario service
-│   │   │       ├── security_compliance.py           # SOC2 / ISO 27001 / GDPR compliance auditor
-│   │   │       ├── simulation_service.py            # End-to-end simulation runner
-│   │   │       ├── sla_contract_engine.py           # SLA/SLO contract & billing credit engine
-│   │   │       ├── sla_monitor.py                   # Real-time p50/p95/p99 latency SLA monitor
-│   │   │       ├── streaming_engine.py              # Async streaming transaction engine
-│   │   │       ├── streaming_gnn_model.py           # PyTorch Streaming GNN model
-│   │   │       ├── streaming_graph_service.py       # Streaming graph update service
-│   │   │       ├── support_diagnostics.py           # Support diagnostic compiler & PII redactor
-│   │   │       ├── tenant_metering.py               # Multi-tenant resource metering service
-│   │   │       ├── webhook_service.py               # Developer webhook & HMAC-SHA256 signer
-│   │   │       └── zero_downtime_deployer.py        # Rolling deployment manager
-│   │   ├── domain/
-│   │   │   ├── ai_act_compliance.py                 # EU AI Act risk classification & audit
-│   │   │   ├── async_fl_engine.py                   # Asynchronous FL coordinator engine
-│   │   │   ├── backup_record.py                     # Backup artifact & restore probe models
-│   │   │   ├── benchmark_runner.py                  # System benchmarking suite
-│   │   │   ├── case_management.py                   # Case state machine & supervisor signature
-│   │   │   ├── consortium_governance.py             # Consortium voting & quorum entities
-│   │   │   ├── consortium_policy.py                 # Governance policy models
-│   │   │   ├── data_validator.py                    # Data validation rules
-│   │   │   ├── deployment_state.py                  # Rolling upgrade session & window
-│   │   │   ├── dr_coordinator.py                    # Multi-region DR failover models
-│   │   │   ├── entities.py                          # Core domain entities
-│   │   │   ├── entities_phase2.py                   # Extended domain entities
-│   │   │   ├── enums.py                             # Core domain enums
-│   │   │   ├── fuzzy_psi.py                         # Private Set Intersection algorithm
-│   │   │   ├── incident_playbook.py                 # SEV1-SEV4 incident severity & playbooks
-│   │   │   ├── inference_fallback.py                # High-availability heuristic fallback engine
-│   │   │   ├── label_privacy_guard.py               # Zero-PII leak validator & DP epsilon guard
-│   │   │   ├── metrics_service.py                   # Metric calculation domain models
-│   │   │   ├── model_governance.py                  # SR 11-7 model governance entities
-│   │   │   ├── model_lifecycle.py                   # Champion/Challenger state machine
-│   │   │   ├── protocol_versioning.py               # Protocol version compatibility matrix
-│   │   │   ├── psi_service.py                       # PSI calculation models
-│   │   │   ├── quorum_manager.py                    # Consortium quorum manager
-│   │   │   ├── realtime_explainer.py                # Fast SHAP feature attribution explainer
-│   │   │   ├── regional_governance.py               # Regional data residency models
-│   │   │   ├── retention_policy.py                  # Data retention TTL policy & erasure audit
-│   │   │   ├── security_evaluator.py                # Security evaluation models
-│   │   │   ├── sla_contract.py                      # SLA contract, SLO metrics & penalty report
-│   │   │   ├── spectral_defense.py                  # Spectral anomaly poisoning defense
-│   │   │   ├── tenant_management.py                 # Multi-tenant isolation models
-│   │   │   ├── value_objects.py                     # Core value objects
-│   │   │   ├── value_objects_phase2.py              # Extended value objects
-│   │   │   └── web_console.py                       # Multi-role console view config & metrics
-│   │   ├── infrastructure/
-│   │   │   ├── connectors/
-│   │   │   │   ├── factory.py                       # Dynamic production bank connector factory
-│   │   │   │   ├── fixture_connector.py             # Test-only fixture reader (not importable in production)
-│   │   │   │   ├── iso20022_connector.py            # ISO 20022 XML financial message connector
-│   │   │   │   ├── kafka_connector.py               # Apache Kafka payment stream connector
-│   │   │   │   ├── open_banking_connector.py        # PSD2 Open Banking REST API connector
-│   │   │   │   ├── parquet_connector.py             # Apache Parquet dataset connector
-│   │   │   │   ├── rabbitmq_connector.py            # RabbitMQ AMQP message connector
-│   │   │   │   └── rest_connector.py                # REST API payment connector
-│   │   │   ├── deployment/
-│   │   │   │   └── airgap_installer.py              # Air-gapped bundle builder & checksum verifier
-│   │   │   ├── disaster_recovery/
-│   │   │   │   ├── backup_verifier.py               # SHA-256 checksum & sandbox restore probe
-│   │   │   │   └── region_failover.py               # Active-passive multi-region failover manager
-│   │   │   ├── logging/
-│   │   │   │   └── siem_exporter.py                 # Syslog CEF / Splunk / Datadog exporter
-│   │   │   └── security/
-│   │   │       └── perimeter_waf.py                 # Edge WAF guard (SQLi / XSS / IP Whitelist)
-│   │   └── presentation/
-│   │       ├── cli/
-│   │       │   └── cfi_cli.py                       # Official operator cfi-cli utility
-│   │       └── routers/
-│   │           ├── admin_console.py                 # Commercial web console dashboard router
-│   │           ├── realtime_inference.py            # Real-time scoring API router (<100ms)
-│   │           └── webhook_gateway.py               # Developer webhook subscriptions router
-│   └── tests/
-│       └── unit/                                    # Automated unit test suite
-│           ├── test_admin_console_router.py
-│           ├── test_automated_retraining.py
-│           ├── test_backup_verifier.py
-│           ├── test_case_management_workbench.py
-│           ├── test_disaster_recovery_failover.py
-│           ├── test_incident_triage_engine.py
-│           ├── test_label_feedback_pipeline.py
-│           ├── test_perimeter_airgap.py
-│           ├── test_realtime_inference_engine.py
-│           ├── test_realtime_sla_explanation.py
-│           ├── test_retention_erasure_engine.py
-│           ├── test_security_compliance.py
-│           ├── test_siem_support_diagnostics.py
-│           ├── test_sla_contract_engine.py
-│           ├── test_webhook_gateway.py
-│           └── test_zero_downtime_deployment.py
-└── docs/                                            # Architectural specifications & guides
-    ├── airgapped_deployment_guide.md
-    ├── backup_verification_spec.md
-    ├── case_management_spec.md
-    ├── cfi_cli_user_guide.md
-    ├── commercial_console_ui_spec.md
-    ├── data_retention_policy_spec.md
-    ├── disaster_recovery_plan.md
-    ├── incident_response_playbook.md
-    ├── label_feedback_loop_spec.md
-    ├── public_api_webhooks_spec.md
-    ├── realtime_inference_api.md
-    ├── security/
-    │   ├── SECURITY.md                              # Responsible Vulnerability Disclosure Policy
-    │   ├── pentest_scope.md                         # Penetration Testing Scope & Rules of Engagement
-    │   └── soc2_type2_controls_matrix.md            # SOC2 Type II & ISO 27001 Security Controls
-    ├── security_controls_matrix.md
-    ├── siem_and_support_guide.md
-    ├── sla_slo_contract_spec.md
-    └── zero_downtime_upgrade_strategy.md
+├── Dockerfile                                       # Production container runtime specification
+├── docker-compose.yml                               # Multi-container orchestration (API, Redis, Postgres, Kafka)
+├── Makefile                                         # Developer automation & build tasks
+├── backend/                                         # Clean Architecture FastAPI Backend
+│   └── app/
+│       ├── config.py                                # Platform configuration settings & env management
+│       ├── dependencies.py                          # FastAPI Dependency Injection provider
+│       ├── main.py                                  # Application entrypoint & CORS/middleware setup
+│       ├── application/
+│       │   └── services/                            # Application Use Cases & Orchestration Services
+│       │       ├── adversarial_service.py           # Robustness & adversarial attack evaluator
+│       │       ├── alert_service.py                 # Real-time alert dispatching service
+│       │       ├── auto_rollback.py                 # Performance degradation auto-rollback engine
+│       │       ├── automated_retraining.py          # Drift-triggered automated retraining pipeline
+│       │       ├── bank_onboarding_service.py       # Bank institution onboarding service
+│       │       ├── case_service.py                  # Core case state machine service
+│       │       ├── case_workbench.py                # 6-stage case management workbench
+│       │       ├── consortium_service.py            # Consortium governance lifecycle service
+│       │       ├── coordinator_service.py           # FL Coordinator orchestration service
+│       │       ├── data_generator.py                # Synthetic financial transaction data generator
+│       │       ├── data_validator.py                # Ingestion schema & distribution validator
+│       │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
+│       │       ├── entity_resolution.py             # Cross-bank fuzzy entity resolution service
+│       │       ├── explainability_service.py        # SHAP Kernel & GNN feature attribution
+│       │       ├── feature_store_service.py         # Online & offline feature store manager
+│       │       ├── financial_message_parser.py      # ISO 20022 XML financial message parser
+│       │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
+│       │       ├── flower_engine.py                 # Flower FL framework integration engine
+│       │       ├── graph_analytics_service.py       # Entity graph analytics service
+│       │       ├── graph_embedding_service.py       # PyTorch GraphSAGE embedding generator
+│       │       ├── incident_triage.py               # SEV1-SEV4 SRE incident triage engine
+│       │       ├── kms_service.py                   # Tenant Key Management System (KMS)
+│       │       ├── label_feedback_pipeline.py       # DP noise-protected label feedback loop
+│       │       ├── metrics_service.py               # Real-time metric aggregator service
+│       │       ├── model_registry.py                # Champion/Challenger model registry
+│       │       ├── policy_engine.py                 # Governance policy evaluation engine
+│       │       ├── privacy_audit_service.py         # Privacy budget & empirical leakage auditor
+│       │       ├── privacy_service.py               # Opacus Differential Privacy guard
+│       │       ├── psi_service.py                   # Population Stability Index calculation engine
+│       │       ├── regulatory_reporter.py           # FinCEN BSA SAR XML report compiler
+│       │       ├── retention_engine.py              # Data retention TTL & GDPR Art. 17 engine
+│       │       ├── risk_engine.py                   # 9-Signal composite risk scoring engine
+│       │       ├── security_compliance.py           # SOC2 / ISO 27001 / GDPR compliance auditor
+│       │       ├── simulation_service.py            # Typology simulation scenario runner
+│       │       ├── sla_contract_engine.py           # SLA/SLO contract & penalty credit engine
+│       │       ├── sla_monitor.py                   # Latency p50/p95/p99 SLA monitor
+│       │       ├── streaming_engine.py              # Async streaming transaction processor
+│       │       ├── support_diagnostics.py           # Support bundle compiler & PII redactor
+│       │       ├── tenant_metering.py               # Multi-tenant resource metering service
+│       │       ├── webhook_service.py               # Developer webhook & HMAC-SHA256 signer
+│       │       └── zero_downtime_deployer.py        # Rolling deployment manager
+│       ├── domain/                                  # Enterprise Domain Layer (Business Logic & Entities)
+│       │   ├── ai_act_compliance.py                 # EU AI Act Articles 10-15 compliance engine
+│       │   ├── async_fl_engine.py                   # Asynchronous FL coordinator domain model
+│       │   ├── case_management.py                   # Case entity & supervisor signature
+│       │   ├── consortium_governance.py             # Consortium voting & quorum entities
+│       │   ├── entities.py                          # Core domain entities (Bank, Transaction, Alert)
+│       │   ├── fuzzy_psi.py                         # Private Set Intersection (PSI) algorithm
+│       │   ├── label_privacy_guard.py               # Differential Privacy epsilon bounds guard
+│       │   ├── model_lifecycle.py                   # Champion / Challenger state machine
+│       │   ├── realtime_explainer.py                # Sub-ms fast SHAP explainer
+│       │   ├── retention_policy.py                  # Data retention TTL policy & erasure models
+│       │   ├── security_evaluator.py                # Security evaluation domain models
+│       │   ├── sla_contract.py                      # SLA contract & SLO penalty models
+│       │   ├── spectral_defense.py                  # Spectral anomaly poisoning defense
+│       │   └── value_objects.py                     # Immutable value objects
+│       ├── infrastructure/                          # Infrastructure & External Adapters
+│       │   ├── connectors/                          # Financial Data Ingestion Connectors
+│       │   │   ├── factory.py                       # Bank connector factory
+│       │   │   ├── iso20022_connector.py            # ISO 20022 XML connector
+│       │   │   ├── kafka_connector.py               # Apache Kafka payment stream connector
+│       │   │   ├── open_banking_connector.py        # PSD2 Open Banking REST connector
+│       │   │   ├── parquet_connector.py             # Apache Parquet connector
+│       │   │   ├── rabbitmq_connector.py            # RabbitMQ AMQP connector
+│       │   │   └── rest_connector.py                # REST API payment connector
+│       │   ├── deployment/                          # Air-gapped installer & bundle builder
+│       │   ├── disaster_recovery/                   # Multi-region DR failover & backup verifier
+│       │   ├── grpc/                                # gRPC protobuf services & client
+│       │   ├── logging/                             # SIEM Log Exporter (Syslog CEF, Splunk, Datadog)
+│       │   ├── repositories/                        # Database repository implementations
+│       │   ├── security/                            # Security Infrastructure
+│       │   │   ├── abac_engine.py                   # Attribute-Based Access Control engine
+│       │   │   ├── ai_act_compliance.py             # EU AI Act certificate generator
+│       │   │   ├── fhe_driver.py                    # Fully Homomorphic Encryption driver
+│       │   │   ├── hsm_signer.py                    # Zero-Disk HSM signing engine
+│       │   │   ├── immutable_audit_chain.py         # SHA-256 cryptographic audit chain
+│       │   │   ├── mtls_manager.py                  # mTLS x509 cert & CRL manager
+│       │   │   ├── oidc_authenticator.py            # OIDC JWT authentication provider
+│       │   │   ├── perimeter_waf.py                 # Edge WAF guard (SQLi / XSS / IP Whitelist)
+│       │   │   ├── tee_driver.py                    # TEE SGX/Nitro enclave driver
+│       │   │   └── vault_client.py                  # HashiCorp Vault PKI client
+│       │   └── telemetry/                           # OpenTelemetry tracing & metrics exporter
+│       └── presentation/                            # Presentation & API Gateway Layer
+│           ├── cli/
+│           │   └── cfi_cli.py                       # Official operator cfi-cli CLI tool
+│           ├── messaging/                           # Async message listeners (Redis/Kafka)
+│           ├── routers/                             # REST API Endpoints (FastAPI)
+│           │   ├── admin_console.py                 # Commercial web console router
+│           │   ├── alerts.py                        # Alert management router
+│           │   ├── banks.py                         # Bank institution router
+│           │   ├── cases.py                         # Case management router
+│           │   ├── compliance.py                    # Regulatory compliance & certificate router
+│           │   ├── coordinator.py                   # FL coordinator router
+│           │   ├── dashboard.py                     # Analytics dashboard router
+│           │   ├── gateway.py                       # API Gateway & WAF router
+│           │   ├── graph.py                         # Entity graph router
+│           │   ├── health.py                        # Liveness & readiness probe router
+│           │   ├── monitoring.py                    # Prometheus metrics & SLA router
+│           │   ├── onboarding.py                    # Bank onboarding router
+│           │   ├── realtime_inference.py            # Real-time scoring API router (<100ms)
+│           │   ├── security.py                      # Security status & audit chain router
+│           │   └── webhook_gateway.py               # Developer webhook router
+│           └── websockets/                          # Real-time WebSocket streaming handlers
+├── frontend/                                        # Commercial Web Application Console (Next.js / React)
+├── contracts/                                       # Web3 CBDC Smart Contracts (ConsortiumIncentiveSettlement.sol)
+├── deployments/                                     # Production Kubernetes Helm Charts & Terraform
+├── docs/                                            # Architectural specifications & operator guides
+├── monitoring/                                      # Grafana Dashboards & Prometheus Alert Rules
+├── sdk/                                             # Python Client SDK & Integration Libraries
+└── verification/                                    # Publication-Quality Scientific Audit Registry
+    ├── README.md                                    # Central audit registry index
+    ├── federated_learning/                          # FL Engine & aggregation audit report
+    ├── differential_privacy/                        # Differential Privacy audit report
+    ├── secure_aggregation/                          # SecAgg & TEE Enclave audit report
+    ├── risk_scoring/                                # AML Risk Engine & AST Policy audit report
+    ├── graph_intelligence/                          # GraphSAGE / FedGNN audit report
+    ├── drift_detection/                             # Model Drift & Calibration audit report
+    ├── explainability/                              # SHAP & GNN Explainability audit report
+    ├── federation_coordinator/                      # Distributed Coordinator audit report
+    ├── telemetry/                                   # Telemetry, SIEM & SLA audit report
+    ├── connectors/                                  # Bank Connector Framework audit report
+    ├── api/                                         # REST API Presentation Layer audit report
+    └── audit_logging/                               # Cryptographic Audit Chain & Compliance report
 ```
 
 ---
