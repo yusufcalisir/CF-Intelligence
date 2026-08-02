@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 logger = logging.getLogger(__name__)
 
@@ -65,8 +66,10 @@ def compute_recall_at_fpr(
         return 0.0
 
     fpr, tpr, _ = roc_curve(y_t, y_p)
+    fpr_f = np.asarray(fpr, dtype=np.float64)
+    tpr_f = np.asarray(tpr, dtype=np.float64)
     # Find recall (tpr) at target_fpr using linear interpolation
-    recall_val = float(np.interp(target_fpr, fpr, tpr))
+    recall_val = float(np.interp(target_fpr, fpr_f, tpr_f))
     return round(recall_val, 4)
 
 
@@ -94,8 +97,8 @@ def compute_precision_at_k(
 
 def compute_scientific_benchmark(
     model_config_name: str,
-    y_true: list[int] | np.ndarray,
-    y_pred: list[float] | np.ndarray,
+    y_true: npt.ArrayLike,
+    y_pred: npt.ArrayLike,
     detection_latency_ms: float = 4.2,
     communication_payload_mb: float = 1.2,
     dp_epsilon: float = 0.0,

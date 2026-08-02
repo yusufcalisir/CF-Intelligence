@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from typing import TypedDict
 
 import numpy as np
 
@@ -24,6 +25,16 @@ import numpy as np
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "backend")))
 
 from app.domain.metrics_service import compute_scientific_benchmark
+
+
+class BenchmarkConfig(TypedDict):
+    name: str
+    seed: int
+    latency: float
+    payload: float
+    eps: float
+    delta: float
+    gen_delta: float
 
 
 def generate_synthetic_benchmark_predictions(
@@ -69,7 +80,7 @@ def run_benchmark_suite() -> list[dict]:
     print(" CFI PLATFORM - PRODUCTION BENCHMARK SUITE & SCIENTIFIC VALIDATION ")
     print("=" * 85)
 
-    configs = [
+    configs: list[BenchmarkConfig] = [
         {
             "name": "Local-Only Model (Bank A)",
             "seed": 1,
