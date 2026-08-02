@@ -14,7 +14,7 @@
 
 🌐 **[Live Web Application Console](https://cf-intelligence.vercel.app)**
 
-[Executive Summary](#1-executive-summary--architectural-vision) • [System Architecture](#2-master-system-architecture) • [Core Subsystems](#3-multi-bank-synthetic-data--multi-standard-ingestion) • [Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) • [Directory Tree](#14-complete-clean-architecture-directory-structure) • [API Blueprints](#15-api-endpoint-blueprints--json-schemas) • [Operator Guide](#16-cli-operator-tooling-guide-cfi-cli) • [Quick Start](#17-step-by-step-operator-quick-start)
+[Executive Summary](#1-executive-summary--architectural-vision) • [System Architecture](#2-master-system-architecture) • [Core Subsystems](#3-multi-bank-synthetic-data--multi-standard-ingestion) • [Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) • [Scientific Audits](#131-subsystem-scientific-audit-reports-verification) • [Directory Tree](#14-complete-clean-architecture-directory-structure) • [API Blueprints](#15-api-endpoint-blueprints--json-schemas) • [Operator Guide](#16-cli-operator-tooling-guide-cfi-cli) • [Quick Start](#17-step-by-step-operator-quick-start)
 
 </div>
 
