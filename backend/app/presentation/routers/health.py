@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.infrastructure.cache import check_redis_health
@@ -35,9 +36,14 @@ async def health() -> dict:
     return {"status": "healthy", "service": "fraud-intelligence-api"}
 
 
-@router.get("/health/ready", status_code=status.HTTP_200_OK)
-async def readiness() -> dict:
-    """Readiness probe. Checks downstream dependencies."""
+@router.get("/health/ready")
+async def readiness() -> JSONResponse:
+    """Readiness probe. Checks downstream dependencies.
+
+    Returns HTTP 200 when all dependencies are healthy.
+    Returns HTTP 503 (Service Unavailable) when any dependency is degraded,
+    as required by the Kubernetes readiness probe contract.
+    """
     checks: dict[str, bool] = {}
 
     # Redis health check
@@ -49,7 +55,13 @@ async def readiness() -> dict:
     # Determine overall status
     all_healthy = all(checks.values())
 
-    return {
-        "status": "ready" if all_healthy else "degraded",
-        "checks": checks,
-    }
+    if not all_healthy:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"status": "degraded", "checks": checks},
+        )
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={"status": "ready", "checks": checks},
+    )

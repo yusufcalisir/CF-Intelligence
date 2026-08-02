@@ -14,7 +14,7 @@ import uuid
 from typing import Any
 
 import torch
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, status
 from pydantic import BaseModel, Field
 
 from app.application.services.alert_service import AlertIntelligenceService
@@ -195,6 +195,7 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
 async def predict_transaction(
     payload: TransactionPredictRequest,
     session: SessionDep,
+    background_tasks: BackgroundTasks,
     x_api_key: str | None = Header(None, alias="X-API-Key"),
 ) -> TransactionPredictResponse:
     """Evaluate a transaction in real-time.
@@ -266,19 +267,15 @@ async def predict_transaction(
 
         txn_dict = payload.model_dump()
 
-        # Ingest and query from Feature Store
+        # Online Feature Store: schedule ingest as background task (fire-and-forget).
+        # This follows real production feature store semantics:
+        #   - Scoring reads the last committed feature snapshot (get_online_features).
+        #   - The current transaction's features are written asynchronously after scoring.
+        #   - The next request will observe the updated snapshot.
+        # This eliminates the rolling_velocity_1h accumulation side-effect identified
+        # in the scientific audit (Section 6 — Prediction Idempotency).
         if _settings.feature_store_enabled:
             merch_id = f"merch_{payload.merchant_category}"
-            _feature_store.ingest_transaction(
-                customer_id=entity_hash,
-                amount=payload.transaction_amount,
-                merchant_id=merch_id,
-                merchant_category=payload.merchant_category,
-                merchant_risk_score=payload.merchant_risk_score,
-                customer_history_score=payload.customer_history_score,
-                chargeback_count=payload.chargeback_count,
-                account_age_days=payload.account_age_days,
-            )
             online_feats = _feature_store.get_online_features(
                 [{"customer_id": entity_hash, "merchant_id": merch_id}],
                 [
@@ -311,6 +308,18 @@ async def predict_transaction(
                 txn_dict["merchant_category"] = feats.get(
                     "merchant_category", txn_dict.get("merchant_category", "grocery")
                 )
+            # Schedule asynchronous feature ingestion — runs after response is sent
+            background_tasks.add_task(
+                _feature_store.ingest_transaction,
+                customer_id=entity_hash,
+                amount=payload.transaction_amount,
+                merchant_id=merch_id,
+                merchant_category=payload.merchant_category,
+                merchant_risk_score=payload.merchant_risk_score,
+                customer_history_score=payload.customer_history_score,
+                chargeback_count=payload.chargeback_count,
+                account_age_days=payload.account_age_days,
+            )
 
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
 

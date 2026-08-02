@@ -16,8 +16,11 @@ print(">>> Python main.py loaded successfully! <<<", flush=True)
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 
 from app.config import get_settings
 from app.presentation.routers import (
@@ -53,11 +56,28 @@ if TYPE_CHECKING:
 # ── Logging ───────────────────────────────────
 settings = get_settings()
 
-logging.basicConfig(
-    level=getattr(logging, settings.app_log_level.upper(), logging.INFO),
-    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-)
+# ── Structured JSON Logging ────────────────────────────────────────────────────
+# Uses python-json-logger for machine-parseable log output compatible with
+# ELK / Datadog / Cloud Logging ingestion pipelines without regex parsing.
+try:
+    from pythonjsonlogger import jsonlogger  # type: ignore[import-untyped]
+
+    _json_handler = logging.StreamHandler()
+    _json_formatter = jsonlogger.JsonFormatter(
+        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+        datefmt="%Y-%m-%dT%H:%M:%S",
+        rename_fields={"asctime": "timestamp", "levelname": "level"},
+    )
+    _json_handler.setFormatter(_json_formatter)
+    logging.root.setLevel(getattr(logging, settings.app_log_level.upper(), logging.INFO))
+    logging.root.handlers = [_json_handler]
+except ImportError:
+    # Graceful fallback if python-json-logger is not yet installed
+    logging.basicConfig(
+        level=getattr(logging, settings.app_log_level.upper(), logging.INFO),
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
 logger = logging.getLogger(__name__)
 
 
@@ -367,6 +387,82 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Global Exception Handler ─────────────────────────────────────────────────
+# Ensures ALL unhandled runtime exceptions return application/json HTTP 500.
+# Without this, FastAPI falls back to starlette's text/plain 500 response,
+# which breaks the JSON error contract audited in Section 3.1.
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(
+        "Unhandled exception on %s %s: %s",
+        request.method,
+        request.url.path,
+        exc,
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal server error",
+            "type": type(exc).__name__,
+            "path": str(request.url.path),
+        },
+    )
+
+
+# ── Content-Type Enforcement Middleware ───────────────────────────────────────
+# POST / PUT / PATCH requests that do not send Content-Type: application/json
+# receive HTTP 415 Unsupported Media Type instead of a cryptic HTTP 500.
+class ContentTypeMiddleware(BaseHTTPMiddleware):
+    """Reject non-JSON bodies on mutating endpoints with HTTP 415."""
+
+    _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH"})
+    # Paths exempt from the check (form-data uploads, WebSocket upgrades, etc.)
+    _EXEMPT_PREFIXES = ("/ws/", "/docs", "/redoc", "/openapi.json", "/api/v1/banks/upload")
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        if request.method in self._MUTATING_METHODS and not any(
+            request.url.path.startswith(p) for p in self._EXEMPT_PREFIXES
+        ):
+            ct = request.headers.get("content-type", "")
+            if ct and not ct.startswith("application/json"):
+                return JSONResponse(
+                    status_code=415,
+                    content={
+                        "detail": "Unsupported Media Type. Only 'application/json' is accepted.",
+                        "received": ct.split(";")[0].strip(),
+                    },
+                )
+        return await call_next(request)
+
+
+app.add_middleware(ContentTypeMiddleware)
+
+
+# ── API Version Lifecycle Headers Middleware ──────────────────────────────────
+# Adds RFC 8594 Deprecation and Sunset headers to all responses so that clients
+# and gateways can handle version lifecycle transitions programmatically.
+class APIVersionLifecycleMiddleware(BaseHTTPMiddleware):
+    """Attach RFC 8594 Deprecation / Sunset headers to every API response."""
+
+    # Update these dates when planning a version deprecation cycle.
+    _DEPRECATION_DATE: str | None = None  # e.g. "Sat, 01 Jan 2026 00:00:00 GMT"
+    _SUNSET_DATE: str | None = None       # e.g. "Sat, 01 Jul 2026 00:00:00 GMT"
+    _API_VERSION = "v1"
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        response = await call_next(request)
+        response.headers["X-API-Version"] = self._API_VERSION
+        if self._DEPRECATION_DATE:
+            response.headers["Deprecation"] = self._DEPRECATION_DATE
+        if self._SUNSET_DATE:
+            response.headers["Sunset"] = self._SUNSET_DATE
+        return response
+
+
+app.add_middleware(APIVersionLifecycleMiddleware)
+
 
 # ── Observability ─────────────────────────────
 from app.infrastructure.telemetry import setup_telemetry

@@ -42,8 +42,22 @@ async def list_alerts(
     limit: int = Query(50, ge=1, le=200),
 ) -> list[AlertResponse]:
     """List fraud alerts with optional filters."""
-    sev = AlertSeverity(severity) if severity else None
-    stat = AlertStatus(status) if status else None
+    try:
+        sev = AlertSeverity(severity) if severity else None
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid severity value: {severity!r}. "
+            f"Valid values: {[e.value for e in AlertSeverity]}",
+        )
+    try:
+        stat = AlertStatus(status) if status else None
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status value: {status!r}. "
+            f"Valid values: {[e.value for e in AlertStatus]}",
+        )
 
     alerts = _alert_service.get_alerts(
         bank_id=bank_id,

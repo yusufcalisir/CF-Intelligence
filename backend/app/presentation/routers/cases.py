@@ -9,8 +9,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.application.schemas.phase2 import (
     CaseCreateRequest,
@@ -32,6 +32,7 @@ from app.application.services.case_service import (
     EvidenceRegistryService,
 )
 from app.domain.enums import CasePriority, CaseStatus
+from app.application.services.idempotency import IdempotencyService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
@@ -50,8 +51,22 @@ async def list_cases(
     limit: int = Query(50, ge=1, le=200),
 ) -> list[CaseSummaryResponse]:
     """List investigation cases."""
-    stat = CaseStatus(status) if status else None
-    pri = CasePriority(priority) if priority else None
+    try:
+        stat = CaseStatus(status) if status else None
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status value: {status!r}. "
+            f"Valid values: {[e.value for e in CaseStatus]}",
+        )
+    try:
+        pri = CasePriority(priority) if priority else None
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid priority value: {priority!r}. "
+            f"Valid values: {[e.value for e in CasePriority]}",
+        )
 
     cases = _case_service.get_cases(status=stat, priority=pri, limit=limit)
     return [
@@ -93,15 +108,41 @@ async def log_session_duration(req: SessionDurationRequest) -> dict:
 
 
 @router.post("", response_model=CaseResponse)
-async def create_case(req: CaseCreateRequest) -> CaseResponse:
-    """Create a new investigation case."""
-    priority = CasePriority(req.priority)
+async def create_case(
+    req: CaseCreateRequest,
+    idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+) -> CaseResponse | JSONResponse:
+    """Create a new investigation case.
+
+    Supports idempotent creation via the ``Idempotency-Key`` request header.
+    If a request with the same key was successfully processed within 24 hours,
+    the original response is returned without creating a duplicate case.
+    """
+    idem = IdempotencyService.get()
+    cached = idem.get_cached(idempotency_key)
+    if cached is not None:
+        return JSONResponse(
+            content=cached,
+            status_code=200,
+            headers={"Idempotency-Replayed": "true"},
+        )
+
+    try:
+        priority = CasePriority(req.priority)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid priority value: {req.priority!r}. "
+            f"Valid values: {[e.value for e in CasePriority]}",
+        )
     case = _case_service.create_case(
         title=req.title,
         priority=priority,
         alert_ids=req.alert_ids,
     )
-    return _serialize_case(case)
+    result = _serialize_case(case)
+    idem.store(idempotency_key, result.model_dump())
+    return result
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
