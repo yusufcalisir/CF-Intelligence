@@ -1,4 +1,4 @@
-﻿"""Idempotency Key Service.
+"""Idempotency Key Service.
 
 Provides Redis-backed (with in-memory fallback) idempotency key deduplication
 for POST endpoints that create resources.
@@ -74,7 +74,7 @@ class IdempotencyService:
             self._redis_client = None
 
     @classmethod
-    def get(cls) -> "IdempotencyService":
+    def get(cls) -> IdempotencyService:
         """Return the singleton instance (thread-safe lazy init)."""
         if cls._instance is None:
             with cls._lock:

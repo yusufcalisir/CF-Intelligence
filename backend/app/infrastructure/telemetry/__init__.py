@@ -300,7 +300,9 @@ def setup_telemetry(app: FastAPI) -> None:
     from fastapi import Response
 
     try:
-        from prometheus_fastapi_instrumentator import Instrumentator  # type: ignore[import-untyped,import-not-found]
+        from prometheus_fastapi_instrumentator import (
+            Instrumentator,  # type: ignore[import-untyped,import-not-found]
+        )
 
         instrumentator = Instrumentator(
             should_group_status_codes=True,

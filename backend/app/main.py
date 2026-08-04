@@ -21,7 +21,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 from app.config import get_settings
 from app.presentation.routers import (
@@ -53,6 +52,8 @@ from app.presentation.websockets import streaming_ws, training_ws
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+    from starlette.responses import Response
 
 # ── Logging ───────────────────────────────────
 settings = get_settings()
@@ -403,7 +404,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
     accept = request.headers.get("accept", "")
     media_type = "application/problem+json" if "application/problem+json" in accept else "application/json"
-    
+
     problem_details = {
         "type": f"https://cfi-platform.org/errors/{type(exc).__name__}",
         "title": "Internal Server Error",

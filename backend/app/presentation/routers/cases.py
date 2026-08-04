@@ -31,8 +31,8 @@ from app.application.services.case_service import (
     CaseManagementService,
     EvidenceRegistryService,
 )
-from app.domain.enums import CasePriority, CaseStatus
 from app.application.services.idempotency import IdempotencyService
+from app.domain.enums import CasePriority, CaseStatus
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
