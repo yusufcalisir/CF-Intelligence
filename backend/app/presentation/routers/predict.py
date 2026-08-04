@@ -6,6 +6,7 @@ computes risk scores, generates explainability reports, and triggers alerts.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import random
@@ -31,6 +32,14 @@ router = APIRouter(prefix="/api/v1", tags=["prediction"])
 
 # Singleton instances (matching backend router architectures)
 _settings = get_settings()
+
+
+def _eval_model(model: torch.nn.Module, input_tensor: torch.Tensor) -> float:
+    """Evaluate PyTorch model forward pass synchronously (offloaded to threadpool)."""
+    with torch.no_grad():
+        return float(model(input_tensor).item())
+
+
 _model_service = ModelService(_settings)
 _registry = ModelRegistry()
 _eval_engine = ModelEvaluationEngine(_registry)
@@ -327,10 +336,9 @@ async def predict_transaction(
 
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
 
-        # Measure Champion Latency
+        # Measure Champion Latency (offloaded to threadpool to avoid blocking event loop)
         champ_start = time.perf_counter()
-        with torch.no_grad():
-            champ_prob = float(model(input_tensor).item())
+        champ_prob = await asyncio.to_thread(_eval_model, model, input_tensor)
         champ_latency = (time.perf_counter() - champ_start) * 1000
 
         # Measure Challenger Latency (Shadow Deployment)
@@ -354,8 +362,7 @@ async def predict_transaction(
                     chall_model.eval()
 
                     chall_start = time.perf_counter()
-                    with torch.no_grad():
-                        chall_prob = float(chall_model(input_tensor).item())
+                    chall_prob = await asyncio.to_thread(_eval_model, chall_model, input_tensor)
                     chall_latency = (time.perf_counter() - chall_start) * 1000
                 except Exception as exc:
                     logger.warning(
@@ -611,8 +618,8 @@ async def score_transaction(
         **({"country_risk_score": country_risk_override} if country_risk_override else {}),
     }
 
-    # Run composite risk scoring engine
-    risk_score_obj = _risk_engine.score_transaction(txn_dict, ml_prediction=0.15)
+    # Run composite risk scoring engine offloaded to threadpool
+    risk_score_obj = await asyncio.to_thread(_risk_engine.score_transaction, txn_dict, 0.15)
     raw_score = risk_score_obj.score
 
     # Normalize integer risk score [0, 1000]

@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 import uuid
+from threading import Lock
 
 # Configure CPU threading limits to 2 cores for maximum performance
 os.environ["OMP_NUM_THREADS"] = "2"
@@ -500,6 +502,103 @@ class APIVersionLifecycleMiddleware(BaseHTTPMiddleware):
 
 
 app.add_middleware(APIVersionLifecycleMiddleware)
+
+
+# ── In-App mTLS Peer Verification Middleware ─────────────────────────────────
+# Enforces mutual TLS peer certificate verification at the application layer,
+# checking client certificate SHA-256 fingerprints and CRL revocation status.
+class MTLSVerificationMiddleware(BaseHTTPMiddleware):
+    """Enforce in-app mTLS peer certificate validation on sensitive routes."""
+
+    _ENFORCED_PREFIXES = ("/api/v1/predict", "/api/v1/training", "/api/v1/banks")
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        if settings.mtls_enabled and any(
+            request.url.path.startswith(p) for p in self._ENFORCED_PREFIXES
+        ):
+            cert_verify = request.headers.get("x-ssl-client-verify", "").upper()
+            cert_hash = request.headers.get("x-client-cert-sha256", "")
+
+            if cert_verify and cert_verify != "SUCCESS":
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "type": "https://cfi-platform.org/errors/mTLSVerificationFailed",
+                        "title": "mTLS Handshake Verification Failed",
+                        "status": 403,
+                        "detail": f"Client certificate verification status: '{cert_verify}'",
+                        "instance": request.url.path,
+                    },
+                    media_type="application/problem+json",
+                )
+
+            from app.infrastructure.security.mtls_manager import MTLSManager
+
+            mtls_mgr = MTLSManager()
+            if cert_hash and cert_hash in mtls_mgr.crl_revoked_serials:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "type": "https://cfi-platform.org/errors/mTLSCertificateRevoked",
+                        "title": "mTLS Certificate Revoked",
+                        "status": 403,
+                        "detail": f"Client certificate SHA-256 fingerprint '{cert_hash}' is revoked in CRL.",
+                        "instance": request.url.path,
+                    },
+                    media_type="application/problem+json",
+                )
+
+        return await call_next(request)
+
+
+app.add_middleware(MTLSVerificationMiddleware)
+
+
+# ── Application-Layer DDoS & Volumetric Flood Protection Middleware ──────────
+# Implements sliding-window token bucket rate limiting for burst attack detection
+# and volumetric request flood prevention at the L7 application layer.
+class DDoSProtectionMiddleware(BaseHTTPMiddleware):
+    """Enforce sliding-window L7 volumetric flood protection per client IP."""
+
+    _WINDOW_SECONDS = 10.0
+    _MAX_REQUESTS_PER_WINDOW = 100
+    _requests: dict[str, list[float]] = {}
+    _lock = Lock()
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        client_ip = request.client.host if request.client else "unknown"
+        now = time.time()
+        cutoff = now - self._WINDOW_SECONDS
+
+        with self._lock:
+            history = [t for t in self._requests.get(client_ip, []) if t > cutoff]
+            if len(history) >= self._MAX_REQUESTS_PER_WINDOW:
+                self._requests[client_ip] = history
+                logger.warning(
+                    "DDoS Volumetric Throttling triggered for IP %s (%d reqs in %.1fs)",
+                    client_ip,
+                    len(history),
+                    self._WINDOW_SECONDS,
+                )
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "type": "https://cfi-platform.org/errors/DDoSThrottled",
+                        "title": "Volumetric Flood Throttling Triggered",
+                        "status": 429,
+                        "detail": f"Request burst limit exceeded ({self._MAX_REQUESTS_PER_WINDOW} reqs/{int(self._WINDOW_SECONDS)}s). Temporarily throttled.",
+                        "instance": request.url.path,
+                    },
+                    headers={"Retry-After": "10", "X-DDoS-Throttled": "true"},
+                    media_type="application/problem+json",
+                )
+            history.append(now)
+            self._requests[client_ip] = history
+
+        return await call_next(request)
+
+
+app.add_middleware(DDoSProtectionMiddleware)
 
 
 # ── Observability ─────────────────────────────
