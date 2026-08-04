@@ -58,9 +58,13 @@ REFERENCE_BOUNDS = {
 class TransactionPredictRequest(BaseModel):
     transaction_amount: float = Field(..., ge=0.0, description="Amount of the transaction")
     merchant_category: str = Field(
-        "grocery", max_length=256, description="Merchant category name (e.g. crypto, grocery, travel)"
+        "grocery",
+        max_length=256,
+        description="Merchant category name (e.g. crypto, grocery, travel)",
     )
-    country_code: str = Field("US", max_length=256, description="Originating ISO country code (e.g. US, NG, TR)")
+    country_code: str = Field(
+        "US", max_length=256, description="Originating ISO country code (e.g. US, NG, TR)"
+    )
     device_type: str = Field(
         "web_browser", max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
     )

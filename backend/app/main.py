@@ -390,6 +390,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 # ── Global Exception Handler (RFC 7807 Compliant) ─────────────────────────────
 # Ensures ALL unhandled runtime exceptions return structured JSON (HTTP 500).
 # Supports RFC 7807 application/problem+json when requested via Accept header.
@@ -403,7 +404,9 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         exc_info=True,
     )
     accept = request.headers.get("accept", "")
-    media_type = "application/problem+json" if "application/problem+json" in accept else "application/json"
+    media_type = (
+        "application/problem+json" if "application/problem+json" in accept else "application/json"
+    )
 
     problem_details = {
         "type": f"https://cfi-platform.org/errors/{type(exc).__name__}",
@@ -483,7 +486,7 @@ class APIVersionLifecycleMiddleware(BaseHTTPMiddleware):
 
     # Update these dates when planning a version deprecation cycle.
     _DEPRECATION_DATE: str | None = None  # e.g. "Sat, 01 Jan 2026 00:00:00 GMT"
-    _SUNSET_DATE: str | None = None       # e.g. "Sat, 01 Jul 2026 00:00:00 GMT"
+    _SUNSET_DATE: str | None = None  # e.g. "Sat, 01 Jul 2026 00:00:00 GMT"
     _API_VERSION = "v1"
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]

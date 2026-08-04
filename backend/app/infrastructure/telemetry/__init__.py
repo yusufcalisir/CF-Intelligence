@@ -312,7 +312,9 @@ def setup_telemetry(app: FastAPI) -> None:
             inprogress_labels=True,
         )
         instrumentator.instrument(app)
-        logger.info("Prometheus FastAPI Instrumentator initialized for per-endpoint HTTP histograms")
+        logger.info(
+            "Prometheus FastAPI Instrumentator initialized for per-endpoint HTTP histograms"
+        )
     except Exception as exc:
         logger.warning("prometheus_fastapi_instrumentator initialization deferred/failed: %s", exc)
 
