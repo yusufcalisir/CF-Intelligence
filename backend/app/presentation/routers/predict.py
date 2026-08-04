@@ -612,7 +612,7 @@ async def score_transaction(
     raw_score = risk_score_obj.score
 
     # Normalize integer risk score [0, 1000]
-    risk_score = max(0, min(1000, int(round(raw_score))))
+    risk_score = max(0, min(1000, round(raw_score)))
 
     # Determine risk_level
     if risk_score < 300:

@@ -256,23 +256,19 @@ class MetricProxy:
         self.registry = registry
 
     def set(self, value: float, *args: Any, **kwargs: Any) -> None:
-        self.registry._gauges[self.name] = float(value)
+        self.registry._gauges[self.name] = value
 
     def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + float(
-            amount
-        )
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + amount
 
     def dec(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - float(
-            amount
-        )
+        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - amount
 
     def add(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
         self.inc(amount)
 
     def observe(self, value: float, *args: Any, **kwargs: Any) -> None:
-        self.registry._histograms.setdefault(self.name, []).append(float(value))
+        self.registry._histograms.setdefault(self.name, []).append(value)
 
     def record(self, value: float, *args: Any, **kwargs: Any) -> None:
         self.observe(value)
@@ -304,7 +300,7 @@ def setup_telemetry(app: FastAPI) -> None:
     from fastapi import Response
 
     try:
-        from prometheus_fastapi_instrumentator import Instrumentator
+        from prometheus_fastapi_instrumentator import Instrumentator  # type: ignore[import-untyped,import-not-found]
 
         instrumentator = Instrumentator(
             should_group_status_codes=True,

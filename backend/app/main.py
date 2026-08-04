@@ -409,7 +409,7 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         "title": "Internal Server Error",
         "status": 500,
         "detail": str(exc) or "An unhandled internal server error occurred",
-        "instance": str(request.url.path),
+        "instance": request.url.path,
     }
     return JSONResponse(
         status_code=500,
@@ -442,7 +442,7 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
                         "status": 415,
                         "detail": "Only 'application/json' bodies are supported for mutating operations.",
                         "received": ct.split(";")[0].strip(),
-                        "instance": str(request.url.path),
+                        "instance": request.url.path,
                     },
                 )
         return await call_next(request)
