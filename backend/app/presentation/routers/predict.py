@@ -58,11 +58,11 @@ REFERENCE_BOUNDS = {
 class TransactionPredictRequest(BaseModel):
     transaction_amount: float = Field(..., ge=0.0, description="Amount of the transaction")
     merchant_category: str = Field(
-        "grocery", description="Merchant category name (e.g. crypto, grocery, travel)"
+        "grocery", max_length=256, description="Merchant category name (e.g. crypto, grocery, travel)"
     )
-    country_code: str = Field("US", description="Originating ISO country code (e.g. US, NG, TR)")
+    country_code: str = Field("US", max_length=256, description="Originating ISO country code (e.g. US, NG, TR)")
     device_type: str = Field(
-        "web_browser", description="Type of device (e.g. web_browser, mobile_app)"
+        "web_browser", max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
     )
     velocity: float = Field(1.0, ge=0.0, description="Transaction velocity (txns/hr)")
     hour_of_day: int = Field(12, ge=0, le=23, description="Hour of the transaction")
@@ -75,10 +75,10 @@ class TransactionPredictRequest(BaseModel):
     chargeback_count: int = Field(0, ge=0, description="Customer chargeback count")
     account_age_days: int = Field(365, ge=0, description="Age of the customer account in days")
     bank_id: str | None = Field(
-        None, description="Optional bank identifier. Defaults to gateway ID."
+        None, max_length=256, description="Optional bank identifier. Defaults to gateway ID."
     )
     simulation_id: str | None = Field(
-        None, description="Optional simulation run ID to resolve versioned models."
+        None, max_length=256, description="Optional simulation run ID to resolve versioned models."
     )
 
 
@@ -114,13 +114,13 @@ class TransactionPredictResponse(BaseModel):
 
 
 class ScoreTransactionRequest(BaseModel):
-    transaction_id: str = Field(..., description="Unique transaction identifier")
-    account_id: str = Field(..., description="Source account identifier")
+    transaction_id: str = Field(..., max_length=256, description="Unique transaction identifier")
+    account_id: str = Field(..., max_length=256, description="Source account identifier")
     amount: float = Field(..., ge=0.0, description="Transaction amount")
-    currency: str = Field("EUR", description="ISO 4217 currency code")
-    merchant_id: str = Field(..., description="Target merchant identifier")
-    country: str = Field("EE", description="ISO 3166-1 alpha-2 origin country code")
-    device_id: str = Field(..., description="Device fingerprint identifier")
+    currency: str = Field("EUR", max_length=16, description="ISO 4217 currency code")
+    merchant_id: str = Field(..., max_length=256, description="Target merchant identifier")
+    country: str = Field("EE", max_length=16, description="ISO 3166-1 alpha-2 origin country code")
+    device_id: str = Field(..., max_length=256, description="Device fingerprint identifier")
 
 
 class FeatureContributionItem(BaseModel):

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import uuid
 
 # Configure CPU threading limits to 2 cores for maximum performance
 os.environ["OMP_NUM_THREADS"] = "2"
@@ -388,10 +389,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ── Global Exception Handler ─────────────────────────────────────────────────
-# Ensures ALL unhandled runtime exceptions return application/json HTTP 500.
-# Without this, FastAPI falls back to starlette's text/plain 500 response,
-# which breaks the JSON error contract audited in Section 3.1.
+# ── Global Exception Handler (RFC 7807 Compliant) ─────────────────────────────
+# Ensures ALL unhandled runtime exceptions return structured JSON (HTTP 500).
+# Supports RFC 7807 application/problem+json when requested via Accept header.
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     logger.error(
@@ -401,13 +401,20 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
         exc,
         exc_info=True,
     )
+    accept = request.headers.get("accept", "")
+    media_type = "application/problem+json" if "application/problem+json" in accept else "application/json"
+    
+    problem_details = {
+        "type": f"https://cfi-platform.org/errors/{type(exc).__name__}",
+        "title": "Internal Server Error",
+        "status": 500,
+        "detail": str(exc) or "An unhandled internal server error occurred",
+        "instance": str(request.url.path),
+    }
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": "Internal server error",
-            "type": type(exc).__name__,
-            "path": str(request.url.path),
-        },
+        content=problem_details,
+        media_type=media_type,
     )
 
 
@@ -430,14 +437,41 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
                 return JSONResponse(
                     status_code=415,
                     content={
-                        "detail": "Unsupported Media Type. Only 'application/json' is accepted.",
+                        "type": "https://cfi-platform.org/errors/UnsupportedMediaType",
+                        "title": "Unsupported Media Type",
+                        "status": 415,
+                        "detail": "Only 'application/json' bodies are supported for mutating operations.",
                         "received": ct.split(";")[0].strip(),
+                        "instance": str(request.url.path),
                     },
                 )
         return await call_next(request)
 
 
 app.add_middleware(ContentTypeMiddleware)
+
+
+# ── W3C Distributed Trace Context Middleware ─────────────────────────────────
+# Injects W3C compliant traceparent header (00-{trace_id}-{span_id}-01) into all responses
+# for cross-service distributed trace propagation per OpenTelemetry standards.
+class W3CTraceContextMiddleware(BaseHTTPMiddleware):
+    """Extract or generate W3C traceparent header and propagate to HTTP response headers."""
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        incoming_tp = request.headers.get("traceparent")
+        if incoming_tp and incoming_tp.startswith("00-") and len(incoming_tp.split("-")) == 4:
+            traceparent = incoming_tp
+        else:
+            trace_id = uuid.uuid4().hex
+            span_id = uuid.uuid4().hex[:16]
+            traceparent = f"00-{trace_id}-{span_id}-01"
+
+        response = await call_next(request)
+        response.headers["traceparent"] = traceparent
+        return response
+
+
+app.add_middleware(W3CTraceContextMiddleware)
 
 
 # ── API Version Lifecycle Headers Middleware ──────────────────────────────────

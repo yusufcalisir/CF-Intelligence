@@ -60,14 +60,14 @@ class SharedIntelligenceResponse(BaseModel):
 
 
 class CaseCreateRequest(BaseModel):
-    title: str
-    priority: str = "p3_medium"
-    alert_ids: list[str] = []
+    title: str = Field(..., max_length=256, description="Title of the investigation case")
+    priority: str = Field("p3_medium", max_length=64, description="Priority level of the case")
+    alert_ids: list[str] = Field(default_factory=list, description="Associated alert IDs")
 
 
 class CaseNoteRequest(BaseModel):
-    author: str = "analyst"
-    content: str
+    author: str = Field("analyst", max_length=128, description="Author identifier")
+    content: str = Field(..., max_length=4096, description="Note content text")
 
 
 class CaseStatusRequest(BaseModel):

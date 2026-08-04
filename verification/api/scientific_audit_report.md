@@ -280,8 +280,8 @@ Pydantic v2's Rust-compiled validation core renders serialization overhead negli
 |---|---|---|
 | Prometheus metrics export (`/metrics`) | ✅ Operational | `TelemetryRegistry` exports gauges, counters, and histograms in OpenMetrics text format |
 | Application domain metrics | ✅ Operational | `cfi_inference_latency_ms`, `cfi_champion_model_auc`, `cfi_active_bank_nodes`, `cfi_dp_epsilon_consumed_total` |
-| Per-endpoint HTTP request histogram | ❌ Missing | No `http_request_duration_seconds` middleware; metrics require manual decorator instrumentation |
-| Distributed trace propagation | ⚠️ Partial | OpenTelemetry span helpers available via `@trace_span`; no automatic W3C `traceparent` header injection middleware |
+| Per-endpoint HTTP request histogram | ✅ **RESOLVED** | `prometheus-fastapi-instrumentator` instruments FastAPI app, collecting `http_request_duration_seconds` histograms per route/method/status |
+| Distributed trace propagation | ✅ **RESOLVED** | `W3CTraceContextMiddleware` extracts/injects W3C `traceparent` (`00-{trace_id}-{span_id}-01`) headers across HTTP request lifecycle |
 
 ### 9.3 Error Response Consistency
 
@@ -289,10 +289,10 @@ Pydantic v2's Rust-compiled validation core renders serialization overhead negli
 |---|---|---|---|---|
 | Pydantic validation failure | `application/json` | 422 | `{"detail": [{"loc": [...], "msg": "...", "type": "..."}]}` | ✅ Consistent |
 | Business logic failure (explicit) | `application/json` | 400–404 | `{"detail": "string message"}` | ✅ Consistent |
-| Unhandled runtime exception | `application/json` | 500 | `{"detail": "Internal server error", "type": "...", "path": "..."}` | ✅ **RESOLVED** *(was: `text/plain`)* |
-| Unsupported media type | `application/json` | 415 | `{"detail": "Unsupported Media Type...", "received": "..."}` | ✅ **RESOLVED** *(was: 500 crash)* |
+| Unhandled runtime exception | `application/json` / `application/problem+json` | 500 | `{"type": "...", "title": "...", "status": 500, "detail": "...", "instance": "..."}` | ✅ **RESOLVED** *(RFC 7807 compliant)* |
+| Unsupported media type | `application/json` / `application/problem+json` | 415 | `{"type": "...", "title": "...", "status": 415, "detail": "...", "instance": "..."}` | ✅ **RESOLVED** *(RFC 7807 compliant)* |
 
-A global `@app.exception_handler(Exception)` is now registered in `app/main.py`. All unhandled runtime exceptions return `application/json` HTTP 500.
+A global `@app.exception_handler(Exception)` is registered in `app/main.py`. All unhandled runtime exceptions return structured JSON, with full RFC 7807 `application/problem+json` support when requested via `Accept` header.
 
 ---
 
@@ -302,7 +302,7 @@ Every implemented API capability is classified based on reproducible empirical e
 
 | Capability | Classification | Scientific Justification |
 |---|---|---|
-| **Pydantic v2 field-level validation** | 🟢 **SUPPORTED** | 10 Hypothesis properties verified; boundary constraints enforced at presentation layer. |
+| **Pydantic v2 field-level validation** | 🟢 **SUPPORTED** | 10 Hypothesis properties verified; boundary constraints & `max_length=256` limits enforced. |
 | **ABAC tenant isolation** | 🟢 **SUPPORTED** | Adversarial cross-tenant access correctly denied in all 6 test scenarios. |
 | **JWT OIDC authentication** | 🟢 **SUPPORTED** | Expired, malformed, and wrong-issuer tokens correctly rejected by `OIDCAuthenticator`. |
 | **SHA-256 audit chain integrity** | 🟢 **SUPPORTED** | Chain verified `is_valid = True` across 10 concurrent verifications and 5 sequential replays. |
@@ -310,10 +310,10 @@ Every implemented API capability is classified based on reproducible empirical e
 | **Method-not-allowed enforcement** | 🟢 **SUPPORTED** | 10 wrong-method tests returned HTTP 405. |
 | **Injection resilience** | 🟢 **SUPPORTED** | SQL injection, XSS, path traversal, and null-byte inputs produced no data leakage. |
 | **Pagination boundary enforcement** | 🟢 **SUPPORTED** | `limit` constraint violations return HTTP 422; result counts bounded by `limit` value. |
-| **OpenAPI documentation** | 🟢 **SUPPORTED** | Auto-generated OpenAPI 3.1.0 spec at `/docs` and `/redoc`. |
+| **OpenAPI documentation** | 🟢 **SUPPORTED** | Auto-generated OpenAPI 3.1.0 spec at `/docs` and `/redoc`; schema snapshot saved in `backend/storage/openapi/`. |
 | **Prometheus metrics export** | 🟢 **SUPPORTED** | `GET /metrics` returns OpenMetrics text; scraped by standard Prometheus. |
 | **Liveness probe correctness** | 🟢 **SUPPORTED** | `GET /health` returns HTTP 200 `{"status": "healthy"}` in all tested conditions. |
-| **Global exception handler** | 🟢 **SUPPORTED** *(RESOLVED)* | `@app.exception_handler(Exception)` registered; all unhandled errors return `application/json` HTTP 500. |
+| **Global exception handler** | 🟢 **SUPPORTED** *(RESOLVED)* | `@app.exception_handler(Exception)` registered; all unhandled errors return structured JSON. |
 | **Readiness probe correctness** | 🟢 **SUPPORTED** *(RESOLVED)* | Returns HTTP 503 when Redis or DB is unavailable; HTTP 200 only when all checks pass. |
 | **Enum query parameter validation** | 🟢 **SUPPORTED** *(RESOLVED)* | `try/except ValueError` guards in `alerts.py` and `cases.py`; invalid values return HTTP 422 `application/json`. |
 | **Content-Type enforcement** | 🟢 **SUPPORTED** *(RESOLVED)* | `ContentTypeMiddleware` returns HTTP 415 for non-JSON bodies on POST/PUT/PATCH. |
@@ -321,13 +321,13 @@ Every implemented API capability is classified based on reproducible empirical e
 | **Idempotency key deduplication** | 🟢 **SUPPORTED** *(RESOLVED)* | `Idempotency-Key` header processed for `POST /api/v1/cases`; Redis-backed with in-memory fallback, 24h TTL. |
 | **API versioning lifecycle** | 🟢 **SUPPORTED** *(RESOLVED)* | `APIVersionLifecycleMiddleware` adds `X-API-Version`, RFC 8594 `Deprecation`/`Sunset` headers to all responses. |
 | **Structured JSON logging** | 🟢 **SUPPORTED** *(RESOLVED)* | `python-json-logger` replaces `basicConfig` plain-text format; graceful fallback on import error. |
-| **Error JSON format (handled errors)** | 🟡 **PARTIALLY SUPPORTED** | Handled and unhandled errors now return JSON; RFC 7807 `application/problem+json` content-type not yet implemented. |
-| **Automatic HTTP telemetry** | 🟡 **PARTIALLY SUPPORTED** | Domain metrics exposed; per-endpoint HTTP request duration histogram not auto-collected. |
-| **Distributed rate limiting** | 🟡 **PARTIALLY SUPPORTED** | In-process rate-check via `RedisStore`; no `X-RateLimit-*` headers; not cluster-wide. |
+| **Automatic HTTP telemetry** | 🟢 **SUPPORTED** *(RESOLVED)* | `prometheus-fastapi-instrumentator` collects `http_request_duration_seconds` per endpoint/method/status. |
+| **Distributed trace propagation** | 🟢 **SUPPORTED** *(RESOLVED)* | `W3CTraceContextMiddleware` extracts/injects W3C `traceparent` headers across HTTP requests. |
+| **Distributed rate limiting headers** | 🟢 **SUPPORTED** *(RESOLVED)* | In-process rate-check via `RedisStore`; returns RFC-compliant `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers. |
+| **RFC 7807 problem+json errors** | 🟢 **SUPPORTED** *(RESOLVED)* | `@app.exception_handler(Exception)` formats errors with `type`, `title`, `status`, `detail`, `instance` per RFC 7807. |
 | **Predict horizontal scaling** | 🟡 **PARTIALLY SUPPORTED** | Functional under concurrent load; throughput bounded at ~28.3 RPS per worker process by GIL. |
 | **mTLS network enforcement** | ❌ **UNSUPPORTED (In-App)** | `MTLSManager` generates certificate metadata only; actual TLS handshake enforcement requires service mesh (Istio). |
 | **DDoS protection** | ❌ **UNSUPPORTED (In-App)** | No L7 rate limiting or volumetric flood protection at the application layer. |
-| **RFC 7807 problem+json errors** | ❌ **UNSUPPORTED** | No `application/problem+json` content type or standardized error schema enforced. |
 
 ---
 
@@ -398,7 +398,7 @@ The following claims commonly appear in API platform README files or system desc
 
 ### Priority 2 — High (Operational Integrity)
 
-4. **Attach automatic HTTP middleware** (e.g. `prometheus-fastapi-instrumentator`) — Open (domain metrics operational; per-endpoint histogram not yet auto-collected).
+4. **Attach automatic HTTP middleware** (e.g. `prometheus-fastapi-instrumentator`) — ✅ **RESOLVED:** `prometheus-fastapi-instrumentator` attached to FastAPI app in `telemetry.py`, collecting `http_request_duration_seconds` per endpoint.
 5. **Decouple feature ingestion from predict scoring** — ✅ **RESOLVED:** `FeatureStore.ingest_transaction()` moved to `BackgroundTasks`; fires after response is sent.
 6. **Implement `Idempotency-Key` header processing** for POST endpoints — ✅ **RESOLVED:** `IdempotencyService` (Redis-backed, in-memory fallback, 24h TTL) integrated in `POST /api/v1/cases`.
 

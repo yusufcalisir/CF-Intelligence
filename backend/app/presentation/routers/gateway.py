@@ -89,15 +89,26 @@ def get_api_keys() -> dict[str, tuple[str, str]]:
     return keys_map
 
 
-def check_rate_limit(client_id: str) -> bool:
-    minute_bucket = int(time.time() / 60)
+def check_rate_limit(client_id: str) -> tuple[bool, int, int, int]:
+    """Check request count against rate limit.
+
+    Returns:
+        tuple: (allowed: bool, limit: int, remaining: int, reset_seconds: int)
+    """
+    now = time.time()
+    minute_bucket = int(now / 60)
     key = f"rl:{client_id}:{minute_bucket}"
     val = _rate_limiter.get(key)
     count = val.get("count", 0) if val else 0
-    if count >= settings.gateway_rate_limit:
-        return False
+    limit = settings.gateway_rate_limit
+    reset = (minute_bucket + 1) * 60 - int(now)
+
+    if count >= limit:
+        return False, limit, 0, reset
+
     _rate_limiter.set(key, {"count": count + 1}, ex=60)
-    return True
+    remaining = max(0, limit - (count + 1))
+    return True, limit, remaining, reset
 
 
 def authenticate_request(
@@ -303,10 +314,21 @@ async def http_proxy(request: Request, path: str):
         )
         return Response(content="Gateway Error: Unauthorized key", status_code=401)
 
-    # Rate Limiting
+    # Rate Limiting & RFC Headers
     client_id = api_key or client_ip
-    if not check_rate_limit(client_id):
-        return Response(content="Gateway Error: Too Many Requests", status_code=429)
+    allowed, rl_limit, rl_remaining, rl_reset = check_rate_limit(client_id)
+    rl_headers = {
+        "X-RateLimit-Limit": str(rl_limit),
+        "X-RateLimit-Remaining": str(rl_remaining),
+        "X-RateLimit-Reset": str(rl_reset),
+    }
+
+    if not allowed:
+        return Response(
+            content="Gateway Error: Too Many Requests",
+            status_code=429,
+            headers={**rl_headers, "Retry-After": str(rl_reset)},
+        )
 
     # Determine downstream target service
     target_service = None

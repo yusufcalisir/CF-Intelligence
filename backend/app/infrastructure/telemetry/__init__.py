@@ -300,8 +300,23 @@ simulation_rounds_total = MetricProxy("simulation_rounds_total", telemetry_regis
 
 
 def setup_telemetry(app: FastAPI) -> None:
-    """Initialize OpenTelemetry instrumentation and register /metrics endpoint."""
+    """Initialize OpenTelemetry instrumentation, per-endpoint HTTP metrics, and register /metrics endpoint."""
     from fastapi import Response
+
+    try:
+        from prometheus_fastapi_instrumentator import Instrumentator
+
+        instrumentator = Instrumentator(
+            should_group_status_codes=True,
+            should_ignore_untemplated=True,
+            should_instrument_requests_in_flight=True,
+            inprogress_name="http_requests_in_flight",
+            inprogress_labels=True,
+        )
+        instrumentator.instrument(app)
+        logger.info("Prometheus FastAPI Instrumentator initialized for per-endpoint HTTP histograms")
+    except Exception as exc:
+        logger.warning("prometheus_fastapi_instrumentator initialization deferred/failed: %s", exc)
 
     @app.get("/metrics", include_in_schema=False)
     def metrics_endpoint() -> Response:
