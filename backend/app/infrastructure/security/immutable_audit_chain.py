@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import threading
 import time
 from dataclasses import dataclass, field
 from typing import Any
@@ -58,6 +59,7 @@ class ImmutableAuditChain:
 
     def __init__(self) -> None:
         self.chain: list[AuditLogEntry] = []
+        self._lock = threading.Lock()
         self._seed_default_chain()
 
     @classmethod
@@ -123,54 +125,55 @@ class ImmutableAuditChain:
         timestamp_override: str | None = None,
     ) -> AuditLogEntry:
         """Append a new event to the cryptographic audit chain."""
-        index = len(self.chain)
-        prev_hash = self.chain[-1].curr_hash if self.chain else GENESIS_HASH
-        timestamp = timestamp_override or time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime())
-        evt_details = details or {}
+        with self._lock:
+            index = len(self.chain)
+            prev_hash = self.chain[-1].curr_hash if self.chain else GENESIS_HASH
+            timestamp = timestamp_override or time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime())
+            evt_details = details or {}
 
-        curr_hash = self.compute_entry_hash(
-            index=index,
-            event_type=event_type,
-            actor=actor,
-            target_id=target_id,
-            timestamp=timestamp,
-            details=evt_details,
-            prev_hash=prev_hash,
-        )
-
-        entry = AuditLogEntry(
-            index=index,
-            event_type=event_type,
-            actor=actor,
-            target_id=target_id,
-            timestamp=timestamp,
-            details=evt_details,
-            prev_hash=prev_hash,
-            curr_hash=curr_hash,
-        )
-        self.chain.append(entry)
-        logger.info(
-            "Cryptographic audit log #%d appended [%s]. Hash: %s", index, event_type, curr_hash[:12]
-        )
-
-        # SIEM Real-Time Stream Forwarding
-        try:
-            from app.infrastructure.logging.siem_exporter import siem_exporter
-
-            siem_exporter.export(
-                {
-                    "event": event_type,
-                    "actor": actor,
-                    "target_id": target_id,
-                    "timestamp": timestamp,
-                    "details": evt_details,
-                    "curr_hash": curr_hash,
-                }
+            curr_hash = self.compute_entry_hash(
+                index=index,
+                event_type=event_type,
+                actor=actor,
+                target_id=target_id,
+                timestamp=timestamp,
+                details=evt_details,
+                prev_hash=prev_hash,
             )
-        except Exception as exc:
-            logger.warning("SIEM dispatch failed for audit entry #%d: %s", index, exc)
 
-        return entry
+            entry = AuditLogEntry(
+                index=index,
+                event_type=event_type,
+                actor=actor,
+                target_id=target_id,
+                timestamp=timestamp,
+                details=evt_details,
+                prev_hash=prev_hash,
+                curr_hash=curr_hash,
+            )
+            self.chain.append(entry)
+            logger.info(
+                "Cryptographic audit log #%d appended [%s]. Hash: %s", index, event_type, curr_hash[:12]
+            )
+
+            # SIEM Real-Time Stream Forwarding
+            try:
+                from app.infrastructure.logging.siem_exporter import siem_exporter
+
+                siem_exporter.export(
+                    {
+                        "event": event_type,
+                        "actor": actor,
+                        "target_id": target_id,
+                        "timestamp": timestamp,
+                        "details": evt_details,
+                        "curr_hash": curr_hash,
+                    }
+                )
+            except Exception as exc:
+                logger.warning("SIEM dispatch failed for audit entry #%d: %s", index, exc)
+
+            return entry
 
     def append(
         self,
