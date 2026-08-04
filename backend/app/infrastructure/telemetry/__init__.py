@@ -307,7 +307,7 @@ def setup_telemetry(app: FastAPI) -> None:
         instrumentator = Instrumentator(
             should_group_status_codes=True,
             should_ignore_untemplated=True,
-            should_instrument_requests_in_flight=True,
+            should_instrument_requests_inprogress=True,
             inprogress_name="http_requests_in_flight",
             inprogress_labels=True,
         )
