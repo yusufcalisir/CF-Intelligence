@@ -1,4 +1,4 @@
-﻿# Verification Inventory — FederatedLearningEngine Subsystem
+# Verification Inventory — FederatedLearningEngine Subsystem
 
 This document provides a comprehensive scientific audit and verification inventory of the `FederatedLearningEngine` module and its associated value objects, server optimizers, Byzantine defenses, privacy mechanisms, and simulation utilities.
 
@@ -68,7 +68,7 @@ This document provides a comprehensive scientific audit and verification invento
 ### Component 5: FedYogi Adaptive Server Optimizer
 * **Purpose:** Prevents premature learning rate decay via sign-controlled variance tracking (Reddi et al., 2021).
 * **Mathematical Definition:**
-  $$v_t = v_{t-1} - (1-\beta_2)\operatorname{sign}(v_{t-1} - \Delta_t^2) \odot \Delta_t^2, \quad W_{t+1} = W_t + \eta \frac{m_t}{\sqrt{v_t} + \tau}$$
+  $$v_t = v_{t-1} - (1-\beta_2)\mathrm{sign}(v_{t-1} - \Delta_t^2) \odot \Delta_t^2, \quad W_{t+1} = W_t + \eta \frac{m_t}{\sqrt{v_t} + \tau}$$
 * **Expected Invariant:** $v_t \ge 0$ given non-zero initialization $v_0 = \tau^2 \mathbf{1}$.
 * **Implementation Risks:** Incorrect sign function handling near numerical zero.
 * **Edge Cases:** Identical squared pseudo-gradients $v_{t-1} = \Delta_t^2$.
@@ -190,10 +190,10 @@ This document provides a comprehensive scientific audit and verification invento
 ### Component 15: Network Latency Uniform Simulator
 * **Purpose:** Simulates network transport delay across distributed consortium nodes.
 * **Mathematical Definition:**
-  $$\tau_i \sim U(\text{min\_ms}, \text{max\_ms})$$
-* **Expected Invariant:** $\text{min\_ms} \le \tau_i \le \text{max\_ms}$ for all drawn delays.
+  $$\tau_i \sim U(\text{min-ms}, \text{max-ms})$$
+* **Expected Invariant:** $\text{min-ms} \le \tau_i \le \text{max-ms}$ for all drawn delays.
 * **Implementation Risks:** Non-blocking async sleep blocking event loop if misused.
-* **Edge Cases:** $\text{min\_ms} == \text{max\_ms}$.
+* **Edge Cases:** $\text{min-ms} == \text{max-ms}$.
 * **Scientific Claim:** Uniform stochastic delay generator.
 * **Verification Methodology:** Monte Carlo Kolmogorov-Smirnov test.
 
@@ -203,7 +203,7 @@ This document provides a comprehensive scientific audit and verification invento
 * **Purpose:** Generates zero-sum pairwise random masks to protect local updates before aggregation.
 * **Mathematical Definition:**
   $$\sum_{i=1}^N p_i m_i = \mathbf{0}$$
-* **Expected Invariant:** $\operatorname{FedAvg}(\{W_i + m_i\}) \equiv \operatorname{FedAvg}(\{W_i\})$.
+* **Expected Invariant:** $\text{FedAvg}(\{W_i + m_i\}) \equiv \text{FedAvg}(\{W_i\})$.
 * **Implementation Risks:** Non-zero mask sum due to floating point rounding error.
 * **Edge Cases:** $N=2$ pair masking.
 * **Scientific Claim:** Exact zero-sum mask cancellation identity.

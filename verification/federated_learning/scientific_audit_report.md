@@ -1,4 +1,4 @@
-﻿# Scientific Audit & Mathematical Verification Report: `FederatedLearningEngine`
+# Scientific Audit & Mathematical Verification Report: `FederatedLearningEngine`
 
 **Target Module:** `app.application.services.fl_engine.FederatedLearningEngine`  
 **Repository:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -117,7 +117,7 @@ Mathematical Claim Classifications
 | 2 | **FedAvg Weighted** | **SUPPORTED** | Exact dataset-size weighted sum $\sum p_i W_i$; partition preservation and sum normalization $\sum p_i = 1$ strictly hold. |
 | 3 | **FedAdam** | **SUPPORTED** *(UPDATED)* | Server momentum update matches FedOpt (Reddi et al., 2021) with exact bias-correction terms ($\hat{m}_t = \frac{m_t}{1-\beta_1^t}, \hat{v}_t = \frac{v_t}{1-\beta_2^t}$) per round. |
 | 4 | **FedAdaGrad** | **SUPPORTED** | Accurately accumulates squared pseudo-gradients $v_t = v_{t-1} + \Delta_t^2$ without artificial decay. |
-| 5 | **FedYogi** | **SUPPORTED** | Exact sign-controlled variance tracking $v_t = v_{t-1} - (1-\beta_2) \operatorname{sign}(v_{t-1} - \Delta_t^2) \odot \Delta_t^2$ with $v_0 = \tau^2 \mathbf{1}$. |
+| 5 | **FedYogi** | **SUPPORTED** | Exact sign-controlled variance tracking $v_t = v_{t-1} - (1-\beta_2) \mathrm{sign}(v_{t-1} - \Delta_t^2) \odot \Delta_t^2$ with $v_0 = \tau^2 \mathbf{1}$. |
 | 6 | **Krum Selection** | **SUPPORTED** *(UPDATED)* | Blanchard et al. (2017) Krum implementation with dynamic Byzantine parameterization $f = \lfloor \frac{N-1}{2} \rfloor$. |
 | 7 | **Coordinate Median** | **SUPPORTED** | Exact element-wise median calculation with $50\%$ breakdown point under IID assumptions (Yin et al., 2018). |
 | 8 | **Trimmed Mean** | **SUPPORTED** *(UPDATED)* | Drops $f$ extremes with dynamic bound $f = \lfloor \frac{N-1}{2} \rfloor$ (Yin et al., 2018). |
@@ -127,7 +127,7 @@ Mathematical Claim Classifications
 | 12 | **GraphSAGE Agg** | **SUPPORTED** | Strict pre-aggregation validation of tensor shape metadata and parameter counts. |
 | 13 | **Fairness Counts** | **SUPPORTED** | Exact additive collation of discrete contingency table counts for EU AI Act compliance metrics. |
 | 14 | **Client Availability** | **SUPPORTED** | Complete Markovian state transition coverage with tunable $p_{drop}$ and fixed $p_{recon} = 0.7$. |
-| 15 | **Network Latency** | **SUPPORTED** | Non-blocking uniform random delay simulation $\tau \sim U(\text{min\_ms}, \text{max\_ms})$. |
+| 15 | **Network Latency** | **SUPPORTED** | Non-blocking uniform random delay simulation $\tau \sim U(\text{min-ms}, \text{max-ms})$. |
 | 16 | **SecAgg Masking** | **PARTIALLY SUPPORTED** | Zero-sum mask cancellation identity ($\sum p_i m_i = \mathbf{0}$) is mathematically exact, but centralized mask generation on the server lacks cryptographic key exchange against a curious server. |
 | 17 | **Model Poisoning** | **SUPPORTED** | Untargeted random Gaussian noise injection scaled to honest parameter standard deviation. |
 | 18 | **FedAsync** | **SUPPORTED** | Exponential staleness attenuation $S(\tau) = (1+\tau)^{-\alpha}$ and convex update interpolation (Xie et al., 2019). |
@@ -166,14 +166,14 @@ Scenario: Large Consortium (N=20, d=200)| Method: Bulyan      | Max Abs Err: 1.6
 
 * **Result:** **10 / 10 PASSED (100% Success)** (`verification/federated_learning/tests/test_fl_engine_hypothesis.py`).
 * **Key Invariants Proven:**
-  1. Single-client identity ($\operatorname{FedAvg}(\{W\}) = W$) and linear average equivalence.
-  2. Convex hull boundedness ($\min W_i \le W_{agg} \le \max W_i$) under Non-IID sample imbalances.
-  3. Coordinate median translation invariance ($\operatorname{Median}(\{W_i + c\}) = \operatorname{Median}(\{W_i\}) + c$).
-  4. Krum output identity ($W_{krum} \in \{W_i\}$) and outlier rejection ($W_{krum} \neq W_{poisoned}$).
+  1. Single-client identity ($\text{FedAvg}(\{W\}) = W$) and linear average equivalence.
+  2. Convex hull boundedness ($\min W_i \le W_{\text{agg}} \le \max W_i$) under Non-IID sample imbalances.
+  3. Coordinate median translation invariance ($\text{Median}(\{W_i + c\}) = \text{Median}(\{W_i\}) + c$).
+  4. Krum output identity ($W_{\text{krum}} \in \{W_i\}$) and outlier rejection ($W_{\text{krum}} \neq W_{\text{poisoned}}$).
   5. Trimmed Mean extreme coordinate rejection ($\pm 10^8$ coordinates dropped when $N > 2f$).
   6. FedOpt second moment non-negativity ($v_t \ge 0$) and zero-update stability ($W_{t+1} = W_t$ for $\Delta_t = 0$).
   7. Leave-One-Out non-participation invariance ($\frac{\partial W_{-i}}{\partial W_i} = \mathbf{0}$).
-  8. Secure Aggregation zero-sum mask cancellation ($\operatorname{FedAvg}(\text{Masked}) \equiv \operatorname{FedAvg}(\text{Plaintext})$).
+  8. Secure Aggregation zero-sum mask cancellation ($\text{FedAvg}(\text{Masked}) \equiv \text{FedAvg}(\text{Plaintext})$).
   9. High-dimensional vector scaling (up to $d = 2,000$) and empty model exception handling.
 
 ---

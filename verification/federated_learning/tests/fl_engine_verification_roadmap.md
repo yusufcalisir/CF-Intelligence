@@ -1,4 +1,4 @@
-﻿# Master Scientific Verification Roadmap — FederatedLearningEngine Subsystem
+# Master Scientific Verification Roadmap — FederatedLearningEngine Subsystem
 
 This document defines the 5-phase scientific verification roadmap for the `FederatedLearningEngine` module, mapping every audited algorithm and mathematical claim to specific, rigorous validation methodologies.
 
@@ -58,7 +58,7 @@ This document defines the 5-phase scientific verification roadmap for the `Feder
 | 12 | **GraphSAGE Aggregator** | Fault Injection, Unit Testing | Audits dimension validation and rejection of mismatched GNN feature layer shapes. |
 | 13 | **Fairness Counts** | Unit Testing, Reference Verification | Verifies additive exactness and non-negativity of discrete contingency table sums. |
 | 14 | **Client Availability** | Monte Carlo Statistical Audit | 10,000-run chi-squared test confirming stationarity of Markov chain ($p_{\text{recon}} = 0.7$). |
-| 15 | **Network Latency** | Monte Carlo Kolmogorov-Smirnov Test | Confirms uniform stochastic distribution $\tau \sim U(\text{min\_ms}, \text{max\_ms})$ ($p > 0.12$). |
+| 15 | **Network Latency** | Monte Carlo Kolmogorov-Smirnov Test | Confirms uniform stochastic distribution $\tau \sim U(\text{min-ms}, \text{max-ms})$ ($p > 0.12$). |
 | 16 | **SecAgg Masking** | Hypothesis Property Testing | Proves exact zero-sum mask cancellation $\sum p_i m_i = \mathbf{0}$. |
 | 17 | **Model Poisoning** | Monte Carlo Statistical Audit | Verifies Gaussian noise mean $\mathbf{0}$ and standard deviation scaling $\sigma = \text{std}(W_i)$. |
 | 18 | **FedAsync** | Reference Verification, Math Audit | Audits exponential staleness attenuation $(1+\tau)^{-\alpha}$ and convex update interpolation. |

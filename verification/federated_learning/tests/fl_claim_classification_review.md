@@ -1,4 +1,4 @@
-﻿# Claim Classification Review — FederatedLearningEngine Subsystem
+# Claim Classification Review — FederatedLearningEngine Subsystem
 
 This document reviews the 22 mathematical and architectural claims identified in the verification inventory for the `FederatedLearningEngine` subsystem. Each claim is classified as **SUPPORTED**, **PARTIALLY SUPPORTED**, or **UNSUPPORTED**, with scientifically precise reformulations for any over-stated claims.
 
@@ -33,7 +33,7 @@ Mathematical Claim Classifications
 | 12 | **GraphSAGE Aggregator** | 🟢 **SUPPORTED** | Provides dimension-safe GNN parameter aggregation. | Validates layer shapes and parameter counts prior to GNN aggregation. | Strict dimension check prevents shape mismatch errors. |
 | 13 | **Fairness Counts** | 🟢 **SUPPORTED** | Aggregates demographic fairness metrics for EU AI Act compliance. | Computes exact additive collation of discrete contingency table counts. | Non-negative integer sum verified. |
 | 14 | **Client Availability** | 🟢 **SUPPORTED** | Simulates realistic client availability churn. | Generates Markovian online/offline state transitions with $p_{\text{recon}} = 0.7$. | Verified stationary Markov process. |
-| 15 | **Network Latency** | 🟢 **SUPPORTED** | Simulates distributed transport delays. | Generates non-blocking uniform random delay $\tau \sim U(\text{min\_ms}, \text{max\_ms})$. | Stochastic uniform distribution confirmed. |
+| 15 | **Network Latency** | 🟢 **SUPPORTED** | Simulates distributed transport delays. | Generates non-blocking uniform random delay $\tau \sim U(\text{min-ms}, \text{max-ms})$. | Stochastic uniform distribution confirmed. |
 | 16 | **SecAgg Masking** | 🟡 **PARTIALLY SUPPORTED** | Guarantees secure multi-party private aggregation. | Provides zero-sum pairwise mask cancellation identity ($\sum p_i m_i = \mathbf{0}$) in simulation environment. | Centralized server mask generation is a simulation prototype, lacking Diffie-Hellman MPC against a curious server. |
 | 17 | **Model Poisoning** | 🟢 **SUPPORTED** | Simulates Byzantine model poisoning attacks. | Injects Gaussian noise scaled to parameter standard deviation. | Noise variance correctly calibrated. |
 | 18 | **FedAsync** | 🟢 **SUPPORTED** | Implements asynchronous FL parameter aggregation. | Applies exponential staleness attenuation $(1+\tau)^{-\alpha}$ for out-of-order updates. | Matches Xie et al. (2019) convex update interpolation. |
