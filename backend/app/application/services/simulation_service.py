@@ -890,7 +890,9 @@ class SimulationService:
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
                             "duration_ms": round_duration,
-                            "privacy_budget": budget.total_epsilon if (enable_dp and budget is not None) else 0.0,
+                            "privacy_budget": budget.total_epsilon
+                            if (enable_dp and budget is not None)
+                            else 0.0,
                             "feature_importance": round_feature_importance,
                             "canary_info": canary_info,
                         },
@@ -902,7 +904,9 @@ class SimulationService:
                         round_num=round_num,
                         round_loss=round_loss,
                         active_participants=len(participating),
-                        privacy_budget=budget.total_epsilon if (enable_dp and budget is not None) else 0.0,
+                        privacy_budget=budget.total_epsilon
+                        if (enable_dp and budget is not None)
+                        else 0.0,
                     )
 
             # Phase 3b: Federated Graph Embedding (FedGNN)
