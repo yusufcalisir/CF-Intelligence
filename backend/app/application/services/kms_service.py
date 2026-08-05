@@ -117,6 +117,24 @@ class KMSService:
             logger.info("Generated new aggregation mask seed for %s", bank_id)
         return bytes.fromhex(keys["aggregation_seed"])
 
+    def derive_round_mask_seed(self, bank_id: str, round_id: int) -> bytes:
+        """Derives a round-specific mask seed using HKDF-SHA256.
+
+        Prevents cross-round static mask seed persistence and update differencing attacks.
+        """
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+        master_seed = self.get_aggregation_mask_seed(bank_id)
+        info = f"secagg_round_{round_id}".encode()
+        hkdf = HKDF(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=None,
+            info=info,
+        )
+        return hkdf.derive(master_seed)
+
     def rotate_key(self, bank_id: str, key_type: str) -> str:
         """Force-rotate a specific key type for a tenant.
 

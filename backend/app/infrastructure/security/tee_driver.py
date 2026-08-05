@@ -153,24 +153,32 @@ class TEEDriver:
 
     @staticmethod
     def seal_data(data: bytes, key: bytes) -> bytes:
-        """Simulate Intel SGX data sealing (AES-GCM-256) to secure data on local storage."""
-        # Simulated AES-GCM: prepend salt and hash to represent ciphertext + tag
-        salt = os.urandom(12)
-        hashed_key = hashlib.sha256(key + salt).digest()
-        # XOR data with hashed key to represent ciphertext
-        ciphertext = bytes(a ^ b for a, b in zip(data, hashed_key * (len(data) // 32 + 1)))
-        return salt + ciphertext
+        """Intel SGX / AWS Nitro data sealing using authenticated AES-256-GCM encryption."""
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        derived_key = hashlib.sha256(key).digest()
+        aesgcm = AESGCM(derived_key)
+        nonce = os.urandom(12)
+        ciphertext = aesgcm.encrypt(nonce, data, None)
+        return nonce + ciphertext
 
     @staticmethod
     def unseal_data(sealed: bytes, key: bytes) -> bytes:
-        """Simulate Intel SGX data unsealing (AES-GCM-256) to retrieve plaintext from storage."""
-        if len(sealed) < 12:
-            raise ValueError("Invalid sealed data size.")
-        salt = sealed[:12]
+        """Intel SGX / AWS Nitro data unsealing using authenticated AES-256-GCM decryption."""
+        from cryptography.exceptions import InvalidTag
+        from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+
+        if len(sealed) < 28:  # 12-byte nonce + minimum 16-byte GCM tag
+            raise ValueError("Invalid sealed data size; payload corrupted or too short.")
+
+        nonce = sealed[:12]
         ciphertext = sealed[12:]
-        hashed_key = hashlib.sha256(key + salt).digest()
-        # XOR back to recover plaintext
-        plaintext = bytes(
-            a ^ b for a, b in zip(ciphertext, hashed_key * (len(ciphertext) // 32 + 1))
-        )
-        return plaintext
+        derived_key = hashlib.sha256(key).digest()
+        aesgcm = AESGCM(derived_key)
+
+        try:
+            return aesgcm.decrypt(nonce, ciphertext, None)
+        except InvalidTag as err:
+            raise ValueError(
+                "Ciphertext authentication failed; data tampered or invalid key."
+            ) from err

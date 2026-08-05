@@ -506,9 +506,8 @@ class FederatedLearningEngine:
                 p_n = proportions[-1]
                 if p_n > 0:
                     # Weighted: sum_{i=1}^n p_i * m_i = 0 => m_n = - (sum_{i=1}^{n-1} p_i * m_i) / p_n
-                    weighted_sum_prev = np.zeros(n_params)
-                    for i in range(n_clients - 1):
-                        weighted_sum_prev += proportions[i] * masks[i]
+                    p_arr = np.array(proportions[:-1])
+                    weighted_sum_prev = np.dot(p_arr, masks[:-1])
                     masks[-1] = -weighted_sum_prev / p_n
                 else:
                     masks[-1] = -masks[:-1].sum(axis=0)
@@ -518,15 +517,16 @@ class FederatedLearningEngine:
             # Unweighted: sum_{i=1}^n m_i = 0
             masks[-1] = -masks[:-1].sum(axis=0)
 
-        masked_weights = []
-        for w, mask in zip(client_weights, masks, strict=False):
-            masked = [fw + m for fw, m in zip(w.flat_weights, mask, strict=False)]
-            masked_weights.append(
-                ModelWeights(
-                    layer_shapes=w.layer_shapes,
-                    flat_weights=masked,
-                )
+        # Vectorized matrix addition for performance
+        weights_matrix = np.array([w.flat_weights for w in client_weights])
+        masked_matrix = weights_matrix + masks
+        masked_weights = [
+            ModelWeights(
+                layer_shapes=w.layer_shapes,
+                flat_weights=masked_matrix[i].tolist(),
             )
+            for i, w in enumerate(client_weights)
+        ]
 
         logger.info("Applied secure aggregation masks to %d clients", n_clients)
         return masked_weights

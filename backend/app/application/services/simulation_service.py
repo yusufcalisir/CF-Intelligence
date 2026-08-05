@@ -52,6 +52,12 @@ logger = logging.getLogger(__name__)
 ProgressCallback = Callable[[str, str, dict[str, Any]], None] | None
 
 
+class InvalidPipelineConfigurationError(Exception):
+    """Raised when an incompatible pipeline configuration (e.g. SecAgg + Krum/Median) is selected."""
+
+    pass
+
+
 class SimulationService:
     """Orchestrates the complete federated learning simulation."""
 
@@ -98,6 +104,35 @@ class SimulationService:
         simulation = SimulationRun(config=config, total_rounds=config.num_rounds)
         simulation.started_at = _now()
         rng = np.random.default_rng(42)
+
+        # Pre-initialize variables to prevent static analyzer uninitialized warnings
+        budget: Any = None
+        active_tenant: Any = None
+        bank_connectors: dict[str, Any] = {}
+        final_round_weights: list[Any] | None = None
+        final_round_participating: list[Any] | None = None
+        final_round_samples: list[int] | None = None
+        banks: list[Any] = []
+
+        # Validate pipeline compatibility early: SecAgg is mathematically incompatible with non-linear Byzantine defenses
+        enable_sa = config.enable_secure_aggregation or getattr(
+            config, "privacy_mechanism", None
+        ) in (
+            PrivacyMechanism.SECURE_AGGREGATION,
+            PrivacyMechanism.BOTH,
+        )
+        non_linear_byzantine_methods = {
+            AggregationMethod.KRUM,
+            AggregationMethod.COORDINATE_WISE_MEDIAN,
+            AggregationMethod.BULYAN,
+            AggregationMethod.TRIMMED_MEAN,
+        }
+        if enable_sa and config.aggregation_method in non_linear_byzantine_methods:
+            method_name = getattr(config.aggregation_method, "value", config.aggregation_method)
+            raise InvalidPipelineConfigurationError(
+                f"Additive Secure Aggregation is mathematically incompatible with non-linear Byzantine defense '{method_name}'. Masking distorts L2 distance calculations."
+            )
+
         active_simulations.add(1)
 
         # Initialize MLflow experiment run
@@ -855,7 +890,7 @@ class SimulationService:
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
                             "duration_ms": round_duration,
-                            "privacy_budget": budget.total_epsilon if enable_dp else 0.0,
+                            "privacy_budget": budget.total_epsilon if (enable_dp and budget is not None) else 0.0,
                             "feature_importance": round_feature_importance,
                             "canary_info": canary_info,
                         },
@@ -867,7 +902,7 @@ class SimulationService:
                         round_num=round_num,
                         round_loss=round_loss,
                         active_participants=len(participating),
-                        privacy_budget=budget.total_epsilon if enable_dp else 0.0,
+                        privacy_budget=budget.total_epsilon if (enable_dp and budget is not None) else 0.0,
                     )
 
             # Phase 3b: Federated Graph Embedding (FedGNN)
@@ -938,7 +973,8 @@ class SimulationService:
                                 config.dp_max_grad_norm,
                                 rng=rng,
                             )
-                            budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
+                            if budget is not None:
+                                budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
                         client_gnn_weights.append(local_weights)
                         client_gnn_samples.append(int(local_metrics["num_nodes"]))
@@ -1149,8 +1185,9 @@ class SimulationService:
 
             contribution_scores = {}
             if (
-                "final_round_weights" in locals()
-                and final_round_weights
+                final_round_weights
+                and final_round_participating is not None
+                and final_round_samples is not None
                 and len(final_round_weights) > 1
             ):
                 try:
@@ -1202,7 +1239,7 @@ class SimulationService:
 
                 # Check for free-riding (parameters update variance is near 0)
                 is_free_rider = False
-                if "final_round_weights" in locals() and final_round_weights:
+                if final_round_weights and final_round_participating is not None:
                     try:
                         bank_idx = final_round_participating.index(bank)
                         weights_flat = np.array(final_round_weights[bank_idx].flat_weights)
