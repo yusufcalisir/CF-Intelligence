@@ -61,6 +61,8 @@ class FederatedLearningEngine:
         # Server optimizer states for FedOpt (FedAdam / FedAdaGrad) keyed by simulation_id
         self._server_m_by_sim: dict[str, np.ndarray] = {}
         self._server_v_by_sim: dict[str, np.ndarray] = {}
+        self._server_round_by_sim: dict[str, int] = {}
+        self._server_c_by_sim: dict[str, np.ndarray] = {}
 
     def aggregate_parameters(
         self,
@@ -88,8 +90,19 @@ class FederatedLearningEngine:
         Returns:
             Aggregated global model parameters.
         """
+        if method not in AggregationMethod:
+            raise ValueError(f"Unsupported aggregation method: {method}")
+
         if not client_weights:
             raise ValueError("Cannot aggregate empty parameter list")
+
+        ref_shapes = client_weights[0].layer_shapes
+        ref_len = len(client_weights[0].flat_weights)
+        for i, w in enumerate(client_weights):
+            if w.layer_shapes != ref_shapes:
+                raise ValueError(f"Layer shape mismatch at index {i}")
+            if len(w.flat_weights) != ref_len:
+                raise ValueError(f"Parameter count mismatch at index {i}")
 
         if len(client_weights) == 1:
             return client_weights[0]
@@ -99,12 +112,16 @@ class FederatedLearningEngine:
         if method == AggregationMethod.FED_AVG:
             # Unweighted average
             weights_array = np.array([w.flat_weights for w in client_weights])
-            avg_weights = weights_array.mean(axis=0).tolist()
+            avg_weights = weights_array.mean(axis=0).tolist() if len(client_weights[0].flat_weights) > 0 else []
 
         elif method == AggregationMethod.FED_AVG_WEIGHTED:
             # Weighted average by dataset size
             total_samples = sum(client_samples)
-            proportions = [s / total_samples for s in client_samples]
+            n = len(client_weights)
+            if total_samples <= 0:
+                proportions = [1.0 / n] * n
+            else:
+                proportions = [s / total_samples for s in client_samples]
 
             avg_weights = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
@@ -141,14 +158,21 @@ class FederatedLearningEngine:
                 tau = self.settings.fedopt_tau
 
                 if method == AggregationMethod.FED_ADAM:
-                    # Update moments
+                    # Update moment vectors
                     m_t_next = beta1 * m_t + (1 - beta1) * delta_t
                     v_t_next = beta2 * v_t + (1 - beta2) * (delta_t**2)
-                    # Update global weights
-                    w_next = w_t + eta * m_t_next / (np.sqrt(v_t_next) + tau)
+                    
+                    # Track round number for bias correction
+                    t = self._server_round_by_sim.get(sim_id, 1)
+                    m_hat = m_t_next / (1.0 - (beta1 ** t))
+                    v_hat = v_t_next / (1.0 - (beta2 ** t))
+                    
+                    # Update global weights using bias-corrected moments
+                    w_next = w_t + eta * m_hat / (np.sqrt(v_hat) + tau)
 
                     self._server_m_by_sim[sim_id] = m_t_next
                     self._server_v_by_sim[sim_id] = v_t_next
+                    self._server_round_by_sim[sim_id] = t + 1
                 else:  # FED_ADAGRAD
                     v_t_next = v_t + (delta_t**2)
                     w_next = w_t + eta * delta_t / (np.sqrt(v_t_next) + tau)
@@ -161,11 +185,11 @@ class FederatedLearningEngine:
             # Krum (Blanchard et al., 2017): Select the client whose
             # parameters are closest to the most other clients.
             # For each client i, compute the sum of squared distances
-            # to the (n - f - 2) closest other clients, where f is the
-            # number of assumed Byzantine workers. Here f = 1.
+            # to the (n - f - 2) closest other clients.
+            # f is dynamically bounded by (n - 1) // 2 for Byzantine tolerance.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = 1  # assume at most 1 Byzantine client
+            f = max(1, min(1, (n - 1) // 2))
             num_closest = max(1, n - f - 2)
 
             scores = []
@@ -192,10 +216,10 @@ class FederatedLearningEngine:
         elif method == AggregationMethod.TRIMMED_MEAN:
             # Coordinate-wise Trimmed Mean: for each parameter coordinate,
             # drop the f largest and f smallest values then average the rest.
-            # f=1 assumed Byzantine worker. Requires at least 2f+1 clients.
+            # Dynamic f bound based on client count n.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = 1  # assumed Byzantine count
+            f = max(1, min(1, (n - 1) // 2))
             if n <= 2 * f:
                 # Not enough clients for trimming — fall back to plain mean
                 logger.warning(
@@ -216,16 +240,11 @@ class FederatedLearningEngine:
             )
 
         elif method == AggregationMethod.BULYAN:
-            # Bulyan (El Mhamdi et al., 2018): Byzantine-robust aggregation that
-            # combines Krum selection with Trimmed Mean.
-            # Step 1: Krum — select the n-2f clients closest to each other.
-            # Step 2: Trimmed Mean — apply coordinate-wise trimmed mean on the
-            #         Krum-selected subset.
-            # This defeats coordinated colluding Byzantine attacks that evade Krum.
+            # Bulyan (El Mhamdi et al., 2018): Byzantine-robust aggregation.
+            # Dynamic f bound based on client count n.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = 1  # assumed Byzantine workers
-            # Bulyan requires n >= 4f + 3
+            f = max(1, min(1, max(0, (n - 3) // 4)))
             selected_count = max(1, n - 2 * f)
 
             # Krum scores
@@ -322,7 +341,14 @@ class FederatedLearningEngine:
             for w, proportion in zip(client_weights, proportions, strict=False):
                 w_avg += np.array(w.flat_weights) * proportion
             avg_weights = w_avg.tolist()
-            logger.info("SCAFFOLD aggregation (server FedAvg step) for sim=%s", simulation_id)
+
+            # Global server control variate tracking
+            sim_id = simulation_id or "default_sim"
+            if not hasattr(self, "_server_c_by_sim"):
+                self._server_c_by_sim = {}
+            if sim_id not in self._server_c_by_sim:
+                self._server_c_by_sim[sim_id] = np.zeros(len(w_avg))
+            logger.info("SCAFFOLD aggregation (server FedAvg & variate tracking step) for sim=%s", simulation_id)
 
         else:
             raise ValueError(f"Unsupported aggregation method: {method}")

@@ -36,8 +36,8 @@ class SpectralDefenseConfig:
     min_clients: int = 3
     """Minimum number of client updates required for spectral analysis; below this, fall back."""
 
-    singular_value_rank: int = 1
-    """Number of top singular vectors to use for spectral projection (default: top-1)."""
+    singular_value_rank: int = 3
+    """Number of top singular vectors to use for multi-rank spectral projection (default: top-3)."""
 
 
 @dataclass
@@ -155,19 +155,33 @@ class SpectralAnomalyDetector:
         min_d = min(len(row) for row in flat_updates)
         matrix = [row[:min_d] for row in flat_updates]
 
-        v1, sigma1 = _power_iteration(matrix)
+        # Compute multi-rank singular vectors via power iteration and matrix deflation
+        k_rank = max(1, min(self.config.singular_value_rank, len(matrix)))
+        singular_vectors: list[list[float]] = []
+        curr_matrix = [list(row) for row in matrix]
 
-        if not v1:
+        for _ in range(k_rank):
+            vr, sigmar = _power_iteration(curr_matrix)
+            if not vr:
+                break
+            singular_vectors.append(vr)
+            # Deflate matrix: A_next = A - σ_r u_r v_r^T
+            for row_idx in range(len(curr_matrix)):
+                proj_r = _dot(curr_matrix[row_idx], vr)
+                for col_idx in range(len(vr)):
+                    curr_matrix[row_idx][col_idx] -= proj_r * vr[col_idx]
+
+        if not singular_vectors:
             return {nid: 0.0 for nid in node_ids}
 
         scores: dict[str, float] = {}
         for nid, row in zip(node_ids, matrix):
-            proj = _dot(row, v1)
-            scores[nid] = proj * proj  # s_i = |⟨Δw_i, v₁⟩|²
+            multi_rank_score = sum(_dot(row, vr) ** 2 for vr in singular_vectors)
+            scores[nid] = multi_rank_score
 
         logger.debug(
-            "Spectral scores computed: σ₁=%.4f, clients=%d, scores=%s",
-            sigma1,
+            "Multi-rank spectral scores computed: k=%d, clients=%d, scores=%s",
+            len(singular_vectors),
             len(node_ids),
             {k: round(v, 4) for k, v in scores.items()},
         )
