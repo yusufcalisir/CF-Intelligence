@@ -112,7 +112,11 @@ class FederatedLearningEngine:
         if method == AggregationMethod.FED_AVG:
             # Unweighted average
             weights_array = np.array([w.flat_weights for w in client_weights])
-            avg_weights = weights_array.mean(axis=0).tolist() if len(client_weights[0].flat_weights) > 0 else []
+            avg_weights = (
+                weights_array.mean(axis=0).tolist()
+                if len(client_weights[0].flat_weights) > 0
+                else []
+            )
 
         elif method == AggregationMethod.FED_AVG_WEIGHTED:
             # Weighted average by dataset size
@@ -164,8 +168,8 @@ class FederatedLearningEngine:
 
                     # Track round number for bias correction
                     t = self._server_round_by_sim.get(sim_id, 1)
-                    m_hat = m_t_next / (1.0 - (beta1 ** t))
-                    v_hat = v_t_next / (1.0 - (beta2 ** t))
+                    m_hat = m_t_next / (1.0 - (beta1**t))
+                    v_hat = v_t_next / (1.0 - (beta2**t))
 
                     # Update global weights using bias-corrected moments
                     w_next = w_t + eta * m_hat / (np.sqrt(v_hat) + tau)
@@ -348,7 +352,10 @@ class FederatedLearningEngine:
                 self._server_c_by_sim = {}
             if sim_id not in self._server_c_by_sim:
                 self._server_c_by_sim[sim_id] = np.zeros(len(w_avg))
-            logger.info("SCAFFOLD aggregation (server FedAvg & variate tracking step) for sim=%s", simulation_id)
+            logger.info(
+                "SCAFFOLD aggregation (server FedAvg & variate tracking step) for sim=%s",
+                simulation_id,
+            )
 
         else:
             raise ValueError(f"Unsupported aggregation method: {method}")

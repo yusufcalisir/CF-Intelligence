@@ -153,7 +153,10 @@ class ImmutableAuditChain:
             )
             self.chain.append(entry)
             logger.info(
-                "Cryptographic audit log #%d appended [%s]. Hash: %s", index, event_type, curr_hash[:12]
+                "Cryptographic audit log #%d appended [%s]. Hash: %s",
+                index,
+                event_type,
+                curr_hash[:12],
             )
 
             # SIEM Real-Time Stream Forwarding
