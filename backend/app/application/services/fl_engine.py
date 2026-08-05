@@ -161,12 +161,12 @@ class FederatedLearningEngine:
                     # Update moment vectors
                     m_t_next = beta1 * m_t + (1 - beta1) * delta_t
                     v_t_next = beta2 * v_t + (1 - beta2) * (delta_t**2)
-                    
+
                     # Track round number for bias correction
                     t = self._server_round_by_sim.get(sim_id, 1)
                     m_hat = m_t_next / (1.0 - (beta1 ** t))
                     v_hat = v_t_next / (1.0 - (beta2 ** t))
-                    
+
                     # Update global weights using bias-corrected moments
                     w_next = w_t + eta * m_hat / (np.sqrt(v_hat) + tau)
 
