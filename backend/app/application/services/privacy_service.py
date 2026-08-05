@@ -83,6 +83,19 @@ class PrivacyService:
     def __init__(self) -> None:
         self._budgets: dict[str, PrivacyBudget] = {}
 
+    def calculate_gaussian_noise_scale(
+        self,
+        epsilon: float = 1.0,
+        delta: float = 1e-5,
+        sensitivity: float = 1.0,
+    ) -> float:
+        """Computes analytical Gaussian mechanism noise scale sigma."""
+        if epsilon <= 0:
+            raise ValueError("Epsilon must be positive")
+        if delta <= 0 or delta >= 1.0:
+            raise ValueError("Delta must be in (0, 1)")
+        return float(sensitivity * np.sqrt(2.0 * np.log(1.25 / delta)) / epsilon)
+
     def get_or_create_budget(
         self,
         simulation_id: str,

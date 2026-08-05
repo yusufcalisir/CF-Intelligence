@@ -250,7 +250,7 @@ class PrivacyPreservingIdentifier:
             hmac_key.encode(),
             salted.encode(),
             hashlib.sha256,
-        ).hexdigest()[:16]  # Truncated for readability in UI
+        ).hexdigest()[:32]  # 128-bit truncated output to prevent birthday collisions
 
     @classmethod
     def compute_with_kms(cls, raw_value: str, entity_type: str, bank_id: str) -> str:

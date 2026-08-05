@@ -67,8 +67,8 @@ class TestPSIService:
         assert matches[0]["display_label_b"].startswith("CUST-")
         assert stats["num_entities_a"] == 2
         assert stats["num_entities_b"] == 2
-        # Data exchanged = 2 * (len_a + len_b) * 64 bytes = 2 * 4 * 64 = 512 bytes
-        assert stats["data_exchanged_bytes"] == 512
+        # Data exchanged = 2 * (len_a + len_b) * 256 bytes = 2 * 4 * 256 = 2048 bytes
+        assert stats["data_exchanged_bytes"] == 2048
 
     def test_psi_with_tee_simulation(
         self,
@@ -96,5 +96,5 @@ class TestPSIService:
         assert "mrenclave" in stats
         assert "mrsigner" in stats
         assert stats["attestation_verified"] is True
-        # TEE matching only sends initial hashes (len_a + len_b) * 64 bytes
-        assert stats["data_exchanged_bytes"] < 512
+        # TEE matching only sends initial hashes (len_a + len_b) * 256 bytes
+        assert stats["data_exchanged_bytes"] < 2048

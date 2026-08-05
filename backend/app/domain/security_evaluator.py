@@ -65,8 +65,6 @@ class MIAEvaluator:
         unprotected_preds = (bce_losses < loss_threshold).astype(int)
         unprotected_correct = np.sum((unprotected_preds == 1) == member_mask)
         unprotected_acc = float(np.round(unprotected_correct / n_samples, 4))
-        # Ensure realistic baseline attack accuracy bounds (~65-75%)
-        unprotected_acc = float(np.clip(unprotected_acc, 0.65, 0.76))
         unprotected_adv = self.compute_advantage(unprotected_acc)
 
         # DP-Protected Model: Inject calibrated Laplace noise proportional to DP epsilon
@@ -78,8 +76,6 @@ class MIAEvaluator:
         dp_preds = (dp_bce_losses < dp_threshold).astype(int)
         dp_correct = np.sum((dp_preds == 1) == member_mask)
         dp_acc = float(np.round(dp_correct / n_samples, 4))
-        # Calibrate DP attack accuracy near random guessing (~50-52%)
-        dp_acc = float(np.clip(dp_acc, 0.501, 0.522))
         dp_adv = self.compute_advantage(dp_acc)
 
         is_private = dp_adv < 0.05
@@ -153,28 +149,24 @@ class DLGEvaluator:
         rng = np.random.default_rng(self.seed)
         dim = len(x_orig)
 
-        # 1. Unprotected gradient DLG: high correlation r ~ 0.89
+        # 1. Unprotected gradient DLG: empirical reconstruction
         recon_unprotected = x_orig + rng.normal(0, 0.15, size=dim)
         r_unprotected = self.compute_pearson_correlation(x_orig, recon_unprotected)
-        r_unprotected = float(np.clip(r_unprotected, 0.85, 0.95))
         mse_unprotected = round(float(np.mean((x_orig - recon_unprotected) ** 2)), 4)
 
-        # 2. Gradient Clipping only: partial correlation degradation r ~ 0.45
+        # 2. Gradient Clipping only: partial correlation degradation
         recon_clipped = x_orig + rng.normal(0, 0.65, size=dim)
         r_clipped = self.compute_pearson_correlation(x_orig, recon_clipped)
-        r_clipped = float(np.clip(r_clipped, 0.38, 0.55))
         mse_clipped = round(float(np.mean((x_orig - recon_clipped) ** 2)), 4)
 
-        # 3. Secure Aggregation (SecAgg Masks): near-zero correlation r < 0.08
+        # 3. Secure Aggregation (SecAgg Masks): random mask reconstruction
         recon_secagg = rng.uniform(-1.0, 1.0, size=dim)
         r_secagg = abs(self.compute_pearson_correlation(x_orig, recon_secagg))
-        r_secagg = float(np.clip(r_secagg, 0.001, 0.078))
         mse_secagg = round(float(np.mean((x_orig - recon_secagg) ** 2)), 4)
 
-        # 4. Differential Privacy (Epsilon=1.0): near-zero correlation r < 0.08
+        # 4. Differential Privacy (Epsilon=1.0): noised gradient reconstruction
         recon_dp = rng.normal(0, 1.5, size=dim)
         r_dp = abs(self.compute_pearson_correlation(x_orig, recon_dp))
-        r_dp = float(np.clip(r_dp, 0.001, 0.075))
         mse_dp = round(float(np.mean((x_orig - recon_dp) ** 2)), 4)
 
         is_blocked = r_secagg < 0.10 and r_dp < 0.10
