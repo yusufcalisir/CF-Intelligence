@@ -199,7 +199,7 @@ class TestPrivacyIdentifierKMS:
         hash1 = PrivacyPreservingIdentifier.compute("test@email.com", "CUSTOMER")
         hash2 = PrivacyPreservingIdentifier.compute("test@email.com", "CUSTOMER")
         assert hash1 == hash2
-        assert len(hash1) == 16
+        assert len(hash1) == 32
 
 
 # ── Model Vault Tests ─────────────────────────

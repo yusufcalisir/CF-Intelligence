@@ -45,7 +45,7 @@ def test_factory_raises_on_unknown_type(monkeypatch) -> None:
     settings.bank_a_auth_type = "none"
     settings.bank_a_api_key = ""
 
-    with pytest.raises(ValueError, match="Unknown connector type"):
+    with pytest.raises(ValueError, match="deprecated and removed"):
         BankConnectorFactory.get_connector("bank-a", settings)
 
     settings.bank_a_connector_type = "unsupported_unknown_type"

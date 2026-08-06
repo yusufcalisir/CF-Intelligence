@@ -31,7 +31,7 @@ def test_dh_psi_commutative_property() -> None:
     double_enc_b = pow(enc_b, key_a, PSI_PRIME)
 
     assert double_enc_a == double_enc_b, "DH-PSI commutative exponentiation equality failed!"
-    assert PRIME_BIT_LENGTH == 512
+    assert PRIME_BIT_LENGTH == 2048
 
 
 def test_minhash_lsh_fuzzy_matching() -> None:

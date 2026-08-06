@@ -175,13 +175,13 @@ class TestGraphSAGEModel:
             param.data = torch.randn_like(param)
 
         # Serialize
-        weights = model.to_model_weights()
+        weights = model.to_model_weights(include_classifier=True)
         assert len(weights.flat_weights) > 0
         assert len(weights.layer_shapes) > 0
 
         # Create new model and load weights
         model2 = GraphSAGEModel(input_dim=12, hidden_dim=64, embedding_dim=32, num_layers=2)
-        model2.load_model_weights(weights)
+        model2.load_model_weights(weights, include_classifier=True)
 
         # Compare parameters
         for p1, p2 in zip(model.parameters(), model2.parameters()):
@@ -190,7 +190,7 @@ class TestGraphSAGEModel:
     def test_model_weights_parameter_count(self) -> None:
         """Serialized weight count should match model parameter count."""
         model = GraphSAGEModel(input_dim=12, hidden_dim=128, embedding_dim=64, num_layers=2)
-        weights = model.to_model_weights()
+        weights = model.to_model_weights(include_classifier=True)
 
         expected_params = sum(p.numel() for p in model.parameters())
         assert weights.num_parameters == expected_params

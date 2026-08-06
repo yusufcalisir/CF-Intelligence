@@ -83,10 +83,10 @@ class ModelDriftService:
         if len(actual) == 0 or len(expected) == 0:
             return 0.0
 
-        # Small-sample guard (N < 500): quantile PSI exhibits ~97.5% FPR at N=50 under H0
-        if len(actual) < 500 or len(expected) < 500:
+        # Small-sample guard (N < 30): quantile PSI exhibits unstable behavior at N < 30
+        if len(actual) < 30 or len(expected) < 30:
             logger.warning(
-                "Sample size too small for reliable quantile PSI (actual=%d, expected=%d < 500). Returning 0.0.",
+                "Sample size too small for reliable quantile PSI (actual=%d, expected=%d < 30). Returning 0.0.",
                 len(actual),
                 len(expected),
             )

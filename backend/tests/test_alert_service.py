@@ -112,7 +112,7 @@ class TestIntelligenceSharing:
         intel = alert_service.publish_intelligence(alerts[0])
         assert intel.source_bank_id == "bank_a"
         assert 0 < intel.risk_indicator <= 1.0
-        assert len(intel.privacy_hash) == 16
+        assert len(intel.privacy_hash) == 32
 
     def test_consume_intelligence_excludes_own(
         self,

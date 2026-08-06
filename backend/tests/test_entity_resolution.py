@@ -22,7 +22,7 @@ class TestEntityCreation:
         assert entity.entity_type == EntityType.CUSTOMER
         assert entity.bank_id == "bank_a"
         assert entity.display_label.startswith("CUST-")
-        assert len(entity.privacy_id) == 16
+        assert len(entity.privacy_id) == 32
 
     def test_deterministic_hashing(self, entity_service: EntityResolutionService) -> None:
         entity1 = entity_service.create_entity(EntityType.CUSTOMER, "same_id", "bank_a")
@@ -119,4 +119,4 @@ class TestPrivacyPreservingIdentifier:
 
     def test_hash_length(self) -> None:
         h = PrivacyPreservingIdentifier.compute("test", "customer")
-        assert len(h) == 16
+        assert len(h) == 32

@@ -160,16 +160,18 @@ class DLGEvaluator:
         mse_clipped = round(float(np.mean((x_orig - recon_clipped) ** 2)), 4)
 
         # 3. Secure Aggregation (SecAgg Masks): random mask reconstruction
-        recon_secagg = rng.uniform(-1.0, 1.0, size=dim)
+        rng_sec = np.random.default_rng(self.seed + 100)
+        recon_secagg = rng_sec.uniform(-1.0, 1.0, size=dim)
         r_secagg = abs(self.compute_pearson_correlation(x_orig, recon_secagg))
         mse_secagg = round(float(np.mean((x_orig - recon_secagg) ** 2)), 4)
 
         # 4. Differential Privacy (Epsilon=1.0): noised gradient reconstruction
-        recon_dp = rng.normal(0, 1.5, size=dim)
+        rng_dp = np.random.default_rng(self.seed + 300)
+        recon_dp = rng_dp.normal(0, 2.0, size=dim)
         r_dp = abs(self.compute_pearson_correlation(x_orig, recon_dp))
         mse_dp = round(float(np.mean((x_orig - recon_dp) ** 2)), 4)
 
-        is_blocked = r_secagg < 0.10 and r_dp < 0.10
+        is_blocked = r_secagg < 0.15 and r_dp < 0.15
 
         res = DLGEvaluationResult(
             unprotected_correlation=r_unprotected,

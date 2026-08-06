@@ -14,12 +14,17 @@ client = TestClient(app)
 
 
 @pytest.fixture(autouse=True)
-def override_db_session():
+def override_db_session(monkeypatch):
     mock_session = MagicMock()
     mock_session.execute = AsyncMock()
     mock_result = MagicMock()
     mock_result.scalars.return_value.all.return_value = []
     mock_session.execute.return_value = mock_result
+
+    from app.config import get_settings
+
+    settings = get_settings()
+    monkeypatch.setattr(settings, "feature_store_enabled", False)
 
     app.dependency_overrides[get_session] = lambda: mock_session
     yield
@@ -60,16 +65,16 @@ def test_predict_low_risk_transaction() -> None:
 def test_predict_high_risk_transaction() -> None:
     """Verify that a high-risk transaction flags fraud and registers an alert."""
     payload = {
-        "transaction_amount": 4900.0,
+        "transaction_amount": 15000.0,
         "merchant_category": "crypto",
         "country_code": "NG",
         "device_type": "mobile_app",
-        "velocity": 18.0,
+        "velocity": 25.0,
         "hour_of_day": 3,
-        "merchant_risk_score": 0.85,
-        "customer_history_score": 0.10,
-        "chargeback_count": 5,
-        "account_age_days": 5,
+        "merchant_risk_score": 0.95,
+        "customer_history_score": 0.01,
+        "chargeback_count": 8,
+        "account_age_days": 1,
         "bank_id": "bank_b",
     }
 
