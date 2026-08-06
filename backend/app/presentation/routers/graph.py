@@ -221,6 +221,17 @@ async def find_similar_entities(req: GNNSimilarityRequest) -> dict:
         top_k=req.top_k,
         threshold=req.threshold,
     )
+    # Budget exhaustion: service returns [] when per-entity query limit is reached
+    query_count = _graph_embedding_service._query_counts.get(req.entity_id, 0)
+    if not results and query_count >= _graph_embedding_service.max_query_budget:
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Query budget exhausted for entity '{req.entity_id}'. "
+                f"Maximum {_graph_embedding_service.max_query_budget} similarity "
+                "queries per entity are permitted to prevent membership inference attacks."
+            ),
+        )
     return {
         "query_entity_id": req.entity_id,
         "similar_entities": results,
@@ -238,7 +249,7 @@ async def embedding_risk_propagation(
     between connected entities. More accurate than hardcoded relationship
     multipliers because the weights are learned from labeled fraud data.
     """
-    embeddings = _graph_embedding_service.get_all_embeddings()
+    embeddings = _graph_embedding_service.get_all_embeddings(dp_noise=True)
     if not embeddings:
         raise HTTPException(
             status_code=400,
@@ -259,7 +270,7 @@ async def embedding_fraud_clusters(req: GNNEmbeddingClusterRequest) -> dict:
     they are in different connected components of the graph. Detects
     fraud rings using the same techniques across different banks.
     """
-    embeddings = _graph_embedding_service.get_all_embeddings()
+    embeddings = _graph_embedding_service.get_all_embeddings(dp_noise=True)
     if not embeddings:
         raise HTTPException(
             status_code=400,

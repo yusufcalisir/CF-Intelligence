@@ -104,6 +104,7 @@ class ExplainabilityService:
             model_confidence=alert.model_confidence,
             risk_score_breakdown=risk_signals or [],
             explanation_text=explanation_text,
+            explanation_method="LINEAR_HEURISTIC_FALLBACK",
         )
 
     def get_top_features(
@@ -165,7 +166,8 @@ class ExplainabilityService:
             lines.append("**Signal breakdown:**")
             sorted_signals = sorted(risk_signals, key=lambda s: s.weighted_score, reverse=True)
             for signal in sorted_signals[:5]:
-                bar_len = int(signal.normalized_score * 20)
+                norm_val = max(0.0, min(1.0, float(signal.normalized_score)))
+                bar_len = int(norm_val * 20)
                 bar = "█" * bar_len + "░" * (20 - bar_len)
                 lines.append(
                     f"  {signal.signal_name:<22} {bar} "
@@ -244,15 +246,30 @@ class ExplainabilityService:
                     idx = len(devices) - 1
                 val = idx / (len(devices) - 1) if len(devices) > 1 else 0.0
             elif name == "transaction_amount":
-                val = min(1.0, float(val) / 10000.0)
+                try:
+                    val = min(1.0, float(val) / 10000.0)
+                except (ValueError, TypeError):
+                    val = 0.0
             elif name == "account_age_days":
-                val = min(1.0, float(val) / 365.0)
+                try:
+                    val = min(1.0, float(val) / 365.0)
+                except (ValueError, TypeError):
+                    val = 0.0
             elif name == "velocity":
-                val = min(1.0, float(val) / 20.0)
+                try:
+                    val = min(1.0, float(val) / 20.0)
+                except (ValueError, TypeError):
+                    val = 0.0
             elif name == "hour_of_day":
-                val = min(1.0, float(val) / 23.0)
+                try:
+                    val = min(1.0, float(val) / 23.0)
+                except (ValueError, TypeError):
+                    val = 0.0
             elif name == "chargeback_count":
-                val = min(1.0, float(val) / 10.0)
+                try:
+                    val = min(1.0, float(val) / 10.0)
+                except (ValueError, TypeError):
+                    val = 0.0
             else:
                 try:
                     val = float(val)
@@ -375,6 +392,12 @@ class ExplainabilityService:
 
         current_score = orig_score
 
+        # Helper to extract feature value from alert top_features dict list
+        top_feat_dict = {f.get("feature"): f.get("contribution") for f in alert.top_features if isinstance(f, dict)}
+        
+        orig_country_val = str(top_feat_dict.get("country_code", "HIGH_RISK_JURISDICTION"))
+        orig_mcc_val = str(top_feat_dict.get("merchant_category", "high_risk_category"))
+
         # 1. Remediate transaction amount if high
         if has_high_amt and current_score > target_score:
             amount_reduction = round((current_score - target_score) * 1.85, 2)
@@ -395,9 +418,9 @@ class ExplainabilityService:
             changes.append(
                 CounterfactualChange(
                     feature="country_code",
-                    original_value="RU",
-                    remediated_value="US",
-                    delta_explanation="Originate transaction from home country (US) instead of high-risk jurisdiction (RU).",
+                    original_value=orig_country_val if orig_country_val != "0.5" else "HIGH_RISK_JURISDICTION",
+                    remediated_value="DOMESTIC_HOME_COUNTRY",
+                    delta_explanation="Originate transaction from home country instead of high-risk jurisdiction.",
                 )
             )
             current_score -= 180.0
@@ -407,7 +430,7 @@ class ExplainabilityService:
             changes.append(
                 CounterfactualChange(
                     feature="velocity",
-                    original_value="14 txns / 5 min",
+                    original_value="HIGH_VELOCITY",
                     remediated_value="1 txn / 5 min",
                     delta_explanation="Space out transactions to normal velocity (1 transaction per 5-minute window).",
                 )
@@ -419,19 +442,20 @@ class ExplainabilityService:
             changes.append(
                 CounterfactualChange(
                     feature="merchant_category",
-                    original_value="crypto_exchange",
+                    original_value=orig_mcc_val if orig_mcc_val != "0.5" else "high_risk_mcc",
                     remediated_value="online_retail",
-                    delta_explanation="Transact with verified 3DS retail merchant instead of high-risk crypto exchange.",
+                    delta_explanation="Transact with verified 3DS retail merchant instead of high-risk category.",
                 )
             )
             current_score -= 110.0
 
         # Fallback if no specific trigger matched but score is high
         if not changes and orig_score > target_score:
+            amt_val = round(orig_score * 1.25, 2)
             changes.append(
                 CounterfactualChange(
                     feature="transaction_amount",
-                    original_value="$1,250.00",
+                    original_value=f"${amt_val:,.2f}",
                     remediated_value="$45.00",
                     delta_explanation="Reduce transaction amount below $50.00 threshold.",
                 )
@@ -505,8 +529,8 @@ class ExplainabilityService:
                 )
             )
 
-        # Scale reconstructed score to match alert score deterministically
-        reconstructed_score = alert.risk_score
+        # Independently reconstruct risk score from policy rule evaluations
+        reconstructed_score = tot_score
         audit_matched = abs(reconstructed_score - alert.risk_score) < 1.0
 
         return DecisionReplayReport(

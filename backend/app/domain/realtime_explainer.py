@@ -13,8 +13,18 @@ from app.infrastructure.cache import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-# Fallback in-memory cache when Redis server is unreachable
-_local_shap_cache: dict[str, str] = {}
+from collections import OrderedDict
+
+# Bounded in-memory LRU fallback cache (max 1000 entries) when Redis is unreachable
+_local_shap_cache: OrderedDict[str, str] = OrderedDict()
+_MAX_LOCAL_CACHE_SIZE = 1000
+
+
+def _put_local_cache(key: str, value: str) -> None:
+    _local_shap_cache[key] = value
+    _local_shap_cache.move_to_end(key)
+    while len(_local_shap_cache) > _MAX_LOCAL_CACHE_SIZE:
+        _local_shap_cache.popitem(last=False)
 
 
 @dataclass
@@ -114,7 +124,7 @@ class FastInferenceExplainer:
         }
 
         serialized = json.dumps(res)
-        _local_shap_cache[f"cfi:shap:{transaction_id}"] = serialized
+        _put_local_cache(f"cfi:shap:{transaction_id}", serialized)
 
         # Store in Redis with 300 seconds (5 min) TTL
         try:

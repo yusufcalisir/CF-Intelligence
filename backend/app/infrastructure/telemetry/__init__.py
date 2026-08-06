@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import threading
 import time
 from collections.abc import Callable  # noqa: TC003
 from typing import TYPE_CHECKING, Any
@@ -35,6 +36,7 @@ class TelemetryRegistry:
     """Thread-safe Prometheus metrics registry and OpenTelemetry tracer wrapper."""
 
     def __init__(self) -> None:
+        self._lock = threading.Lock()
         self._counters: dict[str, float] = {}
         self._counter_labels: dict[str, dict[str, float]] = {}
         self._gauges: dict[str, float] = {
@@ -256,19 +258,25 @@ class MetricProxy:
         self.registry = registry
 
     def set(self, value: float, *args: Any, **kwargs: Any) -> None:
-        self.registry._gauges[self.name] = value
+        with self.registry._lock:
+            self.registry._gauges[self.name] = value
 
     def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + amount
+        with self.registry._lock:
+            self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + amount
 
     def dec(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
-        self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) - amount
+        if self.name.endswith("_total") or "counter" in self.name:
+            raise ValueError(f"Prometheus Counter metric '{self.name}' is monotonically increasing and cannot be decremented.")
+        with self.registry._lock:
+            self.registry._gauges[self.name] = self.registry._gauges.get(self.name, 0.0) - amount
 
     def add(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
         self.inc(amount)
 
     def observe(self, value: float, *args: Any, **kwargs: Any) -> None:
-        self.registry._histograms.setdefault(self.name, []).append(value)
+        with self.registry._lock:
+            self.registry._histograms.setdefault(self.name, []).append(value)
 
     def record(self, value: float, *args: Any, **kwargs: Any) -> None:
         self.observe(value)

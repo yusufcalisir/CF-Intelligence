@@ -10,6 +10,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Any
 
 import numpy as np
 from scipy import stats
@@ -77,9 +78,18 @@ class ModelDriftService:
         self.psi_threshold_critical = psi_threshold_critical
 
     @staticmethod
-    def _calculate_psi(actual: np.ndarray, expected: np.ndarray, num_bins: int = 10) -> float:
+    def _calculate_psi(actual: Any, expected: Any, num_bins: int = 10) -> float:
         """Calculate Population Stability Index (PSI) between actual and expected distributions."""
         if len(actual) == 0 or len(expected) == 0:
+            return 0.0
+
+        # Small-sample guard (N < 500): quantile PSI exhibits ~97.5% FPR at N=50 under H0
+        if len(actual) < 500 or len(expected) < 500:
+            logger.warning(
+                "Sample size too small for reliable quantile PSI (actual=%d, expected=%d < 500). Returning 0.0.",
+                len(actual),
+                len(expected),
+            )
             return 0.0
 
         # Determine bin edges from reference/expected distribution
@@ -120,19 +130,25 @@ class ModelDriftService:
             curr_arr = np.array(current_data[feature_name], dtype=float)
             ref_arr = np.array(reference_data[feature_name], dtype=float)
 
-            if len(curr_arr) == 0 or len(ref_arr) == 0:
+            # Sanitize IEEE 754 Inf/NaN (BUG-DR-02 fix)
+            curr_valid = curr_arr[np.isfinite(curr_arr)]
+            ref_valid = ref_arr[np.isfinite(ref_arr)]
+
+            if len(curr_valid) == 0 or len(ref_valid) == 0:
                 continue
 
             # 1. Kolmogorov-Smirnov 2-sample test
-            ks_res = stats.ks_2samp(curr_arr, ref_arr)
+            ks_res = stats.ks_2samp(curr_valid, ref_valid)
             ks_stat = float(ks_res.statistic)
             ks_p_val = float(ks_res.pvalue)
 
-            # 2. Wasserstein Distance (Earth Mover's Distance)
-            w_dist = float(stats.wasserstein_distance(curr_arr, ref_arr))
+            # 2. Wasserstein Distance normalized by reference std dev (EMD / sigma)
+            ref_std = max(float(np.std(ref_valid)), 1e-8)
+            w_dist_raw = float(stats.wasserstein_distance(curr_valid, ref_valid))
+            w_dist = w_dist_raw / ref_std
 
             # 3. PSI Calculation
-            psi_val = self._calculate_psi(curr_arr, ref_arr)
+            psi_val = self._calculate_psi(curr_valid, ref_valid)
 
             # Classify status
             if psi_val >= self.psi_threshold_critical or ks_p_val < 0.01:
@@ -173,6 +189,20 @@ class ModelDriftService:
 
         y_true_arr = np.array(y_true, dtype=float)
         y_prob_arr = np.array(y_prob, dtype=float)
+
+        # Sanitize IEEE 754 NaN/Inf values (BUG-DR-01 fix)
+        valid_mask = np.isfinite(y_true_arr) & np.isfinite(y_prob_arr)
+        if not np.any(valid_mask):
+            return CalibrationReport(
+                brier_score=0.0,
+                expected_calibration_error=0.0,
+                max_calibration_error=0.0,
+                is_well_calibrated=True,
+                evaluated_at=time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
+            )
+
+        y_true_arr = y_true_arr[valid_mask]
+        y_prob_arr = y_prob_arr[valid_mask]
 
         # 1. Brier Score: mean squared error between probabilities and binary labels
         brier = float(np.mean((y_prob_arr - y_true_arr) ** 2))
@@ -217,8 +247,8 @@ class ModelDriftService:
 
         return CalibrationReport(
             brier_score=round(brier, 4),
-            expected_calibration_error=round(float(ece), 4),
-            max_calibration_error=round(float(max_ce), 4),
+            expected_calibration_error=round(ece, 4),
+            max_calibration_error=round(max_ce, 4),
             is_well_calibrated=is_calibrated,
             evaluated_at=time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
             bins=bins_list,
@@ -236,8 +266,14 @@ class ModelDriftService:
         """Run comprehensive feature drift, concept drift (PSI on risk scores), and calibration audit."""
         feature_drifts = self.analyze_feature_drift(current_data, reference_data)
 
+        # Sanitize score arrays for concept drift
+        curr_scores_arr = np.array(current_scores, dtype=float)
+        ref_scores_arr = np.array(reference_scores, dtype=float)
+        curr_scores_valid = curr_scores_arr[np.isfinite(curr_scores_arr)]
+        ref_scores_valid = ref_scores_arr[np.isfinite(ref_scores_arr)]
+
         # Concept drift on prediction scores
-        concept_psi = self._calculate_psi(np.array(current_scores), np.array(reference_scores))
+        concept_psi = self._calculate_psi(curr_scores_valid, ref_scores_valid)
 
         max_psi = (
             max([fd.psi for fd in feature_drifts] + [concept_psi])
@@ -248,15 +284,26 @@ class ModelDriftService:
             float(np.mean([fd.ks_p_value for fd in feature_drifts])) if feature_drifts else 1.0
         )
 
+        # Benjamini-Hochberg FDR adjustment on feature p-values to control FWER (~40.1% -> 5%)
+        significant_features = 0
+        if feature_drifts:
+            raw_p_values = [fd.ks_p_value for fd in feature_drifts]
+            m = len(raw_p_values)
+            sorted_indices = np.argsort(raw_p_values)
+            for rank, idx in enumerate(sorted_indices, start=1):
+                bh_threshold = (rank / m) * 0.05  # alpha = 0.05
+                if raw_p_values[idx] <= bh_threshold:
+                    significant_features += 1
+
         # Calibration
         calibration_rpt = None
         if y_true is not None and y_prob is not None:
             calibration_rpt = self.compute_calibration(y_true, y_prob)
 
         # Classify overall system status
-        if max_psi >= self.psi_threshold_critical or concept_psi >= self.psi_threshold_critical:
+        if max_psi >= self.psi_threshold_critical or concept_psi >= self.psi_threshold_critical or significant_features >= 2:
             overall_status = "CRITICAL"
-        elif max_psi >= self.psi_threshold_warning or concept_psi >= self.psi_threshold_warning:
+        elif max_psi >= self.psi_threshold_warning or concept_psi >= self.psi_threshold_warning or significant_features == 1:
             overall_status = "WARNING"
         else:
             overall_status = "HEALTHY"

@@ -202,6 +202,7 @@ class ExplainabilityReport:
     model_confidence: float  # 0.0-1.0
     risk_score_breakdown: list[RiskSignal] = field(default_factory=list)
     explanation_text: str = ""  # Generated human-readable summary
+    explanation_method: str = "LINEAR_HEURISTIC_FALLBACK"  # "KERNEL_SHAP" | "LINEAR_HEURISTIC_FALLBACK"
 
 
 @dataclass(frozen=True)

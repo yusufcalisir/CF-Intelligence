@@ -83,6 +83,8 @@ class OpenBankingConnector(BaseBankConnector):
                 return self._cached_token
         except Exception as err:
             logger.warning("OAuth2 token endpoint unreachable (%s) -> using configured token", err)
+            if os.getenv("APP_ENV") == "production":
+                raise RuntimeError("Production Open Banking OAuth2 authentication failed. Fallback tokens disabled in production.") from err
 
         self._cached_token = f"psd2_token_{uuid.uuid4().hex[:12]}"
         self._token_expires_at = now + 3600.0

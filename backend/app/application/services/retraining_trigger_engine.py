@@ -45,6 +45,16 @@ class RetrainingTriggerEngine:
 
     def check_drift_threshold(self, psi_score: float, ks_p_value: float = 1.0) -> bool:
         """Evaluates whether Population Stability Index (PSI > 0.20) or KS test indicates drift."""
+        import math
+
+        if not math.isfinite(psi_score) or not math.isfinite(ks_p_value):
+            logger.warning(
+                "Non-finite drift metrics received (PSI=%s, KS_p=%s). Retraining trigger suppressed.",
+                psi_score,
+                ks_p_value,
+            )
+            return False
+
         psi_triggered = psi_score > self.psi_threshold
         ks_triggered = ks_p_value < self.ks_pvalue_threshold
 

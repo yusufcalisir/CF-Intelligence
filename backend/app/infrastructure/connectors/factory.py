@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
@@ -35,6 +36,30 @@ APPROVED_PRODUCTION_CONNECTORS = {
     "batch",
     "benchmark",
 }
+
+CONNECTOR_REGISTRY: dict[str, type] = {
+    "iso20022": ISO20022MessagingConnector,
+    "batch": BatchEODFileConnector,
+    "redis": RedisBankConnector,
+    "streaming": StreamingPaymentConnector,
+    "open_banking": OpenBankingConnector,
+    "psd2": OpenBankingConnector,
+    "rabbitmq": RabbitMQBankConnector,
+    "kafka": KafkaBankConnector,
+    "parquet": ParquetConnector,
+    "rest": RESTBankConnector,
+}
+
+
+def register_connector(connector_type: str) -> Callable:
+    """Decorator for registering custom connector implementations dynamically."""
+
+    def decorator(cls: type) -> type:
+        CONNECTOR_REGISTRY[connector_type.lower()] = cls
+        APPROVED_PRODUCTION_CONNECTORS.add(connector_type.lower())
+        return cls
+
+    return decorator
 
 
 class BankConnectorFactory:

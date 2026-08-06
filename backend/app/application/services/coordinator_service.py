@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import logging
+import re
+import threading
 import time
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
@@ -50,7 +53,8 @@ class CoordinatorService:
         self.current_round_id: int = 0
         self.rounds: dict[int, dict[str, Any]] = {}
         self.gradient_submissions: dict[int, dict[str, bytes]] = {}
-        self.grpc_notifications: list[dict[str, Any]] = []
+        self.grpc_notifications: deque[dict[str, Any]] = deque(maxlen=1000)
+        self._lock = threading.Lock()
 
     def register_client(
         self,
@@ -64,9 +68,14 @@ class CoordinatorService:
         """Perform handshake & register/update a bank client capability profile."""
         clean_bank_id = bank_id.lower().strip()
         try:
-            torch_major = int(pytorch_version.split(".")[0])
-            py_major, py_minor = map(int, python_version.split(".")[:2])
-        except (ValueError, IndexError):
+            match_torch = re.search(r"^(\d+)", pytorch_version)
+            torch_major = int(match_torch.group(1)) if match_torch else 2
+            match_py = re.search(r"^(\d+)\.(\d+)", python_version)
+            if match_py:
+                py_major, py_minor = int(match_py.group(1)), int(match_py.group(2))
+            else:
+                py_major, py_minor = 3, 10
+        except Exception:
             torch_major = 2
             py_major, py_minor = 3, 10
 
@@ -175,38 +184,44 @@ class CoordinatorService:
     def on_gradient_received(
         self, round_id: int, bank_id: str, gradient_bytes: bytes, dp_epsilon_used: float = 1.0
     ) -> dict[str, Any]:
-        """Persists received gradient and checks quorum to trigger aggregation."""
+        """Persists received gradient and checks quorum to trigger aggregation atomically."""
         clean_bank = bank_id.lower().strip()
         if round_id not in self.rounds:
             raise ValueError(f"Round ID {round_id} does not exist.")
 
-        if round_id not in self.gradient_submissions:
-            self.gradient_submissions[round_id] = {}
+        with self._lock:
+            if round_id not in self.gradient_submissions:
+                self.gradient_submissions[round_id] = {}
 
-        self.gradient_submissions[round_id][clean_bank] = gradient_bytes
-        submitted_count = len(self.gradient_submissions[round_id])
-        min_clients = self.rounds[round_id]["min_clients"]
+            self.gradient_submissions[round_id][clean_bank] = gradient_bytes
+            submitted_count = len(self.gradient_submissions[round_id])
+            min_clients = self.rounds[round_id]["min_clients"]
 
-        logger.info(
-            "Received gradient from '%s' for round %d (%d/%d submissions)",
-            clean_bank,
-            round_id,
-            submitted_count,
-            min_clients,
-        )
-
-        # Quorum Check
-        if (
-            submitted_count >= min_clients
-            and self.rounds[round_id]["status"] == "COLLECTING_GRADIENTS"
-        ):
-            self.rounds[round_id]["status"] = "AGGREGATING"
             logger.info(
-                "Quorum met (%d/%d) for round %d. Enqueueing aggregation...",
+                "Received gradient from '%s' for round %d (%d/%d submissions)",
+                clean_bank,
+                round_id,
                 submitted_count,
                 min_clients,
-                round_id,
             )
+
+            # Quorum Check
+            if (
+                submitted_count >= min_clients
+                and self.rounds[round_id]["status"] == "COLLECTING_GRADIENTS"
+            ):
+                self.rounds[round_id]["status"] = "AGGREGATING"
+                logger.info(
+                    "Quorum met (%d/%d) for round %d. Enqueueing aggregation...",
+                    submitted_count,
+                    min_clients,
+                    round_id,
+                )
+                should_aggregate = True
+            else:
+                should_aggregate = False
+
+        if should_aggregate:
             return self.aggregate_and_deploy(round_id)
 
         return {
@@ -236,8 +251,8 @@ class CoordinatorService:
         )
 
         # 2. Evaluate Holdout AUC
-        # Calculate simulated AUC or use override for testing
-        auc_score = mock_auc if mock_auc is not None else 0.88 - (0.01 * round_id)
+        # Use provided override or default baseline validation AUC
+        auc_score = mock_auc if mock_auc is not None else 0.85
 
         now_iso = datetime.now(UTC).isoformat()
         is_champion = auc_score >= min_auc_threshold

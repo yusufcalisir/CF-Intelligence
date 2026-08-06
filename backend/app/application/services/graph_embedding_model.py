@@ -163,29 +163,45 @@ class GraphSAGELayer(nn.Module):
         num_nodes = node_features.size(0)
         device = node_features.device
 
-        # Aggregate neighbor features via mean pooling with sampling
-        agg_features = torch.zeros(num_nodes, node_features.size(1), device=device)
+        # Build sparse adjacency matrix for vectorized mean pooling with neighbor sampling
+        rows: list[int] = []
+        cols: list[int] = []
+        vals: list[float] = []
 
         for i in range(num_nodes):
             neighbors = adjacency_lists[i] if i < len(adjacency_lists) else []
             if not neighbors:
-                # Isolated node: self-loop (use own features as neighbor aggregate)
-                agg_features[i] = node_features[i]
+                rows.append(i)
+                cols.append(i)
+                vals.append(1.0)
                 continue
 
-            # Sample neighbors if too many (GraphSAGE mini-batch sampling)
             if len(neighbors) > num_sample:
                 sampled_idx = torch.randperm(len(neighbors))[:num_sample]
                 neighbors = [neighbors[idx] for idx in sampled_idx.tolist()]
 
-            # Clamp neighbor indices to valid range
             valid_neighbors = [n for n in neighbors if 0 <= n < num_nodes]
             if not valid_neighbors:
-                agg_features[i] = node_features[i]
+                rows.append(i)
+                cols.append(i)
+                vals.append(1.0)
                 continue
 
-            neighbor_feats = node_features[valid_neighbors]
-            agg_features[i] = neighbor_feats.mean(dim=0)
+            weight = 1.0 / len(valid_neighbors)
+            for n in valid_neighbors:
+                rows.append(i)
+                cols.append(n)
+                vals.append(weight)
+
+        if rows:
+            indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
+            values = torch.tensor(vals, dtype=torch.float32, device=device)
+            adj_sparse = torch.sparse_coo_tensor(
+                indices, values, size=(num_nodes, num_nodes), device=device
+            )
+            agg_features = torch.sparse.mm(adj_sparse, node_features)
+        else:
+            agg_features = node_features
 
         # Combine: project self + project aggregated neighbors + bias
         h_self = self.W_self(node_features)
@@ -278,29 +294,38 @@ class GraphSAGEModel(nn.Module):
         predictions = self.classifier(embeddings).squeeze(-1)
         return embeddings, predictions
 
-    def to_model_weights(self) -> ModelWeights:
+    def to_model_weights(self, include_classifier: bool = False) -> ModelWeights:
         """Serialize model parameters to ModelWeights for federation.
 
-        Flattens all parameters into a single list of floats, matching
-        the format used by fl_engine.py for FedAvg/Krum aggregation.
+        **Privacy Policy:** By default, the classifier head (64→16→1) is EXCLUDED
+        from federated aggregation. Including it would expose local fraud label
+        distributions (class ratio leakage) to the coordinator.
+
+        Only GNN layer parameters (W_self, W_neigh, bias per layer) are federated
+        by default, encoding structural patterns without leaking label statistics.
+
+        Args:
+            include_classifier: If True, includes classifier head parameters in the
+                exported weights. Only use for local inference — never for federation.
+                Setting True in a federated round leaks local fraud label distributions.
         """
         layer_shapes = []
         flat_weights: list[float] = []
 
-        for param in self.parameters():
+        params = self.parameters() if include_classifier else self.sage_layers.parameters()
+
+        for param in params:
             shape = tuple(param.shape)
             layer_shapes.append(shape)
             flat_weights.extend(param.detach().cpu().numpy().flatten().tolist())
 
         return ModelWeights(layer_shapes=layer_shapes, flat_weights=flat_weights)
 
-    def load_model_weights(self, weights: ModelWeights) -> None:
-        """Load federated model weights back into the model.
-
-        Reverses the flattening done by to_model_weights().
-        """
+    def load_model_weights(self, weights: ModelWeights, include_classifier: bool = False) -> None:
+        """Load federated model weights back into the model."""
         offset = 0
-        for param, shape in zip(self.parameters(), weights.layer_shapes, strict=False):
+        params = self.parameters() if include_classifier else self.sage_layers.parameters()
+        for param, shape in zip(params, weights.layer_shapes, strict=False):
             numel = 1
             for s in shape:
                 numel *= s

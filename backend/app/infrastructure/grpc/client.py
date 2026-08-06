@@ -11,6 +11,7 @@ import asyncio
 import hashlib
 import logging
 import os
+import random
 from typing import TYPE_CHECKING
 
 import grpc
@@ -136,7 +137,7 @@ class GRPCBankClient:
     # ── Retry decorator ───────────────────────────────────────────────────────
 
     async def _with_retry(self, coro_fn, *args, **kwargs):
-        """Execute ``coro_fn(*args, **kwargs)`` with retry on transient gRPC errors."""
+        """Execute ``coro_fn(*args, **kwargs)`` with retry on transient gRPC errors using Exponential Backoff with Full Jitter."""
         last_exc: Exception | None = None
         for attempt in range(1, _MAX_RETRIES + 1):
             try:
@@ -152,7 +153,8 @@ class GRPCBankClient:
                         exc.code(),
                         exc.details(),
                     )
-                    await asyncio.sleep(_RETRY_DELAY_S)
+                    sleep_time = random.uniform(0, min(15.0, _RETRY_DELAY_S * (2 ** (attempt - 1))))
+                    await asyncio.sleep(sleep_time)
                 else:
                     raise
         raise RuntimeError(

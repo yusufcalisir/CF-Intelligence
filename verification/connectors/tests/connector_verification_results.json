@@ -1,0 +1,14 @@
+{
+  "test_1_interface_compliance": true,
+  "test_2_schema_validation": true,
+  "test_3_iso20022_swift_parsing": true,
+  "test_4_open_banking_psd2": true,
+  "test_5_hmac_signature": true,
+  "test_6_batch_alias_mapping": true,
+  "test_7_streaming_push": true,
+  "test_8_backoff_mathematics": true,
+  "test_9_onboarding_yaml": true,
+  "test_10_production_policy_guard": true,
+  "test_11_mq_serialization": true,
+  "test_12_daemon_config_resolver": true
+}

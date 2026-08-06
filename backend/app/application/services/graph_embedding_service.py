@@ -69,6 +69,8 @@ class GraphEmbeddingService:
         self._embeddings: dict[str, np.ndarray] = {}
         self._node_id_to_index: dict[str, int] = {}
         self._index_to_node_id: dict[int, str] = {}
+        self._query_counts: dict[str, int] = defaultdict(int)
+        self.max_query_budget: int = 100
 
     def _get_or_create_model(self) -> GraphSAGEModel:
         """Lazily initialize the GraphSAGE model."""
@@ -274,7 +276,7 @@ class GraphEmbeddingService:
             metrics["num_edges"],
         )
 
-        return model.to_model_weights(), metrics
+        return model.to_model_weights(include_classifier=False), metrics
 
     def get_model_weights(self) -> ModelWeights | None:
         """Get current model weights for federated aggregation."""
@@ -303,6 +305,9 @@ class GraphEmbeddingService:
     ) -> list[dict[str, Any]]:
         """Find entities with similar structural patterns via cosine similarity.
 
+        Enforces query rate-limiting budget to prevent binary-search membership
+        triangulation attacks.
+
         Args:
             query_entity_id: Entity to find similar nodes for.
             top_k: Maximum number of similar entities to return.
@@ -311,6 +316,12 @@ class GraphEmbeddingService:
         Returns:
             List of dicts with entity_id, similarity score, and metadata.
         """
+        if self._query_counts[query_entity_id] >= self.max_query_budget:
+            logger.warning("Query budget exhausted for entity_id=%s", query_entity_id)
+            return []
+
+        self._query_counts[query_entity_id] += 1
+
         query_emb = self._embeddings.get(query_entity_id)
         if query_emb is None:
             return []
@@ -343,12 +354,48 @@ class GraphEmbeddingService:
 
         return results[:top_k]
 
-    def get_all_embeddings(self) -> dict[str, list[float]]:
-        """Get all cached embeddings as serializable dictionaries.
+    def get_all_embeddings(
+        self, noise_scale: float = 0.05, dp_noise: bool = True
+    ) -> dict[str, list[float]]:
+        """Get cached embeddings with optional DP noise injection and L2 re-normalization.
 
-        Used for API responses and visualization.
+        Injects calibrated Gaussian noise and re-normalizes vectors onto the L2 unit
+        sphere to protect graph topology from reconstruction attacks while maintaining
+        unit-norm invariants.
+
+        In production (APP_ENV=production), disabling DP noise is prohibited.
+        Raw embedding export leaks graph topology (neighbor cosine similarity=0.460
+        enables topology reconstruction attacks).
+
+        Args:
+            noise_scale: Standard deviation of injected Gaussian noise. Default 0.05.
+            dp_noise: If True (default), injects Gaussian noise before returning embeddings.
+                      Setting False is only permitted in non-production environments.
+
+        Raises:
+            RuntimeError: If dp_noise=False and APP_ENV=production.
         """
-        return {entity_id: emb.tolist() for entity_id, emb in self._embeddings.items()}
+        import os
+        if not dp_noise and os.getenv("APP_ENV") == "production":
+            raise RuntimeError(
+                "DP noise cannot be disabled in production. "
+                "Raw embedding export is prohibited: neighbor cosine similarity=0.460 "
+                "enables graph topology reconstruction attacks."
+            )
+
+        out: dict[str, list[float]] = {}
+        for entity_id, emb in self._embeddings.items():
+            if dp_noise and noise_scale > 0.0:
+                rng = np.random.default_rng()
+                noise = rng.normal(0.0, noise_scale, size=emb.shape)
+                noised_emb = emb + noise
+                norm = np.linalg.norm(noised_emb)
+                if norm > 1e-8:
+                    noised_emb = noised_emb / norm
+                out[entity_id] = noised_emb.tolist()
+            else:
+                out[entity_id] = emb.tolist()
+        return out
 
     def get_embedding_stats(self) -> dict[str, Any]:
         """Get summary statistics about the embedding space."""

@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import logging
+from collections import deque
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
@@ -20,7 +21,8 @@ class BatchEODFileConnector(BaseBankConnector):
     """Connector for validating and ingesting EOD batch CSV and Parquet transaction dumps."""
 
     def __init__(self):
-        self._batch_queue: list[NormalizedTransaction] = []
+        super().__init__()
+        self._batch_queue: deque[NormalizedTransaction] = deque()
 
     def parse_csv_stream(self, csv_content: str | bytes) -> list[NormalizedTransaction]:
         """Parses a CSV formatted transaction batch into NormalizedTransaction list."""
@@ -86,7 +88,7 @@ class BatchEODFileConnector(BaseBankConnector):
     def consume_stream(self) -> Generator[NormalizedTransaction, None, None]:
         """Yields transactions from ingested batch file queue."""
         while self._batch_queue:
-            yield self._batch_queue.pop(0)
+            yield self._batch_queue.popleft()
 
     def parse_batch(self, payload: Any) -> list[NormalizedTransaction]:
         """Parses string CSV content or list of dict rows."""

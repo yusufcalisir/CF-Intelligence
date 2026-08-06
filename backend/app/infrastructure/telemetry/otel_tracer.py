@@ -68,9 +68,10 @@ class OpenTelemetryTracer:
 
         if traceparent and traceparent.startswith("00-") and len(traceparent.split("-")) == 4:
             parts = traceparent.split("-")
-            trace_id = parts[1]
-            span_id = parts[2]
-            return trace_id, span_id
+            if len(parts[1]) == 32 and len(parts[2]) == 16:
+                trace_id = parts[1]
+                span_id = parts[2]
+                return trace_id, span_id
 
         # Fallback if header missing or malformed
         return self.generate_trace_id(), self.generate_span_id()

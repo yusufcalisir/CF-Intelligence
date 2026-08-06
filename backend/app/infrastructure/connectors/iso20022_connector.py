@@ -18,6 +18,9 @@ from app.infrastructure.logging.siem_exporter import SIEMAuditEvent, SIEMLogExpo
 if TYPE_CHECKING:
     from collections.abc import Generator
 
+import asyncio
+import inspect
+
 logger = logging.getLogger(__name__)
 
 F = TypeVar("F", bound=Callable[..., Any])
@@ -31,8 +34,33 @@ def retry_connector(
     """Decorator retrying connector operations on transient network/IO failures with backoff."""
 
     def decorator(func: F) -> F:
+        if inspect.iscoroutinefunction(func):
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                last_exc: Exception | None = None
+                for attempt in range(1, max_attempts + 1):
+                    try:
+                        return await func(*args, **kwargs)
+                    except exceptions as exc:
+                        last_exc = exc
+                        logger.warning(
+                            "Connector attempt %d/%d failed for %s: %s",
+                            attempt,
+                            max_attempts,
+                            func.__name__,
+                            exc,
+                        )
+                        if attempt < max_attempts:
+                            await asyncio.sleep(backoff_seconds * (2 ** (attempt - 1)))
+                if last_exc:
+                    raise last_exc
+                return None
+
+            return async_wrapper  # type: ignore[return-value]
+
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
             last_exc: Exception | None = None
             for attempt in range(1, max_attempts + 1):
                 try:
@@ -52,7 +80,7 @@ def retry_connector(
                 raise last_exc
             return None
 
-        return wrapper  # type: ignore[return-value]
+        return sync_wrapper  # type: ignore[return-value]
 
     return decorator
 

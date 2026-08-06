@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
@@ -14,6 +15,43 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from app.domain.value_objects import ModelWeights
+
+
+class CircuitBreakerOpenError(RuntimeError):
+    """Raised when an operation is attempted while CircuitBreaker is in OPEN state."""
+
+    pass
+
+
+class CircuitBreaker:
+    """Lightweight Circuit Breaker state machine supporting CLOSED, OPEN, and HALF_OPEN states."""
+
+    def __init__(self, failure_threshold: int = 5, recovery_timeout: float = 30.0) -> None:
+        self.failure_threshold = failure_threshold
+        self.recovery_timeout = recovery_timeout
+        self.failure_count = 0
+        self.state = "CLOSED"
+        self.last_state_change = time.time()
+
+    def record_success(self) -> None:
+        self.failure_count = 0
+        self.state = "CLOSED"
+
+    def record_failure(self) -> None:
+        self.failure_count += 1
+        if self.failure_count >= self.failure_threshold:
+            self.state = "OPEN"
+            self.last_state_change = time.time()
+
+    def can_execute(self) -> bool:
+        if self.state == "CLOSED":
+            return True
+        if self.state == "OPEN":
+            if time.time() - self.last_state_change > self.recovery_timeout:
+                self.state = "HALF_OPEN"
+                return True
+            return False
+        return True
 
 
 class NormalizedTransaction(BaseModel):
@@ -47,6 +85,9 @@ class NormalizedTransaction(BaseModel):
 
 class BaseBankConnector(BankConnectorInterface, ABC):
     """Abstract base class defining standardized ingestion interface for core bank systems."""
+
+    def __init__(self) -> None:
+        self.circuit_breaker = CircuitBreaker()
 
     def initialize(
         self,

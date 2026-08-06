@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import math
+from collections import deque
 from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ class RealtimeSLAMonitor:
 
     def __init__(self, target_sla_ms: float = 100.0) -> None:
         self.target_sla_ms = target_sla_ms
-        self._latencies: list[float] = []
+        self._latencies: deque[float] = deque(maxlen=10000)
         self._violations_count: int = 0
 
     def record_latency(self, latency_ms: float) -> bool:

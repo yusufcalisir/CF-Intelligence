@@ -206,7 +206,7 @@ class RiskScoringEngine:
             signal_name="ml_prediction",
             weight=self.weights.ml_prediction,
             raw_value=prediction,
-            normalized_score=min(1.0, prediction),
+            normalized_score=max(0.0, min(1.0, prediction)),
             explanation=f"ML model confidence: {prediction:.1%}",
         )
 
@@ -225,10 +225,10 @@ class RiskScoringEngine:
 
     def _eval_merchant_reputation(self, txn: dict) -> RiskSignal:
         category = txn.get("merchant_category", "")
-        merchant_score = txn.get("merchant_risk_score", 0.0)
+        merchant_score = txn.get("merchant_risk_score", 0.10)
         category_risk = MERCHANT_RISK.get(category, 0.1)
-        # Blend merchant's own risk score with category risk
-        normalized = min(1.0, 0.6 * merchant_score + 0.4 * category_risk)
+        # Blend merchant's own risk score with category risk, clamped to [0.0, 1.0]
+        normalized = max(0.0, min(1.0, 0.6 * merchant_score + 0.4 * category_risk))
         return RiskSignal(
             signal_name="merchant_reputation",
             weight=self.weights.merchant_reputation,
@@ -239,7 +239,7 @@ class RiskScoringEngine:
         )
 
     def _eval_country_risk(self, txn: dict) -> RiskSignal:
-        country = txn.get("country_code", "US")
+        country = str(txn.get("country_code", "US")).upper()
         risk = COUNTRY_RISK.get(country, 0.15)
         return RiskSignal(
             signal_name="country_risk",
@@ -270,8 +270,8 @@ class RiskScoringEngine:
 
     def _eval_customer_history(self, txn: dict) -> RiskSignal:
         history_score = txn.get("customer_history_score", 0.5)
-        # Invert: low history score = high risk
-        risk = 1.0 - min(1.0, history_score)
+        # Invert: low history score = high risk, clamped to [0.0, 1.0]
+        risk = max(0.0, 1.0 - min(1.0, history_score))
         account_age = txn.get("account_age_days", 365)
         if account_age < 30:
             risk = min(1.0, risk + 0.3)
@@ -321,10 +321,16 @@ class RiskScoringEngine:
         amount = txn.get("transaction_amount", 0)
         mean_amt = baseline.get("mean_amount", 100)
         std_amt = baseline.get("std_amount", 50)
-        z_score = abs(amount - mean_amt) / std_amt if std_amt > 0 else 0.0
 
-        # Normalize z-score: 0-1 = normal, >3 = extreme
-        normalized = min(1.0, max(0.0, (z_score - 1) / 3))
+        if std_amt > 0:
+            z_score = abs(amount - mean_amt) / std_amt
+            normalized = min(1.0, max(0.0, (z_score - 1) / 3))
+        else:
+            # Zero-variance baseline: any non-zero deviation is anomalous
+            deviation = abs(amount - mean_amt)
+            z_score = 10.0 if deviation > 1e-6 else 0.0
+            normalized = 1.0 if deviation > 1e-6 else 0.0
+
         return RiskSignal(
             signal_name="behavior_anomaly",
             weight=self.weights.behavior_anomaly,

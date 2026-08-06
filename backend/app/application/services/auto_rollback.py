@@ -32,6 +32,9 @@ class RollbackExecutionRecord:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
+import threading
+
+
 class AutoRollbackManager:
     """Monitors live model health and executes automated zero-downtime rollbacks."""
 
@@ -45,6 +48,7 @@ class AutoRollbackManager:
         self.max_latency_ms = max_latency_ms
         self.max_fpr = max_fpr
         self._history: list[RollbackExecutionRecord] = []
+        self._lock = threading.Lock()
 
     def evaluate_model_health_and_rollback(
         self,
@@ -74,7 +78,8 @@ class AutoRollbackManager:
             restored_model_version=fallback_model_version,
             cause=cause,
         )
-        self._history.append(record)
+        with self._lock:
+            self._history.append(record)
 
         logger.warning(
             "EXECUTED AUTOMATED ROLLBACK %s: Demoted %s -> Restored %s (Cause: %s)",
@@ -87,4 +92,5 @@ class AutoRollbackManager:
 
     def get_rollback_history(self) -> list[RollbackExecutionRecord]:
         """Retrieves rollback execution history."""
-        return list(self._history)
+        with self._lock:
+            return list(self._history)
