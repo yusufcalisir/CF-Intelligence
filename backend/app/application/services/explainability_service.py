@@ -394,7 +394,7 @@ class ExplainabilityService:
 
         # Helper to extract feature value from alert top_features dict list
         top_feat_dict = {f.get("feature"): f.get("contribution") for f in alert.top_features if isinstance(f, dict)}
-        
+
         orig_country_val = str(top_feat_dict.get("country_code", "HIGH_RISK_JURISDICTION"))
         orig_mcc_val = str(top_feat_dict.get("merchant_category", "high_risk_category"))
 

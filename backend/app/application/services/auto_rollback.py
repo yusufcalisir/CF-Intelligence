@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -30,9 +31,6 @@ class RollbackExecutionRecord:
     restored_model_version: str
     cause: RollbackCause
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
-
-
-import threading
 
 
 class AutoRollbackManager:

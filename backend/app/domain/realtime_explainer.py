@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -13,7 +14,6 @@ from app.infrastructure.cache import get_redis_client
 
 logger = logging.getLogger(__name__)
 
-from collections import OrderedDict
 
 # Bounded in-memory LRU fallback cache (max 1000 entries) when Redis is unreachable
 _local_shap_cache: OrderedDict[str, str] = OrderedDict()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 import os
-from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
@@ -18,6 +17,8 @@ from app.infrastructure.connectors.rest_connector import RESTBankConnector
 from app.infrastructure.connectors.streaming_connector import StreamingPaymentConnector
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from app.application.interfaces.bank_connector import BankConnectorInterface
     from app.config import Settings
 
