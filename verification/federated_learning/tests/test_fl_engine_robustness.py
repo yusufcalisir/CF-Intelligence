@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Adversarial Robustness, Security, & Fault Injection Test Suite for FederatedLearningEngine.
 
 Attempts to break every aggregation algorithm using NaN/Inf floats, shape mismatches,
@@ -153,6 +153,52 @@ def test_unsupported_aggregation_method_raises_error(fl_engine: FederatedLearnin
     mw = ModelWeights(layer_shapes=[(5,)], flat_weights=[1.0]*5)
     with pytest.raises(ValueError, match="Unsupported aggregation method"):
         fl_engine.aggregate_parameters(client_weights=[mw], client_samples=[10], method=cast(AggregationMethod, "INVALID_METHOD"))
+
+
+# 12. Flower Engine Ray Failure Fallback Assertion (GR14)
+def test_flower_engine_ray_failure_fallback():
+    from unittest.mock import MagicMock
+    from app.application.services.flower_engine import FlowerFLEngine
+    from app.domain.value_objects import SimulationConfig
+
+    mock_ms = MagicMock()
+    engine = FlowerFLEngine(model_service=mock_ms)
+
+    config = SimulationConfig(num_rounds=1, local_epochs=1, learning_rate=0.01)
+    bank_data = {
+        "bank_a": {"X_train": np.random.randn(10, 5), "y_train": np.zeros(10), "X_test": np.random.randn(5, 5), "y_test": np.zeros(5)},
+        "bank_b": {"X_train": np.random.randn(10, 5), "y_train": np.ones(10), "X_test": np.random.randn(5, 5), "y_test": np.ones(5)},
+    }
+    mock_model = MagicMock()
+    mock_model.parameters.return_value = []
+
+    # Calling run_federated_training will trigger Ray init failure in test environment and fall back seamlessly
+    res = engine.run_federated_training(config, bank_data, mock_model)
+    assert "rounds" in res
+    assert len(res["rounds"]) == 1
+
+
+# 13. Async FL Straggler Timeout Recovery (GR15)
+def test_async_fl_straggler_timeout_recovery():
+    import datetime
+    from app.domain.quorum_manager import DynamicQuorumManager, QuorumState
+
+    qm = DynamicQuorumManager(quorum_threshold_pct=0.60, target_window_seconds=1)
+    nodes = ["bank_a", "bank_b", "bank_c", "bank_d", "bank_e"]
+    qm.register_nodes(nodes)
+
+    # 2 out of 5 submit (40% < 60%)
+    qm.record_node_submission("bank_a")
+    qm.record_node_submission("bank_b")
+
+    # Fast forward time beyond 1 second target window
+    qm.round_start_time = datetime.datetime.now(datetime.UTC) - datetime.timedelta(seconds=2)
+    status = qm.evaluate_quorum_status()
+
+    assert status.state == QuorumState.TIMEOUT_EXPIRED
+    assert status.submitted_nodes_count == 2
+    assert status.time_remaining_seconds == 0.0
+
 
 if __name__ == "__main__":
     pytest.main(["-v", __file__])

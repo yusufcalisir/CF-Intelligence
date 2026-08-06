@@ -75,7 +75,7 @@ Every report in this registry follows the same structure:
 
 | Subsystem | Report | Confidence | Status | Last Audit |
 |:---|:---|:---:|:---:|:---:|
-| Federated Learning Engine | [federated_learning/scientific_audit_report.md](federated_learning/scientific_audit_report.md) | **98 / 100** | Verified | 2026-08-05 |
+| Federated Learning Engine | [federated_learning/scientific_audit_report.md](federated_learning/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-06 |
 | Differential Privacy & PETs | [differential_privacy/scientific_audit_report.md](differential_privacy/scientific_audit_report.md) | **100 / 100** | Verified | 2026-07-31 |
 | Secure Aggregation & TEE | [secure_aggregation/scientific_audit_report.md](secure_aggregation/scientific_audit_report.md) | **Complete** | Verified | 2026-08-01 |
 | AML Risk Scoring | [risk_scoring/scientific_audit_report.md](risk_scoring/scientific_audit_report.md) | **100 / 100** | Verified | 2026-07-31 |

@@ -234,5 +234,49 @@ def test_inv_10_empty_client_list_safety(fl_engine: FederatedLearningEngine):
     with pytest.raises(ValueError, match="Cannot aggregate empty parameter list"):
         fl_engine.aggregate_parameters(client_weights=[], client_samples=[], method=AggregationMethod.FED_AVG)
 
+
+# ---------------------------------------------------------------------------
+# Property 11: Async Staleness Attenuation Monotonicity S(tau_1) >= S(tau_2) for tau_1 <= tau_2
+# ---------------------------------------------------------------------------
+@given(
+    tau1=st.integers(min_value=0, max_value=100),
+    tau2=st.integers(min_value=0, max_value=100),
+    alpha=st.floats(min_value=0.1, max_value=2.0),
+)
+@settings(max_examples=50, suppress_health_check=[HealthCheck.too_slow])
+def test_inv_11_async_staleness_attenuation_monotonicity(tau1: int, tau2: int, alpha: float):
+    from app.domain.async_fl_engine import staleness_attenuation
+
+    t_min, t_max = min(tau1, tau2), max(tau1, tau2)
+    s_min = staleness_attenuation(t_min, alpha)
+    s_max = staleness_attenuation(t_max, alpha)
+
+    assert 0.0 < s_max <= s_min <= 1.0
+
+
+# ---------------------------------------------------------------------------
+# Property 12: Dynamic Quorum Trigger Monotonicity
+# ---------------------------------------------------------------------------
+@given(
+    total_nodes=st.integers(min_value=3, max_value=20),
+    threshold_pct=st.floats(min_value=0.50, max_value=0.90),
+)
+@settings(max_examples=30, suppress_health_check=[HealthCheck.too_slow])
+def test_inv_12_dynamic_quorum_monotonicity(total_nodes: int, threshold_pct: float):
+    from app.domain.quorum_manager import DynamicQuorumManager, QuorumState
+
+    manager = DynamicQuorumManager(quorum_threshold_pct=threshold_pct)
+    node_ids = [f"bank_{i}" for i in range(total_nodes)]
+    manager.register_nodes(node_ids)
+
+    needed = int(np.ceil(threshold_pct * total_nodes))
+    for i in range(needed):
+        state = manager.record_node_submission(node_ids[i])
+
+    status = manager.evaluate_quorum_status()
+    assert status.state == QuorumState.QUORUM_REACHED
+    assert status.current_quorum_pct >= threshold_pct
+
+
 if __name__ == "__main__":
     pytest.main(["-v", __file__])

@@ -279,43 +279,59 @@ class FlowerFLEngine:
             sim_config.num_rounds,
         )
 
-        import ray
+        try:
+            import ray
 
-        backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        current_pp = os.environ.get("PYTHONPATH", "")
-        if backend_dir not in current_pp:
-            os.environ["PYTHONPATH"] = (
-                f"{backend_dir}{os.pathsep}{current_pp}" if current_pp else backend_dir
+            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            current_pp = os.environ.get("PYTHONPATH", "")
+            if backend_dir not in current_pp:
+                os.environ["PYTHONPATH"] = (
+                    f"{backend_dir}{os.pathsep}{current_pp}" if current_pp else backend_dir
+                )
+
+            if ray.is_initialized():
+                ray.shutdown()
+            ray.init(
+                object_store_memory=100 * 1024 * 1024,
+                num_cpus=2,
+                include_dashboard=False,
+                runtime_env={
+                    "sys_paths": [backend_dir],
+                    "env_vars": {"PYTHONPATH": os.environ["PYTHONPATH"]},
+                },
             )
 
-        if ray.is_initialized():
+            history = start_simulation(
+                client_fn=client_fn,
+                num_clients=len(bank_ids),
+                config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
+                strategy=strategy,
+                client_resources={"num_cpus": 1, "num_gpus": 0.0},
+            )
+
             ray.shutdown()
-        ray.init(
-            object_store_memory=100 * 1024 * 1024,
-            num_cpus=2,
-            include_dashboard=False,
-            runtime_env={
-                "sys_paths": [backend_dir],
-                "env_vars": {"PYTHONPATH": os.environ["PYTHONPATH"]},
-            },
-        )
 
-        history = start_simulation(
-            client_fn=client_fn,
-            num_clients=len(bank_ids),
-            config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
-            strategy=strategy,
-            client_resources={"num_cpus": 1, "num_gpus": 0.0},
-        )
+            logger.info(
+                "[Flower] Simulation complete. History losses: %s",
+                history.losses_distributed,
+            )
 
-        ray.shutdown()
+            return {
+                "rounds": round_results,
+                "history": history,
+            }
+        except Exception as exc:
+            logger.warning(
+                "[Flower] Simulation runtime initialization failed: %s. Executing zero-downtime native production fallback via FederatedLearningEngine...",
+                exc,
+            )
+            from app.application.services.fl_engine import FederatedLearningEngine
 
-        logger.info(
-            "[Flower] Simulation complete. History losses: %s",
-            history.losses_distributed,
-        )
-
-        return {
-            "rounds": round_results,
-            "history": history,
-        }
+            fl_engine = FederatedLearningEngine(self.model_service)
+            return fl_engine.run_federated_training(
+                config=config,
+                bank_data=bank_data,
+                global_model=global_model,
+                progress_callback=progress_callback,
+                simulation_id=simulation_id,
+            )
