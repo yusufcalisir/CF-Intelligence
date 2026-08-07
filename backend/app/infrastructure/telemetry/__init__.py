@@ -308,16 +308,12 @@ def setup_telemetry(app: FastAPI) -> None:
     from fastapi import Response
 
     try:
-        from prometheus_fastapi_instrumentator import (  # type: ignore # pyright: ignore[reportMissingImports]
-            Instrumentator,
-        )
+        from prometheus_fastapi_instrumentator import Instrumentator
 
         instrumentator = Instrumentator(
             should_group_status_codes=True,
-            should_ignore_untemplated=True,
-            should_instrument_requests_inprogress=True,
-            inprogress_name="http_requests_in_flight",
-            inprogress_labels=True,
+            should_ignore_untemplated=False,
+            should_instrument_requests_inprogress=False,
         )
         instrumentator.instrument(app)
         logger.info(

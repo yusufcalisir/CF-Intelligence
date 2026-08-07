@@ -201,7 +201,7 @@ class EnterpriseStressTestRunner:
     def prepare(self) -> None:
         """Seeds test state and validates generator is functional."""
         logger.info(
-            "Preparing stress test: %d banks, target %,d tx/sec, duration %ds",
+            "Preparing stress test: %d banks, target %d tx/sec, duration %ds",
             self.config.num_banks,
             self.config.transactions_per_second_target,
             self.config.duration_seconds,
