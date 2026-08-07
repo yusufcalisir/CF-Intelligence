@@ -13,58 +13,41 @@ export default function Dashboard() {
   const { data: simulations, isLoading: simsLoading } = useSimulations();
   const [, setLastSimId] = useState<string | null>(null);
 
-
-
-
-
   const handleSimulationCreated = (id: string) => {
     setLastSimId(id);
-    // Navigate to the simulation view after a brief delay
     setTimeout(() => navigate(`/simulation/${id}`), 500);
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+    <div className="flex flex-col gap-6">
       {/* Hero */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        style={{ flexShrink: 0, padding: '0.75rem 0' }}
+        className="shrink-0 py-2"
       >
-        <h1
-          style={{
-            margin: '0 0 0.5rem 0',
-            fontSize: 'clamp(1.75rem, 4vw, 2.25rem)',
-            fontWeight: 800,
-            background: 'linear-gradient(135deg, #818cf8 0%, #2dd4bf 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            backgroundClip: 'text',
-            letterSpacing: '-0.02em',
-            lineHeight: 1.1,
-          }}
-        >
+        <h1 className="text-2xl md:text-3xl font-extrabold gradient-text tracking-tight mb-2">
           Collaborative Fraud Intelligence
         </h1>
-        <p style={{ margin: 0, fontSize: '0.875rem', color: '#94a3b8', maxWidth: '56rem', lineHeight: 1.6 }}>
+        <p className="text-sm text-[var(--color-text-secondary)] max-w-4xl leading-relaxed">
           Three independent banks collaboratively train a PyTorch fraud detection model using Federated Learning (FedAvg) and Differential Privacy (DP), without pooling raw transaction logs.
         </p>
       </motion.div>
 
       {/* Bank Cards */}
-      <div style={{ flexShrink: 0, marginBottom: '0.5rem' }}>
-        <h2 style={{ margin: '0 0 0.75rem 0', fontSize: '0.7rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+      <div className="shrink-0">
+        <h2 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">
           Participating Institutions
         </h2>
         {banksLoading ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[0, 1, 2].map((i) => (
-              <div key={i} style={{ height: 144, borderRadius: '0.75rem', background: 'rgba(15,22,41,0.5)', animation: 'pulse 2s infinite' }} />
+              <div key={i} className="glass-card p-4 h-36 animate-pulse" />
             ))}
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {banks?.map((bank, idx) => (
               <BankCard key={bank.id} bank={bank} index={idx} />
             ))}
@@ -73,29 +56,30 @@ export default function Dashboard() {
       </div>
 
       {/* Data Drift Visualization */}
-      <div className="shrink-0 mb-2">
+      <div className="shrink-0">
         <DataDriftPanel />
       </div>
 
       {/* Controls + Recent Simulations */}
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1rem', alignItems: 'start' }} className="!grid-cols-1 lg:!grid-cols-3">
-        <div style={{ gridColumn: 'span 2' }}>
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Simulation Controls */}
+        <div className="lg:col-span-2 flex flex-col">
           <SimulationControls onSimulationCreated={handleSimulationCreated} />
         </div>
 
         {/* Recent Simulations */}
-        <div className="glass-card" style={{ padding: '1rem', display: 'flex', flexDirection: 'column', maxHeight: 600 }}>
-          <h3 style={{ margin: '0 0 0.75rem 0', fontSize: '0.75rem', fontWeight: 600, color: '#e2e8f0', flexShrink: 0 }}>
+        <div className="glass-card p-4 flex flex-col max-h-[600px]">
+          <h3 className="text-xs font-semibold text-[var(--color-text-primary)] mb-3 shrink-0">
             Recent Simulations
           </h3>
           {simsLoading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, overflow: 'hidden' }}>
+            <div className="space-y-2 flex-1 overflow-hidden">
               {[0, 1, 2].map((i) => (
-                <div key={i} style={{ height: 48, background: 'rgba(26,32,64,0.5)', borderRadius: '0.5rem' }} />
+                <div key={i} className="h-12 bg-[var(--color-bg-elevated)] rounded-lg animate-pulse" />
               ))}
             </div>
           ) : simulations && simulations.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', flex: 1, overflowY: 'auto', paddingRight: '0.25rem' }}>
+            <div className="space-y-2.5 flex-1 overflow-y-auto pr-1">
               {simulations.map((sim) => {
                 const isCompleted = sim.status === 'completed';
                 const isFailed = sim.status === 'failed';
@@ -103,55 +87,48 @@ export default function Dashboard() {
                 const idSlice = sim.id.slice(0, 8).toUpperCase();
                 const timeStr = new Date(sim.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-                const iconBg = isCompleted ? 'rgba(16,185,129,0.12)' : isFailed ? 'rgba(239,68,68,0.12)' : 'rgba(99,102,241,0.12)';
-                const iconColor = isCompleted ? '#10b981' : isFailed ? '#ef4444' : '#818cf8';
-
                 return (
                   <button
                     key={sim.id}
                     onClick={() => navigate(`/simulation/${sim.id}`)}
-                    style={{
-                      width: '100%', textAlign: 'left', padding: '0.875rem', borderRadius: '0.75rem',
-                      background: 'rgba(26,32,64,0.5)', border: '1px solid rgba(30,42,74,0.8)',
-                      cursor: 'pointer', display: 'flex', gap: '0.75rem', alignItems: 'center',
-                      transition: 'border-color 0.2s, background 0.2s',
-                    }}
-                    onMouseEnter={e => {
-                      (e.currentTarget as HTMLElement).style.background = 'rgba(99,102,241,0.08)';
-                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(99,102,241,0.3)';
-                    }}
-                    onMouseLeave={e => {
-                      (e.currentTarget as HTMLElement).style.background = 'rgba(26,32,64,0.5)';
-                      (e.currentTarget as HTMLElement).style.borderColor = 'rgba(30,42,74,0.8)';
-                    }}
+                    className="w-full text-left p-3 rounded-xl bg-[var(--color-bg-secondary)] hover:bg-[var(--color-bg-card)] border border-[var(--color-border)] hover:border-[var(--color-accent-indigo)]/50 transition-all duration-200 flex gap-3 items-center group relative overflow-hidden"
                   >
-                    <div style={{ width: 32, height: 32, borderRadius: '0.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', background: iconBg, color: iconColor, flexShrink: 0 }}>
-                      {isCompleted && <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>✓</span>}
-                      {isFailed && <span style={{ fontSize: '0.75rem', fontWeight: 700 }}>✗</span>}
-                      {isRunning && <div style={{ width: 14, height: 14, border: `2px solid ${iconColor}`, borderTopColor: 'transparent', borderRadius: '50%' }} className="animate-spin" />}
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)]">
+                      {isCompleted && <span className="text-xs font-bold text-emerald-400">✓</span>}
+                      {isFailed && <span className="text-xs font-bold text-rose-400">✗</span>}
+                      {isRunning && (
+                        <div className="w-3.5 h-3.5 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+                      )}
                     </div>
 
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.375rem' }}>
-                        <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 mb-1">
+                        <span className="text-xs font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-accent-indigo-light)] transition-colors truncate">
                           Simulation #{idSlice}
                         </span>
-                        <span style={{ fontSize: '10px', color: '#64748b', fontFamily: 'var(--font-mono)', flexShrink: 0 }}>{timeStr}</span>
+                        <span className="text-[10px] text-[var(--color-text-muted)] font-mono shrink-0">
+                          {timeStr}
+                        </span>
                       </div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.375rem', fontSize: '9px', color: '#94a3b8' }}>
-                        <span style={{ padding: '2px 6px', borderRadius: '0.25rem', background: 'rgba(8,12,24,0.6)', border: '1px solid rgba(30,42,74,0.6)' }}>
+
+                      <div className="flex flex-wrap items-center gap-1.5 text-[9px] text-[var(--color-text-secondary)]">
+                        <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] border border-[var(--color-border-subtle)]">
                           Rounds: {sim.current_round}/{sim.total_rounds}
                         </span>
                         {sim.duration_seconds && (
-                          <span style={{ padding: '2px 6px', borderRadius: '0.25rem', background: 'rgba(8,12,24,0.6)', border: '1px solid rgba(30,42,74,0.6)' }}>
+                          <span className="px-1.5 py-0.5 rounded bg-[var(--color-bg-primary)] border border-[var(--color-border-subtle)]">
                             {formatDuration(sim.duration_seconds)}
                           </span>
                         )}
                         <StatusBadge status={sim.status} />
                       </div>
+
                       {isRunning && (
-                        <div style={{ width: '100%', height: 3, background: 'rgba(8,12,24,0.8)', borderRadius: 9999, marginTop: 10, overflow: 'hidden' }}>
-                          <div style={{ height: '100%', borderRadius: 9999, background: 'linear-gradient(90deg,#6366f1,#14b8a6)', width: `${sim.progress_pct}%`, transition: 'width 0.5s' }} />
+                        <div className="w-full h-1 bg-[var(--color-bg-primary)] rounded-full mt-2 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-teal-400 transition-all duration-500"
+                            style={{ width: `${sim.progress_pct}%` }}
+                          />
                         </div>
                       )}
                     </div>
@@ -160,14 +137,13 @@ export default function Dashboard() {
               })}
             </div>
           ) : (
-            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', padding: '1rem' }}>
-              <div style={{ position: 'relative', width: 64, height: 64, marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: '2px solid rgba(99,102,241,0.2)' }} className="animate-ping" />
-                <div style={{ position: 'absolute', width: 40, height: 40, borderRadius: '50%', border: '1px solid rgba(20,184,166,0.3)' }} className="animate-pulse" />
-                <div style={{ width: 16, height: 16, borderRadius: '50%', background: '#6366f1', boxShadow: '0 0 12px rgba(99,102,241,0.5)' }} />
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-4">
+              <div className="relative w-12 h-12 mb-3 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-indigo-500/20 animate-ping" style={{ animationDuration: '3s' }} />
+                <div className="w-3 h-3 rounded-full bg-indigo-500 shadow-[0_0_12px_rgba(99,102,241,0.5)]" />
               </div>
-              <p style={{ margin: 0, fontSize: '0.75rem', fontWeight: 600, color: '#94a3b8' }}>No simulations yet</p>
-              <p style={{ margin: '0.25rem 0 0', fontSize: '10px', color: '#64748b', maxWidth: 200 }}>
+              <p className="text-xs font-semibold text-[var(--color-text-secondary)]">No simulations yet</p>
+              <p className="text-[10px] text-[var(--color-text-muted)] max-w-[180px] mt-1">
                 Configure and start your first federated training run above.
               </p>
             </div>
