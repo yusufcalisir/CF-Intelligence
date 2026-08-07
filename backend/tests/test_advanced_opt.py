@@ -98,23 +98,23 @@ class TestAMLSimLoader:
 
 
 class TestPaySimLoader:
-    def test_mock_returns_correct_shape(self):
-        result = load_paysim(n_mock_txns=400, rng=np.random.default_rng(0))
+    def test_mock_returns_correct_shape(self, tmp_path):
+        result = load_paysim(path=tmp_path / "nonexistent", n_mock_txns=400, rng=np.random.default_rng(0))
         assert result["source"] == "mock"
         assert result["X"].shape == (400, 29)
         assert result["y"].shape == (400,)
 
 
 class TestLoadDatasetRegistry:
-    def test_known_datasets(self):
+    def test_known_datasets(self, tmp_path):
         # Elliptic takes n_mock_nodes, others take n_mock_txns
-        d1 = load_dataset("elliptic", n_mock_nodes=100, rng=np.random.default_rng(0))
+        d1 = load_dataset("elliptic", path=tmp_path / "nonexistent", n_mock_nodes=100, rng=np.random.default_rng(0))
         assert d1["X"].shape == (100, 166)
 
-        d2 = load_dataset("amlsim", n_mock_txns=100, rng=np.random.default_rng(0))
+        d2 = load_dataset("amlsim", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
         assert d2["X"].shape == (100, 6)
 
-        d3 = load_dataset("paysim", n_mock_txns=100, rng=np.random.default_rng(0))
+        d3 = load_dataset("paysim", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
         assert d3["X"].shape == (100, 29)
 
     def test_unknown_dataset_raises(self):

@@ -24,13 +24,9 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Storage root matches database.py convention
-_STORAGE_ROOT = os.path.abspath(
-    os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-        "storage",
-    )
-)
+from app.infrastructure.storage.storage_utils import get_storage_dir
+
+_STORAGE_ROOT = get_storage_dir()
 
 # DH-PSI prime — must match psi_service.py
 _PSI_PRIME = 0xDEB00B9C694F4BE84A28B101E6A0F1D8B9646D0BF1A0F53FBAFF74205A405D021C7B38A8DE5F482F6B8470E04E5FCEF5BA88CEB8E5E7A0D0BF7BCAAA83DE4F2D

@@ -1393,13 +1393,9 @@ class SimulationService:
                 },
             }
 
-            storage_dir = os.path.abspath(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-                    "storage",
-                )
-            )
-            os.makedirs(storage_dir, exist_ok=True)
+            from app.infrastructure.storage.storage_utils import get_storage_dir
+
+            storage_dir = get_storage_dir()
             report_path = os.path.join(
                 storage_dir, f"ai_act_compliance_report_{simulation.id}.json"
             )

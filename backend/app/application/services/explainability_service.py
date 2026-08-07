@@ -283,10 +283,9 @@ class ExplainabilityService:
         ]
         input_vector = np.array([raw_features_clean], dtype=np.float32)  # Shape: (1, 10)
 
-        # 2. Try loading the global model
-        model_dir = os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "storage"
-        )
+        from app.infrastructure.storage.storage_utils import get_storage_dir
+
+        model_dir = get_storage_dir()
         model_path = os.path.join(model_dir, "global_model.pt")
 
         model = None

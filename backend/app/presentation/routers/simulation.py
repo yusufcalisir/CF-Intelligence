@@ -523,12 +523,9 @@ async def get_ai_act_report(simulation_id: str) -> dict:
     import json
     import os
 
-    storage_dir = os.path.abspath(
-        os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-            "storage",
-        )
-    )
+    from app.infrastructure.storage.storage_utils import get_storage_dir
+
+    storage_dir = get_storage_dir()
     report_path = os.path.join(storage_dir, f"ai_act_compliance_report_{simulation_id}.json")
     if not os.path.exists(report_path):
         raise HTTPException(
