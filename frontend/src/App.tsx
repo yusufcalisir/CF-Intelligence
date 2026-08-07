@@ -1,54 +1,49 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import Layout from './components/layout/Layout';
-import Dashboard from './pages/Dashboard';
-import LiveOperationsView from './pages/LiveOperationsView';
-import BankOnboardingPage from './pages/BankOnboardingPage';
-import AlertsPage from './pages/AlertsPage';
-import CasesPage from './pages/CasesPage';
-import CaseDetailPage from './pages/CaseDetailPage';
-import ScenariosPage from './pages/ScenariosPage';
-import GraphPage from './pages/GraphPage';
-import InvestigationDashboard from './pages/InvestigationDashboard';
-import PoliciesPage from './pages/PoliciesPage';
-import PsiPage from './pages/PsiPage';
-import SecurityPage from './pages/SecurityPage';
-import ObservabilityPage from './pages/ObservabilityPage';
-import CoordinatorPage from './pages/CoordinatorPage';
-import PrivacyDefensePage from './pages/PrivacyDefensePage';
-import LandingPage from './pages/LandingPage';
+import React, { useEffect, useState } from 'react';
+import { Navbar } from './components/Navbar';
+import { GraphVisualizer } from './components/GraphVisualizer';
+import { CounterfactualWorkbench } from './components/CounterfactualWorkbench';
+import { FLRoundRunner } from './components/FLRoundRunner';
+import { Predictor } from './components/Predictor';
+import { DriftAnalytics } from './components/DriftAnalytics';
+import { SystemHealthStatus } from './types';
+import { checkSystemHealth } from './services/api';
 
-export default function App() {
+export function App() {
+  const [activeTab, setActiveTab] = useState('graph');
+  const [selectedBank, setSelectedBank] = useState('all');
+  const [health, setHealth] = useState<SystemHealthStatus | null>(null);
+
+  useEffect(() => {
+    checkSystemHealth().then(setHealth);
+    const interval = setInterval(() => {
+      checkSystemHealth().then(setHealth);
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Enterprise SaaS Landing Page */}
-        <Route path="/" element={<LandingPage />} />
+    <div className="min-h-screen bg-[#0B0F19] text-slate-100 flex flex-col font-sans">
+      <Navbar
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        selectedBank={selectedBank}
+        setSelectedBank={setSelectedBank}
+        health={health}
+      />
 
-        <Route element={<Layout />}>
-          {/* Live Operations & FL Consortium */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/operations" element={<LiveOperationsView />} />
-          <Route path="/operations/:id" element={<LiveOperationsView />} />
-          <Route path="/simulation/:id" element={<LiveOperationsView />} />
+      <main className="flex-1 max-w-7xl w-full mx-auto p-6">
+        {activeTab === 'graph' && <GraphVisualizer selectedBank={selectedBank} />}
+        {activeTab === 'counterfactual' && <CounterfactualWorkbench />}
+        {activeTab === 'fl_runner' && <FLRoundRunner />}
+        {activeTab === 'predict' && <Predictor />}
+        {activeTab === 'drift' && <DriftAnalytics />}
+      </main>
 
-          {/* Phase 2: AML Intelligence Platform */}
-          <Route path="/investigation" element={<InvestigationDashboard />} />
-          <Route path="/alerts" element={<AlertsPage />} />
-          <Route path="/cases" element={<CasesPage />} />
-          <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-          <Route path="/rules" element={<PoliciesPage />} />
-          <Route path="/psi" element={<PsiPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-          <Route path="/observability" element={<ObservabilityPage />} />
-          <Route path="/scenarios" element={<ScenariosPage />} />
-          <Route path="/graph" element={<GraphPage />} />
-
-          {/* Enterprise Platform & Onboarding */}
-          <Route path="/onboarding" element={<BankOnboardingPage />} />
-          <Route path="/coordinator" element={<CoordinatorPage />} />
-          <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+      <footer className="glass-card border-t border-slate-800/80 py-4 px-6 mt-12 text-center text-xs text-slate-500">
+        Cross-Bank Privacy-Preserving Federated Fraud Intelligence Platform &copy; 2026. Built with React, Cytoscape.js, Differential Privacy & FedGNN.
+      </footer>
+    </div>
   );
 }
+
+export default App;
