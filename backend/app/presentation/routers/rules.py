@@ -68,7 +68,7 @@ _DEFAULT_RULES = [
     BusinessRuleResponse(
         id="rule_vel_001",
         rule_name="High Velocity Transfer Detection",
-        condition="transaction.velocity_1h > 5 and transaction.amount > 1000",
+        condition={"field": "velocity_1h", "operator": ">", "value": 5, "min_amount": 1000},
         action="FLAG_HIGH_RISK",
         is_active=True,
         created_at="2026-01-01T00:00:00Z",
@@ -76,7 +76,7 @@ _DEFAULT_RULES = [
     BusinessRuleResponse(
         id="rule_dev_002",
         rule_name="Unrecognized Device Anomaly",
-        condition="transaction.is_new_device == True and transaction.amount > 5000",
+        condition={"field": "is_new_device", "operator": "==", "value": True, "min_amount": 5000},
         action="REQUIRE_MFA",
         is_active=True,
         created_at="2026-01-01T00:00:00Z",
@@ -84,7 +84,7 @@ _DEFAULT_RULES = [
     BusinessRuleResponse(
         id="rule_geo_003",
         rule_name="Cross-Border High Risk Jurisdiction",
-        condition="transaction.country_risk_score > 0.8",
+        condition={"field": "country_risk_score", "operator": ">", "value": 0.8},
         action="FLAG_CRITICAL",
         is_active=True,
         created_at="2026-01-01T00:00:00Z",
@@ -92,7 +92,7 @@ _DEFAULT_RULES = [
     BusinessRuleResponse(
         id="rule_smurf_004",
         rule_name="Structuring / Smurfing Pattern",
-        condition="transaction.amount >= 9000 and transaction.amount < 10000",
+        condition={"field": "amount", "operator": "between", "min_value": 9000, "max_value": 9999},
         action="ESCALATE_TO_SAR",
         is_active=True,
         created_at="2026-01-01T00:00:00Z",
