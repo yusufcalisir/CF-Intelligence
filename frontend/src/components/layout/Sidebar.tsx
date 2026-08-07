@@ -5,7 +5,7 @@ const NAV_SECTIONS = [
   {
     label: 'Live Consortium Operations',
     items: [
-      { path: '/', label: 'Dashboard', icon: '◈' },
+      { path: '/dashboard', label: 'Dashboard', icon: '◈' },
       { path: '/operations', label: 'Live Operations', icon: '📡' },
     ],
   },
@@ -91,32 +91,46 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Logo & Close Button */}
-        <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <img 
-              src="/favicon.svg" 
-              className="w-8 h-8 rounded-full object-cover border border-[var(--color-border)]" 
-              alt="CFI Logo" 
-            />
-            <div>
-              <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
-                Fraud Intelligence
-              </h1>
-              <p className="text-[10px] text-[var(--color-text-muted)]">Federated Simulator</p>
-            </div>
-          </div>
-
-          {/* Close button on mobile */}
-          <button
-            onClick={onClose}
-            className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] md:hidden focus:outline-none"
-            aria-label="Close menu"
+        {/* Back to Landing + Close Button */}
+        <div className="px-3 pt-2 pb-1 border-b border-[var(--color-border)]">
+          {/* Back arrow — subtle link to SaaS landing page */}
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-accent-indigo-light)] transition-colors duration-150 mb-2"
+            title="Back to landing page"
           >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-          </button>
+            Back to site
+          </Link>
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2.5">
+              <img
+                src="/favicon.svg"
+                className="w-8 h-8 rounded-full object-cover border border-[var(--color-border)]"
+                alt="CFI Logo"
+              />
+              <div>
+                <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
+                  Fraud Intelligence
+                </h1>
+                <p className="text-[10px] text-[var(--color-text-muted)]">Federated Simulator</p>
+              </div>
+            </div>
+
+            {/* Close button on mobile */}
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] md:hidden focus:outline-none"
+              aria-label="Close menu"
+            >
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Navigation */}
