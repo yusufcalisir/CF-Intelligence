@@ -94,11 +94,25 @@ def _setup_tenant_logging() -> None:
     System/coordinator logs go to ``storage/logs/system.log``.
     """
     import os
+    import tempfile
 
     from app.infrastructure.database import active_tenant
 
-    logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "storage", "logs"))
-    os.makedirs(logs_dir, exist_ok=True)
+    env_dir = os.environ.get("CFI_STORAGE_DIR")
+    if env_dir:
+        logs_dir = os.path.abspath(os.path.join(env_dir, "logs"))
+    else:
+        logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "storage", "logs"))
+
+    try:
+        os.makedirs(logs_dir, exist_ok=True)
+        test_file = os.path.join(logs_dir, ".write_test")
+        with open(test_file, "w") as _f:
+            pass
+        os.remove(test_file)
+    except OSError:
+        logs_dir = os.path.join(tempfile.gettempdir(), "cfi_storage", "logs")  # nosec B108
+        os.makedirs(logs_dir, exist_ok=True)
 
     class TenantLogFilter(logging.Filter):
         """Filter that only passes records matching the target tenant."""

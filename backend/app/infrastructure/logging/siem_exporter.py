@@ -12,6 +12,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
+import tempfile
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -19,7 +20,27 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-RETRY_QUEUE_FILE = Path(__file__).parent.parent.parent / "storage" / "siem_retry_queue.jsonl"
+
+def get_siem_retry_file() -> Path:
+    env_dir = os.environ.get("CFI_STORAGE_DIR")
+    if env_dir:
+        base_dir = Path(env_dir)
+    else:
+        base_dir = Path(__file__).parent.parent.parent / "storage"
+
+    try:
+        base_dir.mkdir(parents=True, exist_ok=True)
+        test_file = base_dir / ".siem_write_test"
+        test_file.touch()
+        test_file.unlink(missing_ok=True)
+        return base_dir / "siem_retry_queue.jsonl"
+    except OSError:
+        tmp_dir = Path(tempfile.gettempdir()) / "cfi_storage"  # nosec B108
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        return tmp_dir / "siem_retry_queue.jsonl"
+
+
+RETRY_QUEUE_FILE = get_siem_retry_file()
 
 
 class SIEMExportError(Exception):
