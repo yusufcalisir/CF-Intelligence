@@ -477,7 +477,7 @@ docker-compose up -d
 ```bash
 cd backend
 pip install -r requirements.txt
-pytest backend/tests/ -v
+pytest tests/ -v
 ```
 
 ### Step 3: Trigger Optuna Bayesian FL Hyperparameter Tuning

@@ -6,7 +6,7 @@ import csv
 import io
 import logging
 from collections import deque
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.connectors.base_connector import BaseBankConnector, NormalizedTransaction
@@ -45,7 +45,7 @@ class BatchEODFileConnector(BaseBankConnector):
                 currency=str(row.get("currency", "USD")),
                 timestamp=datetime.fromisoformat(row["timestamp"])
                 if "timestamp" in row and row["timestamp"]
-                else datetime.utcnow(),
+                else datetime.now(timezone.utc),
                 merchant_category_code=str(
                     row.get("merchant_category_code") or row.get("mcc") or "0000"
                 ),

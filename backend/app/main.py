@@ -660,7 +660,6 @@ else:
 
     app.include_router(health.router)
     app.include_router(maintenance_cron.router)
-    app.include_router(onboarding.router)
     app.include_router(simulation.router)
 
     app.include_router(banks.router)
