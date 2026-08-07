@@ -46,9 +46,9 @@ COPY backend /app/backend
 
 USER cfi
 
-EXPOSE 8000 50051
+EXPOSE 7860
 
-HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
+    CMD curl -f http://localhost:7860/health || exit 1
 
-CMD ["gunicorn", "app.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]
+CMD ["gunicorn", "app.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:7860"]
