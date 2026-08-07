@@ -1,3 +1,5 @@
+<div align="center">
+
 # Collaborative Fraud Intelligence Platform
 
 ### Privacy-Preserving Cross-Bank Financial Fraud Detection and Anti-Money Laundering Architecture
@@ -11,9 +13,21 @@
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-[Live Web Application Console](https://cf-intelligence.vercel.app)
+**[Live Web Application Console](https://cf-intelligence.vercel.app)**
 
-[Executive Summary](#1-executive-summary--architectural-vision) | [Master System Architecture](#2-master-system-architecture) | [Directory Tree](#3-complete-clean-architecture-directory-structure) | [Data Ingestion](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [FL Engines & Optuna](#5-federated-learning-engines--optuna-tuning) | [PET Security Perimeter](#6-privacy-enhancing-technologies-dp-secagg-fhe--hardware-tee) | [Byzantine Robustness](#7-byzantine-poisoning-defense-backdoors--adversarial-robustness) | [Graph Neural Networks](#8-streaming-graph-neural-networks--fuzzy-psi-identity-resolution) | [Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [Case Management](#11-human-in-the-loop-workbench-feedback-loop--data-retention) | [Disaster Recovery](#12-disaster-recovery-high-availability-failover--sre-operations) | [Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) | [Scientific Audits](#14-subsystem-scientific-audit-reports-verification) | [API Blueprints](#15-api-endpoint-blueprints--json-schemas) | [Quick Start](#16-step-by-step-operator-quick-start)
+---
+
+### Architectural Specification Index
+
+| Core Architecture | Technical Specifications | Verification & Operations |
+|:---|:---|:---|
+| [1. Executive Summary](#1-executive-summary--architectural-vision) | [6. PET Security Perimeter](#6-privacy-enhancing-technologies-dp-secagg-fhe--hardware-tee) | [11. Case Management](#11-human-in-the-loop-workbench-feedback-loop--data-retention) |
+| [2. System Architecture](#2-master-system-architecture) | [7. Byzantine Defense](#7-byzantine-poisoning-defense-backdoors--adversarial-robustness) | [12. Disaster Recovery](#12-disaster-recovery-high-availability-failover--sre-operations) |
+| [3. Directory Structure](#3-complete-clean-architecture-directory-structure) | [8. Graph Neural Networks](#8-streaming-graph-neural-networks--fuzzy-psi-identity-resolution) | [13. Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) |
+| [4. Data Ingestion](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [14. Scientific Audits](#14-subsystem-scientific-audit-reports-verification) |
+| [5. Federated Learning](#5-federated-learning-engines--optuna-tuning) | [10. Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [15. API Blueprints & Quick Start](#15-api-endpoint-blueprints--json-schemas) |
+
+</div>
 
 ---
 
