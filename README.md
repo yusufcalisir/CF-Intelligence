@@ -127,17 +127,18 @@ sequenceDiagram
     Primary-->>App: 200 OK (Score: 895.4)
     Primary->>Standby: Heartbeat Ping (Interval: 3s)
     
-    Note over Primary: 💥 Primary Node Outage
+    Note over Primary: Primary Node Outage
     
     Standby->>Primary: Heartbeat Probe (Timeout 15s)
     Standby->>Primary: Heartbeat Retries (3/3 Failed)
     
-    Note over Standby: ⚡ Standby Promotion (RTO < 30s)
+    Note over Standby: Standby Promotion (RTO < 30s)
     Standby->>DB: Acquire Active Lock
     DB-->>Standby: State Lock Granted
     
     App->>Standby: POST /v1/inference/score
     Standby-->>App: 200 OK (Score: 895.4)
+```
 
 ---
 
@@ -155,7 +156,6 @@ The platform includes a modern, dark-themed **Cross-Bank Fraud Intelligence Web 
 cd frontend
 npm install
 npm run dev
-```
 ```
 
 ---
@@ -221,9 +221,17 @@ Automatically triggers aggregation when minimum client threshold conditions ($\t
   $$\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)$$
 - **Privacy Budget Accountant:** Enforces privacy loss limits ($\epsilon \le 2.0$, $\delta \le 10^{-5}$).
 
-### 5.2 Secure Aggregation (SecAgg) & Fully Homomorphic Encryption (FHE)
-- **Pairwise Zero-Sum Masking:** Applies pairwise cryptographic seed mask exchange ($y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}}$). Pairwise masks cancel out identically at the coordinator ($\sum_k y_k = \sum_k w_k$), hiding individual updates.
-- **TenSEAL / Microsoft SEAL (CKKS Scheme):** Integrates polynomial ring CKKS homomorphic encryption (`poly_modulus_degree=8192`, scale $2^{40}$). Bank updates are encrypted locally into CKKS byte-stream ciphertexts, enabling the central server to compute homomorphic weighted averages ($\sum_i w_i \cdot c_i$) directly over ciphertexts without ever decrypting or accessing private weights.
+### 5.2 Cryptographic Privacy Perimeter: SecAgg, FHE & Hardware TEE Enclaves
+
+| PET Technology | Core Driver | Cryptographic Mechanism | Security Guarantee | Hardware Dependency |
+|:---|:---|:---|:---|:---|
+| **Pairwise SecAgg** | `secagg_driver.py` | Zero-sum pairwise seed masking ($y_k = w_k + \sum s_{kj} - \sum s_{jk}$) | Perfect forward secrecy; masks cancel identically at coordinator | None (Pure Software) |
+| **TenSEAL CKKS FHE** | `fhe_driver.py` | Microsoft SEAL CKKS polynomial ring scheme ($N=8192, 2^{40}$) | Zero-knowledge server-side homomorphic weighted addition | CPU / AVX2 |
+| **Hardware TEE Enclave** | `tee_driver.py` | Intel SGX / AWS Nitro Enclave remote attestation & MRENCLAVE measurement | Confidential computing with hardware isolation & AES-256-GCM sealed memory | SGX / Nitro CPU |
+
+- **Pairwise Zero-Sum Masking (`secagg_driver.py`):** Exchanges Diffie-Hellman pairwise seed masks across participating banks ($y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}}$). Individual bank updates remain cryptographically obscured; masks cancel out identically upon coordinator summation ($\sum_k y_k = \sum_k w_k$).
+- **TenSEAL / Microsoft SEAL (CKKS Scheme) (`fhe_driver.py`):** Integrates polynomial ring CKKS homomorphic encryption (`poly_modulus_degree=8192`, scale $2^{40}$). Model updates are encrypted into CKKS byte-stream ciphertexts, allowing the coordinator to perform zero-knowledge weighted sums ($\sum_i w_i \cdot c_i$) directly over ciphertexts without ever decrypting or accessing private model parameters.
+- **Hardware TEE Enclave Driver (`tee_driver.py`):** Orchestrates hardware enclave execution in Intel SGX / AWS Nitro Enclaves. Generates SHA-256 remote attestation reports (`attestation_report`), verifies hardware measurements (`mrenclave`, `mrsigner`), executes inside isolated enclave memory, and seals sensitive state with AES-256-GCM data sealing (`seal_data` / `unseal_data`).
 
 ### 5.3 Privacy Audit Suite (`privacy_audit_service.py`, `dlg_validation.py`, `mia_validation.py`)
 - **Deep Leakage from Gradients (DLG):** Simulates gradient reconstruction attacks to verify that differential privacy and SecAgg prevent image/feature recovery.
