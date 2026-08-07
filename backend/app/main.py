@@ -13,6 +13,7 @@ os.environ["MKL_NUM_THREADS"] = "2"
 os.environ["OPENBLAS_NUM_THREADS"] = "2"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "2"
 os.environ["NUMEXPR_NUM_THREADS"] = "2"
+os.environ["GIT_PYTHON_REFRESH"] = "quiet"
 
 print(">>> Python main.py loaded successfully! <<<", flush=True)
 

@@ -32,7 +32,10 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
     redis_client = None
 
     try:
-        redis_client = aioredis.from_url(settings.redis_url, decode_responses=True, socket_connect_timeout=2.0)
+        redis_url = settings.redis_url
+        if not redis_url.startswith(("redis://", "rediss://", "unix://")):
+            redis_url = f"redis://{redis_url}"
+        redis_client = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2.0)
         # Replay past events
         events_key = f"simulation:{simulation_id}:events"
         past_events = await redis_client.lrange(events_key, 0, -1)
