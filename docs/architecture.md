@@ -323,7 +323,7 @@ Bank A Subnet (bank-a-net)                  Bank B Subnet (bank-b-net)
 The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant) where each bank node operates against its own isolated database instance or schema:
 - **AsyncEngine Connection Pooling**: Production PostgreSQL / CockroachDB AsyncEngine configured via `_make_engine_kwargs(tenant)` with `pool_size=20`, `max_overflow=10`, `pool_recycle=3600`, and `pool_pre_ping=True`.
 - **Serializable Isolation & Retry Loop**: `run_cockroach_transaction()` handles SQLSTATE `40001` transaction conflicts with exponential retry loops.
-- **Alembic Schema Migrations**: Managed via [`alembic.ini`](file:///backend/alembic.ini) and [`env.py`](file:///backend/app/infrastructure/database/migrations/env.py) for tracking versioned database migrations across multi-tenant schemas.
+- **Alembic Schema Migrations**: Managed via [`alembic.ini`](file:///backend/alembic.ini), [`env.py`](file:///backend/app/infrastructure/database/migrations/env.py), and [`migration_manager.py`](file:///backend/app/infrastructure/database/migration_manager.py) for programmatic `upgrade_head()` / `downgrade_revision()` auto-migrations and tracking versioned revision scripts (`001_production_domain_tables`) across multi-tenant bank schemas.
 
 ### 8.2 gRPC Transport Protocol (`fl_service.proto`)
 

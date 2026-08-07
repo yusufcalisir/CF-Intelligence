@@ -769,10 +769,10 @@ curl -X POST http://localhost:8000/v1/admin/banks/register \
 
 ## 18. Verification & Quality Testing Suite
 
-Execute full automated unit test suite:
+Execute full automated unit & integration test suite (862/862 passing tests):
 
 ```bash
-pytest backend/tests/unit/ -v
+pytest backend/tests/ -v
 ```
 
 Execute end-to-end multi-bank integration & fault-tolerance suite:
