@@ -180,8 +180,11 @@ class PrivacyService:
         delta_w = np.array(updated_weights.flat_weights) - np.array(original_weights.flat_weights)
         norm = np.linalg.norm(delta_w)
 
-        if norm > max_norm:
-            delta_w = delta_w * (max_norm / norm)
+        if norm > max_norm or np.isnan(norm) or np.isinf(norm):
+            if np.isnan(norm) or np.isinf(norm):
+                delta_w = np.nan_to_num(delta_w, nan=0.0, posinf=max_norm, neginf=-max_norm)
+            else:
+                delta_w = delta_w * (max_norm / norm)
             logger.debug("Clipped model update: norm %.4f → %.4f", norm, max_norm)
 
         clipped = np.array(original_weights.flat_weights) + delta_w

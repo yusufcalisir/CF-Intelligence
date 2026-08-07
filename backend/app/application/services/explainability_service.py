@@ -277,7 +277,11 @@ class ExplainabilityService:
                     val = 0.5
             raw_features.append(val)
 
-        input_vector = np.array([raw_features], dtype=np.float32)  # Shape: (1, 10)
+        raw_features_clean = [
+            np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30) if isinstance(val, (int, float)) else val
+            for val in raw_features
+        ]
+        input_vector = np.array([raw_features_clean], dtype=np.float32)  # Shape: (1, 10)
 
         # 2. Try loading the global model
         model_dir = os.path.join(
