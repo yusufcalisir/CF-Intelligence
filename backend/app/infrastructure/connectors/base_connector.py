@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import time
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, Field
@@ -65,7 +65,7 @@ class NormalizedTransaction(BaseModel):
     amount: float = Field(..., gt=0, description="Transaction monetary amount")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     timestamp: datetime = Field(
-        default_factory=datetime.utcnow, description="UTC transaction timestamp"
+        default_factory=lambda: datetime.now(UTC), description="UTC transaction timestamp"
     )
     merchant_category_code: str = Field(
         default="0000", description="ISO 18245 Merchant Category Code"

@@ -9,7 +9,7 @@ if os.getenv("APP_ENV") == "production":
     raise ImportError("FixtureConnector must not be used in production")
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -107,9 +107,9 @@ class FixtureConnector(BaseBankConnector):
             try:
                 ts = datetime.fromisoformat(ts_raw.replace("Z", "+00:00"))
             except ValueError:
-                ts = datetime.utcnow()
+                ts = datetime.now(UTC)
         else:
-            ts = datetime.utcnow()
+            ts = datetime.now(UTC)
 
         return NormalizedTransaction(
             transaction_id=tx_id,

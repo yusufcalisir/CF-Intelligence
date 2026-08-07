@@ -72,7 +72,7 @@ class BatchEODFileConnector(BaseBankConnector):
                 currency=str(row.get("currency", "USD")),
                 timestamp=datetime.fromisoformat(str(row["timestamp"]))
                 if "timestamp" in row
-                else datetime.utcnow(),
+                else datetime.now(UTC),
                 merchant_category_code=str(row.get("merchant_category_code", "0000")),
                 origin_country=str(row.get("origin_country", "US")),
                 destination_country=str(row.get("destination_country", "US")),
