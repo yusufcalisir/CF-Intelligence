@@ -1,0 +1,62 @@
+replicaCount: 2
+
+image:
+  repository: cfi-intelligence/backend
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+serviceAccount:
+  create: true
+  name: "cfi-platform-sa"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+
+service:
+  type: ClusterIP
+  port: 8000
+  grpcPort: 50051
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/limit-rps: "500"
+  hosts:
+    - host: cfi.bank-consortium.org
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: cfi-tls-cert
+      hosts:
+        - cfi.bank-consortium.org
+
+resources:
+  limits:
+    cpu: 2000m
+    memory: 4Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+
+env:
+  APP_ENV: production
+  REDIS_URL: "redis://cfi-redis:6379/0"
+  TELEMETRY_ENABLED: "true"

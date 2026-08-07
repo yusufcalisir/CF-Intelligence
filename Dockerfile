@@ -1,40 +1,54 @@
-FROM python:3.12-slim
+# Multi-Stage Production Dockerfile for CFI Fraud Detection Platform
 
-# Install system utilities and runtime libraries required by PyTorch/scikit-learn (e.g. libgomp1)
+# ── Stage 1: Build Dependencies ──────────────────────
+FROM python:3.12-slim-bookworm AS builder
+
+WORKDIR /build
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libgomp1 \
+    curl \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user for Hugging Face Spaces compliance
-RUN useradd -m -u 1000 user
+RUN pip install --no-cache-dir uv
 
-# Set home and path environment variables explicitly
-ENV HOME=/home/user \
-    PATH=/home/user/.local/bin:$PATH \
-    PYTHONUNBUFFERED=1 \
-    PYTHONIOENCODING=UTF-8
+COPY backend/requirements.txt ./
+RUN uv venv /opt/venv && \
+    . /opt/venv/bin/activate && \
+    uv pip install -r requirements.txt
 
-# Set working directory to user's home app folder
-WORKDIR /home/user/app
+# ── Stage 2: Production Runtime ──────────────────────
+FROM python:3.12-slim-bookworm AS runtime
 
-# Switch to non-root user BEFORE installing packages
-USER user
+WORKDIR /app
 
-# Copy backend requirements and install dependencies as non-root user
-COPY --chown=user backend/requirements.txt requirements.txt
-RUN pip install --no-cache-dir --upgrade -r requirements.txt
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PATH="/opt/venv/bin:$PATH" \
+    PYTHONPATH="/app/backend" \
+    APP_ENV="production"
 
-# Verify that all critical backend dependencies import successfully at build time as non-root user
-RUN python -c "import fastapi, uvicorn, pydantic, sqlalchemy, celery, redis, numpy, pandas, sklearn, torch; print('Build verification: All dependencies imported successfully!')"
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd -g 10001 cfi \
+    && useradd -u 10001 -g cfi -s /bin/sh cfi \
+    && mkdir -p /app/storage /app/logs \
+    && chown -R cfi:cfi /app
 
-# Copy backend application source files with owner permissions
-COPY --chown=user backend/app ./app
-COPY --chown=user backend/alembic ./alembic
-COPY --chown=user backend/alembic.ini .
+COPY --from=builder /opt/venv /opt/venv
+COPY backend /app/backend
 
-# Expose the default Hugging Face Spaces port
-EXPOSE 7860
+USER cfi
 
-# Start backend application via python module with pure-Python fallbacks to bypass C-extension issues (uvloop/httptools)
-CMD ["python", "-m", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "7860", "--loop", "asyncio", "--http", "h11", "--log-level", "debug"]
+EXPOSE 8000 50051
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:8000/health || exit 1
+
+CMD ["gunicorn", "app.main:app", "-w", "2", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:8000"]

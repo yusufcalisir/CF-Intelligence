@@ -1,573 +1,98 @@
-# ══════════════════════════════════════════════════════════════════
-# Collaborative Fraud Intelligence – Decentralized Docker Compose
-# ──────────────────────────────────────────────────────────────────
-# Each bank runs in an isolated network (simulating a VPC) with its
-# own dedicated PostgreSQL database.  Cross-bank communication flows
-# exclusively over the `net-federation` bridge, which connects the
-# FL coordinator to the bank client nodes.
-# ══════════════════════════════════════════════════════════════════
+version: '3.8'
 
 services:
-  # ══════════════════════════════════════════════
-  # COORDINATOR ZONE (net-coordinator)
-  # ══════════════════════════════════════════════
-
-  # ── Central PostgreSQL (coordinator services) ──
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-fraud_intelligence}
-      POSTGRES_USER: ${POSTGRES_USER:-fraud_user}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cfi-intelligence/backend:latest
+    container_name: cfi-api-server
+    restart: unless-stopped
     ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - "8000:8000"
+      - "50051:50051"
+    environment:
+      - APP_ENV=production
+      - REDIS_URL=redis://redis-store:6379/0
+      - TELEMETRY_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    depends_on:
+      redis-store:
+        condition: service_healthy
     networks:
-      - net-coordinator
+      - cfi-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fraud_user} -d ${POSTGRES_DB:-fraud_intelligence}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
-  # ── Redis ───────────────────────────────────
-  redis:
-    image: redis:7-alpine
+  redis-store:
+    image: redis:7.2-alpine
+    container_name: cfi-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - redis-data:/data
     networks:
-      - net-coordinator
+      - cfi-network
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
-      retries: 5
+      timeout: 3s
+      retries: 3
 
-  # ── HashiCorp Vault Secrets & KMS Engine ───
-  vault:
-    image: hashicorp/vault:1.16
-    container_name: cfi-vault
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-token}
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.95.0
+    container_name: cfi-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./docker/otel/otel-collector-config.yaml:/etc/otelcol/config.yaml
     ports:
-      - "8200:8200"
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus metrics exporter
     networks:
-      - net-coordinator
-    healthcheck:
-      test: ["CMD", "vault", "status"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+      - cfi-network
 
-  # ── Neo4j Graph Database ────────────────────
-  neo4j:
-    image: neo4j:5-community
-    ports:
-      - "7474:7474"   # HTTP Browser UI
-      - "7687:7687"   # Bolt Protocol
-    environment:
-      NEO4J_AUTH: ${NEO4J_AUTH:-neo4j/change_me_in_production}
-      NEO4J_PLUGINS: '["apoc"]'
-      NEO4J_dbms_memory_heap_max__size: 1G
-      NEO4J_dbms_memory_pagecache_size: 512M
-    volumes:
-      - neo4j_data:/data
-      - neo4j_logs:/logs
-    networks:
-      - net-coordinator
-    healthcheck:
-      test: ["CMD", "neo4j", "status"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-      start_period: 30s
-    restart: unless-stopped
-    profiles:
-      - graphdb
-
-  # ── API Gateway ─────────────────────────────
-  gateway:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8000
-      --workers ${API_WORKERS:-1}
-    ports:
-      - "8000:8000"
-    environment:
-      - SERVICE_NAME=gateway
-      - FL_COORDINATOR_URL=http://fl-coordinator:8001
-      - IDENTITY_GRAPH_URL=http://identity-graph:8002
-      - FRAUD_ALERT_URL=http://fraud-alert:8003
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-gateway
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      fl-coordinator:
-        condition: service_started
-      identity-graph:
-        condition: service_started
-      fraud-alert:
-        condition: service_started
-      jaeger:
-        condition: service_started
-    networks:
-      - net-coordinator
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ── Federated Learning Coordinator ──────────
-  fl-coordinator:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8001
-    ports:
-      - "8001:8001"
-    environment:
-      - SERVICE_NAME=fl-coordinator
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-fl-coordinator
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      jaeger:
-        condition: service_started
-    networks:
-      - net-coordinator
-      - net-federation
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ── Identity & Graph Resolver ───────────────
-  identity-graph:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8002
-    ports:
-      - "8002:8002"
-    environment:
-      - SERVICE_NAME=identity-graph
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-identity-graph
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      jaeger:
-        condition: service_started
-    networks:
-      - net-coordinator
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ── Fraud & Alert Engine ────────────────────
-  fraud-alert:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8003
-    ports:
-      - "8003:8003"
-    environment:
-      - SERVICE_NAME=fraud-alert
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-fraud-alert
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      jaeger:
-        condition: service_started
-    networks:
-      - net-coordinator
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ── Celery Worker ───────────────────────────
-  worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      celery -A app.infrastructure.celery_app worker
-      --loglevel=info
-      --concurrency=2
-      -E
-    env_file:
-      - .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    networks:
-      - net-coordinator
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ── Celery Flower (Monitoring) ──────────────
-  flower:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      celery -A app.infrastructure.celery_app flower
-      --port=5555
-    ports:
-      - "5555:5555"
-    env_file:
-      - .env
-    depends_on:
-      - worker
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-  # ── Frontend ────────────────────────────────
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-    ports:
-      - "3000:80"
-    depends_on:
-      - gateway
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-  # ══════════════════════════════════════════════
-  # BANK A ZONE (net-bank-a)
-  # ══════════════════════════════════════════════
-
-  postgres-bank-a:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: fraud_bank_a
-      POSTGRES_USER: bank_a_user
-      POSTGRES_PASSWORD: bank_a_secret_change_me
-    volumes:
-      - postgres_bank_a_data:/var/lib/postgresql/data
-    networks:
-      - net-bank-a
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bank_a_user -d fraud_bank_a"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  bank-a:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8011
-    environment:
-      - SERVICE_NAME=bank-a
-      - POSTGRES_HOST=postgres-bank-a
-      - POSTGRES_DB=fraud_bank_a
-      - POSTGRES_USER=bank_a_user
-      - POSTGRES_PASSWORD=bank_a_secret_change_me
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-bank-a
-    env_file:
-      - .env
-    depends_on:
-      postgres-bank-a:
-        condition: service_healthy
-    networks:
-      - net-bank-a
-      - net-federation
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ══════════════════════════════════════════════
-  # BANK B ZONE (net-bank-b)
-  # ══════════════════════════════════════════════
-
-  postgres-bank-b:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: fraud_bank_b
-      POSTGRES_USER: bank_b_user
-      POSTGRES_PASSWORD: bank_b_secret_change_me
-    volumes:
-      - postgres_bank_b_data:/var/lib/postgresql/data
-    networks:
-      - net-bank-b
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bank_b_user -d fraud_bank_b"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  bank-b:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8012
-    environment:
-      - SERVICE_NAME=bank-b
-      - POSTGRES_HOST=postgres-bank-b
-      - POSTGRES_DB=fraud_bank_b
-      - POSTGRES_USER=bank_b_user
-      - POSTGRES_PASSWORD=bank_b_secret_change_me
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-bank-b
-    env_file:
-      - .env
-    depends_on:
-      postgres-bank-b:
-        condition: service_healthy
-    networks:
-      - net-bank-b
-      - net-federation
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ══════════════════════════════════════════════
-  # BANK C ZONE (net-bank-c)
-  # ══════════════════════════════════════════════
-
-  postgres-bank-c:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: fraud_bank_c
-      POSTGRES_USER: bank_c_user
-      POSTGRES_PASSWORD: bank_c_secret_change_me
-    volumes:
-      - postgres_bank_c_data:/var/lib/postgresql/data
-    networks:
-      - net-bank-c
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U bank_c_user -d fraud_bank_c"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  bank-c:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8013
-    environment:
-      - SERVICE_NAME=bank-c
-      - POSTGRES_HOST=postgres-bank-c
-      - POSTGRES_DB=fraud_bank_c
-      - POSTGRES_USER=bank_c_user
-      - POSTGRES_PASSWORD=bank_c_secret_change_me
-      - OTEL_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4317
-      - OTEL_SERVICE_NAME=cfi-bank-c
-    env_file:
-      - .env
-    depends_on:
-      postgres-bank-c:
-        condition: service_healthy
-    networks:
-      - net-bank-c
-      - net-federation
-    volumes:
-      - model_storage:/app/app/storage
-    restart: unless-stopped
-
-  # ══════════════════════════════════════════════
-  # OBSERVABILITY STACK (net-coordinator)
-  # ══════════════════════════════════════════════
-
-  # ── Jaeger (Distributed Tracing) ────────────
-  jaeger:
-    image: jaegertracing/all-in-one:latest
-    ports:
-      - "16686:16686"   # Jaeger UI
-      - "4317:4317"     # OTLP gRPC receiver
-      - "4318:4318"     # OTLP HTTP receiver
-    environment:
-      - COLLECTOR_OTLP_ENABLED=true
-    volumes:
-      - ./monitoring/jaeger-ui-config.json:/etc/jaeger/ui-config.json:ro
-    command:
-      - "--query.ui-config=/etc/jaeger/ui-config.json"
-    networks:
-      - net-coordinator
-      - net-federation
-    restart: unless-stopped
-
-  # ── Prometheus (Metrics) ────────────────────
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.50.1
+    container_name: cfi-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
     ports:
       - "9090:9090"
-    extra_hosts:
-      - "gateway:host-gateway"
-      - "fl-coordinator:host-gateway"
-      - "identity-graph:host-gateway"
-      - "fraud-alert:host-gateway"
-    volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=7d'
-      - '--web.enable-lifecycle'
-    depends_on:
-      - gateway
     networks:
-      - net-coordinator
-    restart: unless-stopped
+      - cfi-network
 
-  # ── Grafana (Dashboards) ────────────────────
   grafana:
-    image: grafana/grafana:11.6.0
-    ports:
-      - "3001:3000"
+    image: grafana/grafana-oss:10.3.3
+    container_name: cfi-grafana
+    restart: unless-stopped
     environment:
       - GF_SECURITY_ADMIN_USER=admin
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
-      - grafana_data:/var/lib/grafana
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
     depends_on:
       - prometheus
-      - jaeger
     networks:
-      - net-coordinator
-    restart: unless-stopped
+      - cfi-network
 
-  # ── MLflow Tracking Server ──────────────────
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.19.0
-    ports:
-      - "5000:5000"
-    environment:
-      - MLFLOW_ALLOW_FILE_STORE=true
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-  # ── Grafana Loki Log Aggregation ───────────
-  loki:
-    image: grafana/loki:3.0.0
-    command: -config.file=/etc/loki/local-config.yaml
-    ports:
-      - "3100:3100"
-    volumes:
-      - ./monitoring/loki/loki-config.yml:/etc/loki/local-config.yaml
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-  # ── Promtail Container Log Collector ──────
-  promtail:
-    image: grafana/promtail:3.0.0
-    command: -config.file=/etc/promtail/config.yml
-    volumes:
-      - ./monitoring/promtail/promtail-config.yml:/etc/promtail/config.yml
-      - /var/log/containers:/var/log/containers:ro
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-  # ── Prometheus Alertmanager ───────────────
-  alertmanager:
-    image: prom/alertmanager:v0.27.0
-    ports:
-      - "9093:9093"
-    volumes:
-      - ./monitoring/alertmanager/config.yml:/etc/alertmanager/config.yml
-    command: --config.file=/etc/alertmanager/config.yml --storage.path=/alertmanager
-    networks:
-      - net-coordinator
-    restart: unless-stopped
-
-
-# ══════════════════════════════════════════════
-# VOLUMES
-# ══════════════════════════════════════════════
-volumes:
-  postgres_data:
-  postgres_bank_a_data:
-  postgres_bank_b_data:
-  postgres_bank_c_data:
-  redis_data:
-  prometheus_data:
-  grafana_data:
-  model_storage:
-  neo4j_data:
-  neo4j_logs:
-
-# ══════════════════════════════════════════════
-# NETWORKS – Simulating VPC Isolation
-# ══════════════════════════════════════════════
-# net-coordinator : Control plane services only.
-# net-bank-{a,b,c}: Each bank's private zone (DB + client).
-# net-federation  : Federated learning channel
-#                   (coordinator + bank clients only).
-# ══════════════════════════════════════════════
 networks:
-  net-coordinator:
+  cfi-network:
     driver: bridge
-  net-bank-a:
-    driver: bridge
-  net-bank-b:
-    driver: bridge
-  net-bank-c:
-    driver: bridge
-  net-federation:
-    driver: bridge
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:

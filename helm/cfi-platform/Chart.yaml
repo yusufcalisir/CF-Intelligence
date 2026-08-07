@@ -1,0 +1,11 @@
+apiVersion: v2
+name: cfi-platform
+description: Helm Chart for Privacy-Preserving Cross-Bank Fraud Detection Platform
+type: application
+version: 1.0.0
+appVersion: "1.4.2"
+keywords:
+  - federated-learning
+  - fraud-detection
+  - differential-privacy
+  - open-banking
