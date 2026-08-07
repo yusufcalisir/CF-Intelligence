@@ -263,7 +263,7 @@ class AlertIntelligenceService:
 
         # Dynamic fallback for demo/seed alert IDs to prevent 404 errors
         import hashlib
-        h = int(hashlib.md5(alert_id.encode()).hexdigest(), 16)
+        h = int(hashlib.md5(alert_id.encode(), usedforsecurity=False).hexdigest(), 16)  # noqa: S324
         banks = ["bank_a", "bank_b", "bank_c"]
         bank_id = banks[h % len(banks)]
         score = 0.82 + (h % 150) / 1000.0  # 0.82 - 0.97
