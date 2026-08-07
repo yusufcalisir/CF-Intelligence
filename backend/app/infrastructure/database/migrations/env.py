@@ -16,7 +16,7 @@ from app.infrastructure.database import Base
 try:
     config = context.config
 except AttributeError:
-    config = None
+    config = None  # type: ignore[assignment]
 
 if config and config.config_file_name:
     with contextlib.suppress(Exception):
