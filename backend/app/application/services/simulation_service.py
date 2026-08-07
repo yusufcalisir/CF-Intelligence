@@ -736,7 +736,11 @@ class SimulationService:
                                 FHEDriver.encrypt_weights(w, fhe_keyring, rng)
                                 for w in client_weights
                             ]
-                            enc_avg = FHEDriver.homomorphic_average(enc_updates, client_samples)
+                            enc_avg = FHEDriver.homomorphic_average(
+                                enc_updates,
+                                client_samples,
+                                public_context_bytes=fhe_keyring.public_context_bytes,
+                            )
                             simulation.fhe_noise_bound = enc_avg.noise_bound
                             global_weights = FHEDriver.decrypt_weights(
                                 enc_avg, fhe_keyring, global_weights.layer_shapes

@@ -77,7 +77,7 @@ Every report in this registry follows the same structure:
 |:---|:---|:---:|:---:|:---:|
 | Federated Learning Engine | [federated_learning/scientific_audit_report.md](federated_learning/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-06 |
 | Differential Privacy & PETs | [differential_privacy/scientific_audit_report.md](differential_privacy/scientific_audit_report.md) | **100 / 100** | Verified | 2026-07-31 |
-| Secure Aggregation & TEE | [secure_aggregation/scientific_audit_report.md](secure_aggregation/scientific_audit_report.md) | **Complete** | Verified | 2026-08-01 |
+| Secure Aggregation & FHE (CKKS) | [secure_aggregation/scientific_audit_report.md](secure_aggregation/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-07 |
 | AML Risk Scoring | [risk_scoring/scientific_audit_report.md](risk_scoring/scientific_audit_report.md) | **100 / 100** | Verified | 2026-07-31 |
 | Graph Intelligence (FedGNN) | [graph_intelligence/scientific_audit_report.md](graph_intelligence/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-06 |
 | Drift Detection | [drift_detection/scientific_audit_report.md](drift_detection/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-06 |

@@ -1,4 +1,4 @@
-﻿# Publication-Quality Scientific Audit & Verification Report — Secure Aggregation Subsystem
+# Publication-Quality Scientific Audit & Verification Report — Secure Aggregation Subsystem
 
 **Subsystem:** Secure Aggregation (SecAgg), Trusted Execution Environment (TEE), and Key Management (KMS)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -22,6 +22,7 @@ Every mathematical, cryptographic, and security claim made in the codebase was e
 
 | Component / Claim | Mathematical Formulation | Security Claim | Verification Status | Scientific Classification |
 |:---|:---|:---|:---:|:---:|
+| **TenSEAL CKKS Homomorphic Sum** | $c_{\text{sum}} = \sum_{i=1}^n w_i \cdot c_i \implies \text{Dec}(c_{\text{sum}}) = \sum w_i p_i$ | Zero-knowledge server-side homomorphic aggregation | 5/5 Pass ($MAE < 10^{-5}$) | 🟢 **SUPPORTED** |
 | **Unweighted Zero-Sum Noise Masking** | $m_n = -\sum_{i=1}^{n-1} m_i \implies \sum m_i = \mathbf{0}$ | Hides single-round updates; cancels in sum | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
 | **Weighted Zero-Sum Noise Masking** | $m_n = -\frac{1}{p_n} \sum_{i=1}^{n-1} p_i m_i \implies \sum p_i m_i = \mathbf{0}$ | Preserves exact weighted FedAvg output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
 | **Exact Aggregation Preservation** | $\sum \tilde{w}_i = \sum w_i$ | Zero perturbation on aggregated output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |

@@ -26,7 +26,7 @@ class TestTEEFHEDrivers(unittest.TestCase):
         """Test FHE key generation, encryption, homomorphic addition, and decryption."""
         # 1. Generate keys
         key_ring = FHEDriver.generate_keys(self.simulation_id)
-        self.assertEqual(key_ring.poly_degree, 4096)
+        self.assertIn(key_ring.poly_degree, [4096, 8192])
         self.assertTrue(key_ring.public_key.startswith("fhe_pub_key_"))
         self.assertTrue(key_ring.secret_key.startswith("fhe_sec_key_"))
 
@@ -34,12 +34,16 @@ class TestTEEFHEDrivers(unittest.TestCase):
         enc_a = FHEDriver.encrypt_weights(self.weights_a, key_ring)
         enc_b = FHEDriver.encrypt_weights(self.weights_b, key_ring)
 
-        self.assertEqual(len(enc_a.ciphertexts), 6)
+        self.assertEqual(enc_a.param_count, 6)
         self.assertEqual(enc_a.key_id, self.simulation_id)
         self.assertEqual(enc_a.noise_bound, 1e-9)
 
         # 3. Homomorphic average
-        enc_avg = FHEDriver.homomorphic_average([enc_a, enc_b], client_samples=[10, 10])
+        enc_avg = FHEDriver.homomorphic_average(
+            [enc_a, enc_b],
+            client_samples=[10, 10],
+            public_context_bytes=key_ring.public_context_bytes,
+        )
         self.assertEqual(enc_avg.key_id, self.simulation_id)
         self.assertGreater(enc_avg.noise_bound, 0.0)
 

@@ -216,8 +216,9 @@ Automatically triggers aggregation when minimum client threshold conditions ($\t
   $$\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)$$
 - **Privacy Budget Accountant:** Enforces privacy loss limits ($\epsilon \le 2.0$, $\delta \le 10^{-5}$).
 
-### 5.2 Secure Aggregation (SecAgg)
-Applies pairwise cryptographic seed mask exchange ($y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}}$). Pairwise masks cancel out identically at the coordinator ($\sum_k y_k = \sum_k w_k$), hiding individual updates.
+### 5.2 Secure Aggregation (SecAgg) & Fully Homomorphic Encryption (FHE)
+- **Pairwise Zero-Sum Masking:** Applies pairwise cryptographic seed mask exchange ($y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}}$). Pairwise masks cancel out identically at the coordinator ($\sum_k y_k = \sum_k w_k$), hiding individual updates.
+- **TenSEAL / Microsoft SEAL (CKKS Scheme):** Integrates polynomial ring CKKS homomorphic encryption (`poly_modulus_degree=8192`, scale $2^{40}$). Bank updates are encrypted locally into CKKS byte-stream ciphertexts, enabling the central server to compute homomorphic weighted averages ($\sum_i w_i \cdot c_i$) directly over ciphertexts without ever decrypting or accessing private weights.
 
 ### 5.3 Privacy Audit Suite (`privacy_audit_service.py`, `dlg_validation.py`, `mia_validation.py`)
 - **Deep Leakage from Gradients (DLG):** Simulates gradient reconstruction attacks to verify that differential privacy and SecAgg prevent image/feature recovery.
