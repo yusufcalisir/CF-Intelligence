@@ -42,16 +42,26 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
-      className="glass-card p-6 h-full flex flex-col"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,22,41,0.85) 0%, rgba(8,12,24,0.75) 100%)',
+        border: '1px solid rgba(99,102,241,0.14)',
+        borderRadius: '0.75rem',
+        padding: '1.25rem',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+      }}
     >
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+        <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 600, color: '#e2e8f0' }}>
           Simulation Configuration
         </h3>
         {!isLargeMonitor && (
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+            style={{ fontSize: '0.75rem', color: '#64748b', background: 'transparent', border: 'none', cursor: 'pointer', transition: 'color 0.15s' }}
+            onMouseEnter={e => (e.currentTarget.style.color = '#e2e8f0')}
+            onMouseLeave={e => (e.currentTarget.style.color = '#64748b')}
           >
             {isExpanded ? 'Collapse ▴' : 'Expand ▾'}
           </button>
@@ -59,33 +69,41 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       </div>
 
       {/* Scrollable Settings Form */}
-      <div className="flex-1 overflow-y-auto min-h-0 space-y-4 mb-4 pr-1">
+      <div style={{ flex: 1, overflowY: 'auto', minHeight: 0, display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1rem', paddingRight: '0.25rem' }}>
         {/* Core Settings - always visible */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-2">
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem', marginBottom: '0.5rem' }}>
           <div>
-            <label className="block text-xs text-[var(--color-text-muted)] mb-1">Rounds</label>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Rounds</label>
             <input
               type="number"
               value={config.num_rounds}
               onChange={(e) => updateConfig('num_rounds', parseInt(e.target.value) || 10)}
               min={1}
               max={100}
-              className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:outline-none focus:border-[var(--color-accent-indigo)] transition-colors"
+              style={{
+                width: '100%', backgroundColor: '#0f1629', border: '1px solid rgba(99,102,241,0.2)',
+                borderRadius: '0.375rem', padding: '0.375rem 0.75rem', fontSize: '0.875rem',
+                color: '#e2e8f0', fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
             />
           </div>
           <div>
-            <label className="block text-xs text-[var(--color-text-muted)] mb-1">Local Epochs</label>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Local Epochs</label>
             <input
               type="number"
               value={config.local_epochs}
               onChange={(e) => updateConfig('local_epochs', parseInt(e.target.value) || 3)}
               min={1}
               max={20}
-              className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:outline-none focus:border-[var(--color-accent-indigo)] transition-colors"
+              style={{
+                width: '100%', backgroundColor: '#0f1629', border: '1px solid rgba(99,102,241,0.2)',
+                borderRadius: '0.375rem', padding: '0.375rem 0.75rem', fontSize: '0.875rem',
+                color: '#e2e8f0', fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
             />
           </div>
           <div>
-            <label className="block text-xs text-[var(--color-text-muted)] mb-1">Learning Rate</label>
+            <label style={{ display: 'block', fontSize: '0.75rem', color: '#64748b', marginBottom: '0.25rem' }}>Learning Rate</label>
             <input
               type="number"
               value={config.learning_rate}
@@ -93,7 +111,11 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
               step={0.0001}
               min={0.0001}
               max={1}
-              className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] font-mono focus:outline-none focus:border-[var(--color-accent-indigo)] transition-colors"
+              style={{
+                width: '100%', backgroundColor: '#0f1629', border: '1px solid rgba(99,102,241,0.2)',
+                borderRadius: '0.375rem', padding: '0.375rem 0.75rem', fontSize: '0.875rem',
+                color: '#e2e8f0', fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
             />
           </div>
         </div>
@@ -501,13 +523,36 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       <button
         onClick={handleStart}
         disabled={createMutation.isPending}
-        className="mt-auto w-full py-2.5 rounded-lg font-medium text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
         style={{
-          background: 'linear-gradient(135deg, var(--color-accent-indigo), var(--color-accent-teal))',
+          marginTop: 'auto',
+          width: '100%',
+          padding: '0.625rem 1.25rem',
+          borderRadius: '0.5rem',
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          color: '#ffffff',
+          background: 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
+          border: 'none',
+          cursor: createMutation.isPending ? 'not-allowed' : 'pointer',
+          opacity: createMutation.isPending ? 0.6 : 1,
+          boxShadow: '0 0 20px rgba(99,102,241,0.25)',
+          transition: 'all 0.2s ease',
+        }}
+        onMouseEnter={e => {
+          if (!createMutation.isPending) {
+            e.currentTarget.style.boxShadow = '0 0 30px rgba(99,102,241,0.45)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }
+        }}
+        onMouseLeave={e => {
+          if (!createMutation.isPending) {
+            e.currentTarget.style.boxShadow = '0 0 20px rgba(99,102,241,0.25)';
+            e.currentTarget.style.transform = 'translateY(0)';
+          }
         }}
       >
         {createMutation.isPending ? (
-          <span className="flex items-center justify-center gap-2">
+          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="animate-spin">⟳</span> Starting...
           </span>
         ) : (
@@ -516,7 +561,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
       </button>
 
       {createMutation.isError && (
-        <p className="mt-2 text-xs text-[var(--color-status-error)]">
+        <p style={{ marginTop: '0.5rem', fontSize: '0.75rem', color: '#ef4444' }}>
           Failed to start simulation. Is the backend running?
         </p>
       )}
