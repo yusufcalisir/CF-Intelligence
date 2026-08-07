@@ -278,7 +278,11 @@ class AlertIntelligenceService:
             confidence=round(score, 4),
             involved_entity_ids=[f"cust_{alert_id[:8]}", f"merch_{alert_id[8:16]}"],
             model_confidence=round(score, 4),
-            top_features={"amount": 4250.0, "velocity_1h": 8, "country_mismatch": 1},
+            top_features=[
+                {"feature": "amount", "contribution": 0.42},
+                {"feature": "velocity_1h", "contribution": 0.31},
+                {"feature": "country_mismatch", "contribution": 0.27},
+            ],
             risk_factors=[
                 "Unusual transaction velocity",
                 "High transaction amount",
