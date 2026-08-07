@@ -113,7 +113,7 @@ export default function PoliciesPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold gradient-text mb-1">Policy Rules & Decisions</h1>
           <p className="text-sm text-[var(--color-text-muted)] max-w-2xl">
@@ -122,7 +122,7 @@ export default function PoliciesPage() {
         </div>
         <button
           onClick={() => setIsModalOpen(true)}
-          className="btn btn-primary flex items-center gap-2"
+          className="btn btn-primary flex items-center gap-2 shrink-0 whitespace-nowrap self-start sm:self-auto"
         >
           <span>➕</span> Add Policy Rule
         </button>
