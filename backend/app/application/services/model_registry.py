@@ -27,13 +27,33 @@ class ModelRegistry:
 
     def __init__(self, storage_dir: str | None = None) -> None:
         if storage_dir is None:
-            # Resolve default storage path
-            self.storage_dir = os.path.abspath(
-                os.path.join(
-                    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                    "storage",
+            # 1. Prefer explicit env override (e.g. set in docker-compose / HF Space secrets)
+            env_dir = os.environ.get("CFI_STORAGE_DIR")
+            if env_dir:
+                self.storage_dir = os.path.abspath(env_dir)
+            else:
+                # 2. Default: <repo>/backend/app/storage
+                default_dir = os.path.abspath(
+                    os.path.join(
+                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                        "storage",
+                    )
                 )
-            )
+                # 3. Fall back to /tmp if the default path is not writable (read-only containers)
+                try:
+                    os.makedirs(default_dir, exist_ok=True)
+                    # quick writability probe
+                    test_file = os.path.join(default_dir, ".write_test")
+                    with open(test_file, "w") as _f:
+                        pass
+                    os.remove(test_file)
+                    self.storage_dir = default_dir
+                except OSError:
+                    self.storage_dir = os.path.join("/tmp", "cfi_storage")
+                    logger.info(
+                        "Default storage path not writable; using fallback: %s",
+                        self.storage_dir,
+                    )
         else:
             self.storage_dir = os.path.abspath(storage_dir)
 
