@@ -1,4 +1,5 @@
-﻿import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/layout/Layout';
 import Dashboard from './pages/Dashboard';
 import LiveOperationsView from './pages/LiveOperationsView';
@@ -17,38 +18,51 @@ import CoordinatorPage from './pages/CoordinatorPage';
 import PrivacyDefensePage from './pages/PrivacyDefensePage';
 import LandingPage from './pages/LandingPage';
 
+// Ensure QueryClient is always available even if main.tsx wrapping is lost during builds
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5000,
+      retry: 2,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Enterprise SaaS Landing Page */}
-        <Route path="/" element={<LandingPage />} />
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <Routes>
+          {/* Enterprise SaaS Landing Page */}
+          <Route path="/" element={<LandingPage />} />
 
-        <Route element={<Layout />}>
-          {/* Live Operations & FL Consortium */}
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/operations" element={<LiveOperationsView />} />
-          <Route path="/operations/:id" element={<LiveOperationsView />} />
-          <Route path="/simulation/:id" element={<LiveOperationsView />} />
+          <Route element={<Layout />}>
+            {/* Live Operations & FL Consortium */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/operations" element={<LiveOperationsView />} />
+            <Route path="/operations/:id" element={<LiveOperationsView />} />
+            <Route path="/simulation/:id" element={<LiveOperationsView />} />
 
-          {/* Phase 2: AML Intelligence Platform */}
-          <Route path="/investigation" element={<InvestigationDashboard />} />
-          <Route path="/alerts" element={<AlertsPage />} />
-          <Route path="/cases" element={<CasesPage />} />
-          <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-          <Route path="/rules" element={<PoliciesPage />} />
-          <Route path="/psi" element={<PsiPage />} />
-          <Route path="/security" element={<SecurityPage />} />
-          <Route path="/observability" element={<ObservabilityPage />} />
-          <Route path="/scenarios" element={<ScenariosPage />} />
-          <Route path="/graph" element={<GraphPage />} />
+            {/* Phase 2: AML Intelligence Platform */}
+            <Route path="/investigation" element={<InvestigationDashboard />} />
+            <Route path="/alerts" element={<AlertsPage />} />
+            <Route path="/cases" element={<CasesPage />} />
+            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
+            <Route path="/rules" element={<PoliciesPage />} />
+            <Route path="/psi" element={<PsiPage />} />
+            <Route path="/security" element={<SecurityPage />} />
+            <Route path="/observability" element={<ObservabilityPage />} />
+            <Route path="/scenarios" element={<ScenariosPage />} />
+            <Route path="/graph" element={<GraphPage />} />
 
-          {/* Enterprise Platform & Onboarding */}
-          <Route path="/onboarding" element={<BankOnboardingPage />} />
-          <Route path="/coordinator" element={<CoordinatorPage />} />
-          <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            {/* Enterprise Platform & Onboarding */}
+            <Route path="/onboarding" element={<BankOnboardingPage />} />
+            <Route path="/coordinator" element={<CoordinatorPage />} />
+            <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
+    </QueryClientProvider>
   );
 }
