@@ -166,13 +166,26 @@ class MTLSManager:
             vault_client=vault_client, common_name=cn, sans=sans, ttl="720h"
         )
 
-    def revoke_certificate(self, serial_number: str, vault_client: Any | None = None) -> None:
+    def revoke_certificate(
+        self,
+        serial_number: str,
+        reason: str = "Unspecified",
+        vault_client: Any | None = None,
+    ) -> None:
         """Add certificate serial number to local CRL and notify Vault PKI engine if active."""
         self.crl_revoked_serials.add(serial_number)
         vc = vault_client or self.vault_client
         if vc and getattr(vc, "enabled", False):
             vc.revoke_pki_certificate(serial_number)
-        logger.warning("Certificate serial %s added to mTLS CRL revocation list.", serial_number)
+        logger.warning(
+            "Certificate serial %s added to mTLS CRL revocation list (reason: %s).",
+            serial_number,
+            reason,
+        )
+
+    def is_certificate_valid(self, serial_number: str) -> bool:
+        """Check whether certificate serial number is valid (i.e. not in CRL revocation set)."""
+        return serial_number not in self.crl_revoked_serials
 
     def build_ssl_context(self, is_server: bool = True) -> ssl.SSLContext:
         """Build Python SSLContext configured for mTLS 1.3 peer authentication."""

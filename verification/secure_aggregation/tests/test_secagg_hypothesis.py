@@ -1,4 +1,4 @@
-"""Comprehensive Hypothesis Property-Based Tests for Secure Aggregation Subsystem.
+r"""Comprehensive Hypothesis Property-Based Tests for Secure Aggregation Subsystem.
 
 Verifies 6 core mathematical invariants across hundreds of randomized scenarios:
 - P1: Unweighted Zero-Sum Invariant (\sum m_i = 0)
@@ -37,7 +37,7 @@ _engine = FederatedLearningEngine(settings=cast(Any, None), model_service=cast(A
 )
 @settings(max_examples=100, deadline=None)
 def test_unweighted_zero_sum_invariant(n_clients: int, n_params: int, seed: int):
-    """P1: Verifies that unweighted masks sum strictly to zero across n clients.
+    r"""P1: Verifies that unweighted masks sum strictly to zero across n clients.
     
     Mathematical Justification:
     For m_n = -\sum_{i=1}^{n-1} m_i, the total sum \sum_{i=1}^n m_i = \mathbf{0}.
@@ -66,7 +66,7 @@ def test_unweighted_zero_sum_invariant(n_clients: int, n_params: int, seed: int)
 )
 @settings(max_examples=100, deadline=None)
 def test_weighted_zero_sum_invariant(samples: list[int], n_params: int, seed: int):
-    """P2: Verifies that sample-weighted masks sum strictly to zero (\sum p_i m_i = 0).
+    r"""P2: Verifies that sample-weighted masks sum strictly to zero (\sum p_i m_i = 0).
     
     Mathematical Justification:
     For m_n = -\frac{1}{p_n}\sum_{i=1}^{n-1} p_i m_i, \sum_{i=1}^n p_i m_i = \mathbf{0}.
@@ -118,7 +118,7 @@ def test_individual_parameter_obscuration(n_clients: int, n_params: int, seed: i
 )
 @settings(max_examples=30, deadline=None)
 def test_single_client_fallback(n_params: int, seed: int):
-    """P4: Single-client federation produces m_1 = 0, returning exact unmasked weights.
+    r"""P4: Single-client federation produces m_1 = 0, returning exact unmasked weights.
     
     Mathematical Justification:
     For n=1, \sum_{i=1}^1 m_i = 0 => m_1 = 0.
