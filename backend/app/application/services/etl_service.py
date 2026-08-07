@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-import hmac
+from collections.abc import Sequence
 import hashlib
+import hmac
 import logging
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -55,7 +56,6 @@ class RealWorldETLPipeline:
     ) -> list[dict[str, Any]]:
         """Partitions feature matrix X and labels y across K banks using Dirichlet Non-IID distribution."""
         rng = np.random.default_rng(seed)
-        num_samples = len(y)
         classes = np.unique(y)
 
         client_indices: list[list[int]] = [[] for _ in range(num_banks)]
