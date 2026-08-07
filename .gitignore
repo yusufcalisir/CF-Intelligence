@@ -45,6 +45,7 @@ ENV/
 *.db
 *.sqlite3
 storage/
+!backend/app/infrastructure/storage/
 *.bat
 run_local.*
 
