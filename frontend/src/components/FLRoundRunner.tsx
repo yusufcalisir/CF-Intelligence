@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Play, Terminal, ShieldAlert, CheckCircle, Flame } from 'lucide-react';
+import { Cpu, Play, Terminal, CheckCircle } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { FLRoundResult } from '../types';
 import { runFLSimulation } from '../services/api';
@@ -28,7 +28,10 @@ export const FLRoundRunner: React.FC = () => {
 
     for (let i = 0; i < roundsData.length; i++) {
       await new Promise((r) => setTimeout(r, 400));
-      setResults((prev) => [...prev, roundsData[i]]);
+      const currentItem = roundsData[i];
+      if (currentItem) {
+        setResults((prev) => [...prev, currentItem]);
+      }
       setCurrentRound(i + 1);
     }
 
@@ -150,7 +153,7 @@ export const FLRoundRunner: React.FC = () => {
               </h3>
               {results.length > 0 && (
                 <span className="text-xs font-mono text-emerald-400 flex items-center gap-1">
-                  <CheckCircle className="h-3.5 w-3.5" /> Global Loss: {results[results.length - 1].global_loss}
+                  <CheckCircle className="h-3.5 w-3.5" /> Global Loss: {results[results.length - 1]?.global_loss}
                 </span>
               )}
             </div>

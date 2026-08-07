@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Activity, Send, ShieldAlert, CheckCircle2, AlertOctagon } from 'lucide-react';
+import { Activity, Send } from 'lucide-react';
 import { PredictPayload, PredictResponse } from '../types';
 import { predictTransaction } from '../services/api';
 

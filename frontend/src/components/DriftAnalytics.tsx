@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldAlert, BarChart3, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 export const DriftAnalytics: React.FC = () => {
   const driftMetrics = [

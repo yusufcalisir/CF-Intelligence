@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import cytoscape from 'cytoscape';
-import { Network, Search, Filter, ShieldAlert, Zap, Layers } from 'lucide-react';
+import { Network, Search, ShieldAlert, Layers } from 'lucide-react';
 import { GraphEdge, GraphNode } from '../types';
 
 interface GraphVisualizerProps {
@@ -123,8 +123,10 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ selectedBank }
         center: { eles: matched },
         zoom: 1.5,
       });
-      matched.select();
-      setSelectedNode(matched[0].data() as GraphNode);
+      const firstMatched = matched[0];
+      if (firstMatched) {
+        setSelectedNode(firstMatched.data() as GraphNode);
+      }
     }
   };
 
