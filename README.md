@@ -138,6 +138,24 @@ sequenceDiagram
     
     App->>Standby: POST /v1/inference/score
     Standby-->>App: 200 OK (Score: 895.4)
+
+---
+
+### Modern Web Application Portal (Vite + React 18 + Tailwind CSS + Cytoscape.js)
+
+The platform includes a modern, dark-themed **Cross-Bank Fraud Intelligence Web Console** (`frontend/`) designed for fraud analysts and consortium bank executives:
+
+- 🕸️ **Graph Fraud Visualizer (Cytoscape.js):** Interactive force-directed topology map displaying cross-bank entity resolution (Customers, Merchants, Devices, IPs) with GraphSAGE risk score node heatmaps.
+- 🎛️ **Counterfactual Remediation Workbench:** Interactive slider-driven remediation path simulator calling `/api/v1/explainability/counterfactuals` to compute minimum feature modifications required to clear flagged alerts.
+- ⚡ **Live FL Round Runner Dashboard:** Real-time federated learning orchestrator with live loss convergence charts (Recharts) and Byzantine attack quarantine log streaming.
+- 📈 **Model Drift & Calibration Analytics:** Population Stability Index (PSI) feature heatmaps, Kolmogorov-Smirnov p-values, and Expected Calibration Error (ECE) reliability metrics.
+
+```bash
+# Launch Web Console Locally
+cd frontend
+npm install
+npm run dev
+```
 ```
 
 ---

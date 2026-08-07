@@ -9,9 +9,11 @@ describe('ConfusionMatrix Visualization Test Suite', () => {
       id: 'jpmorgan_chase',
       name: 'JPMorgan Chase',
       tier: 'tier1',
-      samples_count: 5000,
-      fraud_count: 250,
+      num_transactions: 5000,
+      fraud_ratio: 0.05,
       status: 'completed',
+      improvement: null,
+      data_profile: null,
       local_metrics: {
         precision: 0.92,
         recall: 0.88,
@@ -19,6 +21,11 @@ describe('ConfusionMatrix Visualization Test Suite', () => {
         auc_roc: 0.94,
         accuracy: 0.95,
         confusion_matrix: [[4700, 50], [30, 220]],
+        loss: 0.05,
+        roc_fpr: [0, 0.1, 1],
+        roc_tpr: [0, 0.9, 1],
+        roc_thresholds: [1, 0.5, 0],
+        feature_importance: {},
       },
       federated_metrics: {
         precision: 0.98,
@@ -27,6 +34,11 @@ describe('ConfusionMatrix Visualization Test Suite', () => {
         auc_roc: 0.99,
         accuracy: 0.98,
         confusion_matrix: [[4730, 20], [10, 240]],
+        loss: 0.02,
+        roc_fpr: [0, 0.05, 1],
+        roc_tpr: [0, 0.95, 1],
+        roc_thresholds: [1, 0.5, 0],
+        feature_importance: {},
       },
     };
 

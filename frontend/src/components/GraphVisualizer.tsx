@@ -18,7 +18,7 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ selectedBank }
   const mockNodes: GraphNode[] = [
     { id: 'CUST-5ac28f', label: 'Customer A (john.doe@email.com)', type: 'CUSTOMER', riskScore: 850.0, bankId: 'bank_a', degree: 8 },
     { id: 'CUST-99f1b2', label: 'Customer B (m.smith@email.com)', type: 'CUSTOMER', riskScore: 240.0, bankId: 'bank_b', degree: 3 },
-    { id: 'MERCH-crypto', label: 'Crypto Exchange Ltd', type: 'MERCH', riskScore: 920.0, bankId: 'bank_a', degree: 14 },
+    { id: 'MERCH-crypto', label: 'Crypto Exchange Ltd', type: 'MERCHANT', riskScore: 920.0, bankId: 'bank_a', degree: 14 },
     { id: 'DEV-mobile-app', label: 'Mobile Device #4421', type: 'DEVICE', riskScore: 680.0, bankId: 'bank_b', degree: 5 },
     { id: 'IP-185.220.101', label: 'TOR Exit Node #88', type: 'IP', riskScore: 990.0, bankId: 'bank_a', degree: 12 },
     { id: 'BANK-bank_a', label: 'Bank A (JPMorgan)', type: 'BANK', riskScore: 100.0, bankId: 'bank_a', degree: 20 },
@@ -77,8 +77,6 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ selectedBank }
             height: 'mapData(degree, 1, 20, 24, 48)',
             'border-width': 2,
             'border-color': '#00F2FE',
-            'shadow-blur': 12,
-            'shadow-color': 'data(color)',
           },
         },
         {
@@ -101,8 +99,8 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ selectedBank }
             opacity: 1,
           },
         },
-      ],
-      layout: { name: layoutName, animate: true },
+      ] as any,
+      layout: { name: layoutName } as any,
     });
 
     cy.on('tap', 'node', (evt) => {
