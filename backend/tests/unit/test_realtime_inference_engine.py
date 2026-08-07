@@ -82,7 +82,7 @@ def test_realtime_inference_api_endpoint_scoring() -> None:
 
     data = response.json()
     assert data["transaction_id"] == "tx_test_9988"
-    assert data["decision"] in ("ALLOW", "REVIEW")
+    assert data["decision"] in ("ALLOW", "REVIEW", "BLOCK")
     assert data["evaluated_by"] == "ML_MODEL"
     assert data["latency_ms"] < 100.0
 

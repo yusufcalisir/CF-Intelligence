@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import functools
 import logging
 import threading
@@ -306,6 +307,14 @@ simulation_rounds_total = MetricProxy("simulation_rounds_total", telemetry_regis
 def setup_telemetry(app: FastAPI) -> None:
     """Initialize OpenTelemetry instrumentation, per-endpoint HTTP metrics, and register /metrics endpoint."""
     from fastapi import Response
+
+    with contextlib.suppress(Exception):
+        from fastapi.routing import _IncludedRouter
+
+        if not hasattr(_IncludedRouter, "path"):
+            _IncludedRouter.path = property(  # type: ignore[attr-defined]
+                lambda self: getattr(self, "prefix", "")
+            )
 
     try:
         from prometheus_fastapi_instrumentator import Instrumentator
