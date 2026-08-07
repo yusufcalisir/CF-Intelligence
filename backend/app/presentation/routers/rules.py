@@ -18,7 +18,7 @@ from app.application.schemas.phase2 import (
     BusinessRuleUpdateRequest,
 )
 from app.application.services.policy_engine import PolicyEngineService
-from app.dependencies import SessionDep  # noqa: TC001
+from app.dependencies import OptionalSessionDep, SessionDep  # noqa: TC001
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/rules", tags=["rules"])
@@ -101,16 +101,16 @@ _DEFAULT_RULES = [
 
 
 @router.get("", response_model=list[BusinessRuleResponse])
-async def list_business_rules(session: SessionDep) -> list[BusinessRuleResponse]:
+async def list_business_rules(session: OptionalSessionDep = None) -> list[BusinessRuleResponse]:
     """Retrieve all business rules configured in the active tenant."""
-    try:
-        rules = await _policy_service.list_rules(session)
-        if rules:
-            return [_to_rule_response(r) for r in rules]
-        return _DEFAULT_RULES
-    except Exception as exc:
-        logger.warning("Database unavailable for list_business_rules (%s), returning default rules fallback", exc)
-        return _DEFAULT_RULES
+    if session is not None:
+        try:
+            rules = await _policy_service.list_rules(session)
+            if rules:
+                return [_to_rule_response(r) for r in rules]
+        except Exception as exc:
+            logger.warning("Database query failed for list_business_rules (%s), returning default rules fallback", exc)
+    return _DEFAULT_RULES
 
 
 @router.put("/{rule_id}", response_model=BusinessRuleResponse)

@@ -72,7 +72,16 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
+async def get_optional_session() -> AsyncGenerator[AsyncSession | None, None]:
+    try:
+        async for session in get_async_session():
+            yield session
+    except Exception:
+        yield None
+
+
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
+OptionalSessionDep = Annotated[AsyncSession | None, Depends(get_optional_session)]
 
 
 # ── Repositories ──────────────────────────────
