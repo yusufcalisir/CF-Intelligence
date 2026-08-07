@@ -71,12 +71,18 @@ export default function LiveOperationsView() {
       }
     };
 
+    const targetUrl = getWsUrl();
+    let isCleanedUp = false;
+
     try {
-      const targetUrl = getWsUrl();
       ws = new WebSocket(targetUrl);
 
-      ws.onopen = () => setWsStatus('CONNECTED');
+      ws.onopen = () => {
+        if (!isCleanedUp) setWsStatus('CONNECTED');
+      };
+
       ws.onmessage = (event) => {
+        if (isCleanedUp) return;
         try {
           const data = JSON.parse(event.data);
           if (data.event === 'round_started') {
@@ -88,22 +94,35 @@ export default function LiveOperationsView() {
             if (data.auc) setChampionAuc(data.auc);
           }
         } catch {
-          // Ignore parse error
+          // Ignore non-json socket frame
         }
       };
 
       ws.onerror = () => {
-        if (ws) {
+        if (ws && ws.readyState !== WebSocket.CLOSED) {
           try { ws.close(); } catch { /* ignore */ }
         }
-        startMockSimulation();
+        if (!isCleanedUp) {
+          startMockSimulation();
+        }
+      };
+
+      ws.onclose = () => {
+        if (!isCleanedUp) {
+          startMockSimulation();
+        }
       };
     } catch {
       startMockSimulation();
     }
 
     return () => {
+      isCleanedUp = true;
       if (ws) {
+        ws.onopen = null;
+        ws.onmessage = null;
+        ws.onerror = null;
+        ws.onclose = null;
         try { ws.close(); } catch { /* ignore */ }
       }
       if (mockInterval) clearInterval(mockInterval);
