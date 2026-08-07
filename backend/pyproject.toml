@@ -35,3 +35,12 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 asyncio_mode = "auto"
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore::DeprecationWarning:torch.jit.*:",
+    "ignore::torch.jit.TracerWarning",
+    "ignore::UserWarning:opacus.*:",
+    "ignore::UserWarning:torch.sparse.*:",
+    "ignore:.*Sparse invariant checks are implicitly disabled.*:UserWarning",
+    "ignore::UserWarning:app.application.services.model_service:",
+    "ignore::FutureWarning:ray._private.worker:",
+]

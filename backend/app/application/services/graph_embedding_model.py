@@ -197,7 +197,7 @@ class GraphSAGELayer(nn.Module):
             indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
             values = torch.tensor(vals, dtype=torch.float32, device=device)
             adj_sparse = torch.sparse_coo_tensor(
-                indices, values, size=(num_nodes, num_nodes), device=device
+                indices, values, size=(num_nodes, num_nodes), device=device, is_coalesced=True
             )
             agg_features = torch.sparse.mm(adj_sparse, node_features)
         else:
