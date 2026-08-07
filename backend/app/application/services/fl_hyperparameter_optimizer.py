@@ -97,7 +97,7 @@ class FLHyperparameterOptimizer:
         model_service = ModelService(settings)
         privacy_service = PrivacyService()
         fl_engine = FLEngine(settings, model_service, privacy_service)
-        layer_shapes = [(10, 8), (8, 1)]
+        layer_shapes: list[tuple[int, ...]] = [(10, 8), (8, 1)]
 
         # Global model initial weights
         rng = np.random.default_rng(self.seed)
