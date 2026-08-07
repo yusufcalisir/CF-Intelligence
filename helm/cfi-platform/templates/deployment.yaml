@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "cfi-platform.fullname" . | default .Release.Name }}
+  name: "cfi-platform-deployment"
   labels:
     app.kubernetes.io/name: cfi-platform
 spec:
@@ -19,12 +19,8 @@ spec:
       labels:
         app.kubernetes.io/name: cfi-platform
     spec:
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: cfi-backend
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
@@ -34,11 +30,6 @@ spec:
             - name: grpc
               containerPort: 50051
               protocol: TCP
-          env:
-            {{- range $key, $value := .Values.env }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
-            {{- end }}
           livenessProbe:
             httpGet:
               path: /health
@@ -52,4 +43,10 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            limits:
+              cpu: "2000m"
+              memory: "4Gi"
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+

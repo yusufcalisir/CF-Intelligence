@@ -1,29 +1,26 @@
-{{- if .Values.ingress.enabled -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: {{ include "cfi-platform.fullname" . | default .Release.Name }}-ingress
+  name: "cfi-platform-ingress"
   annotations:
-    {{- toYaml .Values.ingress.annotations | nindent 4 }}
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/limit-rps: "500"
 spec:
-  ingressClassName: {{ .Values.ingress.className }}
-  {{- if .Values.ingress.tls }}
+  ingressClassName: "nginx"
   tls:
-    {{- toYaml .Values.ingress.tls | nindent 4 }}
-  {{- end }}
+    - secretName: cfi-tls-cert
+      hosts:
+        - cfi.bank-consortium.org
   rules:
-    {{- range .Values.ingress.hosts }}
-    - host: {{ .host | quote }}
+    - host: "cfi.bank-consortium.org"
       http:
         paths:
-          {{- range .paths }}
-          - path: {{ .path }}
-            pathType: {{ .pathType }}
+          - path: /
+            pathType: Prefix
             backend:
               service:
-                name: {{ include "cfi-platform.fullname" $ | default $.Release.Name }}
+                name: "cfi-platform-service"
                 port:
                   number: 8000
-          {{- end }}
-    {{- end }}
-{{- end }}
+
