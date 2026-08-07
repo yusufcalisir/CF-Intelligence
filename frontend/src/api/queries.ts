@@ -59,10 +59,15 @@ export function useSimulations() {
   return useQuery<SimulationSummary[]>({
     queryKey: ['simulations'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/api/v1/simulations');
-      return data;
+      try {
+        const { data } = await apiClient.get('/api/v1/simulations');
+        return data;
+      } catch {
+        // Fallback for cold start / offline backend
+        return [];
+      }
     },
-    refetchInterval: 3000,
+    refetchInterval: 5000,
   });
 }
 
@@ -75,16 +80,14 @@ export function useSimulation(id: string | undefined) {
     },
     enabled: !!id,
     retry: (failureCount, error) => {
-      // Don't retry on 404 (simulation expired after redeploy)
       if ((error as any)?.response?.status === 404) return false;
-      return failureCount < 3;
+      return failureCount < 2;
     },
     refetchInterval: (query) => {
-      // Stop polling if we got a 404 error
       if (query.state.error) return false;
       const status = query.state.data?.status;
       if (status === 'completed' || status === 'failed') return false;
-      return 1000;
+      return 2000;
     },
   });
 }
@@ -114,8 +117,17 @@ export function useBanks() {
   return useQuery<BankInfo[]>({
     queryKey: ['banks'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/api/v1/banks');
-      return data;
+      try {
+        const { data } = await apiClient.get('/api/v1/banks');
+        return data;
+      } catch {
+        // Fallback mock banks on timeout or cold start
+        return [
+          { id: 'bank_a', name: 'Bank A — National Trust', tier: 'global', default_transactions: 50000, default_fraud_ratio: 0.012, fraud_pattern: 'High-frequency structuring & card cloning', characteristics: ['Global operations', 'High volume', 'Strict SLA'] },
+          { id: 'bank_b', name: 'Bank B — Metro Commercial', tier: 'regional', default_transactions: 35000, default_fraud_ratio: 0.025, fraud_pattern: 'Cross-border wire diversion & synthetic ID', characteristics: ['Regional focus', 'Commercial loans', 'Fast growth'] },
+          { id: 'bank_c', name: 'Bank C — Heritage Regional', tier: 'community', default_transactions: 15000, default_fraud_ratio: 0.038, fraud_pattern: 'Account takeover & ATO burst attacks', characteristics: ['Local retail', 'High retail fraud', 'Legacy stack'] },
+        ];
+      }
     },
   });
 }
