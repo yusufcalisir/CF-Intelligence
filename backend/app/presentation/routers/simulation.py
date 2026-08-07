@@ -523,7 +523,7 @@ async def get_ai_act_report(simulation_id: str) -> dict:
     import hashlib
     import json
     import os
-    from datetime import datetime
+    from datetime import datetime, timezone
 
     from app.infrastructure.storage.storage_utils import get_storage_dir
 
@@ -549,7 +549,7 @@ async def get_ai_act_report(simulation_id: str) -> dict:
     di_ratio = 0.921 + (seed % 6) / 1000.0
     eq_opp = 0.032 + (seed % 4) / 1000.0
     score = round(min(1.0, 0.87 + (seed % 12) / 100.0), 4)
-    timestamp = datetime.now(datetime.UTC).isoformat()
+    timestamp = datetime.now(timezone.utc).isoformat()  # noqa: UP017
 
     return {
         "simulation_id": simulation_id,
