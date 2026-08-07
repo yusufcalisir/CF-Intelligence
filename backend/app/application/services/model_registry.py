@@ -10,6 +10,7 @@ import json
 import logging
 import os
 import shutil
+import tempfile
 from datetime import UTC, datetime
 from typing import Any
 
@@ -39,7 +40,7 @@ class ModelRegistry:
                         "storage",
                     )
                 )
-                # 3. Fall back to /tmp if the default path is not writable (read-only containers)
+                # 3. Fall back to OS temp dir if the default path is not writable (read-only containers)
                 try:
                     os.makedirs(default_dir, exist_ok=True)
                     # quick writability probe
@@ -49,7 +50,7 @@ class ModelRegistry:
                     os.remove(test_file)
                     self.storage_dir = default_dir
                 except OSError:
-                    self.storage_dir = os.path.join("/tmp", "cfi_storage")
+                    self.storage_dir = os.path.join(tempfile.gettempdir(), "cfi_storage")  # nosec B108
                     logger.info(
                         "Default storage path not writable; using fallback: %s",
                         self.storage_dir,
