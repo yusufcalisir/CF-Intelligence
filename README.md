@@ -500,3 +500,29 @@ npm install
 npm run dev
 ```
 Open `http://localhost:3000` in your browser to view the Graph Fraud Visualizer, Counterfactual Remediation Workbench, and Live FL Round Runner.
+
+---
+
+## 17. Academic Citation and Reference Format
+
+If you use this platform, its architectural specifications, PET security drivers, or benchmark datasets in academic research or technical publications, please cite the repository using the following BibTeX reference format:
+
+```bibtex
+@software{calisir2026cfintelligence,
+  author       = {Yusuf {\c{C}}al{\i}{\c{s}}{\i}r},
+  title        = {Collaborative Fraud Intelligence Platform: Privacy-Preserving Cross-Bank Financial Fraud Detection and Anti-Money Laundering Architecture},
+  year         = {2026},
+  publisher    = {GitHub},
+  journal      = {GitHub Repository},
+  howpublished = {\url{https://github.com/yusufcalisir/CF-Intelligence}},
+  version      = {1.0.0}
+}
+```
+
+---
+
+## 18. Author and Maintenance
+
+Designed, developed, and maintained by **Yusuf Çalışır**.
+
+For questions regarding system architecture, cryptographic PET implementation, security evaluations, or consortium deployment, please contact the author via [GitHub Repository Issues](https://github.com/yusufcalisir/CF-Intelligence/issues).
