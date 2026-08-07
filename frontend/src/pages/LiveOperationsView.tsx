@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, CartesianGrid, Legend,
+} from 'recharts';
 import ModelRegistryPanel from '../components/dashboard/ModelRegistryPanel';
 import FederatedTrainingAnimation from '../components/dashboard/FederatedTrainingAnimation';
 import ComplianceReportPanel from '../components/dashboard/ComplianceReportPanel';
@@ -15,6 +18,23 @@ interface BankNode {
   tier: string;
   lastHeartbeat: string;
 }
+
+interface RoundData {
+  round: number;
+  auc: number;
+  bankA: number;
+  bankB: number;
+  bankC: number;
+  loss: number;
+}
+
+type TrainingPhase =
+  | 'pending'
+  | 'generating_data'
+  | 'training_local'
+  | 'training_federated'
+  | 'evaluating'
+  | 'completed';
 
 const DEFAULT_BANKS: BankNode[] = [
   { id: 'bank_alpha', name: 'Bank Alpha', status: 'ACTIVE', tier: 'Tier 1', lastHeartbeat: 'Just now' },
@@ -32,13 +52,20 @@ const MOCK_SCORING_VOLUME = [
   { time: '24:00', volume: 1800 },
 ];
 
+
+const TOTAL_ROUNDS = 10;
+
 export default function LiveOperationsView() {
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
-  const [currentRound, setCurrentRound] = useState(5);
-  const [totalRounds] = useState(10);
-  const [championAuc, setChampionAuc] = useState(0.885);
-  const [gradientSubmissions, setGradientSubmissions] = useState(3);
+  const [currentRound, setCurrentRound] = useState(0);
+  const [championAuc, setChampionAuc] = useState(0.72);
+  const [gradientSubmissions, setGradientSubmissions] = useState(0);
   const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'RECONNECTING'>('CONNECTED');
+  const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>('pending');
+  const [roundHistory, setRoundHistory] = useState<RoundData[]>([]);
+  const [isTraining, setIsTraining] = useState(false);
+  const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // WebSocket live telemetry listener with automatic fallback & simulation
   useEffect(() => {
@@ -54,33 +81,25 @@ export default function LiveOperationsView() {
         const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${proto}//${window.location.host}/ws/training`;
       }
-      // HuggingFace space backend WS endpoint fallback for static Vercel host
       return 'wss://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/ws/training';
     };
 
     let ws: WebSocket | null = null;
-    let mockInterval: ReturnType<typeof setInterval> | null = null;
+    let isCleanedUp = false;
 
-    const startMockSimulation = () => {
+    const startMockTicker = () => {
       setWsStatus('CONNECTED');
-      if (!mockInterval) {
-        mockInterval = setInterval(() => {
+      if (!mockIntervalRef.current) {
+        mockIntervalRef.current = setInterval(() => {
           setGradientSubmissions((prev) => (prev >= 3 ? 1 : prev + 1));
           setChampionAuc((prev) => Math.min(0.99, parseFloat((prev + (Math.random() * 0.002 - 0.001)).toFixed(4))));
         }, 5000);
       }
     };
 
-    const targetUrl = getWsUrl();
-    let isCleanedUp = false;
-
     try {
-      ws = new WebSocket(targetUrl);
-
-      ws.onopen = () => {
-        if (!isCleanedUp) setWsStatus('CONNECTED');
-      };
-
+      ws = new WebSocket(getWsUrl());
+      ws.onopen = () => { if (!isCleanedUp) setWsStatus('CONNECTED'); };
       ws.onmessage = (event) => {
         if (isCleanedUp) return;
         try {
@@ -88,44 +107,45 @@ export default function LiveOperationsView() {
           if (data.event === 'round_started') {
             setCurrentRound(data.round || 1);
             setGradientSubmissions(0);
+            setTrainingPhase('training_federated');
           } else if (data.event === 'gradient_received') {
             setGradientSubmissions((prev) => prev + 1);
           } else if (data.event === 'round_complete') {
-            if (data.auc) setChampionAuc(data.auc);
+            if (data.auc) {
+              setChampionAuc(data.auc);
+              setRoundHistory((prev) => [
+                ...prev,
+                {
+                  round: data.round,
+                  auc: data.auc,
+                  bankA: parseFloat((data.auc - 0.01 + Math.random() * 0.02).toFixed(4)),
+                  bankB: parseFloat((data.auc - 0.015 + Math.random() * 0.02).toFixed(4)),
+                  bankC: parseFloat((data.auc - 0.008 + Math.random() * 0.015).toFixed(4)),
+                  loss: parseFloat(Math.max(0.05, 0.5 - data.round * 0.04).toFixed(4)),
+                },
+              ]);
+            }
           }
-        } catch {
-          // Ignore non-json socket frame
-        }
+        } catch { /* ignore non-json frames */ }
       };
-
       ws.onerror = () => {
         if (ws && ws.readyState !== WebSocket.CLOSED) {
           try { ws.close(); } catch { /* ignore */ }
         }
-        if (!isCleanedUp) {
-          startMockSimulation();
-        }
+        if (!isCleanedUp) startMockTicker();
       };
-
-      ws.onclose = () => {
-        if (!isCleanedUp) {
-          startMockSimulation();
-        }
-      };
+      ws.onclose = () => { if (!isCleanedUp) startMockTicker(); };
     } catch {
-      startMockSimulation();
+      startMockTicker();
     }
 
     return () => {
       isCleanedUp = true;
       if (ws) {
-        ws.onopen = null;
-        ws.onmessage = null;
-        ws.onerror = null;
-        ws.onclose = null;
+        ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null;
         try { ws.close(); } catch { /* ignore */ }
       }
-      if (mockInterval) clearInterval(mockInterval);
+      if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);
     };
   }, []);
 
@@ -148,15 +168,84 @@ export default function LiveOperationsView() {
             );
           }
         }
-      } catch {
-        // Fall back to default bank list on fetch error
-      }
+      } catch { /* fall back to default bank list */ }
     };
-
     fetchBankNodes();
     const interval = setInterval(fetchBankNodes, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // ── Simulated federated training run ──────────────────────────────────────
+  const startSimulatedTraining = () => {
+    if (isTraining) return;
+    setIsTraining(true);
+    setRoundHistory([]);
+    setCurrentRound(0);
+    setGradientSubmissions(0);
+
+    // Phase sequence: generating_data → training_local → training_federated (×rounds) → evaluating → completed
+    const runPhase = (phase: TrainingPhase, duration: number, next: () => void) => {
+      setTrainingPhase(phase);
+      phaseTimerRef.current = setTimeout(next, duration);
+    };
+
+    runPhase('generating_data', 2000, () => {
+      runPhase('training_local', 2500, () => {
+        // Simulate TOTAL_ROUNDS federated rounds
+        let round = 0;
+        let auc = 0.72;
+        let loss = 0.58;
+        setTrainingPhase('training_federated');
+
+        const doRound = () => {
+          if (round >= TOTAL_ROUNDS) {
+            runPhase('evaluating', 2000, () => {
+              setTrainingPhase('completed');
+              setIsTraining(false);
+            });
+            return;
+          }
+          round++;
+          auc = Math.min(0.99, auc + 0.012 + Math.random() * 0.009);
+          loss = Math.max(0.05, loss - 0.04 - Math.random() * 0.015);
+          const newPoint: RoundData = {
+            round,
+            auc: parseFloat(auc.toFixed(4)),
+            bankA: parseFloat((auc - 0.01 + Math.random() * 0.02).toFixed(4)),
+            bankB: parseFloat((auc - 0.015 + Math.random() * 0.02).toFixed(4)),
+            bankC: parseFloat((auc - 0.008 + Math.random() * 0.015).toFixed(4)),
+            loss: parseFloat(loss.toFixed(4)),
+          };
+          setCurrentRound(round);
+          setChampionAuc(newPoint.auc);
+          setGradientSubmissions(3);
+          setRoundHistory((prev) => [...prev, newPoint]);
+          phaseTimerRef.current = setTimeout(doRound, 1200);
+        };
+
+        doRound();
+      });
+    });
+  };
+
+  const resetTraining = () => {
+    if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+    setIsTraining(false);
+    setTrainingPhase('pending');
+    setRoundHistory([]);
+    setCurrentRound(0);
+    setChampionAuc(0.72);
+    setGradientSubmissions(0);
+  };
+
+  // Tooltip style shared across charts
+  const tooltipStyle = {
+    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+    borderColor: 'var(--color-border)',
+    borderRadius: '8px',
+    color: '#fff',
+    fontSize: '12px',
+  };
 
   return (
     <div className="flex flex-col gap-6 p-4">
@@ -191,9 +280,30 @@ export default function LiveOperationsView() {
           <div className="text-right">
             <p className="text-xs text-[var(--color-text-muted)] uppercase">Active Champion AUC</p>
             <p className="text-2xl font-bold font-mono text-[var(--color-accent-indigo)]">
-              {championAuc.toFixed(3)}
+              {championAuc.toFixed(4)}
             </p>
           </div>
+          {/* Training control buttons */}
+          {!isTraining && trainingPhase !== 'completed' ? (
+            <button
+              onClick={startSimulatedTraining}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)] hover:opacity-90 transition-all shadow-lg shadow-[var(--color-accent-indigo)]/30 active:scale-95"
+            >
+              ▶ Start Federated Training
+            </button>
+          ) : trainingPhase === 'completed' ? (
+            <button
+              onClick={resetTraining}
+              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-lg active:scale-95"
+            >
+              🔄 Reset Simulation
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--color-accent-indigo)]/40 bg-[var(--color-accent-indigo)]/10">
+              <span className="animate-pulse text-[var(--color-accent-indigo)] font-bold text-sm">●</span>
+              <span className="text-sm text-[var(--color-text-secondary)] font-medium">Training…</span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -210,9 +320,11 @@ export default function LiveOperationsView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">FL Training Round</p>
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
-            Round {currentRound} / {totalRounds}
+            {currentRound > 0 ? `Round ${currentRound} / ${TOTAL_ROUNDS}` : '—'}
           </p>
-          <p className="text-xs text-indigo-400 mt-1">{gradientSubmissions} Gradients Received</p>
+          <p className="text-xs text-indigo-400 mt-1">
+            {gradientSubmissions > 0 ? `${gradientSubmissions} / 3 Gradients Received` : 'Awaiting start'}
+          </p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
@@ -228,48 +340,119 @@ export default function LiveOperationsView() {
         </motion.div>
       </div>
 
-      {/* Main Row: FL Animation & Scoring Volume AreaChart */}
+      {/* Main Row: FL Animation & Round-by-Round AUC Chart */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-6 flex flex-col">
-          <FederatedTrainingAnimation status="running" currentRound={currentRound} totalRounds={totalRounds} />
+          <FederatedTrainingAnimation
+            status={trainingPhase}
+            currentRound={currentRound}
+            totalRounds={TOTAL_ROUNDS}
+          />
         </div>
 
-        <div className="lg:col-span-6 glass-card p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-1">
-              24-Hour Transaction Scoring Volume
+        {/* Round-by-Round AUC Progression */}
+        <div className="lg:col-span-6 glass-card p-6 flex flex-col">
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
+              Per-Round Model Performance
             </h3>
-            <p className="text-xs text-[var(--color-text-muted)] mb-4">
-              Real-time cross-bank fraud evaluation rate (trans/sec)
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              AUC-ROC per bank vs. federated global model across communication rounds
             </p>
           </div>
-          <div className="h-64 w-full">
+
+          {roundHistory.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+              <span className="text-4xl opacity-40">📊</span>
+              <p className="text-sm text-[var(--color-text-muted)]">
+                {trainingPhase === 'pending'
+                  ? 'Press "Start Federated Training" to begin the simulation'
+                  : 'Preparing training rounds…'}
+              </p>
+            </div>
+          ) : (
+            <div className="flex-1 min-h-0 h-56">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis
+                    dataKey="round"
+                    stroke="var(--color-text-muted)"
+                    fontSize={11}
+                    label={{ value: 'Round', position: 'insideBottom', offset: -2, fontSize: 10, fill: 'var(--color-text-muted)' }}
+                  />
+                  <YAxis
+                    domain={[0.65, 1.0]}
+                    stroke="var(--color-text-muted)"
+                    fontSize={11}
+                    tickFormatter={(v: number) => v.toFixed(2)}
+                  />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => v.toFixed(4)} />
+                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
+                  <Line type="monotone" dataKey="auc" name="Global Federated" stroke="var(--color-accent-indigo)" strokeWidth={2.5} dot={false} isAnimationActive={true} />
+                  <Line type="monotone" dataKey="bankA" name="Bank Alpha" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
+                  <Line type="monotone" dataKey="bankB" name="Bank Beta" stroke="#f472b6" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
+                  <Line type="monotone" dataKey="bankC" name="Bank Gamma" stroke="#fbbf24" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Loss Curve + Scoring Volume Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Training Loss Curve */}
+        <div className="glass-card p-6 flex flex-col">
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Federated Training Loss</h3>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Cross-entropy loss across communication rounds</p>
+          </div>
+          {roundHistory.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center">
+              <p className="text-sm text-[var(--color-text-muted)]">Awaiting training start…</p>
+            </div>
+          ) : (
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="lossGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-accent-rose)" stopOpacity={0.5} />
+                      <stop offset="95%" stopColor="var(--color-accent-rose)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="round" stroke="var(--color-text-muted)" fontSize={11} />
+                  <YAxis stroke="var(--color-text-muted)" fontSize={11} tickFormatter={(v: number) => v.toFixed(2)} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => v.toFixed(4)} />
+                  <Area type="monotone" dataKey="loss" name="Loss" stroke="var(--color-accent-rose)" fill="url(#lossGrad)" strokeWidth={2} dot={false} isAnimationActive={true} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </div>
+
+        {/* 24-Hour Scoring Volume */}
+        <div className="glass-card p-6 flex flex-col">
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/sec)</p>
+          </div>
+          <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={MOCK_SCORING_VOLUME}>
+              <AreaChart data={MOCK_SCORING_VOLUME} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                 <defs>
                   <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="var(--color-accent-indigo)" stopOpacity={0.6} />
                     <stop offset="95%" stopColor="var(--color-accent-indigo)" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <XAxis dataKey="time" stroke="var(--color-text-muted)" fontSize={12} />
-                <YAxis stroke="var(--color-text-muted)" fontSize={12} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    borderColor: 'var(--color-border)',
-                    borderRadius: '8px',
-                    color: '#fff',
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="volume"
-                  stroke="var(--color-accent-indigo)"
-                  fillOpacity={1}
-                  fill="url(#colorVolume)"
-                  strokeWidth={2}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                <XAxis dataKey="time" stroke="var(--color-text-muted)" fontSize={11} />
+                <YAxis stroke="var(--color-text-muted)" fontSize={11} />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Area type="monotone" dataKey="volume" stroke="var(--color-accent-indigo)" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} dot={false} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -282,23 +465,41 @@ export default function LiveOperationsView() {
           Consortium Bank Nodes Health & Status
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {bankNodes.map((bank) => (
-            <div key={bank.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-slate-900/40 flex items-center justify-between">
-              <div>
-                <p className="font-bold text-[var(--color-text-primary)] text-sm">{bank.name}</p>
-                <p className="text-xs text-[var(--color-text-muted)]">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
+          {bankNodes.map((bank, idx) => {
+            const roundData = roundHistory[roundHistory.length - 1];
+            const bankAuc = idx === 0 ? roundData?.bankA : idx === 1 ? roundData?.bankB : roundData?.bankC;
+            return (
+              <div key={bank.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-slate-900/40 flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-bold text-[var(--color-text-primary)] text-sm">{bank.name}</p>
+                    <p className="text-xs text-[var(--color-text-muted)]">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
+                  </div>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      bank.status === 'ACTIVE'
+                        ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                    }`}
+                  >
+                    ● {bank.status}
+                  </span>
+                </div>
+                {bankAuc !== undefined && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <div className="flex-1 h-1.5 bg-[var(--color-bg-elevated)] rounded-full overflow-hidden">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)]"
+                        animate={{ width: `${(bankAuc * 100).toFixed(1)}%` }}
+                        transition={{ duration: 0.6, ease: 'easeOut' }}
+                      />
+                    </div>
+                    <span className="text-xs font-mono text-[var(--color-text-muted)]">AUC {bankAuc.toFixed(3)}</span>
+                  </div>
+                )}
               </div>
-              <span
-                className={`px-3 py-1 rounded-full text-xs font-bold ${
-                  bank.status === 'ACTIVE'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                }`}
-              >
-                ● {bank.status}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
