@@ -22,9 +22,9 @@ import os
 import secrets
 from typing import Any
 
-logger = logging.getLogger(__name__)
-
 from app.infrastructure.storage.storage_utils import get_storage_dir
+
+logger = logging.getLogger(__name__)
 
 _STORAGE_ROOT = get_storage_dir()
 

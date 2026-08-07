@@ -7,12 +7,12 @@ import json
 import logging
 import os
 import socket
+import tempfile
 import threading
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-import tempfile
 from datetime import UTC, datetime
 from enum import Enum
 from pathlib import Path
@@ -23,10 +23,7 @@ logger = logging.getLogger(__name__)
 
 def get_siem_retry_file() -> Path:
     env_dir = os.environ.get("CFI_STORAGE_DIR")
-    if env_dir:
-        base_dir = Path(env_dir)
-    else:
-        base_dir = Path(__file__).parent.parent.parent / "storage"
+    base_dir = Path(env_dir) if env_dir else Path(__file__).parent.parent.parent / "storage"
 
     try:
         base_dir.mkdir(parents=True, exist_ok=True)
