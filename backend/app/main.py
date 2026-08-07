@@ -39,6 +39,7 @@ from app.presentation.routers import (
     maintenance_cron,
     model_registry,
     monitoring,
+    optimization,
     predict,
     privacy_defense,
     psd2,
@@ -684,6 +685,7 @@ else:
     app.include_router(settlement.router)
     app.include_router(realtime_inference.router)
     app.include_router(compliance.router)
+    app.include_router(optimization.router)
 
 
 @app.get("/", tags=["root"])

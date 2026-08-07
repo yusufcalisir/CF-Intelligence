@@ -125,6 +125,11 @@ The gRPC transport layer handles high-throughput, low-latency node communication
   - **Scenario B (Abrupt Node Disconnect)**: 1 node disconnects (40% packet drop) $\rightarrow$ 4 active nodes reach 80% quorum in 14.2s.
   - **FedAsync Staleness Attenuation**: $S(\tau) = (1 + \tau)^{-\alpha}$ preserves $F_1 = 93.2\%$. Zero deadlocks.
 
+### 3.5 Automated Optuna FL Hyperparameter Optimizer & Dirichlet Partitioner (`fl_hyperparameter_optimizer.py` & `fl_dirichlet_partitioner.py`)
+- **Non-IID Dirichlet Partitioner ($\text{Dir}(\alpha)$):** Simulates cross-bank label skew ($\alpha \in [0.01, 10.0]$).
+- **Optuna Bayesian TPE Engine:** Optimizes learning rates, local epochs, DP clip norms $C_{\text{max}}$, noise multipliers $\sigma$, staleness decay $\gamma$, and FedProx $\mu$ using `TPESampler` and early `MedianPruner`.
+- **Management API Endpoints:** Exposes `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
+
 ---
 
 ### 3.4 Berlin Group NextGenPSD2 & Open Banking Data Connector Mapping
