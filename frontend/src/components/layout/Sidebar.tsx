@@ -22,6 +22,7 @@ const NAV_SECTIONS = [
       { path: '/graph', label: 'Entity Graph', icon: '🕸️' },
     ],
   },
+
   {
     label: 'Enterprise Platform',
     items: [
@@ -34,27 +35,29 @@ const NAV_SECTIONS = [
     label: 'Observability',
     items: [
       { path: '/observability', label: 'Observability & Drift', icon: '📊' },
-      {
-        href: import.meta.env.VITE_GRAFANA_URL ?? 'https://curiousheather2678.grafana.net/d/cfi-overview/cfi-platform-overview',
-        label: 'Grafana Dashboards',
-        icon: '📈',
-        isExternal: true,
+      { 
+        href: import.meta.env.VITE_GRAFANA_URL ?? 'https://curiousheather2678.grafana.net/d/cfi-overview/cfi-platform-overview', 
+        label: 'Grafana Dashboards', 
+        icon: '📈', 
+        isExternal: true 
       },
-      {
-        href: import.meta.env.VITE_JAEGER_URL ?? 'https://curiousheather2678.grafana.net/explore',
-        label: 'Jaeger Tracing (Tempo)',
-        icon: '🔍',
-        isExternal: true,
+
+      { 
+        href: import.meta.env.VITE_JAEGER_URL ?? 'https://curiousheather2678.grafana.net/explore', 
+        label: 'Jaeger Tracing (Tempo)', 
+        icon: '🔍', 
+        isExternal: true 
       },
-      {
-        href: import.meta.env.VITE_PROMETHEUS_URL ?? 'https://curiousheather2678.grafana.net/explore',
-        label: 'Prometheus Metrics',
-        icon: '🔥',
-        isExternal: true,
+      { 
+        href: import.meta.env.VITE_PROMETHEUS_URL ?? 'https://curiousheather2678.grafana.net/explore', 
+        label: 'Prometheus Metrics', 
+        icon: '🔥', 
+        isExternal: true 
       },
     ],
   },
 ];
+
 
 interface SidebarProps {
   isOpen: boolean;
@@ -64,10 +67,14 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
 
+  // Close sidebar on navigation change (for mobile viewport)
   useEffect(() => {
     onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
+
+
+  const visibleSections = NAV_SECTIONS;
 
   return (
     <>
@@ -84,50 +91,48 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        {/* Header with Back Link & Logo */}
-        <div className="p-3 border-b border-[var(--color-border)]">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-accent-indigo-light)] transition-colors duration-150 mb-2"
-            title="Back to landing page"
+        {/* Back to site & Logo */}
+        <div className="px-3 pt-2 pb-0">
+          <a
+            href="/"
+            className="inline-flex items-center gap-1 text-[10px] text-[var(--color-text-muted)] hover:text-[var(--color-accent-indigo-light)] transition-colors duration-150"
           >
             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
             Back to site
-          </Link>
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <img
-                src="/favicon.svg"
-                className="w-8 h-8 rounded-full object-cover border border-[var(--color-border)]"
-                alt="CFI Logo"
-              />
-              <div>
-                <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
-                  Fraud Intelligence
-                </h1>
-                <p className="text-[10px] text-[var(--color-text-muted)]">Federated Simulator</p>
-              </div>
+          </a>
+        </div>
+        <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <img 
+              src="/favicon.svg" 
+              className="w-8 h-8 rounded-full object-cover border border-[var(--color-border)]" 
+              alt="CFI Logo" 
+            />
+            <div>
+              <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
+                Fraud Intelligence
+              </h1>
+              <p className="text-[10px] text-[var(--color-text-muted)]">Federated Simulator</p>
             </div>
-
-            {/* Close button on mobile */}
-            <button
-              onClick={onClose}
-              className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] md:hidden focus:outline-none"
-              aria-label="Close menu"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
+
+          {/* Close button on mobile */}
+          <button
+            onClick={onClose}
+            className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)] md:hidden focus:outline-none"
+            aria-label="Close menu"
+          >
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
         {/* Navigation */}
         <nav className="flex-1 p-2 space-y-2 overflow-y-auto">
-          {NAV_SECTIONS.map((section) => (
+          {visibleSections.map((section) => (
             <div key={section.label}>
               <p className="px-2 mb-1 text-[9px] font-bold uppercase tracking-wider text-[var(--color-text-muted)]">
                 {section.label}
@@ -159,7 +164,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                         to={path}
                         className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${
                           isActive
-                            ? 'bg-[var(--color-accent-indigo)]/15 text-[var(--color-accent-indigo-light)] border border-[var(--color-accent-indigo)]/30 font-semibold'
+                            ? 'bg-[var(--color-accent-indigo)]/15 text-[var(--color-accent-indigo-light)] border border-[var(--color-accent-indigo)]/30'
                             : 'text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card)]'
                         }`}
                       >
@@ -182,7 +187,8 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 <span className="text-[8px] text-[var(--color-text-muted)] font-normal uppercase tracking-normal">Live</span>
               </span>
             </p>
-            <div className="mx-1 p-2 rounded-lg bg-black/20 border border-[var(--color-border)]/30 space-y-1.5">
+            <div className="mx-1 p-2 rounded-lg bg-black/10 border border-[var(--color-border)]/30 space-y-1.5">
+              {/* Aggregator Status */}
               <div className="flex items-center justify-between text-[10px]">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[var(--color-accent-indigo-light)] font-bold text-xs">⚡</span>
@@ -193,6 +199,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
               
               <div className="border-t border-[var(--color-border)]/20 my-1" />
               
+              {/* Bank Participants */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[10px]">
                   <span className="text-[var(--color-text-secondary)]">Bank A (Global)</span>
