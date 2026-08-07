@@ -15,6 +15,7 @@ import sys
 import json
 import time
 import tracemalloc
+from pathlib import Path
 import numpy as np
 
 PROJECT_ROOT = r"c:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\backend"
@@ -114,7 +115,7 @@ def benchmark_explainability():
     alerts_batch = [
         Alert(
             id=f"alt_mem_{i}",
-            risk_score=float(np.random.uniform(100, 900)),
+            risk_score=np.random.uniform(100, 900),
             severity=AlertSeverity.HIGH,
             model_confidence=0.85,
             bank_id="bank_a",
@@ -141,7 +142,7 @@ def benchmark_explainability():
         batch = [
             Alert(
                 id=f"alt_scale_{i}",
-                risk_score=float(np.random.uniform(100, 900)),
+                risk_score=np.random.uniform(100, 900),
                 severity=AlertSeverity.HIGH,
                 model_confidence=0.85,
                 bank_id="bank_a",
@@ -162,7 +163,7 @@ def benchmark_explainability():
     dims = [10, 50, 100, 500, 1000]
     dim_timings = {}
     for d in dims:
-        large_dict = {f"feat_{i}": float(np.random.uniform(0, 100)) for i in range(d)}
+        large_dict = {f"feat_{i}": np.random.uniform(0, 100) for i in range(d)}
         t0 = time.perf_counter()
         for _ in range(100):
             explainer_service.compute_shap_values(large_dict)
@@ -205,8 +206,7 @@ def benchmark_explainability():
         }
     }
 
-    # Write results to json
-    out_path = r"C:\Users\Yusuf\.gemini\antigravity-ide\brain\a3429c9e-0a37-425b-9a52-3b35832b8a38\scratch\explainability_benchmark_results.json"
+    out_path = Path(__file__).parent / "explainability_benchmark_results.json"
     with open(out_path, "w") as f:
         json.dump(results, f, indent=2)
 

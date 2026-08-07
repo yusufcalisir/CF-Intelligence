@@ -44,7 +44,19 @@ verification/
 ├── api/
 │   ├── scientific_audit_report.md
 │   └── tests/
-└── audit_logging/
+├── audit_logging/
+│   ├── scientific_audit_report.md
+│   └── tests/
+├── smart_contracts/
+│   ├── scientific_audit_report.md
+│   └── tests/
+├── etl_pipeline/
+│   ├── scientific_audit_report.md
+│   └── tests/
+├── zero_trust_pki/
+│   ├── scientific_audit_report.md
+│   └── tests/
+└── terraform_iac/
     ├── scientific_audit_report.md
     └── tests/
 ```
@@ -87,6 +99,10 @@ Every report in this registry follows the same structure:
 | Bank Connector Framework | [connectors/scientific_audit_report.md](connectors/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-06 |
 | REST API Layer | [api/scientific_audit_report.md](api/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-02 |
 | Audit Logging & Compliance | [audit_logging/scientific_audit_report.md](audit_logging/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-02 |
+| Smart Contracts Incentive Settlement | [smart_contracts/scientific_audit_report.md](smart_contracts/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-07 |
+| Real-World Fraud ETL Pipeline | [etl_pipeline/scientific_audit_report.md](etl_pipeline/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-07 |
+| Zero Trust PKI & ABAC Infrastructure | [zero_trust_pki/scientific_audit_report.md](zero_trust_pki/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-07 |
+| Multi-Cloud Terraform IaC | [terraform_iac/scientific_audit_report.md](terraform_iac/scientific_audit_report.md) | **100 / 100** | Verified | 2026-08-07 |
 
 ---
 
@@ -126,6 +142,9 @@ All audits are conducted using a multi-phase independent verification methodolog
 Each subsystem's tests are self-contained in its `tests/` directory.
 
 ```bash
+# Run master automated verification suite across all 16 subsystems
+python scripts/run_all_verifications.py
+
 # Run all tests for a specific subsystem
 pytest verification/<subsystem>/tests/
 
@@ -140,4 +159,4 @@ pytest verification/
 
 *Scientific Verification & Audit Registry*
 *Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning*
-*Registry Last Updated: 2026-08-06*
+*Registry Last Updated: 2026-08-07*

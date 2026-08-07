@@ -18,19 +18,19 @@ An independent reference verification was conducted on the Audit Logging subsyst
 | 1 | 1. Event Recording & Genesis Seeding | 🟢 PASS | Chain length: 2 |
 | 2 | 2. Timestamp ISO 8601 UTC Formatting | 🟢 PASS | Checked UTC string format |
 | 3 | 3. Correlation & SHA-256 Chaining | 🟢 PASS | Verified H_i linked to H_{i-1} |
-| 4 | 4. Serialization & Hash Determinism | 🟢 PASS | Hash match: c95a0c5a0d32 |
+| 4 | 4. Serialization & Hash Determinism | 🟢 PASS | Hash match: 1aee8f34c4ba |
 | 5 | 5. Persistence Correctness (Retry Queue File) | 🟢 PASS | File path: siem_retry_queue.jsonl |
 | 6 | 6. Event Completeness & Required Fields | 🟢 PASS | All required fields non-empty |
 | 7 | 7. Hash Uniqueness | 🟢 PASS | Unique hashes: 2/2 |
 | 8 | 8. Retrospective Integrity Verification | 🟢 PASS | Verified 2 records |
 | 9 | 9. REST Endpoint Log Retrieval | 🟢 PASS | HTTP Status: 200, Entries: 2 |
-| 10 | 10. Syslog RFC 5424 Format Adherence | 🟢 PASS | Syslog prefix valid: <134>1 2026-08-04T20:51:40.626... |
+| 10 | 10. Syslog RFC 5424 Format Adherence | 🟢 PASS | Syslog prefix valid: <134>1 2026-08-07T17:44:23.923... |
 | 11 | 11. CEF Format Compliance | 🟢 PASS | CEF header valid: CEF:0|CFI|Simulator|2.0|TEST_CEF|CEF tes... |
 | 12 | 12. Datadog V2 Payload Structure | 🟢 PASS | Source: cfi_simulator |
 | 13 | 13. Splunk HEC Wrapper Structure | 🟢 PASS | Sourcetype: cfi:audit:json |
 | 14 | 14. LRA Privacy Audit AUC Bounds | 🟢 PASS | AUC: 1.0, Risk: high_risk |
 | 15 | 15. MIA Privacy Audit ASR Bounds | 🟢 PASS | ASR: 1.0, Risk: high_risk |
-| 16 | 16. SIEM Buffer Flushing Mechanics | 🟢 PASS | Flushed 3 events |
+| 16 | 16. SIEM Buffer Flushing Mechanics | 🟢 PASS | Flushed 2805 events |
 
 ---
 

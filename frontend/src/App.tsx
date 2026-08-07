@@ -1,12 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { Navbar } from './components/Navbar';
-import { GraphVisualizer } from './components/GraphVisualizer';
-import { CounterfactualWorkbench } from './components/CounterfactualWorkbench';
-import { FLRoundRunner } from './components/FLRoundRunner';
-import { Predictor } from './components/Predictor';
-import { DriftAnalytics } from './components/DriftAnalytics';
 import { SystemHealthStatus } from './types';
 import { checkSystemHealth } from './services/api';
+
+const GraphVisualizer = lazy(() => import('./components/GraphVisualizer').then(m => ({ default: m.GraphVisualizer })));
+const CounterfactualWorkbench = lazy(() => import('./components/CounterfactualWorkbench').then(m => ({ default: m.CounterfactualWorkbench })));
+const FLRoundRunner = lazy(() => import('./components/FLRoundRunner').then(m => ({ default: m.FLRoundRunner })));
+const Predictor = lazy(() => import('./components/Predictor').then(m => ({ default: m.Predictor })));
+const DriftAnalytics = lazy(() => import('./components/DriftAnalytics').then(m => ({ default: m.DriftAnalytics })));
 
 export function App() {
   const [activeTab, setActiveTab] = useState('graph');
@@ -32,11 +33,18 @@ export function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-6">
-        {activeTab === 'graph' && <GraphVisualizer selectedBank={selectedBank} />}
-        {activeTab === 'counterfactual' && <CounterfactualWorkbench />}
-        {activeTab === 'fl_runner' && <FLRoundRunner />}
-        {activeTab === 'predict' && <Predictor />}
-        {activeTab === 'drift' && <DriftAnalytics />}
+        <Suspense fallback={
+          <div className="flex items-center justify-center p-12 text-slate-400">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mr-3"></div>
+            <span>Yükleniyor...</span>
+          </div>
+        }>
+          {activeTab === 'graph' && <GraphVisualizer selectedBank={selectedBank} />}
+          {activeTab === 'counterfactual' && <CounterfactualWorkbench />}
+          {activeTab === 'fl_runner' && <FLRoundRunner />}
+          {activeTab === 'predict' && <Predictor />}
+          {activeTab === 'drift' && <DriftAnalytics />}
+        </Suspense>
       </main>
 
       <footer className="glass-card border-t border-slate-800/80 py-4 px-6 mt-12 text-center text-xs text-slate-500">

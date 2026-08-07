@@ -266,11 +266,13 @@ CF-Intelligence/
 │   │   └── presentation/                            # REST Routers, WebSockets and OpenAPI
 │   │       ├── routers/                             # 24 FastAPI REST Routers
 │   │       └── websockets/                          # Live streaming WebSocket endpoints
-│   └── tests/                                       # Unit and Integration Pytest Suite
-├── frontend/                                        # Vite + React 18 + Tailwind CSS Console
-│   ├── src/
-│   │   ├── components/                              # Reusable UI and Cytoscape Graph Components
-│   │   └── pages/                                   # Analyst Workbench and FL Runner Dashboards
+├── contracts/                                       # EVM Smart Contracts Suite for Incentive Settlement
+│   ├── contracts/
+│   │   └── ConsortiumIncentiveSettlement.sol        # CBDC / Stablecoin Shapley Settlement Contract
+│   ├── test/                                        # Hardhat Unit & Integration Tests (13/13 passing)
+│   ├── scripts/
+│   │   └── deploy.js                                # Automated Hardhat / Sepolia Deployment Script
+│   └── hardhat.config.js                            # Solidity 0.8.20 & viaIR optimizer configuration
 ├── docs/                                            # Master Architectural Specifications
 └── verification/                                    # Subsystem Scientific Audit Reports (12 Modules)
 ```
@@ -500,6 +502,15 @@ npm install
 npm run dev
 ```
 Open `http://localhost:3000` in your browser to view the Graph Fraud Visualizer, Counterfactual Remediation Workbench, and Live FL Round Runner.
+
+### Step 5: Test & Deploy Consortium Smart Contracts
+```bash
+cd contracts
+npm install
+npm run compile
+npm run test
+npm run deploy:local
+```
 
 ---
 

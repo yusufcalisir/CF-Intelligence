@@ -197,18 +197,22 @@ def load_paysim(
     rng: np.random.Generator | None = None,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load PaySim / Kaggle Credit Card Fraud dataset.
-
-    Returns
-    -------
-    dict with keys:
-        ``X``      : np.ndarray (N, 29) — V1-V28 + Amount
-        ``y``      : np.ndarray (N,)    — binary label (1=fraud)
-        ``source`` : str
-    """
+    """Load PaySim / Kaggle Credit Card Fraud dataset."""
     rng = rng or np.random.default_rng(42)
     root = path or (_DATASETS_ROOT / "paysim")
     csv_path = root / "creditcard.csv"
+
+    # Check for Parquet partitions produced by ETL pipeline
+    parquet_files = sorted(list(root.glob("*.parquet")))
+    if parquet_files:
+        logger.info("[PaySim] Loading %d ETL Parquet partition files from %s", len(parquet_files), root)
+        dfs = [pd.read_parquet(f) for f in parquet_files]
+        full_df = pd.concat(dfs, ignore_index=True)
+        feature_cols = [c for c in full_df.columns if c not in ("Time", "Class", "is_fraud")]
+        X = full_df[feature_cols].values.astype(np.float32)
+        y = full_df["is_fraud"].values.astype(int) if "is_fraud" in full_df.columns else full_df["Class"].values.astype(int)
+        logger.info("[PaySim] Loaded %d transactions from Parquet partitions", len(y))
+        return {"X": X, "y": y, "source": "real_parquet"}
 
     if csv_path.exists():
         logger.info("[PaySim] Loading real dataset from %s", csv_path)
