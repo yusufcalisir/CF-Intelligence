@@ -1,8 +1,6 @@
-<div align="center">
+# Collaborative Fraud Intelligence Platform
 
-# 🛡️ Collaborative Fraud Intelligence Platform
-
-### *Enterprise-Grade, Privacy-Preserving Cross-Bank Financial Fraud Detection & Collaborative Anti-Money Laundering (AML) Intelligence*
+### Privacy-Preserving Cross-Bank Financial Fraud Detection and Anti-Money Laundering Architecture
 
 [![CI Build](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![Vercel Deployment](https://img.shields.io/badge/Vercel-Live_Demo-000000.svg?style=flat&logo=vercel&logoColor=white)](https://cf-intelligence.vercel.app)
@@ -13,22 +11,20 @@
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-🌐 **[Live Web Application Console](https://cf-intelligence.vercel.app)**
+[Live Web Application Console](https://cf-intelligence.vercel.app)
 
-[Executive Summary](#1-executive-summary--architectural-vision) • [Master System Architecture](#2-master-system-architecture) • [Directory Tree](#3-complete-clean-architecture-directory-structure) • [Data Ingestion](#4-multi-bank-synthetic-data--multi-standard-ingestion) • [FL Engines & Optuna](#5-federated-learning-engines--optuna-tuning) • [PET Security Perimeter](#6-privacy-enhancing-technologies-dp-secagg-fhe--hardware-tee) • [Byzantine Robustness](#7-byzantine-poisoning-defense-backdoors--adversarial-robustness) • [Graph Neural Networks](#8-streaming-graph-neural-networks--fuzzy-psi-identity-resolution) • [Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) • [Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) • [Case Management](#11-human-in-the-loop-workbench-feedback-loop--data-retention) • [Disaster Recovery](#12-disaster-recovery-high-availability-failover--sre-operations) • [Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) • [Scientific Audits](#14-subsystem-scientific-audit-reports-verification) • [API Blueprints](#15-api-endpoint-blueprints--json-schemas) • [Quick Start](#16-step-by-step-operator-quick-start)
-
-</div>
+[Executive Summary](#1-executive-summary--architectural-vision) | [Master System Architecture](#2-master-system-architecture) | [Directory Tree](#3-complete-clean-architecture-directory-structure) | [Data Ingestion](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [FL Engines & Optuna](#5-federated-learning-engines--optuna-tuning) | [PET Security Perimeter](#6-privacy-enhancing-technologies-dp-secagg-fhe--hardware-tee) | [Byzantine Robustness](#7-byzantine-poisoning-defense-backdoors--adversarial-robustness) | [Graph Neural Networks](#8-streaming-graph-neural-networks--fuzzy-psi-identity-resolution) | [Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [Case Management](#11-human-in-the-loop-workbench-feedback-loop--data-retention) | [Disaster Recovery](#12-disaster-recovery-high-availability-failover--sre-operations) | [Feature Matrix](#13-enterprise-feature-matrix--verification-mapping) | [Scientific Audits](#14-subsystem-scientific-audit-reports-verification) | [API Blueprints](#15-api-endpoint-blueprints--json-schemas) | [Quick Start](#16-step-by-step-operator-quick-start)
 
 ---
 
 ## 1. Executive Summary & Architectural Vision
 
-Financial institutions operate under strict statutory constraints (**GDPR Art. 6/17**, **CCPA**, **Bank Secrecy Act**, **Banking Secrecy Laws**) that strictly prohibit centralizing or pooling raw customer transaction records across institutional boundaries. This data fragmentation creates critical systemic vulnerabilities in global financial infrastructure:
+Financial institutions operate under statutory constraints (GDPR Article 6 and Article 17, CCPA, Bank Secrecy Act, national banking secrecy legislation) that prohibit centralizing or pooling raw customer transaction records across institutional boundaries. This data fragmentation creates systemic vulnerabilities in global financial infrastructure:
 
-- 💸 **Cross-Bank Velocity & Layering Syndicates:** Money laundering syndicates distribute illicit funds sequentially across Bank Alpha $\rightarrow$ Bank Beta $\rightarrow$ Bank Gamma within seconds, clearing accounts before individual internal single-bank rule engines can detect velocity anomalies.
-- 🥷 **Structured Smurfing Networks:** Criminal networks divide large illicit cash deposits into micro-transactions placed across multiple financial institutions to remain strictly below mandatory single-bank regulatory reporting thresholds ($10,000\text{ USD}$).
+1. Cross-Bank Velocity and Layering Syndicates: Money laundering syndicates distribute illicit funds sequentially across multiple bank nodes within seconds, clearing accounts before individual single-bank rule engines detect velocity anomalies.
+2. Structured Smurfing Networks: Criminal networks divide large cash deposits into micro-transactions placed across multiple financial institutions to remain strictly below single-bank regulatory reporting thresholds ($10,000 USD).
 
-The **Collaborative Fraud Intelligence Platform** solves this fundamental privacy-utility trade-off. By synthesizing **Federated Machine Learning (FL)**, **Opacus Differential Privacy ($\epsilon, \delta$)**, **Secure Aggregation (SecAgg)**, **Fully Homomorphic Encryption (TenSEAL CKKS FHE)**, **Hardware TEE Enclave Attestation**, **Graph Neural Networks (GraphSAGE)**, and **Byzantine-Robust Consensus Algorithms**, participating banking institutions collaboratively train a global fraud detection model—without ever exposing raw customer transactions, personally identifiable information (PII), or violating banking secrecy legislation.
+The Collaborative Fraud Intelligence Platform resolves this privacy-utility trade-off. By combining Federated Machine Learning (FL), Opacus Differential Privacy ($\epsilon, \delta$), Secure Aggregation (SecAgg), Fully Homomorphic Encryption (TenSEAL CKKS FHE), Hardware Trusted Execution Environment (TEE) attestation, Graph Neural Networks (GraphSAGE), and Byzantine-Robust Consensus Algorithms, participating financial institutions collaboratively train a global fraud detection model without exposing raw customer transactions or personally identifiable information (PII).
 
 ---
 
@@ -160,7 +156,7 @@ sequenceDiagram
 
 ```
 CF-Intelligence/
-├── pyproject.toml                                   # Packaging & cfi-cli entrypoint
+├── pyproject.toml                                   # Packaging and cfi-cli entrypoint
 ├── Dockerfile                                       # Production container specification
 ├── docker-compose.yml                               # Multi-container orchestration (API, Redis, Postgres, Kafka)
 ├── Makefile                                         # Developer automation tasks
@@ -168,12 +164,12 @@ CF-Intelligence/
 │   ├── alembic.ini                                  # Alembic DB migration configuration
 │   ├── requirements.txt                             # Production Python dependencies
 │   ├── app/
-│   │   ├── config.py                                # Platform configuration & env management
+│   │   ├── config.py                                # Platform configuration and env management
 │   │   ├── dependencies.py                          # FastAPI Dependency Injection provider
-│   │   ├── main.py                                  # Application entrypoint & middleware setup
+│   │   ├── main.py                                  # Application entrypoint and middleware setup
 │   │   ├── application/
-│   │   │   └── services/                            # Application Use Cases & Services
-│   │   │       ├── adversarial_service.py           # Robustness & FGSM/PGD attack evaluator
+│   │   │   └── services/                            # Application Use Cases and Services
+│   │   │       ├── adversarial_service.py           # Robustness and FGSM/PGD attack evaluator
 │   │   │       ├── alert_service.py                 # Real-time alert dispatching service
 │   │   │       ├── auto_rollback.py                 # Performance degradation auto-rollback engine
 │   │   │       ├── automated_retraining.py          # Drift-triggered automated retraining pipeline
@@ -183,11 +179,11 @@ CF-Intelligence/
 │   │   │       ├── consortium_service.py            # Consortium governance lifecycle service
 │   │   │       ├── coordinator_service.py           # FL Coordinator orchestration service
 │   │   │       ├── data_generator.py                # Synthetic financial transaction generator
-│   │   │       ├── data_validator.py                # Ingestion schema & distribution validator
-│   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
+│   │   │       ├── data_validator.py                # Ingestion schema and distribution validator
+│   │   │       ├── drift_service.py                 # PSI and Jensen-Shannon feature drift detector
 │   │   │       ├── entity_resolution.py             # Cross-bank fuzzy entity resolution service
-│   │   │       ├── explainability_service.py        # SHAP Kernel & GNN feature attribution
-│   │   │       ├── feature_store_service.py         # Online & offline feature store manager
+│   │   │       ├── explainability_service.py        # SHAP Kernel and GNN feature attribution
+│   │   │       ├── feature_store_service.py         # Online and offline feature store manager
 │   │   │       ├── financial_message_parser.py      # ISO 20022 XML financial message parser
 │   │   │       ├── fl_dirichlet_partitioner.py      # Dir(alpha) Non-IID data partitioner
 │   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
@@ -201,37 +197,37 @@ CF-Intelligence/
 │   │   │       ├── metrics_service.py               # Real-time metric aggregator service
 │   │   │       ├── model_registry.py                # Champion/Challenger model registry
 │   │   │       ├── policy_engine.py                 # Governance policy evaluation engine
-│   │   │       ├── privacy_audit_service.py         # Privacy budget & empirical leakage auditor
+│   │   │       ├── privacy_audit_service.py         # Privacy budget and empirical leakage auditor
 │   │   │       ├── privacy_service.py               # Opacus Differential Privacy guard
 │   │   │       ├── psi_service.py                   # Population Stability Index engine
 │   │   │       ├── regulatory_reporter.py           # FinCEN BSA SAR XML report compiler
-│   │   │       ├── retention_engine.py              # Data retention TTL & GDPR Art. 17 engine
+│   │   │       ├── retention_engine.py              # Data retention TTL and GDPR Art. 17 engine
 │   │   │       ├── risk_engine.py                   # 9-Signal composite risk scoring engine
 │   │   │       ├── security_compliance.py           # SOC2 / ISO 27001 / GDPR auditor
 │   │   │       ├── simulation_service.py            # Typology simulation scenario runner
-│   │   │       ├── sla_contract_engine.py           # SLA/SLO contract & penalty credit engine
+│   │   │       ├── sla_contract_engine.py           # SLA/SLO contract and penalty credit engine
 │   │   │       ├── sla_monitor.py                   # Latency p50/p95/p99 SLA monitor
 │   │   │       ├── streaming_engine.py              # Async streaming transaction processor
-│   │   │       ├── support_diagnostics.py           # Support bundle compiler & PII redactor
+│   │   │       ├── support_diagnostics.py           # Support bundle compiler and PII redactor
 │   │   │       ├── tenant_metering.py               # Multi-tenant resource metering service
-│   │   │       ├── webhook_service.py               # Developer webhook & HMAC-SHA256 signer
+│   │   │       ├── webhook_service.py               # Developer webhook and HMAC-SHA256 signer
 │   │   │       └── zero_downtime_deployer.py        # Rolling deployment manager
-│   │   ├── domain/                                  # Domain Models & Value Objects
+│   │   ├── domain/                                  # Domain Models and Value Objects
 │   │   │   ├── ai_act_compliance.py                 # EU AI Act compliance validator
 │   │   │   ├── async_fl_engine.py                   # Asynchronous FL coordinator domain model
-│   │   │   ├── case_management.py                   # Case entity & supervisor signature
-│   │   │   ├── consortium_governance.py             # Consortium voting & quorum entities
+│   │   │   ├── case_management.py                   # Case entity and supervisor signature
+│   │   │   ├── consortium_governance.py             # Consortium voting and quorum entities
 │   │   │   ├── entities.py                          # Core entities (Bank, Transaction, Alert)
 │   │   │   ├── fuzzy_psi.py                         # Private Set Intersection algorithm
 │   │   │   ├── label_privacy_guard.py               # DP epsilon bounds guard
 │   │   │   ├── model_lifecycle.py                   # Champion / Challenger state machine
 │   │   │   ├── realtime_explainer.py                # Sub-ms fast SHAP explainer
-│   │   │   ├── retention_policy.py                  # Retention policy & erasure models
+│   │   │   ├── retention_policy.py                  # Retention policy and erasure models
 │   │   │   ├── security_evaluator.py                # Security evaluation models
-│   │   │   ├── sla_contract.py                      # SLA contract & SLO penalty models
+│   │   │   ├── sla_contract.py                      # SLA contract and SLO penalty models
 │   │   │   ├── spectral_defense.py                  # Spectral anomaly poisoning defense
 │   │   │   └── value_objects.py                     # Immutable value objects
-│   │   ├── infrastructure/                          # Infrastructure & Security Adapters
+│   │   ├── infrastructure/                          # Infrastructure and Security Adapters
 │   │   │   ├── connectors/                          # Financial Ingestion Connectors
 │   │   │   │   ├── factory.py                       # Bank connector factory
 │   │   │   │   ├── iso20022_connector.py            # ISO 20022 XML connector
@@ -240,27 +236,27 @@ CF-Intelligence/
 │   │   │   │   ├── parquet_connector.py             # Parquet connector
 │   │   │   │   ├── rabbitmq_connector.py            # RabbitMQ connector
 │   │   │   │   └── rest_connector.py                # REST API connector
-│   │   │   ├── database/                            # SQLAlchemy ORM & Alembic Migrations
+│   │   │   ├── database/                            # SQLAlchemy ORM and Alembic Migrations
 │   │   │   │   ├── migration_manager.py             # Programmatic Alembic migration manager
 │   │   │   │   └── migrations/                      # Version revision scripts
-│   │   │   ├── gRPC/                                # gRPC protobuf services & client
-│   │   │   ├── security/                            # Security & PET Drivers
+│   │   │   ├── gRPC/                                # gRPC protobuf services and client
+│   │   │   ├── security/                            # Security and PET Drivers
 │   │   │   │   ├── abac_engine.py                   # Attribute-Based Access Control engine
 │   │   │   │   ├── fhe_driver.py                    # TenSEAL CKKS FHE driver
 │   │   │   │   ├── hsm_signer.py                    # Zero-Disk HSM signing engine
-│   │   │   │   ├── mtls_manager.py                  # mTLS cert manager & CRL inspector
+│   │   │   │   ├── mtls_manager.py                  # mTLS cert manager and CRL inspector
 │   │   │   │   ├── secagg_driver.py                 # Pairwise zero-sum SecAgg driver
 │   │   │   │   ├── tee_driver.py                    # Hardware TEE SGX/Nitro enclave driver
 │   │   │   │   └── vault_client.py                  # HashiCorp Vault PKI client
-│   │   │   └── telemetry/                           # OpenTelemetry & Prometheus metrics
-│   │   └── presentation/                            # REST Routers, WebSockets & OpenAPI
+│   │   │   └── telemetry/                           # OpenTelemetry and Prometheus metrics
+│   │   └── presentation/                            # REST Routers, WebSockets and OpenAPI
 │   │       ├── routers/                             # 24 FastAPI REST Routers
 │   │       └── websockets/                          # Live streaming WebSocket endpoints
-│   └── tests/                                       # Unit & Integration Pytest Suite
+│   └── tests/                                       # Unit and Integration Pytest Suite
 ├── frontend/                                        # Vite + React 18 + Tailwind CSS Console
 │   ├── src/
-│   │   ├── components/                              # Reusable UI & Cytoscape Graph Components
-│   │   └── pages/                                   # Analyst Workbench & FL Runner Dashboards
+│   │   ├── components/                              # Reusable UI and Cytoscape Graph Components
+│   │   └── pages/                                   # Analyst Workbench and FL Runner Dashboards
 ├── docs/                                            # Master Architectural Specifications
 └── verification/                                    # Subsystem Scientific Audit Reports (12 Modules)
 ```
@@ -270,18 +266,18 @@ CF-Intelligence/
 ## 4. Multi-Bank Synthetic Data & Multi-Standard Ingestion
 
 ### 4.1 Synthetic Multi-Bank Data Generator (`data_generator.py`)
-Generates realistic cross-bank transaction datasets across 3 distinct financial institutions (**Bank Alpha**, **Bank Beta**, **Bank Gamma**) with heterogeneous local fraud distributions (wire fraud, credit card velocity, cross-border layering) using reproducible random seeds.
+Generates realistic cross-bank transaction datasets across 3 distinct financial institutions (Bank Alpha, Bank Beta, Bank Gamma) with heterogeneous local fraud distributions (wire fraud, credit card velocity, cross-border layering) using reproducible random seeds.
 
 ### 4.2 Multi-Standard Financial Payload Parser (`financial_message_parser.py`)
 Parses financial payload formats into a unified `NormalizedTransaction` schema:
-- **ISO 20022 Messages:** `pacs.008` (Financial Interbank Credit Transfer) and `camt.053` (Bank-to-Customer Statement XML).
-- **SWIFT MT Messages:** Legacy `MT103` Single Customer Credit Transfer.
-- **PSD2 Open Banking:** Open Banking REST API webhook JSON payloads with eIDAS QWAC/QSeal signature validation.
+- ISO 20022 Messages: `pacs.008` (Financial Interbank Credit Transfer) and `camt.053` (Bank-to-Customer Statement XML).
+- SWIFT MT Messages: Legacy `MT103` Single Customer Credit Transfer.
+- PSD2 Open Banking: Open Banking REST API webhook JSON payloads with eIDAS QWAC/QSeal signature validation.
 
 ### 4.3 Data Contracts & Gating (`data_validator.py` & `data_contracts.py`)
-- **Pandera Data Contracts:** Validates incoming DataFrame schema types, non-negative transaction amounts, and ISO country codes.
-- **Great Expectations Gating:** Enforces distribution bounds before data ingestion.
-- **PyArrow Zero-Copy Streaming:** Ingests large offline datasets using Apache Parquet streaming.
+- Pandera Data Contracts: Validates incoming DataFrame schema types, non-negative transaction amounts, and ISO country codes.
+- Great Expectations Gating: Enforces distribution bounds before data ingestion.
+- PyArrow Zero-Copy Streaming: Ingests large offline datasets using Apache Parquet streaming.
 
 ---
 
@@ -289,17 +285,17 @@ Parses financial payload formats into a unified `NormalizedTransaction` schema:
 
 ### 5.1 Core Federated Learning Engine (`fl_engine.py`)
 Orchestrates global model training rounds supporting 7 distinct aggregation algorithms:
-1. **FedAvg:** Standard weighted parameter averaging.
-2. **FedProx:** Proximal regularization term ($\mu \frac{1}{2} \|w - w^t\|^2$) handling Non-IID data skew.
-3. **FedYogi & FedAdam:** Server-side adaptive optimization with momentum.
-4. **FedAdagrad:** Adaptive gradient server-side scaling.
-5. **SCAFFOLD:** Control variates ($c_i, c$) correcting client-side drift.
-6. **MOON (Model-Contrastive FL):** Contrastive representation learning between local and global embeddings.
+1. FedAvg: Standard weighted parameter averaging.
+2. FedProx: Proximal regularization term ($\mu \frac{1}{2} \|w - w^t\|^2$) handling Non-IID data skew.
+3. FedYogi and FedAdam: Server-side adaptive optimization with momentum.
+4. FedAdagrad: Adaptive gradient server-side scaling.
+5. SCAFFOLD: Control variates ($c_i, c$) correcting client-side drift.
+6. MOON (Model-Contrastive FL): Contrastive representation learning between local and global embeddings.
 
 ### 5.2 Automated Optuna FL Hyperparameter Optimizer & Dirichlet Partitioner (`fl_hyperparameter_optimizer.py` & `fl_dirichlet_partitioner.py`)
-- **Dirichlet Non-IID Data Partitioner ($\text{Dir}(\alpha)$):** Models realistic bank label heterogeneity ($\alpha \in [0.01, 10.0]$).
-- **Optuna Bayesian TPE Optimization:** Automatically searches optimal hyperparameter configurations (`learning_rate`, `local_epochs`, DP clip norm $C_{\text{max}}$, noise multiplier $\sigma$, staleness decay $\gamma$, FedProx $\mu$) using `TPESampler` with early `MedianPruner` trial termination.
-- **Tuning Management REST API:** Accessible via `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
+- Dirichlet Non-IID Data Partitioner ($\text{Dir}(\alpha)$): Models realistic bank label heterogeneity ($\alpha \in [0.01, 10.0]$).
+- Optuna Bayesian TPE Optimization: Automatically searches optimal hyperparameter configurations (`learning_rate`, `local_epochs`, DP clip norm $C_{\text{max}}$, noise multiplier $\sigma$, staleness decay $\gamma$, FedProx $\mu$) using `TPESampler` with early `MedianPruner` trial termination.
+- Tuning Management REST API: Accessible via `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
 
 ---
 
@@ -315,11 +311,11 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 | **Hardware TEE Enclave** | `tee_driver.py` | Intel SGX / AWS Nitro Enclave remote attestation & MRENCLAVE measurement | Confidential computing with hardware isolation & AES-256-GCM sealed memory | SGX / Nitro CPU |
 
 ### 6.2 Mathematical Privacy Formulations
-- **Gradient Norm Clipping ($C$):**
+- Gradient Norm Clipping ($C$):
   $$\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}$$
-- **Gaussian Noise Addition ($\sigma$):**
+- Gaussian Noise Addition ($\sigma$):
   $$\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)$$
-- **SecAgg Pairwise Mask Cancellation:**
+- SecAgg Pairwise Mask Cancellation:
   $$y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_k y_k = \sum_k w_k$$
 
 ---
@@ -328,10 +324,10 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 
 ### 7.1 Byzantine-Robust Aggregator Suite (`byzantine_defense_validation.py`)
 Resists up to 50% compromised nodes using 5 robust aggregators:
-- **Krum & Multi-Krum:** Distance-based update selection.
-- **Trimmed Mean:** Trims upper/lower $\beta$ fraction of extreme outliers per coordinate.
-- **Coordinate-Wise Median:** Element-wise median calculation.
-- **Bulyan:** Combines Multi-Krum with coordinate-wise trimmed mean.
+- Krum and Multi-Krum: Distance-based update selection.
+- Trimmed Mean: Trims upper and lower $\beta$ fraction of extreme outliers per coordinate.
+- Coordinate-Wise Median: Element-wise median calculation.
+- Bulyan: Combines Multi-Krum with coordinate-wise trimmed mean.
 
 ### 7.2 Spectral SVD Backdoor Defense (`spectral_defense.py`)
 Uses top Singular Value Decomposition (SVD) of parameter matrices to isolate and quarantine backdoor poisoning triggers prior to aggregation.
@@ -362,30 +358,30 @@ $$\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times
 Where signals include local model probability ($S_{\text{local}}$), cross-bank velocity ($S_{\text{velocity}}$), GNN centrality ($S_{\text{graph}}$), laundering typologies ($S_{\text{typology}}$), amount Z-score ($S_{\text{amount}}$), device risk ($S_{\text{device}}$), temporal clustering ($S_{\text{temporal}}$), mule probability ($S_{\text{mule}}$), and structuring index ($S_{\text{structuring}}$).
 
 ### 9.2 Fast Model Explainability & Counterfactual Simulator (`explainability_service.py` & `realtime_explainer.py`)
-- **Fast SHAP Explainer:** Computes sub-1ms Shapley feature attributions.
-- **Counterfactual Workbench:** Computes minimum feature edits required to reduce risk scores below alert thresholds.
+- Fast SHAP Explainer: Computes sub-1ms Shapley feature attributions.
+- Counterfactual Workbench: Computes minimum feature edits required to reduce risk scores below alert thresholds.
 
 ---
 
 ## 10. Real-Time Scoring Gateway & High-Availability SLA
 
-- **Sub-100ms SLA Gateway (`POST /v1/inference/score`):** Returns decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` >=700).
-- **SLO Contract Engine (`sla_contract_engine.py`):** Enforces 99.9% uptime SLA compliance and generates penalty credit reports upon breaches.
+- Sub-100ms SLA Gateway (`POST /v1/inference/score`): Returns decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` >=700).
+- SLO Contract Engine (`sla_contract_engine.py`): Enforces 99.9% uptime SLA compliance and generates penalty credit reports upon breaches.
 
 ---
 
 ## 11. Human-in-the-Loop Workbench, Feedback Loop & Data Retention
 
-- **6-Stage Case Workbench (`case_workbench.py`):** Governs case state machine with **Four-Eyes Dual Supervisor Signature** (`SIG_SUPERVISOR_*`).
-- **FinCEN BSA SAR XML (`regulatory_reporter.py`):** Compiles Suspicious Activity Report XML e-filings.
-- **GDPR Art. 17 Retention Engine (`retention_engine.py`):** Manages per-tenant TTL policies and executes cryptographic zeroization.
+- 6-Stage Case Workbench (`case_workbench.py`): Governs case state machine with Four-Eyes Dual Supervisor Signature (`SIG_SUPERVISOR_*`).
+- FinCEN BSA SAR XML (`regulatory_reporter.py`): Compiles Suspicious Activity Report XML e-filings.
+- GDPR Art. 17 Retention Engine (`retention_engine.py`): Manages per-tenant TTL policies and executes cryptographic zeroization.
 
 ---
 
 ## 12. Disaster Recovery, High-Availability Failover & SRE Operations
 
-- **Active-Passive Multi-Region Failover (`region_failover.py`):** Automated failover ($RTO < 30\text{s}, RPO = 0$) upon primary heartbeat failure (>15s).
-- **Official Operator CLI (`cfi_cli.py`):** Terminal subcommands (`cfi-cli status`, `cfi-cli health`, `cfi-cli deploy`).
+- Active-Passive Multi-Region Failover (`region_failover.py`): Automated failover ($RTO < 30\text{s}, RPO = 0$) upon primary heartbeat failure (>15s).
+- Official Operator CLI (`cfi_cli.py`): Terminal subcommands (`cfi-cli status`, `cfi-cli health`, `cfi-cli deploy`).
 
 ---
 
@@ -456,14 +452,14 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 
 ## 16. Step-by-Step Operator Quick Start
 
-### Step 1: Clone Repository & Launch Backend Infrastructure
+### Step 1: Clone Repository and Launch Backend Infrastructure
 ```bash
 git clone https://github.com/yusufcalisir/CF-Intelligence.git
 cd CF-Intelligence
 docker-compose up -d
 ```
 
-### Step 2: Install Backend Dependencies & Run Pytest Suite
+### Step 2: Install Backend Dependencies and Run Pytest Suite
 ```bash
 cd backend
 pip install -r requirements.txt
@@ -489,10 +485,4 @@ cd frontend
 npm install
 npm run dev
 ```
-Open `http://localhost:3000` in your browser to view the **Graph Fraud Visualizer**, **Counterfactual Remediation Workbench**, and **Live FL Round Runner**!
-
----
-
-<div align="center">
-  <sub>Built with PyTorch, FastAPI, Next.js, and TenSEAL FHE by the Google DeepMind & Advanced Agentic Coding Team.</sub>
-</div>
+Open `http://localhost:3000` in your browser to view the Graph Fraud Visualizer, Counterfactual Remediation Workbench, and Live FL Round Runner.
