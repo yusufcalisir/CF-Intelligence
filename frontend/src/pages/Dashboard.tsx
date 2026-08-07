@@ -19,8 +19,8 @@ export default function Dashboard() {
 
   const handleSimulationCreated = (id: string) => {
     setLastSimId(id);
-    // Navigate to the simulation view after a brief delay
-    setTimeout(() => navigate(`/simulation/${id}`), 500);
+    // Navigate to live operations view with autostart
+    setTimeout(() => navigate(`/simulation/${id}?autostart=true`), 300);
   };
 
   return (

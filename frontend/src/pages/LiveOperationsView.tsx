@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
@@ -56,6 +57,8 @@ const MOCK_SCORING_VOLUME = [
 const TOTAL_ROUNDS = 10;
 
 export default function LiveOperationsView() {
+  const { id } = useParams<{ id?: string }>();
+  const location = useLocation();
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
   const [currentRound, setCurrentRound] = useState(0);
   const [championAuc, setChampionAuc] = useState(0.72);
@@ -237,6 +240,14 @@ export default function LiveOperationsView() {
     setChampionAuc(0.72);
     setGradientSubmissions(0);
   };
+
+  // Auto-start simulation when navigated from Dashboard or via simulation route
+  useEffect(() => {
+    const isAutoStart = id || location.pathname.startsWith('/simulation') || location.search.includes('autostart=true');
+    if (isAutoStart && !isTraining && trainingPhase === 'pending') {
+      startSimulatedTraining();
+    }
+  }, [id, location.pathname, location.search]);
 
   // Tooltip style shared across charts
   const tooltipStyle = {
