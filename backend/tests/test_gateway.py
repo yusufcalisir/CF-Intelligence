@@ -63,21 +63,21 @@ def test_gateway_rate_limiting():
     from app.infrastructure.redis_store import RedisStore
     from app.presentation.routers.gateway import _rate_limiter
 
-    # Reset RedisStore global state to ensure clean in-memory fallback isolation during test suite execution
-    RedisStore._global_redis_unavailable = False
-    if "gateway_rate_limit" in RedisStore._shared_fallback_stores:
-        RedisStore._shared_fallback_stores["gateway_rate_limit"].clear()
+    # Force in-memory fallback mode for test suite isolation
+    RedisStore._global_redis_unavailable = True
     _rate_limiter.clear()
+
     original_rate_limit = settings.gateway_rate_limit
-    # Set low rate limit for test
+    original_require_auth = settings.gateway_require_auth
     settings.gateway_rate_limit = 2
+    settings.gateway_require_auth = False
     try:
         headers = {"X-API-Key": "rate_limit_test_key"}
-        # First request -> OK
+        # First request -> OK (502 downstream or 200, not 429)
         response = client.get("/api/v1/simulations", headers=headers)
         assert response.status_code != 429
 
-        # Second request -> OK
+        # Second request -> OK (not 429)
         response = client.get("/api/v1/simulations", headers=headers)
         assert response.status_code != 429
 
@@ -87,6 +87,7 @@ def test_gateway_rate_limiting():
         assert "Too Many Requests" in response.text
     finally:
         settings.gateway_rate_limit = original_rate_limit
+        settings.gateway_require_auth = original_require_auth
 
 
 # Clean up environment variable after tests run

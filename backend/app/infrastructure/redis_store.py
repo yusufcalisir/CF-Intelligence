@@ -147,13 +147,12 @@ class RedisStore:
         return self._fallback_store.get(f"{key}:list_data", [])
 
     def clear(self) -> None:
+        self._fallback_store.clear()
         c = self.client
         if c:
             try:
                 keys = c.keys(f"{self.prefix}:*")
                 if keys:
                     c.delete(*keys)
-                return
             except Exception as e:
                 logger.error(f"Redis clear failed: {e}")
-        self._fallback_store.clear()
