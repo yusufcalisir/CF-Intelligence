@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from logging.config import fileConfig
 from typing import Any
 
@@ -12,10 +13,14 @@ from alembic import context
 from app.config import get_settings
 from app.infrastructure.database import Base
 
-config = context.config
+try:
+    config = context.config
+except AttributeError:
+    config = None
 
-if config.config_file_name:
-    fileConfig(config.config_file_name)
+if config and config.config_file_name:
+    with contextlib.suppress(Exception):
+        fileConfig(config.config_file_name)
 
 target_metadata = Base.metadata
 
@@ -36,11 +41,17 @@ def run_migrations_offline() -> None:
 
 async def run_migrations_online() -> None:
     """Run migrations in 'online' mode with AsyncEngine."""
-    settings = get_settings()
-    db_url = (
-        f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
-        f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
-    )
+    db_url = config.get_main_option("sqlalchemy.url") if config else None
+    if not db_url:
+        settings = get_settings()
+        db_url = (
+            f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
+            f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+        )
+
+    # Use aiosqlite for sqlite test URLs if needed
+    if db_url.startswith("sqlite:///") and "+aiosqlite" not in db_url:
+        db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
 
     connectable = create_async_engine(db_url)
 
@@ -90,7 +101,11 @@ async def run_migrations_for_all_tenants() -> None:
     await connectable.dispose()
 
 
-if context.is_offline_mode():
-    run_migrations_offline()
-else:
-    asyncio.run(run_migrations_online())
+if config is not None:
+    try:
+        if context.is_offline_mode():
+            run_migrations_offline()
+        else:
+            asyncio.run(run_migrations_online())
+    except NameError:
+        pass
