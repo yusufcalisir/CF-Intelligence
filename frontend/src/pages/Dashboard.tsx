@@ -180,16 +180,17 @@ export default function Dashboard() {
 
 function StatusBadge({ status }: { status: string }) {
   type BadgeStyle = { background: string; color: string };
+  const fallback: BadgeStyle = { background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' };
   const styleMap: Record<string, BadgeStyle> = {
     completed:          { background: 'rgba(16,185,129,0.15)',  color: '#10b981' },
     failed:             { background: 'rgba(239,68,68,0.15)',   color: '#ef4444' },
-    pending:            { background: 'rgba(139,92,246,0.15)',  color: '#8b5cf6' },
+    pending:            fallback,
     training_federated: { background: 'rgba(59,130,246,0.15)',  color: '#3b82f6' },
     training_local:     { background: 'rgba(59,130,246,0.15)',  color: '#3b82f6' },
     generating_data:    { background: 'rgba(245,158,11,0.15)',  color: '#f59e0b' },
     evaluating:         { background: 'rgba(20,184,166,0.15)',  color: '#14b8a6' },
   };
-  const s = styleMap[status] ?? styleMap.pending;
+  const s = styleMap[status] ?? fallback;
 
   return (
     <span style={{ fontSize: '9px', padding: '2px 8px', borderRadius: 9999, fontWeight: 500, background: s.background, color: s.color }}>
