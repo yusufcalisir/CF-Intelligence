@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.connectors.base_connector import BaseBankConnector, NormalizedTransaction
@@ -43,7 +43,7 @@ class StreamingPaymentConnector(BaseBankConnector):
             currency=str(event_dict.get("currency", "USD")),
             timestamp=datetime.fromisoformat(event_dict["timestamp"])
             if "timestamp" in event_dict and isinstance(event_dict["timestamp"], str)
-            else datetime.now(timezone.utc),
+            else datetime.now(UTC),
             merchant_category_code=str(
                 event_dict.get("merchant_category_code") or event_dict.get("mcc") or "0000"
             ),

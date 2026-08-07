@@ -309,10 +309,11 @@ def setup_telemetry(app: FastAPI) -> None:
     from fastapi import Response
 
     with contextlib.suppress(Exception):
-        from fastapi.routing import _IncludedRouter
+        import fastapi.routing as _fastapi_routing
 
-        if not hasattr(_IncludedRouter, "path"):
-            _IncludedRouter.path = property(  # type: ignore[attr-defined]
+        included_router_cls = getattr(_fastapi_routing, "_IncludedRouter", None)
+        if included_router_cls and not hasattr(included_router_cls, "path"):
+            included_router_cls.path = property(
                 lambda self: getattr(self, "prefix", "")
             )
 
