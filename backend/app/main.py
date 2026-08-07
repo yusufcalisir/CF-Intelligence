@@ -252,8 +252,9 @@ def seed_mock_data() -> None:
         involved_entity_ids=[c2.id],
         model_confidence=0.85,
         top_features=[
-            {"feature": "velocity", "value": 0.92},
-            {"feature": "new_device", "value": 1.0},
+            {"feature": "velocity", "contribution": 0.92},
+            {"feature": "new_device", "contribution": 1.0},
+            {"feature": "high_risk_merchant", "contribution": 0.74},
         ],
         risk_factors=[
             "Rapid transfer immediately after device change",
@@ -274,12 +275,40 @@ def seed_mock_data() -> None:
         confidence=0.45,
         involved_entity_ids=[c3.id],
         model_confidence=0.45,
-        top_features=[{"feature": "amount", "value": 0.78}],
+        top_features=[
+            {"feature": "amount", "contribution": 0.78},
+            {"feature": "country_mismatch", "contribution": 0.45},
+        ],
         risk_factors=["Transaction amount significantly exceeds customer historical average"],
     )
     alert_svc._alert_store.set(a2.id, _alert_to_dict(a2))
     entity_svc.increment_alert_count(c3.id)
     entity_svc.update_risk_level(c3.id, RiskLevel.MEDIUM)
+
+    a3 = Alert(
+        bank_id="bank_a",
+        transaction_id="tx_77821",
+        risk_score=930.0,
+        severity=AlertSeverity.CRITICAL,
+        status=AlertStatus.NEW,
+        reason_codes=["ML-HIGH", "GEO-RISK", "CB-HIST"],
+        confidence=0.93,
+        involved_entity_ids=[c1.id],
+        model_confidence=0.93,
+        top_features=[
+            {"feature": "ml_fraud_score", "contribution": 0.93},
+            {"feature": "geo_anomaly", "contribution": 0.81},
+            {"feature": "chargeback_history", "contribution": 0.67},
+        ],
+        risk_factors=[
+            "ML model confidence exceeds critical threshold",
+            "Transaction originates from high-risk jurisdiction",
+            "Customer has prior chargeback history",
+        ],
+    )
+    alert_svc._alert_store.set(a3.id, _alert_to_dict(a3))
+    entity_svc.increment_alert_count(c1.id)
+    entity_svc.update_risk_level(c1.id, RiskLevel.CRITICAL)
 
     # 4. Create initial demonstration case
     case = case_svc.create_case(
