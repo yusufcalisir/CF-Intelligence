@@ -264,16 +264,18 @@ export default function LiveOperationsView() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 glass-card p-6 border-l-4 border-l-[var(--color-accent-indigo)]"
+        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 border-l-[var(--color-accent-indigo)]"
       >
-        <div>
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
-            <span className="text-2xl shrink-0">📡</span>
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight min-w-0">
-              Live Operations Dashboard
-            </h1>
+        <div className="space-y-1.5 min-w-0">
+          <div className="flex items-center justify-between sm:justify-start gap-2.5 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xl sm:text-2xl shrink-0">📡</span>
+              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight truncate">
+                Live Operations Dashboard
+              </h1>
+            </div>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
+              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                 wsStatus === 'CONNECTED'
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -282,15 +284,15 @@ export default function LiveOperationsView() {
               ● {wsStatus}
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-1">
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-normal">
             Real-time Consortium Federated Learning Telemetry & Transaction Scoring Stream
           </p>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <p className="text-xs text-[var(--color-text-muted)] uppercase">Active Champion AUC</p>
-            <p className="text-2xl font-bold font-mono text-[var(--color-accent-indigo)]">
+        <div className="flex flex-row sm:flex-row items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t border-[var(--color-border-subtle)] lg:border-t-0">
+          <div className="text-left sm:text-right shrink-0">
+            <p className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">Active Champion AUC</p>
+            <p className="text-lg sm:text-2xl font-bold font-mono text-[var(--color-accent-indigo)]">
               {championAuc.toFixed(4)}
             </p>
           </div>
@@ -298,21 +300,21 @@ export default function LiveOperationsView() {
           {!isTraining && trainingPhase !== 'completed' ? (
             <button
               onClick={startSimulatedTraining}
-              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)] hover:opacity-90 transition-all shadow-lg shadow-[var(--color-accent-indigo)]/30 active:scale-95"
+              className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)] hover:opacity-90 transition-all shadow-lg shadow-[var(--color-accent-indigo)]/30 active:scale-95 whitespace-nowrap shrink-0"
             >
               ▶ Start Federated Training
             </button>
           ) : trainingPhase === 'completed' ? (
             <button
               onClick={resetTraining}
-              className="px-5 py-2.5 rounded-xl font-semibold text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-lg active:scale-95"
+              className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-lg active:scale-95 whitespace-nowrap shrink-0"
             >
               🔄 Reset Simulation
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-4 py-2 rounded-xl border border-[var(--color-accent-indigo)]/40 bg-[var(--color-accent-indigo)]/10">
-              <span className="animate-pulse text-[var(--color-accent-indigo)] font-bold text-sm">●</span>
-              <span className="text-sm text-[var(--color-text-secondary)] font-medium">Training…</span>
+            <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border border-[var(--color-accent-indigo)]/40 bg-[var(--color-accent-indigo)]/10 shrink-0">
+              <span className="animate-pulse text-[var(--color-accent-indigo)] font-bold text-xs sm:text-sm">●</span>
+              <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">Training…</span>
             </div>
           )}
         </div>
