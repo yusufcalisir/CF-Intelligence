@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Comprehensive Hypothesis Property-Based Verification Suite for API Subsystem.
 
 Verifies 10 mathematical and structural system invariants across randomized scenarios:
@@ -15,9 +15,12 @@ Verifies 10 mathematical and structural system invariants across randomized scen
 """
 from __future__ import annotations
 
+import os
 import sys
 import uuid
 from pathlib import Path
+
+import torch
 
 # Add backend directory to sys.path
 backend_dir = Path(__file__).parent.parent.parent.parent / "backend"
@@ -26,9 +29,29 @@ sys.path.insert(0, str(backend_dir))
 from fastapi.testclient import TestClient
 from hypothesis import HealthCheck, Phase, Verbosity, given, settings, strategies as st
 
+from app.application.services.model_registry import ModelRegistry
+from app.application.services.model_service import ModelService
+from app.config import get_settings
 from app.main import app
 
 client = TestClient(app)
+
+
+def _seed_global_model() -> None:
+    """Write a freshly-initialised (untrained) model to the default global_model.pt path.
+
+    This satisfies the predict endpoint's filesystem guard without requiring a full
+    federated training run in the property-based test environment.
+    """
+    registry = ModelRegistry()
+    global_path = os.path.join(registry.storage_dir, "global_model.pt")
+    if not os.path.exists(global_path):
+        svc = ModelService(get_settings())
+        model = svc.create_model(dp_compatible=True)
+        torch.save(model.state_dict(), global_path)
+
+
+_seed_global_model()
 
 # Global Hypothesis Settings
 settings.register_profile(
@@ -161,10 +184,20 @@ def test_property_case_idempotency_key_invariant(title, key):
 )
 def test_property_abac_tenant_isolation_invariant(user_bank, resource_bank):
     """INVARIANT 6: Cross-tenant resource access (user_bank != resource_bank) is strictly denied (allowed: False)."""
+    # ABACEvalRequest uses flat fields — not a nested user/resource dict.
     abac_payload = {
-        "user": {"sub": "usr_hypo", "username": "test_user", "bank_id": user_bank, "roles": ["analyst"]},
-        "resource": {"resource_type": "api_route", "resource_id": "/api/v1/alerts", "bank_id": resource_bank},
-        "action": "read"
+        "user_username": "test_user",
+        "user_bank_id": user_bank,
+        "user_roles": ["analyst"],
+        "user_clearance": 2,
+        "user_shift_hours": "00:00-24:00",
+        "user_approval_tier": 50000.0,
+        "resource_type": "api_route",
+        "resource_id": "/api/v1/alerts",
+        "resource_bank_id": resource_bank,
+        "resource_amount": 0.0,
+        "resource_classification": 1,
+        "action": "read",
     }
     r = client.post("/api/v1/security/abac/evaluate", json=abac_payload)
     assert r.status_code == 200
