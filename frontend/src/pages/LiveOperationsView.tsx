@@ -267,13 +267,13 @@ export default function LiveOperationsView() {
         className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 glass-card p-6 border-l-4 border-l-[var(--color-accent-indigo)]"
       >
         <div>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">📡</span>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 min-w-0">
+            <span className="text-2xl shrink-0">📡</span>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight min-w-0">
               Live Operations Dashboard
             </h1>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+              className={`px-2.5 py-0.5 rounded-full text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                 wsStatus === 'CONNECTED'
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -282,7 +282,7 @@ export default function LiveOperationsView() {
               ● {wsStatus}
             </span>
           </div>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-1">
             Real-time Consortium Federated Learning Telemetry & Transaction Scoring Stream
           </p>
         </div>
@@ -475,19 +475,19 @@ export default function LiveOperationsView() {
         <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-4">
           Consortium Bank Nodes Health & Status
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {bankNodes.map((bank, idx) => {
             const roundData = roundHistory[roundHistory.length - 1];
             const bankAuc = idx === 0 ? roundData?.bankA : idx === 1 ? roundData?.bankB : roundData?.bankC;
             return (
-              <div key={bank.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-slate-900/40 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-bold text-[var(--color-text-primary)] text-sm">{bank.name}</p>
-                    <p className="text-xs text-[var(--color-text-muted)]">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
+              <div key={bank.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-slate-900/40 flex flex-col justify-between gap-3 min-w-0">
+                <div className="flex items-start justify-between gap-2 min-w-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{bank.name}</p>
+                    <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
                   </div>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-bold ${
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                       bank.status === 'ACTIVE'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
@@ -505,7 +505,7 @@ export default function LiveOperationsView() {
                         transition={{ duration: 0.6, ease: 'easeOut' }}
                       />
                     </div>
-                    <span className="text-xs font-mono text-[var(--color-text-muted)]">AUC {bankAuc.toFixed(3)}</span>
+                    <span className="text-xs font-mono text-[var(--color-text-muted)] shrink-0">AUC {bankAuc.toFixed(3)}</span>
                   </div>
                 )}
               </div>
