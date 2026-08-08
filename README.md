@@ -10,7 +10,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
 [![Passing Tests](https://img.shields.io/badge/tests-871%2F871_passing-success.svg?style=flat&logo=pytest&logoColor=white)](#16-step-by-step-operator-quick-start)
-[![HF Spaces](https://img.shields.io/badge/🤗%20HuggingFace-Live%20Demo-FFD21E.svg?style=flat)](https://huggingface.co/spaces/yusufcalisir/Collaborative-Fraud-Intelligence-Simulator)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
