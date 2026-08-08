@@ -107,7 +107,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="flex items-center gap-2.5">
             <img 
               src="/favicon.svg" 
-              className="w-8 h-8 rounded-full object-cover border border-[var(--color-border)]" 
+              className="w-8 h-8 rounded-lg object-contain shrink-0" 
               alt="CFI Logo" 
             />
             <div>

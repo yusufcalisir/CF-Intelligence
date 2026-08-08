@@ -540,19 +540,31 @@ const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => (
         <stop offset="50%" stopColor="#a855f7" />
         <stop offset="100%" stopColor="#06b6d4" />
       </linearGradient>
+      <radialGradient id="brand-core-glow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stopColor="#a855f7" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="#6366f1" stopOpacity="0" />
+      </radialGradient>
       <filter id="brand-glow" x="-20%" y="-20%" width="140%" height="140%">
         <feGaussianBlur stdDeviation="3" result="blur" />
         <feComposite in="SourceGraphic" in2="blur" operator="over" />
       </filter>
     </defs>
-    <rect x="4" y="4" width="112" height="112" rx="26" fill="#07071c" stroke="url(#brand-border-grad)" strokeWidth="2.5" />
+    {/* transparent bg — no dark rect */}
+    <circle cx="60" cy="60" r="48" fill="url(#brand-core-glow)" />
+    <g stroke="url(#brand-border-grad)" strokeWidth="2" strokeLinecap="round" opacity="0.45">
+      <line x1="34" y1="38" x2="86" y2="36" />
+      <line x1="34" y1="38" x2="34" y2="82" />
+      <line x1="34" y1="82" x2="86" y2="36" />
+      <line x1="78" y1="58" x2="34" y2="38" />
+    </g>
     <path d="M 84,36 C 68,22 42,22 32,38 C 22,54 22,66 32,82 C 42,98 68,98 84,84" fill="none" stroke="url(#brand-c-grad)" strokeWidth="7.5" strokeLinecap="round" filter="url(#brand-glow)" />
     <path d="M 52,36 L 86,36 M 52,36 L 52,84 M 52,58 L 78,58" fill="none" stroke="url(#brand-f-grad)" strokeWidth="7" strokeLinecap="round" strokeLinejoin="round" filter="url(#brand-glow)" />
     <circle cx="32" cy="38" r="4.5" fill="#818cf8" stroke="#ffffff" strokeWidth="1.2" />
     <circle cx="86" cy="36" r="4.5" fill="#c084fc" stroke="#ffffff" strokeWidth="1.2" />
     <circle cx="78" cy="58" r="4" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.2" />
     <circle cx="32" cy="82" r="4.5" fill="#34d399" stroke="#ffffff" strokeWidth="1.2" />
-    <circle cx="60" cy="60" r="6.5" fill="#060616" stroke="url(#brand-border-grad)" strokeWidth="2" />
+    <circle cx="84" cy="84" r="4" fill="#818cf8" stroke="#ffffff" strokeWidth="1.2" />
+    <circle cx="60" cy="60" r="7" fill="none" stroke="url(#brand-border-grad)" strokeWidth="2.5" filter="url(#brand-glow)" />
     <circle cx="60" cy="60" r="2.5" fill="#38bdf8" />
   </svg>
 ));

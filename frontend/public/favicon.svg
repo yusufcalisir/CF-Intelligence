@@ -1,59 +1,39 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="100%" height="100%">
   <defs>
-    <!-- 2026 Brand Gradient Palettes -->
     <linearGradient id="cfi-border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#6366f1" />
       <stop offset="50%" stop-color="#a855f7" />
       <stop offset="100%" stop-color="#06b6d4" />
     </linearGradient>
-
     <linearGradient id="cfi-c-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#818cf8" />
       <stop offset="50%" stop-color="#6366f1" />
       <stop offset="100%" stop-color="#4f46e5" />
     </linearGradient>
-
     <linearGradient id="cfi-f-grad" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#c084fc" />
       <stop offset="50%" stop-color="#a855f7" />
       <stop offset="100%" stop-color="#06b6d4" />
     </linearGradient>
-
     <radialGradient id="cfi-core-glow" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.6" />
+      <stop offset="0%" stop-color="#a855f7" stop-opacity="0.25" />
       <stop offset="100%" stop-color="#6366f1" stop-opacity="0" />
     </radialGradient>
-
     <filter id="cfi-glow" x="-20%" y="-20%" width="140%" height="140%">
       <feGaussianBlur stdDeviation="3.5" result="blur" />
       <feComposite in="SourceGraphic" in2="blur" operator="over" />
     </filter>
   </defs>
 
-  <!-- Dark Obsidian Container -->
-  <rect x="4" y="4" width="112" height="112" rx="28" fill="#050514" stroke="url(#cfi-border-grad)" stroke-width="2.5" />
-
-  <!-- Ambient Glow Layer -->
-  <circle cx="60" cy="60" r="40" fill="url(#cfi-core-glow)" />
-
-  <!-- Background Quantum Lattice (Network Grid) -->
-  <g stroke="#1e1e38" stroke-width="1" stroke-dasharray="2 4" opacity="0.6">
-    <circle cx="60" cy="60" r="42" fill="none" />
-    <line x1="60" y1="18" x2="60" y2="102" />
-    <line x1="18" y1="60" x2="102" y2="60" />
-    <line x1="30" y1="30" x2="90" y2="90" />
-    <line x1="90" y1="30" x2="30" y2="90" />
-  </g>
+  <!-- Ambient Glow Layer (transparent bg) -->
+  <circle cx="60" cy="60" r="48" fill="url(#cfi-core-glow)" />
 
   <!-- Interconnected Neural Node Network Beams -->
-  <g stroke="url(#cfi-border-grad)" stroke-width="2" stroke-linecap="round" opacity="0.85" filter="url(#cfi-glow)">
-    <line x1="34" y1="38" x2="60" y2="28" />
-    <line x1="60" y1="28" x2="86" y2="38" />
+  <g stroke="url(#cfi-border-grad)" stroke-width="2" stroke-linecap="round" opacity="0.5">
+    <line x1="34" y1="38" x2="86" y2="36" />
     <line x1="34" y1="38" x2="34" y2="82" />
-    <line x1="34" y1="82" x2="60" y2="92" />
-    <line x1="60" y1="92" x2="86" y2="82" />
-    <line x1="60" y1="28" x2="60" y2="60" />
-    <line x1="34" y1="58" x2="80" y2="58" />
+    <line x1="34" y1="82" x2="86" y2="36" />
+    <line x1="78" y1="58" x2="34" y2="38" />
   </g>
 
   <!-- Futuristic Geometric 'C' Curve Path -->
@@ -64,7 +44,7 @@
         stroke-linecap="round"
         filter="url(#cfi-glow)" />
 
-  <!-- Interlocking Futuristic 'F' Monogram Bar Structure -->
+  <!-- Interlocking Futuristic 'F' Monogram -->
   <path d="M 52,36 L 86,36 M 52,36 L 52,84 M 52,58 L 78,58"
         fill="none"
         stroke="url(#cfi-f-grad)"
@@ -81,6 +61,6 @@
   <circle cx="84" cy="84" r="4" fill="#818cf8" stroke="#ffffff" stroke-width="1.2" />
 
   <!-- Central TEE Enclave Cryptographic Node -->
-  <circle cx="60" cy="60" r="7" fill="#060616" stroke="url(#cfi-border-grad)" stroke-width="2.5" filter="url(#cfi-glow)" />
+  <circle cx="60" cy="60" r="7" fill="none" stroke="url(#cfi-border-grad)" stroke-width="2.5" filter="url(#cfi-glow)" />
   <circle cx="60" cy="60" r="3" fill="#38bdf8" />
 </svg>
