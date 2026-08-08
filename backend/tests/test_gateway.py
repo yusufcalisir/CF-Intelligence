@@ -61,6 +61,7 @@ def test_gateway_authorization():
 
 def test_gateway_rate_limiting():
     from unittest.mock import patch
+
     from app.infrastructure.redis_store import RedisStore
     from app.presentation.routers.gateway import _rate_limiter
 
