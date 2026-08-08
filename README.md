@@ -318,7 +318,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 6. MOON (Model-Contrastive FL): Contrastive representation learning between local and global embeddings.
 
 ### 5.2 Automated Optuna FL Hyperparameter Optimizer & Dirichlet Partitioner (`fl_hyperparameter_optimizer.py` & `fl_dirichlet_partitioner.py`)
-- Dirichlet Non-IID Data Partitioner ($\operatorname{Dir}(\alpha)$): Models realistic bank label heterogeneity across financial institutions using Dirichlet distribution:
+- Dirichlet Non-IID Data Partitioner (Dir($\alpha$)): Models realistic bank label heterogeneity across financial institutions using Dirichlet distribution:
   $$p_k \sim \text{Dirichlet}(\alpha \mathbf{p}), \quad \alpha \in [0.01, 10.0]$$
   where lower concentration ($\alpha \to 0.01$) synthesizes severe non-IID label imbalance across bank nodes and higher concentration ($\alpha \to 10.0$) converges to uniform IID class distributions.
 - Optuna Bayesian TPE Optimization: Automatically searches optimal hyperparameter configurations (`learning_rate`, `local_epochs`, DP clip norm $C_{\text{max}}$, noise multiplier $\sigma$, staleness decay $\gamma$, FedProx $\mu$) using `TPESampler` with early `MedianPruner` trial termination.
