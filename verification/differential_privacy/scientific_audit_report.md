@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit Report — Differential Privacy & PETs Subsystem
+# Publication-Quality Scientific Audit Report: Differential Privacy & PETs Subsystem
 
 This document provides a publication-grade scientific audit report of the Differential Privacy (DP), Private Set Intersection (PETs), and Privacy Audit subsystem within the privacy-preserving cross-bank fraud detection platform.
 
