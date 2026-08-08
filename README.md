@@ -47,41 +47,41 @@ The Collaborative Fraud Intelligence Platform resolves this privacy-utility trad
 ### 2.1 High-Level Topology Architecture
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        3 Client Financial Institutions (Consortium)                    │
-│            [ Bank Alpha ]            [ Bank Beta ]            [ Bank Gamma ]            │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        Local Privacy & Hardware Boundary (PETs)                       │
-│  - Opacus Differential Privacy Guard (L2 Norm Clipping C, Noise Scale σ)               │
-│  - Diffie-Hellman Pairwise SecAgg Masking (Zero-Sum Vector Perturbation)               │
-│  - TenSEAL Microsoft SEAL CKKS FHE Driver (Polynomial Ring Ciphertext Encryption)      │
-│  - Hardware TEE Enclave Driver (Intel SGX / AWS Nitro Remote Attestation & Sealing)    │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                       Byzantine-Robust Server Coordinator Engine                       │
-│  - Robust Aggregators: FedAvg / FedProx / Krum / Trimmed Mean / Median / Bulyan        │
-│  - Spectral SVD Backdoor Trigger Detection & Poisoning Quarantine Log                  │
-│  - Automated Optuna Bayesian TPE Hyperparameter Tuning & Non-IID Dirichlet Partitioner │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                         Canary Quality Gate & Model Registry                           │
-│  - Holdout Metric Evaluation -> Promote Champion / Auto-Rollback Trigger               │
-└───────────────────────────────────────────┬────────────────────────────────────────────┘
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                       Real-Time Scoring & Operational Serving                          │
-│  - Real-Time Scoring Gateway (<100ms SLA, 99.9% Uptime SLO Contract Engine)            │
-│  - Fast SHAP Explainer & Counterfactual Remediation Simulator                          │
-│  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML        │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                     3 Client Financial Institutions (Consortium)                     │
+│          [ Bank Alpha ]            [ Bank Beta ]            [ Bank Gamma ]           │
+└──────────────────────────────────────────┬───────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                       Local Privacy & Hardware Boundary (PETs)                       │
+│  - Opacus Differential Privacy Guard (L2 Norm Clipping C, Noise Scale sigma)         │
+│  - Diffie-Hellman Pairwise SecAgg Masking (Zero-Sum Vector Perturbation)             │
+│  - TenSEAL Microsoft SEAL CKKS FHE Driver (Polynomial Ring Ciphertext Encryption)    │
+│  - Hardware TEE Enclave Driver (Intel SGX / AWS Nitro Remote Attestation & Sealing)  │
+└──────────────────────────────────────────┬───────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                      Byzantine-Robust Server Coordinator Engine                      │
+│  - Robust Aggregators: FedAvg / FedProx / Krum / Trimmed Mean / Median / Bulyan      │
+│  - Spectral SVD Backdoor Trigger Detection & Poisoning Quarantine Log                │
+│  - Automated Optuna Bayesian TPE Tuning & Non-IID Dirichlet Partitioner              │
+└──────────────────────────────────────────┬───────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                         Canary Quality Gate & Model Registry                         │
+│  - Holdout Metric Evaluation -> Promote Champion / Auto-Rollback Trigger             │
+└──────────────────────────────────────────┬───────────────────────────────────────────┘
+                                           │
+                                           ▼
+┌──────────────────────────────────────────────────────────────────────────────────────┐
+│                       Real-Time Scoring & Operational Serving                        │
+│  - Real-Time Scoring Gateway (<100ms SLA, 99.9% Uptime SLO Contract Engine)          │
+│  - Fast SHAP Explainer & Counterfactual Remediation Simulator                        │
+│  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML      │
+└──────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -101,35 +101,44 @@ flowchart TD
         B --> DP2["Opacus DP Noise Injection"]
         C --> DP3["Opacus DP Noise Injection"]
         
-        DP1 --> PET1{"Encryption / Hardware Selection"}
-        DP2 --> PET2{"Encryption / Hardware Selection"}
-        DP3 --> PET3{"Encryption / Hardware Selection"}
+        DP1 --> PET1["Encryption & Hardware Driver"]
+        DP2 --> PET2["Encryption & Hardware Driver"]
+        DP3 --> PET3["Encryption & Hardware Driver"]
         
-        PET1 -->|SecAgg| SA1["Diffie-Hellman Seed Mask"]
-        PET1 -->|FHE| FHE1["TenSEAL CKKS Ciphertext"]
-        PET1 -->|TEE| TEE1["Intel SGX Enclave Sealed"]
+        PET1 --> SA1["Diffie-Hellman Seed Mask"]
+        PET1 --> FHE1["TenSEAL CKKS Ciphertext"]
+        PET1 --> TEE1["Intel SGX Enclave Sealed"]
         
-        PET2 -->|SecAgg| SA2["Diffie-Hellman Seed Mask"]
-        PET2 -->|FHE| FHE2["TenSEAL CKKS Ciphertext"]
-        PET2 -->|TEE| TEE2["Intel SGX Enclave Sealed"]
+        PET2 --> SA2["Diffie-Hellman Seed Mask"]
+        PET2 --> FHE2["TenSEAL CKKS Ciphertext"]
+        PET2 --> TEE2["Intel SGX Enclave Sealed"]
 
-        PET3 -->|SecAgg| SA3["Diffie-Hellman Seed Mask"]
-        PET3 -->|FHE| FHE3["TenSEAL CKKS Ciphertext"]
-        PET3 -->|TEE| TEE3["Intel SGX Enclave Sealed"]
+        PET3 --> SA3["Diffie-Hellman Seed Mask"]
+        PET3 --> FHE3["TenSEAL CKKS Ciphertext"]
+        PET3 --> TEE3["Intel SGX Enclave Sealed"]
     end
 
     subgraph Server["Byzantine-Robust Coordinator Engine"]
-        SA1 & FHE1 & TEE1 & SA2 & FHE2 & TEE2 & SA3 & FHE3 & TEE3 --> Agg{"Robust Aggregator\n(FedAvg / Krum / Bulyan)"}
-        Agg --> SVD{"Spectral SVD Poisoning Check"}
+        SA1 --> Agg["Robust Aggregator Engine"]
+        FHE1 --> Agg
+        TEE1 --> Agg
+        SA2 --> Agg
+        FHE2 --> Agg
+        TEE2 --> Agg
+        SA3 --> Agg
+        FHE3 --> Agg
+        TEE3 --> Agg
+
+        Agg --> SVD["Spectral SVD Poisoning Check"]
         SVD -->|Clean| Candidate["Candidate Global Model"]
         SVD -->|Poisoned| Quarantine["Quarantine Node & Log Alert"]
-        Candidate --> Canary{"Canary Quality Gate"}
+        Candidate --> Canary["Canary Quality Gate"]
         Canary -->|AUC Pass| Champion["Promote Champion Model"]
         Canary -->|AUC Degraded| Rollback["Auto-Rollback Trigger"]
     end
 
     subgraph Serving["Real-Time Scoring & Operational Serving"]
-        Champion --> Gateway["Real-Time Inference Gateway (<100ms SLA)"]
+        Champion --> Gateway["Real-Time Inference Gateway"]
         Gateway --> SHAP["Fast SHAP Explainer"]
         Gateway --> Workbench["6-Stage Case Workbench"]
     end
