@@ -106,9 +106,10 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <img 
-              src="/favicon.svg" 
-              className="w-8 h-8 rounded-lg object-contain shrink-0" 
+              src="/logo.png" 
+              className="w-8 h-8 object-contain shrink-0" 
               alt="CFI Logo" 
+              style={{ mixBlendMode: 'screen' }}
             />
             <div>
               <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
