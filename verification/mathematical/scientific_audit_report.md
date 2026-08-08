@@ -40,95 +40,173 @@ The verification suite encompasses:
 
 ### 3.1 Federated Learning Aggregators & Robustness (M-01 to M-06)
 
-1. **FedAvg Dataset-Weighted Parameter Aggregation:**
-   $$W_{\text{global}} = \sum_{k=1}^K \frac{n_k}{N} W_k$$
-   *Purpose:* Aggregates client model weights proportional to local bank dataset sizes ($n_k / N$).
+#### 1. FedAvg Dataset-Weighted Parameter Aggregation
 
-2. **FedProx Proximal Regularization:**
-   $$\min_w \mathcal{L}_k(w) + \frac{\mu}{2} \|w - w^t\|^2$$
-   *Purpose:* Bounds local client parameter drift under severe Dirichlet label heterogeneity.
+$$
+W_{\text{global}} = \sum_{k=1}^K \frac{n_k}{N} W_k
+$$
 
-3. **SCAFFOLD Control Variate Step:**
-   $$g_i(w) - c_i + c$$
-   *Purpose:* Adjusts client updates via control variates ($c_i, c$) to correct client-side gradient drift.
+*Purpose:* Aggregates client model weights proportional to local bank dataset sizes ($n_k / N$).
 
-4. **MOON Model-Contrastive Representation Loss:**
-   $$\mathcal{L}_{\text{con}} = -\log \frac{\exp(z \cdot z_{\text{glob}} / \tau)}{\exp(z \cdot z_{\text{glob}} / \tau) + \exp(z \cdot z_{\text{prev}} / \tau)}$$
-   *Purpose:* Maximizes agreement between local representations and global model representations.
+#### 2. FedProx Proximal Regularization
 
-5. **Dirichlet Non-IID Label Partitioner:**
-   $$p_{k,c} \sim \text{Dirichlet}(\alpha \mathbf{p})$$
-   *Purpose:* Synthesizes non-IID bank class distributions using concentration parameter $\alpha \in [0.01, 10.0]$.
+$$
+\min_w \mathcal{L}_k(w) + \frac{\mu}{2} \|w - w^t\|^2
+$$
 
-6. **Spectral SVD Backdoor Defense:**
-   $$s_i = \sum_{r=1}^k \left\lvert \langle \Delta w_i, v_r \rangle \right\rvert^2$$
-   *Purpose:* Detects malicious model poisoning attacks by measuring update projection onto top singular vectors.
+*Purpose:* Bounds local client parameter drift under severe Dirichlet label heterogeneity.
+
+#### 3. SCAFFOLD Control Variate Step
+
+$$
+g_i(w) - c_i + c
+$$
+
+*Purpose:* Adjusts client updates via control variates ($c_i, c$) to correct client-side gradient drift.
+
+#### 4. MOON Model-Contrastive Representation Loss
+
+$$
+\mathcal{L}_{\text{con}} = -\log \frac{\exp(z \cdot z_{\text{glob}} / \tau)}{\exp(z \cdot z_{\text{glob}} / \tau) + \exp(z \cdot z_{\text{prev}} / \tau)}
+$$
+
+*Purpose:* Maximizes agreement between local representations and global model representations.
+
+#### 5. Dirichlet Non-IID Label Partitioner
+
+$$
+p_{k,c} \sim \text{Dirichlet}(\alpha \mathbf{p})
+$$
+
+*Purpose:* Synthesizes non-IID bank class distributions using concentration parameter $\alpha \in [0.01, 10.0]$.
+
+#### 6. Spectral SVD Backdoor Defense
+
+$$
+s_i = \sum_{r=1}^k \left\lvert \langle \Delta w_i, v_r \rangle \right\rvert^2
+$$
+
+*Purpose:* Detects malicious model poisoning attacks by measuring update projection onto top singular vectors.
 
 ---
 
 ### 3.2 Differential Privacy & PET Guarantees (M-07 to M-10)
 
-1. **$L_2$ Sensitivity Vector Clipping:**
-   $$\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}$$
-   *Purpose:* Bounds single-record sensitivity to radius $C$.
+#### 1. L2 Sensitivity Vector Clipping
 
-2. **Calibrated Gaussian Noise Addition:**
-   $$\tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$$
-   *Purpose:* Injects calibrated Gaussian noise guaranteeing $(\epsilon, \delta)$-Differential Privacy.
+$$
+\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}
+$$
 
-3. **Noise Scale Derivation Formula:**
-   $$\sigma = \frac{\sqrt{2 \ln(1.25 / \delta)}}{\epsilon}$$
-   *Purpose:* Computes exact noise multiplier given target privacy budget $(\epsilon, \delta)$.
+*Purpose:* Bounds single-record sensitivity to radius $C$.
 
-4. **Population Stability Index (PSI):**
-   $$\text{PSI} = \sum_{i=1}^B (P_i - Q_i) \times \ln\left(\frac{P_i}{Q_i}\right)$$
-   *Purpose:* Quantifies statistical population drift between training and production inference datasets.
+#### 2. Calibrated Gaussian Noise Addition
+
+$$
+\tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 \mathbf{I})
+$$
+
+*Purpose:* Injects calibrated Gaussian noise guaranteeing $(\epsilon, \delta)$-Differential Privacy.
+
+#### 3. Noise Scale Derivation Formula
+
+$$
+\sigma = \frac{\sqrt{2 \ln(1.25 / \delta)}}{\epsilon}
+$$
+
+*Purpose:* Computes exact noise multiplier given target privacy budget $(\epsilon, \delta)$.
+
+#### 4. Population Stability Index (PSI)
+
+$$
+\text{PSI} = \sum_{i=1}^B (P_i - Q_i) \times \ln\left(\frac{P_i}{Q_i}\right)
+$$
+
+*Purpose:* Quantifies statistical population drift between training and production inference datasets.
 
 ---
 
 ### 3.3 Secure Aggregation & FHE (M-11 to M-13)
 
-1. **Zero-Sum Pairwise Mask Cancellation:**
-   $$y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_{k=1}^n y_k = \sum_{k=1}^n w_k$$
-   *Purpose:* Conceals individual updates during server transmission; masks cancel identically at server sum.
+#### 1. Zero-Sum Pairwise Mask Cancellation
 
-2. **HKDF-SHA256 Key Derivation:**
-   $$K_t = \text{HKDF-SHA256}(\text{seed},\; \text{"secagg-round"} \mathbin{\|} t)$$
-   *Purpose:* Generates per-round secret keys to prevent cross-round update differencing attacks.
+$$
+y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_{k=1}^n y_k = \sum_{k=1}^n w_k
+$$
 
-3. **TenSEAL CKKS FHE Homomorphic Sum:**
-   $$\text{Enc}(m_1) \oplus \text{Enc}(m_2) = \text{Enc}(m_1 + m_2)$$
-   *Purpose:* Evaluates server-side parameter additions over encrypted polynomial ring ciphertexts.
+*Purpose:* Conceals individual updates during server transmission; masks cancel identically at server sum.
+
+#### 2. HKDF-SHA256 Key Derivation
+
+$$
+K_t = \text{HKDF-SHA256}(\text{seed},\; \text{"secagg-round"} \mathbin{\|} t)
+$$
+
+*Purpose:* Generates per-round secret keys to prevent cross-round update differencing attacks.
+
+#### 3. TenSEAL CKKS FHE Homomorphic Sum
+
+$$
+\text{Enc}(m_1) \oplus \text{Enc}(m_2) = \text{Enc}(m_1 + m_2)
+$$
+
+*Purpose:* Evaluates server-side parameter additions over encrypted polynomial ring ciphertexts.
 
 ---
 
 ### 3.4 Risk Scoring & Graph Intelligence (M-17 to M-21)
 
-1. **9-Signal Composite Risk Score:**
-   $$\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times 1000\right)\right)$$
-   *Purpose:* Combines 9 anti-fraud signals into a unified composite score bounded in $[0, 1000]$.
+#### 1. 9-Signal Composite Risk Score
 
-2. **GraphSAGE 2-Hop Neighborhood Aggregation:**
-   $$h_v^{(l+1)} = \text{ReLU}\left(W_{\text{self}} h_v^{(l)} + W_{\text{neigh}} \frac{1}{|\mathcal{N}(v)|}\sum_{u \in \mathcal{N}(v)} h_u^{(l)} + b\right)$$
-   *Purpose:* Computes inductive entity embeddings over cross-bank transaction topologies.
+$$
+\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times 1000\right)\right)
+$$
 
-3. **Unit-Sphere Embedding Normalization:**
-   $$\hat{h}_v = \frac{h_v}{\|h_v\|_2}$$
-   *Purpose:* Projects embeddings onto $\mathbb{S}^{d-1}$ ensuring scale-invariant cosine distance comparisons.
+*Purpose:* Combines 9 anti-fraud signals into a unified composite score bounded in $[0, 1000]$.
+
+#### 2. GraphSAGE 2-Hop Neighborhood Aggregation
+
+$$
+h_v^{(l+1)} = \text{ReLU}\left(W_{\text{self}} h_v^{(l)} + W_{\text{neigh}} \frac{1}{|\mathcal{N}(v)|}\sum_{u \in \mathcal{N}(v)} h_u^{(l)} + b\right)
+$$
+
+*Purpose:* Computes inductive entity embeddings over cross-bank transaction topologies.
+
+#### 3. Unit-Sphere Embedding Normalization
+
+$$
+\hat{h}_v = \frac{h_v}{\|h_v\|_2}
+$$
+
+*Purpose:* Projects embeddings onto $\mathbb{S}^{d-1}$ ensuring scale-invariant cosine distance comparisons.
 
 ---
 
 ### 3.5 Smart Contracts & Audit Log Invariants (M-28 to M-31)
 
-1. **Leave-One-Out (LOO) Federated Shapley Incentive Value:**
-   $$\phi_i^{\text{LOO}} = v(N) - v(N \setminus \{i\})$$
-   $$S_i = \max(0, \lfloor \phi_i^{\text{LOO}} \times 10{,}000 \rfloor)$$
-   $$\text{Payout}_i = \left\lfloor \text{TotalPoolWei} \times \frac{S_i}{\sum_{k=1}^N S_k} \right\rfloor$$
-   *Purpose:* Governs on-chain CBDC/Stablecoin pool payouts based on client marginal model contributions.
+#### 1. Leave-One-Out (LOO) Federated Shapley Incentive Value
 
-2. **SHA-256 Audit Log Hash Chain:**
-   $$H_t = \text{SHA-256}(H_{t-1} \mathbin{\|} \text{LogPayload}_t)$$
-   *Purpose:* Guarantees tamper-evident immutable audit log chain for SOC 2 compliance.
+$$
+\phi_i^{\text{LOO}} = v(N) - v(N \setminus \{i\})
+$$
+
+$$
+S_i = \max\left(0, \lfloor \phi_i^{\text{LOO}} \times 10{,}000 \rfloor\right)
+$$
+
+$$
+\text{Payout}_i = \left\lfloor \text{TotalPoolWei} \times \frac{S_i}{\sum_{k=1}^N S_k} \right\rfloor
+$$
+
+*Purpose:* Governs on-chain CBDC/Stablecoin pool payouts based on client marginal model contributions.
+
+#### 2. SHA-256 Audit Log Hash Chain
+
+$$
+H_t = \text{SHA-256}(H_{t-1} \mathbin{\|} \text{LogPayload}_t)
+$$
+
+*Purpose:* Guarantees tamper-evident immutable audit log chain for SOC 2 compliance.
 
 ---
 
