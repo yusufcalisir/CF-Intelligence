@@ -1,4 +1,4 @@
-﻿# Final Post-Remediation Scientific Audit Report
+# Final Post-Remediation Scientific Audit Report
 # Explainability (XAI) Subsystem : Privacy-Preserving Cross-Bank Fraud Detection
 
 **Module:** `app.application.services.explainability_service`, `app.domain.realtime_explainer`, `app.domain.value_objects_phase2`  
@@ -40,7 +40,7 @@ The Explainability subsystem implements five distinct explanation mechanisms : m
 ## 2. Mathematical Correctness
 
 ### 2.1 Risk Signal Normalization
-$$\text{norm\_val} = \max\left(0.0, \min\left(1.0, \frac{v_i}{\sum w_i v_i} \cdot \frac{S_{\text{alert}}}{1000}\right)\right)$$
+$$v^* = \max\!\left(0.0,\; \min\!\left(1.0,\; \frac{v_i}{\sum w_i v_i} \cdot \frac{S_{\text{alert}}}{1000}\right)\right)$$
 - **Remediation:** Explicit `max(0.0, min(1.0, ...))` clamping prevents `-inf` inputs from causing `OverflowError` during ASCII bar formatting (`BUG-EX-01` fixed).
 - **Verification:** 50 randomized float64 trials confirmed 0.000000e+00 absolute error.
 
@@ -105,7 +105,7 @@ $$\text{norm\_val} = \max\left(0.0, \min\left(1.0, \frac{v_i}{\sum w_i v_i} \cdo
 |:----------|:----------------------|:------:|:------:|
 | **Inv 1:** Signal Weight Sum & Bounds | $\sum w_i = 1.0$; $\tilde{v}_i \in [0,1]$ | 100 | ✅ PASS |
 | **Inv 2:** Counterfactual Remediation | $S_\text{rem} \leq S_\text{target}$ iff `is_cleared` | 100 | ✅ PASS |
-| **Inv 3:** Feature Array Structure | Length = 10; $|\phi_1| \geq |\phi_2| \geq \cdots$ | 100 | ✅ PASS |
+| **Inv 3:** Feature Array Structure | Length = 10; $\lvert\phi_1\rvert \geq \lvert\phi_2\rvert \geq \cdots$ | 100 | ✅ PASS |
 | **Inv 4:** GNN Percentage Sum | $\sum \text{pct}_i = 100.0\%$ | 50 | ✅ PASS |
 | **Inv 5:** Real-Time Direction Bounds | Direction $\in \{\text{INC},\text{DEC}\}$; score $\in [0,1]$ | 100 | ✅ PASS |
 | **Inv 6:** Decision Replay Rule Count | 9 policy rules; $c_i = w_i \times \text{norm}$ | 100 | ✅ PASS |
