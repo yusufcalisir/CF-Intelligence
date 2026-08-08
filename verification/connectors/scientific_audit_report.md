@@ -90,21 +90,21 @@ The framework comprises **20 distinct components** organized across four archite
 | **Abstract Base** | `BaseBankConnector` | Data ingestion contract (`consume_stream`, `parse_batch`) + `CircuitBreaker` |
 | **Canonical Model** | `NormalizedTransaction` | Pydantic schema for payment domain normalization |
 | **Factory** | `BankConnectorFactory` | Dynamic connector dispatch + `@register_connector` registry + Zero-Mock policy guard |
-| **Protocol Adapters** | `ISO20022MessagingConnector` | ISO 20022 MX XML + SWIFT MT103 parsing |
-| | `OpenBankingConnector` | Berlin Group NextGenPSD2 REST adapter (production fallback guard) |
-| | `RESTBankConnector` | Outbound HTTP REST + mTLS + HMAC-SHA256 |
-| | `KafkaBankConnector` | Kafka topic messaging (SASL_SSL/SCRAM-SHA-256) |
-| | `RabbitMQBankConnector` | AMQP 0-9-1 RPC with correlation ID matching |
-| | `RedisBankConnector` | Redis Pub/Sub channel polling |
-| | `BatchEODFileConnector` | EOD CSV/Parquet batch ingestion (deque O(1)) |
-| | `ParquetConnector` | PyArrow zero-copy record batch streaming |
-| | `StreamingPaymentConnector` | Raw event push ingestion |
-| | `FixtureConnector` | Test double (production-guarded) |
-| | `MQSkeletonBankConnector` | Deprecated messaging skeleton |
+| **Protocol Adapter** | `ISO20022MessagingConnector` | ISO 20022 MX XML + SWIFT MT103 parsing |
+| **Protocol Adapter** | `OpenBankingConnector` | Berlin Group NextGenPSD2 REST adapter (production fallback guard) |
+| **Protocol Adapter** | `RESTBankConnector` | Outbound HTTP REST + mTLS + HMAC-SHA256 |
+| **Protocol Adapter** | `KafkaBankConnector` | Kafka topic messaging (SASL_SSL/SCRAM-SHA-256) |
+| **Protocol Adapter** | `RabbitMQBankConnector` | AMQP 0-9-1 RPC with correlation ID matching |
+| **Protocol Adapter** | `RedisBankConnector` | Redis Pub/Sub channel polling |
+| **Protocol Adapter** | `BatchEODFileConnector` | EOD CSV/Parquet batch ingestion (deque O(1)) |
+| **Protocol Adapter** | `ParquetConnector` | PyArrow zero-copy record batch streaming |
+| **Protocol Adapter** | `StreamingPaymentConnector` | Raw event push ingestion |
+| **Protocol Adapter** | `FixtureConnector` | Test double (production-guarded) |
+| **Protocol Adapter** | `MQSkeletonBankConnector` | Deprecated messaging skeleton |
 | **Retry Decorator** | `@retry_connector` | Exponential backoff decorator (sync + async) |
 | **Circuit Breaker** | `CircuitBreaker` / `CircuitBreakerOpenError` | CLOSED/OPEN/HALF_OPEN state machine in `BaseBankConnector` |
 | **Daemon Layer** | `BankClientDaemon` | Zero-inbound-port containerized daemon |
-| | `ExponentialBackoffReconnector` | Daemon reconnection with full jitter |
+| **Daemon Layer** | `ExponentialBackoffReconnector` | Daemon reconnection with full jitter |
 
 ### 2.2 Hexagonal Architecture Compliance
 

@@ -33,7 +33,7 @@ The Explainability subsystem implements five distinct explanation mechanisms —
 | Explanation Quality | Faithfulness, Stability, Sanity Checks | 51 / 100 | **100 / 100** |
 | Visualization & Interpretability | Analyst Usability | 80 / 100 | **100 / 100** |
 | Performance | Latency SLA & Scalability | 95 / 100 | **100 / 100** |
-| **TOTAL** | | **58 / 100** | **100 / 100** |
+| **TOTAL** | **Composite Evaluation** | **58 / 100** | **100 / 100** |
 
 ---
 
