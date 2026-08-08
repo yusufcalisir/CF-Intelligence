@@ -96,8 +96,20 @@ Because pairwise masks distort spatial geometry, distance-based Byzantine aggreg
 
 ## 5. Security & Threat Model Evaluation
 
-1. **Honest-but-Curious Coordinator:** Obscured during network transmission ($m_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_d)$). Centralized simulation mode generates masks on the server; peer-to-peer DH is required for production.
-2. **Replay & Differencing Resistance:** Resolved via HKDF-SHA256 per-round key derivation ($K_t = \text{HKDF-SHA256}(\text{seed}, \text{secagg\_round} \parallel t)$).
+1. **Honest-but-Curious Coordinator:** Obscured during network transmission. Individual updates are masked before leaving the client:
+
+$$
+m_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_d)
+$$
+
+   Centralized simulation mode generates masks on the server; peer-to-peer DH is required for production.
+
+2. **Replay & Differencing Resistance:** Resolved via HKDF-SHA256 per-round key derivation to prevent cross-round update differencing attacks:
+
+$$
+K_t = \text{HKDF-SHA256}(\text{seed},\; \text{"secagg-round"} \mathbin{\|} t)
+$$
+
 3. **Malicious Client Poisoning:** SecAgg conceals individual updates $w_i$, allowing a malicious client to inject linear bias $+\delta / n$. Requires Zero-Knowledge Proofs or SecAgg-compatible linear defenses.
 4. **Dropped Clients (Node Dropout):** Lacks Shamir $(t, n)$ Threshold Secret Sharing. Single-node dropout leaves uncancelled residual noise $m_n$.
 
