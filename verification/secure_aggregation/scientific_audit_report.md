@@ -1,4 +1,4 @@
-﻿# Publication-Quality Scientific Audit & Verification Report : Secure Aggregation Subsystem
+# Publication-Quality Scientific Audit & Verification Report: Secure Aggregation Subsystem
 
 **Subsystem:** Secure Aggregation (SecAgg), Trusted Execution Environment (TEE), and Key Management (KMS)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -12,7 +12,7 @@
 
 This report delivers a rigorous scientific audit and verification of the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem. The evaluation encompassed formal cryptographic claim classification, independent mathematical reference implementation comparison, property-based hypothesis testing, adversarial failure injection, scalability benchmarking, and threat vector analysis.
 
-Through code refactoring and cryptographic upgrades, critical vulnerabilities:including static mask seed reuse across rounds and unauthenticated 32-byte XOR data sealing:were resolved. Storage sealing was upgraded to **NIST SP 800-38D AES-256-GCM**, per-round key derivation was upgraded to **RFC 5869 HKDF-SHA256**, matrix mask generation was vectorized for $400\times$ speedup, and an early runtime pipeline guard was introduced to block mathematically incompatible SecAgg + non-linear Byzantine pairings.
+Through code refactoring and cryptographic upgrades, critical vulnerabilities (including static mask seed reuse across rounds and unauthenticated 32-byte XOR data sealing) were resolved. Storage sealing was upgraded to **NIST SP 800-38D AES-256-GCM**, per-round key derivation was upgraded to **RFC 5869 HKDF-SHA256**, matrix mask generation was vectorized for $400\times$ speedup, and an early runtime pipeline guard was introduced to block mathematically incompatible SecAgg + non-linear Byzantine pairings.
 
 ---
 
@@ -20,18 +20,18 @@ Through code refactoring and cryptographic upgrades, critical vulnerabilities:in
 
 Every mathematical, cryptographic, and security claim made in the codebase was evaluated against empirical test results and formal cryptographic standards:
 
-| Component / Claim | Mathematical Formulation | Security Claim | Verification Status | Scientific Classification |
-|:---|:---|:---|:---:|:---:|
-| **TenSEAL CKKS Homomorphic Sum** | $c_{\text{sum}} = \sum_{i=1}^n w_i \cdot c_i \implies \text{Dec}(c_{\text{sum}}) = \sum w_i p_i$ | Zero-knowledge server-side homomorphic aggregation | 5/5 Pass ($MAE < 10^{-5}$) | 🟢 **SUPPORTED** |
-| **Unweighted Zero-Sum Noise Masking** | $m_n = -\sum_{i=1}^{n-1} m_i \implies \sum m_i = \mathbf{0}$ | Hides single-round updates; cancels in sum | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
-| **Weighted Zero-Sum Noise Masking** | $m_n = -\frac{1}{p_n} \sum_{i=1}^{n-1} p_i m_i \implies \sum p_i m_i = \mathbf{0}$ | Preserves exact weighted FedAvg output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
-| **Exact Aggregation Preservation** | $\sum \tilde{w}_i = \sum w_i$ | Zero perturbation on aggregated output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
-| **Float64 Machine Precision** | $\varepsilon_{\text{machine}} \approx 2.22 \times 10^{-16}$ | Bounded double-precision rounding | 450+ Vectors ($MAE < 10^{-14}$) | 🟢 **SUPPORTED** |
-| **AES-256-GCM Data Sealing** | $C, T = \text{AES-GCM-Encrypt}(k, \text{IV}_{96}, P)$ | Authenticated 128-bit MAC tag integrity | Bit-flip raises `ValueError` | 🟢 **SUPPORTED** |
-| **HKDF-SHA256 Round Key Derivation** | $K_t = \text{HKDF-SHA256}(\text{seed}, \text{"secagg\_round\_"} \parallel t)$ | Prevents cross-round update differencing | Key uniqueness verified | 🟢 **SUPPORTED** |
-| **Pipeline Compatibility Guard** | Blocks SecAgg + Krum/Median | Prevents distorted L2 distance metric | Early `InvalidPipelineConfigurationError` | 🟢 **SUPPORTED** |
-| **Shamir Secret Sharing Recovery** | $f(x) = a_0 + a_1 x + \dots + a_{t-1} x^{t-1}$ | Reconstructs masks of dropped clients | Single-node dropout leaves $m_n$ noise | 🔴 **UNSUPPORTED** |
-| **Hardware TEE Enclave Attestation** | Donanımsal Intel SGX / Nitro Enclaves | Hardware isolation & remote attestation | Software simulation fallback mock | 🟡 **PARTIALLY SUPPORTED** |
+| Component & Claim | Verification Status | Classification |
+|:---|:---:|:---:|
+| **TenSEAL CKKS Homomorphic Sum:** $c_{\text{sum}} = \sum_{i=1}^n w_i \cdot c_i \implies \text{Dec}(c_{\text{sum}}) = \sum w_i p_i$, zero-knowledge server-side homomorphic aggregation | 5/5 Pass ($MAE < 10^{-5}$) | 🟢 **SUPPORTED** |
+| **Unweighted Zero-Sum Noise Masking:** $m_n = -\sum_{i=1}^{n-1} m_i \implies \sum m_i = \mathbf{0}$, hides single-round updates & cancels in sum | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
+| **Weighted Zero-Sum Noise Masking:** $m_n = -\frac{1}{p_n} \sum_{i=1}^{n-1} p_i m_i \implies \sum p_i m_i = \mathbf{0}$, preserves exact weighted FedAvg output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
+| **Exact Aggregation Preservation:** $\sum \tilde{w}_i = \sum w_i$, zero perturbation on aggregated output | 22/22 Pass ($MAE < 1.42 \times 10^{-14}$) | 🟢 **SUPPORTED** |
+| **Float64 Machine Precision:** $\varepsilon_{\text{machine}} \approx 2.22 \times 10^{-16}$, bounded double-precision rounding | 450+ Vectors ($MAE < 10^{-14}$) | 🟢 **SUPPORTED** |
+| **AES-256-GCM Data Sealing:** $C, T = \text{AES-GCM-Encrypt}(k, \text{IV}_{96}, P)$, authenticated 128-bit MAC tag integrity | Bit-flip raises `ValueError` | 🟢 **SUPPORTED** |
+| **HKDF-SHA256 Round Key Derivation:** $K_t = \text{HKDF-SHA256}(\text{seed}, \text{salt} \parallel t)$, prevents cross-round update differencing | Key uniqueness verified | 🟢 **SUPPORTED** |
+| **Pipeline Compatibility Guard:** Blocks SecAgg + Krum/Median to prevent distorted L2 distance metric | Early `InvalidPipelineConfigurationError` | 🟢 **SUPPORTED** |
+| **Shamir Secret Sharing Recovery:** $f(x) = a_0 + a_1 x + \dots + a_{t-1} x^{t-1}$, reconstructs masks of dropped clients | Single-node dropout leaves $m_n$ noise | 🔴 **UNSUPPORTED** |
+| **Hardware TEE Enclave Attestation:** Hardware Intel SGX / Nitro Enclaves isolation & remote attestation | Software simulation fallback mock | 🟡 **PARTIALLY SUPPORTED** |
 
 ---
 
@@ -103,4 +103,4 @@ Because pairwise masks distort spatial geometry, distance-based Byzantine aggreg
 
 ---
 
-*This report concludes the scientific verification of the Secure Aggregation subsystem.*
+*End of Final Post-Remediation Scientific Audit Report: Secure Aggregation Subsystem*
