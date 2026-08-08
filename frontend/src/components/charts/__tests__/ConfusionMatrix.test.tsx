@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import ConfusionMatrix from '../ConfusionMatrix';
 import type { BankResult } from '../../../api/types';
 
@@ -42,9 +42,9 @@ describe('ConfusionMatrix Visualization Test Suite', () => {
       },
     };
 
-    render(<ConfusionMatrix bank={mockBank} modelType="federated" />);
+    const { getByText } = render(<ConfusionMatrix bank={mockBank} modelType="federated" />);
 
-    expect(screen.getByText(/Confusion Matrix/i)).toBeDefined();
-    expect(screen.getByText(/JPMorgan Chase/i)).toBeDefined();
+    expect(getByText(/Confusion Matrix/i)).toBeDefined();
+    expect(getByText(/JPMorgan Chase/i)).toBeDefined();
   });
 });
