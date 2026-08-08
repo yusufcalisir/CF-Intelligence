@@ -28,7 +28,8 @@
 | [5. Federated Learning](#5-federated-learning-engines--optuna-tuning) | [10. Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [13c. Comparison](#13c-platform-comparison) |
 | [14. Scientific Audits](#14-subsystem-scientific-audit-reports-verification-16-modules) | [13d. Compliance Map](#13d-compliance-and-regulatory-standards-mapping) | [15. API Blueprints](#15-api-endpoint-blueprints--json-schemas) |
 | [16. Prerequisites](#16-prerequisites-and-system-requirements) | [17. Quick Start](#17-step-by-step-operator-quick-start) | [18. Roadmap](#18-production-roadmap-and-known-limitations) |
-| [19. Related Work](#19-related-work-and-references) | [20. Citation](#20-academic-citation-and-reference-format) | [21. Author](#21-author-and-maintenance) |
+| [19. Related Work](#19-related-work-and-references) | [20. Citation](#20-academic-citation-and-reference-format) | [21. AI Methodology](#21-development-methodology--ai-pair-programming-acknowledgments) |
+| [22. Author](#22-author-and-maintenance) | | |
 
 </div>
 
@@ -677,7 +678,24 @@ If you use this platform, its architectural specifications, PET security drivers
 
 ---
 
-## 21. Author and Maintenance
+## 21. Development Methodology & AI Pair-Programming Acknowledgments
+
+This codebase was architected and engineered using a modern hybrid human-AI pair-programming paradigm:
+
+- **Human Lead Systems Architecture & Domain Engineering:** All core architectural decisions, system boundaries, cryptographic protocol selections (SecAgg, FHE, DP), mathematical formulations, EVM smart contract logic, regulatory compliance mappings (EU AI Act, GDPR), and financial domain modeling were designed, governed, and directed by the lead author (**Yusuf Çalışır**).
+- **AI Agentic Assistance:** Advanced agentic AI coding tools (Google DeepMind Antigravity framework) served as interactive pair-programming assistants, assisting in rapid code synthesis, comprehensive test suite construction (871 unit/integration tests), automated refactoring, scientific audit documentation, and system debugging across the 16 verification subsystems.
+
+| Responsibility Scope | Primary Ownership | Execution Tools & Methods |
+| :--- | :---: | :--- |
+| **System Architecture & Domain Design** | Human Lead | System topology, PET protocols, domain models, regulatory specs |
+| **Mathematical Formulation & Proofs** | Human Lead | Formal invariants, threat models, SLA contracts, risk equations |
+| **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, AI Coding Agents |
+| **Test Engineering & Verification** | Human + AI Pair | Pytest (871 tests), Property-based fuzzing, Hardhat EVM |
+| **Audit Documentation & Blueprints** | Human + AI Pair | Markdown audit reports, OpenAPI schemas, Cypher graph queries |
+
+---
+
+## 22. Author and Maintenance
 
 Designed, developed, and maintained by **Yusuf Çalışır**.
 
