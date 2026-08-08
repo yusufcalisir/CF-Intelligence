@@ -28,7 +28,7 @@
 | [5. Federated Learning](#5-federated-learning-engines--optuna-tuning) | [10. Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [13c. Comparison](#13c-platform-comparison) |
 | [14. Scientific Audits](#14-subsystem-scientific-audit-reports-verification-16-modules) | [13d. Compliance Map](#13d-compliance-and-regulatory-standards-mapping) | [15. API Blueprints](#15-api-endpoint-blueprints--json-schemas) |
 | [16. Prerequisites](#16-prerequisites-and-system-requirements) | [17. Quick Start](#17-step-by-step-operator-quick-start) | [18. Roadmap](#18-production-roadmap-and-known-limitations) |
-| [19. Related Work](#19-related-work-and-references) | [20. Citation](#20-academic-citation-and-reference-format) | [21. AI Methodology](#21-development-methodology--ai-pair-programming-acknowledgments) |
+| [19. Related Work](#19-related-work-and-references) | [20. Citation](#20-academic-citation-and-reference-format) | [21. AI Methodology](#21-development-methodology--agentic-ai-collaboration) |
 | [22. Author](#22-author-and-maintenance) | | |
 
 </div>
@@ -678,20 +678,23 @@ If you use this platform, its architectural specifications, PET security drivers
 
 ---
 
-## 21. Development Methodology & AI Pair-Programming Acknowledgments
+## 21. Development Methodology & Agentic AI Collaboration
 
-This codebase was architected and engineered using a modern hybrid human-AI pair-programming paradigm:
+This platform was engineered using a state-of-the-art hybrid human-AI agentic pair-programming paradigm:
 
-- **Human Lead Systems Architecture & Domain Engineering:** All core architectural decisions, system boundaries, cryptographic protocol selections (SecAgg, FHE, DP), mathematical formulations, EVM smart contract logic, regulatory compliance mappings (EU AI Act, GDPR), and financial domain modeling were designed, governed, and directed by the lead author (**Yusuf Çalışır**).
-- **AI Agentic Assistance:** Advanced agentic AI coding tools (Google DeepMind Antigravity framework) served as interactive pair-programming assistants, assisting in rapid code synthesis, comprehensive test suite construction (871 unit/integration tests), automated refactoring, scientific audit documentation, and system debugging across the 16 verification subsystems.
+- **Human Lead Systems Architecture & Governance:** All core system topology designs, cryptographic PET protocol selections (SecAgg, FHE, DP), mathematical invariant proofs, EVM smart contract logic, regulatory compliance frameworks (EU AI Act, GDPR), and domain modeling were conceived, designed, and directed exclusively by the lead author (**Yusuf Çalışır**).
+- **Agentic AI & LLM Pair-Programming Pipeline:** State-of-the-art AI foundation models and autonomous agent frameworks were utilized as pair-programming assistants for code synthesis, test engineering, scientific audit documentation, and automated debugging across all 16 verification subsystems:
+  - **Google DeepMind Antigravity Platform:** Multi-agent autonomous workflow orchestration, code synthesis, and subagent task delegation.
+  - **Anthropic Claude 3.7 & 3.5 Sonnet:** Deep architectural reasoning, complex refactoring, PyTorch model logic, and cryptographic verification suites.
+  - **Google Gemini 3.6 Flash & 1.5 Pro:** High-throughput code inspection, fast test case generation, and multi-file audit report compilation.
 
-| Responsibility Scope | Primary Ownership | Execution Tools & Methods |
+| Responsibility Scope | Primary Ownership | AI Models & Agent Infrastructure |
 | :--- | :---: | :--- |
-| **System Architecture & Domain Design** | Human Lead | System topology, PET protocols, domain models, regulatory specs |
-| **Mathematical Formulation & Proofs** | Human Lead | Formal invariants, threat models, SLA contracts, risk equations |
-| **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, AI Coding Agents |
-| **Test Engineering & Verification** | Human + AI Pair | Pytest (871 tests), Property-based fuzzing, Hardhat EVM |
-| **Audit Documentation & Blueprints** | Human + AI Pair | Markdown audit reports, OpenAPI schemas, Cypher graph queries |
+| **System Architecture & Domain Engineering** | Human Lead | System topology, PET protocols, domain models, regulatory specs |
+| **Mathematical Specs & Security Proofs** | Human Lead | Formal invariants, threat models, SLA contracts, risk equations |
+| **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, Claude 3.7 Sonnet, Gemini 3.6 Flash |
+| **Test Engineering & Verification** | Human + AI Pair | Pytest (871 tests), Property-based fuzzing, Hardhat EVM, DeepMind Antigravity |
+| **Audit & Documentation Synthesis** | Human + AI Pair | Scientific audit reports, OpenAPI schemas, Cypher graph queries |
 
 ---
 
