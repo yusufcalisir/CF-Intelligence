@@ -47,31 +47,30 @@ This document presents the post-remediation scientific audit of the **Telemetry 
 The Telemetry subsystem provides enterprise-grade observability across federated banking nodes:
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                   TELEMETRY & OBSERVABILITY STACK                  │
-├─────────────────────────────────────────────────────────────────────┤
-│  OpenTelemetryTracer           (otel_tracer.py)                     │
-│  ├─ W3C Trace Context (traceparent, tracestate)                     │
-│  ├─ Enforces len(trace_id)==32 and len(span_id)==16                 │
-│  └─ Span lifecycle profiling (start_time, duration_ms, status)      │
-├─────────────────────────────────────────────────────────────────────┤
-│  TelemetryRegistry             (telemetry/__init__.py)              │
-│  ├─ Thread-safe Prometheus metrics registry via threading.Lock()    │
-│  ├─ MetricProxy enforces Counter monotonicity (dec() raises error)  │
-│  └─ Renders Prometheus v0.0.4 text format with # HELP and # TYPE    │
-├─────────────────────────────────────────────────────────────────────┤
-│  RealtimeSLAMonitor            (sla_monitor.py)                     │
-│  ├─ Bounded deque latency tracker (collections.deque, maxlen=10000) │
-│  └─ p50/p95/p99 linear quantile interpolation (0.00e+00 error)     │
-├─────────────────────────────────────────────────────────────────────┤
-│  SupportDiagnosticCompiler     (support_diagnostics.py)            │
-│  ├─ Multi-pattern PII sanitization (IBAN, email, SSN redaction)     │
-│  └─ Bundle SHA-256 digital fingerprint verification                │
-├─────────────────────────────────────────────────────────────────────┤
-│  SIEMLogExporter               (siem_exporter.py)                   │
-│  └─ Multi-format security audit export (Syslog RFC 5424, CEF, Splunk)│
-└─────────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------+
+|            TELEMETRY & OBSERVABILITY STACK               |
++----------------------------------------------------------+
+| OpenTelemetryTracer            (otel_tracer.py)          |
+| - W3C Trace Context (traceparent, tracestate)            |
+| - Enforces len(trace_id)==32 and len(span_id)==16        |
+| - Span profiling (start_time, duration_ms, status)       |
++----------------------------------------------------------+
+| TelemetryRegistry              (telemetry/__init__.py)   |
+| - Thread-safe Prometheus metrics via threading.Lock()    |
+| - MetricProxy enforces Counter monotonicity              |
+| - Renders Prometheus v0.0.4 text format                  |
++----------------------------------------------------------+
+| RealtimeSLAMonitor             (sla_monitor.py)          |
+| - Bounded deque latency tracker (maxlen=10,000)          |
+| - p50/p95/p99 quantile interpolation (0.00e+00 error)    |
++----------------------------------------------------------+
 ```
+
+| Observability Component | Primary File & Module | Operational Responsibilities |
+|:---|:---|:---|
+| **OpenTelemetry Tracer** | `otel_tracer.py` | W3C Trace Context propagation, traceparent validation, span duration profiling. |
+| **Telemetry Registry** | `telemetry/__init__.py` | Thread-safe Prometheus metric collection, Counter monotonicity enforcement. |
+| **SLA & Realtime Monitor** | `sla_monitor.py` | Bounded deque latency buffering ($N \le 10,000$), p50/p95/p99 quantile calculation. |
 
 ---
 

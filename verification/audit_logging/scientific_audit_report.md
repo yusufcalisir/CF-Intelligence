@@ -26,27 +26,35 @@ The Audit Logging subsystem provides immutable, tamper-evident record-keeping, r
 The Audit Logging subsystem is structured into core cryptographic ledgers, exporter layers, and privacy auditing services:
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ Cryptographic Ledger & Thread Synchronization                                          │
-│ • ImmutableAuditChain (SHA-256 H_i = SHA256(L_i || H_{i-1}))                         │
-│ • threading.Lock() synchronized atomic appends                                        │
-│ • Genesis Block Rooting (GENESIS_BLOCK_CFI_AUDIT_CHAIN_2026)                          │
-└───────────────────────────────────┬────────────────────────────────────────────────────┘
-                                    │
-┌───────────────────────────────────▼────────────────────────────────────────────────────┐
-│ SIEM Multi-Format Exporter & Resilient Buffer                                          │
-│ • Syslog RFC 5424 (UDP 514 / TCP 6514)  • Micro Focus ArcSight CEF Serialization       │
-│ • Splunk HEC JSON Intake API            • Datadog V2 Log Intake API                    │
-│ • Local JSONL Disk Buffer (siem_retry_queue.jsonl) & Daemon Flusher Thread             │
-└───────────────────────────────────┬────────────────────────────────────────────────────┘
-                                    │
-┌───────────────────────────────────▼────────────────────────────────────────────────────┐
-│ Privacy Leakage & Compliance Engines                                                   │
-│ • PrivacyAuditService (LRA ROC AUC & MIA ASR calculations)                            │
-│ • RetentionEngine (GDPR Art 30 / ISO 27001 retention schedules)                        │
-│ • SecurityRouter REST APIs (/api/v1/security/audit-chain/verify)                       │
-└────────────────────────────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------+
+| Cryptographic Ledger & Thread Synchronization            |
+| - ImmutableAuditChain (SHA-256 Hash Chain)               |
+| - threading.Lock() synchronized atomic appends           |
+| - Genesis Block Rooting (GENESIS_BLOCK_2026)             |
++----------------------------+-----------------------------+
+                             |
+                             v
++----------------------------+-----------------------------+
+| SIEM Multi-Format Exporter & Resilient Buffer            |
+| - Syslog RFC 5424          - ArcSight CEF                |
+| - Splunk HEC JSON          - Datadog V2 Intake           |
+| - Local JSONL Disk Buffer & Daemon Flusher Thread        |
++----------------------------+-----------------------------+
+                             |
+                             v
++----------------------------------------------------------+
+| Privacy Leakage & Compliance Engines                     |
+| - PrivacyAuditService (ROC AUC & MIA ASR metrics)        |
+| - RetentionEngine (GDPR Art 30 / ISO 27001)              |
+| - SecurityRouter REST APIs (/audit-chain/verify)         |
++----------------------------------------------------------+
 ```
+
+| Subsystem Component | Key Engineering Modules | Core Responsibility |
+|:---|:---|:---|
+| **Cryptographic Ledger** | `ImmutableAuditChain`, `threading.Lock()`, Genesis Anchor | SHA-256 hash chaining ($H_i = \text{SHA256}(L_i \parallel H_{i-1})$), atomic append thread synchronization. |
+| **SIEM Exporters** | `SyslogExporter`, `CEFFormatter`, `SplunkHECExporter`, `DatadogExporter` | RFC 5424 Syslog forwarding, Micro Focus ArcSight CEF formatting, Splunk/Datadog REST intake APIs. |
+| **Privacy Audit & Compliance** | `PrivacyAuditService`, `RetentionEngine`, `SecurityRouter` | Empirical ROC AUC leakage tracking, GDPR Art 30 retention scheduling, cryptographic chain verification APIs. |
 
 ---
 

@@ -26,26 +26,34 @@ The API subsystem serves as the high-throughput, multi-tenant entry point for tr
 The API is built on FastAPI and Uvicorn, structured into presentation routers, application services, and infrastructure connectors.
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────┐
-│ Edge Gateway & Proxy Middleware Layer                                            │
-│ • ContentTypeMiddleware (HTTP 415)      • MTLSVerificationMiddleware (L7 mTLS)    │
-│ • DDoSProtectionMiddleware (L7 Rate)    • APIVersionLifecycleMiddleware (RFC 8594) │
-│ • W3CTraceContextMiddleware             • Global Exception Handler (RFC 7807)      │
-└───────────────────────────────────┬──────────────────────────────────────────────┘
-                                    │
-┌───────────────────────────────────▼──────────────────────────────────────────────┐
-│ Presentation Routers & Protocol Endpoints                                        │
-│ • /api/v1/predict (ML Scoring)          • /api/v1/alerts (Threat Intelligence)   │
-│ • /api/v1/cases (Case Investigation)    • /api/v1/security (ABAC & Audit Chain)  │
-│ • /health, /health/ready (Probes)       • /ws/stream, /ws/training (WebSockets)  │
-└───────────────────────────────────┬──────────────────────────────────────────────┘
-                                    │
-┌───────────────────────────────────▼──────────────────────────────────────────────┐
-│ Application Services & Threadpool Offloading                                     │
-│ • asyncio.to_thread(_eval_model)        • BackgroundTasks (ingest_transaction)   │
-│ • IdempotencyService (24h TTL)          • ImmutableAuditChain (SHA-256 blocks)   │
-└──────────────────────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------+
+| Edge Gateway & Proxy Middleware Layer                    |
+| - ContentTypeMiddleware      - MTLSVerification          |
+| - DDoSProtectionMiddleware   - APIVersionLifecycle       |
+| - W3CTraceContextMiddleware  - Global Exception Handler  |
++----------------------------+-----------------------------+
+                             |
+                             v
++----------------------------+-----------------------------+
+| Presentation Routers & Protocol Endpoints                |
+| - /api/v1/predict          - /api/v1/alerts              |
+| - /api/v1/cases            - /api/v1/security            |
+| - /health, /health/ready   - /ws/stream, /ws/training    |
++----------------------------+-----------------------------+
+                             |
+                             v
++----------------------------------------------------------+
+| Application Services & Threadpool Offloading             |
+| - asyncio.to_thread        - BackgroundTasks             |
+| - IdempotencyService       - ImmutableAuditChain         |
++----------------------------------------------------------+
 ```
+
+| Architecture Layer | Core Components & Middlewares | Functional Role |
+|:---|:---|:---|
+| **Edge Gateway & Middleware** | `ContentTypeMiddleware`, `MTLSVerificationMiddleware`, `DDoSProtectionMiddleware`, `APIVersionLifecycleMiddleware`, `W3CTraceContextMiddleware` | L7 mTLS verification, rate-limiting, trace context propagation, and RFC 7807 error handling. |
+| **Presentation Routers** | `/api/v1/predict`, `/api/v1/alerts`, `/api/v1/cases`, `/api/v1/security`, `/health`, `/ws/stream` | Multi-tenant REST endpoints, WebSocket streaming, and ABAC security routers. |
+| **Application Services** | `asyncio.to_thread(_eval_model)`, `BackgroundTasks`, `IdempotencyService`, `ImmutableAuditChain` | Non-blocking threadpool offloading, 24h idempotency caching, and SHA-256 audit chaining. |
 
 ---
 
