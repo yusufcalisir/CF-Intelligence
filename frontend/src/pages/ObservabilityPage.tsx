@@ -26,16 +26,16 @@ export default function ObservabilityPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
             Enterprise Observability & Drift Monitoring
           </h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-1">
             Real-time Kolmogorov-Smirnov statistical feature drift, PSI concept drift, Brier calibration, and Prometheus Alertmanager
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-xs font-mono text-[var(--color-text-muted)] cursor-pointer">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+          <label className="flex items-center gap-2 text-xs font-mono text-[var(--color-text-muted)] cursor-pointer whitespace-nowrap">
             <input
               type="checkbox"
               checked={simulatedSevereDrift}
@@ -48,7 +48,7 @@ export default function ObservabilityPage() {
           <button
             onClick={handleRetrain}
             disabled={triggerRetrain.isPending}
-            className="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 shadow-md transition-all flex items-center gap-2"
+            className="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 shadow-md transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap"
           >
             {triggerRetrain.isPending ? 'Initiating FL Round...' : '🔄 Trigger Automated Re-training'}
           </button>
@@ -60,10 +60,10 @@ export default function ObservabilityPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="p-4 rounded-xl border bg-indigo-500/10 border-indigo-500/30 text-indigo-400 flex items-center justify-between"
+          className="p-4 rounded-xl border bg-indigo-500/10 border-indigo-500/30 text-indigo-400 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
         >
           <div className="flex items-center gap-3">
-            <span className="text-2xl">⚡</span>
+            <span className="text-2xl shrink-0">⚡</span>
             <div>
               <div className="font-bold text-sm">Automated Federated Re-training Round Initiated</div>
               <div className="text-xs opacity-90">
@@ -71,7 +71,7 @@ export default function ObservabilityPage() {
               </div>
             </div>
           </div>
-          <span className="text-[10px] font-mono px-2 py-1 bg-black/30 rounded">
+          <span className="text-[10px] font-mono px-2 py-1 bg-black/30 rounded shrink-0 self-start sm:self-auto">
             {triggerRetrain.data.triggered_at}
           </span>
         </motion.div>
@@ -79,7 +79,7 @@ export default function ObservabilityPage() {
 
       {/* System Status Summary Banner */}
       {driftData && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="glass-card p-4 space-y-1">
             <div className="text-xs text-[var(--color-text-muted)]">Overall System Status</div>
             <div
@@ -119,7 +119,7 @@ export default function ObservabilityPage() {
       )}
 
       {/* 4-Tab Navigation */}
-      <div className="flex border-b border-[var(--color-border)] text-sm font-bold gap-4">
+      <div className="flex overflow-x-auto border-b border-[var(--color-border)] text-xs sm:text-sm font-bold gap-4 sm:gap-6 pb-0.5">
         {[
           { id: 'drift', label: '📉 Model Drift Analytics (KS / PSI)' },
           { id: 'calibration', label: '🎯 Model Calibration Curve' },
@@ -129,7 +129,7 @@ export default function ObservabilityPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`pb-3 transition-all ${
+            className={`pb-3 shrink-0 whitespace-nowrap transition-all ${
               activeTab === tab.id
                 ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)] font-bold'
                 : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
@@ -142,12 +142,12 @@ export default function ObservabilityPage() {
 
       {/* Tab 1: Feature & Concept Drift Table */}
       {activeTab === 'drift' && (
-        <div className="glass-card p-5 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
+        <div className="glass-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
               Statistical Feature Drift Breakdown (scipy.stats ks_2samp & wasserstein_distance)
             </h3>
-            <span className="text-xs text-[var(--color-text-muted)]">
+            <span className="text-xs text-[var(--color-text-muted)] shrink-0">
               Evaluated: {driftData?.evaluated_at}
             </span>
           </div>
@@ -156,28 +156,28 @@ export default function ObservabilityPage() {
             <div className="text-center py-8 text-[var(--color-text-muted)]">Running statistical drift tests...</div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono">
+              <table className="w-full text-left text-xs font-mono min-w-[640px]">
                 <thead>
                   <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
-                    <th className="pb-2">Feature Name</th>
-                    <th className="pb-2">KS Statistic</th>
-                    <th className="pb-2">KS p-value</th>
-                    <th className="pb-2">Wasserstein Dist</th>
-                    <th className="pb-2">PSI Index</th>
-                    <th className="pb-2">Drift Status</th>
+                    <th className="pb-2 pr-4 font-semibold">Feature Name</th>
+                    <th className="pb-2 px-3 font-semibold">KS Statistic</th>
+                    <th className="pb-2 px-3 font-semibold">KS p-value</th>
+                    <th className="pb-2 px-3 font-semibold">Wasserstein Dist</th>
+                    <th className="pb-2 px-3 font-semibold">PSI Index</th>
+                    <th className="pb-2 pl-3 font-semibold">Drift Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[var(--color-border)]">
                   {driftData?.feature_drifts.map((fd, i) => (
                     <tr key={i} className="hover:bg-[var(--color-surface-alt)]/50">
-                      <td className="py-2.5 font-semibold text-[var(--color-text-primary)]">{fd.feature_name}</td>
-                      <td className="py-2.5">{fd.ks_statistic.toFixed(4)}</td>
-                      <td className="py-2.5">{fd.ks_p_value.toFixed(4)}</td>
-                      <td className="py-2.5">{fd.wasserstein_distance.toFixed(4)}</td>
-                      <td className="py-2.5 font-bold text-[var(--color-primary)]">{fd.psi.toFixed(4)}</td>
-                      <td className="py-2.5">
+                      <td className="py-2.5 pr-4 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">{fd.feature_name}</td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_statistic.toFixed(4)}</td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_p_value.toFixed(4)}</td>
+                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.wasserstein_distance.toFixed(4)}</td>
+                      <td className="py-2.5 px-3 font-bold text-[var(--color-primary)] whitespace-nowrap">{fd.psi.toFixed(4)}</td>
+                      <td className="py-2.5 pl-3 whitespace-nowrap">
                         <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 whitespace-nowrap ${
                             fd.status === 'STABLE'
                               ? 'bg-emerald-500/20 text-emerald-400'
                               : fd.status === 'MODERATE_DRIFT'
