@@ -20,13 +20,13 @@ The pipeline was evaluated across standard open financial datasets (Kaggle Credi
 
 | Component | Verification Status | Classification |
 |:---|:---:|:---:|
-| **HMAC-SHA256 Identity Anonymization** — Non-reversible deterministic PII hashing via $h_i = \text{HMAC-SHA256}(\text{salt}, \text{raw\_id}_i)$ | 4/4 Pass, $\|h_i\| = 64$ hex | 🟢 **SUPPORTED** |
-| **Dirichlet Non-IID Partitioning** — $(p_1, \dots, p_K) \sim \text{Dir}(\alpha \cdot \mathbf{1}_K)$ simulating statistical heterogeneity | 4/4 Pass, $\sum N_k = N_{\text{total}}$ | 🟢 **SUPPORTED** |
-| **Exact Sample Conservation** — $\sum_{k=1}^K \|X_k\| = \|X_{\text{total}}\|$, zero sample loss during partitioning | 25/25 Reference Scenarios Pass | 🟢 **SUPPORTED** |
-| **PyArrow Zero-Copy Parquet Export** — Snappy compressed columnar layout, no serialization overhead | 4/4 Pass | 🟢 **SUPPORTED** |
-| **Dataloader Auto-Discovery** — `glob storage/datasets/<name>/*.parquet`, FL engine integration | Verified via `load_dataset("paysim")` | 🟢 **SUPPORTED** |
-| **Label Ratio Non-Uniformity** — $\text{Var}(\text{Fraud}_k / N_k) > 0$ for $\alpha < \infty$, realistic Non-IID imbalance | Verified across 3 bank partitions | 🟢 **SUPPORTED** |
-| **Synthetic Mock Fallback** — Fallback to `n_mock_txns` when raw CSV missing, robust CI operation | Verified in CI environment | 🟢 **SUPPORTED** |
+| **HMAC-SHA256 Identity Anonymization:** Non-reversible deterministic PII hashing via $h_i = \text{HMAC-SHA256}(\text{salt},\, r_i)$ | 4/4 Pass, $\lvert h_i \rvert = 64$ hex | 🟢 **SUPPORTED** |
+| **Dirichlet Non-IID Partitioning:** $(p_1, \dots, p_K) \sim \text{Dir}(\alpha \cdot \mathbf{1}_K)$ simulating statistical heterogeneity | 4/4 Pass, $\sum N_k = N_{\text{total}}$ | 🟢 **SUPPORTED** |
+| **Exact Sample Conservation:** $\sum_{k=1}^K \lvert X_k \rvert = \lvert X_{\text{total}} \rvert$, zero sample loss during partitioning | 25/25 Reference Scenarios Pass | 🟢 **SUPPORTED** |
+| **PyArrow Zero-Copy Parquet Export:** Snappy compressed columnar layout, no serialization overhead | 4/4 Pass | 🟢 **SUPPORTED** |
+| **Dataloader Auto-Discovery:** `glob storage/datasets/<name>/*.parquet`, FL engine integration | Verified via `load_dataset("paysim")` | 🟢 **SUPPORTED** |
+| **Label Ratio Non-Uniformity:** $\text{Var}(\text{Fraud}_k / N_k) > 0$ for $\alpha < \infty$, realistic Non-IID imbalance | Verified across 3 bank partitions | 🟢 **SUPPORTED** |
+| **Synthetic Mock Fallback:** Fallback to `n_mock_txns` when raw CSV missing, robust CI operation | Verified in CI environment | 🟢 **SUPPORTED** |
 
 ---
 
