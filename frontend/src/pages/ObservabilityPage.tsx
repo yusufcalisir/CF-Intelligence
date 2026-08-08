@@ -230,21 +230,34 @@ export default function ObservabilityPage() {
             )}
           </div>
 
-          <div className="glass-card p-5 space-y-4 md:col-span-2">
-            <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
+          <div className="glass-card p-4 sm:p-5 space-y-4 md:col-span-2">
+            <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
               Reliability Curve Bins (10-Bin Calibration)
             </h3>
-            <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
-              {calibData?.bins.map((bin) => (
-                <div key={bin.bin_index} className="p-2 rounded bg-[var(--color-surface-alt)] text-xs flex items-center justify-between font-mono">
-                  <span>Bin #{bin.bin_index} [{bin.prob_min} - {bin.prob_max}]</span>
-                  <div className="flex items-center gap-4">
-                    <span>Pred Prob: <strong className="text-[var(--color-primary)]">{bin.mean_predicted_prob}</strong></span>
-                    <span>Actual Ratio: <strong className="text-emerald-400">{bin.empirical_fraud_ratio}</strong></span>
-                    <span className="text-[10px] text-[var(--color-text-muted)]">({bin.sample_count} samples)</span>
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1 overflow-x-auto">
+              <div className="min-w-[540px] space-y-2">
+                {calibData?.bins.map((bin) => (
+                  <div
+                    key={bin.bin_index}
+                    className="p-2.5 rounded-lg bg-[var(--color-surface-alt)] text-xs grid grid-cols-12 items-center font-mono gap-2"
+                  >
+                    <div className="col-span-3 text-[var(--color-text-primary)] font-semibold truncate">
+                      Bin #{bin.bin_index} [{bin.prob_min} - {bin.prob_max}]
+                    </div>
+                    <div className="col-span-3 text-left">
+                      <span className="text-[var(--color-text-muted)] text-[11px]">Pred Prob: </span>
+                      <strong className="text-[var(--color-primary)] font-bold">{bin.mean_predicted_prob}</strong>
+                    </div>
+                    <div className="col-span-3 text-left">
+                      <span className="text-[var(--color-text-muted)] text-[11px]">Actual Ratio: </span>
+                      <strong className="text-emerald-400 font-bold">{bin.empirical_fraud_ratio}</strong>
+                    </div>
+                    <div className="col-span-3 text-right text-[11px] text-[var(--color-text-muted)]">
+                      ({bin.sample_count} samples)
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -252,12 +265,12 @@ export default function ObservabilityPage() {
 
       {/* Tab 3: Prometheus Alertmanager */}
       {activeTab === 'alerts' && (
-        <div className="glass-card p-5 space-y-4">
-          <div className="flex justify-between items-center">
-            <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
+        <div className="glass-card p-4 sm:p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
               Active Prometheus Alertmanager Feed
             </h3>
-            <span className="text-xs text-[var(--color-text-muted)]">Target: http://alertmanager:9093</span>
+            <span className="text-xs font-mono text-[var(--color-text-muted)] shrink-0">Target: http://alertmanager:9093</span>
           </div>
 
           {isAlertsLoading ? (
