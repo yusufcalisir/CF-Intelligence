@@ -39,15 +39,38 @@ This document presents the post-remediation scientific audit of the **Federation
 
 ## 2. System Architecture Overview
 
-The Federation Coordinator operates as an enterprise-grade distributed orchestration stack across five core components:
+The Federation Coordinator operates as an enterprise-grade distributed orchestration stack:
 
-| Orchestration Layer | Implementation Module | Core Responsibility & Architectural Features |
-|:---|:---|:---|
-| **Multi-Region Failover** | `region_failover.py` | Active-passive heartbeat failover with 15.0s timeout and per-region status tracking (`PRIMARY_ACTIVE` / `FAILOVER_PROMOTED`). |
-| **gRPC Servicer Layer** | `servicer.py` | gRPC RPC dispatcher (`RegisterClient`, `Heartbeat`, `SubmitGradient`), mTLS fingerprint checking, ECDSA/RSA-PSS signature verification, DP epsilon cap enforcement ($\epsilon \le 10.0$), Zlib decompression, and `ImmutableAuditChain` integration. |
-| **Coordinator Service** | `coordinator_service.py` | Thread-safe quorum state transition via `threading.Lock()`, safe SemVer regex version parsing, memory-bounded notification queue (`deque(maxlen=1000)`), round lifecycle orchestration (`IDLE` $\rightarrow$ `COLLECTING_GRADIENTS` $\rightarrow$ `AGGREGATING`), and empirical holdout validation AUC quality gate (threshold $\ge 0.70$). |
-| **gRPC Bank Client** | `client.py` | mTLS gRPC channel with certificate `mtime` watcher and AWS Full-Jitter Exponential Backoff retry strategy for thundering herd prevention. |
-| **Flower Engine Adapter** | `flower_engine.py` | Native Flower simulation adapter wrapping `simulate()` calls into zero-downtime production fallback strategies. |
+```
++----------------------------------------------------------------------------+
+|                        FEDERATION COORDINATOR STACK                        |
++----------------------------------------------------------------------------+
+| MultiRegionFailoverManager     (region_failover.py)                        |
+| |- Active-passive heartbeat failover (15.0s timeout)                       |
+| |- Per-region status: PRIMARY_ACTIVE / FAILOVER_PROMOTED                   |
++----------------------------------------------------------------------------+
+| FederatedLearningServicer      (servicer.py)                               |
+| |- gRPC RPC dispatcher: RegisterClient, Heartbeat, SubmitGradient          |
+| |- mTLS certificate fingerprint checking                                   |
+| |- ECDSA/RSA-PSS signature verification                                    |
+| |- DP epsilon cap enforcement (eps <= 10.0)                                |
+| |- Zlib payload decompression & ImmutableAuditChain logging                |
++----------------------------------------------------------------------------+
+| CoordinatorService             (coordinator_service.py)                    |
+| |- Thread-safe quorum transition via threading.Lock()                      |
+| |- Robust SemVer parsing via safe regex matching                           |
+| |- Bounded deque notification queue (collections.deque, maxlen=1000)       |
+| |- Round lifecycle: IDLE -> COLLECTING_GRADIENTS -> AGGREGATING            |
+| |- Empirical holdout validation AUC quality gate (threshold >= 0.70)       |
++----------------------------------------------------------------------------+
+| GRPCBankClient                 (client.py)                                 |
+| |- mTLS gRPC channel with certificate mtime watcher                        |
+| |- AWS Full-Jitter Exponential Backoff retry strategy                      |
++----------------------------------------------------------------------------+
+| FlowerFLEngine                 (flower_engine.py)                          |
+| |- Flower simulation adapter (simulate() -> strategy wrapper)              |
++----------------------------------------------------------------------------+
+```
 
 ---
 
