@@ -492,15 +492,6 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 
 ## 16. Step-by-Step Operator Quick Start
 
-### Step 0: No-Install Live Demo (Hugging Face Spaces)
-Explore the full simulator instantly — no local setup required:
-
-**[🤗 Launch Hugging Face Demo](https://huggingface.co/spaces/yusufcalisir/Collaborative-Fraud-Intelligence-Simulator)**
-
-> Includes: Live FL Round Runner, Shapley Payout Simulator, Risk Score Workbench, Audit Report Viewer, and Byzantine Attack Visualizer.
-
----
-
 ### Step 1: Clone Repository and Launch Backend Infrastructure
 ```bash
 git clone https://github.com/yusufcalisir/CF-Intelligence.git
