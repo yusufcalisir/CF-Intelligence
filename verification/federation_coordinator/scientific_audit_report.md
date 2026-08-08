@@ -1,4 +1,4 @@
-﻿# Final Post-Remediation Scientific Audit Report : Federation Coordinator Subsystem
+# Final Post-Remediation Scientific Audit Report : Federation Coordinator Subsystem
 
 **Project:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
 **Subsystem:** Federation Coordinator & Distributed Orchestration Engine  
@@ -59,9 +59,9 @@ The Federation Coordinator operates as an enterprise-grade distributed orchestra
 │  CoordinatorService             (coordinator_service.py)            │
 │  ├─ Thread-safe quorum transition via threading.Lock()              │
 │  ├─ Robust SemVer parsing via safe regex matching                   │
-│  ├─ Bounded deque notification queue (collections.deque, maxlen=1000)│
+│  ├─ Bounded deque notification queue (deque, maxlen=1000)            │
 │  ├─ Round lifecycle: IDLE → COLLECTING_GRADIENTS → AGGREGATING      │
-│  └─ Empirical holdout validation AUC quality gate (threshold ≥ 0.70)│
+│  └─ Empirical holdout validation AUC quality gate (threshold ≥ 0.7) │
 ├─────────────────────────────────────────────────────────────────────┤
 │  GRPCBankClient                 (client.py)                         │
 │  ├─ mTLS gRPC channel with certificate mtime watcher                │
@@ -91,7 +91,7 @@ The Federation Coordinator operates as an enterprise-grade distributed orchestra
 ### 3.4 Resolution of Thundering Herd Reconnection Storms
 - **Old Behavior:** `GRPCBankClient._with_retry` used a fixed 5.0s retry delay, causing simultaneous reconnection storms across $N$ bank clients upon coordinator recovery.
 - **Remediation:** Implemented AWS Full-Jitter Exponential Backoff in `_with_retry`:
-  $$\text{sleep\_time} = \text{random.uniform}\left(0, \min\left(15.0, 5.0 \times 2^{\text{attempt}-1}\right)\right)$$
+  $$t_{\text{sleep}} = \text{random.uniform}\left(0, \min\left(15.0, 5.0 \times 2^{\text{attempt}-1}\right)\right)$$
 
 ### 3.5 Robust SemVer Version Parsing
 - **Old Behavior:** Brittle `.split(".")[0]` parsing raised `ValueError` or `IndexError` on non-standard PyTorch strings (e.g. `"2.2.0+cu121"`), silently falling through exception handlers to default tiers.
