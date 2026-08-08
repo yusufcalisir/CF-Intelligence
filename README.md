@@ -10,6 +10,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
 [![Passing Tests](https://img.shields.io/badge/tests-871%2F871_passing-success.svg?style=flat&logo=pytest&logoColor=white)](#16-step-by-step-operator-quick-start)
+[![HF Spaces](https://img.shields.io/badge/🤗%20HuggingFace-Live%20Demo-FFD21E.svg?style=flat)](https://huggingface.co/spaces/yusufcalisir/Collaborative-Fraud-Intelligence-Simulator)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -283,7 +284,7 @@ CF-Intelligence/
 │   │   └── deploy.js                                # Automated Hardhat / Sepolia Deployment Script
 │   └── hardhat.config.js                            # Solidity 0.8.20 & viaIR optimizer configuration
 ├── docs/                                            # Master Architectural Specifications
-└── verification/                                    # Subsystem Scientific Audit Reports (12 Modules)
+└── verification/                                    # Subsystem Scientific Audit Reports (16 Modules)
 ```
 
 ---
@@ -431,7 +432,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 
 ---
 
-## 14. Subsystem Scientific Audit Reports (`verification/`)
+## 14. Subsystem Scientific Audit Reports (`verification/`) — 16 Modules
 
 | Subsystem Module | Target Component Scope | Verification Report | Audit Status |
 | :--- | :--- | :--- | :---: |
@@ -490,6 +491,15 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 ---
 
 ## 16. Step-by-Step Operator Quick Start
+
+### Step 0: No-Install Live Demo (Hugging Face Spaces)
+Explore the full simulator instantly — no local setup required:
+
+**[🤗 Launch Hugging Face Demo](https://huggingface.co/spaces/yusufcalisir/Collaborative-Fraud-Intelligence-Simulator)**
+
+> Includes: Live FL Round Runner, Shapley Payout Simulator, Risk Score Workbench, Audit Report Viewer, and Byzantine Attack Visualizer.
+
+---
 
 ### Step 1: Clone Repository and Launch Backend Infrastructure
 ```bash
