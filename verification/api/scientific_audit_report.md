@@ -1,4 +1,4 @@
-# Scientific Audit Report — API Subsystem
+# Scientific Audit Report: API Subsystem
 
 This document presents the definitive publication-quality scientific audit of the API implementation for the Privacy-Preserving Cross-Bank Fraud Detection platform. It synthesizes empirical evidence across 5 rigorous verification phases: API contract testing, Pydantic v2 schema validation, Hypothesis property-based testing, adversarial robustness/security testing, and high-throughput performance benchmarking.
 
@@ -26,25 +26,25 @@ The API subsystem serves as the high-throughput, multi-tenant entry point for tr
 The API is built on FastAPI and Uvicorn, structured into presentation routers, application services, and infrastructure connectors.
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│ Edge Gateway & Proxy Middleware Layer                                                 │
-│ • ContentTypeMiddleware (HTTP 415)      • MTLSVerificationMiddleware (L7 mTLS & CRL)   │
-│ • DDoSProtectionMiddleware (L7 Throttling)• APIVersionLifecycleMiddleware (RFC 8594)   │
-│ • W3CTraceContextMiddleware (traceparent)• Global Exception Handler (RFC 7807)        │
-└───────────────────────────────────┬────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────┐
+│ Edge Gateway & Proxy Middleware Layer                                            │
+│ • ContentTypeMiddleware (HTTP 415)      • MTLSVerificationMiddleware (L7 mTLS)    │
+│ • DDoSProtectionMiddleware (L7 Rate)    • APIVersionLifecycleMiddleware (RFC 8594) │
+│ • W3CTraceContextMiddleware             • Global Exception Handler (RFC 7807)      │
+└───────────────────────────────────┬──────────────────────────────────────────────┘
                                     │
-┌───────────────────────────────────▼────────────────────────────────────────────────────┐
-│ Presentation Routers & Protocol Endpoints                                              │
-│ • /api/v1/predict (ML Scoring)          • /api/v1/alerts (Threat Intelligence)         │
-│ • /api/v1/cases (Case Investigation)    • /api/v1/security (ABAC & Audit Chain)        │
-│ • /health, /health/ready (Probes)       • /ws/stream, /ws/training (WebSockets)        │
-└───────────────────────────────────┬────────────────────────────────────────────────────┘
+┌───────────────────────────────────▼──────────────────────────────────────────────┐
+│ Presentation Routers & Protocol Endpoints                                        │
+│ • /api/v1/predict (ML Scoring)          • /api/v1/alerts (Threat Intelligence)   │
+│ • /api/v1/cases (Case Investigation)    • /api/v1/security (ABAC & Audit Chain)  │
+│ • /health, /health/ready (Probes)       • /ws/stream, /ws/training (WebSockets)  │
+└───────────────────────────────────┬──────────────────────────────────────────────┘
                                     │
-┌───────────────────────────────────▼────────────────────────────────────────────────────┐
-│ Application Services & Threadpool Offloading                                           │
-│ • asyncio.to_thread(_eval_model)        • BackgroundTasks (ingest_transaction)         │
-│ • IdempotencyService (24h TTL)          • ImmutableAuditChain (SHA-256 blocks)         │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────▼──────────────────────────────────────────────┐
+│ Application Services & Threadpool Offloading                                     │
+│ • asyncio.to_thread(_eval_model)        • BackgroundTasks (ingest_transaction)   │
+│ • IdempotencyService (24h TTL)          • ImmutableAuditChain (SHA-256 blocks)   │
+└──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -67,18 +67,20 @@ The API is built on FastAPI and Uvicorn, structured into presentation routers, a
 
 ## 5. Property-Based Testing (Hypothesis)
 
-10 core system invariants were evaluated using the `Hypothesis` framework across randomized payload space:
+10 core system invariants were evaluated using the `Hypothesis` framework across randomized payload spaces:
 
-1. **INV-01 (Bounded Score):** `fraud_probability ∈ [0.0, 1.0]` and `risk_score ∈ [0, 1000]` (✅ PASS).
-2. **INV-02 (Out-of-Bounds Validation):** Invalid temporal features return `HTTP 422` (✅ PASS).
-3. **INV-03 (String Length Bounds):** Strings > 256 chars return `HTTP 422` (✅ PASS).
-4. **INV-04 (Enum Query Guarding):** Query string enum coercions never produce HTTP 500 (✅ PASS).
-5. **INV-05 (Case Idempotency Key):** Duplicate `Idempotency-Key` headers return identical case IDs (✅ PASS).
-6. **INV-06 (ABAC Tenant Isolation):** Cross-tenant bank requests evaluate `allowed: false` (✅ PASS).
-7. **INV-07 (Content-Type Filter):** Non-JSON bodies return `HTTP 415` (✅ PASS).
-8. **INV-08 (Audit Chain Hash Integrity):** Cryptographic SHA-256 chain verified `is_valid = True` (✅ PASS).
-9. **INV-09 (Header Metadata):** `X-API-Version` and `traceparent` headers present on all responses (✅ PASS).
-10. **INV-10 (Malformed JSON Handling):** Invalid JSON syntax handled safely without HTTP 500 (✅ PASS).
+| Invariant | Property Description | Verified Invariant Condition | Result |
+|:---:|:---|:---|:---:|
+| **INV-01** | Bounded Score Range | $\text{prob} \in [0.0, 1.0]$ and $\text{score} \in [0, 1000]$ | 🟢 **PASS** |
+| **INV-02** | Out-of-Bounds Guard | Invalid temporal features return HTTP 422 | 🟢 **PASS** |
+| **INV-03** | String Length Bound | Strings $> 256$ characters return HTTP 422 | 🟢 **PASS** |
+| **INV-04** | Enum Query Guarding | Malformed query string enum coercions never cause HTTP 500 | 🟢 **PASS** |
+| **INV-05** | Case Idempotency Key | Duplicate `Idempotency-Key` headers return identical case ID | 🟢 **PASS** |
+| **INV-06** | ABAC Tenant Isolation | Cross-tenant requests evaluate `allowed: false` | 🟢 **PASS** |
+| **INV-07** | Content-Type Filter | Non-JSON bodies return HTTP 415 | 🟢 **PASS** |
+| **INV-08** | Audit Hash Integrity | Cryptographic SHA-256 chain verified `is_valid = True` | 🟢 **PASS** |
+| **INV-09** | Response Headers | `X-API-Version` and `traceparent` headers present on all responses | 🟢 **PASS** |
+| **INV-10** | Malformed Syntax Guard | Invalid JSON syntax handled safely without HTTP 500 | 🟢 **PASS** |
 
 ---
 
