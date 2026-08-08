@@ -47,14 +47,12 @@ This formulation guarantees exact sample conservation $\sum_{k=1}^K |\mathcal{I}
 ## 4. Verification Evidence & Multi-Phase Test Suite
 
 ### 4.1 Hardhat / Unit Integration Suite (`backend/tests/unit/test_etl_pipeline.py`)
-```
-tests/unit/test_etl_pipeline.py::test_etl_anonymize_identifier PASSED    [ 25%]
-tests/unit/test_etl_pipeline.py::test_etl_anonymize_dataframe PASSED     [ 50%]
-tests/unit/test_etl_pipeline.py::test_etl_partition_dirichlet PASSED     [ 75%]
-tests/unit/test_etl_pipeline.py::test_etl_export_parquet PASSED          [100%]
-
-4 passed in 1.19s
-```
+| Unit Test Target | Target Invariant / Verification Function | Suite Progress | Execution Result |
+|:---|:---|:---:|:---:|
+| **Identity Anonymization** | `test_etl_anonymize_identifier` | 25% | 🟢 **PASSED** |
+| **DataFrame PII Anonymization** | `test_etl_anonymize_dataframe` | 50% | 🟢 **PASSED** |
+| **Dirichlet Partitioning** | `test_etl_partition_dirichlet` | 75% | 🟢 **PASSED** |
+| **Parquet Zero-Copy Export** | `test_etl_export_parquet` | 100% | 🟢 **PASSED (1.19s)** |
 
 ### 4.2 Phase 1: Pure-Python Reference Verification (`etl_reference_verification.py`)
 - Evaluated **25 independent multi-bank dataset scenarios** ($N \in [100, 2000]$ samples, $K \in [2, 8]$ banks, $\alpha \in [0.1, 5.0]$).

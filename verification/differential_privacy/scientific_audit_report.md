@@ -1,4 +1,4 @@
-﻿# Publication-Quality Scientific Audit Report — Differential Privacy & PETs Subsystem
+# Publication-Quality Scientific Audit Report — Differential Privacy & PETs Subsystem
 
 This document provides a publication-grade scientific audit report of the Differential Privacy (DP), Private Set Intersection (PETs), and Privacy Audit subsystem within the privacy-preserving cross-bank fraud detection platform.
 
@@ -8,24 +8,15 @@ This document provides a publication-grade scientific audit report of the Differ
 
 This audit evaluates the mathematical correctness, statistical validity, privacy engineering bounds, adversarial robustness, and performance scalability of the Differential Privacy and Privacy-Enhancing Technologies (PETs) subsystem. 
 
-```
-===================================================================================
-             DIFFERENTIAL PRIVACY SCIENTIFIC AUDIT SCORECARD
-===================================================================================
-  Total Privacy Claims Audited:       18
-  Claim Classification Breakdown:
-    SUPPORTED:                         7  (38.9%)  — Mathematically sound & verified
-    PARTIALLY SUPPORTED:              11  (61.1%)  — Inherent theoretical bounds
-    UNSUPPORTED:                       0  (0.0%)   — All fabricated bounds eliminated
------------------------------------------------------------------------------------
-  Numerical Reference Precision:       Max Absolute Error = 2.22e-16 (IEEE-754 limit)
-  Property-Based Invariants:           9 / 9 Properties Passed (100% Pass Rate)
-  Monte Carlo Distribution Fit:        KS-Test p = 0.7743 > 0.05 (Gaussian Confirmed)
-  Autocorrelation Independence:        Lag 1–20 Autocorr < 0.0026 (i.i.d. Confirmed)
-  Adversarial Robustness Suites:       13 / 13 Passed (Zero Crash, Safe Degradation)
-  Scalability Complexity:              Linear O(d) Time & Space (8.22M params/sec)
-===================================================================================
-```
+| Audit Category | Parameter / Target Scope | Verification Result / Metric | Operational Status |
+|:---|:---|:---|:---:|
+| **Total Privacy Claims** | 18 Formal Privacy Invariants | 7 Supported (38.9%), 11 Partially (61.1%) | 🟢 **AUDITED** |
+| **Numerical Precision** | 50 Reference Contract Tests | Max Abs Error $= 2.22 \times 10^{-16}$ (IEEE-754 limit) | 🟢 **PASSED** |
+| **Property-Based Invariants** | Hypothesis Testing Framework | 9 / 9 Properties Passed (100% Pass Rate) | 🟢 **PASSED** |
+| **Monte Carlo Distribution** | $N=1,000,000$ Samples | KS-Test $p = 0.7743 > 0.05$ (Gaussian) | 🟢 **PASSED** |
+| **Autocorrelation Audit** | i.i.d. Randomness Test | Lag 1–20 Autocorr $< 0.0026$ | 🟢 **PASSED** |
+| **Adversarial Robustness** | Hostile Boundary Injections | 13 / 13 Suites Passed (Zero Crash) | 🟢 **PASSED** |
+| **Scalability Complexity** | Parameter Scaling $O(d)$ | $8.22 \text{ M params/sec}$ Throughput | 🟢 **PASSED** |
 
 > [!NOTE]
 > **AUDIT RESOLUTION:** `MIAEvaluator` and `DLGEvaluator` in `security_evaluator.py` have been fully refactored to remove artificial `np.clip` bounds. Both evaluators now execute true empirical un-clipped loss-threshold classification and Pearson/L2 MSE gradient reconstruction metrics. The DH-PSI prime has been upgraded to a 2048-bit NIST MODP prime, and HMAC identifiers expanded to 128 bits.
@@ -135,38 +126,32 @@ Benchmarking parameter dimensions $d \in \{100, 1\text{k}, 10\text{k}, 100\text{
 
 ## 9. Comprehensive Claim Classification Ledger
 
-```
-===================================================================================
-         DIFFERENTIAL PRIVACY MODULE — FINAL CLAIM CLASSIFICATION SUMMARY
-===================================================================================
-  ID   Component / Claim                        Classification      Status
-  ---  ---------------------------------------  ------------------  ---------------
-  1    Gaussian Mechanism Noise Scale           PARTIALLY SUPPORTED Audited & Verified
-  2    L2 Update Clipping                       SUPPORTED           Audited & Verified
-  3    Linear Privacy Budget Composition        PARTIALLY SUPPORTED Audited & Verified
-  4    Opacus RDP Budget Recording              PARTIALLY SUPPORTED Audited & Verified
-  5    Budget Exhaustion Guard                  SUPPORTED           Audited & Verified
-  6    Link Reconstruction Attack Audit         PARTIALLY SUPPORTED Audited & Verified
-  7    Membership Inference Audit (Threshold)   SUPPORTED           Audited & Verified
-  8    Model Inversion Risk Audit               SUPPORTED           Refactored & Verified
-  9    DLG Gradient Leakage Audit (Pearson)     PARTIALLY SUPPORTED Audited & Verified
-  10   Shadow MIA Evaluator (Security Module)   SUPPORTED           Refactored & Verified
-  11   DLG Evaluator (Security Module)          SUPPORTED           Refactored & Verified
-  12   PII Identifier Guard                     PARTIALLY SUPPORTED Audited & Verified
-  13   DH-PSI Exact Matching                    SUPPORTED           Upgraded (2048-bit)
-  14   Multi-Attribute Fuzzy PSI               PARTIALLY SUPPORTED Audited & Verified
-  15   MinHash LSH Signature                    PARTIALLY SUPPORTED Audited & Verified
-  16   Privacy-Preserving Identifier HMAC       SUPPORTED           Upgraded (128-bit)
-  17   KMS Per-Tenant Key Isolation             PARTIALLY SUPPORTED Audited & Verified
-  18   DP Configuration Object                  PARTIALLY SUPPORTED Audited & Verified
-===================================================================================
+| ID | Component / Claim | Classification | Operational Status |
+|:---:|:---|:---:|:---|
+| 1 | **Gaussian Mechanism Noise Scale** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 2 | **L2 Update Clipping** | **SUPPORTED** | Audited & Verified |
+| 3 | **Linear Privacy Budget Composition** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 4 | **Opacus RDP Budget Recording** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 5 | **Budget Exhaustion Guard** | **SUPPORTED** | Audited & Verified |
+| 6 | **Link Reconstruction Attack Audit** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 7 | **Membership Inference Audit (Threshold)** | **SUPPORTED** | Audited & Verified |
+| 8 | **Model Inversion Risk Audit** | **SUPPORTED** | Refactored & Verified |
+| 9 | **DLG Gradient Leakage Audit (Pearson)** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 10 | **Shadow MIA Evaluator (Security Module)** | **SUPPORTED** | Refactored & Verified |
+| 11 | **DLG Evaluator (Security Module)** | **SUPPORTED** | Refactored & Verified |
+| 12 | **PII Identifier Guard** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 13 | **DH-PSI Exact Matching** | **SUPPORTED** | Upgraded (2048-bit MODP) |
+| 14 | **Multi-Attribute Fuzzy PSI** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 15 | **MinHash LSH Signature** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 16 | **Privacy-Preserving Identifier HMAC** | **SUPPORTED** | Upgraded (128-bit HMAC) |
+| 17 | **KMS Per-Tenant Key Isolation** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 18 | **DP Configuration Object** | **PARTIALLY SUPPORTED** | Audited & Verified |
 
-Summary:
-- SUPPORTED:           7 Claims (38.9%)
-- PARTIALLY SUPPORTED: 11 Claims (61.1%)
-- UNSUPPORTED:          0 Claims (0.0%) — All fabricated bounds eliminated
-===================================================================================
-```
+| Classification Summary | Claim Count | Percentage | Operational Impact |
+|:---|:---:|:---:|:---|
+| **SUPPORTED** | 7 | 38.9% | Mathematically sound & fully verified |
+| **PARTIALLY SUPPORTED** | 11 | 61.1% | Inherent theoretical bounds apply |
+| **UNSUPPORTED** | 0 | 0.0% | Zero unverified or fabricated claims |
 
 ---
 

@@ -15,19 +15,15 @@ This post-remediation scientific audit report presents the definitive evaluation
 
 The Explainability subsystem implements five distinct explanation mechanisms — multi-signal risk attribution, SHAP feature importance with explicit methodology reporting, counterfactual recourse with dynamic transaction inputs, deterministic decision replay with non-trivial rule score reconstruction, and GNN graph attribution — plus a real-time online attribution engine with bounded LRU caching.
 
-```
-================================================================================
-          EXPLAINABILITY SUBSYSTEM FINAL AUDIT & VERIFICATION SUMMARY
-================================================================================
-Numerical Reference Errors:      0.0 Absolute Error (Exact Match)
-Hypothesis Property Tests:       6 / 6 Invariants Passed (550 randomized trials)
-Robustness Boundary Tests:       14 / 14 Passed (BUG-EX-01 & BUG-EX-02 Resolved)
-Real-Time Attribution Latency:   1.51 µs / call (662,000 ops/sec)
-Peak Cache Footprint:            Bounded LRU (Max 1,000 items, ~367 KB)
-Confirmed Production Defects:    0 Remaining (All Priority 1 & 2 Defects Fixed)
-Scientific Credibility Score:    100 / 100 (Fully Remediated & Production-Ready)
-================================================================================
-```
+| Audit Dimension | Benchmark Target | Measured Metric / Outcome | Audit Status |
+|:---|:---|:---|:---:|
+| **Numerical Reference Error** | Shapley & Risk Attribution | 0.0 Absolute Error (Exact Match) | 🟢 **PASSED** |
+| **Hypothesis Property Tests** | 6 Axiomatic Invariants | 6 / 6 Invariants Passed (550 Trials) | 🟢 **PASSED** |
+| **Robustness Boundary Tests** | Fault-Injection Attacks | 14 / 14 Passed (BUG-EX-01/02 Fixed) | 🟢 **PASSED** |
+| **Real-Time Latency SLA** | Sub-ms Attribution Engine | 1.51 $\mu\text{s}$ / call (662,000 ops/sec) | 🟢 **BENCHMARKED** |
+| **Peak Cache Memory** | LRU Cache Bounding | Bounded LRU (Max 1,000 items, ~367 KB) | 🟢 **VERIFIED** |
+| **Confirmed Production Defects** | Unresolved Bugs | **0 Remaining** (All Defects Fixed) | 🟢 **PASSED** |
+| **Scientific Credibility Score** | Overall XAI Audit Score | **100 / 100** | 🟢 **FULL AUDIT** |
 
 | Phase | Evaluation Dimension | Pre-Fix Score | Post-Fix Score |
 |:------|:---------------------|:-------------:|:--------------:|

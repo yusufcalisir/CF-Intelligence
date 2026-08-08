@@ -39,20 +39,12 @@ $$\text{PolicyDecision}(U, R, A, C) = \begin{cases} \text{ALLOW} & \text{if } \e
 
 ## 4. Verification Evidence & Multi-Phase Test Suite
 
-### 4.1 Phase 1: Pure-Python Reference Verification (`zero_trust_pki_reference_verification.py`)
-- Evaluated **20 ABAC policy and certificate validation scenarios**.
-- **Result:** **20/20 PASS (100%)**.
-
-### 4.2 Phase 2: Hypothesis Property-Based Testing (`test_zero_trust_pki_hypothesis.py`)
-- Verified fail-closed default deny and SAN matching invariants across 100 randomized inputs.
-- **Result:** **2/2 PASS (100%)**.
-
-### 4.3 Phase 3: Adversarial Robustness & Failure Injection (`test_zero_trust_pki_robustness.py`)
-- Tested expired certs, revoked serials, malformed JWT claims, and unauthorized IP subnets.
-- **Result:** **4/4 PASS (100%)**.
-
-### 4.4 Phase 4: Performance & Latency Benchmarking (`zero_trust_pki_benchmark_scalability.py`)
-- ABAC policy evaluation completes in **< 0.05 ms** per authorization request (> 20,000 requests/sec).
+| Verification Phase | Test Suite Target | Scenario Count / Workload | Operational Result |
+|:---|:---|:---:|:---:|
+| **Phase 1: Reference Verification** | `zero_trust_pki_reference_verification.py` | 20 Policy & Cert Scenarios | 🟢 **20/20 PASSED** |
+| **Phase 2: Property Testing** | `test_zero_trust_pki_hypothesis.py` | 100 Randomized Fuzz Inputs | 🟢 **2/2 Invariants Passed** |
+| **Phase 3: Robustness & Faults** | `test_zero_trust_pki_robustness.py` | Expired Certs, Revoked Serials | 🟢 **4/4 Scenarios Passed** |
+| **Phase 4: Scalability Benchmark** | `zero_trust_pki_benchmark_scalability.py` | ABAC Authorization Throughput | 🟢 **< 0.05 ms / Request (20k RPS)** |
 
 ---
 

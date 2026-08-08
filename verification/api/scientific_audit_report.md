@@ -1,4 +1,4 @@
-﻿# Scientific Audit Report — API Subsystem
+# Scientific Audit Report — API Subsystem
 
 This document presents the definitive publication-quality scientific audit of the API implementation for the Privacy-Preserving Cross-Bank Fraud Detection platform. It synthesizes empirical evidence across 5 rigorous verification phases: API contract testing, Pydantic v2 schema validation, Hypothesis property-based testing, adversarial robustness/security testing, and high-throughput performance benchmarking.
 
@@ -9,12 +9,15 @@ This document presents the definitive publication-quality scientific audit of th
 The API subsystem serves as the high-throughput, multi-tenant entry point for transaction fraud inference, cross-bank alert intelligence, case management, and Federated Learning orchestration.
 
 ### 1.1 Key Verification Metrics
-* **Total Executed Verification Tests:** 150+ automated test cases across 5 test suites.
-* **API Specification Conformance:** 100% (17/17 contract tests passed, 0 deviations).
-* **Property-Based Invariants Verified:** 10/10 Hypothesis properties passed across 100+ randomized iterations.
-* **Adversarial Security Pass Rate:** 100% (24/24 attack scenarios handled without unhandled HTTP 500 errors).
-* **Measured Median Latency (p50):** 12.30 ms (`GET /health`), 13.79 ms (`POST /api/v1/score-transaction`), 20.34 ms (`POST /security/abac/evaluate`).
-* **Throughput (RPS):** ~166.55 RPS per Uvicorn worker process for non-blocking risk scoring.
+
+| Verification Dimension | Evaluation Target / Method | Measured Result / Performance | Audit Status |
+|:---|:---|:---|:---:|
+| **Total Automated Tests** | 5 Independent Test Suites | 150+ Executed Test Cases | 🟢 **PASSED** |
+| **API Contract Conformance** | OpenAPI Specification Integrity | 100% (17 / 17 Contract Tests Passed) | 🟢 **PASSED** |
+| **Property-Based Invariants** | Hypothesis Randomized Fuzzing | 10 / 10 Properties Validated (100+ Iterations) | 🟢 **PASSED** |
+| **Adversarial Security Rate** | L7 DDoS & Malicious Payload Attacks | 100% (24 / 24 Scenarios Handled Without 500s) | 🟢 **PASSED** |
+| **Median Latency (p50)** | FastAPI Router Endpoints | 12.30 ms (`/health`), 13.79 ms (`/score`) | 🟢 **BENCHMARKED** |
+| **Throughput (RPS)** | Non-Blocking Scoring Engine | ~166.55 RPS / Uvicorn Worker Process | 🟢 **BENCHMARKED** |
 
 ---
 

@@ -11,23 +11,15 @@
 
 ## Verification Status Summary
 
-```
-===================================================================================
-                       FEDERATED LEARNING ENGINE AUDIT SUMMARY
-===================================================================================
-  Audited Subsystems & Algorithms:      22 Component / Mathematical Claims
-  Claim Classifications:                22 SUPPORTED (100.0%)
-                                          0 PARTIALLY SUPPORTED (0.0%)
-                                          0 UNSUPPORTED (0.0%)
------------------------------------------------------------------------------------
-  Independent Reference Benchmark:      50 / 50 Scenarios PASSED (Max Abs Err <= 3.33e-16)
-  Hypothesis Property-Based Testing:     12 / 12 Property Tests PASSED (100%)
-  Adversarial Robustness Testing:        45 / 45 Stress Tests PASSED (100%)
-  Monte Carlo Statistical Experiments:   6 / 6 MC Experiments PASSED (p > 0.05)
-  Seed Reproducibility:                 100% Bit-Wise Identity Across Random Seeds
-  Production Resilience & Fallback:     Zero-Downtime Native Fallback Verified
-===================================================================================
-```
+| Audit Dimension | Evaluation Scope & Benchmark Target | Result / Verification Metric | Audit Status |
+|:---|:---|:---|:---:|
+| **Audited Subsystems & Claims** | 22 Component & Mathematical Invariants | 22 Supported (100.0%) | 🟢 **PASSED** |
+| **Independent Reference Benchmark** | 50 Deterministic Test Scenarios | Max Abs Error $\le 3.33 \times 10^{-16}$ | 🟢 **PASSED** |
+| **Hypothesis Property Testing** | Property-Based Invariant Verification | 12 / 12 Invariants Validated (100%) | 🟢 **PASSED** |
+| **Adversarial Robustness Suite** | Hostile Input & Malicious Outlier Injections | 45 / 45 Stress Scenarios Passed | 🟢 **PASSED** |
+| **Monte Carlo Statistical Audit** | 10,000 Iteration Stochastic Experiments | 6 / 6 Experiments ($p > 0.05$) | 🟢 **PASSED** |
+| **Seed Reproducibility** | Cross-Run Bit-Level Determinism | 100% Bit-Wise Identity Match | 🟢 **VERIFIED** |
+| **Production Resilience** | Zero-Downtime Native Fallback Architecture | Fallback Paths Verified Cleanly | 🟢 **VERIFIED** |
 
 ---
 
@@ -102,12 +94,11 @@ graph TD
 
 Every mathematical claim in the verification inventory was audited against the codebase implementation and foundational literature, receiving one of three formal classifications: **SUPPORTED**, **PARTIALLY SUPPORTED**, or **UNSUPPORTED**.
 
-```
-Mathematical Claim Classifications
-├── SUPPORTED:           22 Claims (100.0%)
-├── PARTIALLY SUPPORTED:  0 Claims (0.0%)
-└── UNSUPPORTED:          0 Claims (0.0%)
-```
+| Classification Status | Claim Count | Percentage | Verification Result |
+|:---|:---:|:---:|:---:|
+| **SUPPORTED** | 22 | 100.0% | 🟢 **FULLY VERIFIED** |
+| **PARTIALLY SUPPORTED** | 0 | 0.0% | N/A |
+| **UNSUPPORTED** | 0 | 0.0% | N/A |
 
 ### Detailed Claim Classification & Reasoning Table
 
@@ -214,16 +205,13 @@ Monte Carlo Statistical Audit Summary
 
 Empirical execution time ($\text{ms}$) and peak memory ($\text{MB}$) were benchmarked across client count $N \in [3, 300]$, parameter dimension $d \in [1\text{K}, 1\text{M}]$, and layer count $L \in [1, 100]$:
 
-```
-Latency Scaling (ms) vs Client Count N (d=10,000)
-----------------------------------------------------------------------------------
-Krum    [O(N²d)] |===========================================> 4,233 ms
-Bulyan  [O(N²d)] |====================================> 3,405 ms
-FedAvg  [O(Nd)]  |====> 543 ms
-FedAdam [O(Nd)]  |===> 462 ms
-Trimmed [O(Nd log N)] |===> 374 ms
-----------------------------------------------------------------------------------
-```
+| Aggregator Algorithm | Asymptotic Complexity | Benchmark Latency ($N=300, d=10,000$) | Performance Profile |
+|:---|:---:|:---:|:---:|
+| **Krum** | $\mathcal{O}(N^2 \cdot d)$ | $4,233 \text{ ms}$ | Pairwise Distance Bottleneck |
+| **Bulyan** | $\mathcal{O}(N^2 \cdot d)$ | $3,405 \text{ ms}$ | Pairwise + Trimmed Selection |
+| **FedAvg** | $\mathcal{O}(N \cdot d)$ | $543 \text{ ms}$ | Highly Parallelizable |
+| **FedAdam** | $\mathcal{O}(N \cdot d)$ | $462 \text{ ms}$ | Adaptive Momentum Accumulation |
+| **Trimmed Mean** | $\mathcal{O}(N \cdot d \log N)$ | $374 \text{ ms}$ | Coordinate-Wise Sort & Trim |
 
 ### Computational Bottleneck Analysis
 * **Root Cause:** Pairwise Euclidean distances in Krum and Bulyan (`fl_engine.py:171-180`) are computed using nested Python loops (`for i in range(n): for j in range(n)`), executing $N(N-1)$ vector subtractions in Python interpreter space.

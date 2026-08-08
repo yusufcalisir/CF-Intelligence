@@ -185,26 +185,20 @@ Performance benchmarks (`scratch/risk_scoring_benchmark_scalability.py`) were co
 
 ## 13. Verification Status & Claim Classification Summary
 
-```
-===================================================================================
-         RISK SCORING ENGINE MODULE — FINAL CLAIM CLASSIFICATION SUMMARY
-===================================================================================
-  ID   Component / Claim                        Classification      Status
-  ---  ---------------------------------------  ------------------  ---------------
-  1    Weighted Composite Score Calculation     SUPPORTED           Audited & Verified
-  2    AST Policy Rule Engine Evaluation        SUPPORTED           Audited & Verified
-  3    Velocity Linear Risk Ramp                SUPPORTED           Audited & Verified
-  4    Score Scaling & Tier Partitioning        SUPPORTED           Audited & Verified
-  5    Top Signals Explainability Ranking       SUPPORTED           Audited & Verified
-  6    Feature Store Online Fallback Safety     SUPPORTED           Audited & Verified
-  7    Merchant Reputation Convex Blend         SUPPORTED           Audited & Verified
-  8    FATF Country Jurisdictional Risk         SUPPORTED           Audited & Verified
-  9    Behavioral Z-Score Amount Anomaly        SUPPORTED           Audited & Verified
-  10   Customer History & Account Age Penalty   SUPPORTED           Audited & Verified
-  11   Previous Alerts & Chargeback History     SUPPORTED           Audited & Verified
-  12   Device Channel Anomaly Mapping           SUPPORTED           Audited & Verified
-===================================================================================
-```
+| ID | Component / Claim | Scientific Classification | Verification Status |
+|:---:|:---|:---:|:---|
+| 1 | **Weighted Composite Score Calculation** | **SUPPORTED** | 🟢 Audited & Verified ($\text{Error} = 0.00\text{e}+00$) |
+| 2 | **AST Policy Rule Engine Evaluation** | **SUPPORTED** | 🟢 Audited & Verified (10/10 Tests) |
+| 3 | **Velocity Linear Risk Ramp** | **SUPPORTED** | 🟢 Audited & Verified |
+| 4 | **Score Scaling & Tier Partitioning** | **SUPPORTED** | 🟢 Audited & Verified |
+| 5 | **Top Signals Explainability Ranking** | **SUPPORTED** | 🟢 Audited & Verified |
+| 6 | **Feature Store Online Fallback Safety** | **SUPPORTED** | 🟢 Audited & Verified |
+| 7 | **Merchant Reputation Convex Blend** | **SUPPORTED** | 🟢 Audited & Verified |
+| 8 | **FATF Country Jurisdictional Risk** | **SUPPORTED** | 🟢 Audited & Verified |
+| 9 | **Behavioral Z-Score Amount Anomaly** | **SUPPORTED** | 🟢 Audited & Verified |
+| 10 | **Customer History & Account Age Penalty** | **SUPPORTED** | 🟢 Audited & Verified |
+| 11 | **Previous Alerts & Chargeback History** | **SUPPORTED** | 🟢 Audited & Verified |
+| 12 | **Device Channel Anomaly Mapping** | **SUPPORTED** | 🟢 Audited & Verified |
 
 ### Justification for Classifications
 

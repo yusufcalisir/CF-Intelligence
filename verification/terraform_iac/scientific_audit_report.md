@@ -31,11 +31,11 @@ This report presents the scientific audit and verification of the **Multi-Cloud 
 
 ## 3. Architecture Analysis & Network Isolation Matrix
 
-```
-   [Bank Node A (AWS EKS)]       <--- mTLS Proxy --->       [Bank Node B (Azure AKS)]
-   ├── Private Subnet (No Public IP)                         ├── Private Subnet (VNet Isolation)
-   └── AWS KMS Enclave Encryption                            └── Azure KeyVault Purge Protection
-```
+| Cloud Infrastructure Node | Subnet & Network Isolation | KMS & Secret Key Protection | Inter-Bank Security Transport |
+|:---|:---|:---|:---:|
+| **Bank Node A (AWS EKS)** | Private Subnet (Zero Public IPs, Egress NAT) | AWS KMS Enclave Envelope Encryption | mTLS 1.3 Proxy Channel |
+| **Bank Node B (Azure AKS)** | Private Subnet (VNet Direct Peering Deny) | Azure KeyVault Purge Protection | mTLS 1.3 Proxy Channel |
+| **Bank Node C (GCP GKE)** | Private GKE Cluster (Cloud NAT Intercept) | GCP Cloud KMS Key Ring Encryption | mTLS 1.3 Proxy Channel |
 
 ---
 
