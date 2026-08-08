@@ -314,7 +314,7 @@ export default function ObservabilityPage() {
       {activeTab === 'telemetry' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <a
-            href="http://localhost:3001"
+            href={import.meta.env.VITE_GRAFANA_URL ?? 'https://curiousheather2678.grafana.net/d/cfi-overview/cfi-platform-overview'}
             target="_blank"
             rel="noreferrer"
             className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
@@ -327,7 +327,7 @@ export default function ObservabilityPage() {
           </a>
 
           <a
-            href="http://localhost:3100"
+            href={import.meta.env.VITE_LOKI_URL ?? 'https://curiousheather2678.grafana.net/explore'}
             target="_blank"
             rel="noreferrer"
             className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
@@ -340,7 +340,7 @@ export default function ObservabilityPage() {
           </a>
 
           <a
-            href="http://localhost:16686"
+            href={import.meta.env.VITE_JAEGER_URL ?? 'https://curiousheather2678.grafana.net/explore'}
             target="_blank"
             rel="noreferrer"
             className="glass-card p-5 space-y-2 hover:border-[var(--color-primary)] transition-all block"
