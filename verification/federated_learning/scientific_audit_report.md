@@ -1,4 +1,4 @@
-﻿# Scientific Audit & Mathematical Verification Report: `FederatedLearningEngine`
+# Scientific Audit & Mathematical Verification Report: `FederatedLearningEngine`
 
 **Target Module:** `app.application.services.fl_engine.FederatedLearningEngine`  
 **Repository:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -50,7 +50,7 @@ The audit systematically evaluated 22 core mathematical operations, parameter ag
 3. **Hypothesis Property-Based Testing:** 10/10 property tests passed across hundreds of randomized input configurations.
 4. **Adversarial Robustness Testing:** 43/43 stress tests passed under NaN/Inf injections, shape mismatches, zero samples, and $10^{12}$ scale malicious outliers.
 5. **Monte Carlo Statistical Verification:** 6/6 experiments ($10,000$ iterations each) confirmed distribution alignment ($p > 0.05$) and **100% bit-wise seed reproducibility**.
-6. **Scalability & Complexity Benchmarking:** Measured latency and memory scaling across $N \le 300$ clients and $d \le 1,000,000$ parameters, identifying vectorization targets for Krum/Bulyan ($\mathcal{O}(N^2 \cdot d)$).
+6. **Scalability & Complexity Benchmarking:** Measured latency and memory scaling across $N \le 300$ clients and $d \le 1{,}000{,}000$ parameters, identifying vectorization targets for Krum/Bulyan with complexity $\mathcal{O}(N^2 \cdot d)$.
 7. **Adversarial Security Assessment:** Comprehensive threat analysis across 6 attack vectors (Byzantine clients, model poisoning, gradient scaling, sign flipping, label flipping, and colluding attackers).
 
 ---
@@ -123,7 +123,7 @@ Every mathematical claim in the verification inventory was audited against the c
 | 17 | **Model Poisoning** | **SUPPORTED** | Untargeted random Gaussian noise injection scaled to honest parameter standard deviation. |
 | 18 | **FedAsync** | **SUPPORTED** *(REMEDIATED)* | Exponential staleness attenuation $S(\tau) = (1+\tau)^{-\alpha}$ with formal Dynamic Quorum convergence proofs and straggler timeout recovery. |
 | 19 | **MAD Norm Defense** | **SUPPORTED** | Robust Median Absolute Deviation norm filtering against heavy-tailed outlier updates. |
-| 20 | **Spectral Defense** | **SUPPORTED** *(UPDATED)* | Multi-rank SVD projection $s_i = \sum_{r=1}^k |\langle \Delta w_i, v_r \rangle|^2$ ($k=3$) detecting multi-subspace backdoors. |
+| 20 | **Spectral Defense** | **SUPPORTED** *(UPDATED)* | Multi-rank SVD projection $s_i = \sum_{r=1}^{k} \lvert\langle \Delta w_i, v_r \rangle\rvert^2$ with $k=3$, detecting multi-subspace backdoors. |
 | 21 | **Gaussian DP** | **SUPPORTED** *(REMEDIATED)* | Post-hoc update clipping $\|\Delta W\|_2 \le C_{max}$ paired with Opacus local gradient clipping (`train_local_with_opacus`) achieving end-to-end sample-level and client-level DP. |
 | 22 | **ModelWeights VO** | **SUPPORTED** | Immutable dataclass container enforcing structural shape-product invariants. |
 
@@ -164,7 +164,7 @@ Scenario: Large Consortium (N=20, d=200)| Method: Bulyan      | Max Abs Err: 1.6
   5. Trimmed Mean extreme coordinate rejection ($\pm 10^8$ coordinates dropped when $N > 2f$).
   6. FedOpt second moment non-negativity ($v_t \ge 0$) and zero-update stability ($W_{t+1} = W_t$ for $\Delta_t = 0$).
   7. Leave-One-Out non-participation invariance ($\frac{\partial W_{-i}}{\partial W_i} = \mathbf{0}$).
-  8. Secure Aggregation zero-sum mask cancellation ($\text{FedAvg}(\text{Masked}) \equiv \text{FedAvg}(\text{Plaintext})$).
+  8. Secure Aggregation zero-sum mask cancellation: $\text{FedAvg}(\text{Masked}) \equiv \text{FedAvg}(\text{Plaintext})$.
   9. High-dimensional vector scaling (up to $d = 2,000$) and empty model exception handling.
 
 ---
