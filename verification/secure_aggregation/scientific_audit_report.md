@@ -42,12 +42,12 @@ Every mathematical, cryptographic, and security claim made in the codebase was e
 For $n$ participating clients with model parameter vectors $w_i \in \mathbb{R}^d$ and sample counts $s_i \in \mathbb{Z}^+$:
 
 #### Unweighted Masking
-Random noise vectors $m_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_d)$ are generated for clients $1 \dots n-1$, with client $n$ taking the inverse sum:
-$$m_n = -\sum_{i=1}^{n-1} m_i \implies \sum_{i=1}^n m_i = \mathbf{0}$$
+Random noise vectors $m_i \sim \mathcal{N}(0, I_d)$ are generated for clients $i = 1, \dots, n-1$, with client $n$ taking the inverse sum:
+$$m_n = -\sum_{i=1}^{n-1} m_i \implies \sum_{i=1}^n m_i = 0$$
 
 #### Weighted Masking
 For client weights $p_i = s_i / \sum_{k=1}^n s_k$, the tail mask guarantees exact cancellation under weighted FedAvg:
-$$m_n = -\frac{1}{p_n} \sum_{i=1}^{n-1} p_i m_i \implies \sum_{i=1}^n p_i m_i = \mathbf{0}$$
+$$m_n = -\frac{1}{p_n} \sum_{i=1}^{n-1} p_i m_i \implies \sum_{i=1}^n p_i m_i = 0$$
 
 $$\sum_{i=1}^n p_i \tilde{w}_i = \sum_{i=1}^n p_i (w_i + m_i) = \sum_{i=1}^n p_i w_i + \sum_{i=1}^n p_i m_i = \sum_{i=1}^n p_i w_i$$
 
@@ -86,8 +86,8 @@ Because pairwise masks distort spatial geometry, distance-based Byzantine aggreg
 
 ## 5. Security & Threat Model Evaluation
 
-1. **Honest-but-Curious Coordinator:** Obscured during network transmission ($m_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_d)$). Centralized simulation mode generates masks on the server; peer-to-peer DH is required for production.
-2. **Replay & Differencing Resistance:** Resolved via HKDF-SHA256 per-round key derivation ($K_t = \text{HKDF}(S_{\text{master}}, t)$).
+1. **Honest-but-Curious Coordinator:** Obscured during network transmission ($m_i \sim \mathcal{N}(0, I_d)$). Centralized simulation mode generates masks on the server; peer-to-peer DH is required for production.
+2. **Replay & Differencing Resistance:** Resolved via HKDF-SHA256 per-round key derivation ($K_t = \text{HKDF}(K, t)$).
 3. **Malicious Client Poisoning:** SecAgg conceals individual updates $w_i$, allowing a malicious client to inject linear bias $+\delta / n$. Requires Zero-Knowledge Proofs or SecAgg-compatible linear defenses.
 4. **Dropped Clients (Node Dropout):** Lacks Shamir $(t, n)$ Threshold Secret Sharing. Single-node dropout leaves uncancelled residual noise $m_n$.
 
