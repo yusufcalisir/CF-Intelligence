@@ -1,4 +1,4 @@
-﻿# Publication-Quality Scientific Audit & Verification Report : Smart Contracts Subsystem
+# Publication-Quality Scientific Audit & Verification Report : Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement & On-Chain Audit Governance (`ConsortiumIncentiveSettlement.sol`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -27,12 +27,16 @@ The verification suite encompasses:
 |:---|:---|:---|:---:|:---:|
 | **Coordinator Access Control** | `modifier onlyCoordinator` | Restricts state-changing admin calls to `coordinator` wallet | 4/4 Hardhat + 1 Failure Injection Pass | 🟢 **SUPPORTED** |
 | **Pool Funding (`depositPool`)** | $\text{Balance}_{t+1} = \text{Balance}_t + v, v > 0$ | Ensures pool balance increases strictly on positive deposit | 3/3 Hardhat + 1 Robustness Pass | 🟢 **SUPPORTED** |
-| **Shapley Payout Distribution** | $\sum \text{payout}_i \le \text{PoolBalance}, \text{Proof} = H_{\text{audit}}$ | Binds payouts to SHA-256 proof and available balance | 4/4 Hardhat + 30 Reference Scenarios Pass | 🟢 **SUPPORTED** |
+| **Shapley Payout Distribution** | Conservation + Proof Binding (see §3.1) | Binds payouts to SHA-256 proof and available balance | 4/4 Hardhat + 30 Reference Scenarios Pass | 🟢 **SUPPORTED** |
 | **Array Length Consistency** | $\|R\| = \|N\| = \|S\| = \|A\|$ | Prevents index out-of-bounds or parameter mismatch | Reverts on mismatch | 🟢 **SUPPORTED** |
 | **Single Settlement Epoch** | `isSettled[epoch] == false` | Enforces idempotency and prevents double distribution | Reverts on re-run | 🟢 **SUPPORTED** |
 | **Payout Claim (`claimPayout`)** | `isClaimed = true` before transfer | Prevents double-claiming and reentrancy exploits | 3/3 Hardhat + Hypothesis Pass | 🟢 **SUPPORTED** |
 | **Quarantine Governance** | $\text{Blacklisted}(B_k) \implies \text{Payout}(B_k) = 0$ | Zeroes payouts and blocks claims for poisoned nodes | 2/2 Hardhat + Property Pass | 🟢 **SUPPORTED** |
 | **EVM viaIR Optimization** | `--via-ir` compiler pipeline | Resolves stack-too-deep limits in complex struct assignments | Compiled cleanly (Paris target) | 🟢 **SUPPORTED** |
+
+> **Shapley Payout Distribution Formal Specification:**
+>
+> $$\sum_{i=1}^{N} \text{payout}_i \;\le\; \text{PoolBalance}, \qquad \text{Proof} = H_{\text{audit}}$$
 
 ---
 
