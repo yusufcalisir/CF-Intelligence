@@ -836,17 +836,17 @@ export default function LandingPage() {
         {/* ══════════════════════════════════════════════════════════
             SECTION 1 — HERO / OVERVIEW (#hero)
         ══════════════════════════════════════════════════════════ */}
-        <section id="hero" className="relative py-4 sm:py-6 lg:py-8 px-3.5 sm:px-6 max-w-7xl mx-auto w-full min-w-0 min-h-[calc(100vh-64px)] flex items-center">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 lg:gap-10 items-center min-w-0 w-full">
+        <section id="hero" className="relative py-10 sm:py-20 px-3.5 sm:px-6 max-w-7xl mx-auto w-full min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 sm:gap-12 items-center min-w-0">
 
             {/* Left Hero Content */}
-            <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.5}} className="lg:col-span-7 space-y-3.5 sm:space-y-4 lg:space-y-5 min-w-0">
-              <div className="space-y-2 lg:space-y-3 min-w-0">
-                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-0.5 sm:py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] sm:text-xs font-mono max-w-full truncate">
+            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6}} className="lg:col-span-7 space-y-6 sm:space-y-8 min-w-0">
+              <div className="space-y-3 sm:space-y-4 min-w-0">
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[11px] sm:text-xs font-mono max-w-full truncate">
                   <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse shrink-0" />
                   <span className="truncate">Privacy-Preserving Federated Infrastructure</span>
                 </div>
-                <h1 className="text-3xl sm:text-4xl lg:text-[44px] xl:text-[48px] font-extrabold tracking-tight leading-[1.12] break-words">
+                <h1 className="text-3xl sm:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.15] break-words">
                   <span className="bg-gradient-to-r from-slate-100 via-indigo-200 to-slate-300 bg-clip-text text-transparent">
                     Collaborative Cross-Bank
                   </span>
@@ -855,42 +855,42 @@ export default function LandingPage() {
                     Fraud Detection Platform
                   </span>
                 </h1>
-                <p className="text-slate-400 text-xs sm:text-sm lg:text-[15px] leading-relaxed max-w-xl font-sans">
+                <p className="text-slate-400 text-sm sm:text-base leading-relaxed max-w-xl font-sans">
                   CF-Intelligence enables banking institutions to collectively train Graph Neural Networks on transaction topologies to detect multi-bank money laundering networks without raw customer data exposure.
                 </p>
               </div>
 
               {/* High impact feature highlights */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 w-full min-w-0">
-                <div className="p-2.5 sm:p-3 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-lg sm:text-xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Detection Gain</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full min-w-0">
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Detection Gain</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">vs. 42% isolated</div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-lg sm:text-xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 0.50</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">Differential Privacy</div>
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 0.50</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">(ε, δ)-DP bounded</div>
                 </div>
-                <div className="p-2.5 sm:p-3 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-lg sm:text-xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
-                  <div className="text-[11px] text-slate-400 font-medium mt-0.5">FPR Reduction</div>
+                <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
+                  <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">FPR Reduction</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">31% → 6.1% FPR</div>
                 </div>
               </div>
 
-              {/* Action Buttons (Restored to bottom position below metric cards) */}
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full min-w-0 pt-1">
+              {/* Action Buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0">
                 <button
                   onClick={() => navigate('/dashboard')}
-                  className="flex items-center justify-center gap-2.5 px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-semibold text-white transition-all cursor-pointer shadow-[0_0_35px_rgba(99,102,241,0.45)] hover:shadow-[0_0_50px_rgba(99,102,241,0.6)] w-full sm:w-auto text-center shrink-0"
+                  className="flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-semibold text-white transition-all cursor-pointer shadow-[0_0_35px_rgba(99,102,241,0.45)] hover:shadow-[0_0_50px_rgba(99,102,241,0.6)] w-full sm:w-auto text-center"
                 >
                   Launch Live Platform Demo <ArrowRight />
                 </button>
                 <a
                   href="#architecture"
                   onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }}
-                  className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl border border-white/10 hover:border-white/25 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-all backdrop-blur-lg w-full sm:w-auto text-center shrink-0"
+                  className="flex items-center justify-center gap-2 px-5 sm:px-6 py-3.5 rounded-2xl border border-white/10 hover:border-white/25 text-xs sm:text-sm font-medium text-slate-300 hover:text-white transition-all backdrop-blur-lg w-full sm:w-auto text-center"
                 >
                   Explore System Design
                 </a>
@@ -898,7 +898,7 @@ export default function LandingPage() {
             </motion.div>
 
             {/* Right Interactive Dashboard Preview */}
-            <motion.div initial={{opacity:0,y:20}} animate={{opacity:1,y:0}} transition={{duration:0.5,delay:0.1}} className="lg:col-span-5 w-full min-w-0">
+            <motion.div initial={{opacity:0,y:25}} animate={{opacity:1,y:0}} transition={{duration:0.6,delay:0.15}} className="lg:col-span-5 w-full min-w-0">
               <InteractiveDashboardPreview flRound={flRound} accuracy={accuracy} />
             </motion.div>
           </div>
