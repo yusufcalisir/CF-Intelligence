@@ -1543,8 +1543,12 @@ telemetry.on('round.stage', (evt) => {
               </button>
             </div>
 
-            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-500 break-words">
+            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-500 break-words text-center">
               PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
+            </div>
+
+            <div className="text-[10px] sm:text-[11px] font-mono text-slate-600 text-center opacity-80">
+              © 2026 Yusuf Çalışır · Collaborative Fraud Intelligence Platform
             </div>
           </div>
         </footer>
