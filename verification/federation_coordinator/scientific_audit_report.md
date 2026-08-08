@@ -46,29 +46,29 @@ The Federation Coordinator operates as an enterprise-grade distributed orchestra
 │                    FEDERATION COORDINATOR STACK                     │
 ├─────────────────────────────────────────────────────────────────────┤
 │  MultiRegionFailoverManager     (region_failover.py)                │
-│  ├─ Active-passive heartbeat failover (15.0s timeout)               │
-│  └─ Per-region status: PRIMARY_ACTIVE / FAILOVER_PROMOTED           │
+│  |- Active-passive heartbeat failover (15.0s timeout)               │
+│  |- Per-region status: PRIMARY_ACTIVE / FAILOVER_PROMOTED           │
 ├─────────────────────────────────────────────────────────────────────┤
 │  FederatedLearningServicer      (servicer.py)                       │
-│  ├─ gRPC RPC dispatcher: RegisterClient, Heartbeat, SubmitGradient  │
-│  ├─ mTLS certificate fingerprint checking                           │
-│  ├─ ECDSA/RSA-PSS signature verification                            │
-│  ├─ DP epsilon cap enforcement (ε ≤ 10.0)                           │
-│  └─ Zlib payload decompression & ImmutableAuditChain logging        │
+│  |- gRPC RPC dispatcher: RegisterClient, Heartbeat, SubmitGradient  │
+│  |- mTLS certificate fingerprint checking                           │
+│  |- ECDSA/RSA-PSS signature verification                            │
+│  |- DP epsilon cap enforcement (eps <= 10.0)                        │
+│  |- Zlib payload decompression & ImmutableAuditChain logging        │
 ├─────────────────────────────────────────────────────────────────────┤
 │  CoordinatorService             (coordinator_service.py)            │
-│  ├─ Thread-safe quorum transition via threading.Lock()              │
-│  ├─ Robust SemVer parsing via safe regex matching                   │
-│  ├─ Bounded deque notification queue (deque, maxlen=1000)            │
-│  ├─ Round lifecycle: IDLE → COLLECTING_GRADIENTS → AGGREGATING      │
-│  └─ Empirical holdout validation AUC quality gate (threshold ≥ 0.7) │
+│  |- Thread-safe quorum transition via threading.Lock()              │
+│  |- Robust SemVer parsing via safe regex matching                   │
+│  |- Bounded deque notification queue (deque, maxlen=1000)            │
+│  |- Round lifecycle: IDLE -> COLLECTING_GRADIENTS -> AGGREGATING    │
+│  |- Empirical holdout validation AUC quality gate (threshold >= 0.7)│
 ├─────────────────────────────────────────────────────────────────────┤
 │  GRPCBankClient                 (client.py)                         │
-│  ├─ mTLS gRPC channel with certificate mtime watcher                │
-│  └─ AWS Full-Jitter Exponential Backoff retry strategy              │
+│  |- mTLS gRPC channel with certificate mtime watcher                │
+│  |- AWS Full-Jitter Exponential Backoff retry strategy              │
 ├─────────────────────────────────────────────────────────────────────┤
 │  FlowerFLEngine                 (flower_engine.py)                  │
-│  └─ Flower simulation adapter (simulate() → strategy wrapper)       │
+│  |- Flower simulation adapter (simulate() -> strategy wrapper)      │
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
