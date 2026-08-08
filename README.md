@@ -318,7 +318,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 6. MOON (Model-Contrastive FL): Contrastive representation learning between local and global embeddings.
 
 ### 5.2 Automated Optuna FL Hyperparameter Optimizer & Dirichlet Partitioner (`fl_hyperparameter_optimizer.py` & `fl_dirichlet_partitioner.py`)
-- Dirichlet Non-IID Data Partitioner ($\text{Dir}(\alpha)$): Models realistic bank label heterogeneity ($\alpha \in [0.01, 10.0]$).
+- Dirichlet Non-IID Data Partitioner (Dir(α)): Models realistic bank label heterogeneity (Dirichlet concentration parameter α ∈ [0.01, 10.0]).
 - Optuna Bayesian TPE Optimization: Automatically searches optimal hyperparameter configurations (`learning_rate`, `local_epochs`, DP clip norm $C_{\text{max}}$, noise multiplier $\sigma$, staleness decay $\gamma$, FedProx $\mu$) using `TPESampler` with early `MedianPruner` trial termination.
 - Tuning Management REST API: Accessible via `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
 
@@ -413,14 +413,17 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 ## 13. Enterprise Feature Matrix & Verification Mapping
 
 | Feature / Module | Technical Specification | Compliance Standard | Verification File | Status |
-| :--- | :--- | :--- | :--- | :--- |
+| :--- | :--- | :--- | :--- | :---: |
 | **Real-Time Scoring API** | Sub-100ms Latency SLA | Banking Core API | `realtime_inference.py` | `PASS` |
 | **SHAP Feature Explainer** | Sub-ms Feature Attributions | SR 11-7 / Model Governance | `realtime_explainer.py` | `PASS` |
 | **Case Workbench** | 6-Stage Lifecycle + 4-Eyes Auth | AML Investigation Standards | `case_workbench.py` | `PASS` |
 | **Differential Privacy Guard** | Gaussian Noise ($\epsilon \le 2.0$) | GDPR / CCPA Compliance | `label_privacy_guard.py` | `PASS` |
 | **Hardware TEE Driver** | Intel SGX / Nitro Attestation | ISO 27001 / FIPS 140-2 | `tee_driver.py` | `PASS` |
 | **TenSEAL CKKS FHE Driver** | Homomorphic Weighted Sum ($N=8192$) | Zero-Knowledge Aggregation | `fhe_driver.py` | `PASS` |
+| **Zero-Trust PKI & ABAC** | HashiCorp Vault + mTLS Certs | Zero-Trust Architecture | `abac_engine.py` | `PASS` |
 | **Optuna FL Optimizer** | Bayesian TPE + Non-IID Dirichlet | MLOps Hyperparameter Tuning | `fl_hyperparameter_optimizer.py` | `PASS` |
+| **Financial Connectors** | ISO 20022 / SWIFT / OpenBanking | FinTech Messaging | `iso20022_connector.py` | `PASS` |
+| **Smart Contracts Suite** | CBDC / Shapley Token Settlement | EVM Solidity 0.8.20 | `ConsortiumIncentiveSettlement.sol` | `PASS` |
 | **GDPR Data Retention** | Automated TTL & Zeroization | GDPR Article 17 | `retention_engine.py` | `PASS` |
 | **Multi-Region Failover** | Active-Passive ($RTO < 30\text{s}$) | Business Continuity | `region_failover.py` | `PASS` |
 
@@ -433,10 +436,19 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 | **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py`, `async_fl_engine.py` | [`verification/federated_learning/scientific_audit_report.md`](verification/federated_learning/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Differential Privacy** | `privacy_service.py`, `label_privacy_guard.py`, `psi_service.py` | [`verification/differential_privacy/scientific_audit_report.md`](verification/differential_privacy/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Secure Aggregation & FHE** | `tee_driver.py`, `fhe_driver.py`, `secagg_driver.py` | [`verification/secure_aggregation/scientific_audit_report.md`](verification/secure_aggregation/scientific_audit_report.md) | `AUDITED (100/100)` |
-| **AML Risk Scoring** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [`verification/risk_scoring/scientific_audit_report.md`](verification/risk_scoring/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Zero-Trust PKI & Security** | `vault_client.py`, `mtls_manager.py`, `abac_engine.py` | [`verification/zero_trust_pki/scientific_audit_report.md`](verification/zero_trust_pki/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Federation Coordinator** | `coordinator_service.py`, `consortium_service.py` | [`verification/federation_coordinator/scientific_audit_report.md`](verification/federation_coordinator/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **AML Risk Scoring Engine** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [`verification/risk_scoring/scientific_audit_report.md`](verification/risk_scoring/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Graph Intelligence (FedGNN)** | `graph_embedding_model.py`, `graph_embedding_service.py` | [`verification/graph_intelligence/scientific_audit_report.md`](verification/graph_intelligence/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Model Drift Detection** | `drift_service.py`, `retraining_trigger_engine.py` | [`verification/drift_detection/scientific_audit_report.md`](verification/drift_detection/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Explainability (XAI)** | `explainability_service.py`, `realtime_explainer.py` | [`verification/explainability/scientific_audit_report.md`](verification/explainability/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Financial Connectors** | `iso20022_connector.py`, `open_banking_connector.py` | [`verification/connectors/scientific_audit_report.md`](verification/connectors/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **ETL & Data Pipeline** | `data_generator.py`, `data_validator.py` | [`verification/etl_pipeline/scientific_audit_report.md`](verification/etl_pipeline/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Smart Contracts Suite** | `ConsortiumIncentiveSettlement.sol`, `deploy.js` | [`verification/smart_contracts/scientific_audit_report.md`](verification/smart_contracts/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Audit Logging & Compliance** | `security_compliance.py`, `privacy_audit_service.py` | [`verification/audit_logging/scientific_audit_report.md`](verification/audit_logging/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **API Gateway & Middleware** | `main.py`, `routers/`, `websockets/` | [`verification/api/scientific_audit_report.md`](verification/api/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Telemetry & Observability** | `prometheus`, `opentelemetry`, `metrics_service.py` | [`verification/telemetry/scientific_audit_report.md`](verification/telemetry/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Terraform IaC & Cloud** | `main.tf`, `variables.tf`, `helm/` | [`verification/terraform_iac/scientific_audit_report.md`](verification/terraform_iac/scientific_audit_report.md) | `AUDITED (100/100)` |
 
 ---
 
