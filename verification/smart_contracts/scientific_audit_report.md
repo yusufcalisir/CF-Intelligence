@@ -34,10 +34,6 @@ The verification suite encompasses:
 | **Quarantine Governance** | $\text{Blacklisted}(B_k) \implies \text{Payout}(B_k) = 0$ | Zeroes payouts and blocks claims for poisoned nodes | 2/2 Hardhat + Property Pass | 🟢 **SUPPORTED** |
 | **EVM viaIR Optimization** | `--via-ir` compiler pipeline | Resolves stack-too-deep limits in complex struct assignments | Compiled cleanly (Paris target) | 🟢 **SUPPORTED** |
 
-> **Shapley Payout Distribution Formal Specification:**
->
-> $$\sum_{i=1}^{N} \text{payout}_i \;\le\; \text{PoolBalance}, \qquad \text{Proof} = H_{\text{audit}}$$
-
 ---
 
 ## 3. Mathematical Correctness & Protocol Invariants
@@ -47,7 +43,9 @@ For a consortium of $N$ bank participants, let $v(S)$ denote the validation accu
 $$\phi_i^{\text{LOO}} = v(N) - v(N \setminus \{i\})$$
 
 To ensure non-negative payouts and normalize basis points (10,000 basis points = 100%):
-$$S_i = \max(0, \lfloor \phi_i^{\text{LOO}} \times 10,000 \rfloor)$$
+
+$$S_i = \max(0, \lfloor \phi_i^{\text{LOO}} \times 10{,}000 \rfloor)$$
+
 $$\text{Payout}_i = \left\lfloor \text{TotalPoolWei} \times \frac{S_i}{\sum_{k=1}^N S_k} \right\rfloor$$
 
 ### 3.2 Cryptographic Audit Chain Binding
@@ -112,3 +110,7 @@ All 13 tests passed cleanly on EVM Paris:
 
 1. **Multi-Sig Governance:** Upgrade `coordinator` role from a single wallet to a 2-of-3 Multi-Signature Gnosis Safe contract.
 2. **ERC-20 CBDC Wrapper Integration:** Extend `claimPayout` to execute safe ERC-20 `transfer` calls for institutional e-TRY / USDC tokens.
+
+---
+
+*End of Final Post-Remediation Scientific Audit Report: Smart Contracts Subsystem*
