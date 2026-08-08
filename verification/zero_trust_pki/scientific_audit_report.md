@@ -32,8 +32,15 @@ This report presents the scientific audit and verification of the **Zero Trust P
 ## 3. Mathematical & Cryptographic Protocol Analysis
 
 ### 3.1 ABAC Policy Rule Formal Definition
+
 Let $U$ be the set of user attributes (roles, bank_id, cert_serial), $R$ the target resource, $A$ the requested action (`READ`, `WRITE`, `AGGREGATE`), and $C$ environmental context (client_ip, time_of_day). The policy engine evaluates:
-$$\text{PolicyDecision}(U, R, A, C) = \begin{cases} \text{ALLOW} & \text{if } \exists \text{ Rule } r \in \text{Rules} \text{ s.t. } r(U, R, A, C) = \text{ALLOW} \text{ and } \nexists r' \text{ s.t. } r'(U, R, A, C) = \text{DENY} \\ \text{DENY} & \text{otherwise (Fail-Closed)} \end{cases}$$
+
+$$
+\text{PolicyDecision}(U, R, A, C) = \begin{cases}
+\text{ALLOW} & \text{if } \exists\, r \in \text{Rules} \text{ s.t. } r(U, R, A, C) = \text{ALLOW} \text{ and } \nexists\, r' \text{ s.t. } r'(U, R, A, C) = \text{DENY} \\
+\text{DENY} & \text{otherwise (Fail-Closed)}
+\end{cases}
+$$
 
 ---
 
@@ -52,3 +59,7 @@ $$\text{PolicyDecision}(U, R, A, C) = \begin{cases} \text{ALLOW} & \text{if } \e
 
 1. **Hardware Security Module (HSM) Integration:** Bind Vault PKI root keys to FIPS 140-2 Level 3 HSM devices.
 2. **Short-Lived Cert TTLs:** Enforce 24-hour mTLS leaf certificate expiry with automated background renewal daemon.
+
+---
+
+*End of Final Post-Remediation Scientific Audit Report: Zero Trust PKI, mTLS & ABAC Infrastructure Subsystem*
