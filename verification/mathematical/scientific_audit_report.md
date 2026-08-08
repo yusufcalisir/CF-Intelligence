@@ -263,7 +263,7 @@ $$
 #### 26. Subnet CIDR Bitwise Mask Matching
 
 $$
-\text{IP}_{\text{uint32}} \mathbin{\&} \text{Mask}_{\text{uint32}} == \text{Subnet}_{\text{uint32}} \mathbin{\&} \text{Mask}_{\text{uint32}}
+\text{IP}_{\text{uint32}} \mathbin{\text{AND}} \text{Mask}_{\text{uint32}} = \text{Subnet}_{\text{uint32}} \mathbin{\text{AND}} \text{Mask}_{\text{uint32}}
 $$
 
 *Purpose:* Verifies client IP address falls strictly within authorized bank VPC CIDR blocks.
