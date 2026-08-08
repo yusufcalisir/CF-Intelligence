@@ -13,7 +13,7 @@
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[Live Web Application Console](https://cf-intelligence.vercel.app)**
+**[🌐 Live Deployment](https://cf-intelligence.vercel.app)**
 
 ---
 
