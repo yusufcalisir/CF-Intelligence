@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit & Verification Report — Zero Trust PKI, mTLS & ABAC Infrastructure
+# Publication-Quality Scientific Audit & Verification Report: Zero Trust PKI, mTLS & ABAC Infrastructure
 
 **Subsystem:** Zero Trust PKI Certificate Authority, Mutual TLS (mTLS) Rotation, and Attribute-Based Access Control (ABAC) (`zero_trust_pki_mtls.py`, `vault_pki_mtls.py`, `abac_engine.py`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

@@ -1,4 +1,4 @@
-# Scientific Audit Report — Audit Logging Subsystem
+# Scientific Audit Report: Audit Logging Subsystem
 
 This document presents the definitive publication-quality scientific audit of the Audit Logging implementation for the Privacy-Preserving Cross-Bank Fraud Detection platform. It synthesizes empirical evidence across 5 rigorous verification phases: reference specification compliance, Hypothesis property-based testing, adversarial security and fault injection testing, high-throughput performance benchmarking, and regulatory compliance evaluation.
 
@@ -68,18 +68,20 @@ The Audit Logging subsystem is structured into core cryptographic ledgers, expor
 
 ## 4. Property-Based Testing (Hypothesis)
 
-10 core invariants were evaluated across randomized payloads:
+10 core system invariants were evaluated using the `Hypothesis` framework across randomized payload spaces:
 
-1. **INV-01 (Sequential Hash Continuity):** $H_i$ correctly links to $H_{i-1}$ for arbitrary event streams (✅ PASS).
-2. **INV-02 (Retrospective Tamper Detection):** Modifying any single byte in historical entries breaks `verify_chain_integrity()` (✅ PASS).
-3. **INV-03 (Index Monotonicity):** Sequential appends increment indices monotonically without gaps (✅ PASS).
-4. **INV-04 (Deterministic Hash Calculation):** Cross-platform JSON `sort_keys=True` hash reproducibility (✅ PASS).
-5. **INV-05 (Randomized Timestamp Integrity):** Arbitrary timestamp strings preserve hash linkage (✅ PASS).
-6. **INV-06 (Duplicate Payload Disambiguation):** Replayed payloads generate distinct SHA-256 hashes due to tail progression (✅ PASS).
-7. **INV-07 (Large Audit Stream Integrity):** 100+ event streams maintain $\mathcal{O}(N)$ integrity without memory leaks (✅ PASS).
-8. **INV-08 (Syslog RFC 5424 Format):** Generates valid RFC 5424 headers for arbitrary dictionary payloads (✅ PASS).
-9. **INV-09 (CEF Format Security):** Formats pipe-delimited CEF header strings without unhandled exceptions (✅ PASS).
-10. **INV-10 (SIEM Retry Queue Serialization):** Guarantees lossless JSONL file serialization and deserialization (✅ PASS).
+| Invariant | Property Description | Verified Invariant Condition | Result |
+|:---:|:---|:---|:---:|
+| **INV-01** | Hash Continuity | $H_i$ correctly links to $H_{i-1}$ for arbitrary event streams | 🟢 **PASS** |
+| **INV-02** | Tamper Detection | Byte modification in history breaks `verify_chain_integrity()` | 🟢 **PASS** |
+| **INV-03** | Index Monotonicity | Sequential appends increment indices monotonically without gaps | 🟢 **PASS** |
+| **INV-04** | Deterministic Hash | Cross-platform JSON `sort_keys=True` hash reproducibility | 🟢 **PASS** |
+| **INV-05** | Timestamp Integrity | Arbitrary timestamp strings preserve cryptographic hash linkage | 🟢 **PASS** |
+| **INV-06** | Payload Disambiguation | Replayed payloads generate distinct hashes via tail progression | 🟢 **PASS** |
+| **INV-07** | Audit Stream Scaling | 100+ event streams maintain $\mathcal{O}(N)$ integrity without leaks | 🟢 **PASS** |
+| **INV-08** | Syslog RFC 5424 | Generates valid RFC 5424 headers for arbitrary payloads | 🟢 **PASS** |
+| **INV-09** | CEF Format Security | Formats pipe-delimited CEF headers without exceptions | 🟢 **PASS** |
+| **INV-10** | SIEM Retry Queue | Guarantees lossless JSONL file serialization & deserialization | 🟢 **PASS** |
 
 ---
 
