@@ -1,4 +1,4 @@
-# Scientific Audit Report: API Subsystem
+﻿# Scientific Audit Report: API Subsystem
 
 This document presents the definitive publication-quality scientific audit of the API implementation for the Privacy-Preserving Cross-Bank Fraud Detection platform. It synthesizes empirical evidence across 5 rigorous verification phases: API contract testing, Pydantic v2 schema validation, Hypothesis property-based testing, adversarial robustness/security testing, and high-throughput performance benchmarking.
 
@@ -176,19 +176,19 @@ Empirical benchmarks collected via `tracemalloc` and `ThreadPoolExecutor`:
 
 All production claims regarding the API platform have been empirically verified and remediated across the verification suite:
 
-### Claim 1 — Error Handling
+### Claim 1 : Error Handling
 > ✅ **Verified Status:** Global `@app.exception_handler(Exception)` and `ContentTypeMiddleware` enforce structured JSON / RFC 7807 problem details (`application/problem+json`) across all handled and unhandled errors.
 
-### Claim 2 — Prediction Idempotency
-> ✅ **Verified Status:** `ingest_transaction` decoupled to `BackgroundTasks` — scoring reads the last committed feature snapshot (`get_online_features`), eliminating score drift side-effects.
+### Claim 2 : Prediction Idempotency
+> ✅ **Verified Status:** `ingest_transaction` decoupled to `BackgroundTasks` : scoring reads the last committed feature snapshot (`get_online_features`), eliminating score drift side-effects.
 
-### Claim 3 — Horizontal Scalability
+### Claim 3 : Horizontal Scalability
 > ✅ **Verified Status:** PyTorch forward pass and risk scoring offloaded via `asyncio.to_thread`; event loop remains non-blocking, scaling throughput linearly across multi-worker Uvicorn instances.
 
-### Claim 4 — Readiness Probe
+### Claim 4 : Readiness Probe
 > ✅ **Verified Status:** `GET /health/ready` checks Redis and PostgreSQL dependencies, returning HTTP 503 `{"status": "degraded"}` on failure and HTTP 200 when ready.
 
-### Claim 5 — Rate Limiting & DDoS Protection
+### Claim 5 : Rate Limiting & DDoS Protection
 > ✅ **Verified Status:** `DDoSProtectionMiddleware` and gateway proxy enforce sliding-window L7 volumetric flood protection, returning RFC-compliant `X-RateLimit-*`, `X-DDoS-Throttled`, and `Retry-After` headers.
 
 ---

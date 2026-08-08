@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit & Verification Report: Real-World Financial Fraud ETL Pipeline
+﻿# Publication-Quality Scientific Audit & Verification Report: Real-World Financial Fraud ETL Pipeline
 
 **Subsystem:** Real-World Financial Fraud Dataset Ingestion, Anonymization & Dirichlet Partitioning Engine (`etl_service.py`, `etl_dataset_pipeline.py`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -60,7 +60,7 @@ This formulation guarantees exact sample conservation $\sum_{k=1}^K |\mathcal{I}
 ### 4.2 Phase 1: Pure-Python Reference Verification (`etl_reference_verification.py`)
 
 - Evaluated **25 independent multi-bank dataset scenarios** ($N \in [100, 2000]$ samples, $K \in [2, 8]$ banks, $\alpha \in [0.1, 5.0]$).
-- **Result:** **25/25 PASS (100%)** — Exact sample conservation ($\sum N_k = N_{\text{total}}$) and disjoint index sets verified.
+- **Result:** **25/25 PASS (100%)** : Exact sample conservation ($\sum N_k = N_{\text{total}}$) and disjoint index sets verified.
 
 ### 4.3 Phase 2: Hypothesis Property-Based Testing (`test_etl_hypothesis.py`)
 

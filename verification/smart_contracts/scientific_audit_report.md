@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit & Verification Report — Smart Contracts Subsystem
+﻿# Publication-Quality Scientific Audit & Verification Report : Smart Contracts Subsystem
 
 **Subsystem:** Consortium Incentive Settlement & On-Chain Audit Governance (`ConsortiumIncentiveSettlement.sol`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -64,7 +64,7 @@ All 13 tests passed cleanly on EVM Paris:
 
 ### 4.2 Phase 1: Pure-Python Reference Verification (`smart_contracts_reference_verification.py`)
 - Evaluated **30 independent multi-bank consortium settlement scenarios** ($N \in [3, 10]$ banks, pool sizes up to $10^{24}$ wei).
-- **Result:** **30/30 PASS (100%)** — All state machine transitions and balance conservation invariants verified.
+- **Result:** **30/30 PASS (100%)** : All state machine transitions and balance conservation invariants verified.
 
 ### 4.3 Phase 2: Hypothesis Property-Based Testing (`test_smart_contracts_hypothesis.py`)
 - **Properties Verified across 200+ randomized inputs:**

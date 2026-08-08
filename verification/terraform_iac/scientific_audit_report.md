@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit & Verification Report — Multi-Cloud Terraform Infrastructure as Code (IaC)
+﻿# Publication-Quality Scientific Audit & Verification Report : Multi-Cloud Terraform Infrastructure as Code (IaC)
 
 **Subsystem:** Multi-Cloud Infrastructure as Code (IaC) Provisioning Engine (`terraform_service.py`, `aws_vpc.tf`, `azure_vnet.tf`, `gcp_vpc.tf`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

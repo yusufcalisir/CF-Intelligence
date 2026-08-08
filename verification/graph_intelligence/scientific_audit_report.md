@@ -1,6 +1,6 @@
-# Scientific Audit Report - Graph Intelligence (FedGNN) Subsystem
+﻿# Scientific Audit Report - Graph Intelligence (FedGNN) Subsystem
 
-**Target Subsystem:** Federated Graph Neural Network (FedGNN) — GraphSAGE Embedding Engine
+**Target Subsystem:** Federated Graph Neural Network (FedGNN) : GraphSAGE Embedding Engine
 **Audited Module Paths:**
 - `app.application.services.graph_embedding_model` (GraphSAGELayer, GraphSAGEModel)
 - `app.application.services.graph_embedding_service` (GraphEmbeddingService)
@@ -40,7 +40,7 @@
 | R-1 | `train_local_gnn()` called `to_model_weights()` without explicit `include_classifier=False` | Changed call site to `model.to_model_weights(include_classifier=False)` | GR15 |
 | R-2 | `get_all_embeddings(dp_noise=False)` silently bypassed DP noise in all environments | Added `if not dp_noise and APP_ENV=production: raise RuntimeError(...)` guard | GR14 |
 | R-3 | `/v1/graph/embeddings/propagate-risk` called `get_all_embeddings()` without explicit `dp_noise=True` | Added explicit `dp_noise=True` kwarg at both router call sites | Router audit |
-| R-4 | `/v1/graph/embeddings/similar` returned silent `[]` on budget exhaustion — no HTTP error | Added HTTP 429 response with membership inference warning message | Router audit |
+| R-4 | `/v1/graph/embeddings/similar` returned silent `[]` on budget exhaustion : no HTTP error | Added HTTP 429 response with membership inference warning message | Router audit |
 | R-5 | No test coverage for production DP guard or explicit classifier exclusion | Added GR14, GR15 (robustness) and HP11, HP12 (hypothesis) tests | pytest 23/23 |
 
 **Post-Remediation Test Results:**
@@ -108,7 +108,7 @@ verification tests pass with zero failures.
 | 2-layer depth | Captures 2-hop fraud ring patterns (account→device→account) | Empirically sufficient for ring detection |
 | Unit sphere L2 normalization | Enables cosine similarity directly as dot product | Verified: ||h||₂ = 1.000000 ± 1e-6 |
 | Classifier head excluded from federation | Prevents local fraud label distribution leakage | GR15: 6 vs 10 layer_shapes confirmed |
-| Mini-batch neighbor sampling (k=10) | O(N·k) instead of O(N·deg) — caps runtime on hub nodes | GR8: 10,000-edge hub <5ms |
+| Mini-batch neighbor sampling (k=10) | O(N·k) instead of O(N·deg) : caps runtime on hub nodes | GR8: 10,000-edge hub <5ms |
 
 ---
 
@@ -118,23 +118,23 @@ verification tests pass with zero failures.
 
 $$h_v^{(l+1)} = \text{ReLU}\left(W_{\text{self}} \cdot h_v^{(l)} + W_{\text{neigh}} \cdot \frac{1}{|\mathcal{N}(v)|}\sum_{u \in \mathcal{N}(v)} h_u^{(l)} + b\right)$$
 
-**Reference Test RV-01:** Max Abs Error = 8.94×10⁻⁸ (Tolerance 1.0×10⁻⁵) — **PASSED**
+**Reference Test RV-01:** Max Abs Error = 8.94×10⁻⁸ (Tolerance 1.0×10⁻⁵) : **PASSED**
 
 ### 3.2 Full 2-Layer Forward Pass
 
-**Reference Test RV-02:** Max Abs Error = 1.79×10⁻⁷ — **PASSED**
+**Reference Test RV-02:** Max Abs Error = 1.79×10⁻⁷ : **PASSED**
 
 ### 3.3 Cosine Similarity
 
 $$\text{sim}(u, v) = \frac{h_u \cdot h_v}{\|h_u\|_2 \cdot \|h_v\|_2}$$
 
-**Reference Test RV-03:** Abs Error = 0.00×10⁰ (Exact) — **PASSED**
+**Reference Test RV-03:** Abs Error = 0.00×10⁰ (Exact) : **PASSED**
 
 ### 3.4 FedAvg GNN Aggregation
 
 $$W_{\text{global}} = \sum_{k=1}^{K} \frac{n_k}{n} W_k$$
 
-**Reference Test RV-04:** Max Abs Error = 0.00×10⁰ (Exact) — **PASSED**
+**Reference Test RV-04:** Max Abs Error = 0.00×10⁰ (Exact) : **PASSED**
 
 ---
 
@@ -163,21 +163,21 @@ $$W_{\text{global}} = \sum_{k=1}^{K} \frac{n_k}{n} W_k$$
 
 | ID | Scenario | Outcome |
 |:---:|:---|:---:|
-| GR1 | Empty Local Graph (N=0, E=0) | PASS — Empty metrics returned safely |
-| GR2 | Single-Node Graph (N=1, E=0) | PASS — Self-loop used, valid (1,16) vector |
-| GR3 | Isolated Nodes & Disconnected Subgraphs | PASS — Independent unit-norm embeddings |
-| GR4 | Duplicate Edges & Self-Loops | PASS — Mean computed without overflow |
-| GR5 | Out-of-Bounds Neighbor Indices [-5, 999] | PASS — Invalid indices safely filtered |
-| GR6 | NaN Feature Injection | PASS — Process does not crash |
-| GR7 | Infinite Feature Injection (+Inf) | PASS — L2 normalization bounds magnitude |
-| GR8 | High-Degree Hub Nodes (10,000 edges) | PASS — Mini-batch sampling caps runtime <5ms |
-| GR9 | Severe Class Imbalance (0% Fraud) | PASS — Unweighted BCE fallback succeeds |
-| GR10 | Mismatched FL Layer Aggregation Validation | PASS — ValueError raised on shape mismatch |
-| GR11 | DP Noise Injection on Embeddings | PASS — Noised vectors remain on unit sphere |
-| GR12 | Query Rate-Limit Budget Enforcement | PASS — [] returned after 3rd query with budget=3 |
-| GR13 | Classifier Head Isolation | PASS — GNN-only has fewer params than full model |
-| GR14 | Production DP Noise Guard | PASS — RuntimeError raised with APP_ENV=production |
-| GR15 | `train_local_gnn()` Excludes Classifier in Weights | PASS — Exactly 6 GNN layer_shapes, no (1,16) classifier shape |
+| GR1 | Empty Local Graph (N=0, E=0) | PASS : Empty metrics returned safely |
+| GR2 | Single-Node Graph (N=1, E=0) | PASS : Self-loop used, valid (1,16) vector |
+| GR3 | Isolated Nodes & Disconnected Subgraphs | PASS : Independent unit-norm embeddings |
+| GR4 | Duplicate Edges & Self-Loops | PASS : Mean computed without overflow |
+| GR5 | Out-of-Bounds Neighbor Indices [-5, 999] | PASS : Invalid indices safely filtered |
+| GR6 | NaN Feature Injection | PASS : Process does not crash |
+| GR7 | Infinite Feature Injection (+Inf) | PASS : L2 normalization bounds magnitude |
+| GR8 | High-Degree Hub Nodes (10,000 edges) | PASS : Mini-batch sampling caps runtime <5ms |
+| GR9 | Severe Class Imbalance (0% Fraud) | PASS : Unweighted BCE fallback succeeds |
+| GR10 | Mismatched FL Layer Aggregation Validation | PASS : ValueError raised on shape mismatch |
+| GR11 | DP Noise Injection on Embeddings | PASS : Noised vectors remain on unit sphere |
+| GR12 | Query Rate-Limit Budget Enforcement | PASS : [] returned after 3rd query with budget=3 |
+| GR13 | Classifier Head Isolation | PASS : GNN-only has fewer params than full model |
+| GR14 | Production DP Noise Guard | PASS : RuntimeError raised with APP_ENV=production |
+| GR15 | `train_local_gnn()` Excludes Classifier in Weights | PASS : Exactly 6 GNN layer_shapes, no (1,16) classifier shape |
 
 **15 / 15 fault-injection scenarios passed.**
 
@@ -203,7 +203,7 @@ Embedding quality evaluated on a synthetic entity graph (N=100, 80 legitimate, 2
 | Metric | Value | Interpretation |
 |:---|:---:|:---|
 | Unit Sphere Normalization | `||h||₂ = 1.000000` | Verified to 6 decimal places |
-| Global Pairwise Cosine Std | σ = 0.5059 | Well-distributed — no representation collapse |
+| Global Pairwise Cosine Std | σ = 0.5059 | Well-distributed : no representation collapse |
 | Intra-Fraud Cluster Coherence | mean = 0.5888 | Strong fraud ring grouping |
 | Inter-Class Separation | mean = 0.0001 | Fraud/legitimate orthogonal on unit sphere |
 | Neighborhood Preservation Ratio | 0.4600 vs 0.0177 | 26× neighbor vs non-neighbor similarity |
@@ -252,9 +252,9 @@ No unsupported capabilities remain after remediation.
 
 ## 10. Threats to Validity
 
-1. **Synthetic Graph Priors:** Intra-fraud similarity (0.5888) reflects synthetic engineered homophily — cannot generalize to real-world transaction graphs without empirical validation.
+1. **Synthetic Graph Priors:** Intra-fraud similarity (0.5888) reflects synthetic engineered homophily : cannot generalize to real-world transaction graphs without empirical validation.
 2. **Non-IID Partition Drift:** Cross-bank subgraphs are topologically disconnected. FedAvg across heterogeneous subgraphs is vulnerable to client drift without multi-bank validation.
-3. **In-Memory Circuit Breaker:** DP noise guard (`APP_ENV=production`) relies on environment variable — not a cryptographic enforcement mechanism.
+3. **In-Memory Circuit Breaker:** DP noise guard (`APP_ENV=production`) relies on environment variable : not a cryptographic enforcement mechanism.
 
 ---
 

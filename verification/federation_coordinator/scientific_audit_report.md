@@ -1,4 +1,4 @@
-# Final Post-Remediation Scientific Audit Report — Federation Coordinator Subsystem
+﻿# Final Post-Remediation Scientific Audit Report : Federation Coordinator Subsystem
 
 **Project:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
 **Subsystem:** Federation Coordinator & Distributed Orchestration Engine  
@@ -124,4 +124,4 @@ The Federation Coordinator operates as an enterprise-grade distributed orchestra
 
 ---
 
-*End of Final Post-Remediation Scientific Audit Report — Federation Coordinator Subsystem*
+*End of Final Post-Remediation Scientific Audit Report : Federation Coordinator Subsystem*

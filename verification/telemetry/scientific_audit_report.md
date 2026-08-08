@@ -1,4 +1,4 @@
-# Final Post-Remediation Scientific Audit Report — Telemetry & Observability Subsystem
+﻿# Final Post-Remediation Scientific Audit Report : Telemetry & Observability Subsystem
 
 **Project:** Privacy-Preserving Cross-Bank Fraud Detection using Federated Learning  
 **Subsystem:** Telemetry & Observability  
@@ -130,4 +130,4 @@ The Telemetry subsystem provides enterprise-grade observability across federated
 
 ---
 
-*End of Final Post-Remediation Scientific Audit Report — Telemetry & Observability Subsystem*
+*End of Final Post-Remediation Scientific Audit Report : Telemetry & Observability Subsystem*

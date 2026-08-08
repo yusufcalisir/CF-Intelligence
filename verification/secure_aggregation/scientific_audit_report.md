@@ -1,4 +1,4 @@
-# Publication-Quality Scientific Audit & Verification Report — Secure Aggregation Subsystem
+﻿# Publication-Quality Scientific Audit & Verification Report : Secure Aggregation Subsystem
 
 **Subsystem:** Secure Aggregation (SecAgg), Trusted Execution Environment (TEE), and Key Management (KMS)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
@@ -12,7 +12,7 @@
 
 This report delivers a rigorous scientific audit and verification of the **Secure Aggregation (SecAgg)**, Trusted Execution Environment (TEE), and Key Management (KMS) subsystem. The evaluation encompassed formal cryptographic claim classification, independent mathematical reference implementation comparison, property-based hypothesis testing, adversarial failure injection, scalability benchmarking, and threat vector analysis.
 
-Through code refactoring and cryptographic upgrades, critical vulnerabilities—including static mask seed reuse across rounds and unauthenticated 32-byte XOR data sealing—were resolved. Storage sealing was upgraded to **NIST SP 800-38D AES-256-GCM**, per-round key derivation was upgraded to **RFC 5869 HKDF-SHA256**, matrix mask generation was vectorized for $400\times$ speedup, and an early runtime pipeline guard was introduced to block mathematically incompatible SecAgg + non-linear Byzantine pairings.
+Through code refactoring and cryptographic upgrades, critical vulnerabilities:including static mask seed reuse across rounds and unauthenticated 32-byte XOR data sealing:were resolved. Storage sealing was upgraded to **NIST SP 800-38D AES-256-GCM**, per-round key derivation was upgraded to **RFC 5869 HKDF-SHA256**, matrix mask generation was vectorized for $400\times$ speedup, and an early runtime pipeline guard was introduced to block mathematically incompatible SecAgg + non-linear Byzantine pairings.
 
 ---
 
