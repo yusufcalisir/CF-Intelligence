@@ -328,7 +328,7 @@ export function useScenarios() {
 export function useStartScenario() {
   return useMutation<ScenarioStartResponse, Error, { scenario_type: string; speed_multiplier?: number }>({
     mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/api/v1/scenarios/start', payload);
+      const { data } = await apiClient.post('/api/v1/scenarios/start', payload, { timeout: 60000 });
       return data;
     },
   });
@@ -338,11 +338,19 @@ export function useScenarioStatus(scenarioId: string | undefined) {
   return useQuery<ScenarioStatus>({
     queryKey: ['scenario-status', scenarioId],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/api/v1/scenarios/${scenarioId}/status`);
+      const { data } = await apiClient.get(`/api/v1/scenarios/${scenarioId}/status`, { timeout: 30000 });
       return data;
     },
     enabled: !!scenarioId,
-    refetchInterval: 1000,
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      if (status === 'completed' || status === 'stopped' || status === 'failed') {
+        return false;
+      }
+      return 1500;
+    },
+    retry: 2,
+    retryDelay: 1000,
   });
 }
 
