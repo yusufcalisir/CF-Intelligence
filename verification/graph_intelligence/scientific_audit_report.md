@@ -1,4 +1,4 @@
-﻿# Scientific Audit Report - Graph Intelligence (FedGNN) Subsystem
+# Scientific Audit Report - Graph Intelligence (FedGNN) Subsystem
 
 **Target Subsystem:** Federated Graph Neural Network (FedGNN) : GraphSAGE Embedding Engine
 **Audited Module Paths:**
@@ -142,7 +142,7 @@ $$W_{\text{global}} = \sum_{k=1}^{K} \frac{n_k}{n} W_k$$
 
 | ID | Property Invariant | Trials | Result |
 |:---:|:---|:---:|:---:|
-| HP1 | Unit Sphere Norm: `||h||₂ = 1.0` for all nodes | 100 | PASS |
+| HP1 | Unit Sphere Norm: &#124;&#124;h&#124;&#124;₂ = 1.0 for all nodes | 100 | PASS |
 | HP2 | Permutation Invariance of Neighbor Order | 100 | PASS |
 | HP3 | Isolated Node Self-Loop Fallback | 100 | PASS |
 | HP4 | Neighbor Subsampling Budget Cap (k=10) | 100 | PASS |
@@ -153,7 +153,7 @@ $$W_{\text{global}} = \sum_{k=1}^{K} \frac{n_k}{n} W_k$$
 | HP9 | FedAvg Parameter Concatenation Invariant | 100 | PASS |
 | HP10 | Single-Node Graph Continuity | 100 | PASS |
 | HP11 | Classifier Exclusion Monotonicity: `params(GNN-only) < params(full)` for all architectures | 30 | PASS |
-| HP12 | DP-Noised Embeddings Unit Sphere Invariant: `||noised_emb||₂ ≈ 1.0` | 30 | PASS |
+| HP12 | DP-Noised Embeddings Unit Sphere Invariant: &#124;&#124;noised_emb&#124;&#124;₂ ≈ 1.0 | 30 | PASS |
 
 **All 12 properties verified. Zero violations across all trials.**
 
@@ -202,7 +202,7 @@ Embedding quality evaluated on a synthetic entity graph (N=100, 80 legitimate, 2
 
 | Metric | Value | Interpretation |
 |:---|:---:|:---|
-| Unit Sphere Normalization | `||h||₂ = 1.000000` | Verified to 6 decimal places |
+| Unit Sphere Normalization | &#124;&#124;h&#124;&#124;₂ = 1.000000 | Verified to 6 decimal places |
 | Global Pairwise Cosine Std | σ = 0.5059 | Well-distributed : no representation collapse |
 | Intra-Fraud Cluster Coherence | mean = 0.5888 | Strong fraud ring grouping |
 | Inter-Class Separation | mean = 0.0001 | Fraud/legitimate orthogonal on unit sphere |
