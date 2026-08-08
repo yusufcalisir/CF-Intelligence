@@ -39,12 +39,12 @@ Each signal evaluator computes a normalized score $s_k \in [0.0, 1.0]$:
 1. **ML Prediction:** $s_{\text{ml}} = \min(1.0, p_{\text{ml}})$
 2. **Velocity Ramp:** $s_{\text{vel}} = \min\left(1.0, \max\left(0.0, \frac{v - 2}{8}\right)\right)$
 3. **Merchant Reputation:** $s_{\text{merch}} = \min\left(1.0, 0.6 \cdot m_{\text{score}} + 0.4 \cdot c_{\text{risk}}\right)$
-4. **Country Jurisdictional Risk:** $s_{\text{country}} = \text{COUNTRY\_RISK}[code]$
-5. **Device Channel Anomaly:** $s_{\text{device}} = \text{DEVICE\_SCORES}[device]$
-6. **Customer History & Age:** $s_{\text{hist}} = (1 - h) + 0.30$ (if $age < 30$)
-7. **Previous Alerts:** $s_{\text{alerts}} = \min\left(1.0, \frac{cnt}{5}\right)$
+4. **Country Jurisdictional Risk:** $s_{\text{country}} = \text{CountryRisk}(\text{code})$
+5. **Device Channel Anomaly:** $s_{\text{device}} = \text{DeviceScore}(\text{device})$
+6. **Customer History & Age:** $s_{\text{hist}} = (1 - h) + 0.30$ (if $\text{age} < 30$)
+7. **Previous Alerts:** $s_{\text{alerts}} = \min\left(1.0, \frac{\text{count}}{5}\right)$
 8. **Chargeback Rate:** $s_{\text{cb}} = \min(1.0, \text{rate} \cdot 10)$
-9. **Behavior Z-Score Anomaly:** $s_{\text{behavior}} = \min\left(1.0, \max\left(0.0, \frac{z - 1}{3}\right)\right)$ where $z = \frac{|\text{amt} - \mu|}{\sigma}$
+9. **Behavior Z-Score Anomaly:** $s_{\text{behavior}} = \min\left(1.0, \max\left(0.0, \frac{z - 1}{3}\right)\right)$ where $z = \frac{|\text{amount} - \mu|}{\sigma}$
 
 ### 2.2 Weighted Combination & Scaling
 Signals are combined into a composite score $\bar{S} \in [0.0, 1.0]$ and scaled to $[0.0, 1000.0]$:
@@ -56,17 +56,17 @@ $$\bar{S} = \min\left(1.0, \frac{\sum_{k=1}^9 w_k \cdot s_k}{\sum_{k=1}^9 w_k}\r
 ## 3. Scoring Logic & Policy AST Analysis
 
 ```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                     DECISION SYSTEM ARCHITECTURE                        │
-├─────────────────────────────────────────────────────────────────────────┤
-│ Transaction Payload + ML Confidence (p_ml)                              │
-│   │                                                                     │
-│   ├──► 9 Pure-Function Signal Evaluators (s_k ∈ [0, 1])                 │
-│   ├──► Weighted Convex Combiner: S_comp = (∑ w_k s_k) / (∑ w_k)          │
-│   ├──► Integer Scaling: Score = round(S_comp · 1000, 1)                  │
-│   ├──► Qualitative Risk Tier Mapping: {minimal, low, medium, high, crit}│
-│   └──► Declarative JSON AST Policy Screening Engine                     │
-└─────────────────────────────────────────────────────────────────────────┘
++----------------------------------------------------------------------------+
+|                        DECISION SYSTEM ARCHITECTURE                        |
++----------------------------------------------------------------------------+
+| Transaction Payload + ML Confidence (p_ml)                                 |
+|   |                                                                        |
+|   |--> 9 Pure-Function Signal Evaluators (s_k in [0, 1])                   |
+|   |--> Weighted Convex Combiner: S_comp = (sum w_k s_k) / (sum w_k)        |
+|   |--> Integer Scaling: Score = round(S_comp * 1000, 1)                    |
+|   |--> Qualitative Risk Tier Mapping: {minimal, low, medium, high, crit}   |
+|   |--> Declarative JSON AST Policy Screening Engine                        |
++----------------------------------------------------------------------------+
 ```
 
 The decision system uses a hybrid model-rule architecture:
@@ -214,3 +214,7 @@ Performance benchmarks (`scratch/risk_scoring_benchmark_scalability.py`) were co
 10. **Customer History & Account Age Penalty (`SUPPORTED`):** Refactored with `max(0.0, 1.0 - min(1.0, history))` lower-bound clamping and $+0.30$ new account tenure penalty.
 11. **Previous Alerts & Chargeback History (`SUPPORTED`):** Verified linear scaling $s = \min(1.0, \text{cnt}/5)$ and $s = \min(1.0, \text{rate} \cdot 10)$.
 12. **Device Channel Anomaly Mapping (`SUPPORTED`):** Fully deterministic discrete channel risk mapping ($0.05 \le s \le 0.40$).
+
+---
+
+*End of Final Post-Remediation Scientific Audit Report: Risk Scoring Subsystem*
