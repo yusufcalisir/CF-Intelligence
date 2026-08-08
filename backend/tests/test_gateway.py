@@ -60,6 +60,7 @@ def test_gateway_authorization():
 
 
 def test_gateway_rate_limiting():
+    from unittest.mock import patch
     from app.infrastructure.redis_store import RedisStore
     from app.presentation.routers.gateway import _rate_limiter
 
@@ -72,19 +73,20 @@ def test_gateway_rate_limiting():
     settings.gateway_rate_limit = 2
     settings.gateway_require_auth = False
     try:
-        headers = {"X-API-Key": "rate_limit_test_key"}
-        # First request -> OK (502 downstream or 200, not 429)
-        response = client.get("/api/v1/simulations", headers=headers)
-        assert response.status_code != 429
+        with patch("time.time", return_value=1700000000.0):
+            headers = {"X-API-Key": "rate_limit_test_key"}
+            # First request -> OK (502 downstream or 200, not 429)
+            response = client.get("/api/v1/simulations", headers=headers)
+            assert response.status_code != 429
 
-        # Second request -> OK (not 429)
-        response = client.get("/api/v1/simulations", headers=headers)
-        assert response.status_code != 429
+            # Second request -> OK (not 429)
+            response = client.get("/api/v1/simulations", headers=headers)
+            assert response.status_code != 429
 
-        # Third request -> 429 Too Many Requests
-        response = client.get("/api/v1/simulations", headers=headers)
-        assert response.status_code == 429
-        assert "Too Many Requests" in response.text
+            # Third request -> 429 Too Many Requests
+            response = client.get("/api/v1/simulations", headers=headers)
+            assert response.status_code == 429
+            assert "Too Many Requests" in response.text
     finally:
         settings.gateway_rate_limit = original_rate_limit
         settings.gateway_require_auth = original_require_auth
