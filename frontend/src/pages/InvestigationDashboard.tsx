@@ -233,7 +233,7 @@ export default function InvestigationDashboard() {
           <div className="text-xs font-mono">Synchronizing consortium intelligence metrics...</div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 sm:gap-5">
           {statCards.map((card, i) => (
             <motion.div
               key={card.id}
@@ -249,13 +249,17 @@ export default function InvestigationDashboard() {
                 {/* Ambient Top Radial Gradient Glow */}
                 <div className={`absolute -top-12 -right-12 w-32 h-32 rounded-full bg-gradient-to-br ${card.gradient} blur-2xl opacity-60 group-hover:opacity-100 transition-opacity`} />
 
-                {/* Top Header Row: Badge & Trend */}
+                {/* Top Header Row: Dedicated Icon Container, Badge & Trend Pill */}
                 <div className="flex items-center justify-between gap-2 mb-3 relative z-10 min-w-0">
-                  <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[9.5px] font-mono font-bold border uppercase tracking-wider ${card.badgeColor} truncate max-w-[65%]`}>
-                    {card.icon}
-                    <span className="truncate">{card.badge}</span>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className={`p-1.5 rounded-lg border ${card.badgeColor} shrink-0 flex items-center justify-center`}>
+                      {card.icon}
+                    </div>
+                    <span className="text-[9.5px] font-mono font-bold uppercase tracking-wider text-slate-300 truncate min-w-0">
+                      {card.badge}
+                    </span>
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 bg-white/5 border border-white/8 px-2 py-0.5 rounded-full shrink-0 font-medium">
+                  <div className="text-[9.5px] font-mono text-slate-300 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full shrink-0 font-medium whitespace-nowrap">
                     {card.trend}
                   </div>
                 </div>

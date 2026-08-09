@@ -264,10 +264,10 @@ export default function LiveOperationsView() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 border-l-[var(--color-accent-indigo)]"
+        className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 border-l-[var(--color-accent-indigo)] min-w-0"
       >
-        <div className="space-y-1.5 min-w-0">
-          <div className="flex items-center justify-between sm:justify-start gap-2.5 min-w-0">
+        <div className="space-y-1.5 min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <div className="flex items-center gap-2 min-w-0">
               <span className="text-xl sm:text-2xl shrink-0">📡</span>
               <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight truncate">
@@ -289,7 +289,7 @@ export default function LiveOperationsView() {
           </p>
         </div>
 
-        <div className="flex flex-row sm:flex-row items-center justify-between lg:justify-end gap-3 pt-3 lg:pt-0 border-t border-[var(--color-border-subtle)] lg:border-t-0">
+        <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-4 pt-3 xl:pt-0 border-t border-[var(--color-border-subtle)] xl:border-t-0 shrink-0">
           <div className="text-left sm:text-right shrink-0">
             <p className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">Active Champion AUC</p>
             <p className="text-lg sm:text-2xl font-bold font-mono text-[var(--color-accent-indigo)]">

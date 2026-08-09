@@ -127,7 +127,7 @@ export default function CoordinatorPage() {
     (displayClients.find((c) => c.bank_id === selectedBankId) || displayClients[0] || DEMO_CLIENTS[0]) as ClientCapabilityItem;
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-100">
+    <div className="p-4 sm:p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-100 w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 border-b border-slate-800">
         <div>
@@ -163,7 +163,7 @@ export default function CoordinatorPage() {
       </div>
 
       {/* Summary Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Card 1: Online Clients */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
@@ -392,7 +392,7 @@ export default function CoordinatorPage() {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700 max-w-full">
             {displayClients.map((c) => (
               <button
                 key={c.bank_id}
@@ -624,9 +624,9 @@ export default function CoordinatorPage() {
                   onClick={() => handleCopyCurl(path, method)}
                   className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all duration-200 cursor-pointer group flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider ${
+                      className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider shrink-0 ${
                         method === 'POST'
                           ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                           : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -634,11 +634,11 @@ export default function CoordinatorPage() {
                     >
                       {method}
                     </span>
-                    <div>
-                      <code className="font-mono text-xs text-indigo-300 group-hover:text-indigo-200 transition-colors">
+                    <div className="min-w-0 flex-1">
+                      <code className="font-mono text-xs text-indigo-300 group-hover:text-indigo-200 transition-colors break-all sm:break-normal">
                         {path}
                       </code>
-                      <p className="text-[11px] text-slate-400 mt-0.5">{desc}</p>
+                      <p className="text-[11px] text-slate-400 mt-0.5 truncate">{desc}</p>
                     </div>
                   </div>
 
