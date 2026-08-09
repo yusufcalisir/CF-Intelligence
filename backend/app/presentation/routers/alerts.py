@@ -118,27 +118,27 @@ async def explain_alert(alert_id: str) -> ExplainabilityResponse:
         raise HTTPException(status_code=404, detail="Alert not found")
 
     report = _explainability_service.explain_alert(alert)
-
-    total_weighted = sum(s.weighted_score for s in report.risk_score_breakdown)
+    breakdown_list = report.risk_score_breakdown or []
+    total_weighted = sum(getattr(s, "weighted_score", 0.0) for s in breakdown_list)
 
     return ExplainabilityResponse(
         alert_id=report.alert_id,
-        top_features=report.top_features,
-        risk_factors=report.risk_factors,
-        historical_evidence=report.historical_evidence,
-        model_confidence=report.model_confidence,
+        top_features=report.top_features or [],
+        risk_factors=report.risk_factors or [],
+        historical_evidence=report.historical_evidence or [],
+        model_confidence=float(report.model_confidence or 0.0),
         risk_score_breakdown=[
             {
-                "signal_name": s.signal_name,
-                "weight": s.weight,
-                "raw_value": s.raw_value,
-                "normalized_score": s.normalized_score,
-                "explanation": s.explanation,
-                "contribution": s.weighted_score / total_weighted if total_weighted > 0 else 0.0,
+                "signal_name": getattr(s, "signal_name", "signal"),
+                "weight": float(getattr(s, "weight", 0.0)),
+                "raw_value": float(getattr(s, "raw_value", 0.0)),
+                "normalized_score": float(getattr(s, "normalized_score", 0.0)),
+                "explanation": getattr(s, "explanation", ""),
+                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted if total_weighted > 0 else 0.0,
             }
-            for s in report.risk_score_breakdown
+            for s in breakdown_list
         ],
-        explanation_text=report.explanation_text,
+        explanation_text=report.explanation_text or "",
     )
 
 
@@ -150,26 +150,27 @@ async def explain_transaction(transaction_id: str) -> ExplainabilityResponse:
         raise HTTPException(status_code=404, detail="Alert not found for this transaction ID")
 
     report = _explainability_service.explain_alert(alert)
-    total_weighted = sum(s.weighted_score for s in report.risk_score_breakdown)
+    breakdown_list = report.risk_score_breakdown or []
+    total_weighted = sum(getattr(s, "weighted_score", 0.0) for s in breakdown_list)
 
     return ExplainabilityResponse(
         alert_id=report.alert_id,
-        top_features=report.top_features,
-        risk_factors=report.risk_factors,
-        historical_evidence=report.historical_evidence,
-        model_confidence=report.model_confidence,
+        top_features=report.top_features or [],
+        risk_factors=report.risk_factors or [],
+        historical_evidence=report.historical_evidence or [],
+        model_confidence=float(report.model_confidence or 0.0),
         risk_score_breakdown=[
             {
-                "signal_name": s.signal_name,
-                "weight": s.weight,
-                "raw_value": s.raw_value,
-                "normalized_score": s.normalized_score,
-                "explanation": s.explanation,
-                "contribution": s.weighted_score / total_weighted if total_weighted > 0 else 0.0,
+                "signal_name": getattr(s, "signal_name", "signal"),
+                "weight": float(getattr(s, "weight", 0.0)),
+                "raw_value": float(getattr(s, "raw_value", 0.0)),
+                "normalized_score": float(getattr(s, "normalized_score", 0.0)),
+                "explanation": getattr(s, "explanation", ""),
+                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted if total_weighted > 0 else 0.0,
             }
-            for s in report.risk_score_breakdown
+            for s in breakdown_list
         ],
-        explanation_text=report.explanation_text,
+        explanation_text=report.explanation_text or "",
     )
 
 

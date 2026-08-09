@@ -98,12 +98,12 @@ class ExplainabilityService:
 
         return ExplainabilityReport(
             alert_id=alert.id,
-            top_features=alert.top_features,
-            risk_factors=alert.risk_factors,
-            historical_evidence=alert.historical_evidence,
-            model_confidence=alert.model_confidence,
+            top_features=alert.top_features or [],
+            risk_factors=alert.risk_factors or [],
+            historical_evidence=alert.historical_evidence or [],
+            model_confidence=float(alert.model_confidence or 0.0),
             risk_score_breakdown=risk_signals or [],
-            explanation_text=explanation_text,
+            explanation_text=explanation_text or "",
             explanation_method="LINEAR_HEURISTIC_FALLBACK",
         )
 
@@ -128,10 +128,13 @@ class ExplainabilityService:
         lines: list[str] = []
 
         # Opening summary
+        sev_str = alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity or "MEDIUM")
+        risk_sc = float(alert.risk_score or 0.0)
+        mod_conf = float(alert.model_confidence or 0.0)
         lines.append(
-            f"This transaction was flagged with {alert.severity.value.upper()} severity "
-            f"and a risk score of {alert.risk_score:.0f}/1000 "
-            f"(model confidence: {alert.model_confidence:.1%})."
+            f"This transaction was flagged with {str(sev_str).upper()} severity "
+            f"and a risk score of {risk_sc:.0f}/1000 "
+            f"(model confidence: {mod_conf:.1%})."
         )
 
         # Reason codes

@@ -267,15 +267,15 @@ export default function LiveOperationsView() {
         className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 border-l-[var(--color-accent-indigo)] min-w-0"
       >
         <div className="space-y-1.5 min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-            <div className="flex items-center gap-2 min-w-0">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <span className="text-xl sm:text-2xl shrink-0">📡</span>
               <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight truncate">
                 Live Operations Dashboard
               </h1>
             </div>
             <span
-              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
+              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 self-start sm:self-auto ${
                 wsStatus === 'CONNECTED'
                   ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                   : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'

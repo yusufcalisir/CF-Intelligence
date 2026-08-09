@@ -129,32 +129,32 @@ export default function CoordinatorPage() {
   return (
     <div className="p-4 sm:p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-100 w-full min-w-0 overflow-x-hidden">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-6 border-b border-slate-800">
-        <div>
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/5">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-800 min-w-0">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/5 shrink-0">
               <ServerIcon />
             </div>
-            <div>
-              <h1 className="text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent truncate">
                 Federated Coordinator Suite
               </h1>
-              <p className="text-xs md:text-sm text-slate-400 mt-0.5">
+              <p className="text-xs md:text-sm text-slate-400 mt-0.5 leading-tight">
                 Dynamic client registry, live heartbeat monitoring, and hardware-aware parameter negotiation
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            100% Quorum Active ({onlineClients.length}/{displayClients.length} Nodes)
+        <div className="flex flex-wrap items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs font-semibold">
+            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+            <span>100% Quorum Active ({onlineClients.length}/{displayClients.length} Nodes)</span>
           </div>
 
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold transition-all duration-200 shadow-sm"
+            className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold transition-all duration-200 shadow-sm whitespace-nowrap"
           >
             <RefreshIcon isSpinning={isRefreshing} />
             <span>Refresh Registry</span>
