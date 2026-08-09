@@ -58,10 +58,17 @@ export default function CaseDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['case', caseId] });
   };
 
+  const [statusError, setStatusError] = useState<string | null>(null);
+
   const handleStatusChange = async (newStatus: string) => {
     if (!caseId) return;
+    setStatusError(null);
     try {
       const isClosure = newStatus.startsWith('closed_');
+      if (isClosure && (!supervisorSig || !supervisorSig.trim())) {
+        setStatusError('⚠️ Supervisor signature is required for case closure (Four-Eyes Principle).');
+        return;
+      }
       await updateStatus.mutateAsync({
         caseId,
         status: newStatus,
@@ -70,8 +77,11 @@ export default function CaseDetailPage() {
       });
       setSupervisorSig('');
       queryClient.invalidateQueries({ queryKey: ['case', caseId] });
-    } catch {
-      // Status transition error handled by API
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Status transition failed. Check your permissions and try again.';
+      setStatusError(`❌ ${detail}`);
     }
   };
 
@@ -199,10 +209,16 @@ export default function CaseDetailPage() {
                 <input
                   type="text"
                   value={supervisorSig}
-                  onChange={(e) => setSupervisorSig(e.target.value)}
+                  onChange={(e) => { setSupervisorSig(e.target.value); setStatusError(null); }}
                   placeholder="Secondary authorization key..."
                   className="px-2 py-1 text-xs rounded bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] flex-1 focus:outline-none focus:border-yellow-500/50"
                 />
+              </div>
+            )}
+            {/* Status Error Toast */}
+            {statusError && (
+              <div className="w-full mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium animate-in fade-in">
+                {statusError}
               </div>
             )}
           </div>

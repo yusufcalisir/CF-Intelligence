@@ -430,7 +430,7 @@ class CaseManagementService:
         ]
         analysts = ["senior_analyst_1", "analyst_2", "compliance_officer_1", "analyst_3"]
         now = datetime.now(UTC)
-        return Case(
+        fallback_case = Case(
             id=case_id,
             title=titles[h % len(titles)],
             status=statuses[h % len(statuses)],
@@ -450,6 +450,10 @@ class CaseManagementService:
             created_at=now,
             total_risk_score=round(0.65 + (h % 350) / 1000.0, 4),
         )
+        # Persist the fallback case so _get_case() (used by change_status,
+        # add_note, link_alert, etc.) can find it on subsequent calls.
+        self._cases.set(case_id, _case_to_dict(fallback_case))
+        return fallback_case
 
     def get_cases(
         self,
