@@ -21,7 +21,7 @@ from app.infrastructure.database import get_async_session
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/admin/banks", tags=["Bank Onboarding"])
+router = APIRouter(prefix="/v1/onboarding", tags=["Bank Onboarding"])
 
 
 # ── Request / Response Models ─────────────────────────────────────────────────
@@ -162,7 +162,7 @@ async def register_bank(
 
 
 @router.get(
-    "/",
+    "/banks",
     response_model=list[BankStatusResponse],
     summary="List all registered bank nodes",
 )
@@ -193,7 +193,7 @@ async def list_banks(
 
 
 @router.get(
-    "/{bank_id}/status",
+    "/banks/{bank_id}/status",
     response_model=BankStatusResponse,
     summary="Get status of a single bank node",
 )
@@ -223,7 +223,7 @@ async def get_bank_status(
 
 
 @router.post(
-    "/{bank_id}/rotate-cert",
+    "/banks/{bank_id}/rotate-cert",
     response_model=CertRotationResponse,
     summary="Rotate mTLS certificate for a bank node",
 )
