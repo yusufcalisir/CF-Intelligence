@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import logging
 import os
+import pathlib
+import tempfile
 import time
 import uuid
 from threading import Lock
@@ -86,6 +88,16 @@ except ImportError:
     )
 logger = logging.getLogger(__name__)
 
+# ── Silence noisy third-party loggers ─────────────────────────────────────────
+# great_expectations v1.x emits hundreds of INFO lines from _docs_decorators
+# during DataSourceManager registration. These carry zero operational value.
+for _ge_logger_name in (
+    "great_expectations",
+    "great_expectations._docs_decorators",
+    "great_expectations.expectations.registry",
+):
+    logging.getLogger(_ge_logger_name).setLevel(logging.WARNING)
+
 
 # ── Tenant-Isolated Logging ──────────────────
 def _setup_tenant_logging() -> None:
@@ -154,7 +166,29 @@ except Exception as exc:
 
 
 # ── Lifecycle ─────────────────────────────────
-# ── Lifecycle ─────────────────────────────────
+
+
+def _seed_sentinel_path() -> pathlib.Path:
+    """Return the path of the one-time seed sentinel file."""
+    storage = os.environ.get("CFI_STORAGE_DIR", tempfile.gettempdir())
+    return pathlib.Path(storage) / "cfi_seeded.sentinel"
+
+
+def _acquire_seed_right() -> bool:
+    """Return True if this process should run seed_mock_data().
+
+    Uses an atomic file creation (exclusive, fails if exists) as a
+    cross-worker lock inside the same container.  Works reliably on
+    POSIX filesystems (Linux / HF Spaces /tmp).
+    """
+    sentinel = _seed_sentinel_path()
+    try:
+        sentinel.touch(exist_ok=False)  # atomic O_CREAT | O_EXCL
+        return True
+    except FileExistsError:
+        return False
+
+
 def seed_mock_data() -> None:
     """Seed initial mock data for Phase 2 AML platform."""
     from app.application.services.alert_service import _alert_to_dict, _intel_to_dict
@@ -348,11 +382,31 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.warning("Could not set PyTorch threading limits: %s", e)
 
-    # Seed mock data
+    # Probe Redis availability once at startup (avoids per-connection WARNING spam)
+    _redis_available = False
     try:
-        seed_mock_data()
-    except Exception as exc:
-        logger.error("Failed to seed mock data: %s", exc, exc_info=True)
+        import redis.asyncio as _aioredis
+        _redis_url = settings.redis_url or "redis://localhost:6379"
+        _r = _aioredis.from_url(_redis_url, socket_connect_timeout=1.0)
+        await _r.ping()
+        await _r.aclose()
+        _redis_available = True
+        logger.info("Redis: available at %s", _redis_url)
+    except Exception as _re:
+        logger.info(
+            "Redis: not available (%s) — WebSocket will use in-process event bus "
+            "(expected degraded mode in HF Spaces / no-Redis deployments)",
+            type(_re).__name__,
+        )
+
+    # Seed mock data — only the first worker/process to acquire the sentinel runs this
+    if _acquire_seed_right():
+        try:
+            seed_mock_data()
+        except Exception as exc:
+            logger.error("Failed to seed mock data: %s", exc, exc_info=True)
+    else:
+        logger.info("Seed skipped — sentinel exists, another worker already seeded")
 
     # Start Redis Bank Client Listeners
     redis_listeners = []

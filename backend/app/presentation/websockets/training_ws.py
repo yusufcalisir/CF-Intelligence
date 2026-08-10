@@ -77,7 +77,12 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected for simulation %s", simulation_id)
     except Exception as exc:
-        logger.warning("WebSocket Redis stream unavailable for simulation %s: %s", simulation_id, exc)
+        logger.info(
+            "Redis unavailable for simulation %s (%s) — falling back to in-process keep-alive "
+            "(expected degraded mode when Redis is not provisioned, e.g. HF Spaces)",
+            simulation_id,
+            type(exc).__name__,
+        )
         try:
             await websocket.send_text(json.dumps({"event": "connected", "status": "idle", "simulation_id": simulation_id}))
             while True:
