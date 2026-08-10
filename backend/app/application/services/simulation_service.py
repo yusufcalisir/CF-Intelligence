@@ -295,7 +295,7 @@ class SimulationService:
                 bank.local_metrics = self.metrics_service.from_eval_dict(eval_dict, feat_imp)
 
                 logger.info(
-                    "Local model for %s â€” F1: %.4f, AUC: %.4f",
+                    "Local model for %s | F1: %.4f, AUC: %.4f",
                     bank.name,
                     bank.local_metrics.f1_score,
                     bank.local_metrics.auc_roc,
@@ -1122,7 +1122,7 @@ class SimulationService:
                             fed_feat_imp,
                         )
                     except Exception as exc:
-                        logger.error(
+                        logger.warning(
                             "Connector evaluation fallback locally for bank %s: %s",
                             bank.id,
                             exc,
@@ -1183,7 +1183,7 @@ class SimulationService:
                     )
 
                     logger.info(
-                        "Federated model at %s — F1: %.4f (local: %.4f), AUC: %.4f (local: %.4f)",
+                        "Federated model at %s | F1: %.4f (local: %.4f), AUC: %.4f (local: %.4f)",
                         bank.name,
                         bank.federated_metrics.f1_score,
                         bank.local_metrics.f1_score if bank.local_metrics else 0,

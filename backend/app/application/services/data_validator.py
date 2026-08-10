@@ -34,16 +34,23 @@ else:
         HAS_GREAT_EXPECTATIONS = False
 
     try:
-        import pandera as pa
+        import pandera.pandas as pa
         from pandera.errors import SchemaError
-        from pandera.typing import Series  # noqa: TC002
+        from pandera.pandas import Series  # noqa: TC002
 
         HAS_PANDERA = True
     except ImportError:
-        pa = None
-        SchemaError = Exception
-        Series = None
-        HAS_PANDERA = False
+        try:
+            import pandera as pa
+            from pandera.errors import SchemaError
+            from pandera.typing import Series  # noqa: TC002
+
+            HAS_PANDERA = True
+        except ImportError:
+            pa = None
+            SchemaError = Exception
+            Series = None
+            HAS_PANDERA = False
 
 import pandas as pd  # noqa: TC002
 

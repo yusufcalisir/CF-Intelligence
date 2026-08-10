@@ -16,6 +16,8 @@ os.environ["OPENBLAS_NUM_THREADS"] = "2"
 os.environ["VECLIB_MAXIMUM_THREADS"] = "2"
 os.environ["NUMEXPR_NUM_THREADS"] = "2"
 os.environ["GIT_PYTHON_REFRESH"] = "quiet"
+os.environ["DISABLE_PANDERA_IMPORT_WARNING"] = "True"
+os.environ["TQDM_DISABLE"] = "1"
 
 print(">>> Python main.py loaded successfully! <<<", flush=True)
 
@@ -89,14 +91,15 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ── Silence noisy third-party loggers ─────────────────────────────────────────
-# great_expectations v1.x emits hundreds of INFO lines from _docs_decorators
-# during DataSourceManager registration. These carry zero operational value.
-for _ge_logger_name in (
+# great_expectations, alembic, and ray internal logging
+for _noisy_logger_name in (
     "great_expectations",
     "great_expectations._docs_decorators",
     "great_expectations.expectations.registry",
+    "great_expectations.data_context.types.base",
+    "alembic.runtime.plugins",
 ):
-    logging.getLogger(_ge_logger_name).setLevel(logging.WARNING)
+    logging.getLogger(_noisy_logger_name).setLevel(logging.WARNING)
 
 
 # ── Tenant-Isolated Logging ──────────────────

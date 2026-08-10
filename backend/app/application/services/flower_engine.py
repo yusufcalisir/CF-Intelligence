@@ -209,7 +209,7 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
             )
 
         logger.info(
-            "[Flower] Round %d/%d — avg loss: %.4f, duration: %.0fms",
+            "[Flower] Round %d/%d | avg loss: %.4f, duration: %.0fms",
             server_round,
             self.num_rounds,
             avg_loss,
@@ -217,6 +217,20 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
         )
 
         return aggregated
+
+
+def _aggregate_flower_metrics(metrics: list[tuple[int, dict[str, Any]]]) -> dict[str, Any]:
+    """Aggregate client metrics using weighted average by sample count."""
+    total_examples = sum(num_examples for num_examples, _ in metrics)
+    if total_examples == 0:
+        return {}
+    aggregated: dict[str, float] = {}
+    for num_examples, m in metrics:
+        if isinstance(m, dict):
+            for k, v in m.items():
+                if isinstance(v, (int, float)):
+                    aggregated[k] = aggregated.get(k, 0.0) + (v * num_examples)
+    return {k: round(v / total_examples, 4) for k, v in aggregated.items()}
 
 
 class FlowerFLEngine:
@@ -246,8 +260,22 @@ class FlowerFLEngine:
 
         round_results: list[dict[str, Any]] = []
 
-        def client_fn(cid: str) -> fl.client.Client:
-            bank_id = bank_ids[int(cid)]
+        def client_fn(context: Any) -> fl.client.Client:
+            if hasattr(context, "node_config") and isinstance(context.node_config, dict) and "partition-id" in context.node_config:
+                cid_str = str(context.node_config["partition-id"])
+            elif hasattr(context, "node_id") and isinstance(context.node_id, int):
+                cid_str = str(context.node_id % len(bank_ids))
+            elif hasattr(context, "partition_id"):
+                cid_str = str(context.partition_id)
+            else:
+                cid_str = str(context)
+
+            try:
+                idx = int(cid_str)
+            except (ValueError, TypeError):
+                idx = 0
+
+            bank_id = bank_ids[idx % len(bank_ids)]
             return FraudFlowerClient(
                 bank_id=bank_id,
                 bank_data=bank_data[bank_id],
@@ -271,6 +299,8 @@ class FlowerFLEngine:
             min_evaluate_clients=len(bank_ids),
             min_available_clients=len(bank_ids),
             initial_parameters=initial_params,
+            fit_metrics_aggregation_fn=_aggregate_flower_metrics,
+            evaluate_metrics_aggregation_fn=_aggregate_flower_metrics,
         )
 
         logger.info(
@@ -292,12 +322,19 @@ class FlowerFLEngine:
             if ray.is_initialized():
                 ray.shutdown()
             ray.init(
-                object_store_memory=100 * 1024 * 1024,
+                object_store_memory=128 * 1024 * 1024,
                 num_cpus=2,
                 include_dashboard=False,
+                ignore_reinit_error=True,
+                _system_config={
+                    "object_store_full_delay_ms": 100,
+                },
                 runtime_env={
                     "sys_paths": [backend_dir],
-                    "env_vars": {"PYTHONPATH": os.environ["PYTHONPATH"]},
+                    "env_vars": {
+                        "PYTHONPATH": os.environ["PYTHONPATH"],
+                        "RAY_ACCEL_ENV_VAR_OVERRIDE_ON_ZERO": "0",
+                    },
                 },
             )
 
@@ -306,7 +343,7 @@ class FlowerFLEngine:
                 num_clients=len(bank_ids),
                 config=fl.server.ServerConfig(num_rounds=sim_config.num_rounds),
                 strategy=strategy,
-                client_resources={"num_cpus": 1, "num_gpus": 0.0},
+                client_resources={"num_cpus": 0.5, "num_gpus": 0.0},
             )
 
             ray.shutdown()
