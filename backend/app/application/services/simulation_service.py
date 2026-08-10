@@ -1410,6 +1410,9 @@ class SimulationService:
                 simulation.streaming_gnn_edge_count = summary["edge_count"]
 
             active_simulations.add(-1)
+            # Persist the accumulated training rounds onto the simulation entity
+            simulation.rounds = rounds if "rounds" in locals() else []
+            simulation.rounds_run = len(simulation.rounds)
             simulation.status = SimulationStatus.COMPLETED
             simulation.completed_at = _now()
 
