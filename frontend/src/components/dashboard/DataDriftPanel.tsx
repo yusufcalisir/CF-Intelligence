@@ -226,18 +226,26 @@ export default function DataDriftPanel() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <p className="font-medium text-[var(--color-text-primary)] mb-0.5">🧠 PSI (Population Stability Index)</p>
-                <p className="text-[9px] text-[var(--color-text-muted)]">
-                  Measures distribution change over populations.
-                  Formula: $\sum (A_i - E_i) \times \ln(A_i / E_i)$
+                <p className="text-[9px] text-[var(--color-text-muted)] space-y-1">
+                  <span>Measures distribution change over populations.</span>
                   <br />
-                  🟢 <span className="text-[#10B981]">&lt;0.10</span> Stable | 🟡 <span className="text-[#F59E0B]">0.10–0.25</span> Moderate Shift | 🔴 <span className="text-[#EF4444]">&gt;0.25</span> Significant Drift (requires Federated Training).
+                  <span className="inline-block mt-0.5">
+                    Formula: <code className="font-mono text-cyan-400 bg-cyan-950/40 px-1.5 py-0.5 rounded border border-cyan-500/20 text-[9px]">∑ (A<sub>i</sub> - E<sub>i</sub>) × ln(A<sub>i</sub> / E<sub>i</sub>)</code>
+                  </span>
+                  <br />
+                  <span className="inline-block mt-1">
+                    🟢 <span className="text-[#10B981]">&lt;0.10</span> Stable | 🟡 <span className="text-[#F59E0B]">0.10–0.25</span> Moderate Shift | 🔴 <span className="text-[#EF4444]">&gt;0.25</span> Significant Drift (requires Federated Training).
+                  </span>
                 </p>
               </div>
               <div>
                 <p className="font-medium text-[var(--color-text-primary)] mb-0.5">🔬 Jensen-Shannon (JS) Divergence</p>
-                <p className="text-[9px] text-[var(--color-text-muted)]">
-                  Symmetric, smooth measure of distribution divergence bounded between $0.0$ (identical) and $1.0$ (disjoint).
-                  Helps identify local feature alignment. Used directly to capture concept drift on model outputs $P(Y|X)$.
+                <p className="text-[9px] text-[var(--color-text-muted)] leading-relaxed">
+                  Symmetric, smooth measure of distribution divergence bounded between{' '}
+                  <code className="font-mono text-cyan-400 bg-cyan-950/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">0.0</code> (identical) and{' '}
+                  <code className="font-mono text-cyan-400 bg-cyan-950/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">1.0</code> (disjoint).
+                  Helps identify local feature alignment. Used directly to capture concept drift on model outputs{' '}
+                  <code className="font-mono text-cyan-400 bg-cyan-950/40 px-1 py-0.2 rounded border border-cyan-500/20 text-[9px]">P(Y|X)</code>.
                 </p>
               </div>
             </div>

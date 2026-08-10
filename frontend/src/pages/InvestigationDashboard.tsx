@@ -500,7 +500,47 @@ export default function InvestigationDashboard() {
           </span>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Stacked Cards (No horizontal scrolling, details fully visible) */}
+        <div className="block md:hidden space-y-3">
+          {!auditLogs || auditLogs.length === 0 ? (
+            <div className="py-6 text-center text-slate-500 font-mono text-xs">
+              No investigator activity logs recorded yet.
+            </div>
+          ) : (
+            auditLogs.map((log: any) => (
+              <div
+                key={log.id}
+                className="p-3 rounded-xl bg-slate-900/60 border border-white/5 space-y-2 font-mono text-xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-bold text-indigo-400">{log.investigator}</span>
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase">
+                    {log.action.replace(/_/g, ' ')}
+                  </span>
+                </div>
+                <div className="flex flex-col gap-1 text-[11px] text-slate-400 border-t border-white/5 pt-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-slate-500">Target ID:</span>
+                    <span className="text-slate-200 font-semibold truncate max-w-[180px]">{log.target_id}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-2 text-[10px]">
+                    <span className="text-slate-500">Timestamp:</span>
+                    <span className="text-slate-400">{new Date(log.timestamp).toLocaleString()}</span>
+                  </div>
+                </div>
+                {log.metadata && (
+                  <div className="text-[10px] text-slate-400 bg-black/40 p-2 rounded border border-white/5 break-all mt-1">
+                    <span className="text-slate-500 font-semibold block mb-0.5">Details:</span>
+                    {typeof log.metadata === 'object' ? JSON.stringify(log.metadata) : String(log.metadata)}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Desktop View: Full Table */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="border-b border-white/10 text-slate-400 font-mono text-[11px]">
