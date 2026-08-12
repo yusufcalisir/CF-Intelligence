@@ -1103,44 +1103,59 @@ class SimulationService:
                         fed_feat_imp,
                     )
                 else:
-                    correlation_id = f"evaluate_final_{simulation.id}_{bank.id}"
-                    try:
-                        connector = bank_connectors[bank.id]
-                        eval_res = connector.evaluate(
-                            bank_id=bank.id,
-                            weights=global_weights,
-                            correlation_id=correlation_id,
-                        )
-                        if "error" in eval_res:
-                            raise RuntimeError(eval_res["error"])
-                        eval_dicts[bank.id] = eval_res
-                        fed_feat_imp = self.model_service.get_feature_importance(
-                            global_model, X_val_global
-                        )
-                        bank.federated_metrics = self.metrics_service.from_eval_dict(
-                            eval_res,
-                            fed_feat_imp,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "Connector evaluation fallback locally for bank %s: %s",
-                            bank.id,
-                            exc,
-                        )
-                        # Fallback: evaluate locally using the bank's test data
+                    if bank.id in bank_data:
                         data = bank_data[bank.id]
                         fed_eval = self.model_service.evaluate(
                             global_model,
                             data["X_test"],
                             data["y_test"],
-                            sens_attr=data["sens_test"],
+                            sens_attr=data.get("sens_test"),
                         )
                         eval_dicts[bank.id] = fed_eval
-                        fed_feat_imp = self.model_service.get_feature_importance(global_model)
+                        fed_feat_imp = self.model_service.get_feature_importance(global_model, X_val_global)
                         bank.federated_metrics = self.metrics_service.from_eval_dict(
                             fed_eval,
                             fed_feat_imp,
                         )
+                    else:
+                        correlation_id = f"evaluate_final_{simulation.id}_{bank.id}"
+                        try:
+                            connector = bank_connectors[bank.id]
+                            eval_res = connector.evaluate(
+                                bank_id=bank.id,
+                                weights=global_weights,
+                                correlation_id=correlation_id,
+                            )
+                            if "error" in eval_res or "f1_score" not in eval_res:
+                                raise RuntimeError(eval_res.get("error", "Missing f1_score in connector evaluation"))
+                            eval_dicts[bank.id] = eval_res
+                            fed_feat_imp = self.model_service.get_feature_importance(
+                                global_model, X_val_global
+                            )
+                            bank.federated_metrics = self.metrics_service.from_eval_dict(
+                                eval_res,
+                                fed_feat_imp,
+                            )
+                        except Exception as exc:
+                            logger.warning(
+                                "Connector evaluation fallback locally for bank %s: %s",
+                                bank.id,
+                                exc,
+                            )
+                            if bank.id in bank_data:
+                                data = bank_data[bank.id]
+                                fed_eval = self.model_service.evaluate(
+                                    global_model,
+                                    data["X_test"],
+                                    data["y_test"],
+                                    sens_attr=data.get("sens_test"),
+                                )
+                                eval_dicts[bank.id] = fed_eval
+                                fed_feat_imp = self.model_service.get_feature_importance(global_model)
+                                bank.federated_metrics = self.metrics_service.from_eval_dict(
+                                    fed_eval,
+                                    fed_feat_imp,
+                                )
 
                 if "fairness_counts" in eval_dicts[bank.id]:
                     client_counts.append(eval_dicts[bank.id]["fairness_counts"])
