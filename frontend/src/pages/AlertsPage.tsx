@@ -241,17 +241,18 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
       animate={{ opacity: 1, x: 0 }}
       className="glass-card p-5 sticky top-6 space-y-4 border border-[var(--color-border)] shadow-2xl bg-slate-950/90 text-slate-100"
     >
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-        <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider flex items-center gap-2">
-          <span>🧠</span> AI Explainability Portal
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <h3 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider flex items-center gap-1.5 min-w-0">
+          <span className="shrink-0">🧠</span>
+          <span className="truncate">AI Explainability Portal</span>
         </h3>
-        <span className="text-[10px] font-mono px-2.5 py-1 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
+        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold shrink-0">
           GDPR Art. 22 Compliant
         </span>
       </div>
 
       {/* Tabs */}
-      <div className="grid grid-cols-4 gap-1 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-[10px] sm:text-xs font-bold">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-xs font-bold">
         {[
           { id: 'attribution', label: 'Attribution' },
           { id: 'counterfactuals', label: 'Remediation' },
@@ -261,7 +262,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`py-1.5 px-1 rounded-lg transition-all ${
+            className={`py-1.5 px-2 rounded-lg transition-all text-[11px] truncate whitespace-nowrap ${
               activeTab === tab.id
                 ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50 font-medium'

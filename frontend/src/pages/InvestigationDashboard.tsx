@@ -296,14 +296,14 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
-              Alerts by Severity
+          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-rose-400 shrink-0" />
+              <span className="truncate">Alerts by Severity</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">Live Breakdown</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">Live Breakdown</span>
           </div>
 
           {alertsBySeverity && Object.keys(alertsBySeverity).length > 0 ? (
@@ -321,7 +321,7 @@ export default function InvestigationDashboard() {
                     <div key={severity} className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span className="capitalize font-semibold text-slate-300 flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           {severity}
                         </span>
                         <span className="font-mono font-bold text-slate-200">
@@ -351,14 +351,14 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-indigo-400" />
-              Consortium Bank Distribution
+          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-indigo-400 shrink-0" />
+              <span className="truncate">Consortium Distribution</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">3 Bank Nodes</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">3 Bank Nodes</span>
           </div>
 
           {alertsByBank && Object.keys(alertsByBank).length > 0 ? (
@@ -371,7 +371,7 @@ export default function InvestigationDashboard() {
                   <div key={bankId} className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="font-semibold text-slate-300 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: bankColor }} />
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: bankColor }} />
                         {BANK_NAMES[bankId] || bankId}
                       </span>
                       <span className="font-mono font-bold text-slate-200">
@@ -401,43 +401,43 @@ export default function InvestigationDashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4"
+          className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl space-y-4 flex flex-col justify-between min-w-0"
         >
-          <div className="flex items-center justify-between border-b border-white/6 pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-violet-400" />
-              Shared Intelligence Matrix
+          <div className="flex items-center justify-between border-b border-white/6 pb-3 gap-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-violet-400 shrink-0" />
+              <span className="truncate">Shared Intelligence Matrix</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">DP Guarded</span>
+            <span className="text-[10px] font-mono text-slate-500 shrink-0 bg-white/5 px-2 py-0.5 rounded-full border border-white/5">DP Guarded</span>
           </div>
 
           {intelStats && intelStats.total_items > 0 ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-3 text-center">
-                <div className="p-3 rounded-xl bg-violet-500/10 border border-violet-500/20">
-                  <div className="text-2xl font-black font-mono text-violet-300">
+              <div className="grid grid-cols-2 gap-2.5 text-center">
+                <div className="p-2.5 rounded-xl bg-violet-500/10 border border-violet-500/20 overflow-hidden">
+                  <div className="text-xl sm:text-2xl font-black font-mono text-violet-300 truncate">
                     {intelStats.total_items.toLocaleString()}
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">Total Shared Items</div>
+                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Total Shared Items</div>
                 </div>
 
-                <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
-                  <div className="text-2xl font-black font-mono text-emerald-300">
+                <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 overflow-hidden">
+                  <div className="text-lg sm:text-xl font-black font-mono text-emerald-300 truncate">
                     {(intelStats.avg_risk_indicator * 100).toFixed(1)}%
                   </div>
-                  <div className="text-[10px] font-mono text-slate-400 mt-0.5">Avg Risk Indicator</div>
+                  <div className="text-[9.5px] font-mono text-slate-400 mt-0.5 truncate">Avg Risk Indicator</div>
                 </div>
               </div>
 
               <div>
-                <h4 className="text-[10px] font-mono uppercase text-slate-400 mb-2 font-semibold">Breakdown By Threat Object</h4>
+                <h4 className="text-[10px] font-mono uppercase text-slate-400 mb-2 font-semibold tracking-wider">Breakdown By Threat Object</h4>
                 <div className="space-y-1.5">
                   {Object.entries(intelStats.items_by_type).map(([type, count]) => (
-                    <div key={type} className="flex justify-between items-center text-xs p-1.5 rounded-lg bg-white/3 border border-white/5">
-                      <span className="text-slate-300 capitalize text-[11px] font-mono">
+                    <div key={type} className="flex justify-between items-center text-xs p-2 rounded-lg bg-white/3 border border-white/5">
+                      <span className="text-slate-300 capitalize text-[11px] font-mono truncate mr-2">
                         {type.replace(/_/g, ' ')}
                       </span>
-                      <span className="font-mono font-bold text-violet-300">{count}</span>
+                      <span className="font-mono font-bold text-violet-300 shrink-0 px-1.5 py-0.5 rounded bg-violet-500/10 border border-violet-500/20">{count}</span>
                     </div>
                   ))}
                 </div>
