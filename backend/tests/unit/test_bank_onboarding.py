@@ -134,13 +134,13 @@ async def test_connector_config_contains_required_fields(db_session: AsyncSessio
 def test_onboarding_endpoint_returns_bundle(
     mock_init_tables: AsyncMock, db_session: AsyncSession
 ) -> None:
-    """POST /v1/onboarding/register must return complete onboarding bundle."""
+    """POST /api/v1/onboarding/register must return complete onboarding bundle."""
     app.dependency_overrides[get_async_session] = lambda: db_session
     client = TestClient(app)
 
     try:
         response = client.post(
-            "/v1/onboarding/register",
+            "/api/v1/onboarding/register",
             json={
                 "bank_id": "bank_delta",
                 "legal_name": "Delta Savings Bank",
@@ -161,7 +161,7 @@ def test_onboarding_endpoint_returns_bundle(
 
         # Test duplicate -> 409
         dup_resp = client.post(
-            "/v1/onboarding/register",
+            "/api/v1/onboarding/register",
             json={
                 "bank_id": "bank_delta",
                 "legal_name": "Delta Savings Bank",
@@ -173,12 +173,12 @@ def test_onboarding_endpoint_returns_bundle(
         assert dup_resp.status_code == 409
 
         # Test list -> 200
-        list_resp = client.get("/v1/onboarding/banks")
+        list_resp = client.get("/api/v1/onboarding/banks")
         assert list_resp.status_code == 200
         assert len(list_resp.json()) == 1
 
         # Test single status -> 200
-        status_resp = client.get("/v1/onboarding/banks/bank_delta/status")
+        status_resp = client.get("/api/v1/onboarding/banks/bank_delta/status")
         assert status_resp.status_code == 200
         assert status_resp.json()["bank_id"] == "bank_delta"
 

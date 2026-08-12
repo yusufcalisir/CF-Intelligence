@@ -21,7 +21,7 @@ from app.infrastructure.database import get_async_session
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/v1/onboarding", tags=["Bank Onboarding"])
+router = APIRouter(prefix="/api/v1/onboarding", tags=["Bank Onboarding"])
 
 
 # ── Request / Response Models ─────────────────────────────────────────────────
