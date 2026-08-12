@@ -101,24 +101,25 @@ export default function SecurityPage() {
       )}
 
       {/* 5-Tab Navigation */}
-      <div className="flex border-b border-[var(--color-border)] text-sm font-bold gap-4">
+      <div className="flex overflow-x-auto no-scrollbar gap-2 sm:gap-3 pb-2 border-b border-[var(--color-border)]">
         {[
-          { id: 'mtls', label: '🔑 mTLS & Cert PKI' },
-          { id: 'oidc', label: '🆔 OIDC & IAM' },
-          { id: 'abac', label: '🛡️ Dynamic ABAC Rules' },
-          { id: 'vault', label: '🔐 HashiCorp Vault' },
-          { id: 'audit', label: '⛓️ Cryptographic Audit Chain' },
+          { id: 'mtls', icon: '🔑', label: 'mTLS & Cert PKI' },
+          { id: 'oidc', icon: '🆔', label: 'OIDC & IAM' },
+          { id: 'abac', icon: '🛡️', label: 'Dynamic ABAC Rules' },
+          { id: 'vault', icon: '🔐', label: 'HashiCorp Vault' },
+          { id: 'audit', icon: '⛓️', label: 'Cryptographic Audit Chain' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`pb-3 transition-all ${
+            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border min-h-[44px] cursor-pointer ${
               activeTab === tab.id
-                ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)] font-bold'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-600/15'
+                : 'bg-white/3 border-white/5 text-[var(--color-text-muted)] hover:text-slate-200 hover:bg-white/5'
             }`}
           >
-            {tab.label}
+            <span className="shrink-0">{tab.icon}</span>
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
