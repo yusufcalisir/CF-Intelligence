@@ -529,7 +529,12 @@ class TransactionFeedbackRequest(BaseModel):
     actual_label: int = Field(
         ..., ge=0, le=1, description="Actual outcome (0 for legitimate, 1 for fraud)"
     )
-    simulation_id: str
+    simulation_id: str | None = None
+    simulationId: str | None = None  # noqa: N815
+
+    @property
+    def effective_simulation_id(self) -> str:
+        return self.simulation_id or self.simulationId or "live_prod_v2"
 
 
 @router.post("/predict/feedback")
@@ -537,7 +542,7 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
     """Ingest ground truth label feedback for evaluation of Champion/Challenger models."""
     try:
         metrics = _eval_engine.log_feedback(
-            simulation_id=payload.simulation_id,
+            simulation_id=payload.effective_simulation_id,
             transaction_id=payload.transaction_id,
             actual_label=payload.actual_label,
         )

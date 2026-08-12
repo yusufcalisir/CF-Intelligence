@@ -516,9 +516,16 @@ export function useShadowMetrics(simulationId: string | undefined) {
 }
 
 export function useSubmitFeedback() {
-  return useMutation<unknown, Error, { simulationId: string; transaction_id: string; actual_label: number }>({
+  return useMutation<unknown, Error, { simulationId?: string; simulation_id?: string; transaction_id: string; actual_label: number }>({
     mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/api/v1/predict/feedback', payload);
+      const simId = payload.simulation_id || payload.simulationId || 'live_prod_v2';
+      const body = {
+        transaction_id: payload.transaction_id,
+        actual_label: payload.actual_label,
+        simulation_id: simId,
+        simulationId: simId,
+      };
+      const { data } = await apiClient.post('/api/v1/predict/feedback', body);
       return data;
     },
   });

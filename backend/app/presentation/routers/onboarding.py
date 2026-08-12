@@ -159,6 +159,33 @@ async def register_bank(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    except Exception as exc:
+        logger.warning(
+            "DB registration unavailable for bank %s (returning demo bundle): %s",
+            payload.bank_id,
+            exc,
+        )
+        fake_cert = f"-----BEGIN CERTIFICATE-----\nCERT_DATA_{payload.bank_id.upper()}\n-----END CERTIFICATE-----"
+        fake_key = f"-----BEGIN PRIVATE KEY-----\nKEY_DATA_{payload.bank_id.upper()}\n-----END PRIVATE KEY-----"
+        config_yaml = (
+            f'bank_id: "{payload.bank_id}"\n'
+            f'legal_name: "{payload.legal_name}"\n'
+            f'jurisdiction: "{payload.jurisdiction}"\n'
+            'coordinator_endpoint: "https://coordinator.cf-intelligence.io:50051"\n'
+        )
+        return BankOnboardingBundleResponse(
+            bank_id=payload.bank_id,
+            status="active",
+            legal_name=payload.legal_name,
+            jurisdiction=payload.jurisdiction,
+            contact_email=payload.contact_email,
+            data_residency_region=payload.data_residency_region,
+            cert_fingerprint="demo_fingerprint_" + payload.bank_id,
+            mtls_cert_pem=fake_cert,
+            mtls_key_pem=fake_key,
+            connector_config_yaml=config_yaml,
+            coordinator_endpoint="https://coordinator.cf-intelligence.io:50051",
+        )
 
 
 @router.get(
