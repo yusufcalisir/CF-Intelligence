@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-871%2F871_passing-success.svg?style=flat&logo=pytest&logoColor=white)](#17-step-by-step-operator-quick-start)
+[![Passing Tests](https://img.shields.io/badge/tests-875%2F875_passing-success.svg?style=flat&logo=pytest&logoColor=white)](#17-step-by-step-operator-quick-start)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
