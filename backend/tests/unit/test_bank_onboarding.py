@@ -87,7 +87,7 @@ async def test_full_onboarding_pipeline_sets_active(
 
     assert activated is not None
     assert activated.status == BankStatus.ACTIVE
-    assert bool(activated.schema_provisioned)
+    assert activated.schema_provisioned
     assert activated.vault_key_path == "transit/keys/tenant_bank_test2"
 
 
