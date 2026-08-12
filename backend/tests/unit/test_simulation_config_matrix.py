@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import logging
 from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
-import numpy as np
 
+from app.application.schemas.simulation import SimulationConfigRequest
 from app.application.services.data_generator import DataGenerator
 from app.application.services.fl_engine import FederatedLearningEngine
 from app.application.services.metrics_service import MetricsService
@@ -25,9 +25,8 @@ from app.application.services.simulation_service import (
     SimulationService,
 )
 from app.config import get_settings
-from app.domain.enums import AggregationMethod, PrivacyMechanism, SimulationStatus
+from app.domain.enums import SimulationStatus
 from app.domain.value_objects import SimulationConfig
-from app.application.schemas.simulation import SimulationConfigRequest
 
 logger = logging.getLogger(__name__)
 
