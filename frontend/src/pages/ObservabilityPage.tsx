@@ -119,23 +119,27 @@ export default function ObservabilityPage() {
       )}
 
       {/* 4-Tab Navigation */}
-      <div className="flex overflow-x-auto border-b border-[var(--color-border)] text-xs sm:text-sm font-bold gap-4 sm:gap-6 pb-0.5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 border-b border-[var(--color-border)] pb-3">
         {[
-          { id: 'drift', label: '📉 Model Drift Analytics (KS / PSI)' },
-          { id: 'calibration', label: '🎯 Model Calibration Curve' },
-          { id: 'alerts', label: '🚨 Prometheus Alertmanager' },
-          { id: 'telemetry', label: '📊 Loki & OpenTelemetry Stack' },
+          { id: 'drift', icon: '📈', title: 'Model Drift Analytics', subtitle: 'KS & PSI Drift' },
+          { id: 'calibration', icon: '🎯', title: 'Calibration Curve', subtitle: 'Brier & Reliability' },
+          { id: 'alerts', icon: '🚨', title: 'Prometheus Alerts', subtitle: 'Alertmanager Quorum' },
+          { id: 'telemetry', icon: '📊', title: 'Loki & OpenTelemetry', subtitle: 'Trace & Log Pipeline' },
         ].map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`pb-3 shrink-0 whitespace-nowrap transition-all ${
+            className={`p-2.5 sm:p-3 rounded-xl transition-all border text-left min-h-[56px] flex items-center gap-2.5 cursor-pointer ${
               activeTab === tab.id
-                ? 'text-[var(--color-primary)] border-b-2 border-[var(--color-primary)] font-bold'
-                : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)]'
+                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-600/15'
+                : 'bg-white/3 border-white/5 text-[var(--color-text-muted)] hover:text-slate-200 hover:bg-white/5'
             }`}
           >
-            {tab.label}
+            <span className="text-lg sm:text-xl shrink-0">{tab.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-bold text-slate-100 truncate">{tab.title}</div>
+              <div className="text-[10px] font-mono text-slate-400 truncate">{tab.subtitle}</div>
+            </div>
           </button>
         ))}
       </div>
