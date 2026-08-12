@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, memo } from 'react';
 import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import PlatformLaunchModal from '../components/PlatformLaunchModal';
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
 export interface BankInfoDetail {
@@ -559,6 +560,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCapabilitiesDropdownOpen, setIsCapabilitiesDropdownOpen] = useState(false);
+  const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
   const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
@@ -566,6 +568,15 @@ export default function LandingPage() {
   const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
   const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
   const [isCopied, setIsCopied] = useState(false);
+
+  const handleLaunchDemo = () => {
+    setIsLaunchModalOpen(true);
+  };
+
+  const handleLaunchComplete = () => {
+    setIsLaunchModalOpen(false);
+    navigate('/dashboard');
+  };
 
   const handleCopyEmail = () => {
     navigator.clipboard.writeText('ysfcals@gmail.com');
@@ -693,7 +704,7 @@ export default function LandingPage() {
                 {isMobileMenuOpen ? <CloseIcon /> : <MenuIcon />}
               </button>
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={handleLaunchDemo}
                 className="hidden sm:flex items-center gap-2 px-5 py-2 rounded-xl text-[13px] font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:opacity-95 transition-all cursor-pointer shadow-[0_0_25px_rgba(99,102,241,0.4)] shrink-0"
               >
                 Launch Demo <ArrowRight />
@@ -820,7 +831,7 @@ export default function LandingPage() {
               {/* Bottom Mobile Action */}
               <div className="pt-4 border-t border-white/8 space-y-2.5 min-w-0 mt-4">
                 <button
-                  onClick={() => { setIsMobileMenuOpen(false); navigate('/dashboard'); }}
+                  onClick={() => { setIsMobileMenuOpen(false); handleLaunchDemo(); }}
                   className="w-full py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2"
                 >
                   Launch Live Platform Demo <ArrowRight />
@@ -882,7 +893,7 @@ export default function LandingPage() {
               {/* Action Buttons */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full min-w-0">
                 <button
-                  onClick={() => navigate('/dashboard')}
+                  onClick={handleLaunchDemo}
                   className="flex items-center justify-center gap-2.5 px-6 sm:px-7 py-3.5 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-xs sm:text-sm font-semibold text-white transition-all cursor-pointer shadow-[0_0_35px_rgba(99,102,241,0.45)] hover:shadow-[0_0_50px_rgba(99,102,241,0.6)] w-full sm:w-auto text-center"
                 >
                   Launch Live Platform Demo <ArrowRight />
@@ -1536,7 +1547,7 @@ telemetry.on('round.stage', (evt) => {
               </div>
 
               <button
-                onClick={() => navigate('/dashboard')}
+                onClick={handleLaunchDemo}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer shadow-[0_0_20px_rgba(99,102,241,0.4)] w-full sm:w-auto justify-center shrink-0"
               >
                 Open Platform Demo <ArrowRight />
@@ -1614,6 +1625,12 @@ telemetry.on('round.stage', (evt) => {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── PLATFORM DEMO LAUNCH ANIMATED INITIALIZER MODAL ──────── */}
+        <PlatformLaunchModal
+          isOpen={isLaunchModalOpen}
+          onComplete={handleLaunchComplete}
+        />
       </div>
     </div>
   );
