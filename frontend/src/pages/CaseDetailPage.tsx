@@ -388,13 +388,13 @@ export default function CaseDetailPage() {
         </h2>
 
         {/* Register Evidence Form */}
-        <form onSubmit={handleAddEvidence} className="grid grid-cols-1 md:grid-cols-4 gap-3 mb-6 p-3.5 sm:p-4 rounded-xl bg-[var(--color-surface-alt)]/50 border border-[var(--color-border)]/50">
+        <form onSubmit={handleAddEvidence} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5 mb-6 p-4 rounded-xl bg-[var(--color-surface-alt)]/50 border border-[var(--color-border)]/50">
           <div>
-            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">Type</label>
+            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1 whitespace-nowrap">Evidence Type</label>
             <select
               value={evType}
               onChange={(e) => setEvType(e.target.value)}
-              className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)]"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] font-mono"
             >
               <option value="document">📄 Document File</option>
               <option value="kyc_profile">👤 KYC Profile</option>
@@ -402,52 +402,52 @@ export default function CaseDetailPage() {
             </select>
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">Title</label>
+            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1 whitespace-nowrap">Evidence Title</label>
             <input
               type="text"
               value={evTitle}
               onChange={(e) => setEvTitle(e.target.value)}
               placeholder="e.g. Identity Proof"
-              className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] font-mono"
               required
             />
           </div>
           <div>
-            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">File Path / Reference</label>
+            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1 whitespace-nowrap">File Path / Reference</label>
             <input
               type="text"
               value={evFilePath}
               onChange={(e) => setEvFilePath(e.target.value)}
               placeholder="e.g. uploads/id.pdf"
-              className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
+              className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] font-mono"
               required
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:items-end">
-            <div className="flex-1">
-              <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">File Content (for SHA-256)</label>
-              <input
-                type="text"
-                value={evContent}
-                onChange={(e) => setEvContent(e.target.value)}
-                placeholder="Content string to hash..."
-                className="w-full px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)]"
-                required
-              />
-            </div>
+          <div>
+            <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1 whitespace-nowrap truncate">File Content (SHA-256)</label>
+            <input
+              type="text"
+              value={evContent}
+              onChange={(e) => setEvContent(e.target.value)}
+              placeholder="Content string to hash..."
+              className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:border-[var(--color-primary)] font-mono"
+              required
+            />
+          </div>
+          <div className="flex items-end sm:col-span-2 lg:col-span-1">
             <button
               type="submit"
               disabled={addEvidence.isPending}
-              className="px-4 py-1.5 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:opacity-90 disabled:opacity-50 whitespace-nowrap shrink-0"
+              className="w-full py-2 px-4 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:opacity-90 disabled:opacity-50 whitespace-nowrap transition-all shadow-md shadow-indigo-500/20"
             >
-              {addEvidence.isPending ? 'Registering...' : 'Register'}
+              {addEvidence.isPending ? 'Registering...' : '+ Register Evidence'}
             </button>
           </div>
         </form>
 
         {/* Evidence List */}
-        {/* Mobile View: Stacked Cards */}
-        <div className="block md:hidden space-y-3">
+        {/* Mobile / Tablet View: Stacked Cards */}
+        <div className="block lg:hidden space-y-3">
           {!evidenceList || evidenceList.length === 0 ? (
             <div className="py-6 text-center text-[var(--color-text-muted)] text-xs font-mono">
               No evidence registered for this case.
@@ -460,22 +460,22 @@ export default function CaseDetailPage() {
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-bold text-slate-100">{ev.title}</span>
-                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold capitalize">
+                  <span className="px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[10px] font-bold capitalize shrink-0">
                     {ev.evidence_type.replace('_', ' ')}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1 text-[11px] text-slate-400 border-t border-slate-800 pt-2">
+                <div className="flex flex-col gap-1.5 text-[11px] text-slate-400 border-t border-slate-800 pt-2">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="text-slate-500">Path:</span>
-                    <span className="text-slate-300 font-semibold truncate max-w-[200px]">{ev.file_path}</span>
+                    <span className="text-slate-500 shrink-0">Path:</span>
+                    <span className="text-slate-300 font-semibold truncate max-w-[220px]">{ev.file_path}</span>
                   </div>
                   <div className="flex flex-col gap-0.5">
                     <span className="text-slate-500 text-[10px]">Cryptographic Hash (SHA-256):</span>
-                    <span className="text-cyan-400 font-mono text-[10px] break-all bg-black/40 p-1 rounded border border-white/5">
+                    <span className="text-cyan-400 font-mono text-[10px] break-all bg-black/40 p-1.5 rounded border border-white/5">
                       {ev.content_hash}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 text-[10px] pt-1">
+                  <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-800/50">
                     <span className="text-slate-400">By: <span className="text-slate-200">{ev.uploaded_by}</span></span>
                     <span className="text-slate-500">{new Date(ev.uploaded_at).toLocaleString()}</span>
                   </div>
@@ -485,35 +485,35 @@ export default function CaseDetailPage() {
           )}
         </div>
 
-        {/* Desktop View: Full Table with minimum width */}
-        <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+        {/* Desktop View: Full Table */}
+        <div className="hidden lg:block overflow-x-auto rounded-xl border border-white/5">
+          <table className="w-full text-left text-xs border-collapse min-w-[750px]">
             <thead>
-              <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)] font-mono text-[11px]">
-                <th className="py-2.5 px-2">Type</th>
-                <th className="py-2.5 px-2">Title</th>
-                <th className="py-2.5 px-2 font-mono">Reference Path</th>
-                <th className="py-2.5 px-2 font-mono">Cryptographic Hash (SHA-256)</th>
-                <th className="py-2.5 px-2">Registered By</th>
-                <th className="py-2.5 px-2 text-right">Date</th>
+              <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)] font-mono text-[11px] bg-white/2">
+                <th className="py-3 px-3 whitespace-nowrap">Type</th>
+                <th className="py-3 px-3 whitespace-nowrap">Title</th>
+                <th className="py-3 px-3 whitespace-nowrap font-mono">Reference Path</th>
+                <th className="py-3 px-3 whitespace-nowrap font-mono">Cryptographic Hash (SHA-256)</th>
+                <th className="py-3 px-3 whitespace-nowrap">Registered By</th>
+                <th className="py-3 px-3 whitespace-nowrap text-right">Date</th>
               </tr>
             </thead>
             <tbody>
               {!evidenceList || evidenceList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-6 text-center text-[var(--color-text-muted)] text-xs font-mono">
+                  <td colSpan={6} className="py-8 text-center text-[var(--color-text-muted)] text-xs font-mono">
                     No evidence registered for this case.
                   </td>
                 </tr>
               ) : (
                 evidenceList.map((ev) => (
                   <tr key={ev.id} className="border-b border-[var(--color-border)]/50 hover:bg-[var(--color-surface-alt)]/20 transition-colors font-mono text-[11px]">
-                    <td className="py-2.5 px-2 capitalize font-medium text-slate-300">{ev.evidence_type.replace('_', ' ')}</td>
-                    <td className="py-2.5 px-2 font-bold text-slate-100">{ev.title}</td>
-                    <td className="py-2.5 px-2 font-mono text-slate-400">{ev.file_path}</td>
-                    <td className="py-2.5 px-2 font-mono text-cyan-400 text-[10px] break-all">{ev.content_hash}</td>
-                    <td className="py-2.5 px-2 text-slate-300">{ev.uploaded_by}</td>
-                    <td className="py-2.5 px-2 text-right text-slate-400">
+                    <td className="py-3 px-3 capitalize font-medium text-slate-300 whitespace-nowrap">{ev.evidence_type.replace('_', ' ')}</td>
+                    <td className="py-3 px-3 font-bold text-slate-100 whitespace-nowrap">{ev.title}</td>
+                    <td className="py-3 px-3 font-mono text-slate-400 whitespace-nowrap">{ev.file_path}</td>
+                    <td className="py-3 px-3 font-mono text-cyan-400 text-[10px] break-all">{ev.content_hash}</td>
+                    <td className="py-3 px-3 text-slate-300 whitespace-nowrap">{ev.uploaded_by}</td>
+                    <td className="py-3 px-3 text-right text-slate-400 whitespace-nowrap">
                       {new Date(ev.uploaded_at).toLocaleString()}
                     </td>
                   </tr>
