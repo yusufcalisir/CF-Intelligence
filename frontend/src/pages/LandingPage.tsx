@@ -574,7 +574,6 @@ export default function LandingPage() {
   };
 
   const handleLaunchComplete = () => {
-    setIsLaunchModalOpen(false);
     navigate('/dashboard');
   };
 
