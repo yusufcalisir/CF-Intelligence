@@ -312,7 +312,7 @@ class FlowerFLEngine:
         try:
             import ray
 
-            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+            backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
             current_pp = os.environ.get("PYTHONPATH", "")
             if backend_dir not in current_pp:
                 os.environ["PYTHONPATH"] = (
