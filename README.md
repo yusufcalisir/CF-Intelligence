@@ -27,9 +27,8 @@
 | [4. Data Ingestion](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [13b. Benchmarks](#13b-empirical-performance-benchmarks) |
 | [5. Federated Learning](#5-federated-learning-engines--optuna-tuning) | [10. Real-Time Scoring](#10-real-time-scoring-gateway--high-availability-sla) | [13c. Comparison](#13c-platform-comparison) |
 | [14. Scientific Audits](#14-subsystem-scientific-audit-reports-verification-16-modules) | [13d. Compliance Map](#13d-compliance-and-regulatory-standards-mapping) | [15. API Blueprints](#15-api-endpoint-blueprints--json-schemas) |
-| [16. Prerequisites](#16-prerequisites-and-system-requirements) | [17. Quick Start](#17-step-by-step-operator-quick-start) | [18. Roadmap](#18-production-roadmap-and-known-limitations) |
-| [19. Related Work](#19-related-work-and-references) | [20. Citation](#20-academic-citation-and-reference-format) | [21. AI Methodology](#21-development-methodology--agentic-ai-collaboration) |
-| [22. Author](#22-author-and-maintenance) | | |
+| [16. Prerequisites](#16-prerequisites-and-system-requirements) | [17. Quick Start](#17-step-by-step-operator-quick-start) | [18. Related Work](#18-related-work-and-references) |
+| [19. Citation](#19-academic-citation-and-reference-format) | [20. AI Methodology](#20-development-methodology--agentic-ai-collaboration) | [21. Author](#21-author-and-maintenance) |
 
 </div>
 
@@ -94,58 +93,54 @@ The Collaborative Fraud Intelligence Platform resolves this privacy-utility trad
 
 ```mermaid
 flowchart TD
-    subgraph Banks["Participating Bank Nodes"]
-        A["Bank Alpha Node"]
-        B["Bank Beta Node"]
-        C["Bank Gamma Node"]
+    subgraph Banks["1. Consortium Banking Institutions (Data Ingestion & Local Training)"]
+        Alpha["🏛️ Bank Alpha Node<br/><code>pacs.008 ISO 20022 Feeds</code>"]
+        Beta["🏛️ Bank Beta Node<br/><code>camt.053 Account Ledgers</code>"]
+        Gamma["🏛️ Bank Gamma Node<br/><code>GAT Dynamic Subgraphs</code>"]
     end
 
-    subgraph PETs["Cryptographic PET Security Boundary"]
-        A --> DP1["Opacus DP Noise Injection"]
-        B --> DP2["Opacus DP Noise Injection"]
-        C --> DP3["Opacus DP Noise Injection"]
+    subgraph PETs["2. Cryptographic PET Perimeter & Local Hardware Isolation"]
+        DP["🛡️ Opacus & Rényi DP Auto-Scaler<br/><i>Adaptive Noise Calibration (σ_t) & L2 Gradient Clipping (C=1.0)</i>"]
         
-        DP1 --> PET1["Encryption & Hardware Driver"]
-        DP2 --> PET2["Encryption & Hardware Driver"]
-        DP3 --> PET3["Encryption & Hardware Driver"]
-        
-        PET1 --> SA1["Diffie-Hellman Seed Mask"]
-        PET1 --> FHE1["TenSEAL CKKS Ciphertext"]
-        PET1 --> TEE1["Intel SGX Enclave Sealed"]
-        
-        PET2 --> SA2["Diffie-Hellman Seed Mask"]
-        PET2 --> FHE2["TenSEAL CKKS Ciphertext"]
-        PET2 --> TEE2["Intel SGX Enclave Sealed"]
-
-        PET3 --> SA3["Diffie-Hellman Seed Mask"]
-        PET3 --> FHE3["TenSEAL CKKS Ciphertext"]
-        PET3 --> TEE3["Intel SGX Enclave Sealed"]
+        subgraph CryptoEngines["Modular Privacy & Encryption Engines"]
+            SecAgg["🔗 P2P Curve25519 SecAgg & PQC Kyber-768<br/><i>Zero-Sum Pairwise Masking + Lattice KEM</i>"]
+            FHE["🔒 TenSEAL CKKS Homomorphic Encryption<br/><i>Polynomial Ring Ciphertext Evaluation</i>"]
+            TEE["⚡ Intel SGX / Nitro Confidential Enclave<br/><i>MRENCLAVE Hardware Isolation & Sealed Memory</i>"]
+        end
     end
 
-    subgraph Server["Byzantine-Robust Coordinator Engine"]
-        SA1 --> Agg["Robust Aggregator Engine"]
-        FHE1 --> Agg
-        TEE1 --> Agg
-        SA2 --> Agg
-        FHE2 --> Agg
-        TEE2 --> Agg
-        SA3 --> Agg
-        FHE3 --> Agg
-        TEE3 --> Agg
-
-        Agg --> SVD["Spectral SVD Poisoning Check"]
-        SVD -->|Clean| Candidate["Candidate Global Model"]
-        SVD -->|Poisoned| Quarantine["Quarantine Node & Log Alert"]
-        Candidate --> Canary["Canary Quality Gate"]
-        Canary -->|AUC Pass| Champion["Promote Champion Model"]
-        Canary -->|AUC Degraded| Rollback["Auto-Rollback Trigger"]
+    subgraph Coordinator["3. Byzantine-Robust Coordinator & Attestation Pipeline"]
+        zkSNARK["⚡ Groth16 zk-SNARK Model Weight Attestation<br/><i>Poseidon Hash & BN254 Elliptic Curve Verification (O(1) <5ms)</i>"]
+        Agg["🛡️ Byzantine-Robust Aggregation Engine<br/><i>Bulyan · Krum · Trimmed Mean · FedProx · Flower P2P</i>"]
+        SVD["🔍 Spectral SVD Poisoning & Anomaly Quarantine<br/><i>Cosine Distance Filtering & Sub-graph Outlier Pruning</i>"]
+        Canary["🚦 Canary Quality Gate & Registry Promotion<br/><i>Holdout Dataset Verification (Target AUC >= 0.94)</i>"]
     end
 
-    subgraph Serving["Real-Time Scoring & Operational Serving"]
-        Champion --> Gateway["Real-Time Inference Gateway"]
-        Gateway --> SHAP["Fast SHAP Explainer"]
-        Gateway --> Workbench["6-Stage Case Workbench"]
+    subgraph Serving["4. Real-Time Inference & Operational Serving Layer"]
+        Gateway["🚀 Real-Time Scoring Gateway<br/><i>Sub-100ms Inference SLA & Prometheus Telemetry</i>"]
+        SHAP["📊 Fast SHAP & Explainability Engine<br/><i>TreeExplainer Feature Attribution & Risk Vectors</i>"]
+        AML["🤖 Autonomous Agentic AML Copilot<br/><i>5-Paragraph FinCEN SAR Narrative & 4-Eyes Supervisor Briefing</i>"]
+        Bridge["🌉 Cross-Chain Settlement Bridge<br/><i>Chainlink CCIP & LayerZero Multi-Ledger Liquidity</i>"]
     end
+
+    Alpha --> DP
+    Beta --> DP
+    Gamma --> DP
+    DP --> CryptoEngines
+    
+    CryptoEngines --> zkSNARK
+    zkSNARK --> Agg
+    Agg --> SVD
+    
+    SVD -->|Clean Weights| Canary
+    SVD -->|Poisoned Outlier| Quarantine["⚠️ Quarantine Node & Trigger Forensic Audit"]
+    
+    Canary -->|AUC >= 0.94 Pass| Gateway
+    Canary -->|AUC Degraded| Rollback["⏪ Auto-Rollback to Active Champion"]
+    
+    Gateway --> SHAP
+    Gateway --> AML
+    Gateway --> Bridge
 ```
 
 ---
@@ -672,40 +667,7 @@ npm run deploy:local
 
 ---
 
-## 18. Production Roadmap and Known Limitations
-
-### Current Known Limitations
-
-| Limitation | Affected Module | Remediation Path |
-| :--- | :--- | :--- |
-| ~~SecAgg masks generated server-side~~ | ~~`secagg_driver.py`~~ | ✅ **RESOLVED** — `p2p_secagg_driver.py` implements full Curve25519 ECDH client-side mask generation. Zero server cryptographic involvement. |
-| ~~No client-to-client peer DH channel~~ | ~~FL Clients~~ | ✅ **RESOLVED** — gRPC `BroadcastPublicKey` / `FetchPeerPublicKeys` RPCs provide authenticated X25519 key exchange routing via the coordinator relay. |
-| ~~No Shamir (t, n) Threshold Secret Sharing~~ | ~~`p2p_secagg_driver.py`~~ | ✅ **RESOLVED** — `shamir_engine.py` implements Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction. |
-| ~~Vault PKI Root CA keys in software~~ | ~~`vault_client.py`~~ | ✅ **RESOLVED** — `vault_hsm_pki_binder.py` binds Vault Root CA generation and certificate signing to FIPS 140-2 Level 3 HSM enclaves via PKCS#11 (`is_exportable = False`). |
-| ~~Coordinator role is a single-wallet EOA~~ | ~~`ConsortiumIncentiveSettlement.sol`~~ | ✅ **RESOLVED** — `GnosisSafeMultiSigCoordinator.sol` implements 2-of-3 threshold multi-sig governance with EIP-712 structured data signatures. Zero single-wallet centralization SPOF. |
-| ~~Central server requirement in FL simulation~~ | ~~`flower_engine.py`~~ | ✅ **RESOLVED** — `flower_p2p_engine.py` implements serverless peer-to-peer FL training rounds with Ring and Mesh gossip strategies (`P2PGossipStrategy`). |
-| ~~Batch graph querying overhead~~ | ~~`graph_analytics_service.py`~~ | ✅ **RESOLVED** — `flink_graph_streaming.py` implements Apache Flink sub-second stateful graph stream accumulators ($W(t, 500\text{ms})$) with $<50\text{ms}$ SLA. |
-| TEE operates as software simulation without SGX SDK | `tee_driver.py` | Connect to Open Enclave SDK or Intel SGX C++ bindings |
-
-### Version 2.0 Roadmap Status
-
-> [!NOTE]
-> All **Version 2.0 Roadmap** milestones (P2P Diffie-Hellman SecAgg, Shamir Secret Sharing, HSM Root Key Binding, Multi-Sig Coordinator, Flower P2P Integration, and Real-Time Graph Streaming) have been **100% COMPLETED and SHIPPED to production**.
-
-### Version 3.0 Commercial Enterprise Roadmap Status
-
-| Milestone | Description | Target | Status |
-| :--- | :--- | :---: | :---: |
-| **zk-SNARK Weight Attestation** | Groth16 $O(1)$ zero-knowledge model weight integrity proof | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Agentic AML Copilot** | Multi-agent RAG narrative generator for FinCEN SAR filings | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Confidential Federated Unlearning** | Exact & approximate Hessian inversion gradient erasure | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Post-Quantum Cryptography** | CRYSTALS-Kyber & Dilithium PQC SecAgg + mTLS | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Cross-Chain Inter-Bank Settlement** | Layer-2 CCIP CBDC token disbursement bridge | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Adaptive RDP Auto-Scaler** | Rényi Differential Privacy dynamic budget manager | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-
----
-
-## 19. Related Work and References
+## 18. Related Work and References
 
 This platform synthesizes and operationalizes research from the following foundational publications:
 
@@ -723,7 +685,7 @@ This platform synthesizes and operationalizes research from the following founda
 
 ---
 
-## 20. Academic Citation and Reference Format
+## 19. Academic Citation and Reference Format
 
 If you use this platform, its architectural specifications, PET security drivers, or benchmark datasets in academic research or technical publications, please cite the repository using the following BibTeX reference format:
 
@@ -741,7 +703,7 @@ If you use this platform, its architectural specifications, PET security drivers
 
 ---
 
-## 21. Development Methodology & Agentic AI Collaboration
+## 20. Development Methodology & Agentic AI Collaboration
 
 This platform was engineered using a state-of-the-art hybrid human-AI agentic pair-programming paradigm:
 
@@ -761,7 +723,7 @@ This platform was engineered using a state-of-the-art hybrid human-AI agentic pa
 
 ---
 
-## 22. Author and Maintenance
+## 21. Author and Maintenance
 
 Designed, developed, and maintained by **Yusuf Çalışır**.
 
