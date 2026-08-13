@@ -55,6 +55,7 @@ CFI Simulator utilizes 4 decoupled microservices coordinated via Docker Compose:
 *   **zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`):** Groth16 / PlonK zero-knowledge proof verification over BN254 elliptic curve with $O(1)$ constant time bilinear pairing verification ($<5\text{ms}$ SLA).
 *   **Autonomous Agentic AML Copilot (`aml_agentic_copilot.py`):** Ingests Neo4j subgraphs, SHAP attributions, and ISO 20022 payloads to synthesize 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
 *   **Confidential Federated Unlearning (`federated_unlearning_engine.py`):** Exact & approximate Sub-sampled Newton Steps and First-Order Hessian Inversion ($\delta W = - H^{-1} \nabla \mathcal{L}$) gradient erasure for revoked banks without full retraining.
+*   **Post-Quantum Cryptography (`pqc_secagg_driver.py`):** NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg key exchange driver ($<1.5\text{ms}$ SLA).
 
 ---
 

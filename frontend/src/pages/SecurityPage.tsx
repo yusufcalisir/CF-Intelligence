@@ -8,12 +8,43 @@ import {
 } from '../api/queries';
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning'>('mtls');
+  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc'>('mtls');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
   const evaluateABAC = useEvaluateABAC();
   const verifyChain = useVerifyAuditChain();
+
+  // Post-Quantum Cryptography (PQC) state
+  const [pqcKemAlgo, setPqcKemAlgo] = useState('Kyber768');
+  const [pqcSigAlgo, setPqcSigAlgo] = useState('Dilithium3');
+  const [isPqcLoading, setIsPqcLoading] = useState(false);
+  const [pqcResult, setPqcResult] = useState<{
+    kem_algorithm: string;
+    kyber_public_key_hex: string;
+    signature_algorithm: string;
+    dilithium_public_key_hex: string;
+    quantum_security_level: string;
+  } | null>(null);
+
+  const handleGeneratePQCKeypair = async () => {
+    setIsPqcLoading(true);
+    try {
+      const res = await fetch('/api/v1/security/pqc/keypair', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ kem_algorithm: pqcKemAlgo, signature_algorithm: pqcSigAlgo }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setPqcResult(data);
+      }
+    } catch (e) {
+      console.error('Failed to generate PQC keypair', e);
+    } finally {
+      setIsPqcLoading(false);
+    }
+  };
 
   // Confidential Unlearning state
   const [unlearnBankId, setUnlearnBankId] = useState('bank_gamma');
@@ -171,9 +202,11 @@ export default function SecurityPage() {
           { id: 'oidc',   icon: '🆔',  label: 'OIDC & IAM' },
           { id: 'abac',   icon: '🛡️',  label: 'Dynamic ABAC Rules' },
           { id: 'vault',  icon: '🔐',  label: 'HashiCorp Vault' },
-          { id: 'audit',  icon: '⛓️',  label: 'Cryptographic Audit Chain' },
-          { id: 'secagg', icon: '🔗',  label: 'P2P SecAgg (V2.0)' },
-          { id: 'zkp',    icon: '⚡',  label: 'zk-SNARK Attestation (V3.0)' },
+          { id: 'audit',      icon: '⛓️',  label: 'Cryptographic Audit Chain' },
+          { id: 'secagg',     icon: '🔗',  label: 'P2P SecAgg (V2.0)' },
+          { id: 'zkp',        icon: '⚡',  label: 'zk-SNARK Attestation (V3.0)' },
+          { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning (V3.0)' },
+          { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber (V3.0)' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -984,6 +1017,111 @@ export default function SecurityPage() {
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
                   <span>Engine: federated_unlearning_engine.py</span>
                   <span>MIA Status: Audited</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 9: PQC SecAgg & Kyber/Dilithium (V3.0) */}
+          {activeTab === 'pqc' && (
+            <div className="glass-card p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <span>🛡️</span> NIST Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium)
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) & FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe SecAgg
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                  NIST Level 3 (256-bit Lattice Security)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Post-Quantum Key Exchange Config</h4>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Key Encapsulation Mechanism (ML-KEM):</label>
+                      <select
+                        value={pqcKemAlgo}
+                        onChange={(e) => setPqcKemAlgo(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      >
+                        <option value="Kyber768">CRYSTALS-Kyber-768 (NIST Level 3 - Default)</option>
+                        <option value="Kyber1024">CRYSTALS-Kyber-1024 (NIST Level 5)</option>
+                        <option value="Kyber512">CRYSTALS-Kyber-512 (NIST Level 1)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Digital Signature Standard (ML-DSA):</label>
+                      <select
+                        value={pqcSigAlgo}
+                        onChange={(e) => setPqcSigAlgo(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      >
+                        <option value="Dilithium3">CRYSTALS-Dilithium-3 (NIST Level 3 - Default)</option>
+                        <option value="Dilithium5">CRYSTALS-Dilithium-5 (NIST Level 5)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleGeneratePQCKeypair}
+                      disabled={isPqcLoading}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isPqcLoading ? 'Generating Lattice Keys...' : '🔑 Generate Kyber-768 + Dilithium-3 Keypair'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-indigo-500/5 border border-indigo-500/15 text-[11px] text-slate-300 space-y-1.5">
+                    <div className="font-bold text-indigo-300">Quantum Security Guarantee:</div>
+                    <p className="text-[var(--color-text-muted)]">
+                      Lattice-based Module Learning With Errors (M-LWE) provides 100% mathematical immunity against Shor&apos;s algorithm on future quantum supercomputers.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lattice Keypair Telemetry & Public Keys</h4>
+
+                  {pqcResult ? (
+                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono">
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">KEM Algorithm:</span>
+                        <span className="text-indigo-300 font-bold">{pqcResult.kem_algorithm}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Kyber Public Key:</span>
+                        <span className="text-amber-400 font-bold truncate max-w-[200px]">{pqcResult.kyber_public_key_hex}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Signature Algorithm:</span>
+                        <span className="text-purple-300 font-bold">{pqcResult.signature_algorithm}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Dilithium Public Key:</span>
+                        <span className="text-emerald-400 font-bold truncate max-w-[200px]">{pqcResult.dilithium_public_key_hex}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Quantum Security Level:</span>
+                        <span className="text-cyan-300 font-bold">{pqcResult.quantum_security_level}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
+                      Click <strong>Generate Kyber-768 + Dilithium-3 Keypair</strong> to derive NIST lattice public keys.
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-2">
+                  <span>Driver: pqc_secagg_driver.py</span>
+                  <span>NIST FIPS 203 / 204 Compliant</span>
                 </div>
               </div>
             </div>

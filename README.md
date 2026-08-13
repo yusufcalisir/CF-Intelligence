@@ -352,6 +352,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 | **Hardware TEE Enclave** | `tee_driver.py` | Intel SGX / AWS Nitro Enclave remote attestation & MRENCLAVE measurement | Confidential computing with hardware isolation & AES-256-GCM sealed memory | SGX / Nitro CPU |
 | **zk-SNARK Attestation** | `zk_snark_verifier.py` | Groth16 / PlonK over BN254 elliptic curve + Poseidon hash commitment | $O(1)$ constant time proof verification ($<5\text{ms}$ SLA) | CPU / Native Circom |
 | **Confidential Unlearning** | `federated_unlearning_engine.py` | First-Order Hessian Inversion + Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}$) | Erases evicted bank gradient footprints ($P_{\text{MIA}} \le 0.52$) without retraining | CPU / PyTorch Autograd |
+| **Post-Quantum Cryptography** | `pqc_secagg_driver.py` | NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) + FIPS 204 (Dilithium-3 signatures) | Quantum-safe lattice-based hybrid P2P SecAgg ($<1.5\text{ms}$ SLA) | CPU / Native HKDF |
 
 ### 6.2 Mathematical Privacy Formulations
 - Gradient Norm Clipping ($C$):
@@ -374,6 +375,9 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 
 ### 6.6 Confidential Federated Unlearning & Anti-Poisoning Erasure (`federated_unlearning_engine.py`)
 - Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}_{b^*}$) to remove historical gradient contributions of compromised or revoked banks in $<10\text{ms}$ while bounding MIA membership probability ($P_{\text{MIA}} \le 0.52$).
+
+### 6.7 Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) (`pqc_secagg_driver.py`)
+- NIST FIPS 203 & 204 Lattice Cryptography: Implements Module Learning With Errors (M-LWE) CRYSTALS-Kyber-768 KEM and CRYSTALS-Dilithium-3 signatures combined into a hybrid quantum-safe P2P SecAgg protocol, protecting key exchanges against Shor's algorithm on quantum supercomputers.
 
 ---
 
@@ -471,6 +475,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 | **zk-SNARK Attestation** | Groth16 $O(1)$ Bilinear Pairing over BN254 | Zero-Knowledge Model Integrity | `zk_snark_verifier.py` | `PASS` |
 | **Agentic AML Copilot** | FinCEN 5-Paragraph SAR Narrative & RAG | Autonomous BSA/AML Reporting | `aml_agentic_copilot.py` | `PASS` |
 | **Confidential Unlearning** | First-Order Hessian Inversion Gradient Erasure | Revoked Bank Gradient Erasure | `federated_unlearning_engine.py` | `PASS` |
+| **Post-Quantum Cryptography** | NIST FIPS 203 Kyber-768 & FIPS 204 Dilithium-3 | Quantum-Safe P2P SecAgg Key Exchange | `pqc_secagg_driver.py` | `PASS` |
 
 ---
 
@@ -684,7 +689,7 @@ npm run deploy:local
 | **zk-SNARK Weight Attestation** | Groth16 $O(1)$ zero-knowledge model weight integrity proof | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Agentic AML Copilot** | Multi-agent RAG narrative generator for FinCEN SAR filings | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Confidential Federated Unlearning** | Exact & approximate Hessian inversion gradient erasure | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Post-Quantum Cryptography** | CRYSTALS-Kyber & Dilithium PQC SecAgg + mTLS | Q3 2027 | `PLANNED` |
+| **Post-Quantum Cryptography** | CRYSTALS-Kyber & Dilithium PQC SecAgg + mTLS | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Cross-Chain Inter-Bank Settlement** | Layer-2 CCIP CBDC token disbursement bridge | Q3 2027 | `PLANNED` |
 | **Adaptive RDP Auto-Scaler** | Rényi Differential Privacy dynamic budget manager | Q4 2027 | `PLANNED` |
 

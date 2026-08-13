@@ -6,6 +6,7 @@ mTLS certificate status, and tamper-proof SHA-256 cryptographic audit chain veri
 
 from __future__ import annotations
 
+import hashlib
 import logging
 from typing import Any
 
@@ -14,12 +15,14 @@ from pydantic import BaseModel
 
 from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
 from app.config import get_settings
+from app.domain.value_objects_pqc import PQCKemAlgorithm, PQCSignatureAlgorithm
 from app.domain.value_objects_unlearning import UnlearningMethod
 from app.domain.value_objects_zkp import ZKSNARKAttestationProof
 from app.infrastructure.security.abac_engine import ABACEngine, ABACResource
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator, UserClaims
+from app.infrastructure.security.pqc_secagg_driver import PQCSecAggDriver
 from app.infrastructure.security.vault_client import VaultClient
 from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
 
@@ -338,4 +341,75 @@ async def get_unlearning_status() -> dict[str, Any]:
         "total_unlearning_runs": _unlearning_engine.unlearning_runs_count,
         "target_mia_threshold": 0.52,
         "hessian_inversion_solver": "Conjugate Gradient (H^-1 v)",
+    }
+
+
+# ── Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) Endpoints ───
+
+_pqc_driver = PQCSecAggDriver()
+
+
+class GeneratePQCKeypairRequest(BaseModel):
+    kem_algorithm: str = PQCKemAlgorithm.KYBER_768.value
+    signature_algorithm: str = PQCSignatureAlgorithm.DILITHIUM_3.value
+
+
+@router.post("/pqc/keypair")
+async def generate_pqc_keypair(req: GeneratePQCKeypairRequest) -> dict[str, Any]:
+    """Generate NIST FIPS 203 CRYSTALS-Kyber KEM and FIPS 204 CRYSTALS-Dilithium signature keypairs."""
+    kyber_kp = _pqc_driver.generate_kyber_keypair()
+    dilithium_kp = _pqc_driver.generate_dilithium_keypair()
+
+    return {
+        "kem_algorithm": kyber_kp.algorithm.value,
+        "kyber_public_key_hex": kyber_kp.public_key_bytes.hex()[:64] + "...",
+        "kyber_pk_len_bytes": len(kyber_kp.public_key_bytes),
+        "kyber_sk_len_bytes": len(kyber_kp.secret_key_bytes),
+        "signature_algorithm": dilithium_kp.algorithm.value,
+        "dilithium_public_key_hex": dilithium_kp.public_key_bytes.hex()[:64] + "...",
+        "dilithium_pk_len_bytes": len(dilithium_kp.public_key_bytes),
+        "dilithium_sk_len_bytes": len(dilithium_kp.secret_key_bytes),
+        "quantum_security_level": "NIST Security Level 3 (256-bit Lattice Security)",
+    }
+
+
+@router.post("/pqc/encapsulate")
+async def encapsulate_pqc_secret() -> dict[str, Any]:
+    """Execute NIST FIPS 203 Kyber KEM secret encapsulation and hybrid shared secret derivation."""
+    kyber_kp = _pqc_driver.generate_kyber_keypair()
+    ct, ss = _pqc_driver.encapsulate_secret(kyber_kp.public_key_bytes)
+
+    return {
+        "kem_algorithm": "Kyber768",
+        "ciphertext_hex": ct.hex()[:64] + "...",
+        "ciphertext_len_bytes": len(ct),
+        "shared_secret_hash": hashlib.sha256(ss).hexdigest(),
+        "shared_secret_len_bytes": len(ss),
+        "encapsulation_status": "COMPLETED",
+        "lattice_security": "M-LWE (Module Learning With Errors)",
+    }
+
+
+@router.get("/pqc/status")
+async def get_pqc_status() -> dict[str, Any]:
+    """Get status telemetry for Post-Quantum Cryptography suite and NIST standards compliance."""
+    state = _pqc_driver.compute_pqc_secagg_round_state(
+        round_id=42,
+        participating_banks=["bank_alpha", "bank_beta", "bank_gamma", "bank_delta"],
+    )
+    return {
+        "status": "ACTIVE",
+        "standard_fips_203": "NIST ML-KEM (CRYSTALS-Kyber-768)",
+        "standard_fips_204": "NIST ML-DSA (CRYSTALS-Dilithium-3)",
+        "quantum_security_level": state.quantum_security_level,
+        "total_encapsulations": _pqc_driver.encapsulations_count,
+        "total_signatures_verified": _pqc_driver.signatures_verified_count,
+        "round_state": {
+            "round_id": state.round_id,
+            "participating_banks": state.participating_banks,
+            "hybrid_shared_secrets_derived": state.hybrid_shared_secrets_derived,
+            "zero_sum_verified": state.zero_sum_verified,
+            "lineage_hash": state.lineage_hash,
+            "audit_events": state.audit_events,
+        },
     }
