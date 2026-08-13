@@ -8,7 +8,7 @@ import {
 } from '../api/queries';
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit'>('mtls');
+  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg'>('mtls');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
@@ -43,6 +43,26 @@ export default function SecurityPage() {
       action: action,
     });
   };
+
+  // P2P SecAgg panel state (simulates live key broadcast status for current round)
+  interface SecAggNode { id: string; label: string; x: number; y: number; broadcast: boolean; pkHex: string; hmacHex: string; }
+  const [secaggRound] = useState(42);
+  const secaggNodes: SecAggNode[] = [
+    { id: 'bank_alpha', label: 'Alpha Intl.', x: 160, y: 60,  broadcast: true,  pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
+    { id: 'bank_beta',  label: 'Beta Corp.',  x: 300, y: 160, broadcast: true,  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
+    { id: 'bank_gamma', label: 'Gamma Fin.',  x: 160, y: 260, broadcast: true,  pkHex: '1da472..5c9f', hmacHex: '2e8531..a167' },
+    { id: 'bank_delta', label: 'Delta Bank',  x:  20, y: 160, broadcast: false, pkHex: '——',     hmacHex: '——' },
+  ];
+  const broadcastCount = secaggNodes.filter(n => n.broadcast).length;
+  const quorumReady = broadcastCount >= 3;
+  // Edges between all broadcast nodes (mesh)
+  const meshEdges: { a: SecAggNode; b: SecAggNode }[] = [];
+  const broadcast = secaggNodes.filter(n => n.broadcast);
+  for (let i = 0; i < broadcast.length; i++)
+    for (let j = i + 1; j < broadcast.length; j++) {
+      const a = broadcast[i]; const b = broadcast[j];
+      if (a && b) meshEdges.push({ a, b });
+    }
 
   return (
     <div className="space-y-6">
@@ -100,14 +120,15 @@ export default function SecurityPage() {
         </motion.div>
       )}
 
-      {/* 5-Tab Navigation */}
+      {/* 6-Tab Navigation */}
       <div className="flex overflow-x-auto no-scrollbar gap-2 sm:gap-3 pb-2 border-b border-[var(--color-border)]">
         {[
-          { id: 'mtls', icon: '🔑', label: 'mTLS & Cert PKI' },
-          { id: 'oidc', icon: '🆔', label: 'OIDC & IAM' },
-          { id: 'abac', icon: '🛡️', label: 'Dynamic ABAC Rules' },
-          { id: 'vault', icon: '🔐', label: 'HashiCorp Vault' },
-          { id: 'audit', icon: '⛓️', label: 'Cryptographic Audit Chain' },
+          { id: 'mtls',   icon: '🔑',  label: 'mTLS & Cert PKI' },
+          { id: 'oidc',   icon: '🆔',  label: 'OIDC & IAM' },
+          { id: 'abac',   icon: '🛡️',  label: 'Dynamic ABAC Rules' },
+          { id: 'vault',  icon: '🔐',  label: 'HashiCorp Vault' },
+          { id: 'audit',  icon: '⛓️',  label: 'Cryptographic Audit Chain' },
+          { id: 'secagg', icon: '🔗',  label: 'P2P SecAgg (V2.0)' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -430,6 +451,144 @@ export default function SecurityPage() {
                     ))}
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+          {/* Tab 6: P2P SecAgg (V2.0) */}
+          {activeTab === 'secagg' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+
+              {/* Left: Mesh Topology Visualiser */}
+              <div className="glass-card p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
+                    🔗 X25519 Key Exchange Topology — Round #{secaggRound}
+                  </h3>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                      quorumReady
+                        ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                        : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    }`}
+                  >
+                    {quorumReady ? `✓ QUORUM MET (${broadcastCount}/4)` : `⏳ AWAITING QUORUM (${broadcastCount}/4)`}
+                  </span>
+                </div>
+
+                {/* SVG Mesh Diagram */}
+                <div className="bg-[var(--color-surface-alt)] rounded-xl p-2 flex items-center justify-center">
+                  <svg viewBox="0 0 320 320" width="100%" style={{ maxWidth: 320, maxHeight: 320 }}>
+                    {/* ECDH edges between broadcast nodes */}
+                    {meshEdges.map((e, i) => (
+                      <line
+                        key={i}
+                        x1={e.a.x + 40} y1={e.a.y + 40}
+                        x2={e.b.x + 40} y2={e.b.y + 40}
+                        stroke="#6366f1" strokeWidth="1.5" strokeDasharray="5 3"
+                        opacity="0.55"
+                      />
+                    ))}
+                    {secaggNodes.map((node) => (
+                      <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
+                        {/* Node circle */}
+                        <circle
+                          cx="40" cy="40" r="32"
+                          fill={node.broadcast ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.10)'}
+                          stroke={node.broadcast ? '#6366f1' : '#475569'}
+                          strokeWidth={node.broadcast ? '2' : '1.5'}
+                        />
+                        {/* Key icon */}
+                        <text x="40" y="37" textAnchor="middle" fontSize="18">
+                          {node.broadcast ? '🔑' : '⏳'}
+                        </text>
+                        {/* Node label */}
+                        <text
+                          x="40" y="56" textAnchor="middle" fontSize="8.5"
+                          fill={node.broadcast ? '#a5b4fc' : '#64748b'}
+                          fontWeight="600"
+                        >
+                          {node.label}
+                        </text>
+                        {/* Broadcast status badge */}
+                        {node.broadcast && (
+                          <>
+                            <circle cx="64" cy="16" r="8" fill="#10b981" />
+                            <text x="64" y="20" textAnchor="middle" fontSize="9" fill="white" fontWeight="bold">✓</text>
+                          </>
+                        )}
+                      </g>
+                    ))}
+                  </svg>
+                </div>
+
+                {/* Protocol note */}
+                <p className="text-[10px] text-[var(--color-text-muted)] leading-relaxed">
+                  Dashed edges represent pairwise HKDF-SHA256 channels derived from X25519 ECDH.
+                  The coordinator is a stateless relay — it stores only authenticated public key bundles
+                  and never computes shared secrets or holds plaintext model weights.
+                </p>
+              </div>
+
+              {/* Right: Node Details & Protocol Spec */}
+              <div className="space-y-4">
+                {/* Per-node status table */}
+                <div className="glass-card p-5 space-y-3">
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">Node Key Broadcast Status</h3>
+                  <div className="space-y-2">
+                    {secaggNodes.map((node) => (
+                      <div
+                        key={node.id}
+                        className={`p-3 rounded-lg border text-xs flex items-start gap-3 ${
+                          node.broadcast
+                            ? 'bg-indigo-500/5 border-indigo-500/20'
+                            : 'bg-slate-800/40 border-slate-700/30'
+                        }`}
+                      >
+                        <span className="text-lg shrink-0 mt-0.5">{node.broadcast ? '🔑' : '⏳'}</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-bold text-[var(--color-text-primary)] truncate">{node.label}</span>
+                            <span
+                              className={`shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                                node.broadcast
+                                  ? 'bg-emerald-500/15 text-emerald-400'
+                                  : 'bg-amber-500/15 text-amber-400'
+                              }`}
+                            >
+                              {node.broadcast ? 'BROADCAST' : 'PENDING'}
+                            </span>
+                          </div>
+                          <div className="font-mono text-[10px] text-[var(--color-text-muted)] mt-1 space-y-0.5">
+                            <div>PK  <span className="text-indigo-400">{node.pkHex}</span></div>
+                            <div>SIG <span className="text-purple-400">{node.hmacHex}</span></div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Protocol specification card */}
+                <div className="glass-card p-5 space-y-3">
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">Protocol Specification</h3>
+                  <div className="space-y-2 text-xs">
+                    {[
+                      { label: 'Key Agreement',    value: 'Curve25519 ECDH (RFC 7748)' },
+                      { label: 'KDF',              value: 'HKDF-SHA256 (RFC 5869)' },
+                      { label: 'Mask PRG',         value: 'HMAC-SHA256 counter mode' },
+                      { label: 'Modular Ring',     value: 'Z_{2^32} (32-bit unsigned)' },
+                      { label: 'Authentication',   value: 'HMAC-SHA256 over (bank_id ∥ round_id ∥ pk)' },
+                      { label: 'Zero-Sum Proof',   value: 'Σ y_u ≡ Σ w_u (mod 2^32)' },
+                      { label: 'Server Knowledge', value: 'None — pure relay, ε=0 information' },
+                      { label: 'Protocol Ver.',    value: '2.0.0' },
+                    ].map((item) => (
+                      <div key={item.label} className="flex justify-between gap-2 p-2 rounded bg-[var(--color-surface-alt)]">
+                        <span className="text-[var(--color-text-muted)] shrink-0">{item.label}</span>
+                        <span className="font-mono font-bold text-[var(--color-primary)] text-right">{item.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           )}
