@@ -216,6 +216,7 @@ CF-Intelligence/
 │   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
 │   │   │       ├── fl_hyperparameter_optimizer.py   # Optuna Bayesian TPE hyperparameter optimizer
 │   │   │       ├── flower_engine.py                 # Flower FL framework integration engine
+│   │   │       ├── flower_p2p_engine.py             # Flower serverless P2P engine & gossip strategy (V2.0)
 │   │   │       ├── graph_analytics_service.py       # Entity graph analytics service
 │   │   │       ├── graph_embedding_service.py       # PyTorch GraphSAGE embedding generator
 │   │   │       ├── incident_triage.py               # SEV1-SEV4 SRE incident triage engine
@@ -642,7 +643,7 @@ npm run deploy:local
 | **Shamir Secret Sharing** | Dropout-resilient mask reconstruction via (t, n) threshold scheme | ✅ **SHIPPED (Q3 2026)** |
 | **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | ✅ **SHIPPED (Q4 2026)** |
 | **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | ✅ **SHIPPED (Q4 2026)** |
-| **Flower P2P Integration** | Peer-to-peer FL training round via Flower framework without central server | Q1 2027 |
+| **Flower P2P Integration** | Peer-to-peer FL training round via Flower framework without central server | ✅ **SHIPPED (Q1 2027)** |
 | **Real-Time Graph Streaming** | Apache Flink integration for sub-second entity graph updates | Q1 2027 |
 
 ---

@@ -260,6 +260,7 @@ The `FederatedLearningEngine` exhibits exceptional numerical precision, exact pr
 2. **Formal Dynamic Quorum Proofs & Invariants (`async_fl_engine.py`, `quorum_manager.py`):** Verified $S(\tau) = (1+\tau)^{-\alpha}$ staleness monotonicity (HP11), dynamic quorum threshold triggering (HP12), and straggler timeout recovery (GR15).
 3. **Diffie-Hellman MPC SecAgg Integration:** Paired zero-sum pairwise masks with DH-KMS key management for server-curious threat models (`tee_fhe_drivers.py`).
 4. **End-to-End Opacus Differential Privacy:** Combined post-hoc model update clipping with local Opacus per-sample gradient clipping (`train_local_with_opacus`).
+5. **Serverless Flower P2P Integration (`flower_p2p_engine.py`):** Implemented serverless peer-to-peer federated learning rounds with Ring and Mesh peer gossip strategies (`P2PGossipStrategy`), bypassing central server aggregation.
 
 ---
 
