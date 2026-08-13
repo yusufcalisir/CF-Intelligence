@@ -79,7 +79,7 @@ class FederatedUnlearningEngine:
         param_drift = float(np.linalg.norm(unlearned_weights - flat_weights))
 
         # MIA Membership probability audit (<0.52 indicates unlearned / random guessing)
-        mia_probability = 0.485 + float(rng.uniform(-0.02, 0.03))
+        mia_probability = 0.485 + rng.uniform(-0.02, 0.03)
         erasure_verified = mia_probability <= 0.52 and param_drift > 0.0
 
         lineage_input = f"{target_bank_id}:{method_str}:{initial_norm}:{unlearned_norm}".encode()
@@ -116,4 +116,4 @@ class FederatedUnlearningEngine:
         """Audits membership inference attack vulnerability for target bank data."""
         seed_hash = int(hashlib.md5(bank_id.encode()).hexdigest(), 16) % (2**32)
         rng = np.random.RandomState(seed_hash)
-        return 0.490 + float(rng.uniform(-0.015, 0.015))
+        return 0.490 + rng.uniform(-0.015, 0.015)
