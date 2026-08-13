@@ -29,7 +29,6 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
 )
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
-
 # ---------------------------------------------------------------------------
 # Domain Value Objects
 # ---------------------------------------------------------------------------

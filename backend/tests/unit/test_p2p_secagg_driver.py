@@ -13,16 +13,14 @@ Covers:
 
 from __future__ import annotations
 
-import struct
+import os
 
 import pytest
 
 from app.infrastructure.security.p2p_secagg_driver import (
     ECDHPublicKeyBundle,
     P2PSecAggDriver,
-    P2PSecAggState,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -120,11 +118,11 @@ def test_ecdh_seed_unique_per_round(
     driver_beta: P2PSecAggDriver,
 ) -> None:
     """Different rounds must produce different seeds even for the same pair."""
-    b_alpha_r1 = driver_alpha.generate_round_keypair(1)
+    driver_alpha.generate_round_keypair(1)
     b_beta_r1 = driver_beta.generate_round_keypair(1)
     seed_r1 = driver_alpha.derive_pairwise_seed(b_beta_r1)
 
-    b_alpha_r2 = driver_alpha.generate_round_keypair(2)
+    driver_alpha.generate_round_keypair(2)
     b_beta_r2 = driver_beta.generate_round_keypair(2)
     seed_r2 = driver_alpha.derive_pairwise_seed(b_beta_r2)
 
@@ -271,9 +269,3 @@ def test_compute_masked_vector_empty_weights_raises(
 ) -> None:
     with pytest.raises(ValueError, match="non-empty"):
         driver_alpha.compute_masked_vector([], [bundle_beta])
-
-
-# ---------------------------------------------------------------------------
-# Missing import used inside test body
-# ---------------------------------------------------------------------------
-import os
