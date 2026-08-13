@@ -45,13 +45,14 @@ CFI Simulator utilizes 4 decoupled microservices coordinated via Docker Compose:
 3.  **`identity-graph` (Port 8002):** Manages HMAC hash resolution and parses resolved entities into dynamic React Flow elements.
 4.  **`fraud-alert` (Port 8003):** Houses the 9-Signal Risk Scoring Engine, explainability (SHAP), and case resolution.
 
-### 2.2 Version 2.0 Core Production Subsystems
+### 2.2 Version 2.0 & 3.0 Core Production Subsystems
 *   **P2P Curve25519 SecAgg (`p2p_secagg_driver.py`):** Client-side zero-sum pairwise vector perturbation via X25519 ECDH + HKDF-SHA256.
 *   **Shamir Secret Sharing (`shamir_engine.py`):** Galois polynomial threshold secret sharing over $\mathbb{Z}_p$ for dropout-resilient mask recovery.
 *   **HSM Root Key Binding (`vault_hsm_pki_binder.py`):** FIPS 140-2 Level 3 HSM PKCS#11 enclave binding for Vault Root CA key isolation.
 *   **Multi-Sig Coordinator (`GnosisSafeMultiSigCoordinator.sol`):** Gnosis Safe 2-of-3 EIP-712 threshold multi-sig governance contract.
 *   **Flower P2P Integration (`flower_p2p_engine.py`):** Serverless peer-to-peer FL training rounds with Ring and Mesh P2P gossip strategies.
 *   **Real-Time Graph Streaming (`flink_graph_streaming.py`):** Apache Flink sub-second stateful graph stream accumulators ($W(t, 500\text{ms})$) with $<50\text{ms}$ SLA.
+*   **zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`):** Groth16 / PlonK zero-knowledge proof verification over BN254 elliptic curve with $O(1)$ constant time bilinear pairing verification ($<5\text{ms}$ SLA).
 
 ---
 

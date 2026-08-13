@@ -55,6 +55,7 @@ Concrete implementation of dependencies. Adapts foreign libraries and databases.
 *   `security/p2p_secagg_driver.py` & `shamir_engine.py`: Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 *   `security/vault_hsm_pki_binder.py`: HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11.
 *   `security/gnosis_multisig_coordinator.py`: Gnosis Safe 2-of-3 threshold multi-sig coordinator governance driver with EIP-712 structured data signatures.
+*   `security/zk_snark_verifier.py` & `zk_circuits/`: Groth16 zk-SNARK model weight attestation driver over BN254 curve with Poseidon hashing and $O(1)$ constant-time bilinear pairing proof verification.
 *   `connectors/`: Production Bank Connector sub-system implementing Hexagonal Ports & Adapters:
     *   `base_connector.py`: Defines the `BaseBankConnector` abstract interface and unified `NormalizedTransaction` Pydantic domain schema.
     *   `streaming_connector.py`: High-throughput real-time payment event streaming connector for Kafka, RabbitMQ, and Redis streams.

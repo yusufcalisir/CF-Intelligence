@@ -13,11 +13,13 @@ from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
 from app.config import get_settings
+from app.domain.value_objects_zkp import ZKSNARKAttestationProof
 from app.infrastructure.security.abac_engine import ABACEngine, ABACResource
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator, UserClaims
 from app.infrastructure.security.vault_client import VaultClient
+from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/security", tags=["security"])
@@ -237,3 +239,54 @@ async def verify_audit_chain() -> AuditChainVerifyResponse:
         last_hash=rpt.last_hash,
         verified_at=rpt.verified_at,
     )
+
+
+# ── Zero-Knowledge Proof (zk-SNARK) Endpoints ─────────────────────────
+
+_zk_verifier = ZKSNARKProofVerifier()
+
+
+class VerifyZKProofRequest(BaseModel):
+    proof_id: str = "zk_proof_bank_alpha_r1"
+    bank_id: str = "bank_alpha"
+    round_id: int = 1
+    pi_a: list[str] = ["0x1234", "0x5678"]
+    pi_b: list[list[str]] = [["0x1", "0x2"], ["0x3", "0x4"]]
+    pi_c: list[str] = ["0x9abc", "0xdef0"]
+    public_weight_hash: str = "0x0000000000000000000000000000000000000000000000000000000000000001"
+    l2_norm_bound: float = 10.0
+    vector_dimension: int = 128
+
+
+@router.post("/zkp/verify")
+async def verify_zk_proof(req: VerifyZKProofRequest) -> dict[str, Any]:
+    """Verify Groth16 zk-SNARK model weight attestation proof in O(1) time."""
+    proof = ZKSNARKAttestationProof(
+        proof_id=req.proof_id,
+        bank_id=req.bank_id,
+        round_id=req.round_id,
+        pi_a=req.pi_a,
+        pi_b=req.pi_b,
+        pi_c=req.pi_c,
+        public_weight_hash=req.public_weight_hash,
+        l2_norm_bound=req.l2_norm_bound,
+        vector_dimension=req.vector_dimension,
+        created_at_timestamp=0.0,
+    )
+    res = _zk_verifier.verify_attestation_proof(proof)
+    return {
+        "is_valid": res.is_valid,
+        "status_code": res.status_code,
+        "proof_id": res.proof_id,
+        "bank_id": res.bank_id,
+        "verification_time_ms": res.verification_time_ms,
+        "verification_message": res.verification_message,
+        "pairing_check_passed": res.pairing_check_passed,
+        "circuit_metadata": res.circuit_metadata,
+    }
+
+
+@router.get("/zkp/status")
+async def get_zkp_status() -> dict[str, Any]:
+    """Get status telemetry for zk-SNARK model weight attestation circuit and verifier."""
+    return _zk_verifier.get_verifier_status()

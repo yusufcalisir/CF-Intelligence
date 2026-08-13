@@ -34,6 +34,8 @@ if TYPE_CHECKING:
     from app.application.services.privacy_service import PrivacyService
     from app.config import Settings
 
+from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,10 +45,8 @@ class FederatedLearningEngine:
     Responsible for:
     1. Distributing global model parameters to clients
     2. Collecting locally-trained parameters
-    3. Aggregating parameters (FedAvg, Krum, or Coordinate-wise Median)
-    4. Simulating network conditions (latency, dropout)
-    5. Applying privacy mechanisms before aggregation
-    6. Simulating adversarial model poisoning attacks
+    3. Aggregating parameter updates (FedAvg, FedProx, SCAFFOLD, MOON, FedYogi)
+    4. Managing Differential Privacy and Secure Aggregation
     """
 
     def __init__(
@@ -58,6 +58,7 @@ class FederatedLearningEngine:
         self.settings = settings
         self.model_service = model_service
         self.privacy_service = privacy_service
+        self.zk_verifier = ZKSNARKProofVerifier()
         # Server optimizer states for FedOpt (FedAdam / FedAdaGrad) keyed by simulation_id
         self._server_m_by_sim: dict[str, np.ndarray] = {}
         self._server_v_by_sim: dict[str, np.ndarray] = {}
