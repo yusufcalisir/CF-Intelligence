@@ -284,24 +284,24 @@ export default function DataDriftPanel() {
         >
           {/* VIEW: DISTRIBUTIONS */}
           {viewMode === 'distributions' && (
-            <div className="flex flex-col gap-4">
-              <div className="flex gap-1 bg-[var(--color-bg-primary)] rounded-md p-0.5 w-max">
+            <div className="flex flex-col gap-4 min-w-0">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 bg-[var(--color-bg-primary)] rounded-lg p-1 w-full sm:w-max">
                 {DIST_TABS.map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveDistTab(tab.id)}
-                    className={`flex items-center justify-center gap-1 px-2.5 py-1 rounded text-[9px] font-medium transition-all duration-150 ${
+                    className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-md text-[9.5px] sm:text-[10px] font-medium transition-all duration-150 ${
                       activeDistTab === tab.id
-                        ? 'bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] shadow-sm border border-[var(--color-border-subtle)]'
+                        ? 'bg-[var(--color-bg-elevated)] text-[var(--color-text-primary)] shadow-sm border border-[var(--color-border-subtle)] font-bold'
                         : 'text-[var(--color-text-muted)] hover:text-[var(--color-text-secondary)]'
                     }`}
                   >
-                    <span>{tab.icon}</span>
-                    <span>{tab.label}</span>
+                    <span className="shrink-0">{tab.icon}</span>
+                    <span className="truncate">{tab.label}</span>
                   </button>
                 ))}
               </div>
-              <div className="h-56 sm:h-64">
+              <div className="h-56 sm:h-64 min-w-0">
                 {activeDistTab === 'amount' && <AmountChart data={amountData} />}
                 {activeDistTab === 'hourly' && <HourlyChart data={hourlyData} />}
                 {activeDistTab === 'merchant' && <MerchantChart data={merchantData} />}
@@ -311,8 +311,64 @@ export default function DataDriftPanel() {
 
           {/* VIEW: FEATURE DRIFT */}
           {viewMode === 'feature_drift' && (
-            <div className="flex flex-col gap-3">
-              <div className="overflow-x-auto rounded-lg border border-[var(--color-border-subtle)]">
+            <div className="flex flex-col gap-3 min-w-0">
+              {/* Mobile View: Clean Responsive Cards (Zero Horizontal Scroll) */}
+              <div className="block md:hidden space-y-2.5">
+                {['transaction_amount', 'velocity', 'hour_of_day', 'merchant_category', 'device_type'].map((feature) => {
+                  const getCellData = (pairKey: string) => {
+                    const info = featureDrift[pairKey]?.features?.[feature];
+                    return info || { psi: 0, js_divergence: 0, ks: null, status: 'stable' };
+                  };
+                  const isCategorical = feature === 'merchant_category' || feature === 'device_type';
+
+                  return (
+                    <div
+                      key={feature}
+                      className="p-3 rounded-xl bg-[var(--color-bg-primary)] border border-[var(--color-border-subtle)] space-y-2"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-[var(--color-text-primary)] capitalize">
+                          {feature.replace(/_/g, ' ')}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[8.5px] font-mono uppercase bg-white/5 border border-white/10 text-[var(--color-text-muted)]">
+                          {isCategorical ? 'Categorical' : 'Continuous'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-1.5 pt-1 border-t border-[var(--color-border-subtle)]/50">
+                        {[
+                          { key: 'a_vs_b', label: 'Mer ↔ Nex' },
+                          { key: 'a_vs_c', label: 'Mer ↔ Her' },
+                          { key: 'b_vs_c', label: 'Nex ↔ Her' },
+                        ].map(({ key, label }) => {
+                          const val = getCellData(key);
+                          const style = getStatusStyle(val.status);
+                          return (
+                            <div
+                              key={key}
+                              className="p-1.5 rounded-lg bg-[var(--color-bg-card)]/50 border border-[var(--color-border-subtle)] text-center font-mono"
+                            >
+                              <div className="text-[8px] text-[var(--color-text-muted)] truncate mb-0.5">{label}</div>
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: style.text }} />
+                                <span className="text-[10px] font-bold text-[var(--color-text-primary)]">
+                                  {val.psi.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="text-[7.5px] text-[var(--color-text-muted)] mt-0.5">
+                                JS:{val.js_divergence.toFixed(2)}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Desktop/Tablet Table View */}
+              <div className="hidden md:block overflow-x-auto rounded-lg border border-[var(--color-border-subtle)]">
                 <table className="w-full border-collapse text-left text-[10px]">
                   <thead>
                     <tr className="bg-[var(--color-bg-primary)] border-b border-[var(--color-border-subtle)] text-[var(--color-text-muted)]">

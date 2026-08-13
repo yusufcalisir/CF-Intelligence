@@ -69,16 +69,16 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
   });
 
   return (
-    <div className="glass-card p-6 flex flex-col gap-6 border border-slate-800 relative overflow-hidden">
+    <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col gap-4 sm:gap-6 border border-slate-800 relative overflow-hidden min-w-0">
       <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
       <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl -z-10 pointer-events-none" />
 
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <div className="flex items-center gap-2 mb-1">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 border-b border-slate-800 pb-4 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1 min-w-0">
             {hwMode === 'tee' ? <CpuIcon /> : <KeyIcon />}
-            <h3 className="text-base font-bold text-slate-100">
+            <h3 className="text-sm sm:text-base font-bold text-slate-100 truncate">
               {hwMode === 'tee' ? '🛡️ Trusted Execution Environment (TEE)' : '🔑 Fully Homomorphic Encryption (FHE)'}
             </h3>
           </div>
@@ -89,66 +89,66 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
           </p>
         </div>
         <div>
-          <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5">
+          <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
             {hwMode === 'tee' ? 'SGX Enclave Active' : 'FHE CKKS Active'}
           </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 min-w-0">
         {/* Telemetry Info */}
-        <div className="lg:col-span-1 space-y-4">
+        <div className="lg:col-span-1 space-y-3 min-w-0">
           <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Security Telemetry</h4>
           
           {hwMode === 'tee' ? (
-            <div className="space-y-3">
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+            <div className="space-y-2.5">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">MRENCLAVE (Code Measurement)</div>
                 <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
                   {simulation.tee_mrenclave || 'a7b8e9c0d1e2f3...'}
                 </div>
               </div>
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">MRSIGNER (Signer Authority)</div>
                 <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
                   {simulation.tee_mrsigner || 'f3e2d1c0b9a8...'}
                 </div>
               </div>
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Attestation Signature</div>
                 <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
                   {simulation.tee_attestation_signature || 'tee_signature_verified'}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 p-2 rounded border border-emerald-500/10">
+              <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 p-2 rounded border border-emerald-500/10 min-w-0">
                 <ShieldCheckIcon />
-                <span>Remote Attestation verified by Central CA</span>
+                <span className="truncate">Remote Attestation verified by Central CA</span>
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+            <div className="space-y-2.5">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">FHE Poly Degree</div>
                 <div className="text-xs font-mono text-slate-200 mt-0.5">
                   {simulation.fhe_poly_degree || 4096}
                 </div>
               </div>
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Noise Bound (Error budget)</div>
                 <div className="text-xs font-mono text-slate-200 mt-0.5">
                   {(simulation.fhe_noise_bound || 1e-9).toExponential(2)}
                 </div>
               </div>
-              <div className="p-3 bg-slate-950/40 border border-slate-800 rounded-lg">
+              <div className="p-2.5 sm:p-3 bg-slate-950/40 border border-slate-800 rounded-lg min-w-0">
                 <div className="text-[10px] text-slate-500 uppercase font-semibold">Keyring ID</div>
                 <div className="text-xs font-mono text-slate-200 truncate mt-0.5">
                   {simulation.fhe_key_id || simulation.id}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-blue-400 font-semibold bg-blue-500/5 p-2 rounded border border-blue-500/10">
+              <div className="flex items-center gap-2 text-xs text-blue-400 font-semibold bg-blue-500/5 p-2 rounded border border-blue-500/10 min-w-0">
                 <LockIcon />
-                <span>Zero-knowledge plaintext parameter leaks</span>
+                <span className="truncate">Zero-knowledge plaintext parameter leaks</span>
               </div>
             </div>
           )}

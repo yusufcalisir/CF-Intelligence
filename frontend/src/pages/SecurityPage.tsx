@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { ShieldCheck, Lock } from 'lucide-react';
 import {
   useSecurityStatus,
   useEvaluateABAC,
@@ -7,8 +8,44 @@ import {
   useVerifyAuditChain,
 } from '../api/queries';
 
+type SecurityTabId = 'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp';
+
+interface SecurityTabItem {
+  id: SecurityTabId;
+  icon: string;
+  label: string;
+  category: 'identity' | 'crypto' | 'governance';
+}
+
+const SECURITY_CATEGORIES = [
+  { id: 'all', label: 'All Modules', count: 11, icon: '🛡️' },
+  { id: 'identity', label: 'Identity & PKI', count: 4, icon: '🔑' },
+  { id: 'crypto', label: 'Crypto Proofs', count: 3, icon: '⚡' },
+  { id: 'governance', label: 'Audit & Governance', count: 4, icon: '⛓️' },
+] as const;
+
+const SECURITY_TABS: SecurityTabItem[] = [
+  // Identity & PKI
+  { id: 'mtls', icon: '🔑', label: 'mTLS & Cert PKI', category: 'identity' },
+  { id: 'oidc', icon: '🆔', label: 'OIDC & IAM', category: 'identity' },
+  { id: 'abac', icon: '🛡️', label: 'Dynamic ABAC Rules', category: 'identity' },
+  { id: 'vault', icon: '🔐', label: 'HashiCorp Vault HSM', category: 'identity' },
+  
+  // Crypto Engines
+  { id: 'secagg', icon: '🔗', label: 'P2P Curve25519 SecAgg', category: 'crypto' },
+  { id: 'zkp', icon: '⚡', label: 'zk-SNARK Attestation', category: 'crypto' },
+  { id: 'pqc', icon: '🛡️', label: 'PQC SecAgg & Kyber-768', category: 'crypto' },
+  
+  // Governance
+  { id: 'audit', icon: '⛓️', label: 'Cryptographic Audit Chain', category: 'governance' },
+  { id: 'unlearning', icon: '♻️', label: 'Confidential Unlearning', category: 'governance' },
+  { id: 'bridge', icon: '🌉', label: 'Cross-Chain Settlement', category: 'governance' },
+  { id: 'rdp', icon: '📈', label: 'Adaptive DP Auto-Scaler', category: 'governance' },
+];
+
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp'>('mtls');
+  const [activeTab, setActiveTab] = useState<SecurityTabId>('mtls');
+  const [selectedCategory, setSelectedCategory] = useState<'all' | 'identity' | 'crypto' | 'governance'>('all');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
@@ -233,26 +270,53 @@ export default function SecurityPage() {
       if (a && b) meshEdges.push({ a, b });
     }
 
+  const filteredTabs = selectedCategory === 'all'
+    ? SECURITY_TABS
+    : SECURITY_TABS.filter((t) => t.category === selectedCategory);
+
   return (
-    <div className="space-y-6">
-      {/* Page Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
-            Enterprise Security & Identity Control Suite
-          </h1>
-          <p className="text-sm text-[var(--color-text-muted)]">
-            ISO 27001, SOC2, PCI-DSS compliance suite: mTLS 1.3, OIDC JWT, ABAC, HashiCorp Vault & SHA-256 Audit Chain
+    <div className="space-y-6 min-w-0">
+      {/* Page Header Banner */}
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 relative overflow-hidden min-w-0">
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
+        <div className="space-y-2 min-w-0">
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <div className="p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-400 shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <h1 className="text-lg sm:text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-200 to-purple-300 tracking-tight truncate">
+              Enterprise Security & Identity Control Suite
+            </h1>
+          </div>
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-relaxed">
+            ISO 27001, SOC2 Type II, PCI-DSS 4.0 compliance: mTLS 1.3, OIDC JWT, ABAC, HashiCorp Vault HSM & SHA-256 Audit Chain
           </p>
+          <div className="flex items-center gap-1.5 pt-0.5 flex-wrap">
+            {['ISO 27001', 'SOC2 Type II', 'PCI-DSS 4.0', 'FIPS 140-3 HSM'].map((badge) => (
+              <span key={badge} className="px-2 py-0.5 rounded text-[9.5px] font-mono font-semibold bg-white/5 border border-white/10 text-slate-300">
+                {badge}
+              </span>
+            ))}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center shrink-0">
           <button
             onClick={() => verifyChain.mutate()}
             disabled={verifyChain.isPending}
-            className="px-4 py-2 text-xs font-bold rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 shadow-md transition-all flex items-center gap-2"
+            className="w-full md:w-auto px-4 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-50 shrink-0"
           >
-            {verifyChain.isPending ? 'Verifying Hashes...' : '🔒 Verify SHA-256 Audit Chain'}
+            {verifyChain.isPending ? (
+              <>
+                <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent" />
+                <span>Verifying Hashes...</span>
+              </>
+            ) : (
+              <>
+                <Lock className="w-3.5 h-3.5 text-emerald-200" />
+                <span>Verify SHA-256 Audit Chain</span>
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -289,34 +353,60 @@ export default function SecurityPage() {
         </motion.div>
       )}
 
-      {/* 6-Tab Navigation */}
-      <div className="flex overflow-x-auto no-scrollbar gap-2 sm:gap-3 pb-2 border-b border-[var(--color-border)]">
-        {[
-          { id: 'mtls',   icon: '🔑',  label: 'mTLS & Cert PKI' },
-          { id: 'oidc',   icon: '🆔',  label: 'OIDC & IAM' },
-          { id: 'abac',   icon: '🛡️',  label: 'Dynamic ABAC Rules' },
-          { id: 'vault',  icon: '🔐',  label: 'HashiCorp Vault' },
-          { id: 'audit',      icon: '⛓️',  label: 'Cryptographic Audit Chain' },
-          { id: 'secagg',     icon: '🔗',  label: 'P2P Curve25519 SecAgg' },
-          { id: 'zkp',        icon: '⚡',  label: 'zk-SNARK Attestation' },
-          { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning' },
-          { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber' },
-          { id: 'bridge',     icon: '🌉',  label: 'Cross-Chain Settlement' },
-          { id: 'rdp',        icon: '📈',  label: 'Adaptive DP Auto-Scaler' },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id as any)}
-            className={`px-3.5 py-2 text-xs sm:text-sm font-bold rounded-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 border min-h-[44px] cursor-pointer ${
-              activeTab === tab.id
-                ? 'bg-indigo-600/20 border-indigo-500/50 text-indigo-300 shadow-md shadow-indigo-600/15'
-                : 'bg-white/3 border-white/5 text-[var(--color-text-muted)] hover:text-slate-200 hover:bg-white/5'
-            }`}
-          >
-            <span className="shrink-0">{tab.icon}</span>
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      {/* Category Filter & Module Tabs Navigation (Responsive Zero-Scroll Grid) */}
+      <div className="space-y-3 min-w-0">
+        {/* Category Selector Pills */}
+        <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 min-w-0">
+          {SECURITY_CATEGORIES.map((cat) => {
+            const isCatActive = selectedCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center justify-center sm:justify-start gap-1.5 cursor-pointer border ${
+                  isCatActive
+                    ? 'bg-indigo-600/25 border-indigo-500/50 text-indigo-200 shadow-sm'
+                    : 'bg-white/[0.03] border-white/5 text-slate-400 hover:text-slate-200 hover:bg-white/[0.06]'
+                }`}
+              >
+                <span>{cat.icon}</span>
+                <span>{cat.label}</span>
+                <span className="text-[10px] opacity-60 font-mono">({cat.count})</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Module Pill Cards Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 min-w-0">
+          {filteredTabs.map((tab) => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`p-2.5 sm:p-3 rounded-xl transition-all flex flex-col justify-between text-left border min-h-[58px] cursor-pointer relative overflow-hidden group ${
+                  isActive
+                    ? 'bg-indigo-600/20 border-indigo-500/60 shadow-lg shadow-indigo-600/15 text-indigo-200'
+                    : 'bg-[#090b1e]/70 border-white/5 text-slate-400 hover:text-slate-200 hover:border-white/15 hover:bg-[#0d102b]'
+                }`}
+              >
+                {isActive && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
+                )}
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-base sm:text-lg">{tab.icon}</span>
+                  {isActive && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                  )}
+                </div>
+                <div className="text-xs font-bold truncate mt-1">
+                  {tab.label}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {isStatusLoading ? (

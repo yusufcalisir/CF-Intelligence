@@ -491,11 +491,14 @@ export default function InvestigationDashboard() {
         transition={{ delay: 0.6 }}
         className="p-5 rounded-2xl bg-[#090a1f]/80 border border-white/10 backdrop-blur-xl shadow-xl mt-6"
       >
-        <div className="flex items-center justify-between border-b border-white/6 pb-3 mb-4">
-          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-2">
-            🕵️ Investigator Activity Audit Trail (Immutable Log Chain)
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/6 pb-3 mb-4">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5 flex-wrap min-w-0">
+            <span>🕵️</span>
+            <span>Investigator Activity Audit Trail</span>
+            <span className="text-slate-500 text-[10px] font-normal font-mono">(Immutable Log Chain)</span>
           </h3>
-          <span className="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+          <span className="self-start sm:self-auto text-[10px] font-mono font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 rounded-full whitespace-nowrap shrink-0 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             SHA-256 Verified
           </span>
         </div>

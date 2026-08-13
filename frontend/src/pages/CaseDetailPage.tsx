@@ -12,6 +12,7 @@ import {
 import { CASE_STATUS_LABELS, PRIORITY_LABELS } from '../api/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { ExplainabilityPanel } from './AlertsPage';
+import { Bot, Sparkles, Copy, Check, FileText, ShieldAlert } from 'lucide-react';
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -51,6 +52,7 @@ export default function CaseDetailPage() {
     lineage_hash: string;
   } | null>(null);
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const handleGenerateCopilotNarrative = async () => {
     if (!caseId) return;
@@ -234,14 +236,14 @@ export default function CaseDetailPage() {
             )}
             {/* Supervisor Signature for Case Closure */}
             {['investigating', 'pending_review', 'escalated', 'sar_filed'].includes(caseData.status) && (
-              <div className="flex gap-2 items-center w-full max-w-sm mt-3 p-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg">
-                <span className="text-[10px] text-yellow-500 font-bold uppercase whitespace-nowrap">Supervisor Signature:</span>
+              <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 sm:items-center w-full max-w-full sm:max-w-md mt-3 p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg min-w-0">
+                <span className="text-[10px] text-yellow-500 font-bold uppercase whitespace-nowrap shrink-0">Supervisor Signature:</span>
                 <input
                   type="text"
                   value={supervisorSig}
                   onChange={(e) => { setSupervisorSig(e.target.value); setStatusError(null); }}
                   placeholder="Secondary authorization key..."
-                  className="px-2 py-1 text-xs rounded bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] flex-1 focus:outline-none focus:border-yellow-500/50"
+                  className="w-full sm:flex-1 min-w-0 px-2 py-1 text-xs rounded bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-[var(--color-text-primary)] focus:outline-none focus:border-yellow-500/50"
                 />
               </div>
             )}
@@ -260,62 +262,117 @@ export default function CaseDetailPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.05 }}
-        className="glass-card p-5 space-y-4"
+        className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-gradient-to-br from-[#08091a]/95 via-[#0b0d26]/90 to-[#08091a]/95 border border-purple-500/20 shadow-[0_0_40px_rgba(139,92,246,0.12)] relative overflow-hidden min-w-0"
       >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🤖</span>
-            <div>
-              <h2 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
-                Autonomous Agentic AML Copilot & RAG Narrative
-              </h2>
-              <p className="text-xs text-[var(--color-text-muted)]">
-                Synthesizes FinCEN FIN-2007-G003 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings
+        {/* Ambient Top Cyber Strip */}
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400 opacity-60" />
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 min-w-0">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-500/30 text-purple-300 shadow-[0_0_15px_rgba(168,85,247,0.25)] shrink-0">
+              <Bot className="w-5 h-5 text-purple-300" />
+              <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500" />
+              </span>
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-base font-bold text-slate-100 tracking-tight">
+                  Autonomous Agentic AML Copilot & RAG Narrative
+                </h2>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap">
+                  FIN-2007-G003
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                Synthesizes FinCEN 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings from Graph Topology
               </p>
             </div>
           </div>
+
           <button
             onClick={handleGenerateCopilotNarrative}
             disabled={isCopilotLoading}
-            className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+            className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/25 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shrink-0 border border-purple-400/30 whitespace-nowrap"
           >
-            {isCopilotLoading ? '⏳ Synthesizing AI Narrative...' : '✨ Generate AI SAR Narrative'}
+            {isCopilotLoading ? (
+              <>
+                <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent" />
+                <span>Synthesizing AI Narrative...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                <span>{copilotData ? 'Regenerate Narrative' : 'Generate AI SAR Narrative'}</span>
+              </>
+            )}
           </button>
         </div>
 
+        {/* Narrative Output Grid */}
         {copilotData && (
-          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-2 border-t border-[var(--color-border)]">
-            <div className="xl:col-span-2 glass-card p-4 space-y-3 bg-black/20">
-              <div className="flex items-center justify-between text-xs font-bold text-indigo-300 border-b border-[var(--color-border)] pb-2">
-                <span>📄 FinCEN 5-Paragraph Regulatory SAR Narrative</span>
-                <span className="font-mono text-[10px] text-emerald-400">ZERO-PII VERIFIED</span>
-              </div>
-              <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap max-h-96 overflow-y-auto pr-2">
-                {copilotData.fincen_sar_narrative}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-3 border-t border-white/10 min-w-0">
+            {/* FinCEN 5-Paragraph Narrative */}
+            <div className="xl:col-span-2 rounded-xl p-4 space-y-3 bg-[#040510]/80 border border-indigo-500/20 shadow-inner flex flex-col justify-between min-w-0">
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-bold text-indigo-300 border-b border-white/10 pb-2.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                    <span className="truncate">FinCEN 5-Paragraph Regulatory SAR Narrative</span>
+                  </div>
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                    <span className="font-mono text-[9.5px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full whitespace-nowrap">
+                      ZERO-PII VERIFIED
+                    </span>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(copilotData.fincen_sar_narrative);
+                        setIsCopied(true);
+                        setTimeout(() => setIsCopied(false), 2000);
+                      }}
+                      className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition flex items-center gap-1 cursor-pointer"
+                    >
+                      {isCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                      <span>{isCopied ? 'Copied' : 'Copy'}</span>
+                    </button>
+                  </div>
+                </div>
+                <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap max-h-96 overflow-y-auto pr-2 mt-3">
+                  {copilotData.fincen_sar_narrative}
+                </div>
               </div>
             </div>
 
-            <div className="glass-card p-4 space-y-3 bg-black/20 flex flex-col justify-between">
+            {/* 4-Eyes Supervisor Briefing & SHAP Drivers */}
+            <div className="rounded-xl p-4 space-y-3 bg-[#040510]/80 border border-purple-500/20 shadow-inner flex flex-col justify-between min-w-0">
               <div>
-                <div className="text-xs font-bold text-purple-300 border-b border-[var(--color-border)] pb-2 mb-3">
-                  🛡️ BSA/AML 4-Eyes Supervisor Briefing
+                <div className="flex items-center justify-between text-xs font-bold text-purple-300 border-b border-white/10 pb-2.5 mb-3 min-w-0">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <ShieldAlert className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span className="truncate">BSA/AML 4-Eyes Briefing</span>
+                  </div>
+                  <span className="text-[9px] font-mono text-purple-300 bg-purple-500/10 px-2 py-0.5 rounded border border-purple-500/20 shrink-0">
+                    SUPERVISOR
+                  </span>
                 </div>
-                <div className="text-xs text-slate-200 font-mono whitespace-pre-wrap mb-4">
+                <div className="text-xs text-slate-300 font-mono whitespace-pre-wrap mb-4 leading-relaxed">
                   {copilotData.four_eyes_briefing}
                 </div>
                 <div className="space-y-1.5">
-                  <div className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase">Top SHAP Anomaly Drivers</div>
+                  <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Top SHAP Anomaly Drivers</div>
                   {copilotData.top_risk_drivers.map((d, i) => (
-                    <div key={i} className="p-2 rounded bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[11px] flex justify-between">
-                      <span className="font-mono text-indigo-300">{d.feature}</span>
-                      <span className="font-mono text-emerald-400 font-bold">+{(d.impact * 100).toFixed(1)}%</span>
+                    <div key={i} className="p-2 rounded-lg bg-white/[0.03] border border-white/5 text-[11px] flex justify-between items-center font-mono">
+                      <span className="text-indigo-300 truncate mr-2">{d.feature}</span>
+                      <span className="text-emerald-400 font-bold shrink-0">+{(d.impact * 100).toFixed(1)}%</span>
                     </div>
                   ))}
                 </div>
               </div>
-              <div className="text-[9px] font-mono text-[var(--color-text-muted)] pt-2 border-t border-[var(--color-border)] flex justify-between">
-                <span>Lineage Hash: {copilotData.lineage_hash.slice(0, 16)}...</span>
-                <span className="text-indigo-400 font-bold">{copilotData.recommended_action}</span>
+              <div className="text-[9px] font-mono text-slate-400 pt-2.5 border-t border-white/10 flex justify-between items-center min-w-0">
+                <span className="truncate mr-2">Hash: {copilotData.lineage_hash.slice(0, 14)}...</span>
+                <span className="text-indigo-400 font-bold uppercase shrink-0">{copilotData.recommended_action}</span>
               </div>
             </div>
           </div>

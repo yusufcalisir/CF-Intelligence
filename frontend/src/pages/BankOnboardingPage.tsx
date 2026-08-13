@@ -1,6 +1,19 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
+import {
+  Building2,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Download,
+  Key,
+  FileCode,
+  Copy,
+  ShieldCheck,
+  Radio,
+  FileText,
+} from 'lucide-react';
 
 interface OnboardingFormData {
   bank_id: string;
@@ -10,11 +23,19 @@ interface OnboardingFormData {
   data_residency_region: string;
 }
 
+const ONBOARDING_STEPS = [
+  { num: 1, title: 'Legal Info', subtitle: 'Institutional Details', icon: '🏛️' },
+  { num: 2, title: 'Review', subtitle: 'Compliance Audit', icon: '📋' },
+  { num: 3, title: 'mTLS PKI', subtitle: 'X.509 Certificate', icon: '🔑' },
+  { num: 4, title: 'Config YAML', subtitle: 'Connector Setup', icon: '📄' },
+  { num: 5, title: 'Connection', subtitle: 'Quorum Quorum', icon: '📡' },
+] as const;
+
 export default function BankOnboardingPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [formData, setFormData] = useState<OnboardingFormData>({
     bank_id: 'bank_delta',
-    legal_name: 'Delta International Bank',
+    legal_name: 'Delta International Bank AG',
     jurisdiction: 'EU',
     contact_email: 'secops@deltabank.eu',
     data_residency_region: 'eu-central-1',
@@ -25,6 +46,7 @@ export default function BankOnboardingPage() {
   const [generatedKey, setGeneratedKey] = useState<string>('');
   const [generatedYaml, setGeneratedYaml] = useState<string>('');
   const [nodeStatus, setNodeStatus] = useState<'PENDING' | 'ACTIVE'>('PENDING');
+  const [isCliCopied, setIsCliCopied] = useState(false);
 
   const handleInputChange = (field: keyof OnboardingFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -60,8 +82,8 @@ data_residency_region: "${formData.data_residency_region}"
 coordinator:
   endpoint: "grpcs://coordinator.cfi-platform.org:50051"
   tls_enabled: true
-  mtls_cert_path: "/etc/cfi/certs/bank.crt"
-  mtls_key_path: "/etc/cfi/certs/bank.key"
+  mtls_cert_path: "/etc/cfi/certs/${formData.bank_id}.crt"
+  mtls_key_path: "/etc/cfi/certs/${formData.bank_id}.key"
 
 differential_privacy:
   epsilon_max_budget: 8.0
@@ -119,133 +141,234 @@ differential_privacy:
   }, [step, formData.bank_id]);
 
   return (
-    <div className="flex flex-col gap-6 p-4 max-w-5xl mx-auto">
-      {/* Header */}
+    <div className="flex flex-col gap-4 sm:gap-6 max-w-4xl mx-auto w-full min-w-0">
+      {/* Header Banner */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 glass-card p-6 border-l-4 border-l-[var(--color-accent-indigo)]"
+        className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden min-w-0"
       >
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🏛️</span>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight">
-              Bank Node Onboarding Wizard
-            </h1>
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-11 h-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
+            <Building2 className="w-6 h-6 text-indigo-300" />
           </div>
-          <p className="text-sm text-[var(--color-text-muted)] mt-1">
-            Register a new institution, generate X.509 mTLS credentials, and join the FL Consortium.
-          </p>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-black text-slate-100 tracking-tight">
+                Bank Node Onboarding Wizard
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                mTLS 1.3 Quorum
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
+              Register institution, issue cryptographic X.509 credentials, and connect to the FL consortium.
+            </p>
+          </div>
         </div>
+
         <Link
           to="/operations"
-          className="text-xs text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors"
+          className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-white/5 border border-white/10 hover:bg-white/10 text-slate-300 transition flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
         >
-          ← Back to Operations
+          <ArrowLeft className="w-3.5 h-3.5" />
+          <span>Back to Operations</span>
         </Link>
       </motion.div>
 
-      {/* Step Stepper Indicator */}
-      <div className="grid grid-cols-5 gap-2 glass-card p-4">
-        {[
-          { num: 1, label: '1. Legal Info' },
-          { num: 2, label: '2. Review & Submit' },
-          { num: 3, label: '3. Certificates' },
-          { num: 4, label: '4. Config YAML' },
-          { num: 5, label: '5. Connection' },
-        ].map((item) => (
-          <div
-            key={item.num}
-            className={`p-2 rounded-lg text-center transition-all ${
-              step === item.num
-                ? 'bg-[var(--color-accent-indigo)]/20 border border-[var(--color-accent-indigo)] text-[var(--color-text-primary)] font-bold'
-                : step > item.num
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                : 'text-[var(--color-text-muted)] opacity-60'
-            }`}
-          >
-            <p className="text-xs">{item.label}</p>
+      {/* Responsive Stepper Container (Zero Horizontal Scroll) */}
+      <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-[#07091e]/90 shadow-xl space-y-3.5 min-w-0">
+        {/* Mobile View: Progress Header & Segmented Track (< 768px) */}
+        <div className="block md:hidden space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-mono font-bold text-indigo-400 uppercase tracking-wider">
+              Step {step} of 5
+            </span>
+            <span className="text-xs font-bold text-slate-200">
+              {ONBOARDING_STEPS[step - 1]?.title} · <span className="text-slate-400 font-normal">{ONBOARDING_STEPS[step - 1]?.subtitle}</span>
+            </span>
           </div>
-        ))}
+
+          {/* Glowing Segmented Progress Bar */}
+          <div className="w-full bg-slate-800/80 h-2 rounded-full overflow-hidden p-0.5 border border-white/5 flex gap-1">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div
+                key={i}
+                className={`h-full flex-1 rounded-full transition-all duration-300 ${
+                  i < step
+                    ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                    : i === step
+                    ? 'bg-gradient-to-r from-indigo-500 to-purple-500 shadow-[0_0_8px_rgba(99,102,241,0.6)]'
+                    : 'bg-slate-700/40'
+                }`}
+              />
+            ))}
+          </div>
+
+          {/* Compact step numbers circles */}
+          <div className="flex items-center justify-between pt-1">
+            {ONBOARDING_STEPS.map((s) => {
+              const isPast = step > s.num;
+              const isCurrent = step === s.num;
+              return (
+                <button
+                  key={s.num}
+                  disabled={step < s.num}
+                  onClick={() => s.num < step && setStep(s.num as any)}
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-mono font-bold transition-all border ${
+                    isPast
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 cursor-pointer'
+                      : isCurrent
+                      ? 'bg-indigo-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/40 scale-110'
+                      : 'bg-slate-800/50 border-white/5 text-slate-500 cursor-not-allowed'
+                  }`}
+                >
+                  {isPast ? '✓' : s.num}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Desktop View: Full 5-Step Connected Nodes (>= 768px) */}
+        <div className="hidden md:grid grid-cols-5 gap-3">
+          {ONBOARDING_STEPS.map((item) => {
+            const isPast = step > item.num;
+            const isCurrent = step === item.num;
+            return (
+              <div
+                key={item.num}
+                onClick={() => isPast && setStep(item.num as any)}
+                className={`p-3 rounded-xl transition-all border relative flex flex-col justify-between min-h-[72px] ${
+                  isCurrent
+                    ? 'bg-indigo-600/20 border-indigo-500/70 text-slate-100 shadow-lg shadow-indigo-600/15'
+                    : isPast
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-slate-300 cursor-pointer hover:bg-emerald-500/15'
+                    : 'bg-white/[0.02] border-white/5 text-slate-500'
+                }`}
+              >
+                {isCurrent && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
+                )}
+                <div className="flex items-center justify-between w-full">
+                  <span className="text-base">{item.icon}</span>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-full ${
+                      isPast
+                        ? 'bg-emerald-500/20 text-emerald-400'
+                        : isCurrent
+                        ? 'bg-indigo-500/30 text-indigo-300'
+                        : 'bg-slate-800 text-slate-500'
+                    }`}
+                  >
+                    {isPast ? '✓ Done' : `0${item.num}`}
+                  </span>
+                </div>
+                <div className="mt-1">
+                  <div className="text-xs font-bold truncate">{item.title}</div>
+                  <div className="text-[10px] opacity-60 truncate">{item.subtitle}</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* STEP 1: Legal Info Form */}
       {step === 1 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)] border-b border-[var(--color-border)] pb-2">
-            Step 1: Institutional Legal & Regional Information
-          </h3>
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+          <div className="border-b border-white/10 pb-3">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <span>🏛️</span>
+              <span>Step 1: Institutional Legal & Regional Profile</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Enter official banking consortium identifier and designated sovereign data residency region.
+            </p>
+          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-[var(--color-text-muted)] uppercase block mb-1">Bank Identifier (ID)</label>
+              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+                Bank Identifier (ID)
+              </label>
               <input
                 type="text"
                 value={formData.bank_id}
                 onChange={(e) => handleInputChange('bank_id', e.target.value)}
-                className="w-full bg-slate-900/80 border border-[var(--color-border)] rounded-lg p-2.5 text-sm text-[var(--color-text-primary)]"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 font-mono transition outline-none"
                 placeholder="e.g. bank_delta"
               />
             </div>
 
             <div>
-              <label className="text-xs text-[var(--color-text-muted)] uppercase block mb-1">Full Legal Name</label>
+              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+                Full Legal Entity Name
+              </label>
               <input
                 type="text"
                 value={formData.legal_name}
                 onChange={(e) => handleInputChange('legal_name', e.target.value)}
-                className="w-full bg-slate-900/80 border border-[var(--color-border)] rounded-lg p-2.5 text-sm text-[var(--color-text-primary)]"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
                 placeholder="e.g. Delta International Bank AG"
               />
             </div>
 
             <div>
-              <label className="text-xs text-[var(--color-text-muted)] uppercase block mb-1">Legal Jurisdiction</label>
+              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+                Legal Jurisdiction
+              </label>
               <select
                 value={formData.jurisdiction}
                 onChange={(e) => handleInputChange('jurisdiction', e.target.value)}
-                className="w-full bg-slate-900/80 border border-[var(--color-border)] rounded-lg p-2.5 text-sm text-[var(--color-text-primary)]"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
               >
-                <option value="EU">European Union (EU)</option>
-                <option value="US">United States (US)</option>
-                <option value="UK">United Kingdom (UK)</option>
-                <option value="TR">Turkey (TR)</option>
-                <option value="SG">Singapore (SG)</option>
-                <option value="JP">Japan (JP)</option>
+                <option value="EU">European Union (EU - GDPR)</option>
+                <option value="US">United States (US - FinCEN)</option>
+                <option value="UK">United Kingdom (UK - FCA)</option>
+                <option value="TR">Turkey (TR - BDDK / KVKK)</option>
+                <option value="SG">Singapore (SG - MAS)</option>
+                <option value="JP">Japan (JP - FSA)</option>
               </select>
             </div>
 
             <div>
-              <label className="text-xs text-[var(--color-text-muted)] uppercase block mb-1">Security Contact Email</label>
+              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+                Security Contact Email
+              </label>
               <input
                 type="email"
                 value={formData.contact_email}
                 onChange={(e) => handleInputChange('contact_email', e.target.value)}
-                className="w-full bg-slate-900/80 border border-[var(--color-border)] rounded-lg p-2.5 text-sm text-[var(--color-text-primary)]"
-                placeholder="secops@bank.com"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+                placeholder="secops@deltabank.eu"
               />
             </div>
 
-            <div className="md:col-span-2">
-              <label className="text-xs text-[var(--color-text-muted)] uppercase block mb-1">Data Residency Region</label>
+            <div className="sm:col-span-2">
+              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
+                Data Residency Region
+              </label>
               <select
                 value={formData.data_residency_region}
                 onChange={(e) => handleInputChange('data_residency_region', e.target.value)}
-                className="w-full bg-slate-900/80 border border-[var(--color-border)] rounded-lg p-2.5 text-sm text-[var(--color-text-primary)]"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
               >
-                <option value="eu-central-1">eu-central-1 (Frankfurt, Germany)</option>
-                <option value="us-east-1">us-east-1 (N. Virginia, USA)</option>
-                <option value="ap-southeast-1">ap-southeast-1 (Singapore)</option>
+                <option value="eu-central-1">eu-central-1 (Frankfurt, Germany - ISO 27001 Enclave)</option>
+                <option value="us-east-1">us-east-1 (N. Virginia, USA - SOC2 Type II)</option>
+                <option value="ap-southeast-1">ap-southeast-1 (Singapore - MAS TRM)</option>
               </select>
             </div>
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(2)}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Continue to Step 2 →
+              <span>Continue to Step 2</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>
@@ -253,47 +376,64 @@ differential_privacy:
 
       {/* STEP 2: Review & Submit */}
       {step === 2 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)] border-b border-[var(--color-border)] pb-2">
-            Step 2: Review Registration Details
-          </h3>
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+          <div className="border-b border-white/10 pb-3">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <span>📋</span>
+              <span>Step 2: Review Registration Details</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Confirm legal entity credentials before generating cryptographic mTLS X.509 certificates.
+            </p>
+          </div>
 
-          <div className="p-4 rounded-xl bg-slate-900/60 border border-[var(--color-border)] space-y-2 text-sm">
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-[var(--color-text-muted)]">Bank ID:</span>
+          <div className="p-4 rounded-xl bg-[#03040d]/80 border border-white/10 space-y-2.5 text-xs sm:text-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+              <span className="text-slate-400 font-semibold">Consortium Bank ID:</span>
               <span className="font-mono font-bold text-indigo-400">{formData.bank_id}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-[var(--color-text-muted)]">Legal Name:</span>
-              <span className="font-bold text-[var(--color-text-primary)]">{formData.legal_name}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+              <span className="text-slate-400 font-semibold">Legal Entity Name:</span>
+              <span className="font-bold text-slate-200">{formData.legal_name}</span>
             </div>
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-[var(--color-text-muted)]">Jurisdiction:</span>
-              <span className="font-bold text-emerald-400">{formData.jurisdiction}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+              <span className="text-slate-400 font-semibold">Jurisdiction & Standard:</span>
+              <span className="font-bold text-emerald-400">{formData.jurisdiction} Compliance</span>
             </div>
-            <div className="flex justify-between border-b border-slate-800 pb-2">
-              <span className="text-[var(--color-text-muted)]">Security Contact:</span>
-              <span className="text-[var(--color-text-primary)]">{formData.contact_email}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-white/5 pb-2 gap-1">
+              <span className="text-slate-400 font-semibold">SecOps Contact:</span>
+              <span className="text-slate-200 font-mono">{formData.contact_email}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-[var(--color-text-muted)]">Data Residency Region:</span>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+              <span className="text-slate-400 font-semibold">Data Residency Region:</span>
               <span className="font-mono text-indigo-300">{formData.data_residency_region}</span>
             </div>
           </div>
 
-          <div className="flex justify-between pt-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(1)}
-              className="px-4 py-2 rounded-lg text-sm text-[var(--color-text-muted)] hover:text-white"
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              ← Back
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Step 1</span>
             </button>
             <button
               onClick={handleRegisterSubmit}
               disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors disabled:opacity-50"
+              className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
             >
-              {isSubmitting ? 'Registering...' : 'Confirm & Register Institution ✓'}
+              {isSubmitting ? (
+                <>
+                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <span>Issuing X.509 Credentials...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Confirm & Issue Credentials ✓</span>
+                </>
+              )}
             </button>
           </div>
         </motion.div>
@@ -301,48 +441,70 @@ differential_privacy:
 
       {/* STEP 3: Download Certificates */}
       {step === 3 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)] border-b border-[var(--color-border)] pb-2">
-            Step 3: Download X.509 mTLS Certificate & Key
-          </h3>
-          <p className="text-xs text-[var(--color-text-muted)]">
-            Cryptographic identity issued for node authentication over gRPC mTLS.
-          </p>
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+          <div className="border-b border-white/10 pb-3">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <span>🔑</span>
+              <span>Step 3: Cryptographic X.509 mTLS Keypair</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Unique mutual TLS identity issued for node authentication over gRPC secure channel.
+            </p>
+          </div>
 
-          <div className="space-y-3">
-            <div>
-              <p className="text-xs font-bold text-emerald-400 mb-1">X.509 Public Certificate (bank.crt)</p>
-              <pre className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-emerald-300 overflow-x-auto max-h-32 border border-slate-800">
+          <div className="space-y-4">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-emerald-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold font-mono text-emerald-400 flex items-center gap-1.5">
+                  <FileCode className="w-3.5 h-3.5" />
+                  X.509 Public Certificate ({formData.bank_id}.crt)
+                </span>
+                <span className="text-[9.5px] font-mono text-emerald-400/80 bg-emerald-500/10 px-2 py-0.5 rounded">
+                  2048-bit RSA
+                </span>
+              </div>
+              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-emerald-300 overflow-x-auto max-h-28 border border-white/5 custom-scrollbar">
                 {generatedCert}
               </pre>
               <button
                 onClick={() => downloadFile(`${formData.bank_id}.crt`, generatedCert)}
-                className="mt-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 hover:bg-emerald-600/30"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600/20 text-emerald-300 border border-emerald-500/30 hover:bg-emerald-600/30 transition flex items-center gap-1.5 cursor-pointer"
               >
-                📥 Download {formData.bank_id}.crt
+                <Download className="w-3.5 h-3.5" />
+                <span>Download {formData.bank_id}.crt</span>
               </button>
             </div>
 
-            <div>
-              <p className="text-xs font-bold text-amber-400 mb-1">RSA Private Key (bank.key)</p>
-              <pre className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-amber-300 overflow-x-auto max-h-32 border border-slate-800">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-amber-500/20 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold font-mono text-amber-400 flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" />
+                  RSA Private Key ({formData.bank_id}.key)
+                </span>
+                <span className="text-[9.5px] font-mono text-amber-400/80 bg-amber-500/10 px-2 py-0.5 rounded">
+                  CONFIDENTIAL
+                </span>
+              </div>
+              <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-amber-300 overflow-x-auto max-h-28 border border-white/5 custom-scrollbar">
                 {generatedKey}
               </pre>
               <button
                 onClick={() => downloadFile(`${formData.bank_id}.key`, generatedKey)}
-                className="mt-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-amber-600/20 text-amber-400 border border-amber-500/30 hover:bg-amber-600/30"
+                className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-amber-600/20 text-amber-300 border border-amber-500/30 hover:bg-amber-600/30 transition flex items-center gap-1.5 cursor-pointer"
               >
-                🔑 Download {formData.bank_id}.key
+                <Download className="w-3.5 h-3.5" />
+                <span>Download {formData.bank_id}.key</span>
               </button>
             </div>
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(4)}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Continue to Step 4 →
+              <span>Continue to Step 4</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>
@@ -350,37 +512,66 @@ differential_privacy:
 
       {/* STEP 4: Download Connector Config */}
       {step === 4 && (
-        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-6 space-y-4">
-          <h3 className="text-lg font-bold text-[var(--color-text-primary)] border-b border-[var(--color-border)] pb-2">
-            Step 4: Download Connector Configuration YAML
-          </h3>
+        <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="glass-card p-4 sm:p-6 space-y-4 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
+          <div className="border-b border-white/10 pb-3">
+            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
+              <span>📄</span>
+              <span>Step 4: Connector Configuration YAML</span>
+            </h3>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Production configuration manifest for launching local bank node container.
+            </p>
+          </div>
 
-          <div>
-            <p className="text-xs font-bold text-indigo-400 mb-1">Generated config.yaml</p>
-            <pre className="p-3 bg-slate-950 rounded-lg text-xs font-mono text-indigo-300 overflow-x-auto max-h-44 border border-slate-800">
+          <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-indigo-500/20 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold font-mono text-indigo-400 flex items-center gap-1.5">
+                <FileText className="w-3.5 h-3.5" />
+                Generated config.yaml
+              </span>
+            </div>
+            <pre className="p-3 bg-black/50 rounded-lg text-[11px] font-mono text-indigo-200 overflow-x-auto max-h-36 border border-white/5 custom-scrollbar">
               {generatedYaml}
             </pre>
             <button
               onClick={() => downloadFile('config.yaml', generatedYaml)}
-              className="mt-2 px-3 py-1.5 rounded-md text-xs font-semibold bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600/30"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-600/30 transition flex items-center gap-1.5 cursor-pointer"
             >
-              📄 Download config.yaml
+              <Download className="w-3.5 h-3.5" />
+              <span>Download config.yaml</span>
             </button>
           </div>
 
-          <div className="p-4 rounded-xl bg-slate-900 border border-slate-800 space-y-2">
-            <p className="text-xs font-bold text-[var(--color-text-primary)]">CLI Command for IT Operations Team:</p>
-            <code className="block p-2 bg-slate-950 rounded text-xs font-mono text-emerald-400">
+          <div className="p-4 rounded-xl bg-[#03040d] border border-white/10 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                CLI Command for Bank IT Operations Team
+              </span>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`cfi-cli join --config config.yaml --cert ${formData.bank_id}.crt --key ${formData.bank_id}.key`);
+                  setIsCliCopied(true);
+                  setTimeout(() => setIsCliCopied(false), 2000);
+                }}
+                className="px-2 py-0.5 rounded text-[10px] font-mono text-slate-400 hover:text-white bg-white/5 border border-white/10 transition flex items-center gap-1 cursor-pointer"
+              >
+                {isCliCopied ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                <span>{isCliCopied ? 'Copied' : 'Copy'}</span>
+              </button>
+            </div>
+            <code className="block p-2.5 bg-black/60 rounded-lg text-xs font-mono text-emerald-400 border border-emerald-500/20 overflow-x-auto">
               cfi-cli join --config config.yaml --cert {formData.bank_id}.crt --key {formData.bank_id}.key
             </code>
           </div>
 
-          <div className="flex justify-end pt-4">
+          <div className="flex justify-end pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(5)}
-              className="px-6 py-2.5 rounded-lg text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-500 transition-colors"
+              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
             >
-              Proceed to Connection Verification →
+              <span>Proceed to Quorum Verification</span>
+              <ArrowRight className="w-4 h-4" />
             </button>
           </div>
         </motion.div>
@@ -388,32 +579,52 @@ differential_privacy:
 
       {/* STEP 5: Verify Connection */}
       {step === 5 && (
-        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-8 text-center space-y-4">
+        <motion.div initial={{ opacity: 0, scale: 0.98 }} animate={{ opacity: 1, scale: 1 }} className="glass-card p-6 sm:p-10 text-center space-y-6 rounded-2xl bg-[#080a21]/90 border border-indigo-500/20 shadow-xl min-w-0">
           {nodeStatus === 'PENDING' ? (
-            <div>
-              <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <h3 className="text-xl font-bold text-[var(--color-text-primary)]">
-                Waiting for Bank Node Heartbeat...
-              </h3>
-              <p className="text-sm text-[var(--color-text-muted)] mt-1">
-                Polling status for <span className="font-mono text-indigo-400">{formData.bank_id}</span> every 5 seconds...
-              </p>
+            <div className="space-y-4 max-w-md mx-auto">
+              <div className="relative flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 border border-indigo-500/30 mx-auto">
+                <Radio className="w-8 h-8 text-indigo-400 animate-pulse" />
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-20" />
+              </div>
+              <div>
+                <h3 className="text-lg sm:text-xl font-bold text-slate-100">
+                  Listening for Bank Node Heartbeat...
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+                  Awaiting initial gRPC mTLS 1.3 handshake from <span className="font-mono text-indigo-400 font-bold">{formData.bank_id}</span> on port 50051.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 text-xs font-mono text-slate-500">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                <span>Polling node status every 3s...</span>
+              </div>
             </div>
           ) : (
-            <div>
-              <div className="text-5xl mb-3">✅</div>
-              <h3 className="text-2xl font-extrabold text-emerald-400">
-                Bank Node Successfully Onboarded!
-              </h3>
-              <p className="text-sm text-[var(--color-text-muted)] mt-1 max-w-md mx-auto">
-                <span className="font-bold text-[var(--color-text-primary)]">{formData.legal_name}</span> is now an active participant in the CFI Consortium.
-              </p>
-              <div className="pt-6">
+            <div className="space-y-5 max-w-md mx-auto">
+              <div className="w-16 h-16 rounded-2xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto text-emerald-400 shadow-[0_0_25px_rgba(16,185,129,0.3)]">
+                <ShieldCheck className="w-9 h-9" />
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-extrabold text-emerald-400 tracking-tight">
+                  Bank Node Successfully Onboarded!
+                </h3>
+                <p className="text-xs sm:text-sm text-slate-300 mt-1.5 leading-relaxed">
+                  <span className="font-bold text-white">{formData.legal_name}</span> is now fully verified and registered as an active node in the Privacy-Preserving FL Consortium.
+                </p>
+              </div>
+
+              <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs font-mono text-emerald-300 flex items-center justify-between">
+                <span>Node Quorum Status:</span>
+                <span className="font-bold">ACTIVE (100% HEALTHY)</span>
+              </div>
+
+              <div className="pt-2">
                 <Link
                   to="/operations"
-                  className="px-6 py-3 rounded-lg text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 transition-colors inline-block"
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  View Live Operations Dashboard →
+                  <span>View Live Operations Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -423,3 +634,4 @@ differential_privacy:
     </div>
   );
 }
+

@@ -2,6 +2,18 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useRegisteredClients, useNegotiatedParams } from '../api/queries';
 import type { ClientCapabilityItem } from '../api/types';
+import {
+  Server,
+  RefreshCw,
+  Zap,
+  ShieldCheck,
+  AlertTriangle,
+  HardDrive,
+  Copy,
+  Check,
+  Activity,
+  Layers,
+} from 'lucide-react';
 
 // Fallback bank nodes for interactive demonstration if backend client list is empty
 const DEMO_CLIENTS: ClientCapabilityItem[] = [
@@ -36,54 +48,6 @@ const DEMO_CLIENTS: ClientCapabilityItem[] = [
     last_heartbeat_ago_seconds: 4.1,
   },
 ];
-
-// SVG Icon Helpers
-const RefreshIcon = ({ isSpinning }: { isSpinning: boolean }) => (
-  <svg
-    className={`w-4 h-4 text-slate-200 transition-transform ${isSpinning ? 'animate-spin' : ''}`}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3L21.5 8M22 12.5a10 10 0 0 1-18.8 4.3L2.5 16" />
-  </svg>
-);
-
-const CpuIcon = () => (
-  <svg className="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="4" y="4" width="16" height="16" rx="2" />
-    <rect x="9" y="9" width="6" height="6" />
-    <path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 15h3M1 9h3M1 15h3" />
-  </svg>
-);
-
-const ZapIcon = () => (
-  <svg className="w-5 h-5 text-purple-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-  </svg>
-);
-
-const ShieldIcon = () => (
-  <svg className="w-5 h-5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-  </svg>
-);
-
-const ServerIcon = () => (
-  <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
-    <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
-    <line x1="6" y1="6" x2="6.01" y2="6" />
-    <line x1="6" y1="18" x2="6.01" y2="18" />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg className="w-4 h-4 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
 
 export default function CoordinatorPage() {
   const { data: apiClients, refetch } = useRegisteredClients();
@@ -127,64 +91,69 @@ export default function CoordinatorPage() {
     (displayClients.find((c) => c.bank_id === selectedBankId) || displayClients[0] || DEMO_CLIENTS[0]) as ClientCapabilityItem;
 
   return (
-    <div className="p-4 sm:p-6 md:p-8 space-y-8 max-w-7xl mx-auto text-slate-100 w-full min-w-0 overflow-x-hidden">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-6 border-b border-slate-800 min-w-0">
+    <div className="space-y-4 sm:space-y-6 max-w-7xl mx-auto text-slate-100 w-full min-w-0">
+      {/* Top Header Banner */}
+      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 opacity-70" />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shadow-lg shadow-indigo-500/5 shrink-0">
-              <ServerIcon />
+            <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
+              <Server className="w-6 h-6 text-indigo-300" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-xl sm:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent truncate">
-                Federated Coordinator Suite
-              </h1>
-              <p className="text-xs md:text-sm text-slate-400 mt-0.5 leading-tight">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-lg sm:text-2xl font-black text-slate-100 tracking-tight truncate">
+                  Federated Coordinator Suite
+                </h1>
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                  gRPC 50051
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
                 Dynamic client registry, live heartbeat monitoring, and hardware-aware parameter negotiation
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 shrink-0">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] sm:text-xs font-semibold">
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span>100% Quorum Active ({onlineClients.length}/{displayClients.length} Nodes)</span>
           </div>
 
           <button
             onClick={handleRefresh}
-            className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700 text-xs font-semibold transition-all duration-200 shadow-sm whitespace-nowrap"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-200 transition-all cursor-pointer whitespace-nowrap"
           >
-            <RefreshIcon isSpinning={isRefreshing} />
+            <RefreshCw className={`w-3.5 h-3.5 text-slate-300 ${isRefreshing ? 'animate-spin' : ''}`} />
             <span>Refresh Registry</span>
           </button>
         </div>
       </div>
 
       {/* Summary Stat Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 min-w-0">
         {/* Card 1: Online Clients */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.05 }}
-          className="glass-card p-5 border border-slate-800/80 rounded-2xl bg-slate-900/40 relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300"
+          className="glass-card p-4 sm:p-5 border border-slate-800/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-emerald-500/40 transition-all duration-300 min-w-0"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Online Clients</span>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              <ShieldIcon />
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              <ShieldCheck className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-100 font-mono">{onlineClients.length}</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-100 font-mono">{onlineClients.length}</span>
             <span className="text-xs font-bold text-emerald-400">/ {displayClients.length} Nodes</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2 flex items-center gap-1.5">
+          <p className="text-xs text-slate-400 mt-1.5 flex items-center gap-1.5">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-            Receiving heartbeats &lt; 15s SLA
+            Heartbeats &lt; 15s SLA
           </p>
         </motion.div>
 
@@ -193,21 +162,20 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
-          className="glass-card p-5 border border-slate-800/80 rounded-2xl bg-slate-900/40 relative overflow-hidden group hover:border-rose-500/40 transition-all duration-300"
+          className="glass-card p-4 sm:p-5 border border-slate-800/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-rose-500/40 transition-all duration-300 min-w-0"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-rose-500/5 rounded-full blur-2xl group-hover:bg-rose-500/10 transition-all" />
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Offline / Timed Out</span>
-            <div className="p-2 rounded-lg bg-rose-500/10 text-rose-400 border border-rose-500/20">
-              <span className="text-sm font-bold">⚠️</span>
+            <div className="p-2 rounded-xl bg-rose-500/10 text-rose-400 border border-rose-500/20">
+              <AlertTriangle className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-100 font-mono">{offlineClients.length}</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-100 font-mono">{offlineClients.length}</span>
             <span className="text-xs font-medium text-slate-400">Nodes Excluded</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2">
-            {offlineClients.length === 0 ? 'Zero cluster communication drops' : 'Stale nodes automatically isolated'}
+          <p className="text-xs text-slate-400 mt-1.5">
+            {offlineClients.length === 0 ? 'Zero cluster communication drops' : 'Stale nodes isolated'}
           </p>
         </motion.div>
 
@@ -216,20 +184,19 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.15 }}
-          className="glass-card p-5 border border-slate-800/80 rounded-2xl bg-slate-900/40 relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300"
+          className="glass-card p-4 sm:p-5 border border-slate-800/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300 min-w-0"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-purple-500/5 rounded-full blur-2xl group-hover:bg-purple-500/10 transition-all" />
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">GPU Accelerated</span>
-            <div className="p-2 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
-              <ZapIcon />
+            <div className="p-2 rounded-xl bg-purple-500/10 text-purple-400 border border-purple-500/20">
+              <Zap className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-100 font-mono">{gpuClients.length}</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-100 font-mono">{gpuClients.length}</span>
             <span className="text-xs font-bold text-purple-400">CUDA Enabled</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2">NVIDIA Tensor Core acceleration</p>
+          <p className="text-xs text-slate-400 mt-1.5">NVIDIA Tensor Core acceleration</p>
         </motion.div>
 
         {/* Card 4: Total RAM Capacity */}
@@ -237,31 +204,30 @@ export default function CoordinatorPage() {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.2 }}
-          className="glass-card p-5 border border-slate-800/80 rounded-2xl bg-slate-900/40 relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300"
+          className="glass-card p-4 sm:p-5 border border-slate-800/80 rounded-2xl bg-[#080a21]/80 relative overflow-hidden group hover:border-blue-500/40 transition-all duration-300 min-w-0"
         >
-          <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-2xl group-hover:bg-blue-500/10 transition-all" />
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-2.5">
             <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Total RAM Pool</span>
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
-              <CpuIcon />
+            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              <HardDrive className="w-4 h-4" />
             </div>
           </div>
           <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-black text-slate-100 font-mono">{totalRamGb}</span>
+            <span className="text-2xl sm:text-3xl font-black text-slate-100 font-mono">{totalRamGb}</span>
             <span className="text-xs font-bold text-blue-400">GB System Memory</span>
           </div>
-          <p className="text-xs text-slate-500 mt-2">Distributed memory capacity</p>
+          <p className="text-xs text-slate-400 mt-1.5">Distributed memory capacity</p>
         </motion.div>
       </div>
 
-      {/* Main Section: Live Client Registry Table */}
+      {/* Main Section: Live Client Registry */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.25 }}
-        className="glass-card border border-slate-800/80 rounded-2xl bg-slate-900/50 backdrop-blur-xl overflow-hidden shadow-xl"
+        className="glass-card border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 shadow-xl overflow-hidden min-w-0"
       >
-        <div className="p-5 border-b border-slate-800/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-slate-950/40">
+        <div className="p-4 sm:p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[#03040d]/60">
           <div>
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
               <span className="h-2 w-2 rounded-full bg-indigo-400 animate-pulse" />
@@ -271,12 +237,91 @@ export default function CoordinatorPage() {
               Participating banking nodes registered via REST handshake (/api/v1/coordinator/handshake)
             </p>
           </div>
-          <div className="text-xs text-slate-400 bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-700/50 self-start sm:self-auto font-mono">
+          <div className="text-[11px] text-indigo-300 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20 self-start sm:self-auto font-mono">
             Auto-ping interval: 5.0s
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* Mobile View: Stacked Node Cards (< 768px, Zero Horizontal Scroll) */}
+        <div className="block md:hidden p-3.5 space-y-3">
+          {displayClients.map((client) => {
+            const isSelected = selectedBankId === client.bank_id;
+            const isCuda = client.hardware_type === 'cuda';
+            const isOnline = client.status === 'ONLINE';
+
+            return (
+              <div
+                key={client.bank_id}
+                className={`p-3.5 rounded-xl border transition-all space-y-3 ${
+                  isSelected
+                    ? 'bg-indigo-600/15 border-indigo-500/60 shadow-md shadow-indigo-600/10'
+                    : 'bg-[#03040d]/70 border-white/5'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="h-8 w-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center font-mono text-xs font-bold shrink-0">
+                      {client.bank_id.split('_')[1]?.slice(0, 2).toUpperCase() || 'BK'}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-mono text-sm font-bold text-slate-100 truncate">{client.bank_id}</div>
+                      <div className="text-[10px] text-slate-400 font-mono">
+                        Heartbeat: {client.last_heartbeat_ago_seconds.toFixed(1)}s ago
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        isOnline
+                          ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                          : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                      }`}
+                    >
+                      <span className={`h-1.5 w-1.5 rounded-full ${isOnline ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'}`} />
+                      {client.status}
+                    </span>
+                    <button
+                      onClick={() => setSelectedBankId(client.bank_id)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition cursor-pointer border ${
+                        isSelected
+                          ? 'bg-indigo-600 text-white border-indigo-400'
+                          : 'bg-white/5 hover:bg-white/10 text-slate-300 border-white/10'
+                      }`}
+                    >
+                      {isSelected ? 'Active' : 'Select'}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
+                    <span className="text-slate-400">HW Engine:</span>
+                    <span className={isCuda ? 'text-purple-300 font-bold' : 'text-slate-300'}>
+                      {isCuda ? `⚡ CUDA (${client.device_count}x)` : '🖥️ CPU'}
+                    </span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
+                    <span className="text-slate-400">RAM Pool:</span>
+                    <span className="text-slate-200 font-bold">{client.ram_gb.toFixed(0)} GB</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
+                    <span className="text-slate-400">PyTorch:</span>
+                    <span className="text-indigo-300">{client.pytorch_version.split('+')[0]}</span>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5 flex justify-between">
+                    <span className="text-slate-400">Python:</span>
+                    <span className="text-slate-300">{client.python_version}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Table View (>= 768px) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-slate-950/60 border-b border-slate-800 text-slate-400 font-semibold uppercase tracking-wider">
@@ -291,7 +336,7 @@ export default function CoordinatorPage() {
                 <th className="py-3.5 px-4 text-right">Negotiate</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody className="divide-y divide-slate-800/60 font-mono">
               {displayClients.map((client) => {
                 const isSelected = selectedBankId === client.bank_id;
                 const isCuda = client.hardware_type === 'cuda';
@@ -333,17 +378,17 @@ export default function CoordinatorPage() {
                         {isCuda ? '⚡ CUDA' : '🖥️ CPU'}
                       </span>
                     </td>
-                    <td className="py-3.5 px-4 font-mono text-slate-300">{client.pytorch_version}</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-400">{client.python_version}</td>
-                    <td className="py-3.5 px-4 font-mono font-bold text-slate-200">{client.ram_gb.toFixed(1)} GB</td>
-                    <td className="py-3.5 px-4 font-mono text-slate-300">
+                    <td className="py-3.5 px-4 text-slate-300">{client.pytorch_version}</td>
+                    <td className="py-3.5 px-4 text-slate-400">{client.python_version}</td>
+                    <td className="py-3.5 px-4 font-bold text-slate-200">{client.ram_gb.toFixed(1)} GB</td>
+                    <td className="py-3.5 px-4 text-slate-300">
                       {client.device_count > 0 ? (
                         <span className="text-purple-400 font-bold">{client.device_count}x GPU</span>
                       ) : (
                         <span className="text-slate-500">0 (CPU Host)</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 font-mono">
+                    <td className="py-3.5 px-4">
                       <span className={client.last_heartbeat_ago_seconds > 10 ? 'text-rose-400 font-bold' : 'text-emerald-400'}>
                         {client.last_heartbeat_ago_seconds.toFixed(1)}s ago
                       </span>
@@ -351,7 +396,7 @@ export default function CoordinatorPage() {
                     <td className="py-3.5 px-4 text-right">
                       <button
                         onClick={() => setSelectedBankId(client.bank_id)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border ${
+                        className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 border cursor-pointer ${
                           isSelected
                             ? 'bg-indigo-600 text-white border-indigo-500 shadow-md shadow-indigo-600/30'
                             : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
@@ -373,51 +418,82 @@ export default function CoordinatorPage() {
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, delay: 0.3 }}
-        className="glass-card border border-indigo-500/20 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/90 p-6 shadow-2xl relative overflow-hidden"
+        className="glass-card border border-indigo-500/25 rounded-2xl bg-gradient-to-b from-[#080a24]/95 via-[#06081c]/90 to-[#03040e]/95 p-4 sm:p-6 shadow-2xl relative overflow-hidden min-w-0"
       >
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-indigo-500 to-transparent" />
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-6 border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-mono text-xs font-bold border border-indigo-500/30">
-                ACTIVE PLAYGROUND
-              </span>
-              <h3 className="text-lg font-bold text-slate-100">
-                Hardware-Aware Heterogeneous Parameter Negotiator
-              </h3>
+        {/* Card Header & Node Selector */}
+        <div className="space-y-4 pb-5 border-b border-white/10">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                  Active Playground
+                </span>
+                <span className="text-xs font-mono text-slate-400">· Dynamic Scaling Engine</span>
+              </div>
+              <h2 className="text-base sm:text-xl font-black text-slate-100 tracking-tight">
+                Hardware-Aware Parameter Negotiator
+              </h2>
+              <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                Auto-tunes batch size and epochs per banking node to eliminate straggler latency and prevent OOM errors.
+              </p>
             </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Select a banking node and adjust global baseline parameters to see dynamic scaling calculations based on hardware capability.
-            </p>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto">
+              <span className="text-[11px] font-mono text-slate-400">Target Node:</span>
+              <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 text-indigo-300 border border-indigo-500/40">
+                {selectedBankId}
+              </span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-800/80 p-1.5 rounded-xl border border-slate-700 max-w-full">
-            {displayClients.map((c) => (
-              <button
-                key={c.bank_id}
-                onClick={() => setSelectedBankId(c.bank_id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  selectedBankId === c.bank_id
-                    ? 'bg-indigo-600 text-white shadow-md'
-                    : 'text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                {c.bank_id}
-              </button>
-            ))}
+          {/* Bank Node Segmented Selector Bar (3 Columns, Zero Overflow) */}
+          <div className="grid grid-cols-3 gap-2 bg-[#02030a]/80 p-1.5 rounded-xl border border-white/10 min-w-0">
+            {displayClients.map((c) => {
+              const isSelected = selectedBankId === c.bank_id;
+              const isCuda = c.hardware_type === 'cuda';
+
+              return (
+                <button
+                  key={c.bank_id}
+                  onClick={() => setSelectedBankId(c.bank_id)}
+                  className={`p-2 sm:p-2.5 rounded-lg text-left transition-all duration-200 cursor-pointer min-w-0 flex flex-col justify-center border ${
+                    isSelected
+                      ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500 text-white shadow-lg shadow-indigo-600/20'
+                      : 'bg-white/[0.02] hover:bg-white/[0.06] border-white/5 text-slate-400'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="font-mono text-xs font-bold truncate">
+                      {c.bank_id.split('_')[1]?.toUpperCase() || c.bank_id}
+                    </span>
+                    {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
+                  </div>
+                  <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
+                    {isCuda ? `⚡ ${c.device_count}x GPU` : `🖥️ CPU`}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mt-6">
-          {/* Slider Controls */}
-          <div className="lg:col-span-5 space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
+        {/* Interactive Controls & Results Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 mt-5 min-w-0">
+          {/* Left Column: Sliders & Preset Pills */}
+          <div className="lg:col-span-5 space-y-4 min-w-0">
+            {/* Batch Size Slider */}
+            <div className="p-3.5 rounded-xl bg-[#02030a]/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Base Batch Size
                 </label>
-                <span className="text-sm font-mono font-bold text-indigo-400">{baseBatchSize}</span>
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                  {baseBatchSize} samples
+                </span>
               </div>
               <input
                 type="range"
@@ -428,20 +504,35 @@ export default function CoordinatorPage() {
                 onChange={(e) => setBaseBatchSize(Number(e.target.value))}
                 className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
               />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-                <span>16</span>
-                <span>64</span>
-                <span>128</span>
-                <span>256</span>
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 font-mono mr-1">Presets:</span>
+                {[16, 32, 64, 128, 256].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setBaseBatchSize(val)}
+                    className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
+                      baseBatchSize === val
+                        ? 'bg-indigo-600 text-white border-indigo-400 shadow-sm'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-400 border-white/5'
+                    }`}
+                  >
+                    {val}
+                  </button>
+                ))}
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-2">
+            {/* Local Epochs Slider */}
+            <div className="p-3.5 rounded-xl bg-[#02030a]/60 border border-white/10 space-y-3">
+              <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-slate-300 uppercase tracking-wider">
                   Base Local Epochs
                 </label>
-                <span className="text-sm font-mono font-bold text-indigo-400">{baseEpochs}</span>
+                <span className="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  {baseEpochs} epochs
+                </span>
               </div>
               <input
                 type="range"
@@ -450,93 +541,135 @@ export default function CoordinatorPage() {
                 step="1"
                 value={baseEpochs}
                 onChange={(e) => setBaseEpochs(Number(e.target.value))}
-                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-500"
               />
-              <div className="flex justify-between text-[10px] text-slate-500 font-mono mt-1">
-                <span>1</span>
-                <span>3</span>
-                <span>5</span>
-                <span>10</span>
+              {/* Quick Presets */}
+              <div className="flex items-center gap-1.5 pt-1">
+                <span className="text-[10px] text-slate-400 font-mono mr-1">Presets:</span>
+                {[1, 2, 3, 5, 8, 10].map((val) => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => setBaseEpochs(val)}
+                    className={`flex-1 py-1 rounded text-[10px] font-mono font-semibold transition cursor-pointer border ${
+                      baseEpochs === val
+                        ? 'bg-purple-600 text-white border-purple-400 shadow-sm'
+                        : 'bg-white/5 hover:bg-white/10 text-slate-400 border-white/5'
+                    }`}
+                  >
+                    {val}
+                  </button>
+                ))}
               </div>
             </div>
 
             {/* Target Hardware Summary */}
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-2">
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Selected Client Specs</span>
+            <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-2 min-w-0">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
+                {activeClient.bank_id} Hardware Profile
+              </span>
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                <div>
-                  <span className="text-slate-500">Hardware:</span>{' '}
-                  <span className="text-purple-400 font-bold uppercase">{activeClient.hardware_type}</span>
+                <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-[10px] text-slate-400">Compute</div>
+                  <div className="text-purple-300 font-bold uppercase truncate">{activeClient.hardware_type}</div>
                 </div>
-                <div>
-                  <span className="text-slate-500">RAM:</span>{' '}
-                  <span className="text-slate-200 font-bold">{activeClient.ram_gb} GB</span>
+                <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-[10px] text-slate-400">RAM Pool</div>
+                  <div className="text-slate-200 font-bold">{activeClient.ram_gb} GB</div>
                 </div>
-                <div>
-                  <span className="text-slate-500">GPUs:</span>{' '}
-                  <span className="text-slate-200 font-bold">{activeClient.device_count}</span>
+                <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-[10px] text-slate-400">GPU Devices</div>
+                  <div className="text-slate-200 font-bold">{activeClient.device_count}x Units</div>
                 </div>
-                <div>
-                  <span className="text-slate-500">PyTorch:</span>{' '}
-                  <span className="text-slate-200 font-bold">{activeClient.pytorch_version.split('+')[0]}</span>
+                <div className="p-2 rounded-lg bg-white/[0.02] border border-white/5">
+                  <div className="text-[10px] text-slate-400">PyTorch Core</div>
+                  <div className="text-indigo-300 font-bold truncate">{activeClient.pytorch_version.split('+')[0]}</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Negotiated Results Display Cards */}
-          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-indigo-500/30 flex flex-col justify-between">
+          {/* Right Column: 4 Negotiated Telemetry Cards */}
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-3 min-w-0">
+            {/* Metric 1: Scaled Batch Size */}
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-indigo-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-indigo-500/50 transition-all min-w-0">
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Calculated Scaled Batch Size</span>
-                <p className="text-xs text-slate-500 mt-0.5">Adjusted for VRAM / RAM constraints</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scaled Batch Size</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                    VRAM Fit
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Adjusted for client VRAM & memory ceiling</p>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-3xl font-black text-indigo-400 font-mono">
                   {negotiatedData?.batch_size ??
                     (activeClient.hardware_type === 'cuda' ? baseBatchSize : Math.max(16, Math.floor(baseBatchSize / 2)))}
                 </span>
-                <span className="text-xs text-slate-400 ml-2">samples / step</span>
+                <span className="text-xs text-slate-400 font-mono">samples / step</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-purple-500/30 flex flex-col justify-between">
+            {/* Metric 2: Scaled Epochs */}
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-purple-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-purple-500/50 transition-all min-w-0">
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-purple-500" />
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Calculated Scaled Epochs</span>
-                <p className="text-xs text-slate-500 mt-0.5">Prevents straggler blocking</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Scaled Epochs</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-300 border border-purple-500/20">
+                    Anti-Straggler
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Prevents slower nodes from blocking global rounds</p>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-3xl font-black text-purple-400 font-mono">
                   {negotiatedData?.local_epochs ??
                     (activeClient.ram_gb >= 32 ? baseEpochs : Math.max(1, baseEpochs - 1))}
                 </span>
-                <span className="text-xs text-slate-400 ml-2">local epochs</span>
+                <span className="text-xs text-slate-400 font-mono">local epochs</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-emerald-500/30 flex flex-col justify-between">
+            {/* Metric 3: Gradient Accumulation */}
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-emerald-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-emerald-500/50 transition-all min-w-0">
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Gradient Accumulation Steps</span>
-                <p className="text-xs text-slate-500 mt-0.5">Emulates large batch throughput</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Gradient Accumulation</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    Throughput
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Emulates large batch convergence on constrained nodes</p>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-3xl font-black text-emerald-400 font-mono">
-                  {negotiatedData?.gradient_accumulation_steps ?? (activeClient.hardware_type === 'cuda' ? 1 : 2)}
+                  {negotiatedData?.gradient_accumulation_steps ?? (activeClient.hardware_type === 'cuda' ? 1 : 2)}x
                 </span>
-                <span className="text-xs text-slate-400 ml-2">accum steps</span>
+                <span className="text-xs text-slate-400 font-mono">accum steps</span>
               </div>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/80 border border-blue-500/30 flex flex-col justify-between">
+            {/* Metric 4: Estimated Step Latency */}
+            <div className="p-4 rounded-xl bg-[#02030a]/80 border border-blue-500/30 flex flex-col justify-between relative overflow-hidden group hover:border-blue-500/50 transition-all min-w-0">
+              <div className="absolute top-0 inset-x-0 h-0.5 bg-blue-500" />
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Est. Step Execution Time</span>
-                <p className="text-xs text-slate-400 mt-0.5">Per local training step</p>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Est. Step Latency</span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    Realtime SLA
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-1">Benchmarked per local training step</p>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 flex items-baseline gap-2">
                 <span className="text-3xl font-black text-blue-400 font-mono">
                   {activeClient.hardware_type === 'cuda' ? '14.2 ms' : '82.6 ms'}
                 </span>
-                <span className="text-xs text-slate-400 ml-2">step latency</span>
+                <span className="text-xs text-slate-400 font-mono">per step</span>
               </div>
             </div>
           </div>
@@ -544,15 +677,16 @@ export default function CoordinatorPage() {
       </motion.div>
 
       {/* Architecture Highlights & REST API Reference */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
         {/* Architectural Pillars */}
-        <div className="lg:col-span-6 glass-card p-6 border border-slate-800/80 rounded-2xl bg-slate-900/50 space-y-4">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
           <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-            <span className="text-indigo-400">🏗️</span> Coordinator Architectural Specifications
+            <Layers className="w-4 h-4 text-indigo-400" />
+            <span>Coordinator Architectural Specifications</span>
           </h3>
 
           <div className="space-y-3">
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-500/30 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">🤝</span>
                 <h4 className="text-xs font-bold text-slate-200">Dynamic Handshake & Compatibility</h4>
@@ -562,7 +696,7 @@ export default function CoordinatorPage() {
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-emerald-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-emerald-500/30 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">💓</span>
                 <h4 className="text-xs font-bold text-slate-200">Heartbeat Monitoring & SLA Isolation</h4>
@@ -572,7 +706,7 @@ export default function CoordinatorPage() {
               </p>
             </div>
 
-            <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-purple-500/30 transition-all">
+            <div className="p-3.5 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-purple-500/30 transition-all">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-base">⚖️</span>
                 <h4 className="text-xs font-bold text-slate-200">Heterogeneous Parameter Scaling</h4>
@@ -585,12 +719,13 @@ export default function CoordinatorPage() {
         </div>
 
         {/* REST API Reference Card */}
-        <div className="lg:col-span-6 glass-card p-6 border border-slate-800/80 rounded-2xl bg-slate-900/50 space-y-4">
+        <div className="lg:col-span-6 glass-card p-4 sm:p-6 border border-indigo-500/20 rounded-2xl bg-[#080a21]/90 space-y-4 min-w-0">
           <div className="flex items-center justify-between">
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span className="text-emerald-400">📋</span> REST API Endpoint Blueprints
+              <Activity className="w-4 h-4 text-emerald-400" />
+              <span>REST API Endpoint Blueprints</span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500">Click path to copy cURL</span>
+            <span className="text-[10px] font-mono text-slate-400">Click path to copy cURL</span>
           </div>
 
           <div className="space-y-2.5">
@@ -622,11 +757,11 @@ export default function CoordinatorPage() {
                 <div
                   key={path}
                   onClick={() => handleCopyCurl(path, method)}
-                  className="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 hover:border-indigo-500/40 transition-all duration-200 cursor-pointer group flex items-center justify-between"
+                  className="p-3 rounded-xl bg-[#03040d]/80 border border-white/5 hover:border-indigo-500/40 transition-all duration-200 cursor-pointer group flex items-center justify-between"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <span
-                      className={`px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider shrink-0 ${
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold tracking-wider shrink-0 ${
                         method === 'POST'
                           ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
                           : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
@@ -642,13 +777,15 @@ export default function CoordinatorPage() {
                     </div>
                   </div>
 
-                  <div className="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors">
+                  <div className="text-[10px] font-mono text-slate-400 group-hover:text-slate-200 transition-colors shrink-0 ml-2">
                     {isCopied ? (
                       <span className="flex items-center gap-1 text-emerald-400 font-bold">
-                        <CheckIcon /> Copied!
+                        <Check className="w-3 h-3 text-emerald-400" /> Copied!
                       </span>
                     ) : (
-                      'Copy cURL'
+                      <span className="flex items-center gap-1">
+                        <Copy className="w-3 h-3" /> Copy
+                      </span>
                     )}
                   </div>
                 </div>

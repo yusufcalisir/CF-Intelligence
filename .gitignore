@@ -1,12 +1,12 @@
-# Byte-compiled / optimized / DLL files
+# ==============================================================================
+# Cross-Bank Federated Intelligence (CFI) - Comprehensive .gitignore
+# ==============================================================================
+
+# --- Python & Bytecode ---
 __pycache__/
 *.py[cod]
 *$py.class
-
-# C extensions
 *.so
-
-# Distribution / packaging
 .Python
 build/
 develop-eggs/
@@ -24,94 +24,122 @@ wheels/
 .installed.cfg
 *.egg
 
-# Virtual environments
-.venv
+# --- Virtual Environments ---
+.venv/
 venv/
 ENV/
+env/
+.conda/
+env.bak/
+venv.bak/
 
-# IDE
+# --- Node.js & Frontend ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+*.tsbuildinfo
+.npm/
+.yarn/
+yarn-error.log*
+npm-debug.log*
+
+# --- IDEs & Code Editors ---
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.sublime-workspace
+*.sublime-project
+.project
+.settings/
 
-# Environment variables
+# --- Operating System Files ---
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+*.bak
+
+# --- Environment & Sensitive Credentials ---
 .env
 .env.local
 .env.*.local
+*.env
+!*.env.example
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+*.cer
+*.der
 
-# Database & Local Storage
+# --- Database & Local Storage ---
 *.db
 *.sqlite3
+*.sqlite
 storage/
+backend/storage/
+backend/app/storage/
 !backend/app/infrastructure/storage/
-*.bat
-run_local.*
 
-# Docker
-docker-compose.override.yml
+# --- Model Artifacts & MLflow Tracking ---
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+mlruns/
+mlartifacts/
 
-# Node
-node_modules/
-frontend/node_modules/
-frontend/dist/
-*.tsbuildinfo
-
-# Coverage
+# --- Testing, Coverage & Linters ---
 htmlcov/
 .coverage
 .coverage.*
 coverage.xml
 *.cover
-
-# pytest
 .pytest_cache/
-
-# mypy
 .mypy_cache/
+.ruff_cache/
+.hypothesis/
+.cache/
 
-# Celery
+# --- Celery & Background Jobs ---
 celerybeat-schedule
 celerybeat.pid
 
-# OS
-.DS_Store
-Thumbs.db
+# --- Docker Local Overrides ---
+docker-compose.override.yml
+docker-compose.local.yml
 
-# Logs
+# --- Logs & Monitoring Dumps ---
 *.log
 logs/
 
-# Model artifacts
-*.pt
-*.pth
-*.onnx
-
-# MLflow experiment tracking data
-mlruns/
-
-# Model registry & storage (runtime data)
-backend/storage/
-backend/app/storage/
-
-# Ruff
-.ruff_cache/
-
-# Hypothesis
-.hypothesis/
-
-# Scratch & temporary files
-scratch/
-
-# Agent / Simulator metadata & Batch Scripts
+# --- Agent Workspaces, Scratchpads & Personal Roadmaps ---
 .agents/
 .gemini/
+.claude/
+.cursor/
+.windsurf/
+.roo/
+.cline/
+scratch/
 implementation_plan.md
 task.md
 walkthrough.md
-run_local.bat
-deploy_hf.bat
 production_roadmap.md
 docs/production_roadmap.md
+
+# --- Local Automation & Deployment Scripts ---
+*.bat
+run_local.*
+deploy_hf.*
+deploy_*.sh
 

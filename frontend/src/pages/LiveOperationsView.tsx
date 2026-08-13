@@ -259,7 +259,7 @@ export default function LiveOperationsView() {
   };
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-4 sm:gap-6 w-full min-w-0">
       {/* Header Bar */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -354,8 +354,8 @@ export default function LiveOperationsView() {
       </div>
 
       {/* Main Row: FL Animation & Round-by-Round AUC Chart */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        <div className="lg:col-span-6 flex flex-col">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 min-w-0">
+        <div className="lg:col-span-6 flex flex-col min-w-0">
           <FederatedTrainingAnimation
             status={trainingPhase}
             currentRound={currentRound}
@@ -364,9 +364,9 @@ export default function LiveOperationsView() {
         </div>
 
         {/* Round-by-Round AUC Progression */}
-        <div className="lg:col-span-6 glass-card p-6 flex flex-col">
+        <div className="lg:col-span-6 glass-card p-3.5 sm:p-5 md:p-6 flex flex-col min-w-0">
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
+            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
               Per-Round Model Performance
             </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
@@ -375,7 +375,7 @@ export default function LiveOperationsView() {
           </div>
 
           {roundHistory.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center">
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-6 sm:py-0">
               <span className="text-4xl opacity-40">📊</span>
               <p className="text-sm text-[var(--color-text-muted)]">
                 {trainingPhase === 'pending'
@@ -384,7 +384,7 @@ export default function LiveOperationsView() {
               </p>
             </div>
           ) : (
-            <div className="flex-1 min-h-0 h-56">
+            <div className="flex-1 min-h-0 h-56 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
@@ -414,19 +414,19 @@ export default function LiveOperationsView() {
       </div>
 
       {/* Loss Curve + Scoring Volume Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 min-w-0">
         {/* Training Loss Curve */}
-        <div className="glass-card p-6 flex flex-col">
+        <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col min-w-0">
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">Federated Training Loss</h3>
+            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">Federated Training Loss</h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Cross-entropy loss across communication rounds</p>
           </div>
           {roundHistory.length === 0 ? (
-            <div className="flex-1 flex items-center justify-center">
+            <div className="flex-1 flex items-center justify-center py-6 sm:py-0">
               <p className="text-sm text-[var(--color-text-muted)]">Awaiting training start…</p>
             </div>
           ) : (
-            <div className="h-48">
+            <div className="h-48 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <defs>
@@ -447,12 +447,12 @@ export default function LiveOperationsView() {
         </div>
 
         {/* 24-Hour Scoring Volume */}
-        <div className="glass-card p-6 flex flex-col">
+        <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col min-w-0">
           <div className="mb-4">
-            <h3 className="text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
+            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/sec)</p>
           </div>
-          <div className="h-48">
+          <div className="h-48 min-w-0">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={MOCK_SCORING_VOLUME} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                 <defs>
@@ -473,8 +473,8 @@ export default function LiveOperationsView() {
       </div>
 
       {/* Bank Nodes Health Grid */}
-      <div className="glass-card p-6">
-        <h3 className="text-lg font-bold text-[var(--color-text-primary)] mb-4">
+      <div className="glass-card p-3.5 sm:p-5 md:p-6 min-w-0">
+        <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)] mb-4">
           Consortium Bank Nodes Health & Status
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
