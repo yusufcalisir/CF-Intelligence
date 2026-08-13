@@ -360,10 +360,10 @@ async def generate_copilot_narrative(
     req: CopilotQueryRequest | None = None,
 ) -> CopilotQueryResponse:
     """Synthesize formal FinCEN 5-paragraph SAR narrative and 4-Eyes supervisor briefing using AML Copilot."""
-    c_dict = _case_service.get_case(case_id)
-    title = c_dict.get("title", "Suspicious Structuring Case") if c_dict else f"Case {case_id}"
-    status = c_dict.get("status", "OPEN") if c_dict else "OPEN"
-    alert_ids = c_dict.get("alert_ids", ["alt_101", "alt_102"]) if c_dict else ["alt_101", "alt_102"]
+    c_obj = _case_service.get_case(case_id)
+    title = c_obj.title if c_obj else f"Case {case_id}"
+    status = (c_obj.status.value if hasattr(c_obj.status, "value") else str(c_obj.status)) if c_obj else "OPEN"
+    alert_ids = c_obj.alert_ids if c_obj else ["alt_101", "alt_102"]
     notes = req.custom_investigator_notes if req else None
 
     analysis = _aml_copilot.generate_case_narrative(

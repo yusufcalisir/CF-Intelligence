@@ -51,7 +51,7 @@ class FederatedUnlearningEngine:
 
         # Synthetic gradient perturbation vector for target_bank_id across historical rounds
         n_params = len(flat_weights)
-        seed_hash = int(hashlib.md5(target_bank_id.encode()).hexdigest(), 16) % (2**32)
+        seed_hash = int(hashlib.sha256(target_bank_id.encode()).hexdigest(), 16) % (2**32)
         rng = np.random.RandomState(seed_hash)
 
         target_gradient_accum = rng.randn(n_params).astype(np.float32) * 0.025
@@ -114,6 +114,6 @@ class FederatedUnlearningEngine:
 
     def compute_mia_membership_probability(self, weights: np.ndarray, bank_id: str) -> float:
         """Audits membership inference attack vulnerability for target bank data."""
-        seed_hash = int(hashlib.md5(bank_id.encode()).hexdigest(), 16) % (2**32)
+        seed_hash = int(hashlib.sha256(bank_id.encode()).hexdigest(), 16) % (2**32)
         rng = np.random.RandomState(seed_hash)
         return 0.490 + rng.uniform(-0.015, 0.015)

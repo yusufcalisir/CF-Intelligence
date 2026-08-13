@@ -102,7 +102,7 @@ class Layer2CrossChainBridgeDriver:
                 CBDCDepositWallet(
                     bank_id=bank_id,
                     network=SettlementNetwork.ARBITRUM_ONE,
-                    wallet_address=f"0x{hashlib.md5(bank_id.encode()).hexdigest()}",
+                    wallet_address=f"0x{hashlib.sha256(bank_id.encode()).hexdigest()[:40]}",
                     token_symbol=currency,
                 ),
             )
