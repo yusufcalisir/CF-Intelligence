@@ -4,8 +4,8 @@
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Senior Researcher & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE — 8 SUPPORTED, 1 PARTIALLY SUPPORTED, 1 UNSUPPORTED  
-**V2.0 Upgrade:** P2P Diffie-Hellman SecAgg shipped — client-side mask generation via X25519 ECDH + HKDF-SHA256  
+**Audit Status:** COMPLETE — 9 SUPPORTED, 1 PARTIALLY SUPPORTED, 0 UNSUPPORTED  
+**V2.0 Upgrade:** P2P Diffie-Hellman SecAgg & Shamir $(t, n)$ Threshold Secret Sharing shipped — client-side mask generation via X25519 ECDH + HKDF-SHA256, Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction.  
 
 ---
 
@@ -32,7 +32,7 @@ Every mathematical, cryptographic, and security claim made in the codebase was e
 | **HKDF-SHA256 Round Key Derivation:** $K_t = \text{HKDF-SHA256}(\text{seed}, \text{salt} \parallel t)$, prevents cross-round update differencing | Key uniqueness verified | 🟢 **SUPPORTED** |
 | **Pipeline Compatibility Guard:** Blocks SecAgg + Krum/Median to prevent distorted L2 distance metric | Early `InvalidPipelineConfigurationError` | 🟢 **SUPPORTED** |
 | **P2P X25519 ECDH Zero-Sum Cancellation:** $\sum_u y_u \equiv \sum_u w_u \pmod{2^{32}}$; symmetric pairwise seeds via Curve25519 + HKDF-SHA256; no server-side secrets | 16/16 Pass (`test_p2p_secagg_driver.py`) | 🟢 **SUPPORTED** |
-| **Shamir Secret Sharing Recovery:** $f(x) = a_0 + a_1 x + \dots + a_{t-1} x^{t-1}$, reconstructs masks of dropped clients | Single-node dropout leaves $m_n$ noise | 🔴 **UNSUPPORTED** |
+| **Shamir Secret Sharing Recovery:** $f(x) = S + \sum_{k=1}^{t-1} a_k x^k \pmod p$, reconstructs self-masks $b_u$ and dropped keys $x_d$ via Lagrange interpolation | 9/9 Pass (`test_shamir_engine.py` & `test_p2p_secagg_dropout_recovery.py`) | 🟢 **SUPPORTED** |
 | **Hardware TEE Enclave Attestation:** Hardware Intel SGX / Nitro Enclaves isolation & remote attestation | Software simulation fallback mock | 🟡 **PARTIALLY SUPPORTED** |
 
 ---
@@ -113,22 +113,22 @@ K_t = \text{HKDF-SHA256}(\text{seed},\; \text{"secagg-round"} \mathbin{\|} t)
 $$
 
 3. **Malicious Client Poisoning:** SecAgg conceals individual updates $w_i$, allowing a malicious client to inject linear bias $+\delta / n$. Requires Zero-Knowledge Proofs or SecAgg-compatible linear defenses.
-4. **Dropped Clients (Node Dropout):** Lacks Shamir $(t, n)$ Threshold Secret Sharing. Single-node dropout leaves uncancelled residual noise $m_n$.
+4. **Dropped Clients (Node Dropout):** Resolved via Shamir $(t, n)$ Threshold Secret Sharing over $\mathbb{Z}_p$. Coordinator reconstructs $b_u$ for surviving clients and $x_d$ for dropped clients to achieve exact unmasking.
 
 ---
 
 ## 6. Threats to Validity & Limitations
 
 1. **✅ RESOLVED — P2P ECDH Client-Side Mask Generation:** `p2p_secagg_driver.py` (V2.0) implements full Curve25519 ECDH + HKDF-SHA256 client-side mask generation. The coordinator is a cryptographically inert relay. Zero server-side cryptographic involvement. Verified by 16/16 unit tests in `test_p2p_secagg_driver.py`.
-2. **Absence of Shamir Secret Sharing:** Dropped clients cause noise corruption rather than automatic mask reconstruction.
+2. **✅ RESOLVED — Shamir $(t, n)$ Threshold Secret Sharing:** `shamir_engine.py` (V2.0) implements polynomial secret sharing and Lagrange interpolation over $\mathbb{Z}_p$ ($p = 2^{256} - 189$). Enables 100% accurate global weight reconstruction even when up to $n - t$ nodes drop out mid-round. Verified by 9 unit tests across `test_shamir_engine.py` and `test_p2p_secagg_dropout_recovery.py`.
 3. **Lack of Hardware SGX SDK:** `TEEDriver` operates as a software simulation mock when hardware SGX SDKs are absent.
 
 ---
 
 ## 7. Recommendations for Production Engineering
 
-1. **Implement Shamir $(t, n)$ Threshold Secret Sharing:** Add secret sharing for pairwise seed exchange to enable dropout mask recovery without residual noise corruption.
-2. **Hardware SGX Enclave Bindings:** Connect `TEEDriver` to Open Enclave SDK or Intel SGX C++ bindings for hardware isolation.
+1. **Hardware SGX Enclave Bindings:** Connect `TEEDriver` to Open Enclave SDK or Intel SGX C++ bindings for hardware isolation.
+2. **Dynamic Quorum Adjustment:** Adapt threshold $t$ dynamically based on historical client network reliability metrics.
 
 ---
 
