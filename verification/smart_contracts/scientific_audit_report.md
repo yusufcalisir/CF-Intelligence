@@ -4,13 +4,13 @@
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Senior Blockchain Security & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE (8 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED)  
+**Audit Status:** COMPLETE (9 SUPPORTED, 0 PARTIALLY SUPPORTED, 0 UNSUPPORTED) — Gnosis Safe 2-of-3 Threshold Multi-Sig Governance (`GnosisSafeMultiSigCoordinator.sol`)  
 
 ---
 
 ## 1. Executive Summary
 
-This report delivers a comprehensive scientific audit and formal verification of the **Consortium Incentive Settlement** smart contract (`ConsortiumIncentiveSettlement.sol`) executing on EVM-compatible blockchains. The contract automates CBDC (Central Bank Digital Currency) or Fiat-Backed Stablecoin (`e-TRY`, `USDC`) incentive distribution based on cryptographic **Leave-One-Out (LOO) Federated Shapley Values**, linking disbursements directly to SHA-256 / Keccak-256 on-chain audit proof hashes (`auditProofHash`).
+This report delivers a comprehensive scientific audit and formal verification of the **Consortium Incentive Settlement** smart contract (`ConsortiumIncentiveSettlement.sol`) and **Gnosis Safe 2-of-3 Multi-Sig Coordinator Governance** (`GnosisSafeMultiSigCoordinator.sol`) executing on EVM-compatible blockchains. The contract automates CBDC (Central Bank Digital Currency) or Fiat-Backed Stablecoin (`e-TRY`, `USDC`) incentive distribution based on cryptographic **Leave-One-Out (LOO) Federated Shapley Values**, linking disbursements directly to SHA-256 / Keccak-256 on-chain audit proof hashes (`auditProofHash`).
 
 The verification suite encompasses:
 1. **Hardhat EVM Integration Suite:** 13/13 passing tests on local EVM nodes.
@@ -18,6 +18,7 @@ The verification suite encompasses:
 3. **Property-Based Testing (Hypothesis):** 3 core protocol properties verified across 200+ randomized inputs.
 4. **Adversarial Failure Injection:** 5 fault injection attack vectors tested and mitigated.
 5. **Gas Cost & Scalability Benchmarking:** Empirical $\mathcal{O}(N)$ gas scaling analysis ($N \in [2, 100]$ banks).
+6. **Gnosis Safe 2-of-3 Multi-Sig Governance Unit Suite:** 5/5 passing threshold governance scenarios.
 
 ---
 
@@ -33,6 +34,7 @@ The verification suite encompasses:
 | **Payout Claim (`claimPayout`)** | `isClaimed = true` before transfer | Prevents double-claiming and reentrancy exploits | 3/3 Hardhat + Hypothesis Pass | 🟢 **SUPPORTED** |
 | **Quarantine Governance** | $\text{Blacklisted}(B_k) \implies \text{Payout}(B_k) = 0$ | Zeroes payouts and blocks claims for poisoned nodes | 2/2 Hardhat + Property Pass | 🟢 **SUPPORTED** |
 | **EVM viaIR Optimization** | `--via-ir` compiler pipeline | Resolves stack-too-deep limits in complex struct assignments | Compiled cleanly (Paris target) | 🟢 **SUPPORTED** |
+| **Gnosis Safe 2-of-3 Multi-Sig** | `GnosisSafeMultiSigCoordinator.sol` ($t=2, n=3$) | Eliminates single-wallet EOA centralization SPOF via 2-of-3 threshold | 5/5 Pass (`test_gnosis_multisig_coordinator.py`) | 🟢 **SUPPORTED** |
 
 ---
 

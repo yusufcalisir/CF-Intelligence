@@ -270,6 +270,7 @@ CF-Intelligence/
 │   │   │   ├── security/                            # Security and PET Drivers
 │   │   │   │   ├── abac_engine.py                   # Attribute-Based Access Control engine
 │   │   │   │   ├── fhe_driver.py                    # TenSEAL CKKS FHE driver
+│   │   │   │   ├── gnosis_multisig_coordinator.py   # Gnosis Safe 2-of-3 multi-sig coordinator driver (V2.0)
 │   │   │   │   ├── hsm_signer.py                    # Zero-Disk HSM signing engine
 │   │   │   │   ├── p2p_secagg_driver.py             # P2P Curve25519 ECDH SecAgg driver (V2.0)
 │   │   │   │   ├── shamir_engine.py                 # Shamir (t, n) threshold secret sharing engine (V2.0)
@@ -282,7 +283,8 @@ CF-Intelligence/
 │   │       └── websockets/                          # Live streaming WebSocket endpoints
 ├── contracts/                                       # EVM Smart Contracts Suite for Incentive Settlement
 │   ├── contracts/
-│   │   └── ConsortiumIncentiveSettlement.sol        # CBDC / Stablecoin Shapley Settlement Contract
+│   │   ├── ConsortiumIncentiveSettlement.sol        # CBDC / Stablecoin Shapley Settlement Contract
+│   │   └── GnosisSafeMultiSigCoordinator.sol        # 2-of-3 Threshold Multi-Sig Governance Contract (V2.0)
 │   ├── test/                                        # Hardhat Unit & Integration Tests (13/13 passing)
 │   ├── scripts/
 │   │   └── deploy.js                                # Automated Hardhat / Sepolia Deployment Script
@@ -629,8 +631,8 @@ npm run deploy:local
 | ~~No client-to-client peer DH channel~~ | ~~FL Clients~~ | ✅ **RESOLVED** — gRPC `BroadcastPublicKey` / `FetchPeerPublicKeys` RPCs provide authenticated X25519 key exchange routing via the coordinator relay. |
 | ~~No Shamir (t, n) Threshold Secret Sharing~~ | ~~`p2p_secagg_driver.py`~~ | ✅ **RESOLVED** — `shamir_engine.py` implements Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction. |
 | ~~Vault PKI Root CA keys in software~~ | ~~`vault_client.py`~~ | ✅ **RESOLVED** — `vault_hsm_pki_binder.py` binds Vault Root CA generation and certificate signing to FIPS 140-2 Level 3 HSM enclaves via PKCS#11 (`is_exportable = False`). |
+| ~~Coordinator role is a single-wallet EOA~~ | ~~`ConsortiumIncentiveSettlement.sol`~~ | ✅ **RESOLVED** — `GnosisSafeMultiSigCoordinator.sol` implements 2-of-3 threshold multi-sig governance with EIP-712 structured data signatures. Zero single-wallet centralization SPOF. |
 | TEE operates as software simulation without SGX SDK | `tee_driver.py` | Connect to Open Enclave SDK or Intel SGX C++ bindings |
-| Coordinator role is a single-wallet EOA | `ConsortiumIncentiveSettlement.sol` | Upgrade to 2-of-3 Gnosis Safe multi-sig contract |
 
 ### Version 2.0 Roadmap
 
@@ -639,7 +641,7 @@ npm run deploy:local
 | **P2P Diffie-Hellman SecAgg** | Full client-side mask generation without server involvement | ✅ **SHIPPED (Q3 2026)** |
 | **Shamir Secret Sharing** | Dropout-resilient mask reconstruction via (t, n) threshold scheme | ✅ **SHIPPED (Q3 2026)** |
 | **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | ✅ **SHIPPED (Q4 2026)** |
-| **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | Q4 2026 |
+| **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | ✅ **SHIPPED (Q4 2026)** |
 | **Flower P2P Integration** | Peer-to-peer FL training round via Flower framework without central server | Q1 2027 |
 | **Real-Time Graph Streaming** | Apache Flink integration for sub-second entity graph updates | Q1 2027 |
 
