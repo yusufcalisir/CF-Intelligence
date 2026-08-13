@@ -457,6 +457,40 @@ export default function SecurityPage() {
                   </p>
                 </div>
               </div>
+
+              {/* Gnosis Safe 2-of-3 Multi-Sig Governance Card */}
+              <div className="glass-card p-5 space-y-4 border border-purple-500/30 bg-purple-500/5">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
+                    <span>⚡ On-Chain Governance — Gnosis Safe 2-of-3 Multi-Sig Coordinator</span>
+                  </h3>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    2/3 THRESHOLD GOVERNANCE
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
+                    <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #1 (Central Bank / Regulator)</div>
+                    <div className="font-mono text-[10px] font-bold text-emerald-400 truncate">0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266</div>
+                  </div>
+                  <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
+                    <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #2 (Consortium Trustee Alpha)</div>
+                    <div className="font-mono text-[10px] font-bold text-indigo-300 truncate">0x70997970C51812dc3A010C7d01b50e0d17dc79C8</div>
+                  </div>
+                  <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
+                    <div className="text-[var(--color-text-muted)] text-[10px]">Trustee #3 (Consortium Trustee Beta)</div>
+                    <div className="font-mono text-[10px] font-bold text-purple-300 truncate">0x3C44CdD160573615659514930278505963E8A155</div>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-lg border border-purple-500/20 bg-purple-500/10 text-xs space-y-2 text-purple-200">
+                  <div className="font-bold">Multi-Sig State Invariant:</div>
+                  <p className="text-[10px] opacity-90 leading-relaxed">
+                    Single-wallet EOA coordinator centralization risk is eliminated. Critical smart contract functions (Incentive Settlement, Participant Quarantine, and Token Pool Deposits) require at least 2 valid cryptographic signatures from authorized consortium trustees.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
