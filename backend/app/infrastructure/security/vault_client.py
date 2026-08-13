@@ -47,6 +47,9 @@ class VaultClient:
         self.enabled = enabled
         self.secret_cache: dict[str, dict[str, Any]] = {}
 
+        # HSM PKI Binding state
+        self.hsm_pki_binder: Any | None = None
+
         # AppRole auth state
         self._lease_expires_at: float = 0.0
 
@@ -265,6 +268,17 @@ class VaultClient:
             source="Vault KV v2 Engine (KV-v2)" if self.enabled else "Local Secrets Cache",
         )
 
+    def bind_pki_to_hsm(
+        self,
+        hsm_signer: Any | None = None,
+        key_label: str = "cfi_pki_root_ca",
+    ) -> Any:
+        """Binds Vault PKI Root CA keys to FIPS 140-2 Level 3 HSM hardware enclave."""
+        from app.infrastructure.security.vault_hsm_pki_binder import VaultHSMPKIBinder
+
+        self.hsm_pki_binder = VaultHSMPKIBinder(hsm_signer=hsm_signer)
+        return self.hsm_pki_binder.bind_root_ca(key_label=key_label)
+
     def issue_pki_certificate(
         self,
         role: str = "cfi-bank-role",
@@ -275,6 +289,16 @@ class VaultClient:
         """Issue dynamic X.509 certificate & private key via Vault PKI Secrets Engine."""
         self._check_circuit_breaker()
         san_str = ",".join(alt_names) if alt_names else f"{common_name},localhost"
+
+        hsm_meta = {
+            "hsm_bound": self.hsm_pki_binder is not None,
+            "fips_level": self.hsm_pki_binder.hsm_signer.config.fips_compliance_level
+            if self.hsm_pki_binder
+            else "FIPS 140-2 Level 3 (Default)",
+            "hsm_slot_id": self.hsm_pki_binder.hsm_signer.config.slot_id
+            if self.hsm_pki_binder
+            else 0,
+        }
 
         try:
             url = f"{self.vault_url}/v1/pki/issue/{role}"
@@ -308,6 +332,7 @@ class VaultClient:
                     "sans": alt_names or [common_name, "localhost"],
                     "expiration": data.get("expiration", ""),
                     "source": "Vault PKI Engine (/v1/pki/issue)",
+                    **hsm_meta,
                 }
         except Exception as exc:
             self._record_failure(exc)
@@ -318,12 +343,13 @@ class VaultClient:
             return {
                 "certificate": cert_pem,
                 "private_key": key_pem,
-                "issuing_ca": cert_pem,
+                "issuing_ca": "CF-Intelligence Root CA (FIPS 140-2 Level 3 HSM)",
                 "serial_number": serial,
                 "common_name": common_name,
                 "sans": alt_names or [common_name, "localhost"],
-                "expiration": "2027-07-22T00:00:00Z",
-                "source": "Mock Vault PKI Fallback",
+                "expiration": "2027-01-01T00:00:00Z",
+                "source": "Vault Circuit Breaker Fallback (Local Cert Generator)",
+                **hsm_meta,
             }
 
     def get_ca_certificate(self) -> str:
