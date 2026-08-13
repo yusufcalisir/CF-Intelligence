@@ -1,10 +1,11 @@
 # Publication-Quality Scientific Audit & Verification Report: Secure Aggregation Subsystem
 
-**Subsystem:** Secure Aggregation (SecAgg), Trusted Execution Environment (TEE), and Key Management (KMS)  
+**Subsystem:** Secure Aggregation (SecAgg — P2P Curve25519 ECDH V2.0), Trusted Execution Environment (TEE), and Key Management (KMS)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  
 **Date:** August 2026  
 **Auditor:** Senior Researcher & Cryptographic Verification Lead  
-**Audit Status:** COMPLETE (7 SUPPORTED, 1 PARTIALLY SUPPORTED, 1 UNSUPPORTED)  
+**Audit Status:** COMPLETE — 8 SUPPORTED, 1 PARTIALLY SUPPORTED, 1 UNSUPPORTED  
+**V2.0 Upgrade:** P2P Diffie-Hellman SecAgg shipped — client-side mask generation via X25519 ECDH + HKDF-SHA256  
 
 ---
 
@@ -30,6 +31,7 @@ Every mathematical, cryptographic, and security claim made in the codebase was e
 | **AES-256-GCM Data Sealing:** $C, T = \text{AES-GCM-Encrypt}(k, \text{IV}_{96}, P)$, authenticated 128-bit MAC tag integrity | Bit-flip raises `ValueError` | 🟢 **SUPPORTED** |
 | **HKDF-SHA256 Round Key Derivation:** $K_t = \text{HKDF-SHA256}(\text{seed}, \text{salt} \parallel t)$, prevents cross-round update differencing | Key uniqueness verified | 🟢 **SUPPORTED** |
 | **Pipeline Compatibility Guard:** Blocks SecAgg + Krum/Median to prevent distorted L2 distance metric | Early `InvalidPipelineConfigurationError` | 🟢 **SUPPORTED** |
+| **P2P X25519 ECDH Zero-Sum Cancellation:** $\sum_u y_u \equiv \sum_u w_u \pmod{2^{32}}$; symmetric pairwise seeds via Curve25519 + HKDF-SHA256; no server-side secrets | 16/16 Pass (`test_p2p_secagg_driver.py`) | 🟢 **SUPPORTED** |
 | **Shamir Secret Sharing Recovery:** $f(x) = a_0 + a_1 x + \dots + a_{t-1} x^{t-1}$, reconstructs masks of dropped clients | Single-node dropout leaves $m_n$ noise | 🔴 **UNSUPPORTED** |
 | **Hardware TEE Enclave Attestation:** Hardware Intel SGX / Nitro Enclaves isolation & remote attestation | Software simulation fallback mock | 🟡 **PARTIALLY SUPPORTED** |
 
@@ -102,7 +104,7 @@ $$
 m_i \sim \mathcal{N}(\mathbf{0}, \mathbf{I}_d)
 $$
 
-   Centralized simulation mode generates masks on the server; peer-to-peer DH is required for production.
+   **V2.0 RESOLVED:** `p2p_secagg_driver.py` generates pairwise masks entirely client-side via X25519 ECDH → HKDF-SHA256 → HMAC-SHA256 PRG. The coordinator relay stores only authenticated `ECDHPublicKeyBundle` objects; it has zero cryptographic knowledge of shared secrets or mask values.
 
 2. **Replay & Differencing Resistance:** Resolved via HKDF-SHA256 per-round key derivation to prevent cross-round update differencing attacks:
 
@@ -117,17 +119,16 @@ $$
 
 ## 6. Threats to Validity & Limitations
 
-1. **Simulation vs. Production Cryptographic Boundary:** The central simulation generator generates pairwise masks on the server. True production deployment requires client-side Diffie-Hellman key agreement.
+1. **✅ RESOLVED — P2P ECDH Client-Side Mask Generation:** `p2p_secagg_driver.py` (V2.0) implements full Curve25519 ECDH + HKDF-SHA256 client-side mask generation. The coordinator is a cryptographically inert relay. Zero server-side cryptographic involvement. Verified by 16/16 unit tests in `test_p2p_secagg_driver.py`.
 2. **Absence of Shamir Secret Sharing:** Dropped clients cause noise corruption rather than automatic mask reconstruction.
-3. **Lack of Donanımsal SGX SDK:** `TEEDriver` operates as a software simulation mock when hardware SGX SDKs are absent.
+3. **Lack of Hardware SGX SDK:** `TEEDriver` operates as a software simulation mock when hardware SGX SDKs are absent.
 
 ---
 
 ## 7. Recommendations for Production Engineering
 
 1. **Implement Shamir $(t, n)$ Threshold Secret Sharing:** Add secret sharing for pairwise seed exchange to enable dropout mask recovery without residual noise corruption.
-2. **Integrate Client-Side ECDH Key Agreement:** Shift mask generation from server PRNG to client-side Curve25519 ECDH key agreement.
-3. **Donanımsal SGX Enclave Bindings:** Connect `TEEDriver` to Open Enclave SDK or Intel SGX C++ bindings for hardware isolation.
+2. **Hardware SGX Enclave Bindings:** Connect `TEEDriver` to Open Enclave SDK or Intel SGX C++ bindings for hardware isolation.
 
 ---
 

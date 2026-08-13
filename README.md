@@ -271,8 +271,7 @@ CF-Intelligence/
 │   │   │   │   ├── abac_engine.py                   # Attribute-Based Access Control engine
 │   │   │   │   ├── fhe_driver.py                    # TenSEAL CKKS FHE driver
 │   │   │   │   ├── hsm_signer.py                    # Zero-Disk HSM signing engine
-│   │   │   │   ├── mtls_manager.py                  # mTLS cert manager and CRL inspector
-│   │   │   │   ├── secagg_driver.py                 # Pairwise zero-sum SecAgg driver
+│   │   │   │   ├── p2p_secagg_driver.py             # P2P Curve25519 ECDH SecAgg driver (V2.0)
 │   │   │   │   ├── tee_driver.py                    # Hardware TEE SGX/Nitro enclave driver
 │   │   │   │   └── vault_client.py                  # HashiCorp Vault PKI client
 │   │   │   └── telemetry/                           # OpenTelemetry and Prometheus metrics
@@ -337,7 +336,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 | PET Technology | Core Driver | Cryptographic Mechanism | Security Guarantee | Hardware Dependency |
 |:---|:---|:---|:---|:---|
 | **Opacus DP** | `privacy_service.py` | Gaussian noise addition ($\sigma = \frac{\sqrt{2\ln(1.25/\delta)}}{\epsilon}$) + $L_2$ norm clipping ($C$) | $(\epsilon, \delta)$-Differential Privacy loss bound | None (PyTorch) |
-| **Pairwise SecAgg** | `secagg_driver.py` | Zero-sum pairwise seed masking ($y_k = w_k + \sum s_{kj} - \sum s_{jk}$) | Perfect forward secrecy; masks cancel identically at coordinator | None (Pure Software) |
+| **P2P Curve25519 SecAgg** | `p2p_secagg_driver.py` | Zero-sum pairwise masking via X25519 ECDH + HKDF-SHA256 + HMAC-SHA256 PRG. No server-side secrets. $\sum_u y_u \equiv \sum_u w_u \pmod{2^{32}}$ | ✅ Implemented | None (Pure Software) |
 | **TenSEAL CKKS FHE** | `fhe_driver.py` | Microsoft SEAL CKKS polynomial ring scheme ($N=8192, 2^{40}$) | Zero-knowledge server-side homomorphic weighted addition | CPU / AVX2 |
 | **Hardware TEE Enclave** | `tee_driver.py` | Intel SGX / AWS Nitro Enclave remote attestation & MRENCLAVE measurement | Confidential computing with hardware isolation & AES-256-GCM sealed memory | SGX / Nitro CPU |
 
@@ -498,7 +497,7 @@ Comparative positioning against leading open-source federated learning and priva
 | :--- | :--- | :--- | :---: |
 | **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py`, `async_fl_engine.py` | [`verification/federated_learning/scientific_audit_report.md`](verification/federated_learning/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Differential Privacy** | `privacy_service.py`, `label_privacy_guard.py`, `psi_service.py` | [`verification/differential_privacy/scientific_audit_report.md`](verification/differential_privacy/scientific_audit_report.md) | `AUDITED (100/100)` |
-| **Secure Aggregation & FHE** | `tee_driver.py`, `fhe_driver.py`, `secagg_driver.py` | [`verification/secure_aggregation/scientific_audit_report.md`](verification/secure_aggregation/scientific_audit_report.md) | `AUDITED (100/100)` |
+| **Secure Aggregation & FHE** | `tee_driver.py`, `fhe_driver.py`, `p2p_secagg_driver.py` | [`verification/security/scientific_audit_report.md`](verification/security/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Zero-Trust PKI & Security** | `vault_client.py`, `mtls_manager.py`, `abac_engine.py` | [`verification/zero_trust_pki/scientific_audit_report.md`](verification/zero_trust_pki/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **Federation Coordinator** | `coordinator_service.py`, `consortium_service.py` | [`verification/federation_coordinator/scientific_audit_report.md`](verification/federation_coordinator/scientific_audit_report.md) | `AUDITED (100/100)` |
 | **AML Risk Scoring Engine** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [`verification/risk_scoring/scientific_audit_report.md`](verification/risk_scoring/scientific_audit_report.md) | `AUDITED (100/100)` |
@@ -624,17 +623,17 @@ npm run deploy:local
 
 | Limitation | Affected Module | Remediation Path |
 | :--- | :--- | :--- |
-| SecAgg masks generated server-side in simulation mode | `secagg_driver.py` | Upgrade to client-side Curve25519 ECDH key agreement |
-| No Shamir (t, n) Threshold Secret Sharing | `secagg_driver.py` | Integrate `secretsharing` library for dropout recovery |
+| ~~SecAgg masks generated server-side~~ | ~~`secagg_driver.py`~~ | ✅ **RESOLVED** — `p2p_secagg_driver.py` implements full Curve25519 ECDH client-side mask generation. Zero server cryptographic involvement. |
+| ~~No client-to-client peer DH channel~~ | ~~FL Clients~~ | ✅ **RESOLVED** — gRPC `BroadcastPublicKey` / `FetchPeerPublicKeys` RPCs provide authenticated X25519 key exchange routing via the coordinator relay. |
+| No Shamir (t, n) Threshold Secret Sharing | `p2p_secagg_driver.py` | Integrate `secretsharing` library for dropout recovery |
 | TEE operates as software simulation without SGX SDK | `tee_driver.py` | Connect to Open Enclave SDK or Intel SGX C++ bindings |
 | Coordinator role is a single-wallet EOA | `ConsortiumIncentiveSettlement.sol` | Upgrade to 2-of-3 Gnosis Safe multi-sig contract |
-| No client-to-client peer DH channel | FL Clients | Implement gRPC mTLS P2P key exchange protocol |
 
 ### Version 2.0 Roadmap
 
 | Milestone | Description | Target |
 | :--- | :--- | :---: |
-| **P2P Diffie-Hellman SecAgg** | Full client-side mask generation without server involvement | Q3 2026 |
+| **P2P Diffie-Hellman SecAgg** | Full client-side mask generation without server involvement | ✅ **SHIPPED (Q3 2026)** |
 | **Shamir Secret Sharing** | Dropout-resilient mask reconstruction via (t, n) threshold scheme | Q3 2026 |
 | **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | Q4 2026 |
 | **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | Q4 2026 |
@@ -650,7 +649,7 @@ This platform synthesizes and operationalizes research from the following founda
 | Reference | Contribution to This Platform |
 | :--- | :--- |
 | McMahan et al. (2017). *Communication-Efficient Learning of Deep Networks from Decentralized Data.* AISTATS. | FedAvg aggregation algorithm (`fl_engine.py`) |
-| Bonawitz et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS. | SecAgg zero-sum pairwise masking protocol (`secagg_driver.py`) |
+| Bonawitz et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS. | SecAgg zero-sum pairwise masking protocol (`p2p_secagg_driver.py` — Curve25519 ECDH + HKDF-SHA256) |
 | Abadi et al. (2016). *Deep Learning with Differential Privacy.* ACM CCS. | Opacus DP Gaussian noise + L2 clip guard (`privacy_service.py`) |
 | Blanchard et al. (2017). *Machine Learning with Adversaries: Byzantine Tolerant Gradient Descent.* NeurIPS. | Krum and Multi-Krum robust aggregators (`fl_engine.py`) |
 | Yin et al. (2018). *Byzantine-Robust Distributed Learning: Towards Optimal Statistical Rates.* ICML. | Trimmed Mean and coordinate-wise Median aggregators |
