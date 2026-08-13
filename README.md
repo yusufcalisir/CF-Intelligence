@@ -274,7 +274,8 @@ CF-Intelligence/
 │   │   │   │   ├── p2p_secagg_driver.py             # P2P Curve25519 ECDH SecAgg driver (V2.0)
 │   │   │   │   ├── shamir_engine.py                 # Shamir (t, n) threshold secret sharing engine (V2.0)
 │   │   │   │   ├── tee_driver.py                    # Hardware TEE SGX/Nitro enclave driver
-│   │   │   │   └── vault_client.py                  # HashiCorp Vault PKI client
+│   │   │   │   ├── vault_client.py                  # HashiCorp Vault PKI client
+│   │   │   │   └── vault_hsm_pki_binder.py          # Vault PKI Root CA FIPS 140-2 Level 3 HSM binder (V2.0)
 │   │   │   └── telemetry/                           # OpenTelemetry and Prometheus metrics
 │   │   └── presentation/                            # REST Routers, WebSockets and OpenAPI
 │   │       ├── routers/                             # 24 FastAPI REST Routers
@@ -636,7 +637,7 @@ npm run deploy:local
 | :--- | :--- | :---: |
 | **P2P Diffie-Hellman SecAgg** | Full client-side mask generation without server involvement | ✅ **SHIPPED (Q3 2026)** |
 | **Shamir Secret Sharing** | Dropout-resilient mask reconstruction via (t, n) threshold scheme | ✅ **SHIPPED (Q3 2026)** |
-| **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | Q4 2026 |
+| **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | ✅ **SHIPPED (Q4 2026)** |
 | **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | Q4 2026 |
 | **Flower P2P Integration** | Peer-to-peer FL training round via Flower framework without central server | Q1 2027 |
 | **Real-Time Graph Streaming** | Apache Flink integration for sub-second entity graph updates | Q1 2027 |
