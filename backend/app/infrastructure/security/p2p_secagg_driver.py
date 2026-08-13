@@ -270,7 +270,7 @@ class P2PSecAggDriver:
 
         # Quantize: float → int via fixed-point scaling
         quantized: list[int] = [
-            int(round(w * quantization_scale)) % self._MASK_MODULUS
+            round(w * quantization_scale) % self._MASK_MODULUS
             for w in weights
         ]
         masked = list(quantized)  # copy to apply masks in-place
