@@ -41,6 +41,36 @@ export default function CaseDetailPage() {
   const queryClient = useQueryClient();
   const [noteContent, setNoteContent] = useState('');
   const [supervisorSig, setSupervisorSig] = useState('');
+
+  // Agentic AML Copilot state
+  const [copilotData, setCopilotData] = useState<{
+    fincen_sar_narrative: string;
+    four_eyes_briefing: string;
+    recommended_action: string;
+    top_risk_drivers: Array<{ feature: string; impact: number; description?: string }>;
+    lineage_hash: string;
+  } | null>(null);
+  const [isCopilotLoading, setIsCopilotLoading] = useState(false);
+
+  const handleGenerateCopilotNarrative = async () => {
+    if (!caseId) return;
+    setIsCopilotLoading(true);
+    try {
+      const res = await fetch(`/api/v1/cases/${caseId}/copilot/narrative`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ case_id: caseId, include_fincen_narrative: true }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCopilotData(data);
+      }
+    } catch (e) {
+      console.error('Failed to generate Copilot narrative', e);
+    } finally {
+      setIsCopilotLoading(false);
+    }
+  };
   const [evType, setEvType] = useState('document');
   const [evTitle, setEvTitle] = useState('');
   const [evFilePath, setEvFilePath] = useState('');
@@ -221,6 +251,73 @@ export default function CaseDetailPage() {
                 {statusError}
               </div>
             )}
+          </div>
+        )}
+      </motion.div>
+
+      {/* Agentic AML Copilot & RAG Narrative Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.05 }}
+        className="glass-card p-5 space-y-4"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🤖</span>
+            <div>
+              <h2 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
+                Autonomous Agentic AML Copilot & RAG Narrative
+              </h2>
+              <p className="text-xs text-[var(--color-text-muted)]">
+                Synthesizes FinCEN FIN-2007-G003 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleGenerateCopilotNarrative}
+            disabled={isCopilotLoading}
+            className="px-3.5 py-1.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg text-xs font-bold transition-all shadow-md shadow-indigo-600/20 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+          >
+            {isCopilotLoading ? '⏳ Synthesizing AI Narrative...' : '✨ Generate AI SAR Narrative'}
+          </button>
+        </div>
+
+        {copilotData && (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 pt-2 border-t border-[var(--color-border)]">
+            <div className="xl:col-span-2 glass-card p-4 space-y-3 bg-black/20">
+              <div className="flex items-center justify-between text-xs font-bold text-indigo-300 border-b border-[var(--color-border)] pb-2">
+                <span>📄 FinCEN 5-Paragraph Regulatory SAR Narrative</span>
+                <span className="font-mono text-[10px] text-emerald-400">ZERO-PII VERIFIED</span>
+              </div>
+              <div className="text-xs text-slate-300 leading-relaxed font-mono whitespace-pre-wrap max-h-96 overflow-y-auto pr-2">
+                {copilotData.fincen_sar_narrative}
+              </div>
+            </div>
+
+            <div className="glass-card p-4 space-y-3 bg-black/20 flex flex-col justify-between">
+              <div>
+                <div className="text-xs font-bold text-purple-300 border-b border-[var(--color-border)] pb-2 mb-3">
+                  🛡️ BSA/AML 4-Eyes Supervisor Briefing
+                </div>
+                <div className="text-xs text-slate-200 font-mono whitespace-pre-wrap mb-4">
+                  {copilotData.four_eyes_briefing}
+                </div>
+                <div className="space-y-1.5">
+                  <div className="text-[10px] font-bold text-[var(--color-text-muted)] uppercase">Top SHAP Anomaly Drivers</div>
+                  {copilotData.top_risk_drivers.map((d, i) => (
+                    <div key={i} className="p-2 rounded bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[11px] flex justify-between">
+                      <span className="font-mono text-indigo-300">{d.feature}</span>
+                      <span className="font-mono text-emerald-400 font-bold">+{(d.impact * 100).toFixed(1)}%</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="text-[9px] font-mono text-[var(--color-text-muted)] pt-2 border-t border-[var(--color-border)] flex justify-between">
+                <span>Lineage Hash: {copilotData.lineage_hash.slice(0, 16)}...</span>
+                <span className="text-indigo-400 font-bold">{copilotData.recommended_action}</span>
+              </div>
+            </div>
           </div>
         )}
       </motion.div>

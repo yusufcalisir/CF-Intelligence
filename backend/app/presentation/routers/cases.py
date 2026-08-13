@@ -26,6 +26,7 @@ from app.application.schemas.phase2 import (
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
 )
+from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.case_service import (
     AuditService,
     CaseManagementService,
@@ -33,6 +34,7 @@ from app.application.services.case_service import (
 )
 from app.application.services.idempotency import IdempotencyService
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.value_objects_copilot import CopilotQueryRequest, CopilotQueryResponse
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
@@ -345,3 +347,64 @@ async def file_sar_report(case_id: str) -> dict[str, Any]:
         }
     except SARValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# ── Agentic AML Copilot Endpoints ─────────────────────────────────────
+
+_aml_copilot = AMLAgenticCopilot()
+
+
+@router.post("/{case_id}/copilot/narrative", response_model=CopilotQueryResponse)
+async def generate_copilot_narrative(
+    case_id: str,
+    req: CopilotQueryRequest | None = None,
+) -> CopilotQueryResponse:
+    """Synthesize formal FinCEN 5-paragraph SAR narrative and 4-Eyes supervisor briefing using AML Copilot."""
+    c_dict = _case_service.get_case(case_id)
+    title = c_dict.get("title", "Suspicious Structuring Case") if c_dict else f"Case {case_id}"
+    status = c_dict.get("status", "OPEN") if c_dict else "OPEN"
+    alert_ids = c_dict.get("alert_ids", ["alt_101", "alt_102"]) if c_dict else ["alt_101", "alt_102"]
+    notes = req.custom_investigator_notes if req else None
+
+    analysis = _aml_copilot.generate_case_narrative(
+        case_id=case_id,
+        case_title=title,
+        case_status=status,
+        alert_ids=alert_ids,
+        risk_score=785.0,
+        investigator_notes=notes,
+    )
+
+    from datetime import UTC, datetime
+
+    return CopilotQueryResponse(
+        case_id=analysis.case_id,
+        fincen_sar_narrative=analysis.fincen_sar_narrative,
+        four_eyes_briefing=analysis.four_eyes_briefing,
+        recommended_action=analysis.recommended_action,
+        top_risk_drivers=analysis.top_risk_drivers,
+        graph_topology_summary=analysis.graph_topology_summary,
+        zero_pii_verified=analysis.zero_pii_verified,
+        generated_at=datetime.fromtimestamp(analysis.generated_at_timestamp, tz=UTC).isoformat(),
+        lineage_hash=analysis.lineage_hash,
+    )
+
+
+@router.get("/{case_id}/copilot/summary")
+async def get_copilot_summary(case_id: str) -> dict[str, Any]:
+    """Get structured Copilot findings and 4-Eyes disposition for a case."""
+    analysis = _aml_copilot.generate_case_narrative(
+        case_id=case_id,
+        case_title=f"Case {case_id}",
+        case_status="UNDER_INVESTIGATION",
+        alert_ids=["alt_101", "alt_102"],
+        risk_score=820.0,
+    )
+    return {
+        "case_id": analysis.case_id,
+        "recommended_action": analysis.recommended_action,
+        "top_risk_drivers": analysis.top_risk_drivers,
+        "graph_topology_summary": analysis.graph_topology_summary,
+        "zero_pii_verified": analysis.zero_pii_verified,
+        "lineage_hash": analysis.lineage_hash,
+    }

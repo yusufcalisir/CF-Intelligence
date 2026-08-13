@@ -45,6 +45,7 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `services/risk_engine.py`: Combines 9 independent heuristic and ML signals into a single score ($0 \text{ to } 1000$).
 *   `services/entity_resolution.py`: Computes deterministic one-way HMAC-SHA256 privacy hashes for account and device identifiers.
 *   `services/explainability_service.py`: Computes SHAP attributions using `shap.KernelExplainer` with analytical fallbacks.
+*   `services/aml_agentic_copilot.py`: Autonomous BSA/AML RAG narrative generator synthesizing 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
 *   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, and Canary Gates.
 
 ### 2.3 Infrastructure Layer (`backend/app/infrastructure/`)

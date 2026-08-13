@@ -53,6 +53,7 @@ CFI Simulator utilizes 4 decoupled microservices coordinated via Docker Compose:
 *   **Flower P2P Integration (`flower_p2p_engine.py`):** Serverless peer-to-peer FL training rounds with Ring and Mesh P2P gossip strategies.
 *   **Real-Time Graph Streaming (`flink_graph_streaming.py`):** Apache Flink sub-second stateful graph stream accumulators ($W(t, 500\text{ms})$) with $<50\text{ms}$ SLA.
 *   **zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`):** Groth16 / PlonK zero-knowledge proof verification over BN254 elliptic curve with $O(1)$ constant time bilinear pairing verification ($<5\text{ms}$ SLA).
+*   **Autonomous Agentic AML Copilot (`aml_agentic_copilot.py`):** Ingests Neo4j subgraphs, SHAP attributions, and ISO 20022 payloads to synthesize 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
 
 ---
 

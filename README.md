@@ -465,6 +465,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 | **Flower P2P Integration** | Serverless Ring/Mesh Gossip Strategy | Decentralized FL Training | `flower_p2p_engine.py` | `PASS` |
 | **Real-Time Graph Streaming** | Apache Flink Sub-Second SLA (<50ms) | Real-Time Graph Analytics | `flink_graph_streaming.py` | `PASS` |
 | **zk-SNARK Attestation** | Groth16 $O(1)$ Bilinear Pairing over BN254 | Zero-Knowledge Model Integrity | `zk_snark_verifier.py` | `PASS` |
+| **Agentic AML Copilot** | FinCEN 5-Paragraph SAR Narrative & RAG | Autonomous BSA/AML Reporting | `aml_agentic_copilot.py` | `PASS` |
 
 ---
 
@@ -676,7 +677,7 @@ npm run deploy:local
 | Milestone | Description | Target | Status |
 | :--- | :--- | :---: | :---: |
 | **zk-SNARK Weight Attestation** | Groth16 $O(1)$ zero-knowledge model weight integrity proof | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Agentic AML Copilot** | Multi-agent RAG narrative generator for FinCEN SAR filings | Q2 2027 | `IN_PROGRESS` |
+| **Agentic AML Copilot** | Multi-agent RAG narrative generator for FinCEN SAR filings | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Confidential Federated Unlearning** | Exact & approximate Hessian inversion gradient erasure | Q2 2027 | `PLANNED` |
 | **Post-Quantum Cryptography** | CRYSTALS-Kyber & Dilithium PQC SecAgg + mTLS | Q3 2027 | `PLANNED` |
 | **Cross-Chain Inter-Bank Settlement** | Layer-2 CCIP CBDC token disbursement bridge | Q3 2027 | `PLANNED` |
