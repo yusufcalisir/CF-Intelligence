@@ -19,10 +19,8 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import os
 import struct
-from dataclasses import dataclass, field
-from typing import List
+from dataclasses import dataclass
 
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -56,7 +54,7 @@ class P2PSecAggState:
     """Snapshot of the P2P SecAgg key-exchange state after a round's setup."""
 
     round_id: int
-    active_peers: List[str]
+    active_peers: list[str]
     shared_seeds_derived: int
     mask_dimension: int
     zero_sum_verified: bool
