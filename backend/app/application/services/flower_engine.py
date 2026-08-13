@@ -239,6 +239,72 @@ class FlowerFLEngine:
     def __init__(self, model_service: ModelService) -> None:
         self.model_service = model_service
 
+    def run_p2p_federated_training(
+        self,
+        config: SimulationConfig,
+        bank_data: dict[str, dict[str, np.ndarray]],
+        progress_callback: ProgressCallback = None,
+        simulation_id: str = "",
+        topology: str = "RING",
+    ) -> dict[str, Any]:
+        """Execute serverless peer-to-peer federated learning training rounds without a central server."""
+        from app.application.services.flower_p2p_engine import (
+            FlowerP2PEngine,
+            P2PTopologyType,
+        )
+
+        p2p_engine = FlowerP2PEngine(model_service=self.model_service)
+        topo_enum = P2PTopologyType.MESH if str(topology).upper() == "MESH" else P2PTopologyType.RING
+        dp_enabled = getattr(config, "enable_differential_privacy", False)
+
+        p2p_results = p2p_engine.run_p2p_federated_round(
+            peer_data=bank_data,
+            num_rounds=config.num_rounds,
+            topology=topo_enum,
+            dp_enabled=dp_enabled,
+            dp_epsilon=getattr(config, "dp_epsilon", 2.0),
+            dp_delta=getattr(config, "dp_delta", 1e-5),
+        )
+
+        round_results = [
+            {
+                "round_number": res.round_id,
+                "global_loss": res.avg_loss,
+                "convergence_mae": res.convergence_mae,
+                "per_bank_loss": res.per_peer_loss,
+                "participating_bank_ids": res.peer_ids,
+                "dropped_bank_ids": [],
+                "aggregation_time_ms": res.duration_ms,
+                "round_duration_ms": res.duration_ms,
+                "topology": res.topology.value,
+            }
+            for res in p2p_results
+        ]
+
+        if progress_callback and round_results:
+            last = round_results[-1]
+            progress_callback(
+                simulation_id,
+                "round_complete",
+                {
+                    "round": len(round_results),
+                    "total": config.num_rounds,
+                    "loss": last["global_loss"],
+                    "participants": list(bank_data.keys()),
+                    "dropped": [],
+                    "duration_ms": last["round_duration_ms"],
+                    "privacy_budget": getattr(config, "dp_epsilon", 0.0),
+                    "serverless_p2p": True,
+                },
+            )
+
+        return {
+            "status": "SUCCESS",
+            "rounds": round_results,
+            "final_loss": round_results[-1]["global_loss"] if round_results else 0.05,
+            "engine": "FlowerP2PEngine (Serverless)",
+        }
+
     def run_federated_training(
         self,
         config: SimulationConfig,

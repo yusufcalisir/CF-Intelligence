@@ -449,13 +449,23 @@ class SimulationService:
                 def flower_progress_cb(sim_id: str, event_type: str, data: dict[str, Any]) -> None:
                     self._notify(progress_callback, sim_id, event_type, data)
 
-                flower_result = flower_engine.run_federated_training(
-                    config=config,
-                    bank_data=bank_data,
-                    global_model=global_model,
-                    progress_callback=flower_progress_cb if progress_callback else None,
-                    simulation_id=simulation.id,
-                )
+                is_p2p_flower = getattr(config, "p2p_mode", False) or getattr(config, "fl_engine_mode", "") == "p2p"
+                if is_p2p_flower:
+                    flower_result = flower_engine.run_p2p_federated_training(
+                        config=config,
+                        bank_data=bank_data,
+                        progress_callback=flower_progress_cb if progress_callback else None,
+                        simulation_id=simulation.id,
+                        topology=getattr(config, "topology", "RING"),
+                    )
+                else:
+                    flower_result = flower_engine.run_federated_training(
+                        config=config,
+                        bank_data=bank_data,
+                        global_model=global_model,
+                        progress_callback=flower_progress_cb if progress_callback else None,
+                        simulation_id=simulation.id,
+                    )
 
                 rounds = [
                     TrainingRound(
