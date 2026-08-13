@@ -42,6 +42,7 @@
 | R-3 | `/v1/graph/embeddings/propagate-risk` called `get_all_embeddings()` without explicit `dp_noise=True` | Added explicit `dp_noise=True` kwarg at both router call sites | Router audit |
 | R-4 | `/v1/graph/embeddings/similar` returned silent `[]` on budget exhaustion : no HTTP error | Added HTTP 429 response with membership inference warning message | Router audit |
 | R-5 | No test coverage for production DP guard or explicit classifier exclusion | Added GR14, GR15 (robustness) and HP11, HP12 (hypothesis) tests | pytest 23/23 |
+| R-6 | Batch graph querying latency overhead | Implemented `flink_graph_streaming.py` for sub-second entity graph updates (&lt;50ms SLA) | Flink PyFlink DataStream |
 
 **Post-Remediation Test Results:**
 - `pytest verification/graph_intelligence/tests/` → **23 / 23 PASSED**
@@ -303,6 +304,7 @@ No unsupported capabilities remain after remediation.
 | `graph.py` | HTTP 429 returned when `find_similar_entities()` exhausts per-entity query budget | Surfaces membership inference protection to API consumers |
 | `test_graph_sage_robustness.py` | Added GR14 (production DP guard) and GR15 (classifier exclusion) | Direct test coverage for remediated code paths |
 | `test_graph_sage_hypothesis.py` | Added HP11 (classifier exclusion monotonicity) and HP12 (DP unit-sphere invariant) | Property verification across all architectures |
+| `flink_graph_streaming.py` | Apache Flink real-time graph streaming engine & sliding window accumulator | Sub-second entity graph updates and edge velocity anomaly detection (<50ms SLA) |
 
 ---
 

@@ -215,6 +215,7 @@ CF-Intelligence/
 │   │   │       ├── fl_dirichlet_partitioner.py      # Dir(alpha) Non-IID data partitioner
 │   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
 │   │   │       ├── fl_hyperparameter_optimizer.py   # Optuna Bayesian TPE hyperparameter optimizer
+│   │   │       ├── flink_graph_streaming.py         # Apache Flink real-time graph streaming engine (V2.0)
 │   │   │       ├── flower_engine.py                 # Flower FL framework integration engine
 │   │   │       ├── flower_p2p_engine.py             # Flower serverless P2P engine & gossip strategy (V2.0)
 │   │   │       ├── graph_analytics_service.py       # Entity graph analytics service
@@ -644,7 +645,7 @@ npm run deploy:local
 | **HSM Root Key Binding** | Vault PKI root CA keys bound to FIPS 140-2 Level 3 HSM | ✅ **SHIPPED (Q4 2026)** |
 | **Multi-Sig Coordinator** | Gnosis Safe 2-of-3 governance contract for coordinator functions | ✅ **SHIPPED (Q4 2026)** |
 | **Flower P2P Integration** | Peer-to-peer FL training round via Flower framework without central server | ✅ **SHIPPED (Q1 2027)** |
-| **Real-Time Graph Streaming** | Apache Flink integration for sub-second entity graph updates | Q1 2027 |
+| **Real-Time Graph Streaming** | Apache Flink integration for sub-second entity graph updates | ✅ **SHIPPED (Q1 2027)** |
 
 ---
 
