@@ -47,14 +47,23 @@ export default function SecurityPage() {
   // P2P SecAgg panel state (simulates live key broadcast status for current round)
   interface SecAggNode { id: string; label: string; x: number; y: number; broadcast: boolean; pkHex: string; hmacHex: string; }
   const [secaggRound] = useState(42);
+  const [shamirThreshold, setShamirThreshold] = useState(3);
+  const [droppedNodeIds, setDroppedNodeIds] = useState<string[]>(['bank_delta']);
+
   const secaggNodes: SecAggNode[] = [
-    { id: 'bank_alpha', label: 'Alpha Intl.', x: 160, y: 60,  broadcast: true,  pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
-    { id: 'bank_beta',  label: 'Beta Corp.',  x: 300, y: 160, broadcast: true,  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
-    { id: 'bank_gamma', label: 'Gamma Fin.',  x: 160, y: 260, broadcast: true,  pkHex: '1da472..5c9f', hmacHex: '2e8531..a167' },
-    { id: 'bank_delta', label: 'Delta Bank',  x:  20, y: 160, broadcast: false, pkHex: '——',     hmacHex: '——' },
+    { id: 'bank_alpha', label: 'Alpha Intl.', x: 160, y: 60,  broadcast: !droppedNodeIds.includes('bank_alpha'), pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
+    { id: 'bank_beta',  label: 'Beta Corp.',  x: 300, y: 160, broadcast: !droppedNodeIds.includes('bank_beta'),  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
+    { id: 'bank_gamma', label: 'Gamma Fin.',  x: 160, y: 260, broadcast: !droppedNodeIds.includes('bank_gamma'), pkHex: '1da472..5c9f', hmacHex: '2e8531..a167' },
+    { id: 'bank_delta', label: 'Delta Bank',  x:  20, y: 160, broadcast: !droppedNodeIds.includes('bank_delta'), pkHex: '8b33fe..12a9', hmacHex: '7f91cc..04e2' },
   ];
   const broadcastCount = secaggNodes.filter(n => n.broadcast).length;
-  const quorumReady = broadcastCount >= 3;
+  const quorumReady = broadcastCount >= shamirThreshold;
+
+  const toggleDropout = (bankId: string) => {
+    setDroppedNodeIds(prev =>
+      prev.includes(bankId) ? prev.filter(id => id !== bankId) : [...prev, bankId]
+    );
+  };
   // Edges between all broadcast nodes (mesh)
   const meshEdges: { a: SecAggNode; b: SecAggNode }[] = [];
   const broadcast = secaggNodes.filter(n => n.broadcast);
@@ -577,6 +586,8 @@ export default function SecurityPage() {
                       { label: 'KDF',              value: 'HKDF-SHA256 (RFC 5869)' },
                       { label: 'Mask PRG',         value: 'HMAC-SHA256 counter mode' },
                       { label: 'Modular Ring',     value: 'Z_{2^32} (32-bit unsigned)' },
+                      { label: 'Prime Field',      value: 'Z_p (p = 2^256 - 189)' },
+                      { label: 'Threshold Scheme', value: `Shamir (${shamirThreshold}, 4) Galois Polynomial` },
                       { label: 'Authentication',   value: 'HMAC-SHA256 over (bank_id ∥ round_id ∥ pk)' },
                       { label: 'Zero-Sum Proof',   value: 'Σ y_u ≡ Σ w_u (mod 2^32)' },
                       { label: 'Server Knowledge', value: 'None — pure relay, ε=0 information' },
@@ -587,6 +598,87 @@ export default function SecurityPage() {
                         <span className="font-mono font-bold text-[var(--color-primary)] text-right">{item.value}</span>
                       </div>
                     ))}
+                  </div>
+                </div>
+
+                {/* Shamir (t, n) Threshold & Node Dropout Simulator */}
+                <div className="glass-card p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
+                      <span>🧮 Shamir (t, n) Dropout Reconstruction</span>
+                    </h3>
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="text-[var(--color-text-muted)]">Threshold (t):</span>
+                      <select
+                        value={shamirThreshold}
+                        onChange={(e) => setShamirThreshold(Number(e.target.value))}
+                        className="bg-[var(--color-surface-alt)] border border-[var(--color-border)] rounded px-2 py-1 text-xs font-mono font-bold text-[var(--color-primary)]"
+                      >
+                        <option value={2}>t = 2 (50% Quorum)</option>
+                        <option value={3}>t = 3 (75% Quorum)</option>
+                        <option value={4}>t = 4 (100% Strict)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Node dropout toggle buttons */}
+                  <div className="space-y-2">
+                    <span className="text-[11px] text-[var(--color-text-muted)] font-medium">
+                      Simulate Mid-Round Node Dropouts:
+                    </span>
+                    <div className="grid grid-cols-2 gap-2">
+                      {[
+                        { id: 'bank_alpha', label: 'Alpha' },
+                        { id: 'bank_beta', label: 'Beta' },
+                        { id: 'bank_gamma', label: 'Gamma' },
+                        { id: 'bank_delta', label: 'Delta' },
+                      ].map((bank) => {
+                        const isDropped = droppedNodeIds.includes(bank.id);
+                        return (
+                          <button
+                            key={bank.id}
+                            onClick={() => toggleDropout(bank.id)}
+                            className={`px-3 py-2 rounded-lg text-xs font-semibold flex items-center justify-between border transition-all ${
+                              isDropped
+                                ? 'bg-rose-500/15 border-rose-500/40 text-rose-400'
+                                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                            }`}
+                          >
+                            <span>{bank.label}</span>
+                            <span className="text-[10px] font-bold uppercase">
+                              {isDropped ? '❌ DROPPED' : '✓ ACTIVE'}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Live Reconstruction Banner */}
+                  <div
+                    className={`p-3 rounded-lg border text-xs space-y-1 ${
+                      quorumReady
+                        ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                        : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between font-bold">
+                      <span>
+                        {quorumReady
+                          ? `✓ RECONSTRUCTION SUCCESSFUL (${broadcastCount}/${shamirThreshold} shares collected)`
+                          : `⚠️ RECONSTRUCTION BLOCKED (${broadcastCount}/${shamirThreshold} shares collected)`}
+                      </span>
+                      <span className="font-mono text-[10px]">
+                        {quorumReady ? 'MAE = 0.000000' : 'INSUFFICIENT SHARES'}
+                      </span>
+                    </div>
+                    <p className="text-[10px] opacity-80 leading-relaxed">
+                      {quorumReady
+                        ? `Lagrange polynomial interpolation over Z_p reconstructed secrets for ${
+                            droppedNodeIds.length === 0 ? 'all active participants' : droppedNodeIds.join(', ')
+                          }. Plaintext FedAvg global weights restored identically.`
+                        : `At least ${shamirThreshold} shares required to interpolate polynomial f(0). Aggregation halted.`}
+                    </p>
                   </div>
                 </div>
               </div>
