@@ -140,3 +140,57 @@ class PeerKeysResponse:
     round_id: int
     peer_keys: list[PeerKeyEntry]
     all_peers_ready: bool     # True when all expected participants have broadcast
+
+
+# ---------------------------------------------------------------------------
+# Shamir (t, n) Threshold Secret Sharing Messages
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class EncryptedShareBundle:
+    """Encrypted Shamir share bundle routed between two bank nodes via coordinator."""
+
+    sender_bank_id: str
+    recipient_bank_id: str
+    round_id: int
+    encrypted_b_share: bytes
+    encrypted_x_share: bytes
+    hmac_signature: bytes
+
+
+@dataclass
+class ShareRoutingRequest:
+    """Batch of encrypted share bundles submitted by a bank node for routing."""
+
+    sender_bank_id: str
+    round_id: int
+    bundles: list[EncryptedShareBundle]
+
+
+@dataclass
+class ShareRoutingResponse:
+    """Coordinator acknowledgement of share bundle routing."""
+
+    accepted: bool
+    status_message: str
+    routed_count: int
+
+
+@dataclass
+class DropoutRecoveryRequest:
+    """Submitted by surviving nodes to provide shares for dropped node keys / self-masks."""
+
+    reporting_bank_id: str
+    round_id: int
+    surviving_b_shares: list[bytes]
+    dropped_node_shares: dict[str, bytes]  # dropped_bank_id -> share_bytes
+
+
+@dataclass
+class DropoutRecoveryResponse:
+    """Coordinator acknowledgement of received dropout recovery shares."""
+
+    accepted: bool
+    threshold_met: bool
+    reconstructed_node_count: int

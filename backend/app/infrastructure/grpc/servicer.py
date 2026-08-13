@@ -15,14 +15,19 @@ from app.infrastructure.grpc.types import (
     ClientRegisterResponse,
     CoordinatorCommand,
     CoordinatorStatus,
+    DropoutRecoveryRequest,
+    DropoutRecoveryResponse,
     ECDHBroadcastRequest,
     ECDHBroadcastResponse,
+    EncryptedShareBundle,
     ModelChunk,
     ModelDownloadRequest,
     ParameterChunk,
     PeerKeyEntry,
     PeerKeysRequest,
     PeerKeysResponse,
+    ShareRoutingRequest,
+    ShareRoutingResponse,
     SubmitGradientRequest,
 )
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
@@ -51,6 +56,10 @@ class FederatedLearningServicer:
         # P2P SecAgg key store: round_id -> {bank_id -> ECDHBroadcastRequest}
         # The coordinator relays these bundles; it never derives shared secrets.
         self.secagg_key_store: dict[int, dict[str, ECDHBroadcastRequest]] = {}
+        # Shamir share store: round_id -> { (sender, recipient) -> EncryptedShareBundle }
+        self.share_store: dict[int, dict[tuple[str, str], EncryptedShareBundle]] = {}
+        # Dropout shares store: round_id -> { reporting_bank -> DropoutRecoveryRequest }
+        self.dropout_share_store: dict[int, dict[str, DropoutRecoveryRequest]] = {}
 
     async def RegisterClient(  # noqa: N802
         self, request: ClientRegisterRequest
@@ -416,4 +425,61 @@ class FederatedLearningServicer:
             round_id=request.round_id,
             peer_keys=peer_keys,
             all_peers_ready=all_ready,
+        )
+
+    # -----------------------------------------------------------------------
+    # Shamir (t, n) Threshold Share Routing & Dropout Recovery RPCs
+    # -----------------------------------------------------------------------
+
+    async def RouteShareBundles(  # noqa: N802
+        self, request: ShareRoutingRequest
+    ) -> ShareRoutingResponse:
+        """RPC 7 (V2.0): Receive encrypted Shamir share bundles for routing.
+
+        The coordinator stores encrypted shares in `share_store` indexed by
+        (round_id, (sender, recipient)). The coordinator never possesses
+        decryption keys and cannot read plaintext secret shares.
+        """
+        round_shares = self.share_store.setdefault(request.round_id, {})
+        for bundle in request.bundles:
+            key = (bundle.sender_bank_id, bundle.recipient_bank_id)
+            round_shares[key] = bundle
+
+        logger.info(
+            "RouteShareBundles accepted: sender=%s round=%d routed_count=%d",
+            request.sender_bank_id,
+            request.round_id,
+            len(request.bundles),
+        )
+        return ShareRoutingResponse(
+            accepted=True,
+            status_message="Encrypted share bundles accepted for peer distribution.",
+            routed_count=len(request.bundles),
+        )
+
+    async def SubmitDropoutShares(  # noqa: N802
+        self, request: DropoutRecoveryRequest
+    ) -> DropoutRecoveryResponse:
+        """RPC 8 (V2.0): Receive shares from a surviving node for dropped clients.
+
+        Accumulates shares for dropped node keys x_d and surviving self-masks b_u.
+        Returns threshold_met=True when at least DEFAULT_QUORUM shares have been
+        collected for all dropped nodes.
+        """
+        round_dropouts = self.dropout_share_store.setdefault(request.round_id, {})
+        round_dropouts[request.reporting_bank_id] = request
+
+        threshold_met = len(round_dropouts) >= DEFAULT_QUORUM
+
+        logger.info(
+            "SubmitDropoutShares: reporter=%s round=%d total_reporters=%d threshold_met=%s",
+            request.reporting_bank_id,
+            request.round_id,
+            len(round_dropouts),
+            threshold_met,
+        )
+        return DropoutRecoveryResponse(
+            accepted=True,
+            threshold_met=threshold_met,
+            reconstructed_node_count=len(request.dropped_node_shares),
         )
