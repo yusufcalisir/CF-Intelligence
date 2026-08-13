@@ -91,7 +91,6 @@ class SmartContractSettlementDriver:
         self.contract_address = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
         self.coordinator_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         self.network_name = "EVM CBDC Testnet (Sepolia/Hyperledger)"
-        self.chain_id = 11155111
         self.current_block_height = 5421890
         self.settlement_history: list[dict[str, Any]] = []
 
@@ -101,6 +100,14 @@ class SmartContractSettlementDriver:
             "Bank B": "0x3C44CdD06a900c2197E43783d0988be646140130",
             "Bank C": "0x90F79bf6EB2c4f8080653A214d5aB20fD4F72F7b",
         }
+
+        # Gnosis Safe 2-of-3 Multi-Sig Coordinator Governance Driver
+        from app.infrastructure.security.gnosis_multisig_coordinator import (
+            GnosisSafeMultiSigCoordinatorDriver,
+        )
+
+        self.multisig_driver = GnosisSafeMultiSigCoordinatorDriver()
+        self.multisig_contract_address = "0xa513E6E4b8E27A035041B161B1B5467C08A4D673"
 
     @classmethod
     def get_instance(cls) -> "SmartContractSettlementDriver":
