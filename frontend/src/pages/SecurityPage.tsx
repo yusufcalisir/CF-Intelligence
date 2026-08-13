@@ -297,12 +297,12 @@ export default function SecurityPage() {
           { id: 'abac',   icon: '🛡️',  label: 'Dynamic ABAC Rules' },
           { id: 'vault',  icon: '🔐',  label: 'HashiCorp Vault' },
           { id: 'audit',      icon: '⛓️',  label: 'Cryptographic Audit Chain' },
-          { id: 'secagg',     icon: '🔗',  label: 'P2P SecAgg (V2.0)' },
-          { id: 'zkp',        icon: '⚡',  label: 'zk-SNARK Attestation (V3.0)' },
-          { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning (V3.0)' },
-          { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber (V3.0)' },
-          { id: 'bridge',     icon: '🌉',  label: 'Cross-Chain Settlement (V3.0)' },
-          { id: 'rdp',        icon: '📈',  label: 'Adaptive DP Auto-Scaler (V3.0)' },
+          { id: 'secagg',     icon: '🔗',  label: 'P2P Curve25519 SecAgg' },
+          { id: 'zkp',        icon: '⚡',  label: 'zk-SNARK Attestation' },
+          { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning' },
+          { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber' },
+          { id: 'bridge',     icon: '🌉',  label: 'Cross-Chain Settlement' },
+          { id: 'rdp',        icon: '📈',  label: 'Adaptive DP Auto-Scaler' },
         ].map((tab) => (
           <button
             key={tab.id}

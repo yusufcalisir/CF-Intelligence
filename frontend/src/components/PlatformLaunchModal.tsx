@@ -18,31 +18,38 @@ interface InitializationStage {
 const STAGES: InitializationStage[] = [
   {
     id: 1,
-    label: 'mTLS 1.3 Consortium Handshake',
+    label: 'mTLS 1.3 & Vault PKI HSM Handshake',
     subtext: 'Establishing Zero-Trust links with JPM, HSBC & DBK nodes...',
-    badge: 'PHASE 01',
-    metric: 'mTLS 1.3 · 1.2ms',
+    badge: 'STAGE 01',
+    metric: 'FIPS 140-2 · 1.2ms',
   },
   {
     id: 2,
-    label: 'Intel SGX Hardware Enclave Attestation',
-    subtext: 'Verifying TEE Remote Attestation Quote & Paillier HE Keys...',
-    badge: 'PHASE 02',
-    metric: 'SGX v2 · Attested',
+    label: 'Post-Quantum Lattice Key Exchange',
+    subtext: 'Negotiating NIST FIPS 203 (Kyber-768) & FIPS 204 (Dilithium-3) keys...',
+    badge: 'STAGE 02',
+    metric: 'PQC Lattice · Bound',
   },
   {
     id: 3,
-    label: 'ISO 20022 Graph Tensor Ingestion',
-    subtext: 'Parsing pacs.008 streams & FedGATConv Graph Embeddings...',
-    badge: 'PHASE 03',
-    metric: '12,840 Nodes · GAT',
+    label: 'Intel SGX Enclave & zk-SNARK Attestation',
+    subtext: 'Verifying Groth16 BN254 model proofs & TEE Paillier HE rings...',
+    badge: 'STAGE 03',
+    metric: 'zk-SNARK · O(1) <5ms',
   },
   {
     id: 4,
-    label: 'Mounting Differential Privacy Workbench',
-    subtext: 'Calibrating Differential Privacy bounds (ε=0.50, δ=1e-5)...',
-    badge: 'PHASE 04',
-    metric: 'RDP Accountant · Ready',
+    label: 'ISO 20022 Graph & Agentic AML Stream',
+    subtext: 'Parsing pacs.008 streams, GAT embeddings & FinCEN RAG engine...',
+    badge: 'STAGE 04',
+    metric: '12,840 Nodes · GAT',
+  },
+  {
+    id: 5,
+    label: 'Adaptive Rényi DP Budget Auto-Scaler',
+    subtext: 'Calibrating dynamic noise multiplier (σ_t) against loss velocity...',
+    badge: 'STAGE 05',
+    metric: 'RDP Dual · Active',
   },
 ];
 
@@ -66,34 +73,42 @@ export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaun
           clearInterval(progressInterval);
           return 100;
         }
-        return prev + 2.5;
+        return prev + 2.0;
       });
-    }, 40);
+    }, 35);
 
     // Stage progression & telemetry logs
     const stage1Timeout = setTimeout(() => {
       setCurrentStageIdx(1);
       setLogMessages((prev) => [
         ...prev,
-        '[mTLS 1.3] Bank Nodes Connected: JPM (#01), HSBC (#02), DBK (#03)',
+        '[mTLS / Vault PKI] Bank Nodes Connected & HSM Attested: JPM (#01), HSBC (#02), DBK (#03)',
       ]);
-    }, 650);
+    }, 550);
 
     const stage2Timeout = setTimeout(() => {
       setCurrentStageIdx(2);
       setLogMessages((prev) => [
         ...prev,
-        '[Intel SGX Enclave] IAS Remote Attestation Verified (Paillier HE Active)',
+        '[PQC Lattice] CRYSTALS-Kyber-768 KEM & Dilithium-3 Signatures Verified',
       ]);
-    }, 1300);
+    }, 1100);
 
     const stage3Timeout = setTimeout(() => {
       setCurrentStageIdx(3);
       setLogMessages((prev) => [
         ...prev,
-        '[FedGNN Engine] 12,840 transaction graph tensors synchronized',
+        '[zk-SNARK & SGX] Groth16 BN254 Weight Attestation Verified (Proof SLA <5ms)',
       ]);
-    }, 1950);
+    }, 1650);
+
+    const stage4Timeout = setTimeout(() => {
+      setCurrentStageIdx(4);
+      setLogMessages((prev) => [
+        ...prev,
+        '[FedGNN & AML Copilot] 12,840 transaction graph tensors & FinCEN RAG agent synchronized',
+      ]);
+    }, 2200);
 
     const completionTimeout = setTimeout(() => {
       setLogMessages((prev) => [
@@ -103,13 +118,14 @@ export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaun
       setTimeout(() => {
         onComplete();
       }, 350);
-    }, 2550);
+    }, 2850);
 
     return () => {
       clearInterval(progressInterval);
       clearTimeout(stage1Timeout);
       clearTimeout(stage2Timeout);
       clearTimeout(stage3Timeout);
+      clearTimeout(stage4Timeout);
       clearTimeout(completionTimeout);
     };
   }, [isOpen, onComplete]);
