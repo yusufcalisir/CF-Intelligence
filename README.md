@@ -485,7 +485,7 @@ Comparative positioning against leading open-source federated learning and priva
 | **CCPA** (Consumer Data Rights) | Privacy Guard | `label_privacy_guard.py` | Full |
 | **EU AI Act** (High-Risk AI Systems) | AI Act Compliance | `ai_act_compliance.py` | Full |
 | **Bank Secrecy Act / FinCEN** | SAR Reporting | `regulatory_reporter.py` | Full |
-| **FIPS 140-2 Level 3** | HSM / TEE Driver | `hsm_signer.py`, `tee_driver.py` | Simulated |
+| **FIPS 140-2 Level 3** | HSM / Vault PKI Binder | `hsm_signer.py`, `vault_hsm_pki_binder.py` | Full |
 | **ISO 27001** (Information Security) | Security Compliance | `security_compliance.py` | Full |
 | **SOC 2 Type II** | Audit Logging | `privacy_audit_service.py` | Full |
 | **Zero-Trust Architecture (NIST SP 800-207)** | PKI / ABAC / mTLS | `abac_engine.py`, `mtls_manager.py` | Full |
@@ -628,6 +628,7 @@ npm run deploy:local
 | ~~SecAgg masks generated server-side~~ | ~~`secagg_driver.py`~~ | ✅ **RESOLVED** — `p2p_secagg_driver.py` implements full Curve25519 ECDH client-side mask generation. Zero server cryptographic involvement. |
 | ~~No client-to-client peer DH channel~~ | ~~FL Clients~~ | ✅ **RESOLVED** — gRPC `BroadcastPublicKey` / `FetchPeerPublicKeys` RPCs provide authenticated X25519 key exchange routing via the coordinator relay. |
 | ~~No Shamir (t, n) Threshold Secret Sharing~~ | ~~`p2p_secagg_driver.py`~~ | ✅ **RESOLVED** — `shamir_engine.py` implements Galois polynomial secret sharing over $\mathbb{Z}_p$ ($p = 2^{256} - 189$) for dropout-resilient mask reconstruction. |
+| ~~Vault PKI Root CA keys in software~~ | ~~`vault_client.py`~~ | ✅ **RESOLVED** — `vault_hsm_pki_binder.py` binds Vault Root CA generation and certificate signing to FIPS 140-2 Level 3 HSM enclaves via PKCS#11 (`is_exportable = False`). |
 | TEE operates as software simulation without SGX SDK | `tee_driver.py` | Connect to Open Enclave SDK or Intel SGX C++ bindings |
 | Coordinator role is a single-wallet EOA | `ConsortiumIncentiveSettlement.sol` | Upgrade to 2-of-3 Gnosis Safe multi-sig contract |
 
