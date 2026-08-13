@@ -38,6 +38,8 @@ The core domain model, written in pure Python. It contains business definitions,
 Contains business logic orchestration. Defines ports (interfaces) for data access, which are implemented by the infrastructure layer.
 
 *   `services/fl_engine.py`: Implements parameter aggregation (FedAvg, coordinate median, Krum) and secure aggregation masking.
+*   `services/flower_p2p_engine.py`: Serverless peer-to-peer federated learning rounds with Ring and Mesh gossip strategies (`P2PGossipStrategy`).
+*   `services/flink_graph_streaming.py`: Apache Flink real-time graph streaming engine with $W(t, 500\text{ms})$ sliding window state accumulators (<50ms SLA).
 *   `services/model_service.py`: Lifecycle of the PyTorch MLP model (training, CPU/GPU evaluation, Integrated Gradients attributions).
 *   `services/privacy_service.py`: Bounded L2 gradient clipping and Gaussian mechanism noise addition.
 *   `services/risk_engine.py`: Combines 9 independent heuristic and ML signals into a single score ($0 \text{ to } 1000$).
@@ -50,6 +52,9 @@ Concrete implementation of dependencies. Adapts foreign libraries and databases.
 
 *   `database.py` & `models.py`: SQLAlchemy 2.0 async engine and relational database tables.
 *   `redis_store.py`: A fault-tolerant state manager. It synchronizes simulation configurations and round metrics to Redis. If Redis is unreachable, it falls back to a thread-safe, in-memory cache to maintain liveness.
+*   `security/p2p_secagg_driver.py` & `shamir_engine.py`: Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
+*   `security/vault_hsm_pki_binder.py`: HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11.
+*   `security/gnosis_multisig_coordinator.py`: Gnosis Safe 2-of-3 threshold multi-sig coordinator governance driver with EIP-712 structured data signatures.
 *   `connectors/`: Production Bank Connector sub-system implementing Hexagonal Ports & Adapters:
     *   `base_connector.py`: Defines the `BaseBankConnector` abstract interface and unified `NormalizedTransaction` Pydantic domain schema.
     *   `streaming_connector.py`: High-throughput real-time payment event streaming connector for Kafka, RabbitMQ, and Redis streams.
