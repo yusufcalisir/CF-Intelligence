@@ -91,6 +91,7 @@ class SmartContractSettlementDriver:
         self.contract_address = "0x71C7656EC7ab88b098defB751B7401B5f6d8976F"
         self.coordinator_address = "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
         self.network_name = "EVM CBDC Testnet (Sepolia/Hyperledger)"
+        self.chain_id = 11155111
         self.current_block_height = 5421890
         self.settlement_history: list[dict[str, Any]] = []
 
