@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import os
 import struct
 from dataclasses import dataclass
 
@@ -28,6 +29,11 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
     X25519PublicKey,
 )
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+
+from app.infrastructure.security.shamir_engine import (
+    ShamirSecretSharingEngine,
+    ShamirShare,
+)
 
 # ---------------------------------------------------------------------------
 # Domain Value Objects
@@ -97,22 +103,31 @@ class P2PSecAggDriver:
         self._private_key: X25519PrivateKey | None = None
         self._public_key_bytes: bytes | None = None
         self._round_id: int | None = None
+        self._self_mask_seed: bytes | None = None
 
     # ------------------------------------------------------------------
     # Phase 1: Ephemeral Keypair Generation
     # ------------------------------------------------------------------
 
     def generate_round_keypair(self, round_id: int) -> ECDHPublicKeyBundle:
-        """Generate an ephemeral X25519 keypair for this FL round.
+        """Generate a fresh X25519 keypair and self-mask seed for an FL round.
 
-        Returns an authenticated ECDHPublicKeyBundle ready for broadcast.
-        The private key is stored in memory and never leaves this instance.
+        Args:
+            round_id: Monotonically increasing FL round counter.
+
+        Returns:
+            Authenticated ECDHPublicKeyBundle signed with the node's identity secret.
         """
         self._round_id = round_id
         self._private_key = X25519PrivateKey.generate()
         self._public_key_bytes = self._private_key.public_key().public_bytes_raw()
+        self._self_mask_seed = os.urandom(32)
 
-        signature = self._sign_bundle(self.bank_id, round_id, self._public_key_bytes)
+        signature = self._sign_bundle(
+            self.bank_id,
+            round_id,
+            self._public_key_bytes,
+        )
 
         return ECDHPublicKeyBundle(
             bank_id=self.bank_id,
@@ -240,25 +255,16 @@ class P2PSecAggDriver:
         weights: list[float],
         peer_bundles: list[ECDHPublicKeyBundle],
         quantization_scale: float = 1e6,
+        use_self_mask: bool = False,
     ) -> list[int]:
         """Produce the masked weight vector y_u for coordinator submission.
 
         Quantizes float weights to 32-bit integers, then applies pairwise
         masks following the zero-sum additive protocol:
 
-            y_u = w_u + Σ_{v > u} s_{u,v}  -  Σ_{v < u} s_{v,u}  (mod 2^32)
+            y_u = w_u + Σ_{v > u} s_{u,v}  -  %_{v < u} s_{v,u}  (mod 2^32)
 
-        where v > u / v < u is determined by lexicographic ordering of bank_ids.
-
-        Args:
-            weights: Float model parameter vector of dimension d.
-            peer_bundles: Authenticated ECDHPublicKeyBundles from all peers
-                (excluding self) who are participating this round.
-            quantization_scale: Multiplier for float→int quantization. The
-                coordinator divides by the same scale after dequantizing.
-
-        Returns:
-            Masked integer vector of length d, ready for submission.
+        Optionally adds self-mask PRG(b_u) when Shamir threshold secret sharing is enabled.
         """
         if not weights:
             raise ValueError("weights must be non-empty.")
@@ -285,7 +291,45 @@ class P2PSecAggDriver:
                 for i in range(d):
                     masked[i] = (masked[i] - mask[i]) % self._MASK_MODULUS
 
+        # Apply self-mask seed b_u if enabled and present
+        if use_self_mask and self._self_mask_seed is not None:
+            self_mask = self.expand_mask(self._self_mask_seed, d)
+            for i in range(d):
+                masked[i] = (masked[i] + self_mask[i]) % self._MASK_MODULUS
+
         return masked
+
+    # ------------------------------------------------------------------
+    # Shamir (t, n) Secret Sharing & Share Split
+    # ------------------------------------------------------------------
+
+    def split_round_secrets(
+        self,
+        peer_bank_ids: list[str],
+        threshold: int,
+    ) -> dict[str, tuple[ShamirShare, ShamirShare]]:
+        """Split self-mask seed b_u and ephemeral private key x_u into n shares.
+
+        Returns:
+            Dict mapping bank_id -> (b_share, x_share).
+        """
+        if self._private_key is None or self._self_mask_seed is None:
+            raise RuntimeError("generate_round_keypair() must be called first.")
+
+        all_participants = sorted([self.bank_id] + list(peer_bank_ids))
+        total_shares = len(all_participants)
+
+        engine = ShamirSecretSharingEngine()
+        x_bytes = self._private_key.private_bytes_raw()
+
+        b_shares = engine.split_secret(self._self_mask_seed, threshold, total_shares)
+        x_shares = engine.split_secret(x_bytes, threshold, total_shares)
+
+        result: dict[str, tuple[ShamirShare, ShamirShare]] = {}
+        for idx, bank_id in enumerate(all_participants):
+            result[bank_id] = (b_shares[idx], x_shares[idx])
+
+        return result
 
     # ------------------------------------------------------------------
     # Coordinator: Unmasked Aggregation & Zero-Sum Verification
@@ -296,18 +340,7 @@ class P2PSecAggDriver:
         masked_vectors: dict[str, list[int]],
         quantization_scale: float = 1e6,
     ) -> list[float]:
-        """Sum all masked vectors, verify zero-sum cancellation, return plaintext average.
-
-        This is the coordinator-side operation. The result is identical to
-        plain FedAvg on the original float weights.
-
-        Args:
-            masked_vectors: Mapping from bank_id → masked integer vector y_u.
-            quantization_scale: Must match the scale used by clients.
-
-        Returns:
-            Dequantized average weight vector (identical to unmasked FedAvg).
-        """
+        """Sum all masked vectors, verify zero-sum cancellation, return plaintext average."""
         if not masked_vectors:
             raise ValueError("masked_vectors must be non-empty.")
 
@@ -328,6 +361,91 @@ class P2PSecAggDriver:
             # Handle modular sign: values > 2^31 are negative
             signed = total[i] if total[i] < 2**31 else total[i] - 2**32
             result.append((signed / quantization_scale) / n)
+
+        return result
+
+    @classmethod
+    def reconstruct_aggregate_with_dropouts(
+        cls,
+        surviving_masked_vectors: dict[str, list[int]],
+        surviving_b_shares: dict[str, list[ShamirShare]],
+        dropped_x_shares: dict[str, list[ShamirShare]],
+        peer_public_keys: dict[str, bytes],
+        threshold: int,
+        round_id: int,
+        quantization_scale: float = 1e6,
+    ) -> list[float]:
+        """Coordinator dropout recovery using Shamir (t, n) secret reconstruction.
+
+        Reconstructs b_u (self-mask seed) for surviving clients to subtract their self-masks.
+        Reconstructs x_d (ephemeral private key) for dropped clients to re-derive and cancel
+        out their un-reciprocated pairwise masks with surviving clients.
+
+        Returns:
+            Dequantized plaintext global model weight average for surviving clients.
+        """
+        if not surviving_masked_vectors:
+            raise ValueError("surviving_masked_vectors must be non-empty.")
+
+        surviving_banks = sorted(surviving_masked_vectors.keys())
+        d = len(surviving_masked_vectors[surviving_banks[0]])
+        engine = ShamirSecretSharingEngine()
+
+        # Step 1: Sum surviving masked vectors
+        total = [0] * d
+        for b_id in surviving_banks:
+            vec = surviving_masked_vectors[b_id]
+            for i in range(d):
+                total[i] = (total[i] + vec[i]) % (2**32)
+
+        # Step 2: Subtract self-masks b_u for surviving clients
+        for b_id in surviving_banks:
+            if b_id in surviving_b_shares and len(surviving_b_shares[b_id]) >= threshold:
+                b_seed = engine.reconstruct_secret(surviving_b_shares[b_id], threshold)
+                b_mask = cls.expand_mask(b_seed, d)
+                for i in range(d):
+                    total[i] = (total[i] - b_mask[i]) % (2**32)
+
+        # Step 3: Reconstruct x_d for dropped clients and cancel un-reciprocated pairwise masks
+        for dropped_id, x_shares in dropped_x_shares.items():
+            if len(x_shares) >= threshold:
+                x_bytes = engine.reconstruct_secret(x_shares, threshold)
+                dropped_priv_key = X25519PrivateKey.from_private_bytes(x_bytes)
+
+                for surv_id in surviving_banks:
+                    if surv_id in peer_public_keys:
+                        surv_pub_bytes = peer_public_keys[surv_id]
+                        surv_pub_key = X25519PublicKey.from_public_bytes(surv_pub_bytes)
+                        shared_secret = dropped_priv_key.exchange(surv_pub_key)
+
+                        pair = sorted([dropped_id, surv_id])
+                        info = f"secagg:r{round_id}:{pair[0]}:{pair[1]}".encode()
+                        hkdf = HKDF(
+                            algorithm=hashes.SHA256(),
+                            length=32,
+                            salt=f"cfi:secagg:round:{round_id}".encode(),
+                            info=info,
+                        )
+                        seed = hkdf.derive(shared_secret)
+                        mask = cls.expand_mask(seed, d)
+
+                        # If dropped < surviving, dropped added mask, surviving subtracted mask.
+                        # Surviving subtracted mask, so coordinator sum has -mask. We add +mask to cancel.
+                        if dropped_id < surv_id:
+                            for i in range(d):
+                                total[i] = (total[i] + mask[i]) % (2**32)
+                        else:
+                            # If dropped > surviving, dropped subtracted mask, surviving added mask.
+                            # Surviving added mask, so coordinator sum has +mask. We subtract -mask to cancel.
+                            for i in range(d):
+                                total[i] = (total[i] - mask[i]) % (2**32)
+
+        # Step 4: Dequantize and average over surviving count
+        n_surviving = len(surviving_banks)
+        result: list[float] = []
+        for i in range(d):
+            signed = total[i] if total[i] < 2**31 else total[i] - 2**32
+            result.append((signed / quantization_scale) / n_surviving)
 
         return result
 
