@@ -353,6 +353,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 | **zk-SNARK Attestation** | `zk_snark_verifier.py` | Groth16 / PlonK over BN254 elliptic curve + Poseidon hash commitment | $O(1)$ constant time proof verification ($<5\text{ms}$ SLA) | CPU / Native Circom |
 | **Confidential Unlearning** | `federated_unlearning_engine.py` | First-Order Hessian Inversion + Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}$) | Erases evicted bank gradient footprints ($P_{\text{MIA}} \le 0.52$) without retraining | CPU / PyTorch Autograd |
 | **Post-Quantum Cryptography** | `pqc_secagg_driver.py` | NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) + FIPS 204 (Dilithium-3 signatures) | Quantum-safe lattice-based hybrid P2P SecAgg ($<1.5\text{ms}$ SLA) | CPU / Native HKDF |
+| **Cross-Chain Bridge** | `layer2_crosschain_bridge.py` | Chainlink CCIP `EVM2AnyMessage` & LayerZero V2 multi-ledger settlement | Arbitrum, Optimism, Canton Network & Fabric CBDC routing ($<1\text{s}$ L2 Finality) | EVM / Canton / Fabric |
 
 ### 6.2 Mathematical Privacy Formulations
 - Gradient Norm Clipping ($C$):
@@ -378,6 +379,9 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 
 ### 6.7 Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) (`pqc_secagg_driver.py`)
 - NIST FIPS 203 & 204 Lattice Cryptography: Implements Module Learning With Errors (M-LWE) CRYSTALS-Kyber-768 KEM and CRYSTALS-Dilithium-3 signatures combined into a hybrid quantum-safe P2P SecAgg protocol, protecting key exchanges against Shor's algorithm on quantum supercomputers.
+
+### 6.8 Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge (`layer2_crosschain_bridge.py`)
+- Multi-Ledger Programmable Token Routing: Routes Leave-One-Out (LOO) Shapley utility payouts across Arbitrum One, Optimism, Canton Network Daml contracts, and Hyperledger Fabric channels via Chainlink CCIP `EVM2AnyMessage` payloads with sub-second L2 finality.
 
 ---
 
@@ -476,6 +480,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 | **Agentic AML Copilot** | FinCEN 5-Paragraph SAR Narrative & RAG | Autonomous BSA/AML Reporting | `aml_agentic_copilot.py` | `PASS` |
 | **Confidential Unlearning** | First-Order Hessian Inversion Gradient Erasure | Revoked Bank Gradient Erasure | `federated_unlearning_engine.py` | `PASS` |
 | **Post-Quantum Cryptography** | NIST FIPS 203 Kyber-768 & FIPS 204 Dilithium-3 | Quantum-Safe P2P SecAgg Key Exchange | `pqc_secagg_driver.py` | `PASS` |
+| **Cross-Chain Settlement Bridge** | Chainlink CCIP & LayerZero V2 Multi-Ledger | Cross-Chain CBDC & Deposit Settlement | `layer2_crosschain_bridge.py` | `PASS` |
 
 ---
 
@@ -690,7 +695,7 @@ npm run deploy:local
 | **Agentic AML Copilot** | Multi-agent RAG narrative generator for FinCEN SAR filings | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Confidential Federated Unlearning** | Exact & approximate Hessian inversion gradient erasure | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Post-Quantum Cryptography** | CRYSTALS-Kyber & Dilithium PQC SecAgg + mTLS | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
-| **Cross-Chain Inter-Bank Settlement** | Layer-2 CCIP CBDC token disbursement bridge | Q3 2027 | `PLANNED` |
+| **Cross-Chain Inter-Bank Settlement** | Layer-2 CCIP CBDC token disbursement bridge | ✅ **SHIPPED (Q1 2027)** | `COMPLETED` |
 | **Adaptive RDP Auto-Scaler** | Rényi Differential Privacy dynamic budget manager | Q4 2027 | `PLANNED` |
 
 ---

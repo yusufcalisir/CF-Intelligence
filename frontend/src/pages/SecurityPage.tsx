@@ -8,12 +8,60 @@ import {
 } from '../api/queries';
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc'>('mtls');
+  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge'>('mtls');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
   const evaluateABAC = useEvaluateABAC();
   const verifyChain = useVerifyAuditChain();
+
+  // Cross-Chain Settlement state
+  const [bridgePoolAmount, setBridgePoolAmount] = useState(100000);
+  const [bridgeCurrency, setBridgeCurrency] = useState('wCBDC');
+  const [isBridgeLoading, setIsBridgeLoading] = useState(false);
+  const [bridgeResult, setBridgeResult] = useState<{
+    epoch_id: number;
+    pool_currency: string;
+    total_pool_amount: number;
+    total_gas_fees_usd: number;
+    routes: Array<{
+      bank_id: string;
+      network: string;
+      protocol: string;
+      token_symbol: string;
+      amount: number;
+      shapley_share_pct: number;
+      destination_recipient: string;
+      message_id: string;
+      gas_fee_usd: number;
+      status: string;
+    }>;
+    execution_time_ms: number;
+    bridge_audit_hash: string;
+  } | null>(null);
+
+  const handleDisburseCrossChain = async () => {
+    setIsBridgeLoading(true);
+    try {
+      const res = await fetch('/api/v1/security/bridge/disburse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          epoch_id: 42,
+          pool_amount: bridgePoolAmount,
+          currency: bridgeCurrency,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setBridgeResult(data);
+      }
+    } catch (e) {
+      console.error('Failed to disburse cross-chain bridge', e);
+    } finally {
+      setIsBridgeLoading(false);
+    }
+  };
 
   // Post-Quantum Cryptography (PQC) state
   const [pqcKemAlgo, setPqcKemAlgo] = useState('Kyber768');
@@ -207,6 +255,7 @@ export default function SecurityPage() {
           { id: 'zkp',        icon: '⚡',  label: 'zk-SNARK Attestation (V3.0)' },
           { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning (V3.0)' },
           { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber (V3.0)' },
+          { id: 'bridge',     icon: '🌉',  label: 'Cross-Chain Settlement (V3.0)' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1122,6 +1171,130 @@ export default function SecurityPage() {
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-2">
                   <span>Driver: pqc_secagg_driver.py</span>
                   <span>NIST FIPS 203 / 204 Compliant</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 10: Cross-Chain Settlement & Layer-2 Liquidity Bridge (V3.0) */}
+          {activeTab === 'bridge' && (
+            <div className="glass-card p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <span>🌉</span> Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    Chainlink CCIP & LayerZero V2 multi-ledger Shapley incentive routing for CBDC and Tokenized Deposits
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  L2 Sub-Second Finality (&lt;1s)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-4 md:col-span-1">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Settlement Pool Parameters</h4>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Epoch Settlement Pool Amount:</label>
+                      <input
+                        type="number"
+                        value={bridgePoolAmount}
+                        onChange={(e) => setBridgePoolAmount(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Settlement Asset Standard:</label>
+                      <select
+                        value={bridgeCurrency}
+                        onChange={(e) => setBridgeCurrency(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      >
+                        <option value="wCBDC">wCBDC (Wholesale CBDC Token)</option>
+                        <option value="EUR-Deposit">EUR-Deposit (Tokenized Commercial Deposit)</option>
+                        <option value="USD-Institutional">USD-Institutional (Canton Daml Contract)</option>
+                      </select>
+                    </div>
+
+                    <button
+                      onClick={handleDisburseCrossChain}
+                      disabled={isBridgeLoading}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isBridgeLoading ? 'Relaying CCIP Messages...' : '🚀 Execute CCIP Multi-Ledger Payout'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/15 text-[11px] text-slate-300 space-y-1.5">
+                    <div className="font-bold text-emerald-300">Cross-Ledger Coverage:</div>
+                    <p className="text-[var(--color-text-muted)]">
+                      Routes funds simultaneously across Arbitrum, Optimism, Canton Private DLT, and Hyperledger Fabric with zero counterparty risk.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4 md:col-span-2">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Multi-Ledger Route Receipts & CCIP Message IDs</h4>
+
+                  {bridgeResult ? (
+                    <div className="space-y-3">
+                      <div className="p-3 rounded-xl bg-black/40 border border-[var(--color-border)] flex items-center justify-between text-xs font-mono">
+                        <div>
+                          <span className="text-[var(--color-text-muted)]">Total Disbursed: </span>
+                          <span className="text-emerald-400 font-bold">{bridgeResult.total_pool_amount.toLocaleString()} {bridgeResult.pool_currency}</span>
+                        </div>
+                        <div>
+                          <span className="text-[var(--color-text-muted)]">L2 Gas Fees: </span>
+                          <span className="text-amber-400 font-bold">${bridgeResult.total_gas_fees_usd.toFixed(4)} USD</span>
+                        </div>
+                        <div>
+                          <span className="text-[var(--color-text-muted)]">Audit: </span>
+                          <span className="text-indigo-300 font-bold">{bridgeResult.bridge_audit_hash.slice(0, 10)}...</span>
+                        </div>
+                      </div>
+
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs font-mono border border-[var(--color-border)] rounded-xl overflow-hidden">
+                          <thead className="bg-black/60 text-[var(--color-text-muted)] uppercase text-[10px]">
+                            <tr>
+                              <th className="p-2.5">Bank</th>
+                              <th className="p-2.5">Target Ledger</th>
+                              <th className="p-2.5">Protocol</th>
+                              <th className="p-2.5">Shapley Payout</th>
+                              <th className="p-2.5">CCIP Message ID</th>
+                              <th className="p-2.5">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[var(--color-border)] bg-black/20">
+                            {bridgeResult.routes.map((route, i) => (
+                              <tr key={i} className="hover:bg-white/5">
+                                <td className="p-2.5 font-bold text-slate-200">{route.bank_id}</td>
+                                <td className="p-2.5 text-indigo-300">{route.network}</td>
+                                <td className="p-2.5 text-[var(--color-text-muted)]">{route.protocol}</td>
+                                <td className="p-2.5 text-emerald-400 font-bold">{route.amount.toLocaleString()} {route.token_symbol}</td>
+                                <td className="p-2.5 text-amber-300 truncate max-w-[120px]">{route.message_id}</td>
+                                <td className="p-2.5 text-emerald-400 font-bold">{route.status}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
+                      Click <strong>Execute CCIP Multi-Ledger Payout</strong> to trigger atomic cross-chain incentive disbursements across Arbitrum, Optimism, Canton, and Fabric.
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-3">
+                  <span>Driver: layer2_crosschain_bridge.py</span>
+                  <span>Standards: Chainlink CCIP EVM2AnyMessage & LayerZero V2</span>
                 </div>
               </div>
             </div>

@@ -56,6 +56,7 @@ Concrete implementation of dependencies. Adapts foreign libraries and databases.
 *   `redis_store.py`: A fault-tolerant state manager. It synchronizes simulation configurations and round metrics to Redis. If Redis is unreachable, it falls back to a thread-safe, in-memory cache to maintain liveness.
 *   `security/p2p_secagg_driver.py` & `shamir_engine.py`: Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 *   `security/pqc_secagg_driver.py`: NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
+*   `security/layer2_crosschain_bridge.py`: Chainlink CCIP `EVM2AnyMessage` and LayerZero V2 multi-ledger settlement bridge for Arbitrum, Optimism, Canton, and Hyperledger Fabric.
 *   `security/vault_hsm_pki_binder.py`: HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11.
 *   `security/gnosis_multisig_coordinator.py`: Gnosis Safe 2-of-3 threshold multi-sig coordinator governance driver with EIP-712 structured data signatures.
 *   `security/zk_snark_verifier.py` & `zk_circuits/`: Groth16 zk-SNARK model weight attestation driver over BN254 curve with Poseidon hashing and $O(1)$ constant-time bilinear pairing proof verification.

@@ -20,6 +20,7 @@ from app.domain.value_objects_unlearning import UnlearningMethod
 from app.domain.value_objects_zkp import ZKSNARKAttestationProof
 from app.infrastructure.security.abac_engine import ABACEngine, ABACResource
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+from app.infrastructure.security.layer2_crosschain_bridge import Layer2CrossChainBridgeDriver
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator, UserClaims
 from app.infrastructure.security.pqc_secagg_driver import PQCSecAggDriver
@@ -412,4 +413,70 @@ async def get_pqc_status() -> dict[str, Any]:
             "lineage_hash": state.lineage_hash,
             "audit_events": state.audit_events,
         },
+    }
+
+
+# ── Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge Endpoints ──
+
+_bridge_driver = Layer2CrossChainBridgeDriver()
+
+
+class CrossChainDisburseRequest(BaseModel):
+    epoch_id: int = 42
+    pool_amount: float = 100_000.0
+    currency: str = "wCBDC"
+    allocations: dict[str, float] | None = None
+
+
+@router.post("/bridge/disburse")
+async def disburse_crosschain_incentives(req: CrossChainDisburseRequest) -> dict[str, Any]:
+    """Execute multi-ledger cross-chain incentive disbursements based on Shapley allocations."""
+    allocs = req.allocations or {
+        "bank_alpha": 0.38,
+        "bank_beta": 0.29,
+        "bank_gamma": 0.21,
+        "bank_delta": 0.12,
+    }
+    result = _bridge_driver.disburse_crosschain_incentives(
+        epoch_id=req.epoch_id,
+        allocations=allocs,
+        pool_amount=req.pool_amount,
+        currency=req.currency,
+    )
+    return {
+        "epoch_id": result.epoch_id,
+        "pool_currency": result.pool_currency,
+        "total_pool_amount": result.total_pool_amount,
+        "total_gas_fees_usd": result.total_gas_fees_usd,
+        "routes": [
+            {
+                "bank_id": r.bank_id,
+                "network": r.network.value,
+                "protocol": r.protocol.value,
+                "token_symbol": r.token_symbol,
+                "amount": r.amount,
+                "shapley_share_pct": r.shapley_share_pct,
+                "destination_recipient": r.destination_recipient,
+                "message_id": r.message_id,
+                "gas_fee_usd": r.gas_fee_usd,
+                "status": r.status,
+            }
+            for r in result.routes
+        ],
+        "execution_time_ms": result.execution_time_ms,
+        "bridge_audit_hash": result.bridge_audit_hash,
+        "is_fully_finalized": result.is_fully_finalized,
+        "audit_events": result.audit_events,
+    }
+
+
+@router.get("/bridge/status")
+async def get_bridge_status() -> dict[str, Any]:
+    """Get telemetry for Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge."""
+    return {
+        "bridge_status": "ACTIVE",
+        "primary_protocols": ["Chainlink CCIP (Cross-Chain Interoperability)", "LayerZero V2", "Canton Daml Interop"],
+        "total_disbursements_count": _bridge_driver.total_disbursements_count,
+        "total_volume_settled_usd": _bridge_driver.total_volume_settled_usd,
+        "supported_networks": _bridge_driver.get_network_metrics(),
     }
