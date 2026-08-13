@@ -35,7 +35,7 @@ class TestVaultPKIMTLSIntegration(unittest.TestCase):
         self.assertIn("private_key", cert_data)
         self.assertIn("issuing_ca", cert_data)
         self.assertEqual(cert_data["common_name"], "bank-a.cfi.internal")
-        self.assertIn("Mock Vault PKI Fallback", cert_data["source"])
+        self.assertIn("Vault Circuit Breaker Fallback", cert_data["source"])
 
     def test_vault_client_ca_retrieval(self) -> None:
         """Assert CA certificate PEM retrieval works in fallback mode."""
