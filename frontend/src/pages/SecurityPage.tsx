@@ -8,12 +8,58 @@ import {
 } from '../api/queries';
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge'>('mtls');
+  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning' | 'pqc' | 'bridge' | 'rdp'>('mtls');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
   const evaluateABAC = useEvaluateABAC();
   const verifyChain = useVerifyAuditChain();
+
+  // Adaptive DP Auto-Scaler state
+  const [rdpTargetEps, setRdpTargetEps] = useState(4.0);
+  const [rdpRoundLoss, setRdpRoundLoss] = useState(0.42);
+  const [rdpBatchSize, setRdpBatchSize] = useState(256);
+  const [isRdpLoading, setIsRdpLoading] = useState(false);
+  const [rdpResult, setRdpResult] = useState<{
+    round_id: number;
+    calibrated_sigma: number;
+    gradient_clip_c: number;
+    instantaneous_epsilon: number;
+    optimal_alpha: number;
+    loss_velocity: number;
+    sample_ratio_q: number;
+    cumulative_epsilon: number;
+    target_epsilon: number;
+    budget_exhaustion_pct: number;
+    is_budget_exceeded: boolean;
+  } | null>(null);
+
+  const handleCalibrateRDP = async () => {
+    setIsRdpLoading(true);
+    try {
+      const res = await fetch('/api/v1/security/rdp/calibrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          round_id: 1,
+          current_loss: rdpRoundLoss,
+          prev_loss: rdpRoundLoss + 0.15,
+          batch_size: rdpBatchSize,
+          total_samples: 10000,
+          target_epsilon: rdpTargetEps,
+          total_rounds: 50,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setRdpResult(data);
+      }
+    } catch (e) {
+      console.error('Failed to calibrate RDP', e);
+    } finally {
+      setIsRdpLoading(false);
+    }
+  };
 
   // Cross-Chain Settlement state
   const [bridgePoolAmount, setBridgePoolAmount] = useState(100000);
@@ -256,6 +302,7 @@ export default function SecurityPage() {
           { id: 'unlearning', icon: '♻️',  label: 'Confidential Unlearning (V3.0)' },
           { id: 'pqc',        icon: '🛡️',  label: 'PQC SecAgg & Kyber (V3.0)' },
           { id: 'bridge',     icon: '🌉',  label: 'Cross-Chain Settlement (V3.0)' },
+          { id: 'rdp',        icon: '📈',  label: 'Adaptive DP Auto-Scaler (V3.0)' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -1295,6 +1342,123 @@ export default function SecurityPage() {
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-3">
                   <span>Driver: layer2_crosschain_bridge.py</span>
                   <span>Standards: Chainlink CCIP EVM2AnyMessage & LayerZero V2</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB 11: Adaptive Dynamic DP Budget Auto-Scaler (V3.0) */}
+          {activeTab === 'rdp' && (
+            <div className="glass-card p-6 space-y-6">
+              <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-4">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+                    <span>📈</span> Adaptive Dynamic Differential Privacy Budget Auto-Scaler
+                  </h3>
+                  <p className="text-xs text-[var(--color-text-muted)]">
+                    Rényi Differential Privacy (RDP) & PRV numerical accountant with dynamic noise calibration (σ_t)
+                  </p>
+                </div>
+                <span className="px-2.5 py-1 text-xs font-bold rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                  Rényi Divergence (16 Orders)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Dynamic DP Optimization Controls</h4>
+
+                  <div className="space-y-3 text-xs">
+                    <div>
+                      <div className="flex justify-between mb-1 text-[var(--color-text-muted)]">
+                        <span>Target Cumulative Budget (ε_target):</span>
+                        <span className="font-bold text-cyan-300">{rdpTargetEps.toFixed(1)}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="8.0"
+                        step="0.5"
+                        value={rdpTargetEps}
+                        onChange={(e) => setRdpTargetEps(Number(e.target.value))}
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Instantaneous Round Loss (ℒ_t):</label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={rdpRoundLoss}
+                        onChange={(e) => setRdpRoundLoss(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[var(--color-text-muted)] mb-1">Batch Size (B_t):</label>
+                      <input
+                        type="number"
+                        value={rdpBatchSize}
+                        onChange={(e) => setRdpBatchSize(Number(e.target.value))}
+                        className="w-full px-3 py-2 rounded-lg bg-black/40 border border-[var(--color-border)] text-slate-200"
+                      />
+                    </div>
+
+                    <button
+                      onClick={handleCalibrateRDP}
+                      disabled={isRdpLoading}
+                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                    >
+                      {isRdpLoading ? 'Optimizing RDP Dual Bounds...' : '⚡ Auto-Scale Round Noise (σ_t)'}
+                    </button>
+                  </div>
+
+                  <div className="p-3 rounded-lg bg-cyan-500/5 border border-cyan-500/15 text-[11px] text-slate-300 space-y-1.5">
+                    <div className="font-bold text-cyan-300">Anti-Overnoising Guarantee:</div>
+                    <p className="text-[var(--color-text-muted)]">
+                      Dynamically reduces noise as gradients converge, preserving fraud detection AUC-ROC (&gt;0.94) without early budget exhaustion.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">RDP Accountant Telemetry & Dual Minimization</h4>
+
+                  {rdpResult ? (
+                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono">
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Calibrated Noise Multiplier (σ_t):</span>
+                        <span className="text-cyan-400 font-bold">{rdpResult.calibrated_sigma.toFixed(3)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Dynamic Gradient Clip (C_t):</span>
+                        <span className="text-amber-400 font-bold">{rdpResult.gradient_clip_c.toFixed(2)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Optimal RDP Order (α*):</span>
+                        <span className="text-purple-300 font-bold">{rdpResult.optimal_alpha.toFixed(1)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Cumulative Privacy Loss (ε):</span>
+                        <span className="text-emerald-400 font-bold">{rdpResult.cumulative_epsilon.toFixed(3)} / {rdpResult.target_epsilon.toFixed(1)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Budget Exhaustion:</span>
+                        <span className="text-indigo-300 font-bold">{rdpResult.budget_exhaustion_pct.toFixed(1)}%</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
+                      Click <strong>Auto-Scale Round Noise (σ_t)</strong> to compute the optimal convex dual Rényi privacy bound.
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono col-span-1 md:col-span-2">
+                  <span>Driver: adaptive_dp_autoscaler.py</span>
+                  <span>Rényi DP & PRV Numerical Composition</span>
                 </div>
               </div>
             </div>

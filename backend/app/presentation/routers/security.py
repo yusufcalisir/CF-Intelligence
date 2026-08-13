@@ -19,6 +19,7 @@ from app.domain.value_objects_pqc import PQCKemAlgorithm, PQCSignatureAlgorithm
 from app.domain.value_objects_unlearning import UnlearningMethod
 from app.domain.value_objects_zkp import ZKSNARKAttestationProof
 from app.infrastructure.security.abac_engine import ABACEngine, ABACResource
+from app.infrastructure.security.adaptive_dp_autoscaler import AdaptiveDPAutoScaler
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 from app.infrastructure.security.layer2_crosschain_bridge import Layer2CrossChainBridgeDriver
 from app.infrastructure.security.mtls_manager import MTLSManager
@@ -479,4 +480,63 @@ async def get_bridge_status() -> dict[str, Any]:
         "total_disbursements_count": _bridge_driver.total_disbursements_count,
         "total_volume_settled_usd": _bridge_driver.total_volume_settled_usd,
         "supported_networks": _bridge_driver.get_network_metrics(),
+    }
+
+
+# ── Adaptive Dynamic Differential Privacy Budget Auto-Scaler Endpoints ──
+
+_rdp_autoscaler = AdaptiveDPAutoScaler()
+
+
+class CalibrateRDPRequest(BaseModel):
+    round_id: int = 1
+    current_loss: float = 0.42
+    prev_loss: float = 0.55
+    batch_size: int = 256
+    total_samples: int = 10_000
+    target_epsilon: float = 4.0
+    total_rounds: int = 50
+
+
+@router.post("/rdp/calibrate")
+async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> dict[str, Any]:
+    """Dynamically calibrate per-round noise multiplier sigma_t using Rényi DP and loss velocity."""
+    cal = _rdp_autoscaler.auto_scale_noise_multiplier(
+        round_id=req.round_id,
+        current_loss=req.current_loss,
+        prev_loss=req.prev_loss,
+        batch_size=req.batch_size,
+        total_samples=req.total_samples,
+        total_rounds=req.total_rounds,
+    )
+    state = _rdp_autoscaler.get_accountant_state()
+    return {
+        "round_id": cal.round_id,
+        "calibrated_sigma": cal.calibrated_sigma,
+        "gradient_clip_c": cal.gradient_clip_c,
+        "instantaneous_epsilon": cal.instantaneous_epsilon,
+        "optimal_alpha": cal.optimal_alpha,
+        "loss_velocity": cal.loss_velocity,
+        "sample_ratio_q": cal.sample_ratio_q,
+        "cumulative_epsilon": state.current_epsilon_at_delta,
+        "target_epsilon": state.target_epsilon,
+        "budget_exhaustion_pct": state.budget_exhaustion_pct,
+        "is_budget_exceeded": state.is_budget_exceeded,
+    }
+
+
+@router.get("/rdp/status")
+async def get_rdp_status() -> dict[str, Any]:
+    """Get real-time telemetry and budget projection for the adaptive DP auto-scaler."""
+    telemetry = _rdp_autoscaler.get_telemetry()
+    return {
+        "active_sigma": telemetry.active_sigma,
+        "active_clip_norm": telemetry.active_clip_norm,
+        "cumulative_epsilon": telemetry.cumulative_epsilon,
+        "target_epsilon": telemetry.target_epsilon,
+        "remaining_budget_pct": telemetry.remaining_budget_pct,
+        "projected_final_epsilon": telemetry.projected_final_epsilon,
+        "snr_signal_to_noise": telemetry.snr_signal_to_noise,
+        "risk_tier": telemetry.risk_tier,
+        "audit_events": telemetry.audit_events,
     }
