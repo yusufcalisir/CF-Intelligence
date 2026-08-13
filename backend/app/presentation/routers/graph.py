@@ -23,6 +23,14 @@ from app.domain.enums import EntityType
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/graph", tags=["graph"])
 
+
+class StreamGraphEdgeRequest(BaseModel):
+    edge_id: str = Field(..., description="Unique graph edge transaction ID")
+    source_id: str = Field(..., description="Source entity ID")
+    target_id: str = Field(..., description="Target entity ID")
+    rel_type: str = Field("TRANSACTS_WITH", description="Relationship type")
+    amount: float = Field(100.0, description="Transaction amount")
+
 _graph_engine = GraphEngine()
 
 
@@ -285,6 +293,24 @@ async def embedding_fraud_clusters(req: GNNEmbeddingClusterRequest) -> dict:
         "clusters": clusters,
         "total_clusters": len(clusters),
     }
+
+
+@router.post("/stream/edge")
+async def stream_graph_edge(req: StreamGraphEdgeRequest) -> dict:
+    """Stream a real-time graph edge event into Apache Flink processor."""
+    return _graph_analytics.stream_realtime_edge_event(
+        edge_id=req.edge_id,
+        source_id=req.source_id,
+        target_id=req.target_id,
+        rel_type=req.rel_type,
+        amount=req.amount,
+    )
+
+
+@router.get("/stream/status")
+async def flink_stream_status() -> dict:
+    """Get Apache Flink sub-second real-time graph streaming engine status."""
+    return _graph_analytics.get_flink_streaming_status()
 
 
 @router.get("/embeddings/stats")

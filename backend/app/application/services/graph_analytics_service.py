@@ -63,6 +63,43 @@ class GraphAnalyticsService:
     ) -> None:
         self.graph_engine = graph_engine or GraphEngine()
         self.entity_service = entity_service or EntityResolutionService()
+        from app.application.services.flink_graph_streaming import (
+            FlinkGraphStreamProcessor,
+        )
+
+        self.flink_processor = FlinkGraphStreamProcessor()
+
+    def stream_realtime_edge_event(
+        self,
+        edge_id: str,
+        source_id: str,
+        target_id: str,
+        rel_type: str = "TRANSACTS_WITH",
+        amount: float = 100.0,
+    ) -> dict[str, Any]:
+        """Streams a real-time graph edge transaction through Apache Flink processor."""
+        from app.application.services.flink_graph_streaming import StreamingEdgeEvent
+
+        event = StreamingEdgeEvent(
+            edge_id=edge_id,
+            source_id=source_id,
+            target_id=target_id,
+            rel_type=rel_type,
+            amount=amount,
+        )
+        receipt = self.flink_processor.process_streaming_edge(event)
+        return {
+            "processed_count": receipt.processed_count,
+            "latency_ms": receipt.latency_ms,
+            "window_size_ms": receipt.window_size_ms,
+            "velocity_anomalies": receipt.velocity_anomalies,
+            "high_risk_entities": receipt.high_risk_entities,
+            "processed_at": receipt.processed_at,
+        }
+
+    def get_flink_streaming_status(self) -> dict[str, Any]:
+        """Returns Apache Flink stream processor engine status."""
+        return self.flink_processor.get_stream_status()
 
     def propagate_risk(self, decay_factor: float = 0.85) -> dict[str, Any]:
         """Propagate risk scores from flagged entities through the graph.
