@@ -15,9 +15,14 @@ from app.infrastructure.grpc.types import (
     ClientRegisterResponse,
     CoordinatorCommand,
     CoordinatorStatus,
+    ECDHBroadcastRequest,
+    ECDHBroadcastResponse,
     ModelChunk,
     ModelDownloadRequest,
     ParameterChunk,
+    PeerKeyEntry,
+    PeerKeysRequest,
+    PeerKeysResponse,
     SubmitGradientRequest,
 )
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
@@ -43,6 +48,9 @@ class FederatedLearningServicer:
         }
         self.current_round: int = 1
         self.round_submissions: dict[str, list[dict[str, Any]]] = {}
+        # P2P SecAgg key store: round_id -> {bank_id -> ECDHBroadcastRequest}
+        # The coordinator relays these bundles; it never derives shared secrets.
+        self.secagg_key_store: dict[int, dict[str, ECDHBroadcastRequest]] = {}
 
     async def RegisterClient(  # noqa: N802
         self, request: ClientRegisterRequest
@@ -319,3 +327,93 @@ class FederatedLearningServicer:
                 round_id,
                 bank_id,
             )
+
+    # -----------------------------------------------------------------------
+    # P2P SecAgg Key Exchange RPCs (Version 2.0)
+    # -----------------------------------------------------------------------
+
+    async def BroadcastPublicKey(  # noqa: N802
+        self, request: ECDHBroadcastRequest
+    ) -> ECDHBroadcastResponse:
+        """RPC 5 (V2.0): Receive and store an ephemeral X25519 public key bundle.
+
+        The coordinator stores the bundle indexed by (round_id, bank_id) and
+        routes it to all other participants on demand via FetchPeerPublicKeys.
+        No shared secret is ever derived server-side — the coordinator is a
+        pure relay with zero cryptographic knowledge of pairwise masks.
+
+        Validation:
+          - Rejects bundles with an invalid public key length (must be 32 bytes).
+          - Rejects bundles where protocol_version != '2.0.0'.
+          - Deduplication: silently overwrites an existing bundle from the same
+            bank for the same round (re-broadcast on network retry).
+        """
+        if len(request.public_key_bytes) != 32:
+            logger.warning(
+                "BroadcastPublicKey rejected: invalid pk length %d from bank=%s round=%d",
+                len(request.public_key_bytes),
+                request.bank_id,
+                request.round_id,
+            )
+            return ECDHBroadcastResponse(
+                accepted=False,
+                status_message="Invalid public key length. Expected 32 bytes (X25519).",
+                participant_count=0,
+            )
+
+        if request.protocol_version != "2.0.0":
+            return ECDHBroadcastResponse(
+                accepted=False,
+                status_message=f"Unsupported SecAgg protocol version: {request.protocol_version}",
+                participant_count=0,
+            )
+
+        round_store = self.secagg_key_store.setdefault(request.round_id, {})
+        round_store[request.bank_id] = request
+
+        logger.info(
+            "BroadcastPublicKey accepted: bank=%s round=%d total_keys=%d",
+            request.bank_id,
+            request.round_id,
+            len(round_store),
+        )
+        return ECDHBroadcastResponse(
+            accepted=True,
+            status_message="Public key bundle accepted and stored for routing.",
+            participant_count=len(round_store),
+        )
+
+    async def FetchPeerPublicKeys(  # noqa: N802
+        self, request: PeerKeysRequest
+    ) -> PeerKeysResponse:
+        """RPC 6 (V2.0): Return all peer ECDH public key bundles for a round.
+
+        Excludes the requesting bank's own bundle. Returns all_peers_ready=True
+        when the number of stored bundles meets or exceeds the default quorum.
+        """
+        round_store = self.secagg_key_store.get(request.round_id, {})
+
+        peer_keys = [
+            PeerKeyEntry(
+                bank_id=bank_id,
+                public_key_bytes=bundle.public_key_bytes,
+                hmac_signature=bundle.hmac_signature,
+            )
+            for bank_id, bundle in round_store.items()
+            if bank_id != request.requesting_bank_id
+        ]
+
+        all_ready = len(round_store) >= DEFAULT_QUORUM
+
+        logger.info(
+            "FetchPeerPublicKeys: bank=%s round=%d peers_returned=%d all_ready=%s",
+            request.requesting_bank_id,
+            request.round_id,
+            len(peer_keys),
+            all_ready,
+        )
+        return PeerKeysResponse(
+            round_id=request.round_id,
+            peer_keys=peer_keys,
+            all_peers_ready=all_ready,
+        )

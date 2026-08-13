@@ -85,3 +85,58 @@ class ModelChunk:
     total_chunks: int
     chunk_data: bytes
     sha256_checksum: str
+
+
+# ---------------------------------------------------------------------------
+# P2P SecAgg Key Exchange Messages (Version 2.0)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ECDHBroadcastRequest:
+    """Sent by a bank node to broadcast its ephemeral X25519 public key.
+
+    The coordinator routes this to all other active participants and stores it
+    for the duration of the key-exchange phase of the current round.
+    """
+
+    bank_id: str
+    round_id: int
+    public_key_bytes: bytes   # 32-byte raw X25519 public key
+    hmac_signature: bytes     # HMAC-SHA256 over (bank_id || round_id || pk)
+    protocol_version: str = "2.0.0"
+
+
+@dataclass
+class ECDHBroadcastResponse:
+    """Coordinator acknowledgement of a received ECDH public key bundle."""
+
+    accepted: bool
+    status_message: str
+    participant_count: int    # Number of active participants in this round
+
+
+@dataclass
+class PeerKeyEntry:
+    """A single peer's authenticated public key bundle."""
+
+    bank_id: str
+    public_key_bytes: bytes
+    hmac_signature: bytes
+
+
+@dataclass
+class PeerKeysRequest:
+    """Request sent by a bank node to retrieve all peer public keys for a round."""
+
+    requesting_bank_id: str
+    round_id: int
+
+
+@dataclass
+class PeerKeysResponse:
+    """All authenticated peer public key bundles for a given FL round."""
+
+    round_id: int
+    peer_keys: list[PeerKeyEntry]
+    all_peers_ready: bool     # True when all expected participants have broadcast
