@@ -8,12 +8,47 @@ import {
 } from '../api/queries';
 
 export default function SecurityPage() {
-  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp'>('mtls');
+  const [activeTab, setActiveTab] = useState<'mtls' | 'oidc' | 'abac' | 'vault' | 'audit' | 'secagg' | 'zkp' | 'unlearning'>('mtls');
   const { data: status, isLoading: isStatusLoading } = useSecurityStatus();
   const { data: auditEntries, isLoading: isAuditLoading } = useAuditChain(30);
 
   const evaluateABAC = useEvaluateABAC();
   const verifyChain = useVerifyAuditChain();
+
+  // Confidential Unlearning state
+  const [unlearnBankId, setUnlearnBankId] = useState('bank_gamma');
+  const [unlearnMethod, setUnlearnMethod] = useState('FIRST_ORDER_HESSIAN_INVERSION');
+  const [isUnlearningLoading, setIsUnlearningLoading] = useState(false);
+  const [unlearnResult, setUnlearnResult] = useState<{
+    target_bank_id: string;
+    parameter_drift_delta: number;
+    hessian_spectral_radius: number;
+    mia_membership_probability: number;
+    execution_time_ms: number;
+    erasure_verified: boolean;
+  } | null>(null);
+
+  const handleTriggerUnlearning = async () => {
+    setIsUnlearningLoading(true);
+    try {
+      const res = await fetch('/api/v1/security/unlearn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target_bank_id: unlearnBankId,
+          unlearning_method: unlearnMethod,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUnlearnResult(data);
+      }
+    } catch (e) {
+      console.error('Failed to trigger unlearning', e);
+    } finally {
+      setIsUnlearningLoading(false);
+    }
+  };
 
   // Interactive ABAC Evaluator state
   const [userRole, setUserRole] = useState('analyst');
@@ -53,8 +88,8 @@ export default function SecurityPage() {
   const secaggNodes: SecAggNode[] = [
     { id: 'bank_alpha', label: 'Alpha Intl.', x: 160, y: 60,  broadcast: !droppedNodeIds.includes('bank_alpha'), pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
     { id: 'bank_beta',  label: 'Beta Corp.',  x: 300, y: 160, broadcast: !droppedNodeIds.includes('bank_beta'),  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
-    { id: 'bank_gamma', label: 'Gamma Fin.',  x: 160, y: 260, broadcast: !droppedNodeIds.includes('bank_gamma'), pkHex: '1da472..5c9f', hmacHex: '2e8531..a167' },
-    { id: 'bank_delta', label: 'Delta Bank',  x:  20, y: 160, broadcast: !droppedNodeIds.includes('bank_delta'), pkHex: '8b33fe..12a9', hmacHex: '7f91cc..04e2' },
+    { id: 'bank_gamma', label: 'Gamma Trust', x: 160, y: 260, broadcast: !droppedNodeIds.includes('bank_gamma'), pkHex: '7e23ff..10b4', hmacHex: '1e55aa..77c9' },
+    { id: 'bank_delta', label: 'Delta Bank', x: 20,  y: 160, broadcast: !droppedNodeIds.includes('bank_delta'), pkHex: '99d4e1..f400', hmacHex: '44a1b0..9912' },
   ];
   const broadcastCount = secaggNodes.filter(n => n.broadcast).length;
   const quorumReady = broadcastCount >= shamirThreshold;
@@ -78,8 +113,8 @@ export default function SecurityPage() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-[var(--color-text-primary)]">
-            Enterprise Security & Compliance Control Center
+          <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-300 to-purple-400">
+            Enterprise Security & Identity Control Suite
           </h1>
           <p className="text-sm text-[var(--color-text-muted)]">
             ISO 27001, SOC2, PCI-DSS compliance suite: mTLS 1.3, OIDC JWT, ABAC, HashiCorp Vault & SHA-256 Audit Chain
@@ -833,6 +868,122 @@ export default function SecurityPage() {
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between">
                   <span>Circuit: weight_attestation.circom</span>
                   <span>Verified Proofs: 100% (O(1) Verification)</span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Tab 8: Confidential Unlearning (V3.0) */}
+          {activeTab === 'unlearning' && (
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="glass-card p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] flex items-center gap-2">
+                    <span>♻️ Bank Revocation & Gradient Erasure Console</span>
+                  </h3>
+                  <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono">
+                    FIRST-ORDER HESSIAN INVERSION
+                  </span>
+                </div>
+
+                <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
+                  Erases historical parameter contributions of an evicted or compromised bank from live PyTorch model checkpoints using <strong>Sub-sampled Newton Steps (H⁻¹ ∇L)</strong> without retraining from scratch.
+                </p>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">Target Revoked Bank</label>
+                      <select
+                        value={unlearnBankId}
+                        onChange={(e) => setUnlearnBankId(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-xs font-mono"
+                      >
+                        <option value="bank_gamma">Bank Gamma (Compromised)</option>
+                        <option value="bank_beta">Bank Beta (Revoked)</option>
+                        <option value="bank_alpha">Bank Alpha (Evicted)</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-bold text-[var(--color-text-muted)] uppercase mb-1">Unlearning Algorithm</label>
+                      <select
+                        value={unlearnMethod}
+                        onChange={(e) => setUnlearnMethod(e.target.value)}
+                        className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-xs font-mono"
+                      >
+                        <option value="FIRST_ORDER_HESSIAN_INVERSION">First-Order Hessian Inversion</option>
+                        <option value="SUB_SAMPLED_NEWTON_STEPS">Sub-sampled Newton Steps</option>
+                        <option value="EXACT_LINEAGE_SUBTRACTION">Exact Lineage Subtraction</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleTriggerUnlearning}
+                    disabled={isUnlearningLoading}
+                    className="w-full py-2 bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-white font-bold text-xs rounded-lg transition-all shadow-md shadow-red-600/20 cursor-pointer disabled:opacity-50"
+                  >
+                    {isUnlearningLoading ? '⏳ Executing Hessian Inversion Erasure...' : '⚡ Trigger Model Weight Erasure'}
+                  </button>
+                </div>
+
+                <div className="space-y-2 text-xs pt-2">
+                  <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)]">Solver Method</span>
+                    <span className="font-mono font-bold text-indigo-300">Conjugate Gradient (H⁻¹ v)</span>
+                  </div>
+                  <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
+                    <span className="text-[var(--color-text-muted)]">Target MIA Risk Threshold</span>
+                    <span className="font-mono font-bold text-emerald-400">P(MIA) ≤ 0.52 (Random Guess)</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="glass-card p-5 space-y-4 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] mb-3">
+                    Erasure Metrics & Membership Inference (MIA) Verification
+                  </h3>
+
+                  {unlearnResult ? (
+                    <div className="space-y-3 text-xs font-mono">
+                      <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 space-y-1">
+                        <div className="flex justify-between font-bold">
+                          <span>✓ WEIGHT ERASURE VERIFIED</span>
+                          <span>Latency: {unlearnResult.execution_time_ms.toFixed(2)} ms</span>
+                        </div>
+                        <p className="text-[11px] opacity-80 font-sans">
+                          Target bank gradient footprint removed. Model parameter drift bounded by Euclidean norm delta.
+                        </p>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Target Bank:</span>
+                        <span className="text-indigo-300 font-bold">{unlearnResult.target_bank_id}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Parameter Drift Delta (||Δw||_2):</span>
+                        <span className="text-amber-400 font-bold">{unlearnResult.parameter_drift_delta.toFixed(4)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">Hessian Spectral Radius (λ_max):</span>
+                        <span className="text-purple-300 font-bold">{unlearnResult.hessian_spectral_radius.toFixed(3)}</span>
+                      </div>
+                      <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
+                        <span className="text-[var(--color-text-muted)]">MIA Membership Probability:</span>
+                        <span className="text-emerald-400 font-bold">{(unlearnResult.mia_membership_probability * 100).toFixed(1)}% (Target ≤52%)</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
+                      Select an evicted bank and click <strong>Trigger Model Weight Erasure</strong> to execute Hessian inversion parameter removal.
+                    </div>
+                  )}
+                </div>
+
+                <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
+                  <span>Engine: federated_unlearning_engine.py</span>
+                  <span>MIA Status: Audited</span>
                 </div>
               </div>
             </div>

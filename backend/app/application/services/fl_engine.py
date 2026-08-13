@@ -34,6 +34,7 @@ if TYPE_CHECKING:
     from app.application.services.privacy_service import PrivacyService
     from app.config import Settings
 
+from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
 from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class FederatedLearningEngine:
         self.model_service = model_service
         self.privacy_service = privacy_service
         self.zk_verifier = ZKSNARKProofVerifier()
+        self.unlearning_engine = FederatedUnlearningEngine()
         # Server optimizer states for FedOpt (FedAdam / FedAdaGrad) keyed by simulation_id
         self._server_m_by_sim: dict[str, np.ndarray] = {}
         self._server_v_by_sim: dict[str, np.ndarray] = {}

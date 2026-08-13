@@ -12,7 +12,9 @@ from typing import Any
 from fastapi import APIRouter, Query
 from pydantic import BaseModel
 
+from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
 from app.config import get_settings
+from app.domain.value_objects_unlearning import UnlearningMethod
 from app.domain.value_objects_zkp import ZKSNARKAttestationProof
 from app.infrastructure.security.abac_engine import ABACEngine, ABACResource
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
@@ -290,3 +292,50 @@ async def verify_zk_proof(req: VerifyZKProofRequest) -> dict[str, Any]:
 async def get_zkp_status() -> dict[str, Any]:
     """Get status telemetry for zk-SNARK model weight attestation circuit and verifier."""
     return _zk_verifier.get_verifier_status()
+
+
+# ── Confidential Federated Unlearning Endpoints ───────────────────────
+
+_unlearning_engine = FederatedUnlearningEngine()
+
+
+class UnlearnBankRequest(BaseModel):
+    target_bank_id: str = "bank_gamma"
+    unlearning_method: str = UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION.value
+    start_round: int = 1
+    end_round: int = 42
+
+
+@router.post("/unlearn")
+async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
+    """Trigger exact or approximate federated model weight unlearning for an evicted bank."""
+    method_enum = UnlearningMethod(req.unlearning_method) if req.unlearning_method in UnlearningMethod._value2member_map_ else UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION
+    res = _unlearning_engine.unlearn_bank_contributions(
+        target_bank_id=req.target_bank_id,
+        method=method_enum,
+    )
+    return {
+        "target_bank_id": res.target_bank_id,
+        "unlearning_method": res.unlearning_method,
+        "initial_model_l2_norm": res.initial_model_l2_norm,
+        "unlearned_model_l2_norm": res.unlearned_model_l2_norm,
+        "parameter_drift_delta": res.parameter_drift_delta,
+        "hessian_spectral_radius": res.hessian_spectral_radius,
+        "mia_membership_probability": res.mia_membership_probability,
+        "execution_time_ms": res.execution_time_ms,
+        "erasure_verified": res.erasure_verified,
+        "lineage_hash": res.lineage_hash,
+        "audit_log": res.audit_log,
+    }
+
+
+@router.get("/unlearn/status")
+async def get_unlearning_status() -> dict[str, Any]:
+    """Get telemetry for federated unlearning engine and MIA risk auditor."""
+    return {
+        "engine_status": "ACTIVE",
+        "supported_methods": [m.value for m in UnlearningMethod],
+        "total_unlearning_runs": _unlearning_engine.unlearning_runs_count,
+        "target_mia_threshold": 0.52,
+        "hessian_inversion_solver": "Conjugate Gradient (H^-1 v)",
+    }
