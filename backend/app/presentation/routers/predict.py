@@ -247,18 +247,26 @@ async def predict_transaction(
         # Load default serving model path
         global_path = os.path.join(_registry.storage_dir, "global_model.pt")
         if not os.path.exists(global_path):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Active global model not found. Run a federated training run to generate one.",
-            )
-        try:
-            state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
-        except Exception as e:
-            logger.error("Failed to load serving model: %s", e)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error loading served model file: {e}",
-            )
+            try:
+                os.makedirs(_registry.storage_dir, exist_ok=True)
+                default_m = _model_service.create_model()
+                torch.save(default_m.state_dict(), global_path)
+                state_dict = default_m.state_dict()
+            except Exception as e:
+                logger.error("Failed to initialize baseline serving model: %s", e)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error initializing baseline model: {e}",
+                )
+        else:
+            try:
+                state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
+            except Exception as e:
+                logger.error("Failed to load serving model: %s", e)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail=f"Error loading served model file: {e}",
+                )
 
     # 2. Determine DP model compatibility dynamically based on layer parameter keys
     dp_compatible = True

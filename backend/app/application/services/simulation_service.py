@@ -883,6 +883,11 @@ class SimulationService:
                         # Save weights for the next round's contrastive loss
                         prev_local_weights_by_bank[bank.id] = res_w
 
+                    # Capture raw per-bank client updates before any aggregation transformations/filtering
+                    raw_client_weights = list(client_weights)
+                    raw_client_samples = list(client_samples)
+                    raw_participating = list(participating)
+
                     # Reset tenant context to system/central for aggregation
                     active_tenant.set(None)
 
@@ -1050,9 +1055,9 @@ class SimulationService:
                     simulation.rounds = rounds
 
                     if round_num == config.num_rounds:
-                        final_round_weights = list(client_weights)
-                        final_round_samples = list(client_samples)
-                        final_round_participating = list(participating)
+                        final_round_weights = list(raw_client_weights)
+                        final_round_samples = list(raw_client_samples)
+                        final_round_participating = list(raw_participating)
 
                     logger.info(
                         "[Federated FL] Round %d/%d — loss: %.4f, auc: %.4f, participants: %d, dropped: %d, duration: %.0fms",
@@ -1465,19 +1470,20 @@ class SimulationService:
                 if final_round_weights and final_round_participating is not None:
                     try:
                         bank_idx = final_round_participating.index(bank)
-                        weights_flat = np.array(final_round_weights[bank_idx].flat_weights)
-                        if global_weights is not None:
-                            prev_flat = np.array(global_weights.flat_weights)
-                            update_var = float(np.var(weights_flat - prev_flat))
-                            if update_var < 1e-6:
-                                is_free_rider = True
-                                logger.warning(
-                                    "Free-riding detected for client %s! Variance: %e",
-                                    bank.name,
-                                    update_var,
-                                )
-                    except ValueError:
-                        pass  # Did not participate in final round
+                        if bank_idx < len(final_round_weights):
+                            weights_flat = np.array(final_round_weights[bank_idx].flat_weights)
+                            if global_weights is not None:
+                                prev_flat = np.array(global_weights.flat_weights)
+                                update_var = float(np.var(weights_flat - prev_flat))
+                                if update_var < 1e-6:
+                                    is_free_rider = True
+                                    logger.warning(
+                                        "Free-riding detected for client %s! Variance: %e",
+                                        bank.name,
+                                        update_var,
+                                    )
+                    except (ValueError, IndexError):
+                        pass  # Did not participate in final round or weights omitted by design
 
                 # Quarantine if contribution is highly negative or it's a free-rider
                 if score <= -0.05 or is_free_rider:
