@@ -101,7 +101,7 @@ class ExplainabilityService:
             top_features=alert.top_features or [],
             risk_factors=alert.risk_factors or [],
             historical_evidence=alert.historical_evidence or [],
-            model_confidence=float(alert.model_confidence or 0.0),
+            model_confidence=alert.model_confidence or 0.0,
             risk_score_breakdown=risk_signals or [],
             explanation_text=explanation_text or "",
             explanation_method="LINEAR_HEURISTIC_FALLBACK",
@@ -133,10 +133,10 @@ class ExplainabilityService:
             if hasattr(alert.severity, "value")
             else str(alert.severity or "MEDIUM")
         )
-        risk_sc = float(alert.risk_score or 0.0)
-        mod_conf = float(alert.model_confidence or 0.0)
+        risk_sc = alert.risk_score or 0.0
+        mod_conf = alert.model_confidence or 0.0
         lines.append(
-            f"This transaction was flagged with {str(sev_str).upper()} severity "
+            f"This transaction was flagged with {sev_str.upper()} severity "
             f"and a risk score of {risk_sc:.0f}/1000 "
             f"(model confidence: {mod_conf:.1%})."
         )
@@ -173,7 +173,7 @@ class ExplainabilityService:
             lines.append("**Signal breakdown:**")
             sorted_signals = sorted(risk_signals, key=lambda s: s.weighted_score, reverse=True)
             for signal in sorted_signals[:5]:
-                norm_val = max(0.0, min(1.0, float(signal.normalized_score)))
+                norm_val = max(0.0, min(1.0, signal.normalized_score))
                 bar_len = int(norm_val * 20)
                 bar = "█" * bar_len + "░" * (20 - bar_len)
                 lines.append(
@@ -300,7 +300,10 @@ class ExplainabilityService:
         model = None
         if os.path.exists(model_path):
             try:
-                from app.application.services.model_service import FraudDetectionModel, NUM_FEATURES
+                from app.application.services.model_service import (
+                    NUM_FEATURES,
+                    FraudDetectionModel,
+                )
 
                 state_dict = torch.load(
                     model_path, map_location=torch.device("cpu"), weights_only=True
@@ -337,16 +340,19 @@ class ExplainabilityService:
                 import shap
 
                 # Define model prediction function wrapping PyTorch
-                def predict_fn(x_np):
+                def predict_fn(x_np: np.ndarray) -> np.ndarray:
                     tensor_x = torch.FloatTensor(x_np)
-                    if hasattr(model, "network") and len(model.network) > 0 and hasattr(model.network[0], "in_features"):
-                        expected_dim = model.network[0].in_features
-                        if tensor_x.shape[1] < expected_dim:
-                            tensor_x = torch.nn.functional.pad(
-                                tensor_x, (0, expected_dim - tensor_x.shape[1]), value=0.0
-                            )
-                        elif tensor_x.shape[1] > expected_dim:
-                            tensor_x = tensor_x[:, :expected_dim]
+                    if hasattr(model, "network") and len(model.network) > 0:
+                        first_layer = model.network[0]
+                        in_feats = getattr(first_layer, "in_features", None)
+                        if isinstance(in_feats, int):
+                            curr_dim = int(tensor_x.shape[1])
+                            if curr_dim < in_feats:
+                                tensor_x = torch.nn.functional.pad(
+                                    tensor_x, (0, in_feats - curr_dim), value=0.0
+                                )
+                            elif curr_dim > in_feats:
+                                tensor_x = tensor_x[:, :in_feats]
                     with torch.no_grad():
                         preds = model(tensor_x).numpy()
                     return preds
