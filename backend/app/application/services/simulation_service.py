@@ -761,7 +761,7 @@ class SimulationService:
                                 fairness_lambda=config.fairness_lambda,
                             )
                             local_w = self.model_service.get_parameters(loc_model)
-                            local_loss = float(loss_hist[-1]) if loss_hist else 0.1
+                            local_loss = loss_hist[-1] if loss_hist else 0.1
                             local_samples = len(bank_data[bank.id]["X_train"])
                             train_res: dict[str, Any] = {
                                 "bank_id": bank.id,
@@ -1077,11 +1077,11 @@ class SimulationService:
                             "round": round_num,
                             "total": config.num_rounds,
                             "loss": round_loss,
-                            "auc": round(float(global_auc), 4),
-                            "f1": round(float(global_f1), 4),
-                            "per_bank_auc": {k: round(float(v), 4) for k, v in eval_aucs.items()},
+                            "auc": round(global_auc, 4),
+                            "f1": round(global_f1, 4),
+                            "per_bank_auc": {k: round(v, 4) for k, v in eval_aucs.items()},
                             "per_bank_loss": {
-                                k: round(float(v), 4) for k, v in per_bank_loss.items()
+                                k: round(v, 4) for k, v in per_bank_loss.items()
                             },
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
