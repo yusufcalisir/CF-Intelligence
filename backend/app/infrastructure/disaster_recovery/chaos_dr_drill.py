@@ -9,14 +9,12 @@ from __future__ import annotations
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
 
 from app.domain.dr_coordinator import (
     CoordinatorRegionRole,
     DRNodeStatus,
-    FailoverAuditEvent,
 )
 from app.infrastructure.disaster_recovery.region_failover import (
     MultiRegionFailoverManager,

@@ -146,12 +146,12 @@ def compute_multi_threshold_confusion_matrix(
         tn = int(np.sum((pred_binary == 0) & (y_t == 0)))
         fn = int(np.sum((pred_binary == 0) & (y_t == 1)))
 
-        precision = float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
-        recall = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
-        fpr = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
-        fnr = float(fn / (fn + tp)) if (fn + tp) > 0 else 0.0
-        specificity = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
-        f1 = float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+        precision = (tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        recall = (tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        fpr = (fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+        fnr = (fn / (fn + tp)) if (fn + tp) > 0 else 0.0
+        specificity = (tn / (tn + fp)) if (tn + fp) > 0 else 0.0
+        f1 = (2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
 
         results.append(
             ConfusionMatrixAtThreshold(
@@ -181,7 +181,7 @@ def compute_financial_cost_utility(
     cost_investigation_tp: float = 6.0,
 ) -> AlertFatigueAndCostReport:
     """Calculate operational alert fatigue and financial cost-utility matrix.
-    
+
     Parameters
     ----------
     cost_missed_fraud_fn : float
@@ -222,7 +222,7 @@ def compute_financial_cost_utility(
     total_cost = fraud_loss + inv_cost
 
     tn_op = float(np.sum((pred_op == 0) & (y_t == 0))) * scale_factor
-    fpr_op = float(fp_op / (fp_op + tn_op)) if (fp_op + tn_op) > 0 else 0.0
+    fpr_op = (fp_op / (fp_op + tn_op)) if (fp_op + tn_op) > 0 else 0.0
     impacted_per_10k = round(fpr_op * 10_000, 2)
 
     return AlertFatigueAndCostReport(

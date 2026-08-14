@@ -12,13 +12,14 @@ import hmac
 import logging
 import re
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-import pandas as pd
+
+if TYPE_CHECKING:
+    import pandas as pd
 
 from app.domain.distribution_fidelity_service import (
-    DistributionFidelityReport,
     audit_distribution_fidelity,
 )
 from app.domain.metrics_service import (
@@ -171,7 +172,7 @@ class DesignPartnerPilotService:
         # Generate realistic calibrated predictions for FL model vs Local model
         rng = np.random.default_rng(42)
         n_total = len(y)
-        
+
         # Real-world FL model prediction probabilities with noise and realistic overlap
         y_prob_fl = np.zeros(n_total, dtype=np.float32)
         fraud_idx = np.where(y == 1)[0]
@@ -197,7 +198,6 @@ class DesignPartnerPilotService:
 
         # Multi-threshold confusion matrices
         cm_fl = compute_multi_threshold_confusion_matrix(y, y_prob_fl)
-        cm_local = compute_multi_threshold_confusion_matrix(y, y_prob_local)
 
         # Alert fatigue and financial cost
         cost_fl = compute_financial_cost_utility(y, y_prob_fl, daily_volume=daily_volume)
@@ -209,9 +209,9 @@ class DesignPartnerPilotService:
         synth_data = gen.generate_bank_datasets(bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3)
         synth_features, synth_labels = synth_data["bank_a"]
         # Select numeric columns
-        num_cols = synth_features.select_dtypes(include=[np.number]).columns
+        num_cols = synth_features.select_dtypes(include=["number"]).columns
         X_synth = synth_features[num_cols].values.astype(np.float32)
-        y_synth = synth_labels.values.astype(int)
+        y_synth = np.asarray(synth_labels.values, dtype=int)
 
         fidelity_report = audit_distribution_fidelity(
             X_real=X,

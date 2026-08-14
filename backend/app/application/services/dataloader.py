@@ -216,7 +216,7 @@ def load_paysim(
     """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
     rng = rng or np.random.default_rng(42)
     root = path or (_DATASETS_ROOT / "paysim")
-    
+
     # Check possible filenames for PaySim
     possible_csvs = [
         root / "paysim.csv",
@@ -234,7 +234,7 @@ def load_paysim(
     for csv_file in possible_csvs:
         if csv_file.exists():
             logger.info("[PaySim] Loading real dataset from %s", csv_file)
-            df = pd.read_csv(csv_file, nrows=kwargs.get("nrows", None))
+            df = pd.read_csv(csv_file, nrows=kwargs.get("nrows"))
             return _process_paysim_dataframe(df, source="real_csv")
 
     # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
@@ -340,7 +340,7 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         "y": y,
         "feature_names": available_cols,
         "source": source,
-        "fraud_ratio": float(np.mean(y)),
+        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
     }
 
 
@@ -367,9 +367,8 @@ def load_ieee_cis(
     """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset."""
     rng = rng or np.random.default_rng(42)
     root = path or (_DATASETS_ROOT / "ieee_cis")
-    
+
     txn_csv = root / "train_transaction.csv"
-    id_csv = root / "train_identity.csv"
     parquet_file = root / "ieee_cis_processed.parquet"
 
     if parquet_file.exists():
@@ -378,7 +377,7 @@ def load_ieee_cis(
         y = df["isFraud"].values.astype(int)
         feature_cols = [c for c in df.columns if c not in ("isFraud", "TransactionID")]
         X = df[feature_cols].fillna(0).values.astype(np.float32)
-        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_parquet", "fraud_ratio": float(np.mean(y))}
+        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_parquet", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
 
     if txn_csv.exists():
         logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
@@ -386,10 +385,10 @@ def load_ieee_cis(
         df = pd.read_csv(txn_csv, nrows=nrows)
         y = df["isFraud"].values.astype(int)
         # Select key numerical features
-        num_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        num_cols = df.select_dtypes(include=["number"]).columns.tolist()
         num_cols = [c for c in num_cols if c not in ("isFraud", "TransactionID")]
         X = df[num_cols].fillna(0).values.astype(np.float32)
-        return {"X": X, "y": y, "feature_names": num_cols, "source": "real_csv", "fraud_ratio": float(np.mean(y))}
+        return {"X": X, "y": y, "feature_names": num_cols, "source": "real_csv", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
     logger.warning(
@@ -428,7 +427,7 @@ def load_ieee_cis(
         "y": y[idx],
         "feature_names": feature_names,
         "source": "mock_ieee_cis",
-        "fraud_ratio": float(np.mean(y)),
+        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
     }
 
 
@@ -449,11 +448,11 @@ def load_creditcard_fraud(
 
     if csv_path.exists():
         logger.info("[CreditCard] Loading real dataset from %s", csv_path)
-        df = pd.read_csv(csv_path, nrows=kwargs.get("nrows", None))
+        df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
         feature_cols = [c for c in df.columns if c not in ("Time", "Class")]
         X = df[feature_cols].values.astype(np.float32)
         y = df["Class"].values.astype(int)
-        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_csv", "fraud_ratio": float(np.mean(y))}
+        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_csv", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
 
     # Mock generation
     logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
@@ -463,7 +462,7 @@ def load_creditcard_fraud(
     X[:, -1] = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
     y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
     idx = rng.permutation(n_mock_txns)
-    return {"X": X[idx], "y": y[idx], "source": "mock_pca", "fraud_ratio": float(np.mean(y))}
+    return {"X": X[idx], "y": y[idx], "source": "mock_pca", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
 
 
 # ===========================================================================
@@ -478,14 +477,13 @@ def partition_dataset_non_iid(
     seed: int = 42,
 ) -> list[dict[str, np.ndarray]]:
     """Partition a dataset across multiple banks using Dirichlet distribution Dir(alpha).
-    
+
     Academic standard for non-IID federated learning evaluation (LEAF benchmark).
     Lower alpha (< 0.5) implies extreme non-IID heterogeneity across banks.
     """
     rng = np.random.default_rng(seed)
-    n_samples = len(y)
     classes = np.unique(y)
-    
+
     bank_indices: list[list[int]] = [[] for _ in range(num_banks)]
 
     for c in classes:
@@ -496,7 +494,7 @@ def partition_dataset_non_iid(
         # Normalize and split indices
         splits = (np.cumsum(proportions) * len(c_idx)).astype(int)
         splits = np.insert(splits, 0, 0)
-        
+
         for b in range(num_banks):
             start = splits[b]
             end = splits[b + 1] if b + 1 < len(splits) else len(c_idx)
