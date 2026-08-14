@@ -815,7 +815,24 @@ pytest verification/ -v
 
 # 5. EVM Smart Contracts Test Suite
 cd contracts && npm test
+
+# 6. Mutation Testing & Fault Injection Hardening Suite
+python scripts/run_mutation_tests.py
+# or via master runner
+python scripts/run_all_tests.py --mutation
 ```
+
+#### Mutation Testing & Fault Injection Quality Architecture
+
+Beyond standard line/branch code coverage, the platform utilizes **Mutation Testing** (via Stryker for TypeScript and AST/boundary fault injection for Python). Synthetic mutants (e.g. `>=` to `>`, `<` to `<=`, `all` to `any`, condition bypasses) are systematically introduced to verify that the test suite catches and kills 100% of faults:
+
+| Subsystem / Engine | Injected Fault Mutants | Tested Invariants & Survival Protection |
+| :--- | :--- | :--- |
+| **AST Policy Engine** | Relational (`>=` $\to$ `>`, `<=` $\to$ `<`), Logical (`and` $\to$ `or`), Membership (`in` $\to$ `not in`) | Asserts exact boundary precision at threshold values ($9,000, $10,000, velocity counts) and validates complete logical tree evaluation. |
+| **Spectral Byzantine Defense** | Multiplier scale mutation ($3.0 \cdot \text{MAD} \to 30.0 \cdot \text{MAD}$), Norm threshold mutation | Asserts that poisoned gradients with extreme L2 norms are deterministically identified and isolated from model aggregation. |
+| **Four-Eyes Case Governance** | Supervisor signature bypass (`if not sig` $\to$ `if False`), Self-approval bypass (`sig == actor` $\to$ `False`) | Enforces regulatory Four-Eyes Principle on case closure (`CLOSED_CONFIRMED`, `CLOSED_FALSE_POSITIVE`), preventing unauthorized unilateral analyst closure. |
+| **Merkle Audit Ledger** | Block signing hash mutation, Genesis block corruption | Guarantees tamper-evident immutable logging where any corrupted ledger payload breaks SHA-256 chain verification. |
+| **Frontend Utility Engine** | Boundary mutators (`formatDelta(0)`, `formatDuration(60)`, `formatMs(1000)`) | Eliminates off-by-one boundary bugs and guarantees strict formatting across all dashboard widgets. |
 
 #### Accessibility (a11y), WCAG 2.1 AA & Keyboard Lifecycle Matrix
 

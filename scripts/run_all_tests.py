@@ -131,6 +131,18 @@ def run_contract_tests() -> bool:
     return success
 
 
+def run_mutation_tests() -> bool:
+    print_banner("9. RUNNING MUTATION TESTING & FAULT INJECTION SUITE (Stryker + Python)")
+    cmd = [sys.executable, "scripts/run_mutation_tests.py"]
+    start = time.perf_counter()
+    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    duration = time.perf_counter() - start
+    success = res.returncode == 0
+    status = "PASSED" if success else "FAILED"
+    print(f"\n>> Mutation Testing Suite {status} in {duration:.2f}s")
+    return success
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Master Unified Test Runner for CF-Intelligence")
     parser.add_argument("--frontend", action="store_true", help="Run frontend unit & E2E tests only")
@@ -139,9 +151,10 @@ def main() -> int:
     parser.add_argument("--a11y", action="store_true", help="Run frontend accessibility & keyboard E2E tests only")
     parser.add_argument("--backend", action="store_true", help="Run backend tests only")
     parser.add_argument("--api-contract", action="store_true", help="Run frontend <-> backend API contract tests only")
+    parser.add_argument("--mutation", action="store_true", help="Run frontend & backend mutation testing suites only")
     parser.add_argument("--verification", action="store_true", help="Run verification tests only")
     parser.add_argument("--contracts", action="store_true", help="Run smart contract tests only")
-    parser.add_argument("--all", action="store_true", help="Run all test suites including responsive, visual, a11y, contracts & API contracts")
+    parser.add_argument("--all", action="store_true", help="Run all test suites including responsive, visual, a11y, contracts, API contracts & mutation testing")
 
     args = parser.parse_args()
 
@@ -153,6 +166,7 @@ def main() -> int:
         and not args.a11y
         and not args.backend
         and not args.api_contract
+        and not args.mutation
         and not args.verification
         and not args.contracts
         and not args.all
@@ -163,6 +177,7 @@ def main() -> int:
     run_a11y = args.a11y or args.all
     run_be = args.backend or args.all or is_default
     run_api_ct = args.api_contract or args.all
+    run_mut = args.mutation or args.all
     run_ver = args.verification or args.all
     run_ct = args.contracts or args.all
 
@@ -181,6 +196,8 @@ def main() -> int:
         results["Backend (Pytest)"] = run_backend_tests()
     if run_api_ct:
         results["API Contracts (FE <-> BE)"] = run_api_contract_tests()
+    if run_mut:
+        results["Mutation Testing (Stryker/Py)"] = run_mutation_tests()
     if run_ver:
         results["Verification (Audit)"] = run_verification_tests()
     if run_ct:

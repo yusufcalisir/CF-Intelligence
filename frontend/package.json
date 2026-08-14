@@ -17,6 +17,8 @@
     "test:visual": "vite build && playwright test e2e-visual",
     "test:visual:update": "vite build && playwright test e2e-visual --update-snapshots",
     "test:a11y": "vite build && playwright test e2e-a11y --project=desktop-1440-chromium",
+    "test:mutation": "vitest run src/utils/__tests__/mutationHardening.test.ts src/utils/__tests__/formatters.test.ts",
+    "test:mutation:stryker": "npx stryker run",
     "test:watch": "vitest"
   },
   "dependencies": {
