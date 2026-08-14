@@ -720,131 +720,60 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── 2026 MODERN ULTRA-FLUID MOBILE OVERLAY DRAWER ────────── */}
+        {/* ── 2026 SLEEK MINIMALIST MOBILE OVERLAY DRAWER ────────── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.nav
-              initial={{ opacity: 0, scale: 0.98, y: -10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.98, y: -10 }}
-              transition={{ duration: 0.2, ease: 'easeOut' }}
-              className="lg:hidden fixed inset-x-0 top-16 bottom-0 z-40 bg-[#05050f]/95 backdrop-blur-3xl p-4 sm:p-6 overflow-y-auto flex flex-col justify-between border-b border-white/10 shadow-2xl w-full max-w-full"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18, ease: 'easeOut' }}
+              className="lg:hidden fixed inset-x-0 top-16 z-40 bg-[#070716]/98 backdrop-blur-2xl px-4 py-5 border-b border-white/10 shadow-2xl w-full max-w-full"
             >
-              <div className="space-y-4 min-w-0">
-                <div className="flex items-center justify-between border-b border-white/8 pb-3 min-w-0">
-                  <div className="text-xs font-mono font-bold uppercase tracking-widest text-indigo-400 truncate">Navigation Menu</div>
-                  <span className="text-[10px] font-mono text-slate-500 shrink-0">CF-Intelligence</span>
-                </div>
-
-                {/* Mobile Menu Matching Desktop Headers Exactly */}
-                <div className="space-y-3 min-w-0">
-                  {/* Overview */}
-                  <a
-                    href="#hero"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
-                    className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer block min-w-0"
+              {/* Navigation Items (Clean, Compact, Modern 2-Column Grid) */}
+              <div className="grid grid-cols-2 gap-2 pb-4">
+                {[
+                  { label: 'Overview',        targetId: 'hero',             color: 'bg-indigo-500' },
+                  { label: 'Problem & Case',  targetId: 'problem-solution', color: 'bg-purple-500' },
+                  { label: 'Workflow',        targetId: 'how-it-works',     color: 'bg-cyan-500' },
+                  { label: 'Engine Specs',    targetId: 'product',          color: 'bg-blue-500' },
+                  { label: 'Platform Nodes',  targetId: 'platform',         color: 'bg-emerald-500' },
+                  { label: 'Architecture',    targetId: 'architecture',     color: 'bg-amber-500' },
+                  { label: 'Security & DP',   targetId: 'security',         color: 'bg-rose-500' },
+                  { label: 'API & SDK',       targetId: 'api',              color: 'bg-sky-500' },
+                  { label: 'Contact & Setup', targetId: 'contact',          color: 'bg-indigo-400' },
+                ].map(item => (
+                  <button
+                    key={item.targetId}
+                    onClick={() => handleNavClick(item.targetId)}
+                    className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-white/4 border border-white/6 hover:bg-white/8 hover:border-indigo-500/30 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
                   >
-                    <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md">Overview</span>
-                      <ArrowRight />
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-1.5 h-1.5 rounded-full ${item.color} shrink-0`} />
+                      <span className="text-[12.5px] font-medium text-slate-200 group-hover:text-white truncate">{item.label}</span>
                     </div>
-                    <div className="text-xs font-bold text-slate-200 mt-1">Overview</div>
-                    <div className="text-[10px] font-mono text-slate-500">System introduction & stats</div>
-                  </a>
-
-                  {/* Capabilities Group (Desktop Dropdown mirror) */}
-                  <div className="p-3.5 rounded-2xl bg-white/3 border border-indigo-500/20 space-y-2.5 min-w-0">
-                    <button
-                      onClick={() => handleNavClick('problem-solution')}
-                      className="w-full flex items-center justify-between text-left cursor-pointer group"
-                    >
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[9px] font-mono font-bold text-purple-400 bg-purple-500/10 border border-purple-500/20 px-2 py-0.5 rounded-md">Capabilities</span>
-                          <span className="text-[9px] font-mono text-slate-500">(3 Sections)</span>
-                        </div>
-                        <div className="text-xs font-bold text-slate-100 group-hover:text-purple-300 transition-colors mt-1">Capabilities</div>
-                      </div>
+                    <span className="text-slate-600 group-hover:text-slate-400 transition-colors shrink-0">
                       <ArrowRight />
-                    </button>
-
-                    {/* 3 Capabilities Sub-items */}
-                    <div className="grid grid-cols-1 gap-1.5 pt-1 border-t border-white/6 font-mono text-xs">
-                      <a
-                        href="#problem-solution"
-                        onClick={(e) => { e.preventDefault(); handleNavClick('problem-solution'); }}
-                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-200 text-xs">Problem</div>
-                          <div className="text-[9.5px] text-slate-500">Cross-bank fraud analysis</div>
-                        </div>
-                        <span className="text-[10px] text-purple-400">#01</span>
-                      </a>
-                      <a
-                        href="#how-it-works"
-                        onClick={(e) => { e.preventDefault(); handleNavClick('how-it-works'); }}
-                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-200 text-xs">Workflow</div>
-                          <div className="text-[9.5px] text-slate-500">8-stage federated pipeline</div>
-                        </div>
-                        <span className="text-[10px] text-purple-400">#02</span>
-                      </a>
-                      <a
-                        href="#product"
-                        onClick={(e) => { e.preventDefault(); handleNavClick('product'); }}
-                        className="flex items-center justify-between p-2 rounded-xl bg-white/3 hover:bg-white/7 transition-colors"
-                      >
-                        <div>
-                          <div className="font-semibold text-slate-200 text-xs">Engine Specs</div>
-                          <div className="text-[9.5px] text-slate-500">Platform engine specs</div>
-                        </div>
-                        <span className="text-[10px] text-purple-400">#03</span>
-                      </a>
-                    </div>
-                  </div>
-
-                  {/* Other Desktop Headers */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 min-w-0">
-                    {[
-                      { label: 'Platform',        targetId: 'platform',     badge: 'Consortium',   desc: 'Bank node inspector' },
-                      { label: 'Architecture',    targetId: 'architecture', badge: 'Architecture', desc: 'Service layer mesh' },
-                      { label: 'Security',        targetId: 'security',     badge: 'Security',     desc: 'DP & trust boundaries' },
-                      { label: 'API & Docs',      targetId: 'api',          badge: 'SDK & API',    desc: 'REST API & TypeScript SDK' },
-                      { label: 'Contact & Setup', targetId: 'contact',      badge: 'Integration',  desc: 'Direct onboarding & setup' },
-                    ].map(link => (
-                      <a
-                        key={link.label}
-                        href={`#${link.targetId}`}
-                        onClick={(e) => { e.preventDefault(); handleNavClick(link.targetId); }}
-                        className="p-3.5 rounded-2xl bg-white/3 border border-white/8 hover:bg-indigo-600/10 hover:border-indigo-500/30 transition-all cursor-pointer group space-y-1 block min-w-0"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-[9px] font-mono font-bold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-md truncate">
-                            {link.badge}
-                          </span>
-                          <ArrowRight />
-                        </div>
-                        <div className="text-xs font-bold text-slate-200 group-hover:text-white transition-colors truncate">{link.label}</div>
-                        <div className="text-[10px] font-mono text-slate-500 truncate">{link.desc}</div>
-                      </a>
-                    ))}
-                  </div>
-                </div>
+                    </span>
+                  </button>
+                ))}
               </div>
 
-              {/* Bottom Mobile Action */}
-              <div className="pt-4 border-t border-white/8 space-y-2.5 min-w-0 mt-4">
+              {/* Bottom Responsive Action Button */}
+              <div className="pt-3 border-t border-white/8 space-y-2">
                 <button
                   onClick={() => { setIsMobileMenuOpen(false); handleLaunchDemo(); }}
-                  className="w-full py-3 px-5 rounded-2xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_30px_rgba(99,102,241,0.4)] cursor-pointer flex items-center justify-center gap-2"
+                  className="w-full min-h-[44px] py-2.5 px-4 rounded-xl text-[13px] font-bold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 shadow-[0_0_25px_rgba(99,102,241,0.35)] active:scale-[0.99] transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Launch Live Platform Demo <ArrowRight />
+                  <span>Launch Live Platform Demo</span>
+                  <ArrowRight />
                 </button>
-                <div className="text-center text-[9.5px] font-mono text-slate-600 truncate">
-                  Privacy-Preserving Federated Intelligence Network
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 px-1 pt-1">
+                  <span>CF-Intelligence Network</span>
+                  <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    v1.0.0 Live
+                  </span>
                 </div>
               </div>
             </motion.nav>
@@ -1324,9 +1253,11 @@ export default function LandingPage() {
 
               <button
                 onClick={() => navigate('/benchmarks')}
-                className="px-5 py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white text-xs font-semibold shadow-lg shadow-indigo-950/60 flex items-center gap-2 shrink-0 transition-all cursor-pointer"
+                className="inline-flex items-center justify-center gap-2.5 px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-slate-200 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-indigo-500/40 hover:text-white active:scale-[0.98] transition-all shadow-sm shrink-0 cursor-pointer w-full sm:w-auto"
               >
-                Inspect Benchmark Suite <ArrowRight />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span>Inspect Benchmark Suite</span>
+                <ArrowRight />
               </button>
             </div>
 
@@ -1426,16 +1357,17 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto shrink-0">
+              <div className="flex flex-col sm:flex-row gap-2.5 w-full lg:w-auto shrink-0">
                 <button
                   onClick={() => navigate('/benchmarks')}
-                  className="px-6 py-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-lg text-center cursor-pointer"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-white text-xs font-semibold transition-all shadow-md shadow-indigo-900/30 text-center cursor-pointer"
                 >
-                  Explore Benchmark Hub
+                  <span>Explore Benchmark Hub</span>
+                  <ArrowRight />
                 </button>
                 <a
                   href="mailto:ysfcals@gmail.com?subject=Design%20Partner%20Pilot%20Inquiry"
-                  className="px-6 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-200 text-xs font-bold border border-white/10 transition-all text-center"
+                  className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 active:scale-[0.98] text-slate-200 hover:text-white text-xs font-semibold border border-white/10 transition-all text-center"
                 >
                   Request Pilot Agreement
                 </a>
@@ -1543,16 +1475,17 @@ export default function LandingPage() {
                 </p>
               </div>
 
-              <div className="rounded-2xl bg-[#060614] border border-white/8 overflow-x-auto shadow-2xl">
-                <table className="w-full text-left text-xs font-mono min-w-[700px]">
+              {/* Desktop Table View (>= md screens) */}
+              <div className="hidden md:block rounded-2xl bg-[#060614] border border-white/8 overflow-hidden shadow-2xl">
+                <table className="w-full text-left text-xs font-mono">
                   <thead>
                     <tr className="border-b border-white/8 bg-white/3 text-[11px] text-slate-400">
-                      <th className="p-3.5 sm:p-4 font-semibold">Capability / Architecture</th>
-                      <th className="p-3.5 sm:p-4 font-bold text-emerald-400 bg-emerald-950/20">CF-Intelligence</th>
-                      <th className="p-3.5 sm:p-4 font-semibold text-slate-300">Feedzai</th>
-                      <th className="p-3.5 sm:p-4 font-semibold text-slate-300">ComplyAdvantage</th>
-                      <th className="p-3.5 sm:p-4 font-semibold text-slate-300">NICE Actimize</th>
-                      <th className="p-3.5 sm:p-4 font-semibold text-slate-300">Hawk AI</th>
+                      <th className="p-4 font-semibold">Capability / Architecture</th>
+                      <th className="p-4 font-bold text-emerald-400 bg-emerald-950/20">CF-Intelligence</th>
+                      <th className="p-4 font-semibold text-slate-300">Feedzai</th>
+                      <th className="p-4 font-semibold text-slate-300">ComplyAdvantage</th>
+                      <th className="p-4 font-semibold text-slate-300">NICE Actimize</th>
+                      <th className="p-4 font-semibold text-slate-300">Hawk AI</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5 text-[11px]">
@@ -1566,190 +1499,75 @@ export default function LandingPage() {
                       { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
                     ].map((row, idx) => (
                       <tr key={row.cap} className={idx % 2 === 0 ? 'bg-transparent' : 'bg-white/1'}>
-                        <td className="p-3.5 sm:p-4 font-sans font-medium text-slate-200">{row.cap}</td>
-                        <td className="p-3.5 sm:p-4 font-bold text-emerald-400 bg-emerald-950/15">{row.cfi}</td>
-                        <td className="p-3.5 sm:p-4 text-slate-400">{row.fz}</td>
-                        <td className="p-3.5 sm:p-4 text-slate-400">{row.ca}</td>
-                        <td className="p-3.5 sm:p-4 text-slate-400">{row.na}</td>
-                        <td className="p-3.5 sm:p-4 text-slate-400">{row.ha}</td>
+                        <td className="p-4 font-sans font-medium text-slate-200">{row.cap}</td>
+                        <td className="p-4 font-bold text-emerald-400 bg-emerald-950/15">{row.cfi}</td>
+                        <td className="p-4 text-slate-400">{row.fz}</td>
+                        <td className="p-4 text-slate-400">{row.ca}</td>
+                        <td className="p-4 text-slate-400">{row.na}</td>
+                        <td className="p-4 text-slate-400">{row.ha}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Mobile Adaptive Cards View (< md screens, zero horizontal scroll, 100% complete data) */}
+              <div className="md:hidden space-y-3.5">
+                {[
+                  { cap: 'Cross-Bank Federated Learning', cfi: 'YES (Zero Raw PII)', fz: 'NO (Isolated Silo)', ca: 'NO (Cloud Silo)', na: 'NO (Legacy Silo)', ha: 'NO (Isolated)' },
+                  { cap: 'Multi-Bank Mule & Smurfing GNN', cfi: 'YES (FedGNN Graph)', fz: 'Partial (Single Bank)', ca: 'NO (Watchlists Only)', na: 'Partial (On-Prem)', ha: 'NO (Single Bank)' },
+                  { cap: 'Perimeter Isolation (Zero PII Out)', cfi: 'YES (Edge Cont. + DP)', fz: 'Partial (On-Prem)', ca: 'NO (Vendor Cloud SaaS)', na: 'YES (Heavy Monolith)', ha: 'NO (Cloud SaaS)' },
+                  { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (p99)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
+                  { cap: 'False Positive Alert Reduction', cfi: '-64.7% (Measured)', fz: '-40% (Reported)', ca: '-30% (Reported)', na: 'Baseline Legacy', ha: '-35% (Reported)' },
+                  { cap: 'Automated FinCEN SAR Generation', cfi: 'YES (Native XML Schema)', fz: 'Partial (Case Tool)', ca: 'Partial (Case Tool)', na: 'Manual Workflow', ha: 'AI Copilot Only' },
+                  { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
+                ].map((row) => (
+                  <div key={row.cap} className="p-4 rounded-2xl bg-[#060614] border border-white/8 shadow-lg space-y-2.5">
+                    {/* Capability Title */}
+                    <div className="text-xs font-bold text-slate-100">
+                      {row.cap}
+                    </div>
+
+                    {/* CF-Intelligence Advantage Box */}
+                    <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[11px] font-bold text-emerald-300">CF-Intelligence</span>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-400 text-right">{row.cfi}</span>
+                    </div>
+
+                    {/* Competitor Benchmarks (2x2 Responsive Grid) */}
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-medium text-slate-400">Feedzai</div>
+                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.fz}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-medium text-slate-400">ComplyAdvantage</div>
+                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.ca}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-medium text-slate-400">NICE Actimize</div>
+                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.na}</div>
+                      </div>
+                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
+                        <div className="text-[10px] font-medium text-slate-400">Hawk AI</div>
+                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.ha}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </FadeSection>
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7.7 — ENTERPRISE COMMERCIAL PRICING & LEGAL FRAMEWORK (#pricing, #legal)
+            SECTION 7.7 — INSTITUTIONAL COMPLIANCE & LEGAL FRAMEWORK (#legal)
         ══════════════════════════════════════════════════════════ */}
-        <section id="pricing" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+        <section id="legal" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-14">
-              <div className="max-w-3xl min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
-                  Transparent Commercial Model & Contracts
-                </div>
-                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">
-                  Enterprise Pricing Tiers & Institutional SLA
-                </h2>
-                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                  Predictable tiered subscriptions aligned with transaction volume, backed by contractual 
-                  99.99% availability SLAs, automated service credit penalties, and binding Zero-Raw-PII Data Processing Agreements.
-                </p>
-              </div>
-
-              <div className="flex items-center gap-2 p-1 bg-white/4 rounded-xl border border-white/8 text-xs font-mono text-slate-300 shrink-0">
-                <span className="px-3 py-1 bg-indigo-600 rounded-lg text-white font-bold">Annual Billing (-15%)</span>
-                <span className="px-3 py-1 text-slate-400">Institutional Custom</span>
-              </div>
-            </div>
-
-            {/* 4 Pricing Cards Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 mb-14">
-              {[
-                {
-                  tier: 'Design Partner',
-                  badge: 'Pilot Sandbox',
-                  price: 'Free',
-                  period: '30-Day Evaluation',
-                  volume: '10k txns/day (Mock/Staging)',
-                  overage: 'N/A (Capped Sandbox)',
-                  sla: 'Best-Effort Staging',
-                  highlight: false,
-                  features: [
-                    'Zero-Raw-PII Ingestion Scanner',
-                    'Distribution Fidelity Audit Report',
-                    'SOC 2 Pre-Audit Readiness Dossier',
-                    'Synthetic vs Real Drift Analysis',
-                    'Standard Email Support',
-                  ],
-                  cta: 'Start Design Pilot',
-                  ctaAction: () => navigate('/benchmarks'),
-                  ctaStyle: 'bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10',
-                },
-                {
-                  tier: 'Growth FinTech',
-                  badge: 'PSP & Neobanks',
-                  price: '$3,500',
-                  period: '/ month',
-                  volume: 'Up to 250,000 txns / mo',
-                  overage: '$0.012 / additional txn',
-                  sla: '99.90% Availability SLA',
-                  highlight: false,
-                  features: [
-                    'Real-Time Scoring API (<15ms)',
-                    'Tabular Velocity + GNN Ensemble',
-                    'SHAP Feature Attributions',
-                    'WebHook Suspicious Alert Stream',
-                    '8x5 Business Technical Support',
-                  ],
-                  cta: 'Deploy API Node',
-                  ctaAction: () => navigate('/benchmarks'),
-                  ctaStyle: 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30',
-                },
-                {
-                  tier: 'Enterprise Bank',
-                  badge: 'Commercial & Retail Banks',
-                  price: '$12,000',
-                  period: '/ month',
-                  volume: 'Up to 1,500,000 txns / mo',
-                  overage: '$0.008 / additional txn',
-                  sla: '99.99% Uptime (<14.2ms)',
-                  highlight: true,
-                  features: [
-                    'Dedicated Edge Agent (cfi-agent)',
-                    'Native ISO 20022 PAC.008 Engine',
-                    'On-Prem GPU/CPU Local Training',
-                    'Vault PKI mTLS + HSM Binding',
-                    'Automated FinCEN SAR XML Export',
-                    '24/7 SLA Hotline (1h Response)',
-                  ],
-                  cta: 'Request Enterprise Setup',
-                  ctaAction: () => { window.location.href = 'mailto:ysfcals@gmail.com?subject=Enterprise%20Node%20Subscription%20Inquiry'; },
-                  ctaStyle: 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold shadow-lg shadow-indigo-950/60',
-                },
-                {
-                  tier: 'Consortium Switch',
-                  badge: 'National Clearing Networks',
-                  price: '$35,000+',
-                  period: '/ month pool',
-                  volume: 'Pooled High-Volume (10M+)',
-                  overage: 'Volume Scaled',
-                  sla: '99.999% Fault-Tolerant HA',
-                  highlight: false,
-                  features: [
-                    'Multi-Bank FedGNN Subgraph Sync',
-                    'Intel SGX Hardware TEE Enclave',
-                    'Shapley Incentive Settlement Pool',
-                    'Active-Passive Disaster Recovery',
-                    'Dedicated Technical Account Manager',
-                    'Custom Legal & Regulatory SLAs',
-                  ],
-                  cta: 'Contact Consortium Lead',
-                  ctaAction: () => { window.location.href = 'mailto:ysfcals@gmail.com?subject=Consortium%20Switch%20Inquiry'; },
-                  ctaStyle: 'bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10',
-                },
-              ].map((card) => (
-                <div
-                  key={card.tier}
-                  className={`p-6 rounded-3xl bg-[#08081c] border flex flex-col justify-between space-y-5 transition-all ${
-                    card.highlight
-                      ? 'border-indigo-500/60 shadow-[0_0_50px_rgba(99,102,241,0.2)] ring-1 ring-indigo-500/40 relative'
-                      : 'border-white/8 hover:border-white/20'
-                  }`}
-                >
-                  {card.highlight && (
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider bg-indigo-600 text-white shadow-md">
-                      Most Popular for Banks
-                    </span>
-                  )}
-
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-bold text-slate-100">{card.tier}</h3>
-                      <span className="text-[9.5px] font-mono text-slate-400 bg-white/4 px-2 py-0.5 rounded border border-white/6">
-                        {card.badge}
-                      </span>
-                    </div>
-
-                    <div>
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-2xl sm:text-3xl font-bold font-mono text-white">{card.price}</span>
-                        <span className="text-xs font-mono text-slate-400">{card.period}</span>
-                      </div>
-                      <div className="text-[11px] font-mono text-indigo-300 mt-1">{card.volume}</div>
-                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">Overage: {card.overage}</div>
-                    </div>
-
-                    <div className="p-2 rounded-xl bg-white/3 border border-white/6 text-[10px] font-mono text-emerald-400 font-bold text-center">
-                      SLA: {card.sla}
-                    </div>
-
-                    <ul className="space-y-2 pt-2 border-t border-white/6 text-xs text-slate-300">
-                      {card.features.map((feat) => (
-                        <li key={feat} className="flex items-start gap-2 text-[11px]">
-                          <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
-                          <span className="leading-snug">{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <button
-                    onClick={card.ctaAction}
-                    className={`w-full py-3 px-4 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center ${card.ctaStyle}`}
-                  >
-                    {card.cta}
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Part 2: Institutional Legal & Compliance Agreement Suite */}
             <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-[#060614] border border-white/8 space-y-6 shadow-2xl">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/8 pb-5">
                 <div>

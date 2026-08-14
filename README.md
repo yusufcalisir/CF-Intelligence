@@ -331,7 +331,8 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 ### 5.3 Serverless Flower P2P Engine & Gossip Strategy (`flower_engine.py` & `flower_p2p_engine.py`)
 - Serverless Peer-to-Peer Training: Executes federated learning training rounds without a central coordinator server using Flower's simulation engine.
 - P2P Gossip Weight Mixing (`P2PGossipStrategy`): Computes peer parameter updates via local neighbor weight averaging over 1D Ring and Fully-Connected Mesh topologies:
-  $$\boldsymbol{w}_i^{(t+1)} = \frac{1}{|\mathcal{N}_i|} \sum_{j \in \mathcal{N}_i} \boldsymbol{w}_j^{(t)}$$
+
+  $$w_i^{(t+1)} = \frac{1}{|\mathcal{N}_i|} \sum_{j \in \mathcal{N}_i} w_j^{(t)}$$
 
 ---
 
@@ -360,7 +361,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
   $$y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_k y_k = \sum_k w_k$$
 
 ### 6.3 Curve25519 P2P SecAgg & Shamir Threshold Secret Sharing (`p2p_secagg_driver.py` & `shamir_engine.py`)
-- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations ($s_{uv} = \text{HKDF-SHA256}(\text{ECDH}(sk_u, pk_v))$) with zero server involvement.
+- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations ($s_{uv} = \operatorname{HKDF}(\operatorname{ECDH}(sk_u, pk_v))$) with zero server involvement.
 - Shamir (t, n) Threshold Secret Sharing: Shares pairwise masking seeds over Galois prime field $\mathbb{Z}_p$ ($p = 2^{256} - 189$) to reconstruct dropout node masks when client nodes disconnect during aggregation.
 
 ### 6.4 FIPS 140-2 Level 3 HSM Binding & Gnosis Safe 2-of-3 Multi-Sig (`vault_hsm_pki_binder.py` & `GnosisSafeMultiSigCoordinator.sol`)
@@ -368,10 +369,10 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 - Gnosis Safe 2-of-3 Multi-Sig Coordinator: Decentralizes coordinator functions (simulation triggers, model promotions, fee disbursements) via EIP-712 structured data signatures across 3 trustee wallets requiring 2-of-3 multi-sig consensus.
 
 ### 6.5 Zero-Knowledge Proof (zk-SNARK) Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
-- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates ($\boldsymbol{w}_{\text{local}}$) match Poseidon hash commitments ($H_w$), satisfy $L_2$ norm clip bounds ($\|w\|_2 \le C_{\text{max}}$), and maintain non-zero variance in $O(1)$ constant time ($<5\text{ms}$) over the BN254 elliptic curve without exposing unmasked model parameters.
+- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates ($w_{\text{local}}$) match Poseidon hash commitments ($H_w$), satisfy $L_2$ norm clip bounds ($\|w\|_2 \le C_{\text{max}}$), and maintain non-zero variance in $\mathcal{O}(1)$ constant time ($<5\text{ms}$ SLA) over the BN254 elliptic curve without exposing unmasked model parameters.
 
 ### 6.6 Confidential Federated Unlearning & Anti-Poisoning Erasure (`federated_unlearning_engine.py`)
-- Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}_{b^*}$) to remove historical gradient contributions of compromised or revoked banks in $<10\text{ms}$ while bounding MIA membership probability ($P_{\text{MIA}} \le 0.52$).
+- Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}_b$) to remove historical gradient contributions of compromised or revoked banks in $<10\text{ms}$ while bounding MIA membership probability ($P_{\text{MIA}} \le 0.52$).
 
 ### 6.7 Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) (`pqc_secagg_driver.py`)
 - NIST FIPS 203 & 204 Lattice Cryptography: Implements Module Learning With Errors (M-LWE) CRYSTALS-Kyber-768 KEM and CRYSTALS-Dilithium-3 signatures combined into a hybrid quantum-safe P2P SecAgg protocol, protecting key exchanges against Shor's algorithm on quantum supercomputers.
@@ -380,7 +381,7 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 - Multi-Ledger Programmable Token Routing: Routes Leave-One-Out (LOO) Shapley utility payouts across Arbitrum One, Optimism, Canton Network Daml contracts, and Hyperledger Fabric channels via Chainlink CCIP `EVM2AnyMessage` payloads with sub-second L2 finality.
 
 ### 6.9 Adaptive Dynamic Differential Privacy Budget Auto-Scaler (`adaptive_dp_autoscaler.py`)
-- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers ($\sigma_t$) and gradient norm clipping thresholds ($C_t$) based on instantaneous loss velocity ($\Delta \mathcal{L}_t$) and batch sampling ratios ($q_t = B/N$) to prevent over-noising and ensure $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$ compliance.
+- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers ($\sigma_t$) and gradient norm clipping thresholds ($C_t$) based on instantaneous loss velocity ($\Delta \mathcal{L}_t$) and batch sampling ratios ($q_t = B / N$) to prevent over-noising and ensure $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$ compliance.
 
 ---
 
@@ -588,29 +589,15 @@ The CFI Platform implements architectural and algorithmic controls designed to a
 
 ---
 
-## 13e. Enterprise Business Model, Pricing Tiers & Legal Framework
+## 13e. Institutional Compliance & Legal Governance Framework
 
-CF-Intelligence employs a transparent, hybrid subscription and usage-based commercial model for institutional procurement, backed by institutional legal contract templates:
-
-### Commercial Pricing Matrix
-
-| Commercial Subscription Tier | Monthly Base Fee | Included Scored Volume | Overage Rate (/txn) | SLA Target | Primary Deployment Model |
-| :--- | :---: | :---: | :---: | :---: | :--- |
-| **Tier 1: Design Partner Pilot** | **Free / Sponsored** | 10k txns/day (30 days) | N/A (Sandbox) | Best Effort | Isolated Staging Environment |
-| **Tier 2: Growth FinTech (PSP/EMI)** | **$3,500 / month** | 250k txns/month | $0.012 / txn | **99.90% Uptime** | High-Throughput REST API & WebHooks |
-| **Tier 3: Enterprise Bank Node** | **$12,000 / month** | 1.5M txns/month | $0.008 / txn | **99.99% Uptime** | Dedicated Edge Container (`cfi-agent`) + mTLS |
-| **Tier 4: National Consortium Switch**| **$35,000+ / month**| Custom Pooled ($10M+) | Negotiated Volume | **99.999% Fault-Tol.** | Intel SGX Hardware TEE Cluster |
-
-### Institutional Legal Framework & Agreement Templates
-
-All institutional deployments are governed by standardized B2B contract templates in `docs/legal/`:
+All institutional deployments and research consortium agreements are governed by standardized B2B governance templates in `docs/legal/`:
 
 * **Data Processing Agreement (DPA)**: [`docs/legal/data_processing_agreement.md`](docs/legal/data_processing_agreement.md) - Enforces GDPR Art. 28, KVKK, and the binding **Zero-Raw-PII technical guarantee**.
 * **Terms of Service & Governance (ToS)**: [`docs/legal/terms_of_service.md`](docs/legal/terms_of_service.md) - Consortium participation rules, Byzantine poisoning penalties, and IP ownership boundaries.
 * **Risk Decision Liability & Safe Harbor**: [`docs/legal/liability_and_decision_governance.md`](docs/legal/liability_and_decision_governance.md) - Clarifies statutory allocation of liability for **False Positives (Wrongful Blocks)** and **False Negatives** under EU AI Act Art. 14 & PSD2.
 * **Service Level Agreement (SLA)**: [`docs/legal/service_level_agreement.md`](docs/legal/service_level_agreement.md) - 99.99% uptime commitments, $<15\text{ms}$ latency guarantees, and automated **Service Credit** penalty discount matrices.
 * **Enterprise Privacy Policy**: [`docs/legal/enterprise_privacy_policy.md`](docs/legal/enterprise_privacy_policy.md) - Mathematical Rényi Differential Privacy ($\varepsilon=1.0, \delta=10^{-5}$) and Hessian Inversion unlearning specifications.
-* **Commercial Model & ROI Spec**: [`docs/business_model_and_pricing.md`](docs/business_model_and_pricing.md) - Detailed financial payback formulations, TCO breakdowns, and professional services catalog.
 
 ---
 
