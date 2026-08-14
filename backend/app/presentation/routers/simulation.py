@@ -278,13 +278,18 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
         if not local or not federated:
             continue
 
+        local_resp = _build_metrics_response(local)
+        fed_resp = _build_metrics_response(federated)
+        if local_resp is None or fed_resp is None:
+            continue
+
         improvement = bank_data.get("improvement", {})
         bank_comparisons.append(
             BankComparisonResponse(
                 bank_id=bank_data["id"],
                 bank_name=bank_data["name"],
-                local_metrics=_build_metrics_response(local),
-                federated_metrics=_build_metrics_response(federated),
+                local_metrics=local_resp,
+                federated_metrics=fed_resp,
                 improvement=improvement,
             )
         )

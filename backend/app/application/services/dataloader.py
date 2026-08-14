@@ -385,7 +385,7 @@ def load_ieee_cis(
         df = pd.read_csv(txn_csv, nrows=nrows)
         y = df["isFraud"].values.astype(int)
         # Select key numerical features
-        num_cols = df.select_dtypes(include=["number"]).columns.tolist()
+        num_cols = df.select_dtypes(include="number").columns.tolist()
         num_cols = [c for c in num_cols if c not in ("isFraud", "TransactionID")]
         X = df[num_cols].fillna(0).values.astype(np.float32)
         return {"X": X, "y": y, "feature_names": num_cols, "source": "real_csv", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
@@ -475,7 +475,7 @@ def partition_dataset_non_iid(
     num_banks: int = 3,
     alpha: float = 0.5,
     seed: int = 42,
-) -> list[dict[str, np.ndarray]]:
+) -> list[dict[str, Any]]:
     """Partition a dataset across multiple banks using Dirichlet distribution Dir(alpha).
 
     Academic standard for non-IID federated learning evaluation (LEAF benchmark).

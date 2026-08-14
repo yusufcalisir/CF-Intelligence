@@ -209,8 +209,8 @@ class DesignPartnerPilotService:
         synth_data = gen.generate_bank_datasets(bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3)
         synth_features, synth_labels = synth_data["bank_a"]
         # Select numeric columns
-        num_cols = synth_features.select_dtypes(include=["number"]).columns
-        X_synth = synth_features[num_cols].values.astype(np.float32)
+        num_cols = synth_features.select_dtypes(include="number").columns
+        X_synth = np.asarray(synth_features[num_cols].values, dtype=np.float32)
         y_synth = np.asarray(synth_labels.values, dtype=int)
 
         fidelity_report = audit_distribution_fidelity(

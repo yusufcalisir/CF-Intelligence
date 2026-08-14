@@ -11,11 +11,14 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.application.schemas.phase2 import (
     AlertResponse,
+    CounterfactualChangeSchema,
     CounterfactualExplanationResponse,
     DecisionReplayResponse,
+    EdgeContributionSchema,
     ExplainabilityResponse,
     GNNExplanationResponse,
     IntelligenceStatsResponse,
+    PolicyRuleEvaluationSchema,
     SharedIntelligenceResponse,
 )
 from app.application.services.alert_service import AlertIntelligenceService
@@ -126,7 +129,7 @@ async def explain_alert(alert_id: str) -> ExplainabilityResponse:
         top_features=report.top_features or [],
         risk_factors=report.risk_factors or [],
         historical_evidence=report.historical_evidence or [],
-        model_confidence=float(report.model_confidence or 0.0),
+        model_confidence=report.model_confidence or 0.0,
         risk_score_breakdown=[
             {
                 "signal_name": getattr(s, "signal_name", "signal"),
@@ -158,7 +161,7 @@ async def explain_transaction(transaction_id: str) -> ExplainabilityResponse:
         top_features=report.top_features or [],
         risk_factors=report.risk_factors or [],
         historical_evidence=report.historical_evidence or [],
-        model_confidence=float(report.model_confidence or 0.0),
+        model_confidence=report.model_confidence or 0.0,
         risk_score_breakdown=[
             {
                 "signal_name": getattr(s, "signal_name", "signal"),
@@ -225,12 +228,12 @@ async def get_alert_counterfactuals(
         remediated_score=cf.remediated_score,
         is_cleared=cf.is_cleared,
         changes=[
-            {
-                "feature": c.feature,
-                "original_value": c.original_value,
-                "remediated_value": c.remediated_value,
-                "delta_explanation": c.delta_explanation,
-            }
+            CounterfactualChangeSchema(
+                feature=c.feature,
+                original_value=c.original_value,
+                remediated_value=c.remediated_value,
+                delta_explanation=c.delta_explanation,
+            )
             for c in cf.changes
         ],
         summary_text=cf.summary_text,
@@ -255,15 +258,15 @@ async def replay_alert_decision(alert_id: str) -> DecisionReplayResponse:
         features_snapshot=audit.features_snapshot,
         graph_snapshot=audit.graph_snapshot,
         policy_rules_evaluated=[
-            {
-                "rule_code": r.rule_code,
-                "signal_name": r.signal_name,
-                "weight": r.weight,
-                "raw_value": r.raw_value,
-                "normalized_score": r.normalized_score,
-                "contribution": r.contribution,
-                "triggered": r.triggered,
-            }
+            PolicyRuleEvaluationSchema(
+                rule_code=r.rule_code,
+                signal_name=r.signal_name,
+                weight=r.weight,
+                raw_value=r.raw_value,
+                normalized_score=r.normalized_score,
+                contribution=r.contribution,
+                triggered=r.triggered,
+            )
             for r in audit.policy_rules_evaluated
         ],
         reconstructed_risk_score=audit.reconstructed_risk_score,
@@ -290,13 +293,13 @@ async def get_alert_gnn_explanation(alert_id: str) -> GNNExplanationResponse:
         subgraph_nodes_count=gnn_exp.subgraph_nodes_count,
         subgraph_edges_count=gnn_exp.subgraph_edges_count,
         top_contributing_edges=[
-            {
-                "source": e.source,
-                "target": e.target,
-                "relationship_type": e.relationship_type,
-                "weight": e.weight,
-                "contribution_percentage": e.contribution_percentage,
-            }
+            EdgeContributionSchema(
+                source=e.source,
+                target=e.target,
+                relationship_type=e.relationship_type,
+                weight=e.weight,
+                contribution_percentage=e.contribution_percentage,
+            )
             for e in gnn_exp.top_contributing_edges
         ],
         primary_driver_text=gnn_exp.primary_driver_text,
