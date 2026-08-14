@@ -793,8 +793,8 @@ npm run deploy:local
 The platform provides a **single unified test runner** that executes all frontend, backend, scientific verification, and smart contract suites in one command:
 
 ```bash
-# Execute all test suites across the entire repository (1153 total tests)
-python scripts/run_all_tests.py
+# Execute all test suites across the entire repository (1189 total tests including 36 Playwright VRT snapshots)
+python scripts/run_all_tests.py --all
 # or using Makefile
 make test-all
 ```
@@ -803,29 +803,49 @@ Alternatively, individual test tiers can be executed independently:
 
 ```bash
 # 1. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
-npm --prefix frontend run test:all      # Runs all unit, integration, and E2E suites
-npm --prefix frontend run test:e2e      # Runs 4 critical cross-bank business flow E2E tests
-npm --prefix frontend run test:integration # Runs multi-module integration suites
-npm --prefix frontend run test:unit     # Runs unit test suites
+npm --prefix frontend run test:all          # Runs all unit, integration, and E2E suites
+npm --prefix frontend run test:e2e          # Runs 4 critical cross-bank business flow E2E tests
+npm --prefix frontend run test:integration  # Runs multi-module integration suites
+npm --prefix frontend run test:unit         # Runs unit test suites
 # or
 make frontend-test
 
-# 2. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
+# 2. Frontend Visual Regression Test Suite (Playwright VRT: 36 tests across 4 viewports + Dark Mode)
+npm --prefix frontend run test:visual       # Runs pixel-perfect visual regression tests against baselines
+npm --prefix frontend run test:visual:update # Updates baseline golden snapshots
+python scripts/run_all_tests.py --visual    # Runs visual regression suite via Python master runner
+# or
+make frontend-visual-test
+make frontend-visual-update
+
+# 3. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
 pytest backend/tests/ -v
 # or
 make test
 
-# 3. Scientific Verification & Audit Suite (16 verified subsystems)
+# 4. Scientific Verification & Audit Suite (17 verified subsystems)
 python scripts/run_all_verifications.py
 # or
 pytest verification/ -v
 
-# 4. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
+# 5. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
 cd contracts && npm test
 ```
 
+#### Visual Regression Testing (VRT) Matrix
+
+The Playwright Visual Regression framework prevents CSS / Design System regressions across all critical responsive breakpoints and color schemes:
+
+| Target Viewport | Screen Resolution | Device Profile | Tested Views & Modules |
+| :--- | :--- | :--- | :--- |
+| **Desktop Standard** | `1280 × 800` | Desktop Workstation | Landing Hero, Full Landing Page, Live Operations, AML Alerts Feed, Case Ledger, Security Controls, Privacy Defense |
+| **Desktop Wide** | `1920 × 1080` | High-Resolution Monitor | Landing Hero, Full Landing Page, Live Operations, AML Alerts Feed, Case Ledger, Security Controls, Privacy Defense |
+| **Tablet** | `768 × 1024` | iPad / Tablet Portrait | Landing Hero, Responsive Full Page, Live Operations, AML Alerts Feed, Case Ledger, Security Controls, Privacy Defense |
+| **Mobile** | `375 × 812` | iPhone / Mobile Viewport | Landing Hero, Mobile Full Page, Navigation Drawer, Live Operations, AML Alerts Feed, Case Ledger, Security Controls, Privacy Defense |
+| **Theme Fidelity** | Dark Mode Theme Tokens | Enterprise Dark Contrast | Glassmorphism contrast, border fidelity, chart typography, badge alignment |
+
 > **Verifiable CI/CD Pipeline & Audit Trail:**  
-> All **1153 tests (1023 backend + 130 frontend)** run automatically on every commit via GitHub Actions CI:  
+> All **1189 tests (1023 backend + 130 frontend unit/e2e + 36 frontend visual snapshots)** run with 100% pass verification:  
 > 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
 
 

@@ -69,14 +69,20 @@ frontend-lint: ## Lint frontend code
 frontend-test: ## Run frontend test suite (Vitest)
 	cd frontend && npm test
 
+frontend-visual-test: ## Run Playwright visual regression tests
+	cd frontend && npm run test:visual
+
+frontend-visual-update: ## Update Playwright baseline snapshots
+	cd frontend && npm run test:visual:update
+
 frontend-build: ## Build frontend for production
 	cd frontend && npm run build
 
 frontend-typecheck: ## Run TypeScript type checking
 	cd frontend && npx tsc --noEmit
 
-test-all: ## Run all backend and frontend test suites
-	python scripts/run_all_tests.py
+test-all: ## Run all backend, frontend, visual, and verification test suites
+	python scripts/run_all_tests.py --all
 
 
 # ──────────────────────────────────────────────

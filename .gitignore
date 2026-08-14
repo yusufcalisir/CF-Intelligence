@@ -109,6 +109,10 @@ coverage.xml
 .ruff_cache/
 .hypothesis/
 .cache/
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
 
 # --- Celery & Background Jobs ---
 celerybeat-schedule
