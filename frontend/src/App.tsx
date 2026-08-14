@@ -1,23 +1,35 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import Layout from './components/layout/Layout';
-import Dashboard from './pages/Dashboard';
-import LiveOperationsView from './pages/LiveOperationsView';
-import BankOnboardingPage from './pages/BankOnboardingPage';
-import AlertsPage from './pages/AlertsPage';
-import CasesPage from './pages/CasesPage';
-import CaseDetailPage from './pages/CaseDetailPage';
-import ScenariosPage from './pages/ScenariosPage';
-import GraphPage from './pages/GraphPage';
-import InvestigationDashboard from './pages/InvestigationDashboard';
-import PoliciesPage from './pages/PoliciesPage';
-import PsiPage from './pages/PsiPage';
-import SecurityPage from './pages/SecurityPage';
-import ObservabilityPage from './pages/ObservabilityPage';
-import CoordinatorPage from './pages/CoordinatorPage';
-import PrivacyDefensePage from './pages/PrivacyDefensePage';
-import BenchmarkHubPage from './pages/BenchmarkHubPage';
 import LandingPage from './pages/LandingPage';
+import Dashboard from './pages/Dashboard';
+
+// Lazy-loaded secondary platform modules for lightning fast initial load
+const LiveOperationsView = lazy(() => import('./pages/LiveOperationsView'));
+const BankOnboardingPage = lazy(() => import('./pages/BankOnboardingPage'));
+const AlertsPage = lazy(() => import('./pages/AlertsPage'));
+const CasesPage = lazy(() => import('./pages/CasesPage'));
+const CaseDetailPage = lazy(() => import('./pages/CaseDetailPage'));
+const ScenariosPage = lazy(() => import('./pages/ScenariosPage'));
+const GraphPage = lazy(() => import('./pages/GraphPage'));
+const InvestigationDashboard = lazy(() => import('./pages/InvestigationDashboard'));
+const PoliciesPage = lazy(() => import('./pages/PoliciesPage'));
+const PsiPage = lazy(() => import('./pages/PsiPage'));
+const SecurityPage = lazy(() => import('./pages/SecurityPage'));
+const ObservabilityPage = lazy(() => import('./pages/ObservabilityPage'));
+const CoordinatorPage = lazy(() => import('./pages/CoordinatorPage'));
+const PrivacyDefensePage = lazy(() => import('./pages/PrivacyDefensePage'));
+const BenchmarkHubPage = lazy(() => import('./pages/BenchmarkHubPage'));
+
+const PageFallback = () => (
+  <div className="flex min-h-[60vh] items-center justify-center">
+    <div className="flex flex-col items-center gap-3">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-500 border-t-transparent" />
+      <span className="text-xs font-mono text-slate-400">Loading module...</span>
+    </div>
+  </div>
+);
 
 // Ensure QueryClient is always available even if main.tsx wrapping is lost during builds
 const queryClient = new QueryClient({
@@ -41,29 +53,148 @@ export default function App() {
           <Route element={<Layout />}>
             {/* Live Operations & FL Consortium */}
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/operations" element={<LiveOperationsView />} />
-            <Route path="/operations/:id" element={<LiveOperationsView />} />
-            <Route path="/simulation/:id" element={<LiveOperationsView />} />
+            <Route
+              path="/operations"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <LiveOperationsView />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/operations/:id"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <LiveOperationsView />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/simulation/:id"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <LiveOperationsView />
+                </Suspense>
+              }
+            />
 
             {/* Scientific Validation & Benchmarks */}
-            <Route path="/benchmarks" element={<BenchmarkHubPage />} />
+            <Route
+              path="/benchmarks"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <BenchmarkHubPage />
+                </Suspense>
+              }
+            />
 
             {/* Phase 2: AML Intelligence Platform */}
-            <Route path="/investigation" element={<InvestigationDashboard />} />
-            <Route path="/alerts" element={<AlertsPage />} />
-            <Route path="/cases" element={<CasesPage />} />
-            <Route path="/cases/:caseId" element={<CaseDetailPage />} />
-            <Route path="/rules" element={<PoliciesPage />} />
-            <Route path="/psi" element={<PsiPage />} />
-            <Route path="/security" element={<SecurityPage />} />
-            <Route path="/observability" element={<ObservabilityPage />} />
-            <Route path="/scenarios" element={<ScenariosPage />} />
-            <Route path="/graph" element={<GraphPage />} />
+            <Route
+              path="/investigation"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <InvestigationDashboard />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/alerts"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <AlertsPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/cases"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <CasesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/cases/:caseId"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <CaseDetailPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/rules"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <PoliciesPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/psi"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <PsiPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/security"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <SecurityPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/observability"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <ObservabilityPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/scenarios"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <ScenariosPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/graph"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <GraphPage />
+                </Suspense>
+              }
+            />
 
             {/* Enterprise Platform & Onboarding */}
-            <Route path="/onboarding" element={<BankOnboardingPage />} />
-            <Route path="/coordinator" element={<CoordinatorPage />} />
-            <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
+            <Route
+              path="/onboarding"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <BankOnboardingPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/coordinator"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <CoordinatorPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/privacy-defense"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <PrivacyDefensePage />
+                </Suspense>
+              }
+            />
           </Route>
         </Routes>
       </BrowserRouter>
