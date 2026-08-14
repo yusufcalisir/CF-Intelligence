@@ -584,6 +584,7 @@ The CFI Platform implements architectural and algorithmic controls designed to a
 | **SOC 2 Type II** | Audit Logging & Controls | `privacy_audit_service.py`, `security_compliance.py` | `Audit-Ready (Automated Evidence Pipeline)` |
 | **Zero-Trust (NIST SP 800-207)** | PKI / ABAC / mTLS | `abac_engine.py`, `mtls_manager.py` | `Architecturally Implemented (mTLS 1.3 + ABAC)` |
 | **PSD2 Open Banking** (eIDAS) | Financial Connectors | `open_banking_connector.py` | `Implemented (ASPSP & eIDAS Adapters)` |
+| **Fed SR 11-7 / OCC 2011-12** (Model Risk Mgmt) | Model Governance & Drift | `drift_service.py`, `retraining_trigger_engine.py` | `Aligned (3 Lines of Defense + Auto-Retrain)` |
 
 ---
 
