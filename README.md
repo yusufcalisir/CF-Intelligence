@@ -803,20 +803,14 @@ Alternatively, individual test tiers can be executed independently:
 
 ```bash
 # 1. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
-npm --prefix frontend run test:all          # Runs all unit, integration, and E2E suites
-npm --prefix frontend run test:e2e          # Runs 4 critical cross-bank business flow E2E tests
-npm --prefix frontend run test:integration  # Runs multi-module integration suites
-npm --prefix frontend run test:unit         # Runs unit test suites
+npm --prefix frontend test                  # Runs unified frontend suite (Unit, Integration & E2E)
 # or
 make frontend-test
 
 # 2. Frontend Visual Regression Test Suite (Playwright VRT: 36 tests across 4 viewports + Dark Mode)
 npm --prefix frontend run test:visual       # Runs pixel-perfect visual regression tests against baselines
-npm --prefix frontend run test:visual:update # Updates baseline golden snapshots
-python scripts/run_all_tests.py --visual    # Runs visual regression suite via Python master runner
 # or
 make frontend-visual-test
-make frontend-visual-update
 
 # 3. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
 pytest backend/tests/ -v
