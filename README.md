@@ -488,7 +488,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 
 All benchmark results are derived from the integrated multi-phase verification suite executed across synthetic multi-bank partitions and canonical open-source real-world financial datasets.
 
-### Core Platform Engineering SLAs
+### Core Platform Engineering SLAs & Chaos Verification
 
 | Benchmark Metric | Measured Value | Target SLA | Verification Reference | Status |
 | :--- | :---: | :---: | :--- | :---: |
@@ -500,8 +500,11 @@ All benchmark results are derived from the integrated multi-phase verification s
 | **EVM Gas (100 Banks)** | 2,895,000 gas | < 5M gas | `ShapleyRewardPool.sol` | `PASS` |
 | **FL Synthetic ROC-AUC (FedAvg)** | 0.974 | > 0.95 | `simulation_service.py` | `PASS` |
 | **Differential Privacy Budget** | epsilon = 1.0, delta = 1e-5 | epsilon <= 2.0 | `privacy_audit_service.py` | `PASS` |
-| **Active-Passive Failover RTO** | < 30 s | < 60 s | `region_failover.py` | `PASS` |
-| **Test Suite Coverage** | 889 / 889 passing | 100% | Pytest Full Suite | `PASS` |
+| **Chaos DR Failover RTO (Under 500 TPS Load)** | **15.02 s (RPO = 0 records lost)** | < 30 s | `chaos_dr_drill.py` | `PASS` |
+| **Multi-Tenant Memory/DB Isolation** | **0 Leaks / 100% Isolated** | CC6.1 - CC6.3 | `test_multi_tenant_security_audit.py` | `PASS` |
+| **Test Suite Pass Rate** | **894 / 894 passing** | 100% | Pytest Full Suite | `PASS` |
+
+> Full empirical disaster recovery drill data and multi-tenant penetration reports are published in **[docs/disaster_recovery_drill_report.md](docs/disaster_recovery_drill_report.md)**, **[docs/multi_tenant_isolation_audit_report.md](docs/multi_tenant_isolation_audit_report.md)**, and **[docs/production_infrastructure.md](docs/production_infrastructure.md)**.
 
 ---
 
