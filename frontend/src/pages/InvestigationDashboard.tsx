@@ -267,7 +267,7 @@ export default function InvestigationDashboard() {
                 {/* Main Number Display */}
                 <div className="my-2.5 relative z-10">
                   <div className={`text-3xl sm:text-4xl font-extrabold font-mono tracking-tight bg-gradient-to-r ${card.textColor} bg-clip-text text-transparent group-hover:scale-105 transition-transform origin-left`}>
-                    {card.value.toLocaleString()}
+                    {(card.value ?? 0).toLocaleString()}
                   </div>
                   <div className="text-xs font-bold text-slate-200 mt-1 uppercase tracking-wider">
                     {card.title}

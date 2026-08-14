@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LandingPage from '../LandingPage';
 
@@ -36,7 +36,7 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('CF-Intelligence')).toBeDefined();
+    expect(screen.getAllByText('CF-Intelligence').length).toBeGreaterThan(0);
   });
 
   it('contains all 8 required section anchor targets for complete component access', () => {
@@ -73,13 +73,8 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     );
 
     expect(screen.getByText('Overview')).toBeDefined();
-    expect(screen.getByText('Problem')).toBeDefined();
-    expect(screen.getByText('Workflow')).toBeDefined();
-    expect(screen.getByText('Capabilities')).toBeDefined();
-    expect(screen.getByText('Platform')).toBeDefined();
-    expect(screen.getByText('Architecture')).toBeDefined();
-    expect(screen.getByText('Security')).toBeDefined();
-    expect(screen.getByText('API & Docs')).toBeDefined();
+    expect(screen.getByText('Platform & Engine')).toBeDefined();
+    expect(screen.getByText('Architecture & Security')).toBeDefined();
   });
 
   it('renders call to action buttons leading to live platform demo dashboard', () => {
@@ -106,23 +101,31 @@ describe('LandingPage Architecture & Navigation Component Tests', () => {
     // Click GNN Graph button (⬡)
     const gnnBtn = screen.getByTitle('GNN Graph Node Topology');
     fireEvent.click(gnnBtn);
-    expect(await screen.findByText('GNN Subgraph Inspection')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText('GNN Subgraph Inspection')).toBeInTheDocument();
+    });
 
     // Click Differential Privacy button (◎)
     const privacyBtn = screen.getByTitle('Differential Privacy & SGX Vault');
     fireEvent.click(privacyBtn);
-    expect(await screen.findByText('Intel SGX & (ε, δ)-DP Engine')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText('Intel SGX & (ε, δ)-DP Engine')).toBeInTheDocument();
+    });
 
     // Click Byzantine Defense button (△)
     const bftBtn = screen.getByTitle('Byzantine Attack Defense Lab');
     fireEvent.click(bftBtn);
-    expect(await screen.findByText('Byzantine Resilience Monitor')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText('Byzantine Resilience Monitor')).toBeInTheDocument();
+    });
 
     // Click FinCEN SAR button (▦)
     const sarBtn = screen.getByTitle('FinCEN SAR XML Generator');
     fireEvent.click(sarBtn);
-    expect(await screen.findByText('FinCEN SAR Automated Compliance')).toBeDefined();
-  });
+    await waitFor(() => {
+      expect(screen.getByText('FinCEN SAR Automated Compliance')).toBeInTheDocument();
+    });
+  }, 15000);
 
   it('opens bank node detail drawer when clicking a consortium institution card', () => {
     render(

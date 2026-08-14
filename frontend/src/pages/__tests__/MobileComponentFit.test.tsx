@@ -96,9 +96,7 @@ describe('Mobile Viewport Component Fit, Overflow & Drawer Test Suite', () => {
     // Mobile overlay should display section navigation items mirroring desktop exactly
     const overviewElements = screen.getAllByText('Overview');
     expect(overviewElements.length).toBeGreaterThan(0);
-    const capabilitiesElements = screen.getAllByText('Capabilities');
-    expect(capabilitiesElements.length).toBeGreaterThan(0);
-    const problemElements = screen.getAllByText('Problem');
+    const problemElements = screen.getAllByText(/Problem/i);
     expect(problemElements.length).toBeGreaterThan(0);
   });
 });

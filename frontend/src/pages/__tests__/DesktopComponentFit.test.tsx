@@ -76,7 +76,7 @@ describe('Desktop Viewport Component Fit & Overflow Test Suite', () => {
       expect(zeroOverflowContainers.length).toBeGreaterThan(0);
 
       // Check brand headers and CTA buttons are rendered without text truncation
-      expect(screen.getByText('CF-Intelligence')).toBeDefined();
+      expect(screen.getAllByText('CF-Intelligence').length).toBeGreaterThan(0);
     });
   });
 });

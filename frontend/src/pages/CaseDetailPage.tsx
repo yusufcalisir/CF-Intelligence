@@ -602,7 +602,7 @@ export default function CaseDetailPage() {
         {/* Evidence List */}
         {/* Mobile / Tablet View: Stacked Cards */}
         <div className="block lg:hidden space-y-3">
-          {!evidenceList || evidenceList.length === 0 ? (
+          {!Array.isArray(evidenceList) || evidenceList.length === 0 ? (
             <div className="py-6 text-center text-[var(--color-text-muted)] text-xs font-mono">
               No evidence registered for this case.
             </div>
@@ -618,14 +618,15 @@ export default function CaseDetailPage() {
                     {ev.evidence_type.replace('_', ' ')}
                   </span>
                 </div>
-                <div className="flex flex-col gap-1.5 text-[11px] text-slate-400 border-t border-slate-800 pt-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-slate-500 shrink-0">Path:</span>
-                    <span className="text-slate-300 font-semibold truncate max-w-[220px]">{ev.file_path}</span>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-slate-500 text-[10px]">Cryptographic Hash (SHA-256):</span>
-                    <span className="text-cyan-400 font-mono text-[10px] break-all bg-black/40 p-1.5 rounded border border-white/5">
+                {ev.file_path && (
+                  <p className="text-[11px] text-[var(--color-text-muted)] truncate">
+                    📄 {ev.file_path}
+                  </p>
+                )}
+                <div className="space-y-1 pt-1 border-t border-[var(--color-border)]">
+                  <div className="flex items-center justify-between gap-2 text-[10px]">
+                    <span className="text-[var(--color-text-muted)]">SHA-256:</span>
+                    <span className="font-mono text-indigo-300 truncate max-w-[180px]">
                       {ev.content_hash}
                     </span>
                   </div>
@@ -653,7 +654,7 @@ export default function CaseDetailPage() {
               </tr>
             </thead>
             <tbody>
-              {!evidenceList || evidenceList.length === 0 ? (
+              {!Array.isArray(evidenceList) || evidenceList.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-[var(--color-text-muted)] text-xs font-mono">
                     No evidence registered for this case.

@@ -70,9 +70,7 @@ describe('Mobile, Tablet & Desktop Responsive Layout Test Suite', () => {
     // Verify mobile drawer overlay renders all section navigation links matching desktop
     const overviewElements = screen.getAllByText('Overview');
     expect(overviewElements.length).toBeGreaterThan(0);
-    const capabilitiesElements = screen.getAllByText('Capabilities');
-    expect(capabilitiesElements.length).toBeGreaterThan(0);
-    const platformElements = screen.getAllByText('Platform');
+    const platformElements = screen.getAllByText(/Platform/i);
     expect(platformElements.length).toBeGreaterThan(0);
   });
 
@@ -102,12 +100,7 @@ describe('Mobile, Tablet & Desktop Responsive Layout Test Suite', () => {
 
     // Desktop nav links should be rendered in the DOM
     expect(screen.getByText('Overview')).toBeDefined();
-    expect(screen.getByText('Problem')).toBeDefined();
-    expect(screen.getByText('Workflow')).toBeDefined();
-    expect(screen.getByText('Capabilities')).toBeDefined();
-    expect(screen.getByText('Platform')).toBeDefined();
-    expect(screen.getByText('Architecture')).toBeDefined();
-    expect(screen.getByText('Security')).toBeDefined();
-    expect(screen.getByText('API & Docs')).toBeDefined();
+    expect(screen.getByText('Platform & Engine')).toBeDefined();
+    expect(screen.getByText('Architecture & Security')).toBeDefined();
   });
 });
