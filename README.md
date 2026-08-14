@@ -323,7 +323,11 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 
 ### 5.2 Automated Optuna FL Hyperparameter Optimizer & Dirichlet Partitioner (`fl_hyperparameter_optimizer.py` & `fl_dirichlet_partitioner.py`)
 - Dirichlet Non-IID Data Partitioner (Dir($\alpha$)): Models realistic bank label heterogeneity across financial institutions using Dirichlet distribution:
-  $$p_k \sim \text{Dirichlet}(\alpha \mathbf{p}), \quad \alpha \in [0.01, 10.0]$$
+
+$$
+p_k \sim \text{Dirichlet}(\alpha \mathbf{p}), \quad \alpha \in [0.01, 10.0]
+$$
+
   where lower concentration ($\alpha \to 0.01$) synthesizes severe non-IID label imbalance across bank nodes and higher concentration ($\alpha \to 10.0$) converges to uniform IID class distributions.
 - Optuna Bayesian TPE Optimization: Automatically searches optimal hyperparameter configurations (`learning_rate`, `local_epochs`, DP clip norm $C_{\text{max}}$, noise multiplier $\sigma$, staleness decay $\gamma$, FedProx $\mu$) using `TPESampler` with early `MedianPruner` trial termination.
 - Tuning Management REST API: Accessible via `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
@@ -332,7 +336,9 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 - Serverless Peer-to-Peer Training: Executes federated learning training rounds without a central coordinator server using Flower's simulation engine.
 - P2P Gossip Weight Mixing (`P2PGossipStrategy`): Computes peer parameter updates via local neighbor weight averaging over 1D Ring and Fully-Connected Mesh topologies:
 
-  $$w_i^{(t+1)} = \frac{1}{|\mathcal{N}_i|} \sum_{j \in \mathcal{N}_i} w_j^{(t)}$$
+$$
+w_i^{(t+1)} = \frac{1}{|\mathcal{N}_i|} \sum_{j \in \mathcal{N}_i} w_j^{(t)}
+$$
 
 ---
 
