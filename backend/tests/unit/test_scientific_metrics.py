@@ -1,14 +1,10 @@
 """Unit tests for Multi-threshold Confusion Matrix, Precision-Recall, Alert Fatigue and Cost Utility modeling."""
 
 import numpy as np
-import pytest
 
 from app.domain.metrics_service import (
     compute_financial_cost_utility,
     compute_multi_threshold_confusion_matrix,
-    compute_pr_auc,
-    compute_precision_at_k,
-    compute_recall_at_fpr,
     compute_scientific_benchmark,
 )
 

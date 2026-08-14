@@ -1,12 +1,10 @@
 """Unit tests for Real-World AML/Fraud Benchmark Dataset Loaders & LEAF Non-IID Partitioning."""
 
 import numpy as np
-import pytest
 
 from app.application.services.dataloader import (
     DATASET_REGISTRY,
     load_creditcard_fraud,
-    load_dataset,
     load_elliptic,
     load_ieee_cis,
     load_paysim,

@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
+
 from app.infrastructure.database import _get_or_create_engine, active_tenant
 from app.infrastructure.database.tenant_provisioner import (
-    TenantProvisioner,
     sanitize_bank_id,
 )
 

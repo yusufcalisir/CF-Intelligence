@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from app.domain.dr_coordinator import CoordinatorRegionRole
 from app.infrastructure.disaster_recovery.chaos_dr_drill import (
     ChaosDRDrillRunner,
     DRDrillMetrics,

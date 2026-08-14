@@ -1,7 +1,6 @@
 """Unit tests for Design Partner Pilot Service and API Router."""
 
 import pandas as pd
-import pytest
 
 from app.application.services.design_partner_service import DesignPartnerPilotService
 
