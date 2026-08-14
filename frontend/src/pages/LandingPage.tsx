@@ -1582,6 +1582,233 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
+            SECTION 7.7 — ENTERPRISE COMMERCIAL PRICING & LEGAL FRAMEWORK (#pricing, #legal)
+        ══════════════════════════════════════════════════════════ */}
+        <section id="pricing" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
+          <FadeSection>
+            {/* Header */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-10 sm:mb-14">
+              <div className="max-w-3xl min-w-0">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-emerald-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                  Transparent Commercial Model & Contracts
+                </div>
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">
+                  Enterprise Pricing Tiers & Institutional SLA
+                </h2>
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                  Predictable tiered subscriptions aligned with transaction volume, backed by contractual 
+                  99.99% availability SLAs, automated service credit penalties, and binding Zero-Raw-PII Data Processing Agreements.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 p-1 bg-white/4 rounded-xl border border-white/8 text-xs font-mono text-slate-300 shrink-0">
+                <span className="px-3 py-1 bg-indigo-600 rounded-lg text-white font-bold">Annual Billing (-15%)</span>
+                <span className="px-3 py-1 text-slate-400">Institutional Custom</span>
+              </div>
+            </div>
+
+            {/* 4 Pricing Cards Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 sm:gap-6 mb-14">
+              {[
+                {
+                  tier: 'Design Partner',
+                  badge: 'Pilot Sandbox',
+                  price: 'Free',
+                  period: '30-Day Evaluation',
+                  volume: '10k txns/day (Mock/Staging)',
+                  overage: 'N/A (Capped Sandbox)',
+                  sla: 'Best-Effort Staging',
+                  highlight: false,
+                  features: [
+                    'Zero-Raw-PII Ingestion Scanner',
+                    'Distribution Fidelity Audit Report',
+                    'SOC 2 Pre-Audit Readiness Dossier',
+                    'Synthetic vs Real Drift Analysis',
+                    'Standard Email Support',
+                  ],
+                  cta: 'Start Design Pilot',
+                  ctaAction: () => navigate('/benchmarks'),
+                  ctaStyle: 'bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10',
+                },
+                {
+                  tier: 'Growth FinTech',
+                  badge: 'PSP & Neobanks',
+                  price: '$3,500',
+                  period: '/ month',
+                  volume: 'Up to 250,000 txns / mo',
+                  overage: '$0.012 / additional txn',
+                  sla: '99.90% Availability SLA',
+                  highlight: false,
+                  features: [
+                    'Real-Time Scoring API (<15ms)',
+                    'Tabular Velocity + GNN Ensemble',
+                    'SHAP Feature Attributions',
+                    'WebHook Suspicious Alert Stream',
+                    '8x5 Business Technical Support',
+                  ],
+                  cta: 'Deploy API Node',
+                  ctaAction: () => navigate('/benchmarks'),
+                  ctaStyle: 'bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30',
+                },
+                {
+                  tier: 'Enterprise Bank',
+                  badge: 'Commercial & Retail Banks',
+                  price: '$12,000',
+                  period: '/ month',
+                  volume: 'Up to 1,500,000 txns / mo',
+                  overage: '$0.008 / additional txn',
+                  sla: '99.99% Uptime (<14.2ms)',
+                  highlight: true,
+                  features: [
+                    'Dedicated Edge Agent (cfi-agent)',
+                    'Native ISO 20022 PAC.008 Engine',
+                    'On-Prem GPU/CPU Local Training',
+                    'Vault PKI mTLS + HSM Binding',
+                    'Automated FinCEN SAR XML Export',
+                    '24/7 SLA Hotline (1h Response)',
+                  ],
+                  cta: 'Request Enterprise Setup',
+                  ctaAction: () => { window.location.href = 'mailto:ysfcals@gmail.com?subject=Enterprise%20Node%20Subscription%20Inquiry'; },
+                  ctaStyle: 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold shadow-lg shadow-indigo-950/60',
+                },
+                {
+                  tier: 'Consortium Switch',
+                  badge: 'National Clearing Networks',
+                  price: '$35,000+',
+                  period: '/ month pool',
+                  volume: 'Pooled High-Volume (10M+)',
+                  overage: 'Volume Scaled',
+                  sla: '99.999% Fault-Tolerant HA',
+                  highlight: false,
+                  features: [
+                    'Multi-Bank FedGNN Subgraph Sync',
+                    'Intel SGX Hardware TEE Enclave',
+                    'Shapley Incentive Settlement Pool',
+                    'Active-Passive Disaster Recovery',
+                    'Dedicated Technical Account Manager',
+                    'Custom Legal & Regulatory SLAs',
+                  ],
+                  cta: 'Contact Consortium Lead',
+                  ctaAction: () => { window.location.href = 'mailto:ysfcals@gmail.com?subject=Consortium%20Switch%20Inquiry'; },
+                  ctaStyle: 'bg-white/5 hover:bg-white/10 text-slate-200 border border-white/10',
+                },
+              ].map((card) => (
+                <div
+                  key={card.tier}
+                  className={`p-6 rounded-3xl bg-[#08081c] border flex flex-col justify-between space-y-5 transition-all ${
+                    card.highlight
+                      ? 'border-indigo-500/60 shadow-[0_0_50px_rgba(99,102,241,0.2)] ring-1 ring-indigo-500/40 relative'
+                      : 'border-white/8 hover:border-white/20'
+                  }`}
+                >
+                  {card.highlight && (
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[9px] font-mono font-bold uppercase tracking-wider bg-indigo-600 text-white shadow-md">
+                      Most Popular for Banks
+                    </span>
+                  )}
+
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-base font-bold text-slate-100">{card.tier}</h3>
+                      <span className="text-[9.5px] font-mono text-slate-400 bg-white/4 px-2 py-0.5 rounded border border-white/6">
+                        {card.badge}
+                      </span>
+                    </div>
+
+                    <div>
+                      <div className="flex items-baseline gap-1">
+                        <span className="text-2xl sm:text-3xl font-bold font-mono text-white">{card.price}</span>
+                        <span className="text-xs font-mono text-slate-400">{card.period}</span>
+                      </div>
+                      <div className="text-[11px] font-mono text-indigo-300 mt-1">{card.volume}</div>
+                      <div className="text-[10px] font-mono text-slate-500 mt-0.5">Overage: {card.overage}</div>
+                    </div>
+
+                    <div className="p-2 rounded-xl bg-white/3 border border-white/6 text-[10px] font-mono text-emerald-400 font-bold text-center">
+                      SLA: {card.sla}
+                    </div>
+
+                    <ul className="space-y-2 pt-2 border-t border-white/6 text-xs text-slate-300">
+                      {card.features.map((feat) => (
+                        <li key={feat} className="flex items-start gap-2 text-[11px]">
+                          <span className="text-emerald-400 shrink-0 mt-0.5">✓</span>
+                          <span className="leading-snug">{feat}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={card.ctaAction}
+                    className={`w-full py-3 px-4 rounded-xl text-xs font-semibold transition-all cursor-pointer text-center ${card.ctaStyle}`}
+                  >
+                    {card.cta}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Part 2: Institutional Legal & Compliance Agreement Suite */}
+            <div id="legal" className="p-6 sm:p-8 rounded-3xl bg-[#060614] border border-white/8 space-y-6 shadow-2xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/8 pb-5">
+                <div>
+                  <div className="text-[10px] font-mono font-semibold text-indigo-400 uppercase tracking-widest">
+                    Standardized Institutional Contracts
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-100 mt-0.5">
+                    Institutional Legal Framework & Agreement Suite
+                  </h3>
+                </div>
+                <span className="text-xs font-mono text-emerald-400 bg-emerald-950/30 border border-emerald-800/40 px-3 py-1 rounded-full shrink-0">
+                  Standard B2B Legal Pack (2026)
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                {[
+                  {
+                    title: 'Data Processing Agreement (DPA)',
+                    ref: 'docs/legal/data_processing_agreement.md',
+                    standard: 'GDPR Art. 28 · KVKK · CCPA',
+                    desc: 'Contractually guarantees Zero Raw PII leakage across bank perimeter with strict controller-processor boundaries.',
+                  },
+                  {
+                    title: 'Terms of Service & Governance (ToS)',
+                    ref: 'docs/legal/terms_of_service.md',
+                    standard: 'Consortium Governance · IP Protection',
+                    desc: 'Defines node participation, automated Byzantine poisoning penalties, and collaborative model licensing.',
+                  },
+                  {
+                    title: 'Service Level Agreement (SLA)',
+                    ref: 'docs/legal/service_level_agreement.md',
+                    standard: '99.99% Uptime · <15ms p99',
+                    desc: 'Contractual uptime guarantees with automated monthly invoice Service Credit penalties (up to 100%).',
+                  },
+                  {
+                    title: 'Enterprise Privacy Policy',
+                    ref: 'docs/legal/enterprise_privacy_policy.md',
+                    standard: 'Rényi DP (ε=1.0) · GDPR Art. 17',
+                    desc: 'Formal mathematical privacy guarantees, unlearning erasure workflows, and PKCS#11 HSM key isolation.',
+                  },
+                ].map((item) => (
+                  <div key={item.title} className="p-4 rounded-2xl bg-white/2 border border-white/6 flex flex-col justify-between space-y-3">
+                    <div className="space-y-1.5">
+                      <span className="text-[9.5px] font-mono text-indigo-400 uppercase">{item.standard}</span>
+                      <h4 className="text-xs font-bold text-slate-100">{item.title}</h4>
+                      <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{item.desc}</p>
+                    </div>
+                    <div className="text-[9px] font-mono text-slate-500 truncate pt-2 border-t border-white/5">
+                      Ref: {item.ref}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </FadeSection>
+        </section>
+
+        {/* ══════════════════════════════════════════════════════════
             SECTION 8 — EXPANDED REST API & SDK DOCUMENTATION (#api, #docs)
         ══════════════════════════════════════════════════════════ */}
         <section id="api" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">

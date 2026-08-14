@@ -584,6 +584,31 @@ The CFI Platform implements architectural and algorithmic controls designed to a
 
 ---
 
+## 13e. Enterprise Business Model, Pricing Tiers & Legal Framework
+
+CF-Intelligence employs a transparent, hybrid subscription and usage-based commercial model for institutional procurement, backed by institutional legal contract templates:
+
+### Commercial Pricing Matrix
+
+| Commercial Subscription Tier | Monthly Base Fee | Included Scored Volume | Overage Rate (/txn) | SLA Target | Primary Deployment Model |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Tier 1: Design Partner Pilot** | **Free / Sponsored** | 10k txns/day (30 days) | N/A (Sandbox) | Best Effort | Isolated Staging Environment |
+| **Tier 2: Growth FinTech (PSP/EMI)** | **$3,500 / month** | 250k txns/month | $0.012 / txn | **99.90% Uptime** | High-Throughput REST API & WebHooks |
+| **Tier 3: Enterprise Bank Node** | **$12,000 / month** | 1.5M txns/month | $0.008 / txn | **99.99% Uptime** | Dedicated Edge Container (`cfi-agent`) + mTLS |
+| **Tier 4: National Consortium Switch**| **$35,000+ / month**| Custom Pooled ($10M+) | Negotiated Volume | **99.999% Fault-Tol.** | Intel SGX Hardware TEE Cluster |
+
+### Institutional Legal Framework & Agreement Templates
+
+All institutional deployments are governed by standardized B2B contract templates in `docs/legal/`:
+
+* **Data Processing Agreement (DPA)**: [`docs/legal/data_processing_agreement.md`](docs/legal/data_processing_agreement.md) — Enforces GDPR Art. 28, KVKK, and the binding **Zero-Raw-PII technical guarantee**.
+* **Terms of Service & Governance (ToS)**: [`docs/legal/terms_of_service.md`](docs/legal/terms_of_service.md) — Consortium participation rules, Byzantine poisoning penalties, and IP ownership boundaries.
+* **Service Level Agreement (SLA)**: [`docs/legal/service_level_agreement.md`](docs/legal/service_level_agreement.md) — 99.99% uptime commitments, $<15\text{ms}$ latency guarantees, and automated **Service Credit** penalty discount matrices.
+* **Enterprise Privacy Policy**: [`docs/legal/enterprise_privacy_policy.md`](docs/legal/enterprise_privacy_policy.md) — Mathematical Rényi Differential Privacy ($\varepsilon=1.0, \delta=10^{-5}$) and Hessian Inversion unlearning specifications.
+* **Commercial Model & ROI Spec**: [`docs/business_model_and_pricing.md`](docs/business_model_and_pricing.md) — Detailed financial payback formulations, TCO breakdowns, and professional services catalog.
+
+---
+
 ## 14. Subsystem Automated Scientific Verification Reports (`verification/`) (17 Modules)
 
 > **Note on Verification Methodology:**  
