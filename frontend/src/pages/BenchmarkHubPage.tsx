@@ -118,39 +118,27 @@ export const BenchmarkHubPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 rounded-xl p-1">
-          <button
-            onClick={() => setActiveTab('benchmarks')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'benchmarks' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Real Benchmarks
-          </button>
-          <button
-            onClick={() => setActiveTab('confusion_matrix')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'confusion_matrix' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Confusion & Cost
-          </button>
-          <button
-            onClick={() => setActiveTab('fidelity')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'fidelity' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Distribution Fidelity
-          </button>
-          <button
-            onClick={() => setActiveTab('pilot_sandbox')}
-            className={`px-4 py-2 text-xs font-semibold rounded-lg transition-all ${
-              activeTab === 'pilot_sandbox' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            Design Partner Sandbox
-          </button>
+        <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+          <div className="flex items-center gap-1.5 bg-[#090a1f]/90 border border-white/10 rounded-2xl p-1.5 shadow-xl w-max sm:w-full lg:w-auto">
+            {[
+              { id: 'benchmarks', label: 'Real Benchmarks' },
+              { id: 'confusion_matrix', label: 'Confusion & Cost' },
+              { id: 'fidelity', label: 'Distribution Fidelity' },
+              { id: 'pilot_sandbox', label: 'Design Partner Sandbox' },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as 'benchmarks' | 'confusion_matrix' | 'fidelity' | 'pilot_sandbox')}
+                className={`whitespace-nowrap shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer active:scale-95 ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.35)]'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -237,14 +225,14 @@ export const BenchmarkHubPage: React.FC = () => {
           </div>
 
           {/* Model Comparison Table */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-5 sm:p-6 shadow-xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
               <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <Layers className="w-5 h-5 text-indigo-400" />
-                  Cross-Bank Collaborative vs Isolated Local Model
+                <h2 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Layers className="w-5 h-5 text-indigo-400 shrink-0" />
+                  <span>Cross-Bank Collaborative vs Isolated Local Model</span>
                 </h2>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-400 mt-1">
                   Evaluated on {benchmarkData?.total_transactions_evaluated?.toLocaleString() ?? sampleSize} records of{' '}
                   {datasetDescriptions[selectedDataset]?.title ?? selectedDataset}
                 </p>
@@ -253,14 +241,118 @@ export const BenchmarkHubPage: React.FC = () => {
                 href={datasetDescriptions[selectedDataset]?.sourceLink ?? 'https://www.kaggle.com'}
                 target="_blank"
                 rel="noreferrer"
-                className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1 bg-slate-800/80 px-3 py-1.5 rounded-lg border border-slate-700"
+                className="self-start sm:self-auto text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1.5 bg-slate-800/80 hover:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-700 transition-colors shrink-0"
               >
-                Kaggle Dataset Source <ArrowUpRight className="w-3.5 h-3.5" />
+                <span>Kaggle Dataset Source</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
               </a>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm border-collapse">
+            {/* Mobile View: Stacked Cards (Zero horizontal cut-off, full clarity) */}
+            <div className="block md:hidden space-y-3">
+              {/* Federated Model Mobile Card */}
+              <div className="p-4 rounded-xl bg-indigo-950/25 border border-indigo-500/40 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    <span className="font-bold text-xs text-white truncate">
+                      Privacy-Preserving Federated Model (FedAvg + DP)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0">
+                    Active Leader
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-indigo-500/20">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">PR-AUC</div>
+                    <div className="text-xs font-bold text-emerald-400 font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.federated_learning?.pr_auc ?? '0.8420'}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">ROC-AUC</div>
+                    <div className="text-xs font-bold text-white font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.federated_learning?.roc_auc ?? '0.9120'}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
+                    <div className="text-xs font-bold text-indigo-300 font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr ?? '0.6240'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-300 pt-1 border-t border-indigo-500/20">
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">False Alarms:</span>
+                    <span>{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily ?? 120} FP</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
+                    <span className="text-amber-300">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '12,750'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Total Cost:</span>
+                    <span className="text-emerald-400 font-bold">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '15,630'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Isolated Single Bank Mobile Card */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-xs text-slate-300 truncate">
+                    Isolated Single-Bank Model (Bank A Baseline)
+                  </span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700 shrink-0">
+                    Siloed Baseline
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-800">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">PR-AUC</div>
+                    <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc ?? '0.6940'}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">ROC-AUC</div>
+                    <div className="text-xs font-bold text-slate-300 font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc ?? '0.8350'}
+                    </div>
+                  </div>
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
+                    <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
+                    <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr ?? '0.4320'}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-400 pt-1 border-t border-slate-800">
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">False Alarms:</span>
+                    <span className="text-rose-300">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily ?? 340} FP</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
+                    <span className="text-rose-400">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '25,500'}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-500 block text-[9px]">Total Cost:</span>
+                    <span className="text-rose-400 font-bold">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '29,880'}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse min-w-[650px]">
                 <thead>
                   <tr className="border-b border-slate-800 text-xs text-slate-400 uppercase tracking-wider">
                     <th className="py-3 px-4">Architecture</th>
@@ -275,8 +367,8 @@ export const BenchmarkHubPage: React.FC = () => {
                 <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
                   <tr className="bg-indigo-950/20 text-indigo-200">
                     <td className="py-3 px-4 font-sans font-bold text-white flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                      Privacy-Preserving Federated Model (FedAvg + DP)
+                      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                      <span>Privacy-Preserving Federated Model (FedAvg + DP)</span>
                     </td>
                     <td className="py-3 px-4 text-emerald-400 font-bold">{benchmarkData?.performance_comparison?.federated_learning?.pr_auc ?? '0.8420'}</td>
                     <td className="py-3 px-4">{benchmarkData?.performance_comparison?.federated_learning?.roc_auc ?? '0.9120'}</td>

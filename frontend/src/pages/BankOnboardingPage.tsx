@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   Radio,
   FileText,
+  ChevronDown,
 } from 'lucide-react';
 
 interface OnboardingFormData {
@@ -31,6 +32,21 @@ const ONBOARDING_STEPS = [
   { num: 5, title: 'Connection', subtitle: 'Quorum Quorum', icon: '📡' },
 ] as const;
 
+const JURISDICTION_OPTIONS = [
+  { value: 'EU', label: 'European Union (EU - GDPR)' },
+  { value: 'US', label: 'United States (US - FinCEN)' },
+  { value: 'UK', label: 'United Kingdom (UK - FCA)' },
+  { value: 'TR', label: 'Turkey (TR - BDDK / KVKK)' },
+  { value: 'SG', label: 'Singapore (SG - MAS)' },
+  { value: 'JP', label: 'Japan (JP - FSA)' },
+];
+
+const REGION_OPTIONS = [
+  { value: 'eu-central-1', label: 'eu-central-1 (Frankfurt, Germany - ISO 27001 Enclave)' },
+  { value: 'us-east-1', label: 'us-east-1 (N. Virginia, USA - SOC2 Type II)' },
+  { value: 'ap-southeast-1', label: 'ap-southeast-1 (Singapore - MAS TRM)' },
+];
+
 export default function BankOnboardingPage() {
   const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [formData, setFormData] = useState<OnboardingFormData>({
@@ -41,6 +57,8 @@ export default function BankOnboardingPage() {
     data_residency_region: 'eu-central-1',
   });
 
+  const [openJurisdictionDropdown, setOpenJurisdictionDropdown] = useState(false);
+  const [openRegionDropdown, setOpenRegionDropdown] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [generatedCert, setGeneratedCert] = useState<string>('');
   const [generatedKey, setGeneratedKey] = useState<string>('');
@@ -315,22 +333,47 @@ differential_privacy:
               />
             </div>
 
-            <div>
+            {/* Legal Jurisdiction Custom Dropdown */}
+            <div className="relative">
               <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
                 Legal Jurisdiction
               </label>
-              <select
-                value={formData.jurisdiction}
-                onChange={(e) => handleInputChange('jurisdiction', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenJurisdictionDropdown(!openJurisdictionDropdown);
+                  setOpenRegionDropdown(false);
+                }}
+                className="w-full bg-[#03040d] border border-white/10 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 flex items-center justify-between transition outline-none cursor-pointer"
               >
-                <option value="EU">European Union (EU - GDPR)</option>
-                <option value="US">United States (US - FinCEN)</option>
-                <option value="UK">United Kingdom (UK - FCA)</option>
-                <option value="TR">Turkey (TR - BDDK / KVKK)</option>
-                <option value="SG">Singapore (SG - MAS)</option>
-                <option value="JP">Japan (JP - FSA)</option>
-              </select>
+                <span className="truncate">
+                  {JURISDICTION_OPTIONS.find((o) => o.value === formData.jurisdiction)?.label ?? formData.jurisdiction}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${openJurisdictionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+              </button>
+
+              {openJurisdictionDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
+                  {JURISDICTION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange('jurisdiction', opt.value);
+                        setOpenJurisdictionDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
+                        formData.jurisdiction === opt.value
+                          ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
+                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      {formData.jurisdiction === opt.value && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -341,24 +384,52 @@ differential_privacy:
                 type="email"
                 value={formData.contact_email}
                 onChange={(e) => handleInputChange('contact_email', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
                 placeholder="secops@deltabank.eu"
               />
             </div>
 
-            <div className="sm:col-span-2">
+            {/* Data Residency Region Custom Dropdown */}
+            <div className="sm:col-span-2 relative">
               <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
                 Data Residency Region
               </label>
-              <select
-                value={formData.data_residency_region}
-                onChange={(e) => handleInputChange('data_residency_region', e.target.value)}
-                className="w-full bg-[#03040d] border border-white/10 focus:border-indigo-500 rounded-xl p-2.5 text-xs sm:text-sm text-slate-100 transition outline-none"
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenRegionDropdown(!openRegionDropdown);
+                  setOpenJurisdictionDropdown(false);
+                }}
+                className="w-full bg-[#03040d] border border-white/10 hover:border-indigo-500/40 focus:border-indigo-500 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-slate-100 flex items-center justify-between transition outline-none cursor-pointer"
               >
-                <option value="eu-central-1">eu-central-1 (Frankfurt, Germany - ISO 27001 Enclave)</option>
-                <option value="us-east-1">us-east-1 (N. Virginia, USA - SOC2 Type II)</option>
-                <option value="ap-southeast-1">ap-southeast-1 (Singapore - MAS TRM)</option>
-              </select>
+                <span className="truncate">
+                  {REGION_OPTIONS.find((o) => o.value === formData.data_residency_region)?.label ?? formData.data_residency_region}
+                </span>
+                <ChevronDown className={`w-4 h-4 text-slate-400 shrink-0 ml-2 transition-transform duration-200 ${openRegionDropdown ? 'rotate-180 text-indigo-400' : ''}`} />
+              </button>
+
+              {openRegionDropdown && (
+                <div className="absolute top-full left-0 right-0 mt-1.5 z-50 bg-[#07091e]/98 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl p-1 max-h-56 overflow-y-auto space-y-0.5">
+                  {REGION_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        handleInputChange('data_residency_region', opt.value);
+                        setOpenRegionDropdown(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 text-xs sm:text-sm rounded-lg transition-colors cursor-pointer flex items-center justify-between ${
+                        formData.data_residency_region === opt.value
+                          ? 'bg-indigo-600/20 text-indigo-300 font-bold border border-indigo-500/30'
+                          : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      <span className="truncate">{opt.label}</span>
+                      {formData.data_residency_region === opt.value && <Check className="w-3.5 h-3.5 text-indigo-400 shrink-0" />}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

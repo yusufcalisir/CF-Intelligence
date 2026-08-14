@@ -34,14 +34,14 @@ const RISK_CONFIG: Record<
   { label: string; bg: string; text: string; border: string; glow: string }
 > = {
   safe: {
-    label: 'Safe (Negligible Leakage)',
+    label: 'Safe (0.0% Leakage)',
     bg: 'bg-emerald-500/15',
     text: 'text-emerald-400',
     border: 'border-emerald-500/30',
     glow: 'shadow-[0_0_12px_rgba(16,185,129,0.25)]',
   },
   low_risk: {
-    label: 'Low Risk (Within SLA)',
+    label: 'Low Risk',
     bg: 'bg-emerald-500/10',
     text: 'text-emerald-300',
     border: 'border-emerald-500/20',
@@ -55,7 +55,7 @@ const RISK_CONFIG: Record<
     glow: 'shadow-[0_0_12px_rgba(245,158,11,0.2)]',
   },
   high_risk: {
-    label: 'High Risk (Leakage Alert)',
+    label: 'High Risk (Alert)',
     bg: 'bg-rose-500/15',
     text: 'text-rose-400',
     border: 'border-rose-500/30',
@@ -67,10 +67,10 @@ function RiskBadge({ tier }: { tier: RiskTier }) {
   const config = RISK_CONFIG[tier] || RISK_CONFIG.safe;
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold font-mono ${config.bg} ${config.text} ${config.border} border ${config.glow}`}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold font-mono whitespace-nowrap shrink-0 ${config.bg} ${config.text} ${config.border} border ${config.glow}`}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
-      {config.label}
+      <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse shrink-0" />
+      <span>{config.label}</span>
     </span>
   );
 }
@@ -240,8 +240,8 @@ function AttackAuditPanel() {
           {miaResult ? (
             <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] font-mono text-slate-400">Audit Classification:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
+                <span className="text-[11px] font-mono text-slate-400">Audit Classification:</span>
                 <RiskBadge tier={miaResult.risk_tier as RiskTier} />
               </div>
             </div>
@@ -290,8 +290,8 @@ function AttackAuditPanel() {
           {invResult ? (
             <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] font-mono text-slate-400">Risk Tier:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
+                <span className="text-[11px] font-mono text-slate-400">Risk Tier:</span>
                 <RiskBadge tier={invResult.risk_tier as RiskTier} />
               </div>
               <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5">
@@ -344,8 +344,8 @@ function AttackAuditPanel() {
           {dlgResult ? (
             <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
               <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage Correlation" />
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] font-mono text-slate-400">Audit Status:</span>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
+                <span className="text-[11px] font-mono text-slate-400">Audit Status:</span>
                 <RiskBadge tier={dlgResult.risk_tier as RiskTier} />
               </div>
               <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5">

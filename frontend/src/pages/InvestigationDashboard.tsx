@@ -464,21 +464,22 @@ export default function InvestigationDashboard() {
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3.5 flex items-center gap-2">
           ⚡ Operational Quick Shortcuts
         </h3>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 w-full">
           {[
-            { label: '▶ Run Fraud Ring Scenario', href: '/scenarios', color: '#6366f1' },
-            { label: '🔍 View Ingestion Alerts', href: '/alerts', color: '#f59e0b' },
-            { label: '📋 Open Case Workbench', href: '/cases', color: '#14b8a6' },
-            { label: '🕸️ Explore Identity Graph', href: '/graph', color: '#ec4899' },
-            { label: '🌐 Return to Simulator', href: '/', color: '#3b82f6' },
+            { label: 'Run Fraud Ring Scenario', icon: '▶', href: '/scenarios', color: '#6366f1' },
+            { label: 'View Ingestion Alerts',   icon: '🔍', href: '/alerts', color: '#f59e0b' },
+            { label: 'Open Case Workbench',     icon: '📋', href: '/cases', color: '#14b8a6' },
+            { label: 'Explore Identity Graph',  icon: '🕸️', href: '/graph', color: '#ec4899' },
+            { label: 'Return to Simulator',     icon: '🌐', href: '/', color: '#3b82f6' },
           ].map((link) => (
             <Link
               key={link.label}
               to={link.href}
-              className="px-4 py-2 text-xs font-semibold rounded-xl border border-white/10 bg-white/3 hover:bg-white/10 hover:border-white/20 transition-all text-slate-200"
-              style={{ boxShadow: `0 0 15px ${link.color}20` }}
+              className="w-full flex items-center justify-center gap-2 px-3.5 py-2.5 text-xs font-semibold rounded-xl border border-white/10 bg-white/3 hover:bg-white/8 hover:border-indigo-500/40 transition-all text-slate-200 text-center active:scale-[0.98]"
+              style={{ boxShadow: `0 0 15px ${link.color}15` }}
             >
-              {link.label}
+              <span className="shrink-0">{link.icon}</span>
+              <span className="truncate">{link.label}</span>
             </Link>
           ))}
         </div>

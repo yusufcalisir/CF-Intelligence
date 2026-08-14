@@ -157,46 +157,95 @@ export default function ObservabilityPage() {
           </div>
 
           {isDriftLoading ? (
-            <div className="text-center py-8 text-[var(--color-text-muted)]">Running statistical drift tests...</div>
+            <div className="text-center py-8 text-[var(--color-text-muted)] font-mono text-xs">Running statistical drift tests...</div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs font-mono min-w-[640px]">
-                <thead>
-                  <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
-                    <th className="pb-2 pr-4 font-semibold">Feature Name</th>
-                    <th className="pb-2 px-3 font-semibold">KS Statistic</th>
-                    <th className="pb-2 px-3 font-semibold">KS p-value</th>
-                    <th className="pb-2 px-3 font-semibold">Wasserstein Dist</th>
-                    <th className="pb-2 px-3 font-semibold">PSI Index</th>
-                    <th className="pb-2 pl-3 font-semibold">Drift Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--color-border)]">
-                  {driftData?.feature_drifts.map((fd, i) => (
-                    <tr key={i} className="hover:bg-[var(--color-surface-alt)]/50">
-                      <td className="py-2.5 pr-4 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">{fd.feature_name}</td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_statistic.toFixed(4)}</td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_p_value.toFixed(4)}</td>
-                      <td className="py-2.5 px-3 whitespace-nowrap">{fd.wasserstein_distance.toFixed(4)}</td>
-                      <td className="py-2.5 px-3 font-bold text-[var(--color-primary)] whitespace-nowrap">{fd.psi.toFixed(4)}</td>
-                      <td className="py-2.5 pl-3 whitespace-nowrap">
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 whitespace-nowrap ${
-                            fd.status === 'STABLE'
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : fd.status === 'MODERATE_DRIFT'
-                              ? 'bg-amber-500/20 text-amber-400'
-                              : 'bg-red-500/20 text-red-400'
-                          }`}
-                        >
-                          {fd.status}
-                        </span>
-                      </td>
+            <>
+              {/* Mobile View: Stacked Feature Drift Cards (Zero horizontal scroll/cut-off) */}
+              <div className="block md:hidden space-y-3">
+                {driftData?.feature_drifts.map((fd, i) => (
+                  <div
+                    key={i}
+                    className="p-4 rounded-xl bg-[#090a1f]/90 border border-white/10 space-y-3 shadow-lg"
+                  >
+                    <div className="flex items-center justify-between gap-2 border-b border-white/5 pb-2">
+                      <span className="font-mono font-bold text-xs text-white truncate">
+                        {fd.feature_name}
+                      </span>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold shrink-0 ${
+                          fd.status === 'STABLE'
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : fd.status === 'MODERATE_DRIFT'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-red-500/20 text-red-400 border border-red-500/30'
+                        }`}
+                      >
+                        {fd.status}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+                      <div className="bg-white/3 p-2 rounded-lg border border-white/5">
+                        <span className="text-[10px] text-slate-400 block font-sans">KS Statistic</span>
+                        <span className="font-bold text-slate-200">{fd.ks_statistic.toFixed(4)}</span>
+                      </div>
+                      <div className="bg-white/3 p-2 rounded-lg border border-white/5">
+                        <span className="text-[10px] text-slate-400 block font-sans">KS p-value</span>
+                        <span className="font-bold text-slate-200">{fd.ks_p_value.toFixed(4)}</span>
+                      </div>
+                      <div className="bg-white/3 p-2 rounded-lg border border-white/5">
+                        <span className="text-[10px] text-slate-400 block font-sans">Wasserstein Dist</span>
+                        <span className="font-bold text-slate-200">{fd.wasserstein_distance.toFixed(4)}</span>
+                      </div>
+                      <div className="bg-white/3 p-2 rounded-lg border border-white/5">
+                        <span className="text-[10px] text-slate-400 block font-sans">PSI Index</span>
+                        <span className="font-bold text-indigo-400">{fd.psi.toFixed(4)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table View (>= 768px) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono min-w-[640px]">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border)] text-[var(--color-text-muted)]">
+                      <th className="pb-2 pr-4 font-semibold">Feature Name</th>
+                      <th className="pb-2 px-3 font-semibold">KS Statistic</th>
+                      <th className="pb-2 px-3 font-semibold">KS p-value</th>
+                      <th className="pb-2 px-3 font-semibold">Wasserstein Dist</th>
+                      <th className="pb-2 px-3 font-semibold">PSI Index</th>
+                      <th className="pb-2 pl-3 font-semibold">Drift Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border)]">
+                    {driftData?.feature_drifts.map((fd, i) => (
+                      <tr key={i} className="hover:bg-[var(--color-surface-alt)]/50">
+                        <td className="py-2.5 pr-4 font-semibold text-[var(--color-text-primary)] whitespace-nowrap">{fd.feature_name}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_statistic.toFixed(4)}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{fd.ks_p_value.toFixed(4)}</td>
+                        <td className="py-2.5 px-3 whitespace-nowrap">{fd.wasserstein_distance.toFixed(4)}</td>
+                        <td className="py-2.5 px-3 font-bold text-[var(--color-primary)] whitespace-nowrap">{fd.psi.toFixed(4)}</td>
+                        <td className="py-2.5 pl-3 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 whitespace-nowrap ${
+                              fd.status === 'STABLE'
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : fd.status === 'MODERATE_DRIFT'
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}
+                          >
+                            {fd.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       )}
@@ -238,30 +287,28 @@ export default function ObservabilityPage() {
             <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
               Reliability Curve Bins (10-Bin Calibration)
             </h3>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1 overflow-x-auto">
-              <div className="min-w-[540px] space-y-2">
-                {calibData?.bins.map((bin) => (
-                  <div
-                    key={bin.bin_index}
-                    className="p-2.5 rounded-lg bg-[var(--color-surface-alt)] text-xs grid grid-cols-12 items-center font-mono gap-2"
-                  >
-                    <div className="col-span-3 text-[var(--color-text-primary)] font-semibold truncate">
-                      Bin #{bin.bin_index} [{bin.prob_min} - {bin.prob_max}]
-                    </div>
-                    <div className="col-span-3 text-left">
-                      <span className="text-[var(--color-text-muted)] text-[11px]">Pred Prob: </span>
-                      <strong className="text-[var(--color-primary)] font-bold">{bin.mean_predicted_prob}</strong>
-                    </div>
-                    <div className="col-span-3 text-left">
-                      <span className="text-[var(--color-text-muted)] text-[11px]">Actual Ratio: </span>
-                      <strong className="text-emerald-400 font-bold">{bin.empirical_fraud_ratio}</strong>
-                    </div>
-                    <div className="col-span-3 text-right text-[11px] text-[var(--color-text-muted)]">
-                      ({bin.sample_count} samples)
-                    </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {calibData?.bins.map((bin) => (
+                <div
+                  key={bin.bin_index}
+                  className="p-3 rounded-lg bg-[var(--color-surface-alt)] text-xs flex flex-col sm:grid sm:grid-cols-12 items-start sm:items-center font-mono gap-2 border border-white/5"
+                >
+                  <div className="sm:col-span-3 text-[var(--color-text-primary)] font-semibold truncate">
+                    Bin #{bin.bin_index} [{bin.prob_min} - {bin.prob_max}]
                   </div>
-                ))}
-              </div>
+                  <div className="sm:col-span-3 text-left">
+                    <span className="text-[var(--color-text-muted)] text-[11px]">Pred Prob: </span>
+                    <strong className="text-[var(--color-primary)] font-bold">{bin.mean_predicted_prob}</strong>
+                  </div>
+                  <div className="sm:col-span-3 text-left">
+                    <span className="text-[var(--color-text-muted)] text-[11px]">Actual Ratio: </span>
+                    <strong className="text-emerald-400 font-bold">{bin.empirical_fraud_ratio}</strong>
+                  </div>
+                  <div className="sm:col-span-3 sm:text-right text-[11px] text-[var(--color-text-muted)]">
+                    ({bin.sample_count} samples)
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
