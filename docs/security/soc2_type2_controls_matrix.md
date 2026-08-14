@@ -1,6 +1,9 @@
-# SOC 2 Type II Controls Matrix & Automated Evidence Verification
+# SOC 2 Type II Controls Matrix & Automated Evidence Verification (Pre-Audit Readiness)
 
 This document defines the SOC 2 Type II Trust Services Criteria (TSC) security controls implemented in the CFI Platform and details the automated verification endpoints and unit test proofs for continuous compliance auditing.
+
+> **Audit-Readiness Notice:**  
+> These automated checks and control matrices represent **internal control design and automated continuous evidence collection pipelines** (pre-audit state). Formal SOC 2 Type II certification requires external assessment and opinion from an accredited AICPA third-party audit firm over a minimum 6-month observation period.
 
 ---
 

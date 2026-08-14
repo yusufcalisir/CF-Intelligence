@@ -19,13 +19,13 @@ def test_hsm_session_initialization() -> None:
     assert not engine.is_session_active
     success = engine.initialize_session()
 
-    assert success is True
-    assert engine.is_session_active is True
+    assert success
+    assert engine.is_session_active
 
     # Failure case: missing PIN
     bad_config = HSMSessionConfig(slot_id=1, pin="", kms_provider="AWS_KMS")
     bad_engine = HSMSignerEngine(config=bad_config)
-    assert bad_engine.initialize_session() is False
+    assert not bad_engine.initialize_session()
 
 
 def test_zero_disk_key_signing_and_verification() -> None:
@@ -66,7 +66,7 @@ def test_hardware_attestation_report() -> None:
     attestation = engine.get_hardware_attestation(key_label="attested_bank_key")
 
     assert attestation["status"] == "VALIDATED"
-    assert attestation["fips_compliance_level"] == "FIPS 140-2 Level 3"
+    assert "FIPS 140-2 Level 3" in attestation["fips_compliance_level"]
     assert attestation["is_exportable"] is False
     assert "attestation_signature" in attestation
     assert "timestamp" in attestation

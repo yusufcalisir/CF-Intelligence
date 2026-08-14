@@ -678,17 +678,17 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 border border-indigo-500/30 bg-indigo-500/5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                    <span>🛡️ Vault PKI Root CA — FIPS 140-2 Level 3 HSM Binding</span>
+                    <span>🛡️ Vault PKI Root CA — PKCS#11 Hardware HSM Interface</span>
                   </h3>
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-                    ✓ HSM BOUND (FIPS 140-2 L3)
+                    ✓ PKCS#11 READY (FIPS 140-2 L3 Compatible)
                   </span>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3 text-xs">
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
-                    <div className="text-[var(--color-text-muted)] text-[10px]">HSM Slot & Provider</div>
-                    <div className="font-mono font-bold text-indigo-300">Slot #0 (PKCS#11 / Softhsm2)</div>
+                    <div className="text-[var(--color-text-muted)] text-[10px]">HSM Slot & Driver</div>
+                    <div className="font-mono font-bold text-indigo-300">Slot #0 (PKCS#11 / SoftHSM2 Dev)</div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
                     <div className="text-[var(--color-text-muted)] text-[10px]">Private Key Guarantee</div>
@@ -699,8 +699,8 @@ export default function SecurityPage() {
                     <div className="font-mono font-bold text-purple-300">RSA-4096 / SHA256-PSS</div>
                   </div>
                   <div className="p-3 rounded bg-[var(--color-surface-alt)] space-y-1">
-                    <div className="text-[var(--color-text-muted)] text-[10px]">FIPS Compliance Level</div>
-                    <div className="font-mono font-bold text-amber-300">FIPS 140-2 Level 3</div>
+                    <div className="text-[var(--color-text-muted)] text-[10px]">Hardware Target</div>
+                    <div className="font-mono font-bold text-amber-300">FIPS 140-2 Level 3 Ready</div>
                   </div>
                 </div>
 
@@ -708,7 +708,7 @@ export default function SecurityPage() {
                   <div className="font-bold">Hardware-Anchored Root CA Key Invariant:</div>
                   <p className="text-[10px] opacity-90 leading-relaxed">
                     HashiCorp Vault's PKI engine delegates root CA key generation, certificate signing (CSR), and CRL signing
-                    operations directly to an HSM hardware slot via VaultHSMPKIBinder. Private root CA key material never leaves the hardware boundary.
+                    operations to an HSM enclave interface via VaultHSMPKIBinder. Private root CA key material never leaves the hardware boundary.
                   </p>
                 </div>
               </div>
@@ -1202,7 +1202,7 @@ export default function SecurityPage() {
 
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
                   <span>Engine: federated_unlearning_engine.py</span>
-                  <span>MIA Status: Audited</span>
+                  <span>MIA Status: Self-Verified (P_MIA ≤ 0.52)</span>
                 </div>
               </div>
             </div>

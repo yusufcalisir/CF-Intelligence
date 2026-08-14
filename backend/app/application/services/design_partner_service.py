@@ -118,13 +118,13 @@ class DesignPartnerPilotService:
             },
             {
                 "standard": "Differential Privacy Guarantees",
-                "clause": "EU AI Act High-Risk AI Art 10 & NIST SP 800-207",
+                "clause": "EU AI Act High-Risk AI Art 10 & NIST SP 800-207 Alignment",
                 "status": "PASSED",
                 "evidence": "Rényi DP (epsilon = 1.0, delta = 1e-5) provably bounds reconstruction risk.",
             },
             {
                 "standard": "Cryptographic Aggregation Security",
-                "clause": "FIPS 140-2 Level 3 & Curve25519 SecAgg",
+                "clause": "PKCS#11 HSM Compatible & Curve25519 SecAgg",
                 "status": "PASSED",
                 "evidence": "Zero-trust pairwise masking prevents the coordinator from inspecting individual updates.",
             },
@@ -139,7 +139,7 @@ class DesignPartnerPilotService:
         crypto_guarantees = {
             "aggregation_security": "ECDH Curve25519 Pairwise Masking + TenSEAL CKKS FHE",
             "dp_guarantee": "Gaussian DP Noise (epsilon <= 1.5, delta = 1e-5)",
-            "network_transport": "mTLS 1.3 with Vault PKI HSM Root Binding",
+            "network_transport": "mTLS 1.3 with Vault PKI Hardware-Compatible HSM Root Binding",
             "enclave_isolation": "Intel SGX / AWS Nitro TEE Hardware Attestation",
         }
 

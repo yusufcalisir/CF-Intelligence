@@ -1,8 +1,9 @@
-"""Hardware Security Module (HSM / PKCS#11) Key Vault Engine (Section 6.4).
+"""Hardware Security Module (HSM) & PKCS#11 Cryptographic Driver.
 
-Anchors node private keys and digital envelope signatures into physical Hardware Security
-Modules (HSM) or Enterprise Cloud KMS vaults. Enforces Zero-Disk Private Keys: private RSA
-and Ed25519 keys never leave the hardware enclave.
+Provides a standardized PKCS#11 interface for hardware-anchored key generation and in-enclave signing.
+In local development/testing environments, this runs in a software-emulated mode (SoftHSM2 compatible).
+In production enterprise deployments, it binds directly to physical FIPS 140-2 Level 3 certified hardware
+HSM modules (e.g. AWS CloudHSM, YubiHSM2, Thales Luna Network HSM).
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ class HSMSessionConfig:
     pin: str = "1234"
     pkcs11_lib_path: str = "/usr/lib/pkcs11/libsofthsm2.so"
     kms_provider: str = "AWS_KMS"  # PKCS11, AWS_KMS, AZURE_KEYVAULT_HSM, GCP_KMS
-    fips_compliance_level: str = "FIPS 140-2 Level 3"
+    fips_compliance_level: str = "FIPS 140-2 Level 3 (Hardware Compatible)"
 
 
 @dataclass

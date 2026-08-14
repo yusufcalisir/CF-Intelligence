@@ -1,8 +1,8 @@
-"""Vault PKI Root CA Key Binding to FIPS 140-2 Level 3 HSM.
+"""Vault PKI Root CA Key Binding to FIPS 140-2 Level 3 Compatible HSM.
 
-Binds HashiCorp Vault's PKI secrets engine to Hardware Security Modules (HSM) / Cloud KMS
-hardware enclaves via PKCS#11. Private Root CA keys never leave the hardware enclave
-(is_exportable = False), satisfying strict Zero-Trust PKI and enterprise compliance.
+Provides PKCS#11 hardware binding for HashiCorp Vault PKI secrets engine. Private Root CA keys
+are generated inside the hardware enclave (is_exportable = False) for Zero-Trust PKI compliance.
+Runs in software-emulated mode in test environments and connects to certified HSM hardware in production.
 """
 
 from __future__ import annotations

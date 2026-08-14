@@ -1,8 +1,9 @@
-# Scientific Verification & Audit Registry
+# Automated Scientific Verification & Mathematical Invariant Registry
 
-This directory contains publication-quality scientific audit reports for every major subsystem of the **Privacy-Preserving Cross-Bank Fraud Detection Platform**.
+This directory contains rigorous internal scientific verification reports for every major subsystem of the **Privacy-Preserving Cross-Bank Fraud Detection Platform**.
 
-Each report documents the complete verification methodology applied to a subsystem: mathematical correctness proofs, property-based testing results, adversarial robustness analyses, compliance assessments, and performance benchmarks.
+> **Verification Notice:**  
+> These reports document the internal formal verification and automated testing methodology applied across the codebase: mathematical correctness proofs, property-based testing results, adversarial robustness analyses, regulatory alignment assessments, and performance benchmarks. They provide transparent technical validation and regression baselines prior to external third-party certification audits.
 
 ---
 

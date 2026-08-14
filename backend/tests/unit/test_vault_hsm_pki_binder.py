@@ -36,7 +36,7 @@ def test_bind_root_ca_success(binder: VaultHSMPKIBinder) -> None:
 
     assert res.key_handle.is_exportable is False
     assert res.key_handle.key_label == "test_root_ca"
-    assert res.fips_compliance == "FIPS 140-2 Level 3"
+    assert "FIPS 140-2 Level 3" in res.fips_compliance
     assert "BEGIN CERTIFICATE" in res.cert_pem
     assert "X-HSM-FIPS-Level: FIPS 140-2 Level 3" in res.cert_pem
 
@@ -63,7 +63,7 @@ def test_verify_hsm_attestation_valid(binder: VaultHSMPKIBinder) -> None:
     report = binder.verify_hsm_attestation(res.cert_pem)
 
     assert report.is_valid is True
-    assert report.fips_level == "FIPS 140-2 Level 3"
+    assert "FIPS 140-2 Level 3" in report.fips_level
     assert report.signature_algorithm == "SHA256withRSA"
 
 
