@@ -378,7 +378,12 @@ y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \su
 $$
 
 ### 6.3 Curve25519 P2P SecAgg & Shamir Threshold Secret Sharing (`p2p_secagg_driver.py` & `shamir_engine.py`)
-- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations $s_{uv} = \text{HKDF}(\text{ECDH}(sk_u, pk_v))$ with zero server involvement.
+- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations with zero server involvement:
+
+$$
+s_{uv} = \text{HKDF}(\text{ECDH}(sk_u, pk_v))
+$$
+
 - Shamir (t, n) Threshold Secret Sharing: Shares pairwise masking seeds over Galois prime field $\mathbb{Z}_p$ ($p = 2^{256} - 189$) to reconstruct dropout node masks when client nodes disconnect during aggregation.
 
 ### 6.4 FIPS 140-2 Level 3 HSM Binding & Gnosis Safe 2-of-3 Multi-Sig (`vault_hsm_pki_binder.py` & `GnosisSafeMultiSigCoordinator.sol`)
@@ -386,10 +391,18 @@ $$
 - Gnosis Safe 2-of-3 Multi-Sig Coordinator: Decentralizes coordinator functions (simulation triggers, model promotions, fee disbursements) via EIP-712 structured data signatures across 3 trustee wallets requiring 2-of-3 multi-sig consensus.
 
 ### 6.5 Zero-Knowledge Proof (zk-SNARK) Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
-- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates $w_{\text{local}}$ match Poseidon hash commitments $H_w$, satisfy $L_2$ norm clip bounds $\|w\|_2 \le C_{\text{max}}$, and maintain non-zero variance in $O(1)$ constant time ($<5\text{ms}$ SLA) over the BN254 elliptic curve without exposing unmasked model parameters.
+- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates match Poseidon hash commitments, satisfy $L_2$ norm clip bounds, and maintain non-zero variance in $O(1)$ constant time ($<5\text{ms}$ SLA) over the BN254 elliptic curve without exposing unmasked model parameters:
+
+$$
+\|w_{\text{local}}\|_2 \le C_{\text{max}}, \quad \text{Poseidon}(w_{\text{local}}) = H_w
+$$
 
 ### 6.6 Confidential Federated Unlearning & Anti-Poisoning Erasure (`federated_unlearning_engine.py`)
-- Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps $\delta W = - H^{-1} \nabla \mathcal{L}_b$ to remove historical gradient contributions of compromised or revoked banks in under 10ms SLA while bounding MIA membership probability $P_{\text{MIA}} \le 0.52$.
+- Hessian Inversion Gradient Erasure: Computes parameter unlearning to remove historical gradient contributions of compromised or revoked banks in under 10ms SLA while bounding membership inference attack (MIA) probability ($P_{\text{MIA}} \le 0.52$):
+
+$$
+\delta W = - H^{-1} \nabla \mathcal{L}_b
+$$
 
 ### 6.7 Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) (`pqc_secagg_driver.py`)
 - NIST FIPS 203 & 204 Lattice Cryptography: Implements Module Learning With Errors (M-LWE) CRYSTALS-Kyber-768 KEM and CRYSTALS-Dilithium-3 signatures combined into a hybrid quantum-safe P2P SecAgg protocol, protecting key exchanges against Shor's algorithm on quantum supercomputers.
@@ -398,7 +411,11 @@ $$
 - Multi-Ledger Programmable Token Routing: Routes Leave-One-Out (LOO) Shapley utility payouts across Arbitrum One, Optimism, Canton Network Daml contracts, and Hyperledger Fabric channels via Chainlink CCIP `EVM2AnyMessage` payloads with sub-second L2 finality.
 
 ### 6.9 Adaptive Dynamic Differential Privacy Budget Auto-Scaler (`adaptive_dp_autoscaler.py`)
-- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers $\sigma_t$ and gradient norm clipping thresholds $C_t$ based on instantaneous loss velocity $\Delta \mathcal{L}_t$ and batch sampling ratios $q_t = B / N$ to prevent over-noising and ensure $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$ compliance.
+- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers $\sigma_t$ and gradient norm clipping thresholds $C_t$ based on instantaneous loss velocity $\Delta \mathcal{L}_t$ and batch sampling ratios ($q = B / N$) to prevent over-noising and ensure target differential privacy compliance:
+
+$$
+\epsilon_{\text{total}} \le \epsilon_{\text{target}}
+$$
 
 ---
 
