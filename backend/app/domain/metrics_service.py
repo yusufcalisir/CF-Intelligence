@@ -95,6 +95,150 @@ def compute_precision_at_k(
     return round(precision_k, 4)
 
 
+@dataclass
+class ConfusionMatrixAtThreshold:
+    """Confusion matrix and derived rates at a specific decision threshold."""
+
+    threshold: float
+    true_positives: int
+    false_positives: int
+    true_negatives: int
+    false_negatives: int
+    precision: float
+    recall: float
+    fpr: float  # False Positive Rate (FP / (FP + TN))
+    fnr: float  # False Negative Rate (FN / (FN + TP))
+    specificity: float  # TN / (TN + FP)
+    f1_score: float
+
+
+@dataclass
+class AlertFatigueAndCostReport:
+    """Operational alert fatigue and financial cost-utility audit."""
+
+    threshold: float
+    daily_transactions: int
+    daily_alerts_generated: int
+    false_positive_alerts_daily: int
+    legitimate_customers_impacted_per_10k: float
+    estimated_daily_fraud_loss_dollars: float
+    estimated_daily_investigation_cost_dollars: float
+    total_daily_cost_dollars: float
+    optimal_cost_threshold: float
+    minimized_total_cost_dollars: float
+
+
+def compute_multi_threshold_confusion_matrix(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    thresholds: list[float] | None = None,
+) -> list[ConfusionMatrixAtThreshold]:
+    """Compute confusion matrices across multiple operational decision thresholds."""
+    y_t = np.asarray(y_true).astype(int)
+    y_p = np.asarray(y_pred)
+    thresh_list = thresholds or [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+
+    results: list[ConfusionMatrixAtThreshold] = []
+    for th in thresh_list:
+        pred_binary = (y_p >= th).astype(int)
+        tp = int(np.sum((pred_binary == 1) & (y_t == 1)))
+        fp = int(np.sum((pred_binary == 1) & (y_t == 0)))
+        tn = int(np.sum((pred_binary == 0) & (y_t == 0)))
+        fn = int(np.sum((pred_binary == 0) & (y_t == 1)))
+
+        precision = float(tp / (tp + fp)) if (tp + fp) > 0 else 0.0
+        recall = float(tp / (tp + fn)) if (tp + fn) > 0 else 0.0
+        fpr = float(fp / (fp + tn)) if (fp + tn) > 0 else 0.0
+        fnr = float(fn / (fn + tp)) if (fn + tp) > 0 else 0.0
+        specificity = float(tn / (tn + fp)) if (tn + fp) > 0 else 0.0
+        f1 = float(2 * precision * recall / (precision + recall)) if (precision + recall) > 0 else 0.0
+
+        results.append(
+            ConfusionMatrixAtThreshold(
+                threshold=round(th, 2),
+                true_positives=tp,
+                false_positives=fp,
+                true_negatives=tn,
+                false_negatives=fn,
+                precision=round(precision, 4),
+                recall=round(recall, 4),
+                fpr=round(fpr, 6),
+                fnr=round(fnr, 6),
+                specificity=round(specificity, 4),
+                f1_score=round(f1, 4),
+            )
+        )
+    return results
+
+
+def compute_financial_cost_utility(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    operational_threshold: float = 0.5,
+    daily_volume: int = 100_000,
+    cost_missed_fraud_fn: float = 850.0,
+    cost_false_alarm_fp: float = 18.0,
+    cost_investigation_tp: float = 6.0,
+) -> AlertFatigueAndCostReport:
+    """Calculate operational alert fatigue and financial cost-utility matrix.
+    
+    Parameters
+    ----------
+    cost_missed_fraud_fn : float
+        Average unrecovered dollar loss per missed fraudulent transaction (FN).
+    cost_false_alarm_fp : float
+        Cost of false alert (customer friction, SMS OTP verification, ops triage).
+    cost_investigation_tp : float
+        Analyst triage cost for confirmed true positive SAR filing.
+    """
+    y_t = np.asarray(y_true).astype(int)
+    y_p = np.asarray(y_pred)
+    n = max(1, len(y_t))
+    scale_factor = daily_volume / n
+
+    # Scan 50 thresholds to find the cost-optimal decision threshold
+    test_thresholds = np.linspace(0.05, 0.95, 50)
+    min_cost = float("inf")
+    best_th = operational_threshold
+
+    for th in test_thresholds:
+        pred_b = (y_p >= th).astype(int)
+        tp = float(np.sum((pred_b == 1) & (y_t == 1))) * scale_factor
+        fp = float(np.sum((pred_b == 1) & (y_t == 0))) * scale_factor
+        fn = float(np.sum((pred_b == 0) & (y_t == 1))) * scale_factor
+        c = (fn * cost_missed_fraud_fn) + (fp * cost_false_alarm_fp) + (tp * cost_investigation_tp)
+        if c < min_cost:
+            min_cost = c
+            best_th = float(th)
+
+    # Current operational threshold values
+    pred_op = (y_p >= operational_threshold).astype(int)
+    tp_op = float(np.sum((pred_op == 1) & (y_t == 1))) * scale_factor
+    fp_op = float(np.sum((pred_op == 1) & (y_t == 0))) * scale_factor
+    fn_op = float(np.sum((pred_op == 0) & (y_t == 1))) * scale_factor
+
+    fraud_loss = fn_op * cost_missed_fraud_fn
+    inv_cost = (fp_op * cost_false_alarm_fp) + (tp_op * cost_investigation_tp)
+    total_cost = fraud_loss + inv_cost
+
+    tn_op = float(np.sum((pred_op == 0) & (y_t == 0))) * scale_factor
+    fpr_op = float(fp_op / (fp_op + tn_op)) if (fp_op + tn_op) > 0 else 0.0
+    impacted_per_10k = round(fpr_op * 10_000, 2)
+
+    return AlertFatigueAndCostReport(
+        threshold=round(operational_threshold, 2),
+        daily_transactions=daily_volume,
+        daily_alerts_generated=int(tp_op + fp_op),
+        false_positive_alerts_daily=int(fp_op),
+        legitimate_customers_impacted_per_10k=impacted_per_10k,
+        estimated_daily_fraud_loss_dollars=round(fraud_loss, 2),
+        estimated_daily_investigation_cost_dollars=round(inv_cost, 2),
+        total_daily_cost_dollars=round(total_cost, 2),
+        optimal_cost_threshold=round(best_th, 2),
+        minimized_total_cost_dollars=round(min_cost, 2),
+    )
+
+
 def compute_scientific_benchmark(
     model_config_name: str,
     y_true: npt.ArrayLike,

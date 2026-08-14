@@ -953,3 +953,129 @@ export interface BudgetLogEntry {
   budget_exhausted: boolean;
   epsilon_limit: number;
 }
+
+// ── Real-World Benchmark, Fidelity & Design Partner Types ────
+
+export interface ConfusionMatrixAtThreshold {
+  threshold: number;
+  true_positives: number;
+  false_positives: number;
+  true_negatives: number;
+  false_negatives: number;
+  precision: number;
+  recall: number;
+  fpr: number;
+  fnr: number;
+  specificity: number;
+  f1_score: number;
+}
+
+export interface AlertFatigueAndCostReport {
+  threshold: number;
+  daily_transactions: number;
+  daily_alerts_generated: number;
+  false_positive_alerts_daily: number;
+  legitimate_customers_impacted_per_10k: number;
+  estimated_daily_fraud_loss_dollars: number;
+  estimated_daily_investigation_cost_dollars: number;
+  total_daily_cost_dollars: number;
+  optimal_cost_threshold: number;
+  minimized_total_cost_dollars: number;
+}
+
+export interface FeatureFidelityMetric {
+  feature_name: string;
+  wasserstein_distance: number;
+  js_divergence: number;
+  ks_statistic: number;
+  ks_p_value: number;
+  real_mean: number;
+  synth_mean: number;
+  real_std: number;
+  synth_std: number;
+  fidelity_score: number;
+}
+
+export interface DistributionFidelityReport {
+  dataset_name: string;
+  overall_fidelity_score: number;
+  avg_wasserstein_distance: number;
+  avg_js_divergence: number;
+  covariance_matrix_drift_frobenius: number;
+  class_imbalance_ratio_real: number;
+  class_imbalance_ratio_synth: number;
+  feature_metrics: FeatureFidelityMetric[];
+  degradation_metrics: {
+    synthetic_auc: number;
+    real_world_auc: number;
+    auc_degradation_delta: number;
+    synthetic_pr_auc: number;
+    real_world_pr_auc: number;
+    pr_auc_degradation_delta: number;
+    recall_at_01_fpr_drop: number;
+  };
+  summary_verdict: 'HIGH_FIDELITY' | 'MODERATE_SHIFT' | 'EXTREME_SHIFT';
+}
+
+export interface BenchmarkModelPerformance {
+  roc_auc: number;
+  pr_auc: number;
+  recall_at_01_fpr: number;
+  cost_report: AlertFatigueAndCostReport;
+}
+
+export interface BenchmarkEvaluationResponse {
+  dataset_name: string;
+  source_type: string;
+  total_transactions_evaluated: number;
+  actual_fraud_count: number;
+  actual_fraud_rate_percent: number;
+  performance_comparison: {
+    federated_learning: BenchmarkModelPerformance;
+    isolated_local_model: BenchmarkModelPerformance;
+    federated_advantage: {
+      pr_auc_gain: number;
+      recall_at_01_fpr_gain: number;
+      daily_fraud_loss_saved_dollars: number;
+      daily_investigation_saved_dollars: number;
+      net_daily_economic_benefit_dollars: number;
+    };
+  };
+  multi_threshold_confusion_matrices: ConfusionMatrixAtThreshold[];
+  distribution_fidelity: DistributionFidelityReport;
+  bank_partitions: Array<{
+    bank_id: string;
+    samples: number;
+    fraud_count: number;
+    fraud_ratio: number;
+  }>;
+}
+
+export interface PilotComplianceChecklist {
+  partner_name: string;
+  jurisdiction: string;
+  overall_readiness_score: number;
+  status: 'APPROVED_FOR_PILOT' | 'CONDITIONAL_APPROVAL' | 'REJECTED';
+  compliance_items: Array<{
+    standard: string;
+    clause: string;
+    status: string;
+    evidence: string;
+  }>;
+  cryptographic_guarantees: Record<string, string>;
+}
+
+export interface PiiValidationResponse {
+  partner_name: string;
+  schema_format: string;
+  is_clean_zero_pii: boolean;
+  total_records_scanned: number;
+  violations: Array<{
+    column: string;
+    pii_type: string;
+    sample_count: number;
+    remediation: string;
+  }>;
+  status: string;
+  guidance: string;
+}

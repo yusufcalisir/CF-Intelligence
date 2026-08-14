@@ -24,6 +24,7 @@ import numpy as np
 # Ensure backend directory is in path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "backend")))
 
+from app.application.services.design_partner_service import DesignPartnerPilotService
 from app.domain.metrics_service import compute_scientific_benchmark
 
 
@@ -75,10 +76,10 @@ def generate_synthetic_benchmark_predictions(
 
 
 def run_benchmark_suite() -> list[dict]:
-    """Runs the production scientific benchmark suite across all 6 model configurations."""
-    print("=" * 85)
-    print(" CFI PLATFORM - PRODUCTION BENCHMARK SUITE & SCIENTIFIC VALIDATION ")
-    print("=" * 85)
+    """Runs the production scientific benchmark suite across synthetic configurations and real-world datasets."""
+    print("=" * 95)
+    print(" CFI PLATFORM - SCIENTIFIC BENCHMARK & REAL-WORLD FIDELITY SUITE ")
+    print("=" * 95)
 
     configs: list[BenchmarkConfig] = [
         {
@@ -137,23 +138,12 @@ def run_benchmark_suite() -> list[dict]:
         },
     ]
 
-    results = []
-    for cfg in configs:
-        y_t, y_p = generate_synthetic_benchmark_predictions(seed=cfg["seed"])
-        metrics = compute_scientific_benchmark(
-            model_config_name=cfg["name"],
-            y_true=y_t,
-            y_pred=y_p,
-            detection_latency_ms=cfg["latency"],
-            communication_payload_mb=cfg["payload"],
-            dp_epsilon=cfg["eps"],
-            dp_delta=cfg["delta"],
-            cross_bank_generalization_delta=cfg["gen_delta"],
-        )
-        results.append(metrics.to_dict())
+    print("\n>>> 1. SYNTHETIC MULTI-MODEL FEDERATED BENCHMARK MATRIX:")
+    print("-" * 95)
+    print(f"{'Model Configuration':<42} | {'PR-AUC':<7} | {'ROC-AUC':<7} | {'Rec@0.1%':<8} | {'Lat(ms)':<7}")
+    print("-" * 95)
 
-    # Print Markdown Benchmark Comparison Table
-    print("\n### Scientific Benchmark Results Matrix\n")
+    results = []
     headers = [
         "Model Configuration",
         "PR-AUC",
@@ -172,11 +162,46 @@ def run_benchmark_suite() -> list[dict]:
         f"|:{'-' * 42}-|:{'-' * 7}-|:{'-' * 7}-|:{'-' * 14}-|:{'-' * 6}-|:{'-' * 11}-|:{'-' * 11}-|:{'-' * 6}-|:{'-' * 9}-|"
     )
 
-    for r in results:
+    for cfg in configs:
+        y_t, y_p = generate_synthetic_benchmark_predictions(seed=cfg["seed"])
+        metrics = compute_scientific_benchmark(
+            model_config_name=cfg["name"],
+            y_true=y_t,
+            y_pred=y_p,
+            detection_latency_ms=cfg["latency"],
+            communication_payload_mb=cfg["payload"],
+            dp_epsilon=cfg["eps"],
+            dp_delta=cfg["delta"],
+            cross_bank_generalization_delta=cfg["gen_delta"],
+        )
+        r = metrics.to_dict()
+        results.append(r)
         eps_str = f"{r['dp_epsilon']:.1f}" if r["dp_epsilon"] > 0 else "N/A"
         print(
             f"| {r['model_config_name']:<42} | {r['pr_auc']:<7.4f} | {r['roc_auc']:<7.4f} | {r['recall_at_01_fpr']:<14.4f} | {r['precision_at_k']:<6.4f} | {r['detection_latency_ms']:<11.2f} | {r['communication_payload_mb']:<11.2f} | {eps_str:<6} | {r['cross_bank_generalization_delta']:<+9.4f} |"
         )
+
+    # --- Section 2: Real-World Dataset Evaluations (PaySim, IEEE-CIS, Elliptic) ---
+    print("\n" + "=" * 95)
+    print(">>> 2. REAL-WORLD BENCHMARK EVALUATION & DISTRIBUTION FIDELITY AUDIT")
+    print("=" * 95)
+    pilot = DesignPartnerPilotService()
+
+    real_datasets = ["paysim", "ieee_cis", "elliptic"]
+    for d_name in real_datasets:
+        eval_res = pilot.evaluate_real_benchmark(dataset_name=d_name, n_samples=5_000)
+        perf = eval_res["performance_comparison"]
+        fl_p = perf["federated_learning"]
+        loc_p = perf["isolated_local_model"]
+        adv = perf["federated_advantage"]
+        fid = eval_res["distribution_fidelity"]
+
+        print(f"\n[Dataset: {d_name.upper()}] (Source: {eval_res['source_type']})")
+        print(f"  * Evaluated Samples: {eval_res['total_transactions_evaluated']} | Fraud Rate: {eval_res['actual_fraud_rate_percent']}%")
+        print(f"  * Fidelity Score vs Synth: {fid['overall_fidelity_score']} ({fid['summary_verdict']}) | JS Divergence: {fid['avg_js_divergence']}")
+        print(f"  * FL PR-AUC: {fl_p['pr_auc']} vs Local: {loc_p['pr_auc']} (Delta: +{adv['pr_auc_gain']})")
+        print(f"  * FL Recall@0.1% FPR: {fl_p['recall_at_01_fpr']} vs Local: {loc_p['recall_at_01_fpr']} (Delta: +{adv['recall_at_01_fpr_gain']})")
+        print(f"  * Net Daily Economic Benefit: ${adv['net_daily_economic_benefit_dollars']:,.2f} / 100k daily volume")
 
     # Save benchmark results JSON
     output_dir = os.path.join("storage", "benchmarks")
@@ -186,7 +211,7 @@ def run_benchmark_suite() -> list[dict]:
         json.dump(results, f, indent=2)
 
     print(f"\n[+] Benchmark results saved to {out_path}")
-    print("=" * 85)
+    print("=" * 95)
 
     return results
 

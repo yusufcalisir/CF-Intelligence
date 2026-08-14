@@ -16,6 +16,7 @@ import SecurityPage from './pages/SecurityPage';
 import ObservabilityPage from './pages/ObservabilityPage';
 import CoordinatorPage from './pages/CoordinatorPage';
 import PrivacyDefensePage from './pages/PrivacyDefensePage';
+import BenchmarkHubPage from './pages/BenchmarkHubPage';
 import LandingPage from './pages/LandingPage';
 
 // Ensure QueryClient is always available even if main.tsx wrapping is lost during builds
@@ -43,6 +44,9 @@ export default function App() {
             <Route path="/operations" element={<LiveOperationsView />} />
             <Route path="/operations/:id" element={<LiveOperationsView />} />
             <Route path="/simulation/:id" element={<LiveOperationsView />} />
+
+            {/* Scientific Validation & Benchmarks */}
+            <Route path="/benchmarks" element={<BenchmarkHubPage />} />
 
             {/* Phase 2: AML Intelligence Platform */}
             <Route path="/investigation" element={<InvestigationDashboard />} />

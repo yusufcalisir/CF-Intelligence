@@ -818,5 +818,59 @@ export function useAuditDLG() {
   });
 }
 
+// ── Real-World Benchmark & Design Partner Pilot Hooks ────
+
+export function useBenchmarkEvaluation(dataset: string = 'paysim', nSamples: number = 10000, dailyVolume: number = 100000) {
+  return useQuery<import('./types').BenchmarkEvaluationResponse>({
+    queryKey: ['benchmark-evaluation', dataset, nSamples, dailyVolume],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/design-partner/evaluate-benchmark', {
+        params: { dataset, n_samples: nSamples, daily_volume: dailyVolume },
+      });
+      return data;
+    },
+    staleTime: 60000,
+  });
+}
+
+export function useDistributionFidelity(dataset: string = 'paysim') {
+  return useQuery<import('./types').DistributionFidelityReport>({
+    queryKey: ['distribution-fidelity', dataset],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/design-partner/distribution-fidelity', {
+        params: { dataset },
+      });
+      return data;
+    },
+    staleTime: 60000,
+  });
+}
+
+export function usePilotReadinessChecklist(partnerName: string = 'Design Partner Bank', jurisdiction: string = 'EU/TR/US') {
+  return useQuery<import('./types').PilotComplianceChecklist>({
+    queryKey: ['pilot-readiness', partnerName, jurisdiction],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/design-partner/readiness-checklist', {
+        params: { partner_name: partnerName, jurisdiction },
+      });
+      return data;
+    },
+  });
+}
+
+export function useValidateDataIngestion() {
+  return useMutation<
+    import('./types').PiiValidationResponse,
+    Error,
+    { partner_name: string; schema_format: string; sample_records: Array<Record<string, any>> }
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/design-partner/validate-ingest', payload);
+      return data;
+    },
+  });
+}
+
+
 
 

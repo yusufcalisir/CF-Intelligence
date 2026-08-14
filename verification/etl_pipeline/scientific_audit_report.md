@@ -1,4 +1,4 @@
-﻿# Publication-Quality Scientific Audit & Verification Report: Real-World Financial Fraud ETL Pipeline
+# Publication-Quality Scientific Audit & Verification Report: Real-World Financial Fraud ETL Pipeline
 
 **Subsystem:** Real-World Financial Fraud Dataset Ingestion, Anonymization & Dirichlet Partitioning Engine (`etl_service.py`, `etl_dataset_pipeline.py`)  
 **Repository:** Privacy-preserving Cross-Bank Fraud Detection using Federated Learning  

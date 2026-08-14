@@ -709,9 +709,10 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import onboarding
+from app.presentation.routers import design_partner, onboarding
 
 app.include_router(onboarding.router)
+app.include_router(design_partner.router)
 
 
 # ── Service Mode Specific Routers ──────────────
@@ -731,6 +732,7 @@ elif service_name in ("fl-coordinator", "coordinator"):
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)
     app.include_router(settlement.router)
+    app.include_router(design_partner.router)
 
 elif service_name == "identity-graph":
     app.include_router(health.router)
@@ -786,6 +788,7 @@ else:
     app.include_router(realtime_inference.router)
     app.include_router(compliance.router)
     app.include_router(optimization.router)
+    app.include_router(design_partner.router)
 
 
 @app.get("/", tags=["root"])
