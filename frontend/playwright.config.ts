@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import process from 'node:process';
 
 /**
  * Playwright Multi-Device, Cross-Browser & Responsive Test Configuration
@@ -7,7 +8,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './',
-  testMatch: ['e2e-responsive/**/*.spec.ts', 'e2e-visual/**/*.spec.ts'],
+  testMatch: ['e2e-responsive/**/*.spec.ts', 'e2e-visual/**/*.spec.ts', 'e2e-a11y/**/*.spec.ts'],
   snapshotDir: './e2e-visual/snapshots',
   snapshotPathTemplate: '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
   fullyParallel: false,

@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, Zap, FlaskConical, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { DATASET_PROFILES, type DatasetProfile } from '../utils/datasetProfiles';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export type TrainingMode = 'mock' | 'real';
 
@@ -50,6 +51,14 @@ export default function DatasetTrainingConfigPanel({
   const [selectedId, setSelectedId] = useState<DatasetProfile['id']>(initialDataset);
   const [mode, setMode] = useState<TrainingMode>(initialMode);
 
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen,
+    onClose,
+    closeOnEscape: true,
+    trapFocus: false, // Inline expandable panel
+    restoreFocus: true,
+  });
+
   const selectedProfile = DATASET_PROFILES[selectedId];
 
   return (
@@ -57,26 +66,31 @@ export default function DatasetTrainingConfigPanel({
       {isOpen && (
         <motion.div
           key="config-panel"
+          ref={containerRef}
+          role="region"
+          aria-labelledby="training-config-title"
+          aria-describedby="training-config-desc"
+          tabIndex={-1}
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: 'auto' }}
           exit={{ opacity: 0, height: 0 }}
           transition={{ duration: 0.3, ease: 'easeInOut' }}
-          className="overflow-hidden"
+          className="overflow-hidden focus:outline-none"
         >
           <div className="glass-card p-4 sm:p-6 border border-[var(--color-border)] rounded-2xl space-y-6">
             {/* ── Header ──────────────────────────────────────────────────── */}
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
+                <h3 id="training-config-title" className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
                   Configure Training Session
                 </h3>
-                <p className="text-xs text-[var(--color-text-muted)]">
+                <p id="training-config-desc" className="text-xs text-[var(--color-text-muted)]">
                   Select a benchmark dataset and training mode before launching
                 </p>
               </div>
               <button
                 onClick={onClose}
-                className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shrink-0"
+                className="p-1.5 rounded-lg hover:bg-white/10 text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] transition-colors shrink-0 focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 aria-label="Close config panel"
               >
                 ✕

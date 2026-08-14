@@ -164,11 +164,11 @@ export default function GraphPage() {
                 className={`py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 active:scale-95 ${
                   depth === hop
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/40'
-                    : 'bg-white/4 border border-white/8 text-slate-400 hover:text-white hover:bg-white/8'
+                    : 'bg-white/4 border border-white/8 text-slate-300 hover:text-white hover:bg-white/8'
                 }`}
               >
                 <span>{hop} {hop === 1 ? 'Hop' : 'Hops'}</span>
-                <span className="text-[9px] font-sans opacity-70">
+                <span className="text-[9px] font-sans text-slate-300">
                   {hop === 1 ? 'Direct' : hop === 2 ? 'Standard' : hop === 3 ? 'Deep' : 'Exhaustive'}
                 </span>
               </button>
@@ -202,26 +202,26 @@ export default function GraphPage() {
             </span>
             <input
               type="text"
+              placeholder="Search by display label, entity type, or HMAC privacy ID..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by display label, entity type, or HMAC privacy ID..."
-              className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-white/4 border border-white/10 text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-white/5 border border-white/10 text-xs font-mono text-white placeholder-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
             />
           </div>
 
-          {/* Entity Pills List */}
-          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1">
-            {filteredEntities.map((entity) => {
+          {/* Quick Entity Pills */}
+          <div className="flex flex-wrap gap-2 max-h-36 overflow-y-auto pr-1">
+            {filteredEntities.slice(0, 16).map((entity) => {
               const isSelected = selectedEntityId === entity.id;
               const typeColor = ENTITY_TYPE_COLORS[entity.entity_type] || '#6366f1';
               return (
                 <button
                   key={entity.id}
                   onClick={() => setSelectedEntityId(entity.id)}
-                  className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs transition-all cursor-pointer active:scale-95 ${
+                  className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer border ${
                     isSelected
-                      ? 'bg-indigo-600/25 border-indigo-500/60 text-white shadow-[0_0_15px_rgba(99,102,241,0.3)]'
-                      : 'bg-white/3 border border-white/8 text-slate-300 hover:bg-white/6 hover:border-white/15'
+                      ? 'bg-indigo-600/30 border-indigo-500/60 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]'
+                      : 'bg-white/4 border-white/8 text-slate-300 hover:text-white hover:bg-white/8'
                   }`}
                 >
                   <span
@@ -231,7 +231,7 @@ export default function GraphPage() {
                   <span className="font-mono font-medium truncate max-w-[120px] sm:max-w-[160px]">
                     {entity.display_label}
                   </span>
-                  <span className="text-[9.5px] font-mono text-slate-400 opacity-75">
+                  <span className="text-[9.5px] font-mono text-slate-300">
                     {BANK_NAMES[entity.bank_id] || entity.bank_id}
                   </span>
                   {entity.alert_count > 0 && (
@@ -243,7 +243,7 @@ export default function GraphPage() {
               );
             })}
             {!filteredEntities.length && (
-              <div className="w-full py-4 text-center text-xs text-slate-500 font-mono">
+              <div className="w-full py-4 text-center text-xs text-slate-400 font-mono">
                 No matching entities found in current consortium state.
               </div>
             )}

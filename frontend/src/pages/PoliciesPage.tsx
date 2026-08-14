@@ -7,6 +7,7 @@ import {
   useDeleteRule,
   useTestRule,
 } from '../api/queries';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 export default function PoliciesPage() {
   const { data: rules, refetch, isLoading } = useRules();
@@ -16,6 +17,14 @@ export default function PoliciesPage() {
   const testRuleMutation = useTestRule();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen: isModalOpen,
+    onClose: () => setIsModalOpen(false),
+    closeOnEscape: true,
+    trapFocus: true,
+    restoreFocus: true,
+  });
   const [newRuleName, setNewRuleName] = useState('');
   const [newRuleAction, setNewRuleAction] = useState('BLOCK_TRANSACTION');
   const [newRuleConditionText, setNewRuleConditionText] = useState(
@@ -204,10 +213,12 @@ export default function PoliciesPage() {
 
             <div className="space-y-3">
               <div>
-                <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">
+                <label htmlFor="test-condition-ast" className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">
                   Condition JSON AST
                 </label>
                 <textarea
+                  id="test-condition-ast"
+                  aria-label="Condition JSON AST"
                   className="w-full h-40 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono focus:outline-none focus:border-indigo-500"
                   value={testConditionText}
                   onChange={(e) => setTestConditionText(e.target.value)}
@@ -215,10 +226,12 @@ export default function PoliciesPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">
+                <label htmlFor="test-transaction-payload" className="block text-xs font-medium text-[var(--color-text-muted)] mb-1">
                   Mock Transaction Payload
                 </label>
                 <textarea
+                  id="test-transaction-payload"
+                  aria-label="Mock Transaction Payload"
                   className="w-full h-40 p-2.5 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono focus:outline-none focus:border-indigo-500"
                   value={testTransactionText}
                   onChange={(e) => setTestTransactionText(e.target.value)}
@@ -249,12 +262,16 @@ export default function PoliciesPage() {
                       : 'bg-yellow-500/10 border-yellow-500/20 text-yellow-400'
                   }`}
                 >
-                  <span className="text-xl">{testResult.matches ? '✅' : '⚠️'}</span>
+                  <span className="text-xl">
+                    {testResult.matches ? '🚨' : '✅'}
+                  </span>
                   <div>
-                    <h4 className="font-bold text-sm">
-                      {testResult.matches ? 'Match Triggered' : 'No Match'}
-                    </h4>
-                    <p className="text-xs mt-0.5">{testResult.message}</p>
+                    <div className="font-semibold text-sm">
+                      {testResult.matches ? 'Trigger Condition Met' : 'Passed Cleanly'}
+                    </div>
+                    <div className="text-xs mt-0.5 opacity-80">
+                      {testResult.message}
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -268,18 +285,24 @@ export default function PoliciesPage() {
         {isModalOpen && (
           <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
             <motion.div
+              ref={containerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-rule-modal-title"
+              tabIndex={-1}
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-card w-full max-w-lg p-6 space-y-4"
+              className="glass-card w-full max-w-lg p-6 space-y-4 focus:outline-none"
             >
               <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-3">
-                <h3 className="text-lg font-bold text-[var(--color-text-primary)]">
+                <h3 id="create-rule-modal-title" className="text-lg font-bold text-[var(--color-text-primary)]">
                   Create Dynamic Policy Rule
                 </h3>
                 <button
                   onClick={() => setIsModalOpen(false)}
-                  className="text-[var(--color-text-muted)] hover:text-white text-lg"
+                  aria-label="Close modal"
+                  className="text-[var(--color-text-muted)] hover:text-white text-lg p-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 rounded"
                 >
                   ✕
                 </button>
@@ -287,10 +310,11 @@ export default function PoliciesPage() {
 
               <form onSubmit={handleCreateRule} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
+                  <label htmlFor="new-rule-name-input" className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
                     Rule Name
                   </label>
                   <input
+                    id="new-rule-name-input"
                     type="text"
                     required
                     placeholder="e.g. suspicious_high_value_block"
@@ -301,10 +325,11 @@ export default function PoliciesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
+                  <label htmlFor="new-rule-action-select" className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
                     Triggered Action
                   </label>
                   <select
+                    id="new-rule-action-select"
                     className="w-full px-3 py-2 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-sm text-white focus:outline-none focus:border-indigo-500"
                     value={newRuleAction}
                     onChange={(e) => setNewRuleAction(e.target.value)}
@@ -316,10 +341,11 @@ export default function PoliciesPage() {
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
+                  <label htmlFor="new-rule-condition-textarea" className="block text-xs font-semibold text-[var(--color-text-muted)] mb-1">
                     Condition JSON AST
                   </label>
                   <textarea
+                    id="new-rule-condition-textarea"
                     required
                     rows={8}
                     className="w-full p-3 rounded-lg bg-[var(--color-bg-secondary)] border border-[var(--color-border)] text-xs font-mono text-white focus:outline-none focus:border-indigo-500"

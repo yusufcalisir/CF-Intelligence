@@ -11,6 +11,7 @@ import {
   Radio,
   CheckCircle2,
 } from 'lucide-react';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface PlatformLaunchModalProps {
   isOpen: boolean;
@@ -82,9 +83,17 @@ const BANK_NODES = [
   { id: 'DBK', name: 'Deutsche', role: 'Bank Gamma', x: 50, y: 18, color: '#06b6d4' },
 ];
 
-export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaunchModalProps) {
+export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: PlatformLaunchModalProps) {
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [progress, setProgress] = useState(8);
+
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen,
+    onClose: onClose || onComplete,
+    closeOnEscape: true,
+    trapFocus: true,
+    restoreFocus: true,
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -144,13 +153,17 @@ export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaun
 
         {/* Modal Window Container - Zero Scroll, 100% Viewport-Friendly */}
         <motion.div
+          ref={containerRef}
           role="dialog"
           aria-modal="true"
+          aria-labelledby="launch-modal-title"
+          aria-describedby="launch-modal-desc"
+          tabIndex={-1}
           initial={{ scale: 0.94, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.94, opacity: 0, y: 10 }}
           transition={{ type: 'spring', damping: 26, stiffness: 300 }}
-          className="relative w-full max-w-[480px] bg-[#050614]/95 border border-indigo-500/30 rounded-2xl sm:rounded-3xl shadow-[0_0_80px_rgba(79,70,229,0.3)] overflow-hidden flex flex-col"
+          className="relative w-full max-w-[480px] bg-[#050614]/95 border border-indigo-500/30 rounded-2xl sm:rounded-3xl shadow-[0_0_80px_rgba(79,70,229,0.3)] overflow-hidden flex flex-col focus:outline-none"
         >
           {/* Top Neon Laser Glow Bar */}
           <div className="h-1 w-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 shadow-[0_0_15px_rgba(6,182,212,0.8)]" />
@@ -166,21 +179,22 @@ export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaun
                 </span>
               </div>
               <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight flex items-center gap-1.5 truncate">
+                <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight flex items-center gap-1.5 truncate">
                   Consortium Handshake
                   <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/25">
                     <Radio className="w-2 h-2 animate-pulse" /> LIVE
                   </span>
                 </h3>
-                <p className="text-[10px] font-mono text-slate-400 truncate">
+                <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-400 truncate">
                   CF-Intelligence · Privacy-Preserving Plane
                 </p>
               </div>
             </div>
 
             <button
-              onClick={onComplete}
-              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1 shrink-0"
+              onClick={onComplete || onClose}
+              aria-label="Skip handshake and proceed to dashboard"
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1 shrink-0 focus:outline-none focus:ring-2 focus:ring-cyan-400"
               title="Direct jump to dashboard"
             >
               <span>Skip</span>

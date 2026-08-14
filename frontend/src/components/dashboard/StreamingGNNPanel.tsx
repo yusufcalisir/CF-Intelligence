@@ -150,7 +150,12 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
           <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
             Graph Attention Network (GAT) Edge Coefficients
           </h4>
-          <div className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 h-64 overflow-y-auto space-y-3.5">
+          <div
+            tabIndex={0}
+            role="region"
+            aria-label="Graph Attention Network edge coefficients list"
+            className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 h-64 overflow-y-auto space-y-3.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+          >
             {attentionWeights.map((att, idx) => (
               <div key={idx} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">

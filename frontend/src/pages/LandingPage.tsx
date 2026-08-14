@@ -3,6 +3,7 @@ import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import PlatformLaunchModal from '../components/PlatformLaunchModal';
 import BenchmarkLaunchModal from '../components/BenchmarkLaunchModal';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 // ── TYPES ───────────────────────────────────────────────────────────────────
 export interface BankInfoDetail {
@@ -2086,7 +2087,7 @@ telemetry.on('round.stage', (evt) => {
                 <BrandLogo className="w-7 h-7 sm:w-8 sm:h-8 shrink-0" />
                 <div className="min-w-0">
                   <div className="text-xs sm:text-sm font-bold text-slate-200 truncate">Federated Intelligence Network</div>
-                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-500 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
+                  <div className="text-[10.5px] sm:text-xs font-mono text-slate-400 truncate">Privacy-Preserving Fraud Intelligence Platform</div>
                 </div>
               </div>
 
@@ -2099,11 +2100,11 @@ telemetry.on('round.stage', (evt) => {
               </button>
             </div>
 
-            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-500 break-words text-center">
+            <div className="pt-3 border-t border-white/4 text-[10.5px] sm:text-xs font-mono text-slate-400 break-words text-center">
               PyTorch · Intel SGX · ISO 20022 · FinCEN SAR
             </div>
 
-            <div className="text-[10px] sm:text-[11px] font-mono text-slate-600 text-center opacity-80">
+            <div className="text-[10px] sm:text-[11px] font-mono text-slate-400 text-center">
               © 2026 Yusuf Çalışır · Collaborative Fraud Intelligence Platform
             </div>
           </div>
@@ -2112,77 +2113,121 @@ telemetry.on('round.stage', (evt) => {
         {/* ── BANK NODE INSPECTOR DRAWER ──────────────────────────── */}
         <AnimatePresence>
           {activeBankDrawer && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setActiveBankDrawer(null)}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end w-full max-w-full"
-            >
-              <motion.div
-                initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
-                transition={{ type: 'spring', damping: 28, stiffness: 200 }}
-                onClick={e => e.stopPropagation()}
-                className="w-full max-w-lg bg-[#070714] border-l border-white/10 p-5 sm:p-7 overflow-y-auto space-y-6 max-w-full"
-              >
-                <div className="flex items-start justify-between border-b border-white/6 pb-4 sm:pb-5 gap-2">
-                  <div className="min-w-0">
-                    <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">Institution Node Detail</span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeBankDrawer.name}</h3>
-                    <div className="text-xs font-mono text-slate-500 mt-0.5 truncate">{activeBankDrawer.location}</div>
-                  </div>
-                  <button
-                    onClick={() => setActiveBankDrawer(null)}
-                    className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer"
-                  >
-                    Close
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5 sm:gap-3 font-mono text-xs min-w-0">
-                  {[
-                    { k: 'Ticker',   v: activeBankDrawer.ticker },
-                    { k: 'Latency',  v: activeBankDrawer.latency },
-                    { k: 'Hardware', v: activeBankDrawer.hardware },
-                    { k: 'Host RAM', v: activeBankDrawer.ram },
-                    { k: 'PyTorch',  v: activeBankDrawer.pytorch },
-                    { k: 'Status',   v: 'READY (On-Premises Agent)' },
-                  ].map(row => (
-                    <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
-                      <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">{row.k}</div>
-                      <div className="text-slate-200 truncate">{row.v}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="min-w-0">
-                  <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">ISO 20022 Stream Log</div>
-                  <div className="rounded-2xl bg-[#03030c] border border-white/8 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
-                    {activeBankDrawer.xmlLogs.map((log, i) => (
-                      <div key={i} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0 min-w-0">
-                        <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
-                        <span className="break-all leading-relaxed">{log}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            </motion.div>
+            <BankDetailsDrawerModal
+              bank={activeBankDrawer}
+              onClose={() => setActiveBankDrawer(null)}
+            />
           )}
         </AnimatePresence>
 
         {/* ── PLATFORM DEMO LAUNCH ANIMATED INITIALIZER MODAL ──────── */}
         <PlatformLaunchModal
           isOpen={isLaunchModalOpen}
+          onClose={() => setIsLaunchModalOpen(false)}
           onComplete={handleLaunchComplete}
         />
 
         {/* ── BENCHMARK HUB LAUNCH ANIMATED INITIALIZER MODAL ──────── */}
         <BenchmarkLaunchModal
           isOpen={isBenchmarkModalOpen}
+          onClose={() => setIsBenchmarkModalOpen(false)}
           onComplete={handleBenchmarkComplete}
         />
       </div>
     </div>
+  );
+}
+
+function BankDetailsDrawerModal({
+  bank,
+  onClose,
+}: {
+  bank: BankInfoDetail;
+  onClose: () => void;
+}) {
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen: true,
+    onClose,
+    closeOnEscape: true,
+    trapFocus: true,
+    restoreFocus: true,
+  });
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onClose}
+      className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex justify-end w-full max-w-full"
+    >
+      <motion.div
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bank-drawer-title"
+        aria-describedby="bank-drawer-desc"
+        tabIndex={-1}
+        initial={{ x: '100%' }}
+        animate={{ x: 0 }}
+        exit={{ x: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 200 }}
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg bg-[#070714] border-l border-white/10 p-5 sm:p-7 overflow-y-auto space-y-6 max-w-full focus:outline-none"
+      >
+        <div className="flex items-start justify-between border-b border-white/6 pb-4 sm:pb-5 gap-2">
+          <div className="min-w-0">
+            <span className="text-[9.5px] sm:text-[10px] font-mono text-emerald-400 uppercase tracking-wider">
+              Institution Node Detail
+            </span>
+            <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">
+              {bank.name}
+            </h3>
+            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-500 mt-0.5 truncate">
+              {bank.location}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close node detail drawer"
+            className="px-3.5 py-1.5 rounded-xl text-xs font-mono bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-colors shrink-0 active:scale-95 cursor-pointer focus:outline-none focus:ring-2 focus:ring-emerald-400"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2.5 sm:gap-3 font-mono text-xs min-w-0">
+          {[
+            { k: 'Ticker', v: bank.ticker },
+            { k: 'Latency', v: bank.latency },
+            { k: 'Hardware', v: bank.hardware },
+            { k: 'Host RAM', v: bank.ram },
+            { k: 'PyTorch', v: bank.pytorch },
+            { k: 'Status', v: 'READY (On-Premises Agent)' },
+          ].map((row) => (
+            <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
+              <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
+                {row.k}
+              </div>
+              <div className="text-slate-200 truncate">{row.v}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="min-w-0">
+          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">
+            ISO 20022 Stream Log
+          </div>
+          <div className="rounded-2xl bg-[#03030c] border border-white/8 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
+            {bank.xmlLogs.map((log, i) => (
+              <div key={i} className="flex items-start gap-2 border-b border-white/5 pb-2 last:border-0 last:pb-0 min-w-0">
+                <span className="text-indigo-400 shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
+                <span className="break-all leading-relaxed">{log}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }

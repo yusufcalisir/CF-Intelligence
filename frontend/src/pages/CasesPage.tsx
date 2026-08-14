@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useCases, useCreateCase } from '../api/queries';
 import { CASE_STATUS_LABELS, PRIORITY_LABELS } from '../api/types';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 const PRIORITY_COLORS: Record<string, string> = {
   p1_critical: '#ef4444',
@@ -38,102 +39,99 @@ export default function CasesPage() {
           Case Management
         </h1>
         <p className="text-sm text-[var(--color-text-muted)] max-w-2xl">
-          Investigation cases linking alerts to investigation workflows. Track cases
-          from initial detection through resolution.
+          Track, triage, and manage suspicious activity report (SAR) investigation cases
+          across consortium participants with cryptographically chained evidence.
         </p>
       </motion.div>
 
-      {/* Controls */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex gap-3 flex-wrap items-center"
-      >
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="glass-card px-3 py-2 text-sm rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)] text-[var(--color-text)]"
-        >
-          <option value="">All Statuses</option>
-          {Object.entries(CASE_STATUS_LABELS).map(([val, label]) => (
-            <option key={val} value={val}>{label}</option>
-          ))}
-        </select>
+      {/* Filter and Create Controls */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <label htmlFor="case-status-filter" className="text-xs text-[var(--color-text-muted)]">Status:</label>
+          <select
+            id="case-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)]"
+          >
+            <option value="">All Statuses</option>
+            {Object.entries(CASE_STATUS_LABELS).map(([val, label]) => (
+              <option key={val} value={val}>{label}</option>
+            ))}
+          </select>
+        </div>
 
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="ml-auto px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity"
-        >
-          + New Case
-        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-[var(--color-text-muted)]">
+            {cases?.length ?? 0} cases
+          </span>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity flex items-center gap-1.5"
+          >
+            + New Case
+          </button>
+        </div>
+      </div>
 
-        <span className="text-sm text-[var(--color-text-muted)]">
-          {cases?.length ?? 0} cases
-        </span>
-      </motion.div>
-
-      {/* Case Grid */}
+      {/* Cases Grid */}
       {isLoading ? (
-        <div className="glass-card p-8 text-center text-[var(--color-text-muted)]">Loading cases...</div>
-      ) : !cases?.length ? (
-        <div className="glass-card p-8 text-center text-[var(--color-text-muted)]">
-          <p className="text-lg mb-2">No cases yet</p>
-          <p className="text-sm">Create a case to start tracking investigations.</p>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="glass-card p-5 h-44 animate-pulse" />
+          ))}
+        </div>
+      ) : !cases || cases.length === 0 ? (
+        <div className="glass-card p-12 text-center text-[var(--color-text-muted)]">
+          <p className="text-lg font-semibold mb-1">No cases yet</p>
+          <p className="text-xs">Create a case to start tracking investigations.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {cases.map((c, i) => {
-            const prioColor = PRIORITY_COLORS[c.priority] || '#6b7280';
-            return (
-              <motion.div
-                key={c.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                onClick={() => navigate(`/cases/${c.id}`)}
-                className="glass-card p-4 cursor-pointer hover:scale-[1.02] transition-transform"
-              >
-                <div className="flex items-start justify-between mb-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {cases.map((c) => (
+            <motion.div
+              key={c.id}
+              whileHover={{ y: -2 }}
+              onClick={() => navigate(`/cases/${c.id}`)}
+              className="glass-card p-5 cursor-pointer hover:border-[var(--color-primary)] transition-colors flex flex-col justify-between"
+            >
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <span
-                    className="px-2 py-0.5 rounded text-xs font-bold text-white"
-                    style={{ backgroundColor: prioColor }}
+                    className="text-[10px] font-bold px-2 py-0.5 rounded-full uppercase"
+                    style={{
+                      backgroundColor: `${PRIORITY_COLORS[c.priority] || '#3b82f6'}20`,
+                      color: PRIORITY_COLORS[c.priority] || '#3b82f6',
+                    }}
                   >
                     {PRIORITY_LABELS[c.priority] || c.priority}
                   </span>
-                  <span
-                    className={`px-2 py-0.5 rounded text-xs font-medium ${
-                      c.is_open
-                        ? 'bg-green-500/20 text-green-400'
-                        : 'bg-gray-500/20 text-gray-400'
-                    }`}
-                  >
-                    {CASE_STATUS_LABELS[c.status] || c.status}
+                  <span className="text-[10px] text-[var(--color-text-muted)] font-mono">
+                    #{c.id.slice(0, 8)}
                   </span>
                 </div>
-                <h3 className="font-semibold mb-2 line-clamp-2">{c.title}</h3>
-                <div className="flex justify-between text-xs text-[var(--color-text-muted)]">
-                  <span>{c.alert_count} alerts linked</span>
-                  <span>{new Date(c.created_at).toLocaleDateString()}</span>
-                </div>
-                {c.assigned_to && (
-                  <div className="mt-2 text-xs text-[var(--color-text-muted)]">
-                    Assigned to: <span className="text-[var(--color-text)]">{c.assigned_to}</span>
-                  </div>
-                )}
-              </motion.div>
-            );
-          })}
+                <h3 className="font-semibold text-sm line-clamp-2">{c.title}</h3>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-[var(--color-border)] flex items-center justify-between text-xs text-[var(--color-text-muted)]">
+                <span className="capitalize">{c.status.replace('_', ' ')}</span>
+                <span>{(c as any).alert_count ?? (c as any).alerts_count ?? 0} alerts linked</span>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
 
       {/* Create Modal */}
-      {showCreateModal && (
-        <CreateCaseModal
-          onClose={() => setShowCreateModal(false)}
-          onCreate={handleCreate}
-          isLoading={createCase.isPending}
-        />
-      )}
+      <AnimatePresence>
+        {showCreateModal && (
+          <CreateCaseModal
+            onClose={() => setShowCreateModal(false)}
+            onCreate={handleCreate}
+            isLoading={createCase.isPending}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -150,31 +148,56 @@ function CreateCaseModal({
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState('p3_medium');
 
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen: true,
+    onClose,
+    closeOnEscape: true,
+    trapFocus: true,
+    restoreFocus: true,
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <motion.div
+        ref={containerRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-case-modal-title"
+        tabIndex={-1}
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="glass-card p-6 w-full max-w-md space-y-4"
+        exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-card p-6 w-full max-w-md space-y-4 focus:outline-none"
       >
-        <h2 className="text-lg font-bold">New Investigation Case</h2>
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
+          <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
+          <button
+            onClick={onClose}
+            aria-label="Close dialog"
+            className="text-[var(--color-text-muted)] hover:text-white p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          >
+            ✕
+          </button>
+        </div>
 
         <div>
-          <label className="block text-xs text-[var(--color-text-muted)] mb-1">Title</label>
+          <label htmlFor="case-title-input" className="block text-xs text-[var(--color-text-muted)] mb-1">Title</label>
           <input
+            id="case-title-input"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Suspicious transaction cluster at Meridian..."
-            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)]"
+            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
           />
         </div>
 
         <div>
-          <label className="block text-xs text-[var(--color-text-muted)] mb-1">Priority</label>
+          <label htmlFor="case-priority-select" className="block text-xs text-[var(--color-text-muted)] mb-1">Priority</label>
           <select
+            id="case-priority-select"
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)]"
+            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
           >
             {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
@@ -182,17 +205,19 @@ function CreateCaseModal({
           </select>
         </div>
 
-        <div className="flex gap-3 justify-end pt-2">
+        <div className="flex gap-3 justify-end pt-2 border-t border-[var(--color-border)]">
           <button
+            type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)]"
+            className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
           >
             Cancel
           </button>
           <button
+            type="button"
             onClick={() => title && onCreate(title, priority)}
             disabled={!title || isLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
           >
             {isLoading ? 'Creating...' : 'Create Case'}
           </button>

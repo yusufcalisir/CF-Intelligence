@@ -371,7 +371,7 @@ export default function SecurityPage() {
               >
                 <span>{cat.icon}</span>
                 <span>{cat.label}</span>
-                <span className="text-[10px] opacity-60 font-mono">({cat.count})</span>
+                <span className="text-[10px] text-slate-300 font-mono">({cat.count})</span>
               </button>
             );
           })}

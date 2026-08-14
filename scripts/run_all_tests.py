@@ -69,8 +69,20 @@ def run_visual_tests() -> bool:
     return success
 
 
+def run_a11y_tests() -> bool:
+    print_banner("4. RUNNING FRONTEND ACCESSIBILITY & KEYBOARD E2E SUITE (Playwright + Axe-Core)")
+    cmd = ["npm", "--prefix", "frontend", "run", "test:a11y"]
+    start = time.perf_counter()
+    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    duration = time.perf_counter() - start
+    success = res.returncode == 0
+    status = "PASSED" if success else "FAILED"
+    print(f"\n>> Frontend Accessibility Suite {status} in {duration:.2f}s")
+    return success
+
+
 def run_backend_tests() -> bool:
-    print_banner("4. RUNNING BACKEND TEST SUITE (Pytest)")
+    print_banner("5. RUNNING BACKEND TEST SUITE (Pytest)")
     cmd = [sys.executable, "-m", "pytest", "backend/tests/", "-v"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT)
@@ -82,7 +94,7 @@ def run_backend_tests() -> bool:
 
 
 def run_verification_tests() -> bool:
-    print_banner("5. RUNNING SCIENTIFIC VERIFICATION SUITE")
+    print_banner("6. RUNNING SCIENTIFIC VERIFICATION SUITE")
     cmd = [sys.executable, "-m", "pytest", "verification/", "-v"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT)
@@ -94,7 +106,7 @@ def run_verification_tests() -> bool:
 
 
 def run_contract_tests() -> bool:
-    print_banner("6. RUNNING EVM SMART CONTRACTS TEST SUITE (Hardhat)")
+    print_banner("7. RUNNING EVM SMART CONTRACTS TEST SUITE (Hardhat)")
     cmd = ["npm", "--prefix", "contracts", "test"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
@@ -110,18 +122,20 @@ def main() -> int:
     parser.add_argument("--frontend", action="store_true", help="Run frontend unit & E2E tests only")
     parser.add_argument("--responsive", action="store_true", help="Run frontend responsive & multi-device tests only")
     parser.add_argument("--visual", action="store_true", help="Run frontend visual regression tests only")
+    parser.add_argument("--a11y", action="store_true", help="Run frontend accessibility & keyboard E2E tests only")
     parser.add_argument("--backend", action="store_true", help="Run backend tests only")
     parser.add_argument("--verification", action="store_true", help="Run verification tests only")
     parser.add_argument("--contracts", action="store_true", help="Run smart contract tests only")
-    parser.add_argument("--all", action="store_true", help="Run all test suites including responsive, visual & contracts")
+    parser.add_argument("--all", action="store_true", help="Run all test suites including responsive, visual, a11y & contracts")
 
     args = parser.parse_args()
 
     # Default: run frontend and backend if no specific flags
-    is_default = not args.frontend and not args.responsive and not args.visual and not args.backend and not args.verification and not args.contracts and not args.all
+    is_default = not args.frontend and not args.responsive and not args.visual and not args.a11y and not args.backend and not args.verification and not args.contracts and not args.all
     run_fe = args.frontend or args.all or is_default
     run_resp = args.responsive or args.all
     run_vrt = args.visual or args.all
+    run_a11y = args.a11y or args.all
     run_be = args.backend or args.all or is_default
     run_ver = args.verification or args.all
     run_ct = args.contracts or args.all
@@ -135,6 +149,8 @@ def main() -> int:
         results["Frontend (Responsive)"] = run_responsive_tests()
     if run_vrt:
         results["Frontend (Visual VRT)"] = run_visual_tests()
+    if run_a11y:
+        results["Frontend (Accessibility a11y)"] = run_a11y_tests()
     if run_be:
         results["Backend (Pytest)"] = run_backend_tests()
     if run_ver:

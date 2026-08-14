@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1381%2F1381_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1410%2F1410_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -788,53 +788,47 @@ npm run test
 npm run deploy:local
 ```
 
-### Step 6: Run Comprehensive Automated Test Suites & Single-Command Verification
+### Step 6: Automated Test Suites & Verification
 
-The platform provides a **single unified test runner** that executes all frontend, responsive, visual regression, backend, scientific verification, and smart contract suites in one command:
-
-```bash
-# Execute all test suites across the entire repository (1381 total tests including 192 responsive & 36 Playwright VRT snapshots)
-python scripts/run_all_tests.py --all
-# or using Makefile
-make test-all
-```
-
-Alternatively, individual test tiers can be executed independently:
+The platform provides a unified test architecture organized into 5 primary suites:
 
 ```bash
 # 1. Master Single Test Suite Runner
-python scripts/run_all_tests.py              # Executes frontend, backend and scientific verification suites
-python scripts/run_all_tests.py --responsive # Runs 192 multi-device & cross-browser responsive tests
-python scripts/run_all_tests.py --visual     # Runs 36 pixel-perfect visual regression snapshots
+python scripts/run_all_tests.py --all
+# or using Makefile
+make test-all
 
-# 2. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
-npm --prefix frontend test                   # Runs unified frontend suite (Unit, Integration & E2E)
+# 2. Frontend Test Suite
+npm --prefix frontend test
 # or
 make frontend-test
 
-# 3. Frontend Responsive & Cross-Browser Test Suite (Playwright: 192 tests across 8 device & browser profiles)
-npm --prefix frontend run test:responsive    # Tests zero horizontal overflow, drawer scroll-lock, modals, touch & tables
-# or
-make frontend-responsive-test
-
-# 4. Frontend Visual Regression Test Suite (Playwright VRT: 36 tests across 4 viewports + Dark Mode)
-npm --prefix frontend run test:visual        # Runs pixel-perfect visual regression tests against baselines
-# or
-make frontend-visual-test
-
-# 5. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
+# 3. Backend Test Suite
 pytest backend/tests/ -v
 # or
 make test
 
-# 6. Scientific Verification & Audit Suite (17 verified subsystems)
+# 4. Scientific Verification & Audit Suite
 python scripts/run_all_verifications.py
 # or
 pytest verification/ -v
 
-# 7. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
+# 5. EVM Smart Contracts Test Suite
 cd contracts && npm test
 ```
+
+#### Accessibility (a11y), WCAG 2.1 AA & Keyboard Lifecycle Matrix
+
+The platform incorporates a **dual-layer accessibility verification architecture**: programmatic DOM lifecycle hooks (`useModalA11y`) combined with automated `@axe-core/playwright` WCAG 2.1 AA scanning and real-browser keyboard-only workflow tests:
+
+| Verification Layer | Test Scope & Engine | Tested Invariants & User Experience Standards |
+| :--- | :--- | :--- |
+| **Automated WCAG 2.1 AA Scans** | Axe-Core + Playwright (10 Routes + Active Modals) | Zero critical/serious WCAG 2.1 Level A & AA violations: color contrast ratios $\ge 4.5:1$ (normal text) and $\ge 3:1$ (large text/UI), accessible landmark regions, form `<label htmlFor="...">` and `aria-label` bindings, and keyboard-focusable scroll containers (`tabIndex={0}`). |
+| **Modal Focus Capture** | `useModalA11y` Hook (`requestAnimationFrame`) | When any modal/drawer opens, user focus immediately and safely transitions into the container or its primary interactive control (`containerRef.current.focus()` or `initialFocusRef`). |
+| **Cyclic Tab Focus Trap** | Vitest + Playwright Keyboard Simulation | Pressing `Tab` on the last focusable element wraps cleanly to the first element; pressing `Shift+Tab` on the first element wraps to the last element. Focus is strictly bounded within the dialog. |
+| **Escape Key Dismissal** | Capture Phase Keyboard Event Listeners | Pressing `Escape` at any point during inspection instantly dismisses open dialogs, drawers, or slide-over panels cleanly without page reload or unwanted side-effects. |
+| **Origin Focus Restoration** | React ActiveElement Cache (`useRef`) | When a dialog or drawer closes, focus is deterministically restored to the exact trigger button or interactive element that originally launched the modal. |
+| **Keyboard-Only E2E Workflows** | Playwright E2E (`Tab`, `Enter`, `Space`, Arrows) | Full institutional operator workflow—navbar routing, transaction risk parameters manipulation, SAR case creation, training configuration expansion, and rule evaluation—executable 100% without mouse input. |
 
 #### Multi-Device, Cross-Browser & Responsive Breakpoint Matrix
 
@@ -864,7 +858,7 @@ The Playwright Visual Regression framework prevents CSS / Design System regressi
 | **Theme Fidelity** | Dark Mode Theme Tokens | Enterprise Dark Contrast | Glassmorphism contrast, border fidelity, chart typography, badge alignment |
 
 > **Verifiable CI/CD Pipeline & Audit Trail:**  
-> All **1381 tests (1023 backend + 130 frontend unit/e2e + 192 responsive + 36 frontend visual snapshots)** run with 100% pass verification:  
+> All **1410 tests (1023 backend + 139 frontend unit/integration/e2e + 192 responsive + 36 visual regression + 20 accessibility & keyboard lifecycle)** run with 100% pass verification:  
 > 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
 
 

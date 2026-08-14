@@ -8,7 +8,9 @@ import {
   TrendingUp,
   CheckCircle2,
   Cpu,
+  ArrowRight,
 } from 'lucide-react';
+import { useModalA11y } from '../hooks/useModalA11y';
 
 interface BenchmarkLaunchModalProps {
   isOpen: boolean;
@@ -74,9 +76,17 @@ const BENCHMARK_STAGES: BenchmarkStageInfo[] = [
   },
 ];
 
-export default function BenchmarkLaunchModal({ isOpen, onComplete }: BenchmarkLaunchModalProps) {
+export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: BenchmarkLaunchModalProps) {
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
   const [progress, setProgress] = useState(10);
+
+  const { containerRef } = useModalA11y<HTMLDivElement>({
+    isOpen,
+    onClose: onClose || onComplete,
+    closeOnEscape: true,
+    trapFocus: true,
+    restoreFocus: true,
+  });
 
   useEffect(() => {
     if (!isOpen) {
@@ -134,35 +144,50 @@ export default function BenchmarkLaunchModal({ isOpen, onComplete }: BenchmarkLa
 
         {/* Modal Window Container */}
         <motion.div
+          ref={containerRef}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="benchmark-modal-title"
+          aria-describedby="benchmark-modal-desc"
+          tabIndex={-1}
           initial={{ opacity: 0, scale: 0.94, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 15 }}
-          role="dialog"
-          aria-modal="true"
           transition={{ type: 'spring', damping: 26, stiffness: 260 }}
-          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-[#0a0c28] via-[#07081a] to-[#04050e] border border-indigo-500/30 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden"
+          className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-[#0a0c28] via-[#07081a] to-[#04050e] border border-indigo-500/30 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden focus:outline-none"
         >
           {/* Top Edge Glow */}
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-cyan-400" />
 
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4 gap-2">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300 shadow-inner shrink-0">
                 <BarChart3 className="w-5 h-5 animate-pulse" />
               </div>
               <div className="min-w-0">
-                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                <h3 id="benchmark-modal-title" className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
                   Initializing Benchmark Sandbox
                 </h3>
-                <p className="text-xs text-indigo-300/80 font-mono truncate">
+                <p id="benchmark-modal-desc" className="text-xs text-indigo-300/80 font-mono truncate">
                   Empirical Proof & Real Data Baseline Engine
                 </p>
               </div>
             </div>
-            <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 shrink-0">
-              {Math.min(100, Math.round(progress))}%
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                {Math.min(100, Math.round(progress))}%
+              </span>
+              <button
+                onClick={onComplete || onClose}
+                aria-label="Skip initialization and open benchmark hub"
+                className="px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-mono text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all cursor-pointer flex items-center gap-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                title="Direct jump to benchmark sandbox"
+              >
+                <span>Skip</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
           {/* Active Stage Animated Card */}

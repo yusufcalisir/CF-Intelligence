@@ -187,7 +187,12 @@ export const FLRoundRunner: React.FC = () => {
               <Terminal className="h-4 w-4 text-cyan-400" />
               <span className="font-semibold text-xs">Byzantine Defense & Execution Log</span>
             </div>
-            <div className="bg-slate-950 p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-400">
+            <div
+              tabIndex={0}
+              role="region"
+              aria-label="Byzantine Defense & Execution Log stream"
+              className="bg-slate-950 p-3 rounded-lg h-28 overflow-y-auto space-y-1 text-[11px] text-slate-400 focus:outline-none focus:ring-1 focus:ring-cyan-400"
+            >
               {results.map((r, i) => (
                 <div key={i} className="flex justify-between">
                   <span className="text-cyan-400">[Round {r.round_number}] Aggregated 3 bank models using {algorithm}</span>
