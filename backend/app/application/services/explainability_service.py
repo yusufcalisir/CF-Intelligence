@@ -346,7 +346,7 @@ class ExplainabilityService:
                         first_layer = model.network[0]
                         in_feats = getattr(first_layer, "in_features", None)
                         if isinstance(in_feats, int):
-                            curr_dim = int(tensor_x.shape[1])
+                            curr_dim = tensor_x.shape[1]
                             if curr_dim < in_feats:
                                 tensor_x = torch.nn.functional.pad(
                                     tensor_x, (0, in_feats - curr_dim), value=0.0
