@@ -146,7 +146,9 @@ async def init_tenant_tables(tenant: str | None) -> None:
             if tenant is None:
                 # Seed default demo banks if tenant_configs table is empty
                 from datetime import UTC, datetime
-                from sqlalchemy import select
+
+                from sqlalchemy import insert, select
+
                 from app.infrastructure.models import TenantConfigModel
 
                 result = await conn.execute(select(TenantConfigModel.bank_id).limit(1))
@@ -192,7 +194,6 @@ async def init_tenant_tables(tenant: str | None) -> None:
                             "activated_at": datetime.now(UTC),
                         },
                     ]
-                    from sqlalchemy import insert
                     await conn.execute(insert(TenantConfigModel), demo_banks)
     except Exception as exc:
         logger.warning("Could not initialize tenant tables for tenant=%s: %s", tenant, exc)
