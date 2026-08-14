@@ -22,7 +22,7 @@ from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.feature_store_service import FeatureStoreService
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
-from app.application.services.model_service import ModelService
+from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
 from app.dependencies import SessionDep  # noqa: TC001
@@ -268,16 +268,26 @@ async def predict_transaction(
                     detail=f"Error loading served model file: {e}",
                 )
 
-    # 2. Determine DP model compatibility dynamically based on layer parameter keys
+    # 2. Determine DP model compatibility and dynamic input_dim based on layer parameter keys/shapes
     dp_compatible = True
     for key in state_dict:
         if "running_mean" in key or "running_var" in key:
             dp_compatible = False
             break
 
+    input_dim = NUM_FEATURES
+    for weight_key in ("network.0.weight", "module.network.0.weight"):
+        if (
+            weight_key in state_dict
+            and hasattr(state_dict[weight_key], "shape")
+            and len(state_dict[weight_key].shape) >= 2
+        ):
+            input_dim = int(state_dict[weight_key].shape[1])
+            break
+
     # 3. Instantiate model and perform forward pass
     try:
-        model = _model_service.create_model(dp_compatible=dp_compatible)
+        model = _model_service.create_model(input_dim=input_dim, dp_compatible=dp_compatible)
         model.load_state_dict(state_dict)
         model.eval()
 
@@ -343,6 +353,12 @@ async def predict_transaction(
             )
 
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
+        if input_tensor.shape[1] < input_dim:
+            input_tensor = torch.nn.functional.pad(
+                input_tensor, (0, input_dim - input_tensor.shape[1]), value=0.0
+            )
+        elif input_tensor.shape[1] > input_dim:
+            input_tensor = input_tensor[:, :input_dim]
 
         # Measure Champion Latency (offloaded to threadpool to avoid blocking event loop)
         champ_start = time.perf_counter()
@@ -365,12 +381,33 @@ async def predict_transaction(
                         if "running_mean" in key or "running_var" in key:
                             chall_dp = False
                             break
-                    chall_model = _model_service.create_model(dp_compatible=chall_dp)
+
+                    chall_input_dim = NUM_FEATURES
+                    for weight_key in ("network.0.weight", "module.network.0.weight"):
+                        if (
+                            weight_key in chall_state_dict
+                            and hasattr(chall_state_dict[weight_key], "shape")
+                            and len(chall_state_dict[weight_key].shape) >= 2
+                        ):
+                            chall_input_dim = int(chall_state_dict[weight_key].shape[1])
+                            break
+
+                    chall_model = _model_service.create_model(
+                        input_dim=chall_input_dim, dp_compatible=chall_dp
+                    )
                     chall_model.load_state_dict(chall_state_dict)
                     chall_model.eval()
 
+                    chall_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
+                    if chall_tensor.shape[1] < chall_input_dim:
+                        chall_tensor = torch.nn.functional.pad(
+                            chall_tensor, (0, chall_input_dim - chall_tensor.shape[1]), value=0.0
+                        )
+                    elif chall_tensor.shape[1] > chall_input_dim:
+                        chall_tensor = chall_tensor[:, :chall_input_dim]
+
                     chall_start = time.perf_counter()
-                    chall_prob = await asyncio.to_thread(_eval_model, chall_model, input_tensor)
+                    chall_prob = await asyncio.to_thread(_eval_model, chall_model, chall_tensor)
                     chall_latency = (time.perf_counter() - chall_start) * 1000
                 except Exception as exc:
                     logger.warning(

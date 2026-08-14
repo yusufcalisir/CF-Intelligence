@@ -300,12 +300,21 @@ class ExplainabilityService:
         model = None
         if os.path.exists(model_path):
             try:
-                from app.application.services.model_service import FraudDetectionModel
+                from app.application.services.model_service import FraudDetectionModel, NUM_FEATURES
 
-                model = FraudDetectionModel()
                 state_dict = torch.load(
                     model_path, map_location=torch.device("cpu"), weights_only=True
                 )  # nosec B614
+                input_dim = NUM_FEATURES
+                for weight_key in ("network.0.weight", "module.network.0.weight"):
+                    if (
+                        weight_key in state_dict
+                        and hasattr(state_dict[weight_key], "shape")
+                        and len(state_dict[weight_key].shape) >= 2
+                    ):
+                        input_dim = int(state_dict[weight_key].shape[1])
+                        break
+                model = FraudDetectionModel(input_dim=input_dim)
                 model.load_state_dict(state_dict)
                 model.eval()
             except Exception as e:
@@ -330,6 +339,14 @@ class ExplainabilityService:
                 # Define model prediction function wrapping PyTorch
                 def predict_fn(x_np):
                     tensor_x = torch.FloatTensor(x_np)
+                    if hasattr(model, "network") and len(model.network) > 0 and hasattr(model.network[0], "in_features"):
+                        expected_dim = model.network[0].in_features
+                        if tensor_x.shape[1] < expected_dim:
+                            tensor_x = torch.nn.functional.pad(
+                                tensor_x, (0, expected_dim - tensor_x.shape[1]), value=0.0
+                            )
+                        elif tensor_x.shape[1] > expected_dim:
+                            tensor_x = tensor_x[:, :expected_dim]
                     with torch.no_grad():
                         preds = model(tensor_x).numpy()
                     return preds
