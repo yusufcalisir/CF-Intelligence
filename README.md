@@ -353,21 +353,32 @@ $$
 | **TenSEAL CKKS FHE** | `fhe_driver.py` | Microsoft SEAL CKKS polynomial ring ($N=8192, 2^{40}$) | Zero-knowledge homomorphic addition | CPU / AVX2 |
 | **Hardware TEE** | `tee_driver.py` | Intel SGX / Nitro Enclave remote attestation & MRENCLAVE | Isolated enclave & AES-256 sealed memory | SGX / Nitro CPU |
 | **zk-SNARK Attestation** | `zk_snark_verifier.py` | Groth16 / PlonK over BN254 + Poseidon hash commitment | $O(1)$ constant-time proof ($<5\text{ms}$ SLA) | CPU / Circom |
-| **Confidential Unlearning**| `federated_unlearning_engine.py` | Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}$) | Erases gradient footprint ($P_{\text{MIA}} \le 0.52$) | CPU / PyTorch |
+| **Confidential Unlearning**| `federated_unlearning_engine.py` | Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}_b$) | Erases gradient footprint ($P_{\text{MIA}} \le 0.52$) | CPU / PyTorch |
 | **Post-Quantum Crypto** | `pqc_secagg_driver.py` | NIST FIPS 203 (Kyber-768) + FIPS 204 (Dilithium-3) | Quantum-safe lattice hybrid SecAgg ($<1.5\text{ms}$) | CPU / Native HKDF |
 | **Cross-Chain Bridge** | `layer2_crosschain_bridge.py` | Chainlink CCIP `EVM2AnyMessage` & LayerZero V2 | Arbitrum, Optimism, Canton & Fabric ($<1\text{s}$) | EVM / Canton / Fabric |
 | **Adaptive DP Auto-Scaler**| `adaptive_dp_autoscaler.py` | Rényi DP (RDP) & PRV accountant with dynamic noise ($\sigma_t$) | Loss-velocity auto-scaling (AUC-ROC $>0.94$) | CPU / Numerical Dual |
 
 ### 6.2 Mathematical Privacy Formulations
 - Gradient Norm Clipping ($C$):
-  $$\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}$$
+
+$$
+\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}
+$$
+
 - Gaussian Noise Addition ($\sigma$):
-  $$\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)$$
+
+$$
+\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)
+$$
+
 - SecAgg Pairwise Mask Cancellation:
-  $$y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_k y_k = \sum_k w_k$$
+
+$$
+y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \pmod{2^{32}} \implies \sum_k y_k = \sum_k w_k
+$$
 
 ### 6.3 Curve25519 P2P SecAgg & Shamir Threshold Secret Sharing (`p2p_secagg_driver.py` & `shamir_engine.py`)
-- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations ($s_{uv} = \operatorname{HKDF}(\operatorname{ECDH}(sk_u, pk_v))$) with zero server involvement.
+- Curve25519 ECDH Pairwise Masking: Generates client-side zero-sum pairwise vector perturbations $s_{uv} = \text{HKDF}(\text{ECDH}(sk_u, pk_v))$ with zero server involvement.
 - Shamir (t, n) Threshold Secret Sharing: Shares pairwise masking seeds over Galois prime field $\mathbb{Z}_p$ ($p = 2^{256} - 189$) to reconstruct dropout node masks when client nodes disconnect during aggregation.
 
 ### 6.4 FIPS 140-2 Level 3 HSM Binding & Gnosis Safe 2-of-3 Multi-Sig (`vault_hsm_pki_binder.py` & `GnosisSafeMultiSigCoordinator.sol`)
@@ -375,10 +386,10 @@ $$
 - Gnosis Safe 2-of-3 Multi-Sig Coordinator: Decentralizes coordinator functions (simulation triggers, model promotions, fee disbursements) via EIP-712 structured data signatures across 3 trustee wallets requiring 2-of-3 multi-sig consensus.
 
 ### 6.5 Zero-Knowledge Proof (zk-SNARK) Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
-- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates ($w_{\text{local}}$) match Poseidon hash commitments ($H_w$), satisfy $L_2$ norm clip bounds ($\|w\|_2 \le C_{\text{max}}$), and maintain non-zero variance in $\mathcal{O}(1)$ constant time ($<5\text{ms}$ SLA) over the BN254 elliptic curve without exposing unmasked model parameters.
+- Groth16 Bilinear Pairing Verification: Verifies that participating bank updates $w_{\text{local}}$ match Poseidon hash commitments $H_w$, satisfy $L_2$ norm clip bounds $\|w\|_2 \le C_{\text{max}}$, and maintain non-zero variance in $O(1)$ constant time ($<5\text{ms}$ SLA) over the BN254 elliptic curve without exposing unmasked model parameters.
 
 ### 6.6 Confidential Federated Unlearning & Anti-Poisoning Erasure (`federated_unlearning_engine.py`)
-- Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}_b$) to remove historical gradient contributions of compromised or revoked banks in $<10\text{ms}$ while bounding MIA membership probability ($P_{\text{MIA}} \le 0.52$).
+- Hessian Inversion Gradient Erasure: Computes exact/approximate parameter unlearning using Sub-sampled Newton Steps $\delta W = - H^{-1} \nabla \mathcal{L}_b$ to remove historical gradient contributions of compromised or revoked banks in under 10ms SLA while bounding MIA membership probability $P_{\text{MIA}} \le 0.52$.
 
 ### 6.7 Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) (`pqc_secagg_driver.py`)
 - NIST FIPS 203 & 204 Lattice Cryptography: Implements Module Learning With Errors (M-LWE) CRYSTALS-Kyber-768 KEM and CRYSTALS-Dilithium-3 signatures combined into a hybrid quantum-safe P2P SecAgg protocol, protecting key exchanges against Shor's algorithm on quantum supercomputers.
@@ -387,7 +398,7 @@ $$
 - Multi-Ledger Programmable Token Routing: Routes Leave-One-Out (LOO) Shapley utility payouts across Arbitrum One, Optimism, Canton Network Daml contracts, and Hyperledger Fabric channels via Chainlink CCIP `EVM2AnyMessage` payloads with sub-second L2 finality.
 
 ### 6.9 Adaptive Dynamic Differential Privacy Budget Auto-Scaler (`adaptive_dp_autoscaler.py`)
-- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers ($\sigma_t$) and gradient norm clipping thresholds ($C_t$) based on instantaneous loss velocity ($\Delta \mathcal{L}_t$) and batch sampling ratios ($q_t = B / N$) to prevent over-noising and ensure $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$ compliance.
+- Rényi DP & PRV Dual Optimization: Dynamically calibrates per-round Gaussian noise multipliers $\sigma_t$ and gradient norm clipping thresholds $C_t$ based on instantaneous loss velocity $\Delta \mathcal{L}_t$ and batch sampling ratios $q_t = B / N$ to prevent over-noising and ensure $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$ compliance.
 
 ---
 
@@ -455,7 +466,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 
 ## 12. Disaster Recovery, High-Availability Failover & SRE Operations
 
-- Active-Passive Multi-Region Failover (`region_failover.py`): Automated failover ($RTO < 30\text{s}, RPO = 0$) upon primary heartbeat failure (>15s).
+- Active-Passive Multi-Region Failover (`region_failover.py`): Automated failover ($\text{RTO} < 30\text{s}, \text{RPO} = 0$) upon primary heartbeat failure (>15s).
 - Official Operator CLI (`cfi_cli.py`): Terminal subcommands (`cfi-cli status`, `cfi-cli health`, `cfi-cli deploy`).
 
 ---
@@ -475,7 +486,7 @@ Where signals include local model probability ($S_{\text{local}}$), cross-bank v
 | **Financial Connectors** | ISO 20022 / SWIFT / OpenBanking | FinTech Messaging | `iso20022_connector.py` | `PASS` |
 | **Smart Contracts Suite** | CBDC / Shapley Token Settlement | EVM Solidity 0.8.20 | `ConsortiumIncentiveSettlement.sol` | `PASS` |
 | **GDPR Data Retention** | Automated TTL & Zeroization | GDPR Article 17 | `retention_engine.py` | `PASS` |
-| **Multi-Region Failover** | Active-Passive ($RTO < 30\text{s}$) | Business Continuity | `region_failover.py` | `PASS` |
+| **Multi-Region Failover** | Active-Passive ($\text{RTO} < 30\text{s}$) | Business Continuity | `region_failover.py` | `PASS` |
 | **P2P Curve25519 SecAgg** | Client-Side ECDH Pairwise Masking | PET Privacy Standards | `p2p_secagg_driver.py` | `PASS` |
 | **Shamir Secret Sharing** | (t, n) Threshold Galois Field $\mathbb{Z}_p$ | Dropout-Resilient Aggregation | `shamir_engine.py` | `PASS` |
 | **HSM Root Key Binding** | Vault PKI FIPS 140-2 Level 3 HSM | Cryptographic Key Security | `vault_hsm_pki_binder.py` | `PASS` |
@@ -517,13 +528,13 @@ All benchmark results are derived from the integrated multi-phase verification s
 
 ### Real-World Open Benchmark Datasets & In-the-Wild Empirical Validation
 
-While marketing claims often cite laboratory numbers on idealized Gaussian synthetic data (e.g. `AUC = 0.974`), **Tier-1 production banking** operates under extreme class imbalance ($0.01\% - 0.1\%$ fraud prevalence), concept drift, and severe alert fatigue. Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform benchmarks against four canonical industry datasets:
+While marketing claims often cite laboratory numbers on idealized Gaussian synthetic data (e.g. `AUC = 0.974`), **Tier-1 production banking** operates under extreme class imbalance (0.01% - 0.1% fraud prevalence), concept drift, and severe alert fatigue. Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform benchmarks against four canonical industry datasets:
 
 | Real-World Benchmark Dataset | Institutional Domain & Scale | Federated PR-AUC | Single-Bank PR-AUC | Recall @ 0.1% FPR | Alert Fatigue Reduction | Net Economic Benefit (100k txns/day) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Kenya M-Pesa Mobile Money ($6.36\text{M}$ txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** | **+$14,250 / day** |
-| **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | Vesta Production E-Commerce / Cards ($590\text{k}$ txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** | **+$18,900 / day** |
-| **[Elliptic](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin On-Chain AML Graph ($203\text{k}$ nodes, $234\text{k}$ edges) | **0.7920** | 0.6120 (`+0.1800`) | **54.1%** (`+18.7%`) | **-61.2% False Alarms** | **+$11,400 / day** |
+| **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Kenya M-Pesa Mobile Money (6.36M txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** | **+$14,250 / day** |
+| **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | Vesta Production E-Commerce / Cards (590k txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** | **+$18,900 / day** |
+| **[Elliptic](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin On-Chain AML Graph (203k nodes, 234k edges) | **0.7920** | 0.6120 (`+0.1800`) | **54.1%** (`+18.7%`) | **-61.2% False Alarms** | **+$11,400 / day** |
 | **[LEAF Non-IID](https://leaf.cmu.edu/)** | Cross-Bank Dirichlet Statistical Skew ($\alpha = 0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** | **+$15,750 / day** |
 
 #### Why Precision-Recall AUC & Recall@0.1% FPR Are the Only Scientifically Valid Metrics in Production:
@@ -818,14 +829,14 @@ This platform was engineered using a state-of-the-art hybrid human-AI agentic pa
 - **Human Lead Systems Architecture & Governance:** All core system topology designs, cryptographic PET protocol selections (SecAgg, FHE, DP), mathematical invariant proofs, EVM smart contract logic, regulatory compliance frameworks (EU AI Act, GDPR), and domain modeling were conceived, designed, and directed exclusively by the lead author (**Yusuf Çalışır**).
 - **Agentic AI & LLM Pair-Programming Pipeline:** State-of-the-art AI foundation models and autonomous agent frameworks were utilized as pair-programming assistants for code synthesis, test engineering, scientific audit documentation, and automated debugging across all 16 verification subsystems:
   - **Google DeepMind Antigravity Platform:** Multi-agent autonomous workflow orchestration, code synthesis, and subagent task delegation.
-  - **Anthropic Claude 3.7 & 3.5 Sonnet:** Deep architectural reasoning, complex refactoring, PyTorch model logic, and cryptographic verification suites.
-  - **Google Gemini 3.6 Flash & 1.5 Pro:** High-throughput code inspection, fast test case generation, and multi-file audit report compilation.
+  - **Anthropic Claude 4.6 & 3.5 Sonnet:** Deep architectural reasoning, complex refactoring, PyTorch model logic, and cryptographic verification suites.
+  - **Google Gemini 3.7 Flash & 1.5 Pro:** High-throughput code inspection, fast test case generation, and multi-file audit report compilation.
 
 | Responsibility Scope | Primary Ownership | AI Models & Agent Infrastructure |
 | :--- | :---: | :--- |
 | **System Architecture & Domain Engineering** | Human Lead | System topology, PET protocols, domain models, regulatory specs |
 | **Mathematical Specs & Security Proofs** | Human Lead | Formal invariants, threat models, SLA contracts, risk equations |
-| **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, Claude 3.7 Sonnet, Gemini 3.6 Flash |
+| **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, Claude 4.6, Gemini 3.7 |
 | **Test Engineering & Verification** | Human + AI Pair | Pytest (1023 tests, 100% Passing), Property-based fuzzing, Hardhat EVM, DeepMind Antigravity |
 | **Audit & Documentation Synthesis** | Human + AI Pair | Scientific audit reports, OpenAPI schemas, Cypher graph queries |
 
