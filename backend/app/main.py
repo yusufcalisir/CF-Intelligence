@@ -760,8 +760,6 @@ elif service_name.startswith("bank-") or service_name == "bank_client":
     app.include_router(health.router)
     app.include_router(bank_client.router)
 else:
-    from app.presentation.routers import onboarding
-
     app.include_router(health.router)
     app.include_router(maintenance_cron.router)
     app.include_router(simulation.router)
@@ -789,7 +787,6 @@ else:
     app.include_router(realtime_inference.router)
     app.include_router(compliance.router)
     app.include_router(optimization.router)
-    app.include_router(design_partner.router)
 
 
 @app.get("/", tags=["root"])
