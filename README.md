@@ -793,7 +793,7 @@ npm run deploy:local
 The platform provides a **single unified test runner** that executes all frontend, backend, scientific verification, and smart contract suites in one command:
 
 ```bash
-# Execute all test suites across the entire repository (1148 total tests)
+# Execute all test suites across the entire repository (1153 total tests)
 python scripts/run_all_tests.py
 # or using Makefile
 make test-all
@@ -802,8 +802,11 @@ make test-all
 Alternatively, individual test tiers can be executed independently:
 
 ```bash
-# 1. Frontend Integration & View Test Suite (Vitest & RTL: 57 suites, 125 tests)
-npm --prefix frontend test
+# 1. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
+npm --prefix frontend run test:all      # Runs all unit, integration, and E2E suites
+npm --prefix frontend run test:e2e      # Runs 4 critical cross-bank business flow E2E tests
+npm --prefix frontend run test:integration # Runs multi-module integration suites
+npm --prefix frontend run test:unit     # Runs unit test suites
 # or
 make frontend-test
 
@@ -822,7 +825,7 @@ cd contracts && npm test
 ```
 
 > **Verifiable CI/CD Pipeline & Audit Trail:**  
-> All **1148 tests (1023 backend + 125 frontend)** run automatically on every commit via GitHub Actions CI:  
+> All **1153 tests (1023 backend + 130 frontend)** run automatically on every commit via GitHub Actions CI:  
 > 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
 
 
