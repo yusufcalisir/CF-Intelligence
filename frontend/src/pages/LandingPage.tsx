@@ -1449,12 +1449,12 @@ export default function LandingPage() {
               </div>
 
               <button
-                onClick={() => navigate('/benchmarks')}
-                className="inline-flex items-center justify-center gap-2.5 px-4 py-2.5 sm:px-5 sm:py-2.5 rounded-xl text-xs sm:text-[13px] font-semibold text-slate-200 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-indigo-500/40 hover:text-white active:scale-[0.98] transition-all shadow-sm shrink-0 cursor-pointer w-full sm:w-auto"
+                onClick={handleLaunchBenchmark}
+                className="inline-flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl font-bold text-xs sm:text-[13px] text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_20px_rgba(99,102,241,0.35),inset_0_1px_1px_rgba(255,255,255,0.2)] hover:shadow-[0_0_30px_rgba(99,102,241,0.5),inset_0_1px_1px_rgba(255,255,255,0.3)] active:scale-[0.98] transition-all duration-200 shrink-0 cursor-pointer w-full sm:w-auto group"
               >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                 <span>Inspect Benchmark Suite</span>
-                <ArrowRight />
+                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform duration-200" />
               </button>
             </div>
 
