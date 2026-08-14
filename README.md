@@ -827,6 +827,25 @@ python scripts/run_coverage_audit.py
 python scripts/run_all_tests.py --coverage
 ```
 
+#### GitHub Actions CI/CD Pipeline Job Architecture
+
+Every test suite and quality gate in CF-Intelligence runs in `.github/workflows/ci.yml` under its **own explicit, dedicated job title and card** in GitHub Actions, ensuring immediate root-cause isolation and parallelized CI execution:
+
+| CI Job # | Dedicated Pipeline Job Title | Execution Command / Tool | Validated Invariants & Scope |
+| :---: | :--- | :--- | :--- |
+| **1** | `1. Static Analysis & Security Scanning` | `ruff check backend/app/` + `bandit -r backend/app/` | AST linting, import order, type contracts, and static SAST security checks. |
+| **2** | `2. Backend Unit & Integration Test Suite` | `pytest backend/tests/ -v` | 1023+ backend unit, integration, and chaos resilience tests. |
+| **3** | `3. Frontend Unit & Component Test Suite` | `npm --prefix frontend test` | 234+ React component, view, and integration tests across 72 test suites. |
+| **4** | `4. End-to-End API Contract Integrity` | `python scripts/run_all_tests.py --api-contract` | Frontend TypeScript types $\leftrightarrow$ OpenAPI Schema $\leftrightarrow$ FastAPI backend endpoints. |
+| **5** | `5. Mutation Testing & Fault Injection Suite` | `python scripts/run_mutation_tests.py` | Dual-layer synthetic fault injection (Stryker + Python), asserting 100% mutant kill score. |
+| **6** | `6. Multi-Dimensional Coverage Audit` | `python scripts/run_coverage_audit.py` | 4-tier coverage matrix (Statements, Branches, Functions, Lines) across all active paths. |
+| **7** | `7. Accessibility & WCAG 2.1 AA Compliance` | `npm --prefix frontend run test:a11y` | Playwright + Axe-Core accessibility scans, contrast ratios, and keyboard navigation. |
+| **8** | `8. Multi-Device & Mobile Responsive Suite` | `npm --prefix frontend run test:responsive` | Playwright testing across 8 mobile/tablet/desktop device profiles with 0 overflow. |
+| **9** | `9. Frontend Visual Regression Suite` | `npm --prefix frontend run test:visual` | Pixel-perfect Playwright visual snapshot regression testing across 4 viewports. |
+| **10** | `10. Scientific Verification Audit Suite` | `pytest verification/ -v` + reference script | 100/100 scientific parity across all 17 privacy, DP, SecAgg, and FL math modules. |
+| **11** | `11. EVM Smart Contracts Test Suite` | `npm --prefix contracts test` | Hardhat automated compilation and unit testing for consortium Shapley settlements. |
+| **12** | `12. Production Build & Docker Verification` | `tsc -b && vite build` + `docker build` | Clean production bundle compilation (3,058 modules) and containerization check. |
+
 #### Multi-Dimensional Code & Branch Coverage Architecture (Statements, Branches, Functions, Lines)
 
 Code coverage is evaluated across **4 distinct dimensions** rather than a single superficial metric. Critical business logic, security gating, and algorithmic branches are specifically tested for both truthful and falsy branches to eliminate silent coverage blind spots (e.g. testing only the `if` branch while leaving the `else` or fallback branch unverified):

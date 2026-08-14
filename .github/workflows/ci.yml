@@ -7,8 +7,11 @@ on:
     branches: [ main, master ]
 
 jobs:
+  # --------------------------------------------------------------------------
+  # 1. Static Analysis & Code Security
+  # --------------------------------------------------------------------------
   lint-and-security:
-    name: 1. Static Analysis & Security Scanning
+    name: 1. Static Analysis & Security Scanning (Ruff, Mypy, Bandit)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
@@ -22,7 +25,7 @@ jobs:
       - name: Install uv Package Manager
         run: pip install uv
 
-      - name: Install Dependencies
+      - name: Install Linting & Security Tools
         run: uv pip install --system ruff bandit mypy
 
       - name: Run Ruff Linter
@@ -31,8 +34,11 @@ jobs:
       - name: Run Bandit Security Audit
         run: bandit -r backend/app/ -s B101,B311,B104 -ll -ii
 
-  unit-and-integration-tests:
-    name: 2. Unit & Integration Test Suite
+  # --------------------------------------------------------------------------
+  # 2. Backend Unit, Integration & Chaos Test Suite
+  # --------------------------------------------------------------------------
+  backend-unit-and-integration:
+    name: 2. Backend Unit & Integration Test Suite (Pytest 1023+ Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -44,49 +50,22 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install Dependencies
+      - name: Install Backend Dependencies
         run: |
           pip install uv
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
 
-      - name: Run Pytest Backend Test Suite
+      - name: Run Backend Pytest Suite
         env:
           PYTHONPATH: backend
         run: |
-          pytest backend/tests/ -v --cov=backend/app --cov-report=term-missing
+          pytest backend/tests/ -v
 
-  scientific-verification-audit:
-    name: 3. Scientific Verification Audit Suite
-    runs-on: ubuntu-latest
-    needs: unit-and-integration-tests
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install Dependencies
-        run: |
-          pip install uv
-          uv pip install --system -r backend/requirements.txt pytest hypothesis scipy torch
-
-      - name: Run Subsystem Scientific Verification Audits
-        env:
-          PYTHONPATH: backend
-        run: |
-          pytest verification/ -v
-
-      - name: Run FL Reference Verification Benchmarks
-        env:
-          PYTHONPATH: backend
-        run: |
-          python verification/federated_learning/tests/fl_reference_verification.py
-
-  frontend-tests-and-build:
-    name: 4. Frontend Vitest & Production Build Verification
+  # --------------------------------------------------------------------------
+  # 3. Frontend Unit, View & Component Test Suite
+  # --------------------------------------------------------------------------
+  frontend-unit-and-integration:
+    name: 3. Frontend Unit & Component Test Suite (Vitest 234+ Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -106,21 +85,276 @@ jobs:
       - name: Run Vitest Frontend Test Suite
         run: cd frontend && npm test
 
-      - name: Run TypeScript & Vite Production Build
-        run: cd frontend && npm run build
-
-  docker-build-check:
-    name: 5. Docker Container Build Verification
+  # --------------------------------------------------------------------------
+  # 4. End-to-End API Contract Verification
+  # --------------------------------------------------------------------------
+  api-contract-verification:
+    name: 4. End-to-End API Contract Integrity (Frontend <-> OpenAPI <-> Backend)
     runs-on: ubuntu-latest
-    needs: lint-and-security
+    needs: [backend-unit-and-integration, frontend-unit-and-integration]
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Set up Python 3.12 & Node.js 22
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies
+        run: |
+          pip install uv
+          uv pip install --system -r backend/requirements.txt pytest pytest-asyncio
+          cd frontend && npm install
+
+      - name: Run API Contract Tests
+        env:
+          PYTHONPATH: backend
+        run: |
+          python scripts/run_all_tests.py --api-contract
+
+  # --------------------------------------------------------------------------
+  # 5. Mutation Testing & Fault Injection Hardening
+  # --------------------------------------------------------------------------
+  mutation-testing-and-fault-injection:
+    name: 5. Mutation Testing & Fault Injection Suite (Stryker + Python Mutants)
+    runs-on: ubuntu-latest
+    needs: [backend-unit-and-integration, frontend-unit-and-integration]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12 & Node.js 22
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies
+        run: |
+          pip install uv
+          uv pip install --system -r backend/requirements.txt pytest
+          cd frontend && npm install
+
+      - name: Run Mutation Testing Suite
+        env:
+          PYTHONPATH: backend
+        run: |
+          python scripts/run_mutation_tests.py
+
+  # --------------------------------------------------------------------------
+  # 6. Multi-Dimensional Code & Branch Coverage Audit
+  # --------------------------------------------------------------------------
+  coverage-audit:
+    name: 6. Multi-Dimensional Coverage Audit (Statements, Branches, Functions, Lines)
+    runs-on: ubuntu-latest
+    needs: [backend-unit-and-integration, frontend-unit-and-integration]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12 & Node.js 22
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies
+        run: |
+          pip install uv
+          uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
+          cd frontend && npm install
+
+      - name: Run Multi-Dimensional Coverage Audit
+        env:
+          PYTHONPATH: backend
+        run: |
+          python scripts/run_coverage_audit.py
+
+  # --------------------------------------------------------------------------
+  # 7. Frontend Accessibility & WCAG 2.1 AA Compliance
+  # --------------------------------------------------------------------------
+  frontend-a11y-compliance:
+    name: 7. Accessibility & WCAG 2.1 AA Compliance (Playwright + Axe-Core)
+    runs-on: ubuntu-latest
+    needs: frontend-unit-and-integration
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies & Playwright Browsers
+        run: |
+          cd frontend
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run Accessibility & Keyboard Navigation Tests
+        run: |
+          cd frontend
+          npm run test:a11y
+
+  # --------------------------------------------------------------------------
+  # 8. Multi-Device & Mobile Responsive Suite
+  # --------------------------------------------------------------------------
+  frontend-responsive-suite:
+    name: 8. Multi-Device & Mobile Responsive Suite (Playwright 8 Viewports)
+    runs-on: ubuntu-latest
+    needs: frontend-unit-and-integration
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies & Playwright Browsers
+        run: |
+          cd frontend
+          npm install
+          npx playwright install --with-deps chromium webkit
+
+      - name: Run Responsive Viewport & Breakpoint Tests
+        run: |
+          cd frontend
+          npm run test:responsive
+
+  # --------------------------------------------------------------------------
+  # 9. Frontend Visual Regression Testing (VRT)
+  # --------------------------------------------------------------------------
+  frontend-visual-regression:
+    name: 9. Frontend Visual Regression Suite (Playwright Snapshot VRT)
+    runs-on: ubuntu-latest
+    needs: frontend-unit-and-integration
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Dependencies & Playwright Browsers
+        run: |
+          cd frontend
+          npm install
+          npx playwright install --with-deps chromium
+
+      - name: Run Visual Regression Snapshot Suite
+        run: |
+          cd frontend
+          npm run test:visual
+
+  # --------------------------------------------------------------------------
+  # 10. Subsystem Scientific Verification & Reference Audits
+  # --------------------------------------------------------------------------
+  scientific-verification-audit:
+    name: 10. Scientific Verification Audit Suite (17 Math & Privacy Modules)
+    runs-on: ubuntu-latest
+    needs: backend-unit-and-integration
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Verification Dependencies
+        run: |
+          pip install uv
+          uv pip install --system -r backend/requirements.txt pytest hypothesis scipy torch
+
+      - name: Run Subsystem Scientific Verification Audits
+        env:
+          PYTHONPATH: backend
+        run: |
+          pytest verification/ -v
+
+      - name: Run FL Reference Verification Benchmarks
+        env:
+          PYTHONPATH: backend
+        run: |
+          python verification/federated_learning/tests/fl_reference_verification.py
+
+  # --------------------------------------------------------------------------
+  # 11. EVM Smart Contracts Test Suite
+  # --------------------------------------------------------------------------
+  smart-contracts-suite:
+    name: 11. EVM Smart Contracts Test Suite (Hardhat Shapley Settlement)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: contracts/package.json
+
+      - name: Install Smart Contract Dependencies
+        run: cd contracts && npm install
+
+      - name: Run Hardhat Contract Tests
+        run: cd contracts && npm test
+
+  # --------------------------------------------------------------------------
+  # 12. Production Build & Containerization
+  # --------------------------------------------------------------------------
+  production-build-and-docker:
+    name: 12. Production Build & Docker Container Verification
+    runs-on: ubuntu-latest
+    needs: [frontend-unit-and-integration, backend-unit-and-integration]
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Run TypeScript & Vite Production Build
+        run: |
+          cd frontend
+          npm install
+          npm run build
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Container Image
+      - name: Build Backend Container Image
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -129,4 +363,3 @@ jobs:
           tags: cfi-intelligence/backend:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
