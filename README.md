@@ -4,7 +4,7 @@
 
 ### Privacy-Preserving Cross-Bank Financial Fraud Detection and Anti-Money Laundering Architecture
 
-[![CI Build](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml/badge.svg)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![CI Build](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml)
 [![Vercel Deployment](https://img.shields.io/badge/Vercel-Live_Demo-000000.svg?style=flat&logo=vercel&logoColor=white)](https://cf-intelligence.vercel.app)
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
@@ -340,16 +340,16 @@ Orchestrates global model training rounds supporting 7 distinct aggregation algo
 ### 6.1 PET Cryptographic Security Matrix
 
 | PET Technology | Core Driver | Cryptographic Mechanism | Security Guarantee | Hardware Dependency |
-|:---|:---|:---|:---|:---|
-| **Opacus DP** | `privacy_service.py` | Gaussian noise addition ($\sigma = \frac{\sqrt{2\ln(1.25/\delta)}}{\epsilon}$) + $L_2$ norm clipping ($C$) | $(\epsilon, \delta)$-Differential Privacy loss bound | None (PyTorch) |
-| **P2P Curve25519 SecAgg** | `p2p_secagg_driver.py` | Zero-sum pairwise masking via X25519 ECDH + HKDF-SHA256 + HMAC-SHA256 PRG. No server-side secrets. $\sum_u y_u \equiv \sum_u w_u \pmod{2^{32}}$ | ✅ Implemented | None (Pure Software) |
-| **TenSEAL CKKS FHE** | `fhe_driver.py` | Microsoft SEAL CKKS polynomial ring scheme ($N=8192, 2^{40}$) | Zero-knowledge server-side homomorphic weighted addition | CPU / AVX2 |
-| **Hardware TEE Enclave** | `tee_driver.py` | Intel SGX / AWS Nitro Enclave remote attestation & MRENCLAVE measurement | Confidential computing with hardware isolation & AES-256-GCM sealed memory | SGX / Nitro CPU |
-| **zk-SNARK Attestation** | `zk_snark_verifier.py` | Groth16 / PlonK over BN254 elliptic curve + Poseidon hash commitment | $O(1)$ constant time proof verification ($<5\text{ms}$ SLA) | CPU / Native Circom |
-| **Confidential Unlearning** | `federated_unlearning_engine.py` | First-Order Hessian Inversion + Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}$) | Erases evicted bank gradient footprints ($P_{\text{MIA}} \le 0.52$) without retraining | CPU / PyTorch Autograd |
-| **Post-Quantum Cryptography** | `pqc_secagg_driver.py` | NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) + FIPS 204 (Dilithium-3 signatures) | Quantum-safe lattice-based hybrid P2P SecAgg ($<1.5\text{ms}$ SLA) | CPU / Native HKDF |
-| **Cross-Chain Bridge** | `layer2_crosschain_bridge.py` | Chainlink CCIP `EVM2AnyMessage` & LayerZero V2 multi-ledger settlement | Arbitrum, Optimism, Canton Network & Fabric CBDC routing ($<1\text{s}$ L2 Finality) | EVM / Canton / Fabric |
-| **Adaptive DP Auto-Scaler** | `adaptive_dp_autoscaler.py` | Rényi Differential Privacy (RDP) & PRV accountant with dynamic noise ($\sigma_t$) | Loss-velocity anti-overnoising auto-scaler preserving fraud AUC-ROC ($>0.94$) | CPU / Numerical Dual |
+| :--- | :--- | :--- | :--- | :--- |
+| **Opacus DP** | `privacy_service.py` | Gaussian noise ($\sigma = \frac{\sqrt{2\ln(1.25/\delta)}}{\epsilon}$) + $L_2$ norm clip ($C$) | $(\epsilon, \delta)$-DP privacy loss bound | None (PyTorch) |
+| **Curve25519 SecAgg** | `p2p_secagg_driver.py` | Pairwise masking (X25519 ECDH + HKDF-SHA256 + Shamir SS) | Zero-sum mask cancellation ($\sum y_u \equiv \sum w_u$) | None (Pure Software) |
+| **TenSEAL CKKS FHE** | `fhe_driver.py` | Microsoft SEAL CKKS polynomial ring ($N=8192, 2^{40}$) | Zero-knowledge homomorphic addition | CPU / AVX2 |
+| **Hardware TEE** | `tee_driver.py` | Intel SGX / Nitro Enclave remote attestation & MRENCLAVE | Isolated enclave & AES-256 sealed memory | SGX / Nitro CPU |
+| **zk-SNARK Attestation** | `zk_snark_verifier.py` | Groth16 / PlonK over BN254 + Poseidon hash commitment | $O(1)$ constant-time proof ($<5\text{ms}$ SLA) | CPU / Circom |
+| **Confidential Unlearning**| `federated_unlearning_engine.py` | Sub-sampled Newton Steps ($\delta W = - H^{-1} \nabla \mathcal{L}$) | Erases gradient footprint ($P_{\text{MIA}} \le 0.52$) | CPU / PyTorch |
+| **Post-Quantum Crypto** | `pqc_secagg_driver.py` | NIST FIPS 203 (Kyber-768) + FIPS 204 (Dilithium-3) | Quantum-safe lattice hybrid SecAgg ($<1.5\text{ms}$) | CPU / Native HKDF |
+| **Cross-Chain Bridge** | `layer2_crosschain_bridge.py` | Chainlink CCIP `EVM2AnyMessage` & LayerZero V2 | Arbitrum, Optimism, Canton & Fabric ($<1\text{s}$) | EVM / Canton / Fabric |
+| **Adaptive DP Auto-Scaler**| `adaptive_dp_autoscaler.py` | Rényi DP (RDP) & PRV accountant with dynamic noise ($\sigma_t$) | Loss-velocity auto-scaling (AUC-ROC $>0.94$) | CPU / Numerical Dual |
 
 ### 6.2 Mathematical Privacy Formulations
 - Gradient Norm Clipping ($C$):
@@ -605,12 +605,12 @@ CF-Intelligence employs a transparent, hybrid subscription and usage-based comme
 
 All institutional deployments are governed by standardized B2B contract templates in `docs/legal/`:
 
-* **Data Processing Agreement (DPA)**: [`docs/legal/data_processing_agreement.md`](docs/legal/data_processing_agreement.md) — Enforces GDPR Art. 28, KVKK, and the binding **Zero-Raw-PII technical guarantee**.
-* **Terms of Service & Governance (ToS)**: [`docs/legal/terms_of_service.md`](docs/legal/terms_of_service.md) — Consortium participation rules, Byzantine poisoning penalties, and IP ownership boundaries.
-* **Risk Decision Liability & Safe Harbor**: [`docs/legal/liability_and_decision_governance.md`](docs/legal/liability_and_decision_governance.md) — Clarifies statutory allocation of liability for **False Positives (Wrongful Blocks)** and **False Negatives** under EU AI Act Art. 14 & PSD2.
-* **Service Level Agreement (SLA)**: [`docs/legal/service_level_agreement.md`](docs/legal/service_level_agreement.md) — 99.99% uptime commitments, $<15\text{ms}$ latency guarantees, and automated **Service Credit** penalty discount matrices.
-* **Enterprise Privacy Policy**: [`docs/legal/enterprise_privacy_policy.md`](docs/legal/enterprise_privacy_policy.md) — Mathematical Rényi Differential Privacy ($\varepsilon=1.0, \delta=10^{-5}$) and Hessian Inversion unlearning specifications.
-* **Commercial Model & ROI Spec**: [`docs/business_model_and_pricing.md`](docs/business_model_and_pricing.md) — Detailed financial payback formulations, TCO breakdowns, and professional services catalog.
+* **Data Processing Agreement (DPA)**: [`docs/legal/data_processing_agreement.md`](docs/legal/data_processing_agreement.md) - Enforces GDPR Art. 28, KVKK, and the binding **Zero-Raw-PII technical guarantee**.
+* **Terms of Service & Governance (ToS)**: [`docs/legal/terms_of_service.md`](docs/legal/terms_of_service.md) - Consortium participation rules, Byzantine poisoning penalties, and IP ownership boundaries.
+* **Risk Decision Liability & Safe Harbor**: [`docs/legal/liability_and_decision_governance.md`](docs/legal/liability_and_decision_governance.md) - Clarifies statutory allocation of liability for **False Positives (Wrongful Blocks)** and **False Negatives** under EU AI Act Art. 14 & PSD2.
+* **Service Level Agreement (SLA)**: [`docs/legal/service_level_agreement.md`](docs/legal/service_level_agreement.md) - 99.99% uptime commitments, $<15\text{ms}$ latency guarantees, and automated **Service Credit** penalty discount matrices.
+* **Enterprise Privacy Policy**: [`docs/legal/enterprise_privacy_policy.md`](docs/legal/enterprise_privacy_policy.md) - Mathematical Rényi Differential Privacy ($\varepsilon=1.0, \delta=10^{-5}$) and Hessian Inversion unlearning specifications.
+* **Commercial Model & ROI Spec**: [`docs/business_model_and_pricing.md`](docs/business_model_and_pricing.md) - Detailed financial payback formulations, TCO breakdowns, and professional services catalog.
 
 ---
 
@@ -619,31 +619,18 @@ All institutional deployments are governed by standardized B2B contract template
 > **Engineering Integrity Note:**  
 > The architectural choices below were engineered to address concrete mathematical and operational failure modes in distributed financial systems, documented comprehensively in **[docs/engineering_decisions.md](docs/engineering_decisions.md)** (18 Architecture Decision Records):
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                               ARCHITECTURAL RATIONALE SUMMARY MATRIX                                   │
-├────────────────────────────────┬───────────────────────────────────────┬───────────────────────────────┤
-│ CORE SYSTEM DECISION           │ FAILURE MODE OF NAIVE ALTERNATIVE     │ PRODUCTION SOLUTION IN CFI    │
-├────────────────────────────────┼───────────────────────────────────────┼───────────────────────────────┤
-│ **FedProx / SCAFFOLD vs FedAvg**│ Client Drift on Dirichlet skew (α=0.5)│ Proximal regularization (μ) & │
-│                                │ causes global weight divergence.      │ variance-reduced control vars.│
-├────────────────────────────────┼───────────────────────────────────────┼───────────────────────────────┤
-│ **Multi-Krum & Trimmed Mean**  │ Single malicious node can poison      │ Pairwise distance minimization│
-│ **vs Simple Average**          │ linear aggregation arbitrarily.       │ tolerating f < n/2 Byzantine. │
-├────────────────────────────────┼───────────────────────────────────────┼───────────────────────────────┤
-│ **Rényi DP (ε=1.0, δ=10^-5)**  │ Linear composition exhausts budget;   │ Sub-linear O(sqrt(T)) moments │
-│ **vs Naive Composition**       │ ε>10 leaks MIA; ε<0.1 destroys recall.│ accounting with Opacus.       │
-├────────────────────────────────┼───────────────────────────────────────┼───────────────────────────────┤
-│ **GNN + Tabular Ensemble**     │ Standalone XGBoost is blind to        │ 2-hop topological embeddings  │
-│ **vs Single-Point Classifiers**│ multi-bank smurfing rings.            │ (+19.2% multi-bank recall).   │
-└────────────────────────────────┴───────────────────────────────────────┴───────────────────────────────┘
-```
+| Core System Decision | Failure Mode of Naive Alternative | Production Solution in CFI |
+| :--- | :--- | :--- |
+| **FedProx / SCAFFOLD vs FedAvg** | Client Drift on Dirichlet skew ($\alpha=0.5$) causes global weight divergence. | Proximal regularization ($\mu$) & variance-reduced control variates. |
+| **Multi-Krum & Trimmed Mean vs Simple Average** | Single malicious node can poison linear aggregation arbitrarily. | Pairwise distance minimization tolerating $f < n/2$ Byzantine nodes. |
+| **Rényi DP ($\varepsilon=1.0, \delta=10^{-5}$) vs Naive Composition** | Linear composition exhausts budget; $\varepsilon>10$ leaks MIA; $\varepsilon<0.1$ destroys recall. | Sub-linear $\mathcal{O}(\sqrt{T})$ moments accounting with Opacus. |
+| **GNN + Tabular Ensemble vs Single-Point Classifiers** | Standalone XGBoost is blind to multi-bank smurfing rings. | 2-hop topological embeddings ($+19.2\%$ multi-bank recall). |
 
 1. **Why FedProx & SCAFFOLD over naive FedAvg?**  
-   Standard `FedAvg` assumes IID data distributions. In real banking consortia, institutions exhibit severe Non-IID Dirichlet distribution skew ($\alpha \le 0.50$) — Bank A handles retail POS, Bank B handles international wires. This causes **Client Drift**, where local SGD updates diverge toward conflicting local minima. `FedProx` bounds divergence via a proximal term $\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|^2$, while `SCAFFOLD` applies control variates ($c_i$) to correct gradient trajectories.
+   Standard `FedAvg` assumes IID data distributions. In real banking consortia, institutions exhibit severe Non-IID Dirichlet distribution skew ($\alpha \le 0.50$) - Bank A handles retail POS, Bank B handles international wires. This causes **Client Drift**, where local SGD updates diverge toward conflicting local minima. `FedProx` bounds divergence via a proximal term $\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|^2$, while `SCAFFOLD` applies control variates ($c_i$) to correct gradient trajectories.
 
 2. **Why Byzantine-Robust Aggregation (Multi-Krum & Trimmed Mean)?**  
-   Linear weighted averaging has a breakdown point of $0\%$ — a single rogue or compromised node sending sign-flipped gradients ($-\gamma \nabla \mathcal{L}$) can destroy global convergence. `Multi-Krum` selects updates that minimize Euclidean distance sums across neighbor manifolds, provably tolerating up to $f < n/2$ Byzantine attackers.
+   Linear weighted averaging has a breakdown point of $0\%$ - a single rogue or compromised node sending sign-flipped gradients ($-\gamma \nabla \mathcal{L}$) can destroy global convergence. `Multi-Krum` selects updates that minimize Euclidean distance sums across neighbor manifolds, provably tolerating up to $f < n/2$ Byzantine attackers.
 
 3. **How was the Differential Privacy Budget Calibrated ($\varepsilon=1.0, \delta=10^{-5}$)?**  
    $\varepsilon$ is not arbitrary: $\varepsilon > 10.0$ yields negligible empirical defense against Membership Inference Attacks (MIA), while $\varepsilon < 0.1$ destroys gradient utility (fraud recall drops below $30\%$). $\varepsilon = 1.0$ is the empirical financial sweet spot (MIA accuracy $\le 52.4\% \approx$ random guessing, fraud recall $> 62.4\%$). Cumulative loss across $100+$ rounds is tracked via **Rényi Differential Privacy (RDP)** moments accountant, achieving $\mathcal{O}(\sqrt{T})$ composition rather than pessimistic linear summation ($\sum \varepsilon_t$).
@@ -658,25 +645,25 @@ All institutional deployments are governed by standardized B2B contract template
 > **Note on Verification Methodology:**  
 > The reports below represent **automated, internal scientific verification suites** designed to rigorously validate mathematical invariants, differential privacy bounds ($\varepsilon, \delta$), cryptographic guarantees, and algorithmic correctness across the codebase. They serve as continuous automated regression baselines and technical audit-readiness documentation prior to formal external third-party certification.
 
-| Subsystem Module | Target Component Scope | Verification Document | Internal Suite Status |
+| Subsystem Module | Target Component Scope | Scientific Verification Audit | Status |
 | :--- | :--- | :--- | :---: |
-| **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py`, `async_fl_engine.py` | [`verification/federated_learning/scientific_audit_report.md`](verification/federated_learning/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Differential Privacy** | `privacy_service.py`, `label_privacy_guard.py`, `psi_service.py` | [`verification/differential_privacy/scientific_audit_report.md`](verification/differential_privacy/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Secure Aggregation & FHE** | `tee_driver.py`, `fhe_driver.py`, `p2p_secagg_driver.py` | [`verification/security/scientific_audit_report.md`](verification/security/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Zero-Trust PKI & Security** | `vault_client.py`, `mtls_manager.py`, `abac_engine.py` | [`verification/zero_trust_pki/scientific_audit_report.md`](verification/zero_trust_pki/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Federation Coordinator** | `coordinator_service.py`, `consortium_service.py` | [`verification/federation_coordinator/scientific_audit_report.md`](verification/federation_coordinator/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **AML Risk Scoring Engine** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [`verification/risk_scoring/scientific_audit_report.md`](verification/risk_scoring/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Graph Intelligence (FedGNN)** | `graph_embedding_model.py`, `graph_embedding_service.py` | [`verification/graph_intelligence/scientific_audit_report.md`](verification/graph_intelligence/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Model Drift Detection** | `drift_service.py`, `retraining_trigger_engine.py` | [`verification/drift_detection/scientific_audit_report.md`](verification/drift_detection/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Explainability (XAI)** | `explainability_service.py`, `realtime_explainer.py` | [`verification/explainability/scientific_audit_report.md`](verification/explainability/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Financial Connectors** | `iso20022_connector.py`, `open_banking_connector.py` | [`verification/connectors/scientific_audit_report.md`](verification/connectors/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **ETL & Data Pipeline** | `data_generator.py`, `data_validator.py` | [`verification/etl_pipeline/scientific_audit_report.md`](verification/etl_pipeline/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Smart Contracts Suite** | `ConsortiumIncentiveSettlement.sol`, `deploy.js` | [`verification/smart_contracts/scientific_audit_report.md`](verification/smart_contracts/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Audit Logging & Compliance** | `security_compliance.py`, `privacy_audit_service.py` | [`verification/audit_logging/scientific_audit_report.md`](verification/audit_logging/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **API Gateway & Middleware** | `main.py`, `routers/`, `websockets/` | [`verification/api/scientific_audit_report.md`](verification/api/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Telemetry & Observability** | `prometheus`, `opentelemetry`, `metrics_service.py` | [`verification/telemetry/scientific_audit_report.md`](verification/telemetry/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Terraform IaC & Cloud** | `main.tf`, `variables.tf`, `helm/` | [`verification/terraform_iac/scientific_audit_report.md`](verification/terraform_iac/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
-| **Master Mathematical Protocol** | 35 Formulas Across All Subsystems | [`verification/mathematical/scientific_audit_report.md`](verification/mathematical/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py`, `async_fl_engine.py` | [Audit Report ↗](verification/federated_learning/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Differential Privacy** | `privacy_service.py`, `label_privacy_guard.py`, `psi_service.py` | [Audit Report ↗](verification/differential_privacy/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Secure Aggregation & FHE** | `tee_driver.py`, `fhe_driver.py`, `p2p_secagg_driver.py` | [Audit Report ↗](verification/security/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Zero-Trust PKI & Security** | `vault_client.py`, `mtls_manager.py`, `abac_engine.py` | [Audit Report ↗](verification/zero_trust_pki/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Federation Coordinator** | `coordinator_service.py`, `consortium_service.py` | [Audit Report ↗](verification/federation_coordinator/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **AML Risk Scoring Engine** | `risk_engine.py`, `policy_engine.py`, `alert_service.py` | [Audit Report ↗](verification/risk_scoring/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Graph Intelligence (FedGNN)** | `graph_embedding_model.py`, `graph_embedding_service.py` | [Audit Report ↗](verification/graph_intelligence/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Model Drift Detection** | `drift_service.py`, `retraining_trigger_engine.py` | [Audit Report ↗](verification/drift_detection/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Explainability (XAI)** | `explainability_service.py`, `realtime_explainer.py` | [Audit Report ↗](verification/explainability/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Financial Connectors** | `iso20022_connector.py`, `open_banking_connector.py` | [Audit Report ↗](verification/connectors/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **ETL & Data Pipeline** | `data_generator.py`, `data_validator.py` | [Audit Report ↗](verification/etl_pipeline/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Smart Contracts Suite** | `ConsortiumIncentiveSettlement.sol`, `deploy.js` | [Audit Report ↗](verification/smart_contracts/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Audit Logging & Compliance** | `security_compliance.py`, `privacy_audit_service.py` | [Audit Report ↗](verification/audit_logging/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **API Gateway & Middleware** | `main.py`, `routers/`, `websockets/` | [Audit Report ↗](verification/api/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Telemetry & Observability** | `prometheus`, `opentelemetry`, `metrics_service.py` | [Audit Report ↗](verification/telemetry/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Terraform IaC & Cloud** | `main.tf`, `variables.tf`, `helm/` | [Audit Report ↗](verification/terraform_iac/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
+| **Master Mathematical Protocol** | 35 Formulas Across All Subsystems | [Audit Report ↗](verification/mathematical/scientific_audit_report.md) | `SELF-VERIFIED (100% Pass)` |
 
 ---
 
@@ -802,7 +789,7 @@ This platform synthesizes and operationalizes research from the following founda
 | Reference | Contribution to This Platform |
 | :--- | :--- |
 | McMahan et al. (2017). *Communication-Efficient Learning of Deep Networks from Decentralized Data.* AISTATS. | FedAvg aggregation algorithm (`fl_engine.py`) |
-| Bonawitz et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS. | SecAgg zero-sum pairwise masking protocol (`p2p_secagg_driver.py` — Curve25519 ECDH + HKDF-SHA256) |
+| Bonawitz et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS. | SecAgg zero-sum pairwise masking protocol (`p2p_secagg_driver.py` - Curve25519 ECDH + HKDF-SHA256) |
 | Abadi et al. (2016). *Deep Learning with Differential Privacy.* ACM CCS. | Opacus DP Gaussian noise + L2 clip guard (`privacy_service.py`) |
 | Blanchard et al. (2017). *Machine Learning with Adversaries: Byzantine Tolerant Gradient Descent.* NeurIPS. | Krum and Multi-Krum robust aggregators (`fl_engine.py`) |
 | Yin et al. (2018). *Byzantine-Robust Distributed Learning: Towards Optimal Statistical Rates.* ICML. | Trimmed Mean and coordinate-wise Median aggregators |

@@ -100,8 +100,8 @@ class TestAMLSimLoader:
 class TestPaySimLoader:
     def test_mock_returns_correct_shape(self, tmp_path):
         result = load_paysim(path=tmp_path / "nonexistent", n_mock_txns=400, rng=np.random.default_rng(0))
-        assert result["source"] == "mock"
-        assert result["X"].shape == (400, 29)
+        assert "mock" in result["source"]
+        assert result["X"].shape == (400, 13)
         assert result["y"].shape == (400,)
 
 
@@ -115,7 +115,10 @@ class TestLoadDatasetRegistry:
         assert d2["X"].shape == (100, 6)
 
         d3 = load_dataset("paysim", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
-        assert d3["X"].shape == (100, 29)
+        assert d3["X"].shape == (100, 13)
+
+        d4 = load_dataset("creditcard", path=tmp_path / "nonexistent", n_mock_txns=100, rng=np.random.default_rng(0))
+        assert d4["X"].shape == (100, 29)
 
     def test_unknown_dataset_raises(self):
         with pytest.raises(ValueError, match="Unknown dataset"):
