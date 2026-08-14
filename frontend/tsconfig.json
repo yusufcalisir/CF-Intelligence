@@ -1,1 +1,25 @@
-{  "compilerOptions": {    "target": "ES2022",    "lib": ["ES2023", "DOM", "DOM.Iterable"],    "module": "ESNext",    "skipLibCheck": true,    "moduleResolution": "bundler",    "allowImportingTsExtensions": true,    "isolatedModules": true,    "moduleDetection": "force",    "noEmit": true,    "jsx": "react-jsx",    "strict": true,    "noUnusedLocals": true,    "noUnusedParameters": true,    "noFallthroughCasesInSwitch": true,    "noUncheckedIndexedAccess": true,    "baseUrl": ".",    "paths": {      "@/*": ["src/*"]    }  },  "include": ["src"],  "exclude": ["src/**/__tests__/**", "src/**/*.test.ts", "src/**/*.test.tsx"]}
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+    "types": ["@testing-library/jest-dom/vitest"]
+  },
+  "include": ["src", "vitest.setup.ts"]
+}

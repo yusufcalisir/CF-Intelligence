@@ -8,6 +8,7 @@ describe('BankCard Component', () => {
     id: 'bank_a',
     name: 'Meridian National Bank',
     tier: 'tier_1',
+    description: 'Tier 1 Global National Bank',
     default_transactions: 125000,
     default_fraud_ratio: 0.024,
     fraud_pattern: 'High-frequency cross-border structuring',

@@ -23,6 +23,8 @@ describe('CounterfactualWorkbench Component (User Interaction)', () => {
       alert_id: 'alt_1001',
       original_score: 820.0,
       target_score: 350.0,
+      remediated_score: 345.0,
+      is_cleared: true,
       changes: [
         {
           feature: 'velocity',

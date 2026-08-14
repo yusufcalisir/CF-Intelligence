@@ -1,5 +1,4 @@
-import React from 'react';
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
@@ -45,7 +44,10 @@ describe('BenchmarkHubPage', () => {
     expect(screen.getByText(/284k European transactions transformed via PCA/i)).toBeInTheDocument();
 
     // Click PaySim
-    fireEvent.click(screen.getAllByText(/PaySim Mobile Money/i)[0]);
+    const paySimButton = screen.getAllByText(/PaySim Mobile Money/i)[0];
+    if (paySimButton) {
+      fireEvent.click(paySimButton);
+    }
     expect(screen.getByText(/Derived from real M-Pesa mobile transaction logs/i)).toBeInTheDocument();
   });
 

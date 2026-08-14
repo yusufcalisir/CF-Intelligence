@@ -24,6 +24,9 @@ describe('FLRoundRunner Component (User Interaction)', () => {
         global_auc: 0.78,
         privacy_spent: 0.2,
         per_bank_loss: { bank_a: 0.62, bank_b: 0.68, bank_c: 0.65 },
+        participating_bank_ids: ['bank_a', 'bank_b', 'bank_c'],
+        dropped_bank_ids: [],
+        aggregation_time_ms: 240,
         status: 'COMPLETED' as const,
       },
     ];

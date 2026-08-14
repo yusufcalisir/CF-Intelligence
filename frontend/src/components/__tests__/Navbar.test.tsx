@@ -11,7 +11,13 @@ describe('Navbar Component (User Interaction)', () => {
         setActiveTab={vi.fn()}
         selectedBank="all"
         setSelectedBank={vi.fn()}
-        health={{ status: 'healthy', database: 'connected', version: '1.4.2' }}
+        health={{
+          status: 'healthy',
+          service: 'fraud-platform',
+          environment: 'production',
+          redis_connected: true,
+          version: '1.4.2',
+        }}
       />
     );
 
@@ -32,7 +38,13 @@ describe('Navbar Component (User Interaction)', () => {
         setActiveTab={setActiveTab}
         selectedBank="all"
         setSelectedBank={setSelectedBank}
-        health={{ status: 'healthy', database: 'connected', version: '1.4.2' }}
+        health={{
+          status: 'healthy',
+          service: 'fraud-platform',
+          environment: 'production',
+          redis_connected: true,
+          version: '1.4.2',
+        }}
       />
     );
 

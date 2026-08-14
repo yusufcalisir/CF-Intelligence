@@ -28,19 +28,18 @@ describe('services/api', () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('FL service down'));
     const rounds = await runFLSimulation({
       num_rounds: 3,
-      learning_rate: 0.01,
-      batch_size: 64,
       local_epochs: 2,
+      learning_rate: 0.01,
+      algorithm: 'FED_AVG',
       dp_epsilon: 1.0,
       dp_delta: 1e-5,
-      dp_max_grad_norm: 1.0,
-      aggregation_method: 'fed_avg',
-      byzantine_tolerance: 0,
     });
 
     expect(rounds).toHaveLength(3);
-    expect(rounds[0].round_number).toBe(1);
-    expect(rounds[2].round_number).toBe(3);
-    expect(rounds[0].global_loss).toBeGreaterThan(0);
+    const round0 = rounds[0];
+    const round2 = rounds[2];
+    expect(round0?.round_number).toBe(1);
+    expect(round2?.round_number).toBe(3);
+    expect(round0?.global_loss).toBeGreaterThan(0);
   });
 });

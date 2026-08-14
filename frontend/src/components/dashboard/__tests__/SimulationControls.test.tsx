@@ -28,7 +28,7 @@ describe('SimulationControls Component (User Interaction)', () => {
     const user = userEvent.setup();
     const onCreated = vi.fn();
 
-    const mockMutate = vi.fn().mockImplementation((config, options) => {
+    const mockMutate = vi.fn().mockImplementation((_config, options) => {
       options?.onSuccess?.({ id: 'sim_new_123' });
     });
 

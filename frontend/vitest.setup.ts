@@ -98,6 +98,6 @@ const createMockWebGLContext = () => ({
   getProgramParameter: vi.fn(() => true),
 });
 
-HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((type: string) => {
+HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((_type: string) => {
   return createMockWebGLContext();
 }) as any;
