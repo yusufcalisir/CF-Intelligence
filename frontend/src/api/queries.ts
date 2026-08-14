@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type {
   Alert,
@@ -248,28 +248,43 @@ export function useCase(id: string | undefined) {
 }
 
 export function useCreateCase() {
+  const queryClient = useQueryClient();
   return useMutation<Case, Error, { title: string; priority?: string; alert_ids?: string[] }>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post('/api/v1/cases', payload);
       return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
   });
 }
 
 export function useUpdateCaseStatus() {
+  const queryClient = useQueryClient();
   return useMutation<Case, Error, { caseId: string; status: string; actor?: string; supervisor_signature?: string }>({
     mutationFn: async ({ caseId, ...body }) => {
       const { data } = await apiClient.patch(`/api/v1/cases/${caseId}`, body);
       return data;
     },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
   });
 }
 
 export function useAddCaseNote() {
+  const queryClient = useQueryClient();
   return useMutation<unknown, Error, { caseId: string; author: string; content: string }>({
     mutationFn: async ({ caseId, ...body }) => {
       const { data } = await apiClient.post(`/api/v1/cases/${caseId}/notes`, body);
       return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
     },
   });
 }
@@ -543,28 +558,40 @@ export function useRules() {
 }
 
 export function useCreateRule() {
+  const queryClient = useQueryClient();
   return useMutation<BusinessRule, Error, { rule_name: string; condition: Record<string, any>; action: string; is_active: boolean }>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post('/api/v1/rules', payload);
       return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
+    },
   });
 }
 
 export function useUpdateRule() {
+  const queryClient = useQueryClient();
   return useMutation<BusinessRule, Error, { id: string; rule_name?: string; condition?: Record<string, any>; action?: string; is_active?: boolean }>({
     mutationFn: async ({ id, ...payload }) => {
       const { data } = await apiClient.put(`/api/v1/rules/${id}`, payload);
       return data;
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
+    },
   });
 }
 
 export function useDeleteRule() {
+  const queryClient = useQueryClient();
   return useMutation<unknown, Error, string>({
     mutationFn: async (id) => {
       const { data } = await apiClient.delete(`/api/v1/rules/${id}`);
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['business-rules'] });
     },
   });
 }
