@@ -144,6 +144,8 @@ export default function PlatformLaunchModal({ isOpen, onComplete }: PlatformLaun
 
         {/* Modal Window Container - Zero Scroll, 100% Viewport-Friendly */}
         <motion.div
+          role="dialog"
+          aria-modal="true"
           initial={{ scale: 0.94, opacity: 0, y: 10 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           exit={{ scale: 0.94, opacity: 0, y: 10 }}

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1148%2F1148_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1381%2F1381_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -790,10 +790,10 @@ npm run deploy:local
 
 ### Step 6: Run Comprehensive Automated Test Suites & Single-Command Verification
 
-The platform provides a **single unified test runner** that executes all frontend, backend, scientific verification, and smart contract suites in one command:
+The platform provides a **single unified test runner** that executes all frontend, responsive, visual regression, backend, scientific verification, and smart contract suites in one command:
 
 ```bash
-# Execute all test suites across the entire repository (1189 total tests including 36 Playwright VRT snapshots)
+# Execute all test suites across the entire repository (1381 total tests including 192 responsive & 36 Playwright VRT snapshots)
 python scripts/run_all_tests.py --all
 # or using Makefile
 make test-all
@@ -802,29 +802,54 @@ make test-all
 Alternatively, individual test tiers can be executed independently:
 
 ```bash
-# 1. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
-npm --prefix frontend test                  # Runs unified frontend suite (Unit, Integration & E2E)
+# 1. Master Single Test Suite Runner
+python scripts/run_all_tests.py              # Executes frontend, backend and scientific verification suites
+python scripts/run_all_tests.py --responsive # Runs 192 multi-device & cross-browser responsive tests
+python scripts/run_all_tests.py --visual     # Runs 36 pixel-perfect visual regression snapshots
+
+# 2. Frontend Test Suite (Vitest & RTL: 61 suites, 130 tests including 4 critical E2E business flows)
+npm --prefix frontend test                   # Runs unified frontend suite (Unit, Integration & E2E)
 # or
 make frontend-test
 
-# 2. Frontend Visual Regression Test Suite (Playwright VRT: 36 tests across 4 viewports + Dark Mode)
-npm --prefix frontend run test:visual       # Runs pixel-perfect visual regression tests against baselines
+# 3. Frontend Responsive & Cross-Browser Test Suite (Playwright: 192 tests across 8 device & browser profiles)
+npm --prefix frontend run test:responsive    # Tests zero horizontal overflow, drawer scroll-lock, modals, touch & tables
+# or
+make frontend-responsive-test
+
+# 4. Frontend Visual Regression Test Suite (Playwright VRT: 36 tests across 4 viewports + Dark Mode)
+npm --prefix frontend run test:visual        # Runs pixel-perfect visual regression tests against baselines
 # or
 make frontend-visual-test
 
-# 3. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
+# 5. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
 pytest backend/tests/ -v
 # or
 make test
 
-# 4. Scientific Verification & Audit Suite (17 verified subsystems)
+# 6. Scientific Verification & Audit Suite (17 verified subsystems)
 python scripts/run_all_verifications.py
 # or
 pytest verification/ -v
 
-# 5. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
+# 7. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
 cd contracts && npm test
 ```
+
+#### Multi-Device, Cross-Browser & Responsive Breakpoint Matrix
+
+The Playwright Responsive test framework rigorously validates layout integrity, zero horizontal overflow, touch target ergonomics, and navigation accessibility across 8 distinct device profiles and 3 browser engines:
+
+| Device Profile | Resolution | Engine / Platform | Tested Invariants & Interactions |
+| :--- | :--- | :--- | :--- |
+| **iPhone 13 Mobile** | `375 × 812` | WebKit (iOS Safari) | Zero horizontal overflow (`scrollWidth <= clientWidth`), mobile drawer toggle, body scroll locking (`overflow: hidden`), touch target sizing $\ge 36\text{px}-44\text{px}$, modal viewport fitting |
+| **Pixel 7 Android** | `412 × 915` | Chromium (Android Touch) | Horizontal table scroll wrappers (`overflow-x-auto`), multi-step bank onboarding wizard, search inputs focus & keyboard tab sequencing |
+| **iPhone SE Compact** | `320 × 568` | Mobile WebKit / Chromium | Extreme narrow viewport resilience, text wrapping without badge truncation, sticky header scroll pinning, dialog padding bounds |
+| **iPad Portrait** | `768 × 1024` | WebKit (Tablet Touch) | Dual-pane layout scaling, collapsible sidebar transition, Recharts responsive SVG dimensions, GNN topology graph viewport reflow |
+| **iPad Landscape** | `1024 × 768` | Chromium | Desktop navigation threshold transition (`lg: 1024px`), multi-column metric card grid reflow, audit chain cryptographic log legibility |
+| **Laptop Standard** | `1280 × 800` | Mozilla Firefox | Cross-browser CSS grid rendering, navigation dropdown menus, four-eyes supervisor SAR signing workflow modal bounds |
+| **Desktop High-Res** | `1440 × 900` | Chromium | Full widescreen layout parity, enterprise SLA monitoring cards, live WebSocket telemetry chart smooth container scaling |
+| **UltraWide Workstation** | `1920 × 1080` | Chromium | Max-container centering (`max-w-7xl`), zero horizontal jitter, stable header pinning on 1000px scroll |
 
 #### Visual Regression Testing (VRT) Matrix
 
@@ -839,7 +864,7 @@ The Playwright Visual Regression framework prevents CSS / Design System regressi
 | **Theme Fidelity** | Dark Mode Theme Tokens | Enterprise Dark Contrast | Glassmorphism contrast, border fidelity, chart typography, badge alignment |
 
 > **Verifiable CI/CD Pipeline & Audit Trail:**  
-> All **1189 tests (1023 backend + 130 frontend unit/e2e + 36 frontend visual snapshots)** run with 100% pass verification:  
+> All **1381 tests (1023 backend + 130 frontend unit/e2e + 192 responsive + 36 frontend visual snapshots)** run with 100% pass verification:  
 > 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
 
 

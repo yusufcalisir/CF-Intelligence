@@ -137,6 +137,8 @@ export default function BenchmarkLaunchModal({ isOpen, onComplete }: BenchmarkLa
           initial={{ opacity: 0, scale: 0.94, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.94, y: 15 }}
+          role="dialog"
+          aria-modal="true"
           transition={{ type: 'spring', damping: 26, stiffness: 260 }}
           className="relative w-full max-w-lg rounded-3xl bg-gradient-to-b from-[#0a0c28] via-[#07081a] to-[#04050e] border border-indigo-500/30 p-5 sm:p-7 shadow-[0_0_80px_rgba(99,102,241,0.25)] space-y-5 z-10 overflow-hidden"
         >

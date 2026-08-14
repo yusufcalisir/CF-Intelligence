@@ -45,8 +45,20 @@ def run_frontend_tests() -> bool:
     return success
 
 
+def run_responsive_tests() -> bool:
+    print_banner("2. RUNNING FRONTEND RESPONSIVE & DEVICE TEST SUITE (Playwright)")
+    cmd = ["npm", "--prefix", "frontend", "run", "test:responsive"]
+    start = time.perf_counter()
+    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    duration = time.perf_counter() - start
+    success = res.returncode == 0
+    status = "PASSED" if success else "FAILED"
+    print(f"\n>> Frontend Responsive Suite {status} in {duration:.2f}s")
+    return success
+
+
 def run_visual_tests() -> bool:
-    print_banner("2. RUNNING FRONTEND VISUAL REGRESSION SUITE (Playwright VRT)")
+    print_banner("3. RUNNING FRONTEND VISUAL REGRESSION SUITE (Playwright VRT)")
     cmd = ["npm", "--prefix", "frontend", "run", "test:visual"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
@@ -58,7 +70,7 @@ def run_visual_tests() -> bool:
 
 
 def run_backend_tests() -> bool:
-    print_banner("3. RUNNING BACKEND TEST SUITE (Pytest)")
+    print_banner("4. RUNNING BACKEND TEST SUITE (Pytest)")
     cmd = [sys.executable, "-m", "pytest", "backend/tests/", "-v"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT)
@@ -70,7 +82,7 @@ def run_backend_tests() -> bool:
 
 
 def run_verification_tests() -> bool:
-    print_banner("4. RUNNING SCIENTIFIC VERIFICATION SUITE")
+    print_banner("5. RUNNING SCIENTIFIC VERIFICATION SUITE")
     cmd = [sys.executable, "-m", "pytest", "verification/", "-v"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT)
@@ -82,7 +94,7 @@ def run_verification_tests() -> bool:
 
 
 def run_contract_tests() -> bool:
-    print_banner("5. RUNNING EVM SMART CONTRACTS TEST SUITE (Hardhat)")
+    print_banner("6. RUNNING EVM SMART CONTRACTS TEST SUITE (Hardhat)")
     cmd = ["npm", "--prefix", "contracts", "test"]
     start = time.perf_counter()
     res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
@@ -96,17 +108,19 @@ def run_contract_tests() -> bool:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Master Unified Test Runner for CF-Intelligence")
     parser.add_argument("--frontend", action="store_true", help="Run frontend unit & E2E tests only")
+    parser.add_argument("--responsive", action="store_true", help="Run frontend responsive & multi-device tests only")
     parser.add_argument("--visual", action="store_true", help="Run frontend visual regression tests only")
     parser.add_argument("--backend", action="store_true", help="Run backend tests only")
     parser.add_argument("--verification", action="store_true", help="Run verification tests only")
     parser.add_argument("--contracts", action="store_true", help="Run smart contract tests only")
-    parser.add_argument("--all", action="store_true", help="Run all test suites including visual & contracts")
+    parser.add_argument("--all", action="store_true", help="Run all test suites including responsive, visual & contracts")
 
     args = parser.parse_args()
 
     # Default: run frontend and backend if no specific flags
-    is_default = not args.frontend and not args.visual and not args.backend and not args.verification and not args.contracts and not args.all
+    is_default = not args.frontend and not args.responsive and not args.visual and not args.backend and not args.verification and not args.contracts and not args.all
     run_fe = args.frontend or args.all or is_default
+    run_resp = args.responsive or args.all
     run_vrt = args.visual or args.all
     run_be = args.backend or args.all or is_default
     run_ver = args.verification or args.all
@@ -117,6 +131,8 @@ def main() -> int:
 
     if run_fe:
         results["Frontend (Vitest)"] = run_frontend_tests()
+    if run_resp:
+        results["Frontend (Responsive)"] = run_responsive_tests()
     if run_vrt:
         results["Frontend (Visual VRT)"] = run_visual_tests()
     if run_be:

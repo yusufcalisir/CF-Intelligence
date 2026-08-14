@@ -13,8 +13,9 @@
     "test:e2e": "vitest run src/e2e",
     "test:integration": "vitest run src/integration src/pages",
     "test:unit": "vitest run src/components src/utils src/services src/api",
-    "test:visual": "vite build && playwright test",
-    "test:visual:update": "vite build && playwright test --update-snapshots",
+    "test:responsive": "vite build && playwright test e2e-responsive",
+    "test:visual": "vite build && playwright test e2e-visual",
+    "test:visual:update": "vite build && playwright test e2e-visual --update-snapshots",
     "test:watch": "vitest"
   },
   "dependencies": {

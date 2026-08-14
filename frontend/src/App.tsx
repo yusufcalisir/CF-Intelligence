@@ -130,6 +130,14 @@ export default function App() {
               }
             />
             <Route
+              path="/policies"
+              element={
+                <Suspense fallback={<PageFallback />}>
+                  <PoliciesPage />
+                </Suspense>
+              }
+            />
+            <Route
               path="/psi"
               element={
                 <Suspense fallback={<PageFallback />}>

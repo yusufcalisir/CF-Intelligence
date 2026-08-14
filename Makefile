@@ -69,6 +69,9 @@ frontend-lint: ## Lint frontend code
 frontend-test: ## Run frontend test suite (Vitest)
 	cd frontend && npm test
 
+frontend-responsive-test: ## Run multi-device Playwright responsive tests
+	cd frontend && npm run test:responsive
+
 frontend-visual-test: ## Run Playwright visual regression tests
 	cd frontend && npm run test:visual
 
