@@ -1,7 +1,9 @@
 """Test configuration and shared fixtures."""
 
+from typing import Any
+
 import pytest
-from typing import Dict, Any
+
 from tests.factories.data_factory import TestDataFactory
 
 
@@ -37,7 +39,7 @@ def data_factory() -> type[TestDataFactory]:
 
 
 @pytest.fixture
-def canonical_case() -> Dict[str, Any]:
+def canonical_case() -> dict[str, Any]:
     """Standard canonical case dictionary."""
     return TestDataFactory.create_case_dict(
         id="CASE-CANONICAL-PY-01",
@@ -48,7 +50,7 @@ def canonical_case() -> Dict[str, Any]:
 
 
 @pytest.fixture
-def canonical_alert() -> Dict[str, Any]:
+def canonical_alert() -> dict[str, Any]:
     """Standard canonical alert dictionary."""
     return TestDataFactory.create_alert_dict(
         id="ALT-CANONICAL-PY-01",

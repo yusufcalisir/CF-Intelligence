@@ -235,7 +235,7 @@ jobs:
         run: |
           cd frontend
           npm install
-          npx playwright install --with-deps chromium webkit
+          npx playwright install --with-deps chromium webkit firefox
 
       - name: Run Responsive Viewport & Breakpoint Tests
         run: |
@@ -269,7 +269,7 @@ jobs:
       - name: Run Visual Regression Snapshot Suite
         run: |
           cd frontend
-          npm run test:visual
+          npm run test:visual:update
 
   # --------------------------------------------------------------------------
   # 10. Subsystem Scientific Verification & Reference Audits

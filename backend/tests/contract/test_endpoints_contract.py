@@ -7,8 +7,10 @@ HTTP status code contracts, parameter validation, and data invariants.
 from __future__ import annotations
 
 import uuid
+
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 

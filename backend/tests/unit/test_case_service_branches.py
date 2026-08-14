@@ -1,6 +1,7 @@
 """Targeted Branch Coverage Tests for Case Management Service."""
 
 import pytest
+
 from app.application.services.case_service import CaseManagementService
 from app.domain.enums import CasePriority, CaseStatus
 

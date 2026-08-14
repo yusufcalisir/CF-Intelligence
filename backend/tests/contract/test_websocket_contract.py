@@ -6,9 +6,9 @@ structured JSON message schemas for real-time telemetry streaming.
 
 from __future__ import annotations
 
-import json
 import pytest
 from fastapi.testclient import TestClient
+
 from app.main import app
 
 

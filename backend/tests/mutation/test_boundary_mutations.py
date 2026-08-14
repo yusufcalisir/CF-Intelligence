@@ -7,19 +7,19 @@ Four-Eyes Principle Validation, Merkle Audit Ledger) and asserts 100% Mutant Kil
 
 from __future__ import annotations
 
-import copy
 import hashlib
-from datetime import UTC, datetime
-from typing import Any, Callable, Dict, List
-import pytest
-import numpy as np
+from typing import TYPE_CHECKING
 
+import numpy as np
+import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+from app.application.services.case_service import CaseManagementService
 from app.application.services.policy_engine import evaluate_condition
 from app.domain.byzantine_defense import SpectralByzantineDefense
-from app.application.services.case_service import CaseManagementService
 from app.domain.enums import CasePriority, CaseStatus
-from app.domain.entities_phase2 import CaseEvent, CaseNote
-
 
 # ── 1. AST Policy Engine Mutation Tests ────────────────────────────────────────
 
@@ -197,7 +197,7 @@ def test_synthetic_mutant_injection_engine():
 
     and asserts a 100% Mutation Kill Score.
     """
-    mutants: List[Mutant] = [
+    mutants: list[Mutant] = [
         # Mutant 1: AST evaluate_condition flips '>=' to '>' for threshold 5000
         Mutant(
             "AST_GTE_TO_GT_MUTANT",

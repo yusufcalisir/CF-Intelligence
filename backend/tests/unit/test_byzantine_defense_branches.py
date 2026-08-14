@@ -1,11 +1,11 @@
 """Targeted Branch Coverage Tests for Spectral Byzantine Defense and Robust FL Aggregation."""
 
 from unittest.mock import MagicMock
-import numpy as np
-import pytest
 
-from app.domain.byzantine_defense import SpectralByzantineDefense
+import numpy as np
+
 from app.application.services.fl_engine import FederatedLearningEngine
+from app.domain.byzantine_defense import SpectralByzantineDefense
 from app.domain.enums import AggregationMethod
 from app.domain.value_objects import ModelWeights
 

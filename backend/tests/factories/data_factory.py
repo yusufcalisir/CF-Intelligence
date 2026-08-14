@@ -6,9 +6,9 @@ canonical mocks for unit, integration, contract, and end-to-end test suites.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
 import hashlib
-import time
+from typing import Any
+
 import numpy as np
 
 
@@ -33,7 +33,7 @@ class TestDataFactory:
         country_code: str = "US",
         velocity_1h: float = 14.0,
         **overrides: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generates a raw transaction dictionary conforming to ISO 20022 schemas."""
         txn_id = overrides.get("transaction_id", cls._next_id("TXN"))
         base = {
@@ -64,7 +64,7 @@ class TestDataFactory:
         bank_id: str = "bank_a",
         composite_score: float = 880.0,
         **overrides: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generates a validated AML Alert payload."""
         alert_id = overrides.get("id", cls._next_id("ALT"))
         base = {
@@ -103,9 +103,9 @@ class TestDataFactory:
         cls,
         status: str = "investigating",
         priority: str = "high",
-        assigned_to: Optional[str] = "analyst_01",
+        assigned_to: str | None = "analyst_01",
         **overrides: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generates a Case Management record."""
         case_id = overrides.get("id", cls._next_id("CASE"))
         base = {
@@ -150,7 +150,7 @@ class TestDataFactory:
         case_id: str,
         content: str = '{"proof": "merkle_root_verified"}',
         **overrides: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generates a cryptographic Evidence ledger item with deterministic SHA-256."""
         ev_id = overrides.get("id", cls._next_id("EVD"))
         content_hash = hashlib.sha256(content.encode("utf-8")).hexdigest()
@@ -173,7 +173,7 @@ class TestDataFactory:
         cls,
         name: str = "Block Rapid Structuring",
         **overrides: Any,
-    ) -> Dict[str, Any]:
+    ) -> dict[str, Any]:
         """Generates a Business Rule with AST condition."""
         rule_id = overrides.get("id", cls._next_id("RULE"))
         base = {
@@ -198,9 +198,9 @@ class TestDataFactory:
     @classmethod
     def create_synthetic_weights(
         cls,
-        layer_shapes: Optional[List[tuple]] = None,
+        layer_shapes: list[tuple] | None = None,
         seed: int = 42,
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         """Generates deterministic synthetic model weights for federated aggregation testing."""
         rng = np.random.default_rng(seed)
         shapes = layer_shapes or [(16, 32), (32, 16), (16, 1)]
@@ -211,7 +211,7 @@ class TestDataFactory:
         cls,
         is_byzantine: bool = False,
         seed: int = 42,
-    ) -> List[np.ndarray]:
+    ) -> list[np.ndarray]:
         """Generates clean or malicious Byzantine gradients."""
         weights = cls.create_synthetic_weights(seed=seed)
         if is_byzantine:

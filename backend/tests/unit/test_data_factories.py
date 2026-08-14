@@ -1,7 +1,7 @@
 """Unit test suite for Centralized Backend TestDataFactory."""
 
-import pytest
 import numpy as np
+
 from tests.factories.data_factory import TestDataFactory
 
 

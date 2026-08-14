@@ -1,13 +1,13 @@
 """Targeted Branch Coverage Tests for Policy Engine AST & Service Logic."""
 
-import pytest
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app.application.services.policy_engine import (
     PolicyEngineService,
     evaluate_condition,
 )
-from app.infrastructure.models import BusinessRuleModel
 
 
 class TestPolicyEngineASTBranches:

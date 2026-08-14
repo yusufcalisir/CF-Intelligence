@@ -341,7 +341,7 @@ class ExplainabilityService:
 
                 # Define model prediction function wrapping PyTorch
                 def predict_fn(x_np: np.ndarray) -> np.ndarray:
-                    tensor_x = torch.FloatTensor(x_np)
+                    tensor_x: torch.Tensor = torch.tensor(x_np, dtype=torch.float32)
                     if hasattr(model, "network") and len(model.network) > 0:
                         first_layer = model.network[0]
                         in_feats = getattr(first_layer, "in_features", None)
