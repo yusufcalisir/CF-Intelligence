@@ -5,12 +5,15 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
+import { Settings2, FlaskConical, Zap } from 'lucide-react';
 import ModelRegistryPanel from '../components/dashboard/ModelRegistryPanel';
 import FederatedTrainingAnimation from '../components/dashboard/FederatedTrainingAnimation';
 import ComplianceReportPanel from '../components/dashboard/ComplianceReportPanel';
 import { IncentiveRegistryPanel } from '../components/dashboard/IncentiveRegistryPanel';
 import { SecureHardwarePanel } from '../components/dashboard/SecureHardwarePanel';
 import StreamingGNNPanel from '../components/dashboard/StreamingGNNPanel';
+import DatasetTrainingConfigPanel, { type TrainingMode } from '../components/DatasetTrainingConfigPanel';
+import { DATASET_PROFILES, type DatasetProfile } from '../utils/datasetProfiles';
 
 interface BankNode {
   id: string;
@@ -69,6 +72,11 @@ export default function LiveOperationsView() {
   const [isTraining, setIsTraining] = useState(false);
   const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Dataset-aware training state ──────────────────────────────────────────
+  const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(DATASET_PROFILES.paysim);
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
 
   // WebSocket live telemetry listener with automatic fallback & simulation
   useEffect(() => {
@@ -178,8 +186,8 @@ export default function LiveOperationsView() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Simulated federated training run ──────────────────────────────────────
-  const startSimulatedTraining = () => {
+  // ── Dataset-aware simulated federated training run ────────────────────────
+  const startSimulatedTraining = (profile: DatasetProfile = selectedProfile) => {
     if (isTraining) return;
     setIsTraining(true);
     setRoundHistory([]);
@@ -194,11 +202,15 @@ export default function LiveOperationsView() {
 
     runPhase('generating_data', 2000, () => {
       runPhase('training_local', 2500, () => {
-        // Simulate TOTAL_ROUNDS federated rounds
+        // Use dataset profile convergence parameters
         let round = 0;
-        let auc = 0.72;
-        let loss = 0.58;
+        let auc = profile.initialAuc;
+        let loss = profile.initialLoss;
         setTrainingPhase('training_federated');
+        setChampionAuc(profile.initialAuc);
+
+        const gaussianNoise = (std: number) =>
+          std * Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());
 
         const doRound = () => {
           if (round >= TOTAL_ROUNDS) {
@@ -209,14 +221,21 @@ export default function LiveOperationsView() {
             return;
           }
           round++;
-          auc = Math.min(0.99, auc + 0.012 + Math.random() * 0.009);
-          loss = Math.max(0.05, loss - 0.04 - Math.random() * 0.015);
+          // AUC: bounded Gaussian step toward target with diminishing returns
+          const aucRoom = profile.targetAuc - auc;
+          const aucStep = Math.max(0, profile.aucStepMean * (aucRoom / (profile.targetAuc - profile.initialAuc)) + gaussianNoise(profile.aucStepStd));
+          auc = Math.min(profile.targetAuc, auc + aucStep);
+          // Loss: exponential decay with noise
+          const lossRoom = loss - profile.targetLoss;
+          loss = Math.max(profile.targetLoss, loss - lossRoom * profile.lossDecayRate + Math.abs(gaussianNoise(0.004)));
+
+          const spread = profile.bankSpreadStd;
           const newPoint: RoundData = {
             round,
             auc: parseFloat(auc.toFixed(4)),
-            bankA: parseFloat((auc - 0.01 + Math.random() * 0.02).toFixed(4)),
-            bankB: parseFloat((auc - 0.015 + Math.random() * 0.02).toFixed(4)),
-            bankC: parseFloat((auc - 0.008 + Math.random() * 0.015).toFixed(4)),
+            bankA: parseFloat(Math.max(0.5, Math.min(0.999, auc + gaussianNoise(spread))).toFixed(4)),
+            bankB: parseFloat(Math.max(0.5, Math.min(0.999, auc + gaussianNoise(spread))).toFixed(4)),
+            bankC: parseFloat(Math.max(0.5, Math.min(0.999, auc + gaussianNoise(spread))).toFixed(4)),
             loss: parseFloat(loss.toFixed(4)),
           };
           setCurrentRound(round);
@@ -231,21 +250,42 @@ export default function LiveOperationsView() {
     });
   };
 
+  // ── Config panel launch handler ────────────────────────────────────────────
+  const handleLaunchTraining = (profile: DatasetProfile, mode: TrainingMode) => {
+    setSelectedProfile(profile);
+    setTrainingMode(mode);
+    setIsConfigOpen(false);
+    // Seed champion AUC to dataset baseline before training starts
+    setChampionAuc(profile.championAucDefault);
+
+    if (mode === 'mock') {
+      startSimulatedTraining(profile);
+    } else {
+      // Real mode: WebSocket lifecycle already running from useEffect.
+      // Mark training as live so UI shows the ⚡ indicator.
+      setTrainingPhase('training_federated');
+      setIsTraining(true);
+    }
+  };
+
   const resetTraining = () => {
     if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
     setIsTraining(false);
     setTrainingPhase('pending');
     setRoundHistory([]);
     setCurrentRound(0);
-    setChampionAuc(0.72);
+    // Reset champion AUC to current dataset's default baseline
+    setChampionAuc(selectedProfile.championAucDefault);
     setGradientSubmissions(0);
   };
 
   // Auto-start simulation when navigated from Dashboard or via simulation route
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const isAutoStart = id || location.pathname.startsWith('/simulation') || location.search.includes('autostart=true');
     if (isAutoStart && !isTraining && trainingPhase === 'pending') {
-      startSimulatedTraining();
+      // Auto-start uses paysim defaults for backward compatibility
+      startSimulatedTraining(DATASET_PROFILES.paysim);
     }
   }, [id, location.pathname, location.search]);
 
@@ -264,7 +304,8 @@ export default function LiveOperationsView() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 border-l-[var(--color-accent-indigo)] min-w-0"
+        className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 min-w-0"
+        style={{ borderLeftColor: selectedProfile.color }}
       >
         <div className="space-y-1.5 min-w-0 flex-1">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
@@ -274,15 +315,35 @@ export default function LiveOperationsView() {
                 Live Operations Dashboard
               </h1>
             </div>
-            <span
-              className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 self-start sm:self-auto ${
-                wsStatus === 'CONNECTED'
-                  ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                  : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
-              }`}
-            >
-              ● {wsStatus}
-            </span>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 self-start sm:self-auto ${
+                  wsStatus === 'CONNECTED'
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                }`}
+              >
+                ● {wsStatus}
+              </span>
+              {/* Dataset + mode badges */}
+              <span
+                className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 border"
+                style={{ color: selectedProfile.color, borderColor: `${selectedProfile.color}50`, backgroundColor: `${selectedProfile.color}14` }}
+              >
+                {selectedProfile.icon} {selectedProfile.label}
+              </span>
+              <span
+                className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 border ${
+                  trainingMode === 'mock'
+                    ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
+                    : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+                }`}
+              >
+                {trainingMode === 'mock'
+                  ? <><FlaskConical size={10} /> Mock</>  
+                  : <><Zap size={10} /> Real Backend</>}
+              </span>
+            </div>
           </div>
           <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-normal">
             Real-time Consortium Federated Learning Telemetry & Transaction Scoring Stream
@@ -292,33 +353,66 @@ export default function LiveOperationsView() {
         <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-4 pt-3 xl:pt-0 border-t border-[var(--color-border-subtle)] xl:border-t-0 shrink-0">
           <div className="text-left sm:text-right shrink-0">
             <p className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">Active Champion AUC</p>
-            <p className="text-lg sm:text-2xl font-bold font-mono text-[var(--color-accent-indigo)]">
+            <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: selectedProfile.color }}>
               {championAuc.toFixed(4)}
             </p>
           </div>
           {/* Training control buttons */}
           {!isTraining && trainingPhase !== 'completed' ? (
-            <button
-              onClick={startSimulatedTraining}
-              className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-[var(--color-accent-indigo)] to-[var(--color-accent-teal)] hover:opacity-90 transition-all shadow-lg shadow-[var(--color-accent-indigo)]/30 active:scale-95 whitespace-nowrap shrink-0"
-            >
-              ▶ Start Federated Training
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Configure Dataset button */}
+              <button
+                id="configure-dataset-btn"
+                onClick={() => setIsConfigOpen((v) => !v)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-white/5 transition-all active:scale-95 whitespace-nowrap shrink-0"
+              >
+                <Settings2 size={14} />
+                <span className="hidden sm:inline">Configure</span>
+              </button>
+              {/* Quick-launch with current profile */}
+              <motion.button
+                id="start-federated-training-btn"
+                whileTap={{ scale: 0.96 }}
+                onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
+                className="flex items-center gap-1.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-lg active:scale-95 whitespace-nowrap shrink-0"
+                style={{
+                  background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
+                  boxShadow: `0 4px 20px ${selectedProfile.color}35`,
+                }}
+              >
+                {trainingMode === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
+                {trainingMode === 'mock' ? 'Start Simulation' : 'Start Real Training'}
+              </motion.button>
+            </div>
           ) : trainingPhase === 'completed' ? (
             <button
+              id="reset-simulation-btn"
               onClick={resetTraining}
               className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-lg active:scale-95 whitespace-nowrap shrink-0"
             >
               🔄 Reset Simulation
             </button>
           ) : (
-            <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border border-[var(--color-accent-indigo)]/40 bg-[var(--color-accent-indigo)]/10 shrink-0">
-              <span className="animate-pulse text-[var(--color-accent-indigo)] font-bold text-xs sm:text-sm">●</span>
-              <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">Training…</span>
+            <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border shrink-0"
+              style={{ borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}10` }}
+            >
+              <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>●</span>
+              <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">
+                {trainingMode === 'real' ? '⚡ Real Training…' : '🧪 Simulating…'}
+              </span>
             </div>
           )}
         </div>
       </motion.div>
+
+      {/* Dataset Training Config Panel (collapsible) */}
+      <DatasetTrainingConfigPanel
+        isOpen={isConfigOpen}
+        onClose={() => setIsConfigOpen(false)}
+        onLaunch={handleLaunchTraining}
+        initialDataset={selectedProfile.id}
+        initialMode={trainingMode}
+      />
 
       {/* Top Telemetry KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -335,15 +429,22 @@ export default function LiveOperationsView() {
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
             {currentRound > 0 ? `Round ${currentRound} / ${TOTAL_ROUNDS}` : '—'}
           </p>
-          <p className="text-xs text-indigo-400 mt-1">
+          <p className="text-xs mt-1" style={{ color: selectedProfile.color }}>
             {gradientSubmissions > 0 ? `${gradientSubmissions} / 3 Gradients Received` : 'Awaiting start'}
           </p>
         </motion.div>
 
+        {/* Dataset-specific KPI: Fraud Rate */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card p-4">
-          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Scoring Latency (p95)</p>
-          <p className="text-2xl font-bold font-mono text-emerald-400 mt-1">42.8 ms</p>
-          <p className="text-xs text-[var(--color-text-muted)] mt-1">SLA Target &lt; 100 ms</p>
+          <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">Dataset Fraud Rate</p>
+          <p className="text-2xl font-bold font-mono text-rose-400 mt-1">
+            {selectedProfile.fraudRatio < 0.001
+              ? `${(selectedProfile.fraudRatio * 100).toFixed(3)}%`
+              : `${(selectedProfile.fraudRatio * 100).toFixed(2)}%`}
+          </p>
+          <p className="text-xs text-[var(--color-text-muted)] mt-1 truncate">
+            {selectedProfile.icon} {selectedProfile.totalSamples.toLocaleString()} samples
+          </p>
         </motion.div>
 
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="glass-card p-4">
@@ -368,6 +469,9 @@ export default function LiveOperationsView() {
           <div className="mb-4">
             <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
               Per-Round Model Performance
+              <span className="ml-2 text-xs font-normal" style={{ color: selectedProfile.color }}>
+                — {selectedProfile.label}
+              </span>
             </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
               AUC-ROC per bank vs. federated global model across communication rounds
@@ -402,7 +506,7 @@ export default function LiveOperationsView() {
                   />
                   <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => v.toFixed(4)} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
-                  <Line type="monotone" dataKey="auc" name="Global Federated" stroke="var(--color-accent-indigo)" strokeWidth={2.5} dot={false} isAnimationActive={true} />
+                  <Line type="monotone" dataKey="auc" name="Global Federated" stroke={selectedProfile.color} strokeWidth={2.5} dot={false} isAnimationActive={true} />
                   <Line type="monotone" dataKey="bankA" name="Bank Alpha" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
                   <Line type="monotone" dataKey="bankB" name="Bank Beta" stroke="#f472b6" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
                   <Line type="monotone" dataKey="bankC" name="Bank Gamma" stroke="#fbbf24" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
@@ -418,7 +522,12 @@ export default function LiveOperationsView() {
         {/* Training Loss Curve */}
         <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col min-w-0">
           <div className="mb-4">
-            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">Federated Training Loss</h3>
+            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
+              Federated Training Loss
+              <span className="ml-2 text-xs font-normal" style={{ color: selectedProfile.color }}>
+                — {selectedProfile.label}
+              </span>
+            </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Cross-entropy loss across communication rounds</p>
           </div>
           {roundHistory.length === 0 ? (
