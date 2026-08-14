@@ -21,7 +21,7 @@ export default function ScenariosPage() {
     
     // Scroll to top of the scenarios page container to see the active scenario panel running
     setTimeout(() => {
-      pageRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      pageRef.current?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
     }, 100);
   }, [startScenario, speed]);
 
