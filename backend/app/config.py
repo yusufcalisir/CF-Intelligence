@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     rabbitmq_password: str = "guest"
 
     # ── Distributed Streaming & DBs ───────────
-    database_type: str = "postgres"  # "postgres", "cockroachdb", "sqlite"
+    database_type: str = "sqlite"  # "sqlite", "postgres", "cockroachdb"
     use_kafka: bool = False
     kafka_bootstrap_servers: str = "localhost:9092"
 
