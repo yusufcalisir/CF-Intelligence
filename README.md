@@ -820,7 +820,23 @@ cd contracts && npm test
 python scripts/run_mutation_tests.py
 # or via master runner
 python scripts/run_all_tests.py --mutation
+
+# 7. Multi-Dimensional Code & Branch Coverage Audit
+python scripts/run_coverage_audit.py
+# or via master runner
+python scripts/run_all_tests.py --coverage
 ```
+
+#### Multi-Dimensional Code & Branch Coverage Architecture (Statements, Branches, Functions, Lines)
+
+Code coverage is evaluated across **4 distinct dimensions** rather than a single superficial metric. Critical business logic, security gating, and algorithmic branches are specifically tested for both truthful and falsy branches to eliminate silent coverage blind spots (e.g. testing only the `if` branch while leaving the `else` or fallback branch unverified):
+
+| Dimension | Metrics & Tools | Target & Critical Path Coverage Invariants |
+| :--- | :--- | :--- |
+| **Branches Coverage** | Vitest V8 (`--coverage`) & Pytest-Cov (`--cov-branch`) | Evaluates all conditional forks, ternary operators, AST logic branches (`and`, `or`, `not`), exception fallbacks, Byzantine cluster thresholds, and regulatory Four-Eyes validation gates. **`api.ts` (92.3% branches)**, **`useModalA11y.ts` (84.1% branches)**, **`BankCard.tsx` (83.3% branches)**, **`AdversarialDefensePanel.tsx` (87.1% branches)**. |
+| **Statements Coverage** | AST Statement Trackers | Asserts execution of every operational statement across data transformation, differential privacy accounting, cryptographic signing, and WebSocket event distribution pipelines. |
+| **Functions Coverage** | Method & Function Invocation Trackers | Verifies that 100% of exposed helper utilities, calculation routines, API query wrappers, and domain entity methods are directly exercised with valid and invalid parameters. |
+| **Lines Coverage** | Executable LOC Line Mapping | Tracks line-by-line execution across frontend React components and backend FastAPI service routers, ensuring zero orphaned dead code in active production paths. |
 
 #### Mutation Testing & Fault Injection Quality Architecture
 
