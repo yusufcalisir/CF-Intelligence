@@ -52,7 +52,7 @@ def run_all_verifications() -> bool:
 
     # Step 3: Run full pytest suite across verification/
     logger.info("\n--- Phase 3: Executing Pytest Verification Suite ---")
-    pytest_res = subprocess.run(["pytest", "verification/", "-v"], cwd=REPO_ROOT, capture_output=True, text=True)
+    pytest_res = subprocess.run([sys.executable, "-m", "pytest", "verification/", "-v"], cwd=REPO_ROOT, capture_output=True, text=True)
     logger.info("Pytest Suite Output Summary:\n%s", pytest_res.stdout.splitlines()[-1] if pytest_res.stdout else "")
 
     if pytest_res.returncode != 0:

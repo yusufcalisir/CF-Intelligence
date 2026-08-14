@@ -10,6 +10,7 @@ Usage:
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import sys
 import time
@@ -23,12 +24,18 @@ def print_banner(title: str) -> None:
     print(f"\n{line}\n  {title}\n{line}")
 
 
+def run_command(cmd: list[str], cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess:
+    """Execute command cross-platform by resolving executable via PATH."""
+    executable = shutil.which(cmd[0]) or cmd[0]
+    return subprocess.run([executable] + cmd[1:], cwd=cwd)
+
+
 def run_frontend_mutation_suite() -> tuple[bool, int, int]:
     """Run Frontend Mutation Hardening test suite."""
     print_banner("1. RUNNING FRONTEND MUTATION TESTING SUITE (TypeScript / Stryker)")
     cmd = ["npm", "--prefix", "frontend", "run", "test:mutation"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -42,7 +49,7 @@ def run_backend_mutation_suite() -> tuple[bool, int, int]:
     print_banner("2. RUNNING BACKEND MUTATION TESTING ENGINE (Python / Pytest)")
     cmd = [sys.executable, "-m", "pytest", "backend/tests/mutation/", "-v"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"

@@ -20,6 +20,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 import time
@@ -33,11 +34,17 @@ def print_banner(title: str) -> None:
     print(f"\n{line}\n  {title}\n{line}")
 
 
+def run_command(cmd: list[str], cwd: Path = REPO_ROOT) -> subprocess.CompletedProcess:
+    """Execute command cross-platform by resolving executable via PATH."""
+    executable = shutil.which(cmd[0]) or cmd[0]
+    return subprocess.run([executable] + cmd[1:], cwd=cwd)
+
+
 def run_frontend_tests() -> bool:
     print_banner("1. RUNNING FRONTEND TEST SUITE (Vitest: Unit, Integration & E2E)")
     cmd = ["npm", "--prefix", "frontend", "test"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -49,7 +56,7 @@ def run_responsive_tests() -> bool:
     print_banner("2. RUNNING FRONTEND RESPONSIVE & DEVICE TEST SUITE (Playwright)")
     cmd = ["npm", "--prefix", "frontend", "run", "test:responsive"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -61,7 +68,7 @@ def run_visual_tests() -> bool:
     print_banner("3. RUNNING FRONTEND VISUAL REGRESSION SUITE (Playwright VRT)")
     cmd = ["npm", "--prefix", "frontend", "run", "test:visual"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -73,7 +80,7 @@ def run_a11y_tests() -> bool:
     print_banner("4. RUNNING FRONTEND ACCESSIBILITY & KEYBOARD E2E SUITE (Playwright + Axe-Core)")
     cmd = ["npm", "--prefix", "frontend", "run", "test:a11y"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -85,7 +92,7 @@ def run_backend_tests() -> bool:
     print_banner("5. RUNNING BACKEND TEST SUITE (Pytest)")
     cmd = [sys.executable, "-m", "pytest", "backend/tests/", "-v"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -98,8 +105,8 @@ def run_api_contract_tests() -> bool:
     be_cmd = [sys.executable, "-m", "pytest", "backend/tests/contract/", "-v"]
     fe_cmd = ["npm", "--prefix", "frontend", "test", "--", "api-contract.test.ts"]
     start = time.perf_counter()
-    be_res = subprocess.run(be_cmd, cwd=REPO_ROOT)
-    fe_res = subprocess.run(fe_cmd, cwd=REPO_ROOT, shell=True)
+    be_res = run_command(be_cmd)
+    fe_res = run_command(fe_cmd)
     duration = time.perf_counter() - start
     success = (be_res.returncode == 0) and (fe_res.returncode == 0)
     status = "PASSED" if success else "FAILED"
@@ -111,7 +118,7 @@ def run_verification_tests() -> bool:
     print_banner("7. RUNNING SCIENTIFIC VERIFICATION SUITE")
     cmd = [sys.executable, "-m", "pytest", "verification/", "-v"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -123,7 +130,7 @@ def run_contract_tests() -> bool:
     print_banner("8. RUNNING EVM SMART CONTRACTS TEST SUITE (Hardhat)")
     cmd = ["npm", "--prefix", "contracts", "test"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT, shell=True)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -135,7 +142,7 @@ def run_mutation_tests() -> bool:
     print_banner("9. RUNNING MUTATION TESTING & FAULT INJECTION SUITE (Stryker + Python)")
     cmd = [sys.executable, "scripts/run_mutation_tests.py"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
@@ -147,7 +154,7 @@ def run_coverage_audit() -> bool:
     print_banner("10. RUNNING MULTI-DIMENSIONAL CODE & BRANCH COVERAGE AUDIT")
     cmd = [sys.executable, "scripts/run_coverage_audit.py"]
     start = time.perf_counter()
-    res = subprocess.run(cmd, cwd=REPO_ROOT)
+    res = run_command(cmd)
     duration = time.perf_counter() - start
     success = res.returncode == 0
     status = "PASSED" if success else "FAILED"
