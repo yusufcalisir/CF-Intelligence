@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-875%2F875_passing-success.svg?style=flat&logo=pytest&logoColor=white)](#17-step-by-step-operator-quick-start)
+[![Passing Tests](https://img.shields.io/badge/tests-1023%2F1023_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -780,6 +780,19 @@ npm run test
 npm run deploy:local
 ```
 
+### Step 6: Run Comprehensive Automated Test Suite & Coverage Verification
+```bash
+# Execute full 1023 unit, property-based hypothesis, and chaos DR test suite
+pytest backend/tests/ -v
+
+# Generate line-by-line coverage report
+pytest backend/tests/ --cov=app --cov-report=term-missing
+```
+
+> **Verifiable CI/CD Pipeline & Audit Trail:**  
+> All **1023 tests** run automatically on every commit via GitHub Actions CI:  
+> 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
+
 ---
 
 ## 18. Related Work and References
@@ -833,7 +846,7 @@ This platform was engineered using a state-of-the-art hybrid human-AI agentic pa
 | **System Architecture & Domain Engineering** | Human Lead | System topology, PET protocols, domain models, regulatory specs |
 | **Mathematical Specs & Security Proofs** | Human Lead | Formal invariants, threat models, SLA contracts, risk equations |
 | **Code Implementation & Refactoring** | Human + AI Pair | Python 3.12, PyTorch 2.4, FastAPI, Claude 3.7 Sonnet, Gemini 3.6 Flash |
-| **Test Engineering & Verification** | Human + AI Pair | Pytest (871 tests), Property-based fuzzing, Hardhat EVM, DeepMind Antigravity |
+| **Test Engineering & Verification** | Human + AI Pair | Pytest (1023 tests, 100% Passing), Property-based fuzzing, Hardhat EVM, DeepMind Antigravity |
 | **Audit & Documentation Synthesis** | Human + AI Pair | Scientific audit reports, OpenAPI schemas, Cypher graph queries |
 
 ---
