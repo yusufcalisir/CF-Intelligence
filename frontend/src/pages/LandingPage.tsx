@@ -568,6 +568,7 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isCapabilitiesDropdownOpen, setIsCapabilitiesDropdownOpen] = useState(false);
+  const [openNavDropdown, setOpenNavDropdown] = useState<'platform' | 'arch' | 'bench' | 'dev' | null>(null);
   const [isLaunchModalOpen, setIsLaunchModalOpen] = useState(false);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
@@ -617,6 +618,7 @@ export default function LandingPage() {
     scrollToSection(id);
     setIsMobileMenuOpen(false);
     setIsCapabilitiesDropdownOpen(false);
+    setOpenNavDropdown(null);
   };
 
   const currentWorkflowStep = PRESENTATION_WORKFLOW.find(s => s.id === activeWorkflowStep)!;
@@ -643,17 +645,17 @@ export default function LandingPage() {
               <span className="font-bold text-sm sm:text-base text-slate-100 tracking-tight truncate">CF-Intelligence</span>
             </div>
 
-            {/* Desktop Navigation */}
-            <nav aria-label="primary" className="hidden lg:flex items-center gap-7 text-[13px] font-medium text-slate-400">
+            {/* Desktop Navigation with Contextual Dropdowns */}
+            <nav aria-label="primary" className="hidden lg:flex items-center gap-6 text-[13px] font-medium text-slate-400">
               <a
                 href="#hero"
                 onClick={(e) => { e.preventDefault(); handleNavClick('hero'); }}
-                className="hover:text-slate-100 transition-colors"
+                className="hover:text-slate-100 transition-colors py-2"
               >
                 Overview
               </a>
 
-              {/* Combined CAPABILITIES Dropdown */}
+              {/* 1. Platform & Engine Dropdown */}
               <div
                 className="relative group py-2"
                 onMouseEnter={() => setIsCapabilitiesDropdownOpen(true)}
@@ -663,54 +665,168 @@ export default function LandingPage() {
                   onClick={() => handleNavClick('problem-solution')}
                   className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
                 >
-                  <span>Capabilities</span>
+                  <span>Platform & Engine</span>
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-64 p-2 bg-[#0a0a1c]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
-                    Platform Features
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                    Core Platform Suite
                   </div>
-                  <a
-                    href="#problem-solution"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('problem-solution'); }}
-                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
-                  >
-                    <div>
-                      <div className="font-semibold">Problem</div>
-                      <div className="text-[10px] text-slate-500">Cross-bank fraud analysis</div>
-                    </div>
-                  </a>
-                  <a
-                    href="#how-it-works"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('how-it-works'); }}
-                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
-                  >
-                    <div>
-                      <div className="font-semibold">Workflow</div>
-                      <div className="text-[10px] text-slate-500">8-stage federated pipeline</div>
-                    </div>
-                  </a>
-                  <a
-                    href="#product"
-                    onClick={(e) => { e.preventDefault(); handleNavClick('product'); }}
-                    className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors"
-                  >
-                    <div>
-                      <div className="font-semibold">Engine Specs</div>
-                      <div className="text-[10px] text-slate-500">Platform engine specs</div>
-                    </div>
-                  </a>
+                  {[
+                    { label: 'Problem Statement',   desc: 'Cross-Bank Blindspot',        target: 'problem-solution' },
+                    { label: 'Execution Pipeline',  desc: '8-Stage Federated Workflow', target: 'how-it-works' },
+                    { label: 'Engine Capabilities', desc: 'GNN, Tensor & DP Specs',     target: 'product' },
+                    { label: 'Consortium Nodes',    desc: 'JPM, HSBC & DBK Specs',      target: 'platform' },
+                  ].map(sub => (
+                    <a
+                      key={sub.target}
+                      href={`#${sub.target}`}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                      </div>
+                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                    </a>
+                  ))}
                 </div>
               </div>
 
-              <a href="#platform" onClick={(e) => { e.preventDefault(); handleNavClick('platform'); }} className="hover:text-slate-100 transition-colors">Platform</a>
-              <a href="#architecture" onClick={(e) => { e.preventDefault(); handleNavClick('architecture'); }} className="hover:text-slate-100 transition-colors">Architecture</a>
-              <a href="#security" onClick={(e) => { e.preventDefault(); handleNavClick('security'); }} className="hover:text-slate-100 transition-colors">Security</a>
-              <a href="#api" onClick={(e) => { e.preventDefault(); handleNavClick('api'); }} className="hover:text-slate-100 transition-colors">API & Docs</a>
-              <a href="#contact" onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }} className="hover:text-slate-100 transition-colors">Contact & Setup</a>
+              {/* 2. Architecture & Security Dropdown */}
+              <div
+                className="relative group py-2"
+                onMouseEnter={() => setOpenNavDropdown('arch')}
+                onMouseLeave={() => setOpenNavDropdown(null)}
+              >
+                <button
+                  onClick={() => handleNavClick('architecture')}
+                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                >
+                  <span>Architecture & Security</span>
+                  <ChevronDown />
+                </button>
+
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
+                }`}>
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                    Security & Topology
+                  </div>
+                  {[
+                    { label: 'System Topology',    desc: 'gRPC & mTLS Service Mesh',   target: 'architecture' },
+                    { label: 'Privacy Boundaries', desc: 'Rényi DP, HSM & SGX Enclave', target: 'security' },
+                    { label: 'Threat Model',       desc: 'Byzantine Poisoning Defense', target: 'security' },
+                  ].map(sub => (
+                    <a
+                      key={sub.target + sub.label}
+                      href={`#${sub.target}`}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                      </div>
+                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* 3. Benchmarks & Validation Dropdown */}
+              <div
+                className="relative group py-2"
+                onMouseEnter={() => setOpenNavDropdown('bench')}
+                onMouseLeave={() => setOpenNavDropdown(null)}
+              >
+                <button
+                  onClick={() => handleNavClick('benchmarks')}
+                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                >
+                  <span>Benchmarks & Proof</span>
+                  <ChevronDown />
+                </button>
+
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
+                }`}>
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                    Empirical Proof Suite
+                  </div>
+                  {[
+                    { label: 'Empirical Benchmarks', desc: 'PaySim, IEEE-CIS & Elliptic', target: 'benchmarks' },
+                    { label: 'Competitor Matrix',    desc: 'CFI vs Feedzai & Actimize',   target: 'comparison' },
+                    { label: 'Banking Solutions',    desc: 'Tier-1, 2 & FinTech Profiles', target: 'solutions' },
+                  ].map(sub => (
+                    <a
+                      key={sub.target}
+                      href={`#${sub.target}`}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                      </div>
+                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              {/* 4. Developers & Legal Dropdown */}
+              <div
+                className="relative group py-2"
+                onMouseEnter={() => setOpenNavDropdown('dev')}
+                onMouseLeave={() => setOpenNavDropdown(null)}
+              >
+                <button
+                  onClick={() => handleNavClick('api')}
+                  className="flex items-center gap-1.5 hover:text-slate-100 transition-colors cursor-pointer py-1"
+                >
+                  <span>Developers & Legal</span>
+                  <ChevronDown />
+                </button>
+
+                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                  openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
+                }`}>
+                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                    Integration & Contracts
+                  </div>
+                  {[
+                    { label: 'REST & WebSocket API', desc: 'OpenAPI 3.0 Reference',      target: 'api' },
+                    { label: 'Python & TS SDKs',     desc: 'Official Package Libraries', target: 'docs' },
+                    { label: 'Legal Agreement Suite', desc: 'DPA, ToS, SLA & Liability', target: 'legal' },
+                  ].map(sub => (
+                    <a
+                      key={sub.target + sub.label}
+                      href={`#${sub.target}`}
+                      onClick={(e) => { e.preventDefault(); handleNavClick(sub.target); }}
+                      className="flex items-center justify-between px-3 py-2 text-[12px] text-slate-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors group/item"
+                    >
+                      <div>
+                        <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
+                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                      </div>
+                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+
+              <a
+                href="#contact"
+                onClick={(e) => { e.preventDefault(); handleNavClick('contact'); }}
+                className="hover:text-slate-100 transition-colors py-2"
+              >
+                Enterprise Setup
+              </a>
             </nav>
 
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
@@ -732,18 +848,18 @@ export default function LandingPage() {
           </div>
         </header>
 
-        {/* ── 2026 IMMERSIVE FULL-SCREEN MOBILE NAVIGATION OVERLAY ── */}
+        {/* ── 2026 CLEAN & FOCUSED FULL-SCREEN MOBILE NAVIGATION OVERLAY ── */}
         <AnimatePresence>
           {isMobileMenuOpen && (
             <motion.div
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
-              transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-              className="lg:hidden fixed inset-0 z-[100] bg-[#03030c] min-h-[100dvh] flex flex-col justify-between p-5 sm:p-6 overflow-y-auto"
+              transition={{ duration: 0.2, ease: 'easeOut' }}
+              className="lg:hidden fixed inset-0 z-[100] bg-[#03030c] min-h-[100dvh] flex flex-col justify-between p-6 overflow-y-auto"
             >
               {/* Top Header Bar inside Full-Screen Menu */}
-              <div className="flex items-center justify-between pb-5 border-b border-white/10 shrink-0">
+              <div className="flex items-center justify-between pb-6 border-b border-white/10 shrink-0">
                 <div className="flex items-center gap-3">
                   <BrandLogo className="w-8 h-8 shrink-0" />
                   <div>
@@ -760,66 +876,56 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Central Vertical Stack Navigation List */}
-              <div className="py-6 flex flex-col space-y-1.5 flex-1 justify-center">
+              {/* Clean, High-Level Category Links (Ferah, sade ve yazı boğulması yok) */}
+              <div className="py-8 flex flex-col space-y-2 flex-1 justify-center">
                 {[
-                  { num: '01', label: 'Platform Overview',      targetId: 'hero',             desc: 'Architecture & Consortium Vision' },
-                  { num: '02', label: 'Problem & Case',         targetId: 'problem-solution', desc: 'Cross-Bank Laundering Blindspot' },
-                  { num: '03', label: 'Execution Pipeline',     targetId: 'how-it-works',     desc: '8-Stage Federated Training' },
-                  { num: '04', label: 'Engine Specifications',  targetId: 'product',          desc: 'GNN, DP & Tensor Engine' },
-                  { num: '05', label: 'Bank Consortium Nodes',  targetId: 'platform',         desc: 'JPM, HSBC & DBK Topology' },
-                  { num: '06', label: 'System Topology',        targetId: 'architecture',     desc: 'gRPC & mTLS Service Mesh' },
-                  { num: '07', label: 'Security & Privacy',     targetId: 'security',         desc: 'Rényi DP, HSM & SGX Enclave' },
-                  { num: '08', label: 'Empirical Benchmarks',   targetId: 'benchmarks',       desc: 'PaySim, IEEE-CIS & Elliptic' },
-                  { num: '09', label: 'Developer API & SDK',    targetId: 'api',              desc: 'OpenAPI 3.0 & Python/TS SDK' },
-                  { num: '10', label: 'Institutional Legal',    targetId: 'legal',            desc: 'DPA, ToS, SLA & Liability' },
-                  { num: '11', label: 'Enterprise Setup',       targetId: 'contact',          desc: 'Direct Engineering Onboarding' },
+                  { num: '01', label: 'Platform Overview',      targetId: 'hero' },
+                  { num: '02', label: 'Platform & Engine',      targetId: 'problem-solution' },
+                  { num: '03', label: 'Architecture & Security', targetId: 'architecture' },
+                  { num: '04', label: 'Empirical Benchmarks',   targetId: 'benchmarks' },
+                  { num: '05', label: 'API & Legal Compliance', targetId: 'api' },
+                  { num: '06', label: 'Enterprise Setup',       targetId: 'contact' },
                 ].map((item, idx) => (
                   <motion.button
                     key={item.targetId}
                     initial={{ opacity: 0, x: -12 }}
                     animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: idx * 0.025, duration: 0.2 }}
+                    transition={{ delay: idx * 0.03, duration: 0.2 }}
                     onClick={() => {
                       setIsMobileMenuOpen(false);
                       handleNavClick(item.targetId);
                     }}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/5 hover:border-indigo-500/30 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
+                    className="w-full flex items-center justify-between px-5 py-4 rounded-2xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/6 hover:border-indigo-500/40 active:bg-indigo-600/15 transition-all text-left cursor-pointer group"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <span className="text-[11px] font-mono font-bold text-indigo-400/80 group-hover:text-indigo-300 w-5 shrink-0">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <span className="text-xs font-mono font-bold text-indigo-400 group-hover:text-indigo-300 shrink-0">
                         {item.num}
                       </span>
-                      <div className="min-w-0">
-                        <div className="text-[13.5px] font-semibold text-slate-200 group-hover:text-white truncate">
-                          {item.label}
-                        </div>
-                        <div className="text-[10px] font-mono text-slate-500 group-hover:text-slate-400 truncate">
-                          {item.desc}
-                        </div>
-                      </div>
+                      <span className="text-base font-semibold text-slate-200 group-hover:text-white truncate">
+                        {item.label}
+                      </span>
                     </div>
-                    <span className="text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0 pl-2">
+                    <span className="text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0">
                       <ArrowRight />
                     </span>
                   </motion.button>
                 ))}
               </div>
 
-              {/* Bottom Action Area & Institutional Status */}
-              <div className="pt-4 border-t border-white/10 space-y-3 shrink-0">
+              {/* Bottom Action Area */}
+              <div className="pt-6 border-t border-white/10 space-y-3 shrink-0">
                 <button
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     handleLaunchDemo();
                   }}
-                  className="w-full min-h-[46px] py-3 px-5 rounded-xl text-xs sm:text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-[0_0_25px_rgba(99,102,241,0.35)] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
+                  className="w-full min-h-[48px] py-3 px-5 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-[0_0_25px_rgba(99,102,241,0.35)] active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2 text-center"
                 >
                   <span>Launch Live Platform Demo</span>
                   <ArrowRight />
                 </button>
 
-                <div className="flex items-center justify-between text-[10.5px] font-mono text-slate-500 px-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1 pt-1">
                   <span>CF-Intelligence Network</span>
                   <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
