@@ -33,7 +33,6 @@ from app.application.services.privacy_service import PrivacyService
 from app.domain.entities import Bank, SimulationRun, TrainingRound
 from app.domain.enums import (
     AggregationMethod,
-    BankStatus,
     BankTier,
     ClientStatus,
     PrivacyMechanism,
@@ -197,7 +196,7 @@ class SimulationService:
                         tier=bank_tiers[idx],
                         fraud_ratio=round(f_ratio, 4),
                         num_transactions=n_tx,
-                        status=BankStatus.ACTIVE,
+                        status=ClientStatus.ACTIVE,
                     )
                     banks.append(bank_obj)
 
@@ -745,7 +744,7 @@ class SimulationService:
                                 input_dim=feature_dim, dp_compatible=use_opacus_dp
                             )
                             loc_model = self.model_service.set_parameters(loc_model, global_weights)
-                            loc_model, loss_hist, act_eps = self.model_service.train_local(
+                            loc_model, loss_hist, _c_local = self.model_service.train_local(
                                 loc_model,
                                 bank_data[bank.id]["X_train"],
                                 bank_data[bank.id]["y_train"],
@@ -761,15 +760,15 @@ class SimulationService:
                                 enable_bias_mitigation=config.enable_bias_mitigation,
                                 fairness_lambda=config.fairness_lambda,
                             )
-                            res_w = self.model_service.get_parameters(loc_model)
-                            last_loss = float(loss_hist[-1]) if loss_hist else 0.1
-                            num_samples = len(bank_data[bank.id]["X_train"])
-                            train_res = {
+                            local_w = self.model_service.get_parameters(loc_model)
+                            local_loss = float(loss_hist[-1]) if loss_hist else 0.1
+                            local_samples = len(bank_data[bank.id]["X_train"])
+                            train_res: dict[str, Any] = {
                                 "bank_id": bank.id,
-                                "weights": res_w,
-                                "loss": last_loss,
-                                "num_samples": num_samples,
-                                "actual_epsilon": act_eps,
+                                "weights": local_w,
+                                "loss": local_loss,
+                                "num_samples": local_samples,
+                                "actual_epsilon": None,
                             }
                             del loc_model
                         else:
@@ -811,15 +810,17 @@ class SimulationService:
                             continue
 
                         # Extract result weights
-                        raw_w = train_res["weights"]
+                        raw_w = train_res.get("weights")
                         if isinstance(raw_w, ModelWeights):
                             res_w = raw_w
-                        else:
-                            res_shapes = [tuple(shape) for shape in raw_w["layer_shapes"]]
+                        elif isinstance(raw_w, dict):
+                            res_shapes = [tuple(shape) for shape in raw_w.get("layer_shapes", [])]
                             res_w = ModelWeights(
                                 layer_shapes=res_shapes,
-                                flat_weights=raw_w["flat_weights"],
+                                flat_weights=list(raw_w.get("flat_weights", [])),
                             )
+                        else:
+                            res_w = ModelWeights(layer_shapes=[], flat_weights=[])
 
                         # Apply model poisoning if this bank is the attacker
                         if (
@@ -853,22 +854,31 @@ class SimulationService:
                             )
                             budget.spend(config.dp_epsilon, limit=config.dp_epsilon_limit)
 
-                        if train_res.get("actual_epsilon"):
+                        recorded_eps = train_res.get("actual_epsilon")
+                        if recorded_eps is not None and isinstance(recorded_eps, (int, float)):
                             privacy_service.record_opacus_epsilon(
                                 simulation.id,
-                                train_res["actual_epsilon"],
+                                float(recorded_eps),
                                 limit=config.dp_epsilon_limit,
                             )
 
-                        num_samples = (
+                        raw_samples = (
                             train_res.get("num_samples")
                             or train_res.get("num_examples")
                             or train_res.get("sample_count")
                             or 1000
                         )
+                        num_samples = (
+                            int(raw_samples) if isinstance(raw_samples, (int, float, str)) else 1000
+                        )
+                        raw_loss = train_res.get("loss", 0.0)
+                        loss_val = (
+                            float(raw_loss) if isinstance(raw_loss, (int, float, str)) else 0.0
+                        )
+
                         client_weights.append(res_w)
                         client_samples.append(num_samples)
-                        per_bank_loss[bank.id] = train_res.get("loss", 0.0)
+                        per_bank_loss[bank.id] = loss_val
                         per_bank_samples[bank.id] = num_samples
                         # Save weights for the next round's contrastive loss
                         prev_local_weights_by_bank[bank.id] = res_w
@@ -915,7 +925,6 @@ class SimulationService:
                                 client_weights = self.fl_engine.apply_byzantine_defense(
                                     client_weights,
                                     defense_type=config.byzantine_defense,
-                                    global_weights=global_weights,
                                 )
                                 logger.info(
                                     "Round %d: Byzantine defense (%s) applied",
@@ -1018,7 +1027,6 @@ class SimulationService:
                                         "edges_in_window": edge_index.size(1) // 2,
                                         "loss": loss_val,
                                     },
-                                    simulation_id=simulation.id,
                                 )
                             except Exception as e:
                                 logger.warning("Failed to log GNN event to audit chain: %s", e)
