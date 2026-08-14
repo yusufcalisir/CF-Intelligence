@@ -10,7 +10,7 @@ This audit evaluates the mathematical correctness, statistical validity, privacy
 
 | Audit Category | Parameter / Target Scope | Verification Result / Metric | Operational Status |
 |:---|:---|:---|:---:|
-| **Total Privacy Claims** | 18 Formal Privacy Invariants | 7 Supported (38.9%), 11 Partially (61.1%) | 🟢 **AUDITED** |
+| **Total Privacy Claims** | 18 Formal Privacy Invariants | 7 Supported (38.9%), 11 Partially (61.1%) | 🟢 **SELF-VERIFIED** |
 | **Numerical Precision** | 50 Reference Contract Tests | Max Abs Error $= 2.22 \times 10^{-16}$ (IEEE-754 limit) | 🟢 **PASSED** |
 | **Property-Based Invariants** | Hypothesis Testing Framework | 9 / 9 Properties Passed (100% Pass Rate) | 🟢 **PASSED** |
 | **Monte Carlo Distribution** | $N=1,000,000$ Samples | KS-Test $p = 0.7743 > 0.05$ (Gaussian) | 🟢 **PASSED** |
@@ -128,24 +128,24 @@ Benchmarking parameter dimensions $d \in \{100, 1\text{k}, 10\text{k}, 100\text{
 
 | ID | Component / Claim | Classification | Operational Status |
 |:---:|:---|:---:|:---|
-| 1 | **Gaussian Mechanism Noise Scale** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 2 | **L2 Update Clipping** | **SUPPORTED** | Audited & Verified |
-| 3 | **Linear Privacy Budget Composition** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 4 | **Opacus RDP Budget Recording** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 5 | **Budget Exhaustion Guard** | **SUPPORTED** | Audited & Verified |
-| 6 | **Link Reconstruction Attack Audit** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 7 | **Membership Inference Audit (Threshold)** | **SUPPORTED** | Audited & Verified |
-| 8 | **Model Inversion Risk Audit** | **SUPPORTED** | Refactored & Verified |
-| 9 | **DLG Gradient Leakage Audit (Pearson)** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 10 | **Shadow MIA Evaluator (Security Module)** | **SUPPORTED** | Refactored & Verified |
-| 11 | **DLG Evaluator (Security Module)** | **SUPPORTED** | Refactored & Verified |
-| 12 | **PII Identifier Guard** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 13 | **DH-PSI Exact Matching** | **SUPPORTED** | Upgraded (2048-bit MODP) |
-| 14 | **Multi-Attribute Fuzzy PSI** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 15 | **MinHash LSH Signature** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 16 | **Privacy-Preserving Identifier HMAC** | **SUPPORTED** | Upgraded (128-bit HMAC) |
-| 17 | **KMS Per-Tenant Key Isolation** | **PARTIALLY SUPPORTED** | Audited & Verified |
-| 18 | **DP Configuration Object** | **PARTIALLY SUPPORTED** | Audited & Verified |
+| 1 | **Gaussian Mechanism Noise Scale** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 2 | **L2 Update Clipping** | **SUPPORTED** | Verified via Test Suite |
+| 3 | **Linear Privacy Budget Composition** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 4 | **Opacus RDP Budget Recording** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 5 | **Budget Exhaustion Guard** | **SUPPORTED** | Verified via Test Suite |
+| 6 | **Link Reconstruction Attack Audit** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 7 | **Membership Inference Audit (Threshold)** | **SUPPORTED** | Verified via Test Suite |
+| 8 | **Feature Inversion Attack Audit (L2)** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 9 | **DLG Gradient Leakage Audit (Pearson)** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 10 | **Attribute Inference Audit (Entropy)** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 11 | **Synthetic Data Generator Guard** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 12 | **PII Identifier Guard** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 13 | **HMAC-SHA256 PSI Identifier** | **SUPPORTED** | Verified via Test Suite |
+| 14 | **Multi-Attribute Fuzzy PSI** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 15 | **MinHash LSH Signature** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 16 | **Vault HSM Key Storage Mock** | **SUPPORTED** | Verified via Test Suite |
+| 17 | **KMS Per-Tenant Key Isolation** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
+| 18 | **DP Configuration Object** | **PARTIALLY SUPPORTED** | Verified via Test Suite |
 
 | Classification Summary | Claim Count | Percentage | Operational Impact |
 |:---|:---:|:---:|:---|

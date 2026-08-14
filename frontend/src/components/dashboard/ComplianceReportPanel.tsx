@@ -191,7 +191,7 @@ export default function ComplianceReportPanel({ simulationId, banks }: Complianc
       <div className="border-t border-[var(--color-border-subtle)] pt-4 flex flex-col gap-4">
         <div className="flex justify-between items-center">
           <span className="text-xs text-[var(--color-text-muted)]">
-            Full compliance logs are locked in secure blockchain/hash chain storage.
+            Immutable audit logs are locked in secure tamper-evident hash chain storage.
           </span>
           <button
             onClick={() => setShowJson(!showJson)}

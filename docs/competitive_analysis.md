@@ -6,7 +6,7 @@
 
 In enterprise financial crime compliance, anti-money laundering (AML), and fraud prevention, banking institutions and fintechs evaluate vendor solutions based on four core criteria:
 1. **Detection Efficacy on Multi-Bank Collusion & Smurfing**: Ability to detect money mule networks, structured deposits, and rapid fund transfers hopping across institutional boundaries.
-2. **Zero Raw Customer Data Sharing & Privacy Preservation**: Full compliance with cross-border banking secrecy, GDPR Article 6/17, KVKK, and MASAK/FinCEN regulations without shipping raw customer PII to external vendor clouds.
+2. **Zero Raw Customer Data Sharing & Privacy Preservation**: Architectural alignment with cross-border banking secrecy, GDPR Article 6/17, KVKK, and MASAK/FinCEN regulations without shipping raw customer PII to external vendor clouds.
 3. **Real-Time Operational Latency & False Positive Reduction**: Sub-15ms p99 response times for credit transfer authorization (`pacs.008`) and high Precision-Recall to eliminate operational alert fatigue.
 4. **Decision Transparency & Automated Regulatory Filing**: Explainable AI (SHAP attributions) and automated electronic Suspicious Activity Report (SAR) XML generation.
 
