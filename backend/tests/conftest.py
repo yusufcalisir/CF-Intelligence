@@ -1,6 +1,8 @@
 """Test configuration and shared fixtures."""
 
 import pytest
+from typing import Dict, Any
+from tests.factories.data_factory import TestDataFactory
 
 
 @pytest.fixture
@@ -26,6 +28,33 @@ def sample_config() -> dict:
         "bank_b_transactions": 800,
         "bank_c_transactions": 600,
     }
+
+
+@pytest.fixture
+def data_factory() -> type[TestDataFactory]:
+    """Provides centralized TestDataFactory instance."""
+    return TestDataFactory
+
+
+@pytest.fixture
+def canonical_case() -> Dict[str, Any]:
+    """Standard canonical case dictionary."""
+    return TestDataFactory.create_case_dict(
+        id="CASE-CANONICAL-PY-01",
+        title="Structuring Ring Investigation",
+        status="investigating",
+        priority="critical",
+    )
+
+
+@pytest.fixture
+def canonical_alert() -> Dict[str, Any]:
+    """Standard canonical alert dictionary."""
+    return TestDataFactory.create_alert_dict(
+        id="ALT-CANONICAL-PY-01",
+        severity="CRITICAL",
+        composite_score=920.0,
+    )
 
 
 @pytest.fixture(autouse=True)
