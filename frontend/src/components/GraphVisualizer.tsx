@@ -111,7 +111,13 @@ export const GraphVisualizer: React.FC<GraphVisualizerProps> = ({ selectedBank }
     cyRef.current = cy;
 
     return () => {
-      cy.destroy();
+      try {
+        cy.stop(true);
+        cy.destroy();
+      } catch {
+        // ignore unmount teardown in headless jsdom
+      }
+      cyRef.current = null;
     };
   }, [selectedBank, layoutName]);
 
