@@ -66,11 +66,18 @@ frontend-install: ## Install frontend dependencies
 frontend-lint: ## Lint frontend code
 	cd frontend && npm run lint
 
+frontend-test: ## Run frontend test suite (Vitest)
+	cd frontend && npm test
+
 frontend-build: ## Build frontend for production
 	cd frontend && npm run build
 
 frontend-typecheck: ## Run TypeScript type checking
 	cd frontend && npx tsc --noEmit
+
+test-all: ## Run all backend and frontend test suites
+	python scripts/run_all_tests.py
+
 
 # ──────────────────────────────────────────────
 # Database

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1023%2F1023_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1148%2F1148_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![EU AI Act](https://img.shields.io/badge/EU_AI_Act-Compliant-blue.svg?style=flat&logo=europeanunion&logoColor=white)](#13-enterprise-feature-matrix--verification-mapping)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -788,18 +788,43 @@ npm run test
 npm run deploy:local
 ```
 
-### Step 6: Run Comprehensive Automated Test Suite & Coverage Verification
-```bash
-# Execute full 1023 unit, property-based hypothesis, and chaos DR test suite
-pytest backend/tests/ -v
+### Step 6: Run Comprehensive Automated Test Suites & Single-Command Verification
 
-# Generate line-by-line coverage report
-pytest backend/tests/ --cov=app --cov-report=term-missing
+The platform provides a **single unified test runner** that executes all frontend, backend, scientific verification, and smart contract suites in one command:
+
+```bash
+# Execute all test suites across the entire repository (1148 total tests)
+python scripts/run_all_tests.py
+# or using Makefile
+make test-all
+```
+
+Alternatively, individual test tiers can be executed independently:
+
+```bash
+# 1. Frontend Integration & View Test Suite (Vitest & RTL: 57 suites, 125 tests)
+npm --prefix frontend test
+# or
+make frontend-test
+
+# 2. Backend Test Suite (Pytest: 1023 unit, property-based hypothesis & chaos DR tests)
+pytest backend/tests/ -v
+# or
+make test
+
+# 3. Scientific Verification & Audit Suite (16 verified subsystems)
+python scripts/run_all_verifications.py
+# or
+pytest verification/ -v
+
+# 4. EVM Smart Contracts Test Suite (Hardhat: Shapley token settlements)
+cd contracts && npm test
 ```
 
 > **Verifiable CI/CD Pipeline & Audit Trail:**  
-> All **1023 tests** run automatically on every commit via GitHub Actions CI:  
+> All **1148 tests (1023 backend + 125 frontend)** run automatically on every commit via GitHub Actions CI:  
 > 🔗 **[View Live GitHub Actions CI Runs & Test Execution Logs](https://github.com/yusufcalisir/CF-Intelligence/actions)**
+
 
 ---
 
