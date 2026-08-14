@@ -1765,7 +1765,7 @@ export default function LandingPage() {
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
                   {
                     title: 'Data Processing Agreement (DPA)',
@@ -1778,6 +1778,12 @@ export default function LandingPage() {
                     ref: 'docs/legal/terms_of_service.md',
                     standard: 'Consortium Governance · IP Protection',
                     desc: 'Defines node participation, automated Byzantine poisoning penalties, and collaborative model licensing.',
+                  },
+                  {
+                    title: 'Risk Decision Liability & Safe Harbor',
+                    ref: 'docs/legal/liability_and_decision_governance.md',
+                    standard: 'EU AI Act Art. 14 · PSD2 · UCC',
+                    desc: 'Allocates statutory liability for False Positives (Wrongful Blocks) & False Negatives, establishing Bank as policy arbiter.',
                   },
                   {
                     title: 'Service Level Agreement (SLA)',

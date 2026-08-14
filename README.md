@@ -606,6 +606,7 @@ All institutional deployments are governed by standardized B2B contract template
 
 * **Data Processing Agreement (DPA)**: [`docs/legal/data_processing_agreement.md`](docs/legal/data_processing_agreement.md) — Enforces GDPR Art. 28, KVKK, and the binding **Zero-Raw-PII technical guarantee**.
 * **Terms of Service & Governance (ToS)**: [`docs/legal/terms_of_service.md`](docs/legal/terms_of_service.md) — Consortium participation rules, Byzantine poisoning penalties, and IP ownership boundaries.
+* **Risk Decision Liability & Safe Harbor**: [`docs/legal/liability_and_decision_governance.md`](docs/legal/liability_and_decision_governance.md) — Clarifies statutory allocation of liability for **False Positives (Wrongful Blocks)** and **False Negatives** under EU AI Act Art. 14 & PSD2.
 * **Service Level Agreement (SLA)**: [`docs/legal/service_level_agreement.md`](docs/legal/service_level_agreement.md) — 99.99% uptime commitments, $<15\text{ms}$ latency guarantees, and automated **Service Credit** penalty discount matrices.
 * **Enterprise Privacy Policy**: [`docs/legal/enterprise_privacy_policy.md`](docs/legal/enterprise_privacy_policy.md) — Mathematical Rényi Differential Privacy ($\varepsilon=1.0, \delta=10^{-5}$) and Hessian Inversion unlearning specifications.
 * **Commercial Model & ROI Spec**: [`docs/business_model_and_pricing.md`](docs/business_model_and_pricing.md) — Detailed financial payback formulations, TCO breakdowns, and professional services catalog.
