@@ -78,7 +78,10 @@ class ZKSNARKCircuitProver:
         if l2_norm > l2_norm_bound or variance < 1e-12:
             logger.warning(
                 "Bank %s local update norm/variance bounds warning (norm=%.4f > %.4f, var=%.6f)",
-                bank_id, l2_norm, l2_norm_bound, variance
+                bank_id,
+                l2_norm,
+                l2_norm_bound,
+                variance,
             )
 
         # Construct Groth16 elliptic curve proof elements (A in G1, B in G2, C in G1)
@@ -117,7 +120,10 @@ class ZKSNARKCircuitProver:
         t_elapsed = (time.perf_counter() - t_start) * 1000.0
         logger.info(
             "Generated zk-SNARK attestation proof %s for bank %s (dim=%d, time=%.2fms)",
-            proof_id, bank_id, len(flat_vec), t_elapsed
+            proof_id,
+            bank_id,
+            len(flat_vec),
+            t_elapsed,
         )
         return proof
 

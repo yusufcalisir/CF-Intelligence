@@ -29,7 +29,9 @@ def get_alembic_config(db_url: str | None = None) -> Config:
     config = Config(str(ALEMBIC_INI_PATH))
 
     migrations_dir = str(BACKEND_DIR / "app" / "infrastructure" / "database" / "migrations")
-    versions_dir = str(BACKEND_DIR / "app" / "infrastructure" / "database" / "migrations" / "versions")
+    versions_dir = str(
+        BACKEND_DIR / "app" / "infrastructure" / "database" / "migrations" / "versions"
+    )
     config.set_main_option("path_separator", "os")
     config.set_main_option("script_location", migrations_dir)
     config.set_main_option("version_locations", versions_dir)
@@ -65,5 +67,6 @@ def get_current_head_revision(db_url: str | None = None) -> list[str]:
     """Get the current head revision identifiers."""
     alembic_cfg = get_alembic_config(db_url)
     from alembic.script import ScriptDirectory
+
     script = ScriptDirectory.from_config(alembic_cfg)
     return list(script.get_heads())

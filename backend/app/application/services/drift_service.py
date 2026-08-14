@@ -301,9 +301,17 @@ class ModelDriftService:
             calibration_rpt = self.compute_calibration(y_true, y_prob)
 
         # Classify overall system status
-        if max_psi >= self.psi_threshold_critical or concept_psi >= self.psi_threshold_critical or significant_features >= 2:
+        if (
+            max_psi >= self.psi_threshold_critical
+            or concept_psi >= self.psi_threshold_critical
+            or significant_features >= 2
+        ):
             overall_status = "CRITICAL"
-        elif max_psi >= self.psi_threshold_warning or concept_psi >= self.psi_threshold_warning or significant_features == 1:
+        elif (
+            max_psi >= self.psi_threshold_warning
+            or concept_psi >= self.psi_threshold_warning
+            or significant_features == 1
+        ):
             overall_status = "WARNING"
         else:
             overall_status = "HEALTHY"

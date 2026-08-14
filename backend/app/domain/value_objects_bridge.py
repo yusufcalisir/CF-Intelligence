@@ -34,7 +34,7 @@ class CBDCDepositWallet:
     bank_id: str
     network: SettlementNetwork
     wallet_address: str  # 0x... or Canton Party ID / Fabric MSP ID
-    token_symbol: str    # e.g., 'wCBDC', 'EUR-Deposit', 'USD-Institutional'
+    token_symbol: str  # e.g., 'wCBDC', 'EUR-Deposit', 'USD-Institutional'
 
 
 @dataclass(frozen=True)
@@ -50,7 +50,7 @@ class CrossChainRouteReceipt:
     destination_recipient: str
     message_id: str  # CCIP Message ID or L2 Tx Hash
     gas_fee_usd: float
-    status: str      # 'FINALIZED', 'RELAYED', 'DELIVERED'
+    status: str  # 'FINALIZED', 'RELAYED', 'DELIVERED'
 
 
 @dataclass(frozen=True)

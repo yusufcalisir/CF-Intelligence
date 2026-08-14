@@ -114,7 +114,8 @@ class P2PGossipStrategy:
                 p1, p2 = peers[i], peers[j]
                 w1_list, w2_list = peer_weights[p1], peer_weights[p2]
                 layer_maes = [
-                    float(np.mean(np.abs(w1 - w2))) for w1, w2 in zip(w1_list, w2_list, strict=False)
+                    float(np.mean(np.abs(w1 - w2)))
+                    for w1, w2 in zip(w1_list, w2_list, strict=False)
                 ]
                 total_diff += float(np.mean(layer_maes))
                 pair_count += 1
@@ -164,8 +165,12 @@ class FlowerP2PEngine:
         peer_weights: dict[str, list[np.ndarray]] = {}
         for peer in peer_ids:
             peer_weights[peer] = [
-                np.random.default_rng(seed=abs(hash(peer)) % 100000).normal(0.0, 0.1, (64, 32)).astype(np.float32),
-                np.random.default_rng(seed=abs(hash(peer)) % 100000).normal(0.0, 0.1, (32, 1)).astype(np.float32),
+                np.random.default_rng(seed=abs(hash(peer)) % 100000)
+                .normal(0.0, 0.1, (64, 32))
+                .astype(np.float32),
+                np.random.default_rng(seed=abs(hash(peer)) % 100000)
+                .normal(0.0, 0.1, (32, 1))
+                .astype(np.float32),
             ]
 
         results: list[P2PGossipResult] = []
@@ -183,10 +188,14 @@ class FlowerP2PEngine:
 
                 # Perturb peer weights to simulate local SGD step
                 grad_step = [
-                    np.random.default_rng().normal(0.0, 0.01 * decay, layer.shape).astype(np.float32)
+                    np.random.default_rng()
+                    .normal(0.0, 0.01 * decay, layer.shape)
+                    .astype(np.float32)
                     for layer in peer_weights[peer]
                 ]
-                peer_weights[peer] = [w - g for w, g in zip(peer_weights[peer], grad_step, strict=False)]
+                peer_weights[peer] = [
+                    w - g for w, g in zip(peer_weights[peer], grad_step, strict=False)
+                ]
 
             # 2. Peer gossip weight exchange & mixing over adjacency topology
             peer_weights = P2PGossipStrategy.mix_peer_weights(peer_weights, adjacency)

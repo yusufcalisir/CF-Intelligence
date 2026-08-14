@@ -6,7 +6,24 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # Standard evaluation orders for Rényi DP numerical optimization
-DEFAULT_RDP_ORDERS: list[float] = [1.5, 1.75, 2.0, 2.5, 3.0, 4.0, 5.0, 6.0, 8.0, 12.0, 16.0, 24.0, 32.0, 48.0, 64.0, 128.0]
+DEFAULT_RDP_ORDERS: list[float] = [
+    1.5,
+    1.75,
+    2.0,
+    2.5,
+    3.0,
+    4.0,
+    5.0,
+    6.0,
+    8.0,
+    12.0,
+    16.0,
+    24.0,
+    32.0,
+    48.0,
+    64.0,
+    128.0,
+]
 
 
 @dataclass(frozen=True)

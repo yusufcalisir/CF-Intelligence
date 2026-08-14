@@ -22,7 +22,9 @@ class TuneRequest(BaseModel):
     """Payload requesting an Optuna FL hyperparameter optimization session."""
 
     study_name: str = Field(default="fl_hpo_study", description="Unique study identifier")
-    dirichlet_alpha: float = Field(default=0.5, ge=0.01, le=100.0, description="Non-IID Dirichlet concentration alpha")
+    dirichlet_alpha: float = Field(
+        default=0.5, ge=0.01, le=100.0, description="Non-IID Dirichlet concentration alpha"
+    )
     num_clients: int = Field(default=3, ge=1, le=50, description="Number of client bank nodes")
     num_rounds: int = Field(default=5, ge=1, le=50, description="Number of FL rounds per trial")
     n_trials: int = Field(default=5, ge=1, le=100, description="Number of Optuna Bayesian trials")

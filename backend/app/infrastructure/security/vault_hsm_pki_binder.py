@@ -29,9 +29,7 @@ class VaultHSMBindingResult:
     cert_pem: str
     fips_compliance: str
     hsm_slot_id: int
-    bound_at: str = field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
-    )
+    bound_at: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
 
 @dataclass(frozen=True)
@@ -158,9 +156,7 @@ class VaultHSMPKIBinder:
             signature_algorithm="SHA256withRSA" if is_hsm_signed else "SHA256withRSA-Software",
         )
 
-    def _build_self_signed_root_pem(
-        self, handle: HSMKeyHandle, common_name: str
-    ) -> str:
+    def _build_self_signed_root_pem(self, handle: HSMKeyHandle, common_name: str) -> str:
         """Constructs a deterministic Root CA Certificate PEM header with HSM extensions."""
         hsm_fingerprint = hashlib.sha256(
             f"{handle.key_id}:{handle.key_label}:{self.hsm_signer.config.slot_id}".encode()

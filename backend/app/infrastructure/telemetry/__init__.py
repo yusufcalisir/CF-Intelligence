@@ -264,11 +264,15 @@ class MetricProxy:
 
     def inc(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
         with self.registry._lock:
-            self.registry._counters[self.name] = self.registry._counters.get(self.name, 0.0) + amount
+            self.registry._counters[self.name] = (
+                self.registry._counters.get(self.name, 0.0) + amount
+            )
 
     def dec(self, amount: float = 1.0, *args: Any, **kwargs: Any) -> None:
         if self.name.endswith("_total") or "counter" in self.name:
-            raise ValueError(f"Prometheus Counter metric '{self.name}' is monotonically increasing and cannot be decremented.")
+            raise ValueError(
+                f"Prometheus Counter metric '{self.name}' is monotonically increasing and cannot be decremented."
+            )
         with self.registry._lock:
             self.registry._gauges[self.name] = self.registry._gauges.get(self.name, 0.0) - amount
 
@@ -313,9 +317,7 @@ def setup_telemetry(app: FastAPI) -> None:
 
         included_router_cls = getattr(_fastapi_routing, "_IncludedRouter", None)
         if included_router_cls and not hasattr(included_router_cls, "path"):
-            included_router_cls.path = property(
-                lambda self: getattr(self, "prefix", "")
-            )
+            included_router_cls.path = property(lambda self: getattr(self, "prefix", ""))
 
     try:
         from prometheus_fastapi_instrumentator import Instrumentator

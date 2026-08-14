@@ -254,7 +254,9 @@ class FlowerFLEngine:
         )
 
         p2p_engine = FlowerP2PEngine(model_service=self.model_service)
-        topo_enum = P2PTopologyType.MESH if str(topology).upper() == "MESH" else P2PTopologyType.RING
+        topo_enum = (
+            P2PTopologyType.MESH if str(topology).upper() == "MESH" else P2PTopologyType.RING
+        )
         dp_enabled = getattr(config, "enable_differential_privacy", False)
 
         p2p_results = p2p_engine.run_p2p_federated_round(
@@ -327,7 +329,11 @@ class FlowerFLEngine:
         round_results: list[dict[str, Any]] = []
 
         def client_fn(context: Any) -> fl.client.Client:
-            if hasattr(context, "node_config") and isinstance(context.node_config, dict) and "partition-id" in context.node_config:
+            if (
+                hasattr(context, "node_config")
+                and isinstance(context.node_config, dict)
+                and "partition-id" in context.node_config
+            ):
                 cid_str = str(context.node_config["partition-id"])
             elif hasattr(context, "node_id") and isinstance(context.node_id, int):
                 cid_str = str(context.node_id % len(bank_ids))

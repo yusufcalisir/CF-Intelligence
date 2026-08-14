@@ -37,7 +37,9 @@ class ZKCircuitParams:
     hash_algorithm: str = "Poseidon-BN254"
     max_vector_dimension: int = 10000
     constraint_count: int = 65536
-    field_prime: str = "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+    field_prime: str = (
+        "21888242871839275222246405745257275088548364400416034343698204186575808495617"
+    )
 
 
 @dataclass(frozen=True)

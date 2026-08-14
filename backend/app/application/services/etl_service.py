@@ -17,6 +17,7 @@ import pandas as pd
 try:
     import pyarrow as pa  # type: ignore[import-not-found]
     import pyarrow.parquet as pq  # type: ignore[import-not-found]
+
     HAS_PYARROW = True
 except ImportError:
     HAS_PYARROW = False
@@ -39,7 +40,12 @@ class RealWorldETLPipeline:
     def anonymize_dataframe(
         self,
         df: pd.DataFrame,
-        pii_columns: Sequence[str] = ("account_id", "counterparty_account_id", "ip_address", "device_id"),
+        pii_columns: Sequence[str] = (
+            "account_id",
+            "counterparty_account_id",
+            "ip_address",
+            "device_id",
+        ),
     ) -> pd.DataFrame:
         """Anonymizes specified PII columns in a pandas DataFrame."""
         df_anon = df.copy()

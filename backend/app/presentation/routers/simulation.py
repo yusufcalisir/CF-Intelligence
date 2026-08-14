@@ -79,6 +79,7 @@ async def create_simulation(
             PrivacyMechanism.SECURE_AGGREGATION,
             PrivacyMechanism.BOTH,
         ),
+        "dataset": getattr(config, "dataset", "synthetic"),
         "bank_a_transactions": config.bank_a_transactions,
         "bank_b_transactions": config.bank_b_transactions,
         "bank_c_transactions": config.bank_c_transactions,

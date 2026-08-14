@@ -403,6 +403,7 @@ class CaseManagementService:
         # Only synthesise a fallback for valid UUID-format IDs.
         # Non-UUID strings (e.g. "nonexistent") return None as before.
         import re
+
         if not re.fullmatch(
             r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
             case_id,

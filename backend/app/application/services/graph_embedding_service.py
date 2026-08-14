@@ -376,6 +376,7 @@ class GraphEmbeddingService:
             RuntimeError: If dp_noise=False and APP_ENV=production.
         """
         import os
+
         if not dp_noise and os.getenv("APP_ENV") == "production":
             raise RuntimeError(
                 "DP noise cannot be disabled in production. "

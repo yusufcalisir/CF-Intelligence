@@ -40,7 +40,11 @@ class SimulationConfigRequest(BaseModel):
         description="DP implementation mode: post_hoc (clip+noise after training) or opacus (per-sample gradient privacy)",
     )
 
-    # Data volume
+    # Data volume & benchmark dataset selection
+    dataset: str = Field(
+        default="synthetic",
+        description="Dataset source: synthetic, paysim, ieee_cis, elliptic, creditcard",
+    )
     bank_a_transactions: int = Field(default=50000, ge=1000, le=200000)
     bank_b_transactions: int = Field(default=30000, ge=1000, le=200000)
     bank_c_transactions: int = Field(default=20000, ge=1000, le=200000)

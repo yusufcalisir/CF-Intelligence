@@ -3,6 +3,7 @@ export const DEFAULT_SIMULATION_CONFIG = {
   local_epochs: 3,
   learning_rate: 0.001,
   batch_size: 64,
+  dataset: 'synthetic' as const,
   min_clients_per_round: 2,
   enable_latency_simulation: false,
   latency_min_ms: 50,

@@ -93,9 +93,7 @@ class PQCSecAggDriver:
 
         return ciphertext, shared_secret
 
-    def decapsulate_secret(
-        self, ciphertext: bytes, kyber_sk: bytes, peer_kyber_pk: bytes
-    ) -> bytes:
+    def decapsulate_secret(self, ciphertext: bytes, kyber_sk: bytes, peer_kyber_pk: bytes) -> bytes:
         """Decapsulates shared secret from ciphertext using secret key."""
         hkdf = HKDF(
             algorithm=hashes.SHA256(),
@@ -162,9 +160,25 @@ class PQCSecAggDriver:
             zero_sum_verified=True,
             lineage_hash=lineage_hash,
             audit_events=[
-                {"step": 1, "name": "Distribute Kyber-768 & Dilithium-3 PK bundles", "status": "VERIFIED"},
-                {"step": 2, "name": "Encapsulate hybrid Kyber + X25519 KEM ciphertexts", "status": "COMPLETED"},
-                {"step": 3, "name": "Verify lattice signatures across all P2P channels", "status": "PASSED"},
-                {"step": 4, "name": "Zero-sum mask cancellation sum(y_u) == sum(w_u) (mod 2^32)", "status": "PASSED"},
+                {
+                    "step": 1,
+                    "name": "Distribute Kyber-768 & Dilithium-3 PK bundles",
+                    "status": "VERIFIED",
+                },
+                {
+                    "step": 2,
+                    "name": "Encapsulate hybrid Kyber + X25519 KEM ciphertexts",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 3,
+                    "name": "Verify lattice signatures across all P2P channels",
+                    "status": "PASSED",
+                },
+                {
+                    "step": 4,
+                    "name": "Zero-sum mask cancellation sum(y_u) == sum(w_u) (mod 2^32)",
+                    "status": "PASSED",
+                },
             ],
         )

@@ -283,7 +283,9 @@ async def get_bank_status(
                 activated_at=b.activated_at.isoformat() if b.activated_at else None,
             )
     except Exception as exc:
-        logger.warning("Bank status query unavailable for %s (returning demo status): %s", bank_id, exc)
+        logger.warning(
+            "Bank status query unavailable for %s (returning demo status): %s", bank_id, exc
+        )
 
     return BankStatusResponse(
         bank_id=bank_id,

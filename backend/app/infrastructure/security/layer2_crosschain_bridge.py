@@ -111,7 +111,11 @@ class Layer2CrossChainBridgeDriver:
             bank_payout = (score / total_shapley) * pool_amount
 
             # Protocol mapping
-            if wallet.network in (SettlementNetwork.ARBITRUM_ONE, SettlementNetwork.OPTIMISM_MAINNET, SettlementNetwork.BASE_SEPOLIA):
+            if wallet.network in (
+                SettlementNetwork.ARBITRUM_ONE,
+                SettlementNetwork.OPTIMISM_MAINNET,
+                SettlementNetwork.BASE_SEPOLIA,
+            ):
                 protocol = CrossChainBridgeProtocol.CHAINLINK_CCIP
                 gas_fee = 0.008  # L2 Rollup Gas SLA (~$0.008)
             elif wallet.network == SettlementNetwork.CANTON_NETWORK:
@@ -157,7 +161,12 @@ class Layer2CrossChainBridgeDriver:
 
         logger.info(
             "Completed cross-chain settlement for epoch %d (pool=%.2f %s, routes=%d, gas=$%.4f, time=%.2fms)",
-            epoch_id, pool_amount, currency, len(routes), total_gas_usd, t_elapsed
+            epoch_id,
+            pool_amount,
+            currency,
+            len(routes),
+            total_gas_usd,
+            t_elapsed,
         )
 
         return CrossChainDisbursementResult(
@@ -170,10 +179,26 @@ class Layer2CrossChainBridgeDriver:
             bridge_audit_hash=audit_hash,
             is_fully_finalized=True,
             audit_events=[
-                {"step": 1, "name": "Ingest Leave-One-Out Shapley contribution scores", "status": "COMPLETED"},
-                {"step": 2, "name": "Derive destination ledger wallet registry endpoints", "status": "RESOLVED"},
-                {"step": 3, "name": "Assemble Chainlink CCIP & Canton Interop message payloads", "status": "SIGNED"},
-                {"step": 4, "name": "Relay cross-chain transactions with sub-second L2 finality", "status": "FINALIZED"},
+                {
+                    "step": 1,
+                    "name": "Ingest Leave-One-Out Shapley contribution scores",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 2,
+                    "name": "Derive destination ledger wallet registry endpoints",
+                    "status": "RESOLVED",
+                },
+                {
+                    "step": 3,
+                    "name": "Assemble Chainlink CCIP & Canton Interop message payloads",
+                    "status": "SIGNED",
+                },
+                {
+                    "step": 4,
+                    "name": "Relay cross-chain transactions with sub-second L2 finality",
+                    "status": "FINALIZED",
+                },
             ],
         )
 

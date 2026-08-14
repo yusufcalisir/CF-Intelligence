@@ -314,7 +314,11 @@ class UnlearnBankRequest(BaseModel):
 @router.post("/unlearn")
 async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
     """Trigger exact or approximate federated model weight unlearning for an evicted bank."""
-    method_enum = UnlearningMethod(req.unlearning_method) if req.unlearning_method in UnlearningMethod._value2member_map_ else UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION
+    method_enum = (
+        UnlearningMethod(req.unlearning_method)
+        if req.unlearning_method in UnlearningMethod._value2member_map_
+        else UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION
+    )
     res = _unlearning_engine.unlearn_bank_contributions(
         target_bank_id=req.target_bank_id,
         method=method_enum,
@@ -476,7 +480,11 @@ async def get_bridge_status() -> dict[str, Any]:
     """Get telemetry for Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge."""
     return {
         "bridge_status": "ACTIVE",
-        "primary_protocols": ["Chainlink CCIP (Cross-Chain Interoperability)", "LayerZero V2", "Canton Daml Interop"],
+        "primary_protocols": [
+            "Chainlink CCIP (Cross-Chain Interoperability)",
+            "LayerZero V2",
+            "Canton Daml Interop",
+        ],
         "total_disbursements_count": _bridge_driver.total_disbursements_count,
         "total_volume_settled_usd": _bridge_driver.total_volume_settled_usd,
         "supported_networks": _bridge_driver.get_network_metrics(),

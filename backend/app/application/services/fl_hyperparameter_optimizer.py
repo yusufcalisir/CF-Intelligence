@@ -118,12 +118,18 @@ class FLHyperparameterOptimizer:
                 # Apply local SGD steps
                 grad_step = rng.normal(0, lr * local_epochs * staleness_weight, len(global_flat))
                 # Add DP noise scaled by noise multiplier / clip norm
-                dp_noise = rng.normal(0, (dp_noise_multiplier * dp_clip_norm) / np.sqrt(len(X_i)), len(global_flat))
+                dp_noise = rng.normal(
+                    0, (dp_noise_multiplier * dp_clip_norm) / np.sqrt(len(X_i)), len(global_flat)
+                )
                 # FedProx correction
                 prox_term = fedprox_mu * (np.array(global_weights.flat_weights) * 0.01)
 
-                updated_flat = (np.array(global_weights.flat_weights) - grad_step + dp_noise - prox_term).tolist()
-                client_updates.append(ModelWeights(layer_shapes=layer_shapes, flat_weights=updated_flat))
+                updated_flat = (
+                    np.array(global_weights.flat_weights) - grad_step + dp_noise - prox_term
+                ).tolist()
+                client_updates.append(
+                    ModelWeights(layer_shapes=layer_shapes, flat_weights=updated_flat)
+                )
                 client_samples.append(len(X_i))
 
             # Aggregate round updates
@@ -137,7 +143,9 @@ class FLHyperparameterOptimizer:
             # Report step metric to Optuna for MedianPruner
             trial.report(round_auc, round_idx)
             if trial.should_prune():
-                logger.info("Trial %d pruned at round %d (AUC: %.4f)", trial.number, round_idx, round_auc)
+                logger.info(
+                    "Trial %d pruned at round %d (AUC: %.4f)", trial.number, round_idx, round_auc
+                )
                 raise optuna.TrialPruned()
 
         return final_score
@@ -170,8 +178,12 @@ class FLHyperparameterOptimizer:
             "best_params": best_trial.params,
             "param_importances": importances,
             "total_trials": len(self.study.trials),
-            "completed_trials": len([t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]),
-            "pruned_trials": len([t for t in self.study.trials if t.state == optuna.trial.TrialState.PRUNED]),
+            "completed_trials": len(
+                [t for t in self.study.trials if t.state == optuna.trial.TrialState.COMPLETE]
+            ),
+            "pruned_trials": len(
+                [t for t in self.study.trials if t.state == optuna.trial.TrialState.PRUNED]
+            ),
             "duration_ms": duration,
         }
 

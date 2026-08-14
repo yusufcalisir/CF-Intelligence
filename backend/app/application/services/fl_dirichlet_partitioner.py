@@ -58,7 +58,10 @@ class DirichletPartitioner:
 
                 # Balance proportions if any client got zero
                 proportions = np.array(
-                    [p * (len(client_indices[i]) < num_samples / num_clients) for i, p in enumerate(proportions)]
+                    [
+                        p * (len(client_indices[i]) < num_samples / num_clients)
+                        for i, p in enumerate(proportions)
+                    ]
                 )
                 if np.sum(proportions) == 0:
                     proportions = np.ones(num_clients) / num_clients

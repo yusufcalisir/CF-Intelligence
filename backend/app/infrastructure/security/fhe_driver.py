@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 # Attempt to import TenSEAL (Microsoft SEAL Python binding)
 try:
     import tenseal as ts
+
     TENSEAL_AVAILABLE = True
 except ImportError:
     ts = None  # type: ignore
@@ -198,14 +199,20 @@ class FHEDriver:
             weights = [1.0 / n_clients] * n_clients
         else:
             total_samples = sum(client_samples)
-            weights = [s / total_samples for s in client_samples] if total_samples > 0 else [1.0 / n_clients] * n_clients
+            weights = (
+                [s / total_samples for s in client_samples]
+                if total_samples > 0
+                else [1.0 / n_clients] * n_clients
+            )
 
         if TENSEAL_AVAILABLE and ts is not None and public_context_bytes:
             # Reconstruct public context without secret key
             ctx_pub = ts.context_from(public_context_bytes)
 
             # Homomorphic weighted sum: c_total = sum(c_i * w_i)
-            v_total = ts.ckks_vector_from(ctx_pub, encrypted_updates[0].ciphertext_bytes) * weights[0]
+            v_total = (
+                ts.ckks_vector_from(ctx_pub, encrypted_updates[0].ciphertext_bytes) * weights[0]
+            )
             for i in range(1, n_clients):
                 v_i = ts.ckks_vector_from(ctx_pub, encrypted_updates[i].ciphertext_bytes)
                 v_total += v_i * weights[i]

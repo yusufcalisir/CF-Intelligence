@@ -39,9 +39,7 @@ class MultiSigProposal:
     executed: bool = False
     confirmations: dict[str, bool] = field(default_factory=dict)
     proposer: str = ""
-    created_at: str = field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
-    )
+    created_at: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
 
 class GnosisSafeMultiSigCoordinatorDriver:
@@ -109,9 +107,7 @@ class GnosisSafeMultiSigCoordinatorDriver:
             raise KeyError(f"Transaction ID #{tx_id} does not exist.")
 
         if owner_wallet not in self.owner_wallets:
-            raise ValueError(
-                f"Signer wallet '{owner_wallet}' is not an authorized trustee owner."
-            )
+            raise ValueError(f"Signer wallet '{owner_wallet}' is not an authorized trustee owner.")
 
         prop = self._proposals[tx_id]
         if prop.executed:

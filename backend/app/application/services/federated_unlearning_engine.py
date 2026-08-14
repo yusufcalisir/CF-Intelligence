@@ -90,7 +90,11 @@ class FederatedUnlearningEngine:
 
         logger.info(
             "Completed federated unlearning for bank %s (method=%s, drift=%.4f, mia_p=%.3f, time=%.2fms)",
-            target_bank_id, method_str, param_drift, mia_probability, t_elapsed
+            target_bank_id,
+            method_str,
+            param_drift,
+            mia_probability,
+            t_elapsed,
         )
 
         return FederatedUnlearningResult(
@@ -105,10 +109,26 @@ class FederatedUnlearningEngine:
             erasure_verified=erasure_verified,
             lineage_hash=lineage_hash,
             audit_log=[
-                {"step": 1, "name": "Extract bank historical gradient lineage", "status": "COMPLETED"},
-                {"step": 2, "name": "Formulate Sub-sampled Hessian curvature tensor", "status": "COMPLETED"},
-                {"step": 3, "name": "Execute Conjugate Gradient Hessian Inversion (H^-1 v)", "status": "COMPLETED"},
-                {"step": 4, "name": "Audit Membership Inference Attack (MIA) risk", "status": "PASSED"},
+                {
+                    "step": 1,
+                    "name": "Extract bank historical gradient lineage",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 2,
+                    "name": "Formulate Sub-sampled Hessian curvature tensor",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 3,
+                    "name": "Execute Conjugate Gradient Hessian Inversion (H^-1 v)",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 4,
+                    "name": "Audit Membership Inference Attack (MIA) risk",
+                    "status": "PASSED",
+                },
             ],
         )
 

@@ -26,9 +26,7 @@ class StreamingEdgeEvent:
     target_id: str
     rel_type: str
     amount: float
-    event_time: str = field(
-        default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat()
-    )
+    event_time: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
 
 @dataclass(frozen=True)
@@ -66,9 +64,7 @@ class FlinkGraphStreamProcessor:
         """Processes an incoming streaming graph edge record with sub-second SLA."""
         return self.process_batch_stream([event])
 
-    def process_batch_stream(
-        self, events: list[StreamingEdgeEvent]
-    ) -> FlinkStreamingReceipt:
+    def process_batch_stream(self, events: list[StreamingEdgeEvent]) -> FlinkStreamingReceipt:
         """Processes a batch stream of graph edge records through the stateful window accumulator."""
         start_time = time.perf_counter()
         now = time.time()
@@ -147,9 +143,7 @@ class FlinkGraphStreamProcessor:
     def get_stream_status(self) -> dict[str, Any]:
         """Returns Apache Flink stream processor engine status metrics."""
         avg_latency = (
-            self._total_latency_ms / self._processed_total
-            if self._processed_total > 0
-            else 12.4
+            self._total_latency_ms / self._processed_total if self._processed_total > 0 else 12.4
         )
         return {
             "status": "RUNNING",

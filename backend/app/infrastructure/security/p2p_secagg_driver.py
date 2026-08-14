@@ -51,7 +51,7 @@ class ECDHPublicKeyBundle:
     bank_id: str
     round_id: int
     public_key_bytes: bytes  # 32-byte raw X25519 public key
-    hmac_signature: bytes    # HMAC-SHA256(identity_secret, bank_id || round_id || pk)
+    hmac_signature: bytes  # HMAC-SHA256(identity_secret, bank_id || round_id || pk)
 
 
 @dataclass(frozen=True)
@@ -95,9 +95,9 @@ class P2PSecAggDriver:
                 If None, a deterministic test secret is derived from bank_id.
         """
         self.bank_id = bank_id
-        self._identity_secret: bytes = identity_secret or hashlib.sha256(
-            f"identity:{bank_id}".encode()
-        ).digest()
+        self._identity_secret: bytes = (
+            identity_secret or hashlib.sha256(f"identity:{bank_id}".encode()).digest()
+        )
 
         # Per-round ephemeral state (reset on each new round)
         self._private_key: X25519PrivateKey | None = None
@@ -272,10 +272,7 @@ class P2PSecAggDriver:
         d = len(weights)
 
         # Quantize: float → int via fixed-point scaling
-        quantized: list[int] = [
-            round(w * quantization_scale) % self._MASK_MODULUS
-            for w in weights
-        ]
+        quantized: list[int] = [round(w * quantization_scale) % self._MASK_MODULUS for w in weights]
         masked = list(quantized)  # copy to apply masks in-place
 
         for bundle in peer_bundles:
@@ -457,8 +454,6 @@ class P2PSecAggDriver:
         return self._sign_bundle_static(self._identity_secret, bank_id, round_id, pk_bytes)
 
     @staticmethod
-    def _sign_bundle_static(
-        secret: bytes, bank_id: str, round_id: int, pk_bytes: bytes
-    ) -> bytes:
+    def _sign_bundle_static(secret: bytes, bank_id: str, round_id: int, pk_bytes: bytes) -> bytes:
         msg = bank_id.encode() + struct.pack(">Q", round_id) + pk_bytes
         return hmac.new(secret, msg, hashlib.sha256).digest()

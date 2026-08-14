@@ -37,7 +37,9 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
         if not redis_url.startswith(("redis://", "rediss://", "unix://")):
             redis_url = f"redis://{redis_url}"
 
-        redis_client = aioredis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2.0)
+        redis_client = aioredis.from_url(
+            redis_url, decode_responses=True, socket_connect_timeout=2.0
+        )
         events_key = f"simulation:{simulation_id}:events"
 
         # Replay past events safely
@@ -66,7 +68,10 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
 
                     try:
                         event = json.loads(data)
-                        if isinstance(event, dict) and event.get("event_type") in ("completed", "error"):
+                        if isinstance(event, dict) and event.get("event_type") in (
+                            "completed",
+                            "error",
+                        ):
                             logger.info("Simulation %s ended, closing WebSocket", simulation_id)
                             break
                     except (json.JSONDecodeError, TypeError):
@@ -84,7 +89,9 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             type(exc).__name__,
         )
         try:
-            await websocket.send_text(json.dumps({"event": "connected", "status": "idle", "simulation_id": simulation_id}))
+            await websocket.send_text(
+                json.dumps({"event": "connected", "status": "idle", "simulation_id": simulation_id})
+            )
             while True:
                 await asyncio.sleep(5.0)
         except Exception:

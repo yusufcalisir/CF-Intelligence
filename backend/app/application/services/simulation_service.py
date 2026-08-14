@@ -30,9 +30,11 @@ from sklearn.model_selection import train_test_split
 
 from app.application.services.data_generator import DataGenerator
 from app.application.services.privacy_service import PrivacyService
-from app.domain.entities import SimulationRun, TrainingRound
+from app.domain.entities import Bank, SimulationRun, TrainingRound
 from app.domain.enums import (
     AggregationMethod,
+    BankStatus,
+    BankTier,
     ClientStatus,
     PrivacyMechanism,
     SimulationStatus,
@@ -139,43 +141,191 @@ class SimulationService:
         mlflow_run = self._init_mlflow(simulation.id, config)
 
         try:
-            # Phase 1: Generate data
+            # Phase 1: Ingest or generate data
             simulation.status = SimulationStatus.GENERATING_DATA
-            self._notify(
-                progress_callback,
-                simulation.id,
-                "status",
-                {
-                    "status": simulation.status,
-                    "message": "Generating synthetic transaction data",
-                },
-            )
+            dataset_choice = getattr(config, "dataset", "synthetic")
+            feature_names: list[str] | None = None
+            bank_data: dict[str, dict[str, np.ndarray]] = {}
 
-            # Scale down datasets for optimal CPU training on
-            # Hugging Face Spaces environment (16 GB RAM, 2 vCPUs).
-            # 50,000 â†’ 5,000, 30,000 â†’ 3,000, 20,000 â†’ 2,000 transactions
-            datasets = self.data_generator.generate_bank_datasets(
-                bank_a_size=max(500, config.bank_a_transactions // 10),
-                bank_b_size=max(500, config.bank_b_transactions // 10),
-                bank_c_size=max(500, config.bank_c_transactions // 10),
-            )
+            if dataset_choice in ("paysim", "ieee_cis", "elliptic", "creditcard"):
+                from app.application.services.dataloader import (
+                    load_dataset,
+                    partition_dataset_non_iid,
+                )
 
-            # Run Data Ingestion Validation (Pandera & Great Expectations)
-            from app.application.services.data_validator import DataValidatorService
+                self._notify(
+                    progress_callback,
+                    simulation.id,
+                    "status",
+                    {
+                        "status": simulation.status,
+                        "message": f"Loading real benchmark dataset: {dataset_choice.upper()}",
+                    },
+                )
+                n_samples_req = max(
+                    6000,
+                    config.bank_a_transactions
+                    + config.bank_b_transactions
+                    + config.bank_c_transactions,
+                )
+                real_data = load_dataset(dataset_choice, nrows=n_samples_req)
+                X_full = np.nan_to_num(real_data["X"], nan=0.0, posinf=0.0, neginf=0.0).astype(
+                    np.float32
+                )
+                y_full = np.asarray(real_data["y"], dtype=int)
+                feature_names = real_data.get("feature_names")
 
-            validator_service = DataValidatorService(alert_service=None)
-            validated_datasets = {}
-            for bank_id, (features_df, labels) in datasets.items():
-                # 1. Pandera Streaming Batch Validation
-                validated_df = validator_service.validate_streaming_batch(features_df, bank_id)
-                # 2. Great Expectations Data Contract Gating
-                validator_service.gate_data_contract(validated_df, bank_id)
-                validated_datasets[bank_id] = (validated_df, labels)
-            datasets = validated_datasets
+                # Non-IID Dirichlet partition across 3 banks
+                partitions = partition_dataset_non_iid(
+                    X_full, y_full, num_banks=3, alpha=0.5, seed=42
+                )
+                bank_keys = ["bank_a", "bank_b", "bank_c"]
+                bank_names = ["Bank A (Alpha)", "Bank B (Beta)", "Bank C (Gamma)"]
+                bank_tiers = [BankTier.LARGE, BankTier.MEDIUM, BankTier.SMALL]
+                banks = []
 
-            profiles = self.data_generator.create_bank_profiles(datasets)
-            banks = self.data_generator.create_bank_entities(datasets, profiles)
-            simulation.banks = banks
+                for idx, bank_id in enumerate(bank_keys):
+                    p_info = partitions[idx]
+                    X_bank = p_info["X"]
+                    y_bank = p_info["y"]
+                    n_tx = len(y_bank)
+                    f_ratio = p_info["fraud_ratio"]
+
+                    bank_obj = Bank(
+                        id=bank_id,
+                        name=bank_names[idx],
+                        tier=bank_tiers[idx],
+                        fraud_ratio=round(f_ratio, 4),
+                        num_transactions=n_tx,
+                        status=BankStatus.ACTIVE,
+                    )
+                    banks.append(bank_obj)
+
+                    sensitive_array = np.zeros(n_tx, dtype=int)
+                    if n_tx >= 5:
+                        try:
+                            unique_cls, counts = np.unique(y_bank, return_counts=True)
+                            can_stratify = len(unique_cls) > 1 and int(np.min(counts)) >= 2
+                            X_train, X_test, y_train, y_test, sens_train, sens_test = (
+                                train_test_split(
+                                    X_bank,
+                                    y_bank,
+                                    sensitive_array,
+                                    test_size=0.2,
+                                    random_state=42,
+                                    stratify=cast("Any", y_bank) if can_stratify else None,
+                                )
+                            )
+                        except Exception:
+                            X_train, X_test, y_train, y_test, sens_train, sens_test = (
+                                train_test_split(
+                                    X_bank,
+                                    y_bank,
+                                    sensitive_array,
+                                    test_size=0.2,
+                                    random_state=42,
+                                )
+                            )
+                    else:
+                        X_train = X_bank
+                        X_test = X_bank
+                        y_train = y_bank
+                        y_test = y_bank
+                        sens_train = sensitive_array
+                        sens_test = sensitive_array
+
+                    bank_data[bank_id] = {
+                        "X_train": X_train,
+                        "X_test": X_test,
+                        "y_train": y_train,
+                        "y_test": y_test,
+                        "sens_train": sens_train,
+                        "sens_test": sens_test,
+                    }
+                simulation.banks = banks
+                datasets = {}
+            else:
+                self._notify(
+                    progress_callback,
+                    simulation.id,
+                    "status",
+                    {
+                        "status": simulation.status,
+                        "message": "Generating synthetic transaction data",
+                    },
+                )
+
+                # Scale down datasets for optimal CPU training
+                datasets = self.data_generator.generate_bank_datasets(
+                    bank_a_size=max(500, config.bank_a_transactions // 10),
+                    bank_b_size=max(500, config.bank_b_transactions // 10),
+                    bank_c_size=max(500, config.bank_c_transactions // 10),
+                )
+
+                # Run Data Ingestion Validation (Pandera & Great Expectations)
+                from app.application.services.data_validator import DataValidatorService
+
+                validator_service = DataValidatorService(alert_service=None)
+                validated_datasets = {}
+                for bank_id, (features_df, labels) in datasets.items():
+                    validated_df = validator_service.validate_streaming_batch(features_df, bank_id)
+                    validator_service.gate_data_contract(validated_df, bank_id)
+                    validated_datasets[bank_id] = (validated_df, labels)
+                datasets = validated_datasets
+
+                profiles = self.data_generator.create_bank_profiles(datasets)
+                banks = self.data_generator.create_bank_entities(datasets, profiles)
+                simulation.banks = banks
+
+                from app.application.services.feature_store_service import FeatureStoreService
+
+                feature_store = FeatureStoreService()
+
+                for bank_id, (df, labels) in datasets.items():
+                    offline_features = [
+                        "transaction_amount",
+                        "merchant_category",
+                        "country_code",
+                        "device_type",
+                        "velocity",
+                        "hour_of_day",
+                        "merchant_risk_score",
+                        "customer_history_score",
+                        "chargeback_count",
+                        "account_age_days",
+                    ]
+                    df_features = feature_store.get_historical_features(df, offline_features)
+                    X = DataGenerator.encode_features(df_features)
+                    y = labels.values
+
+                    sensitive_array = (df["country_code"] != "US").astype(int).values
+
+                    try:
+                        X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
+                            X,
+                            y,
+                            sensitive_array,
+                            test_size=0.2,
+                            random_state=42,
+                            stratify=cast("Any", y),
+                        )
+                    except ValueError:
+                        X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
+                            X,
+                            y,
+                            sensitive_array,
+                            test_size=0.2,
+                            random_state=42,
+                        )
+
+                    bank_data[bank_id] = {
+                        "X_train": X_train,
+                        "X_test": X_test,
+                        "y_train": y_train,
+                        "y_test": y_test,
+                        "sens_train": sens_train,
+                        "sens_test": sens_test,
+                    }
 
             # Notify progress callback of the generated banks early
             self._notify(
@@ -197,65 +347,10 @@ class SimulationService:
                 },
             )
 
-            # Split into train/test per bank
-            bank_data: dict[str, dict[str, np.ndarray]] = {}
-            from app.application.services.feature_store_service import FeatureStoreService
-
-            feature_store = FeatureStoreService()
-
-            for bank_id, (df, labels) in datasets.items():
-                # Simulate Offline Feature Store point-in-time join to retrieve training features
-                offline_features = [
-                    "transaction_amount",
-                    "merchant_category",
-                    "country_code",
-                    "device_type",
-                    "velocity",
-                    "hour_of_day",
-                    "merchant_risk_score",
-                    "customer_history_score",
-                    "chargeback_count",
-                    "account_age_days",
-                ]
-                df_features = feature_store.get_historical_features(df, offline_features)
-                X = DataGenerator.encode_features(df_features)
-                y = labels.values
-
-                # Generate sensitive attribute: 1 if country_code != 'US' else 0
-                sensitive_array = (df["country_code"] != "US").astype(int).values
-
-                # Stratified split preferred, but fall back to random split
-                # when a class has < 2 members (tiny datasets).
-                try:
-                    X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
-                        X,
-                        y,
-                        sensitive_array,
-                        test_size=0.2,
-                        random_state=42,
-                        stratify=cast("Any", y),
-                    )
-                except ValueError:
-                    X_train, X_test, y_train, y_test, sens_train, sens_test = train_test_split(
-                        X,
-                        y,
-                        sensitive_array,
-                        test_size=0.2,
-                        random_state=42,
-                    )
-
-                bank_data[bank_id] = {
-                    "X_train": X_train,
-                    "X_test": X_test,
-                    "y_train": y_train,
-                    "y_test": y_test,
-                    "sens_train": sens_train,
-                    "sens_test": sens_test,
-                }
-
             # Create a global validation/test set by concatenating all bank test sets
             X_val_global = np.concatenate([data["X_test"] for data in bank_data.values()], axis=0)
             y_val_global = np.concatenate([data["y_test"] for data in bank_data.values()], axis=0)
+            feature_dim = int(X_val_global.shape[1])
 
             # Phase 2: Train local models (baseline)
             simulation.status = SimulationStatus.TRAINING_LOCAL
@@ -271,7 +366,7 @@ class SimulationService:
 
             for bank in banks:
                 data = bank_data[bank.id]
-                model = self.model_service.create_model()
+                model = self.model_service.create_model(input_dim=feature_dim)
                 model, loss_history, _ = self.model_service.train_local(
                     model,
                     data["X_train"],
@@ -291,7 +386,9 @@ class SimulationService:
                     sens_attr=data["sens_test"],
                 )
 
-                feat_imp = self.model_service.get_feature_importance(model)
+                feat_imp = self.model_service.get_feature_importance(
+                    model, feature_names=feature_names
+                )
                 bank.local_metrics = self.metrics_service.from_eval_dict(eval_dict, feat_imp)
 
                 logger.info(
@@ -335,7 +432,9 @@ class SimulationService:
             dp_mode = getattr(config, "dp_mode", "post_hoc")
             use_opacus_dp = enable_dp and dp_mode == "opacus"
 
-            global_model = self.model_service.create_model(dp_compatible=use_opacus_dp)
+            global_model = self.model_service.create_model(
+                input_dim=feature_dim, dp_compatible=use_opacus_dp
+            )
             global_weights = self.model_service.get_parameters(global_model)
             privacy_service = PrivacyService()
 
@@ -449,7 +548,10 @@ class SimulationService:
                 def flower_progress_cb(sim_id: str, event_type: str, data: dict[str, Any]) -> None:
                     self._notify(progress_callback, sim_id, event_type, data)
 
-                is_p2p_flower = getattr(config, "p2p_mode", False) or getattr(config, "fl_engine_mode", "") == "p2p"
+                is_p2p_flower = (
+                    getattr(config, "p2p_mode", False)
+                    or getattr(config, "fl_engine_mode", "") == "p2p"
+                )
                 if is_p2p_flower:
                     flower_result = flower_engine.run_p2p_federated_training(
                         config=config,
@@ -637,34 +739,70 @@ class SimulationService:
 
                         prev_w = prev_local_weights_by_bank.get(bank.id)
 
-                        train_res = connector.train(
-                            bank_id=bank.id,
-                            weights=global_weights,
-                            learning_rate=config.learning_rate,
-                            batch_size=config.batch_size,
-                            epochs=config.local_epochs,
-                            enable_dp=enable_dp,
-                            dp_epsilon=config.dp_epsilon,
-                            dp_delta=config.dp_delta,
-                            dp_max_grad_norm=config.dp_max_grad_norm,
-                            correlation_id=correlation_id,
-                            fedprox_mu=getattr(config, "fedprox_mu", 0.0),
-                            moon_mu=getattr(config, "moon_mu", 0.0),
-                            moon_temperature=getattr(config, "moon_temperature", 0.5),
-                            prev_local_weights=prev_w,
-                            enable_bias_mitigation=config.enable_bias_mitigation,
-                            fairness_lambda=config.fairness_lambda,
-                            enable_adversarial_training=getattr(
-                                config, "enable_adversarial_training", False
-                            ),
-                            adversarial_attack_type=getattr(
-                                config, "adversarial_attack_type", "fgsm"
-                            ),
-                            adversarial_epsilon=getattr(config, "adversarial_epsilon", 0.05),
-                            adversarial_alpha=getattr(config, "adversarial_alpha", 0.01),
-                            adversarial_steps=getattr(config, "adversarial_steps", 5),
-                            adversarial_loss_weight=getattr(config, "adversarial_loss_weight", 0.5),
-                        )
+                        if bank.id in bank_data:
+                            # Direct PyTorch local training on bank's partition
+                            loc_model = self.model_service.create_model(
+                                input_dim=feature_dim, dp_compatible=use_opacus_dp
+                            )
+                            loc_model = self.model_service.set_parameters(loc_model, global_weights)
+                            loc_model, loss_hist, act_eps = self.model_service.train_local(
+                                loc_model,
+                                bank_data[bank.id]["X_train"],
+                                bank_data[bank.id]["y_train"],
+                                epochs=config.local_epochs,
+                                learning_rate=config.learning_rate,
+                                batch_size=config.batch_size,
+                                fedprox_mu=getattr(config, "fedprox_mu", 0.0),
+                                moon_mu=getattr(config, "moon_mu", 0.0),
+                                moon_temperature=getattr(config, "moon_temperature", 0.5),
+                                global_weights=global_weights,
+                                prev_local_weights=prev_w,
+                                sens_attr=bank_data[bank.id]["sens_train"],
+                                enable_bias_mitigation=config.enable_bias_mitigation,
+                                fairness_lambda=config.fairness_lambda,
+                            )
+                            res_w = self.model_service.get_parameters(loc_model)
+                            last_loss = float(loss_hist[-1]) if loss_hist else 0.1
+                            num_samples = len(bank_data[bank.id]["X_train"])
+                            train_res = {
+                                "bank_id": bank.id,
+                                "weights": res_w,
+                                "loss": last_loss,
+                                "num_samples": num_samples,
+                                "actual_epsilon": act_eps,
+                            }
+                            del loc_model
+                        else:
+                            train_res = connector.train(
+                                bank_id=bank.id,
+                                weights=global_weights,
+                                learning_rate=config.learning_rate,
+                                batch_size=config.batch_size,
+                                epochs=config.local_epochs,
+                                enable_dp=enable_dp,
+                                dp_epsilon=config.dp_epsilon,
+                                dp_delta=config.dp_delta,
+                                dp_max_grad_norm=config.dp_max_grad_norm,
+                                correlation_id=correlation_id,
+                                fedprox_mu=getattr(config, "fedprox_mu", 0.0),
+                                moon_mu=getattr(config, "moon_mu", 0.0),
+                                moon_temperature=getattr(config, "moon_temperature", 0.5),
+                                prev_local_weights=prev_w,
+                                enable_bias_mitigation=config.enable_bias_mitigation,
+                                fairness_lambda=config.fairness_lambda,
+                                enable_adversarial_training=getattr(
+                                    config, "enable_adversarial_training", False
+                                ),
+                                adversarial_attack_type=getattr(
+                                    config, "adversarial_attack_type", "fgsm"
+                                ),
+                                adversarial_epsilon=getattr(config, "adversarial_epsilon", 0.05),
+                                adversarial_alpha=getattr(config, "adversarial_alpha", 0.01),
+                                adversarial_steps=getattr(config, "adversarial_steps", 5),
+                                adversarial_loss_weight=getattr(
+                                    config, "adversarial_loss_weight", 0.5
+                                ),
+                            )
 
                         if "error" in train_res:
                             logger.error(
@@ -728,6 +866,7 @@ class SimulationService:
                             or train_res.get("sample_count")
                             or 1000
                         )
+                        client_weights.append(res_w)
                         client_samples.append(num_samples)
                         per_bank_loss[bank.id] = train_res.get("loss", 0.0)
                         per_bank_samples[bank.id] = num_samples
@@ -776,6 +915,7 @@ class SimulationService:
                                 client_weights = self.fl_engine.apply_byzantine_defense(
                                     client_weights,
                                     defense_type=config.byzantine_defense,
+                                    global_weights=global_weights,
                                 )
                                 logger.info(
                                     "Round %d: Byzantine defense (%s) applied",
@@ -800,21 +940,47 @@ class SimulationService:
 
                     # Evaluate global model on participating client nodes test partitions
                     eval_losses = []
+                    eval_aucs: dict[str, float] = {}
                     for bank in participating:
-                        correlation_id = f"evaluate_{simulation.id}_{round_num}_{bank.id}"
-                        connector = bank_connectors[bank.id]
-                        try:
-                            eval_res = connector.evaluate(
-                                bank_id=bank.id,
-                                weights=global_weights,
-                                correlation_id=correlation_id,
+                        if bank.id in bank_data:
+                            eval_m = self.model_service.create_model(input_dim=feature_dim)
+                            eval_m = self.model_service.set_parameters(eval_m, global_weights)
+                            bank_eval = self.model_service.evaluate(
+                                eval_m,
+                                bank_data[bank.id]["X_test"],
+                                bank_data[bank.id]["y_test"],
+                                sens_attr=bank_data[bank.id]["sens_test"],
                             )
-                            if "error" not in eval_res:
-                                eval_losses.append(eval_res["loss"])
-                        except Exception as exc:
-                            logger.error("Evaluation failed for bank %s: %s", bank.id, exc)
+                            eval_losses.append(bank_eval["loss"])
+                            eval_aucs[bank.id] = bank_eval["auc_roc"]
+                            del eval_m
+                        else:
+                            correlation_id = f"evaluate_{simulation.id}_{round_num}_{bank.id}"
+                            connector = bank_connectors[bank.id]
+                            try:
+                                eval_res = connector.evaluate(
+                                    bank_id=bank.id,
+                                    weights=global_weights,
+                                    correlation_id=correlation_id,
+                                )
+                                if "error" not in eval_res:
+                                    eval_losses.append(eval_res["loss"])
+                            except Exception as exc:
+                                logger.error("Evaluation failed for bank %s: %s", bank.id, exc)
 
                     round_loss = sum(eval_losses) / len(eval_losses) if eval_losses else 0.0
+
+                    # Global validation evaluation across concatenated bank test sets
+                    global_eval_m = self.model_service.create_model(input_dim=feature_dim)
+                    global_eval_m = self.model_service.set_parameters(global_eval_m, global_weights)
+                    global_eval = self.model_service.evaluate(
+                        global_eval_m,
+                        X_val_global,
+                        y_val_global,
+                    )
+                    global_auc = global_eval["auc_roc"]
+                    global_f1 = global_eval["f1_score"]
+                    del global_eval_m
 
                     # Simulate differential privacy canary validation checks if enabled
                     canary_info: dict[str, Any] = {}
@@ -822,7 +988,7 @@ class SimulationService:
                     # Calculate feature importance
                     ref_X = bank_data[participating[0].id]["X_train"]
                     round_feature_importance = self.model_service.get_feature_importance(
-                        global_model, ref_X
+                        global_model, ref_X, feature_names=feature_names
                     )
 
                     # Run online training step for streaming GNN
@@ -852,6 +1018,7 @@ class SimulationService:
                                         "edges_in_window": edge_index.size(1) // 2,
                                         "loss": loss_val,
                                     },
+                                    simulation_id=simulation.id,
                                 )
                             except Exception as e:
                                 logger.warning("Failed to log GNN event to audit chain: %s", e)
@@ -880,10 +1047,11 @@ class SimulationService:
                         final_round_participating = list(participating)
 
                     logger.info(
-                        "[Federated FL] Round %d/%d — loss: %.4f, participants: %d, dropped: %d, duration: %.0fms",
+                        "[Federated FL] Round %d/%d — loss: %.4f, auc: %.4f, participants: %d, dropped: %d, duration: %.0fms",
                         round_num,
                         config.num_rounds,
                         round_loss,
+                        global_auc,
                         len(participating),
                         len(dropped_this_round),
                         round_duration,
@@ -901,6 +1069,12 @@ class SimulationService:
                             "round": round_num,
                             "total": config.num_rounds,
                             "loss": round_loss,
+                            "auc": round(float(global_auc), 4),
+                            "f1": round(float(global_f1), 4),
+                            "per_bank_auc": {k: round(float(v), 4) for k, v in eval_aucs.items()},
+                            "per_bank_loss": {
+                                k: round(float(v), 4) for k, v in per_bank_loss.items()
+                            },
                             "participants": [b.id for b in participating],
                             "dropped": dropped_this_round,
                             "duration_ms": round_duration,
@@ -1122,7 +1296,9 @@ class SimulationService:
                             sens_attr=data.get("sens_test"),
                         )
                         eval_dicts[bank.id] = fed_eval
-                        fed_feat_imp = self.model_service.get_feature_importance(global_model, X_val_global)
+                        fed_feat_imp = self.model_service.get_feature_importance(
+                            global_model, X_val_global, feature_names=feature_names
+                        )
                         bank.federated_metrics = self.metrics_service.from_eval_dict(
                             fed_eval,
                             fed_feat_imp,
@@ -1137,10 +1313,14 @@ class SimulationService:
                                 correlation_id=correlation_id,
                             )
                             if "error" in eval_res or "f1_score" not in eval_res:
-                                raise RuntimeError(eval_res.get("error", "Missing f1_score in connector evaluation"))
+                                raise RuntimeError(
+                                    eval_res.get(
+                                        "error", "Missing f1_score in connector evaluation"
+                                    )
+                                )
                             eval_dicts[bank.id] = eval_res
                             fed_feat_imp = self.model_service.get_feature_importance(
-                                global_model, X_val_global
+                                global_model, X_val_global, feature_names=feature_names
                             )
                             bank.federated_metrics = self.metrics_service.from_eval_dict(
                                 eval_res,
@@ -1161,7 +1341,9 @@ class SimulationService:
                                     sens_attr=data.get("sens_test"),
                                 )
                                 eval_dicts[bank.id] = fed_eval
-                                fed_feat_imp = self.model_service.get_feature_importance(global_model)
+                                fed_feat_imp = self.model_service.get_feature_importance(
+                                    global_model, feature_names=feature_names
+                                )
                                 bank.federated_metrics = self.metrics_service.from_eval_dict(
                                     fed_eval,
                                     fed_feat_imp,

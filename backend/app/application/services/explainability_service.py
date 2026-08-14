@@ -128,7 +128,11 @@ class ExplainabilityService:
         lines: list[str] = []
 
         # Opening summary
-        sev_str = alert.severity.value if hasattr(alert.severity, "value") else str(alert.severity or "MEDIUM")
+        sev_str = (
+            alert.severity.value
+            if hasattr(alert.severity, "value")
+            else str(alert.severity or "MEDIUM")
+        )
         risk_sc = float(alert.risk_score or 0.0)
         mod_conf = float(alert.model_confidence or 0.0)
         lines.append(
@@ -281,7 +285,9 @@ class ExplainabilityService:
             raw_features.append(val)
 
         raw_features_clean = [
-            np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30) if isinstance(val, (int, float)) else val
+            np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30)
+            if isinstance(val, (int, float))
+            else val
             for val in raw_features
         ]
         input_vector = np.array([raw_features_clean], dtype=np.float32)  # Shape: (1, 10)
@@ -399,7 +405,11 @@ class ExplainabilityService:
         current_score = orig_score
 
         # Helper to extract feature value from alert top_features dict list
-        top_feat_dict = {f.get("feature"): f.get("contribution") for f in alert.top_features if isinstance(f, dict)}
+        top_feat_dict = {
+            f.get("feature"): f.get("contribution")
+            for f in alert.top_features
+            if isinstance(f, dict)
+        }
 
         orig_country_val = str(top_feat_dict.get("country_code", "HIGH_RISK_JURISDICTION"))
         orig_mcc_val = str(top_feat_dict.get("merchant_category", "high_risk_category"))
@@ -424,7 +434,9 @@ class ExplainabilityService:
             changes.append(
                 CounterfactualChange(
                     feature="country_code",
-                    original_value=orig_country_val if orig_country_val != "0.5" else "HIGH_RISK_JURISDICTION",
+                    original_value=orig_country_val
+                    if orig_country_val != "0.5"
+                    else "HIGH_RISK_JURISDICTION",
                     remediated_value="DOMESTIC_HOME_COUNTRY",
                     delta_explanation="Originate transaction from home country instead of high-risk jurisdiction.",
                 )

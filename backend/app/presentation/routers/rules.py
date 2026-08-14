@@ -109,7 +109,10 @@ async def list_business_rules(session: OptionalSessionDep = None) -> list[Busine
             if rules:
                 return [_to_rule_response(r) for r in rules]
         except Exception as exc:
-            logger.warning("Database query failed for list_business_rules (%s), returning default rules fallback", exc)
+            logger.warning(
+                "Database query failed for list_business_rules (%s), returning default rules fallback",
+                exc,
+            )
     return _DEFAULT_RULES
 
 

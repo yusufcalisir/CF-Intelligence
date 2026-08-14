@@ -137,7 +137,9 @@ async def explain_alert(alert_id: str) -> ExplainabilityResponse:
                 "raw_value": float(getattr(s, "raw_value", 0.0)),
                 "normalized_score": float(getattr(s, "normalized_score", 0.0)),
                 "explanation": getattr(s, "explanation", ""),
-                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted if total_weighted > 0 else 0.0,
+                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted
+                if total_weighted > 0
+                else 0.0,
             }
             for s in breakdown_list
         ],
@@ -169,7 +171,9 @@ async def explain_transaction(transaction_id: str) -> ExplainabilityResponse:
                 "raw_value": float(getattr(s, "raw_value", 0.0)),
                 "normalized_score": float(getattr(s, "normalized_score", 0.0)),
                 "explanation": getattr(s, "explanation", ""),
-                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted if total_weighted > 0 else 0.0,
+                "contribution": float(getattr(s, "weighted_score", 0.0)) / total_weighted
+                if total_weighted > 0
+                else 0.0,
             }
             for s in breakdown_list
         ],

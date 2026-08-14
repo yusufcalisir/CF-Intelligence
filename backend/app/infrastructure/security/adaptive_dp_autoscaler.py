@@ -109,7 +109,9 @@ class AdaptiveDPAutoScaler:
         calibrated_sigma = max(0.4, min(3.5, calibrated_sigma))
 
         # Dynamic clip norm
-        calibrated_clip = self.nominal_clip * max(0.5, min(2.0, 1.0 + (0.2 * (1.0 - progress_ratio))))
+        calibrated_clip = self.nominal_clip * max(
+            0.5, min(2.0, 1.0 + (0.2 * (1.0 - progress_ratio)))
+        )
 
         # 3. Update cumulative RDP accountant
         for alpha in self.orders:
@@ -117,8 +119,12 @@ class AdaptiveDPAutoScaler:
             self.cumulative_rdp[alpha] += step_rdp
 
         # 4. Convert to (epsilon, delta)-DP
-        current_eps, opt_alpha = self.convert_rdp_to_approx_dp(self.cumulative_rdp, self.target_delta)
-        instant_eps = (sample_ratio_q * math.sqrt(2.0 * math.log(1.25 / self.target_delta))) / calibrated_sigma
+        current_eps, opt_alpha = self.convert_rdp_to_approx_dp(
+            self.cumulative_rdp, self.target_delta
+        )
+        instant_eps = (
+            sample_ratio_q * math.sqrt(2.0 * math.log(1.25 / self.target_delta))
+        ) / calibrated_sigma
 
         calibration = DynamicNoiseCalibration(
             round_id=round_id,
@@ -135,13 +141,20 @@ class AdaptiveDPAutoScaler:
 
         logger.info(
             "Round %d Auto-Scaled DP: sigma=%.3f, clip=%.2f, eps_cum=%.3f (alpha*=%.1f, delta=%.1e)",
-            round_id, calibrated_sigma, calibrated_clip, current_eps, opt_alpha, self.target_delta
+            round_id,
+            calibrated_sigma,
+            calibrated_clip,
+            current_eps,
+            opt_alpha,
+            self.target_delta,
         )
         return calibration
 
     def get_accountant_state(self) -> RDPAccountantState:
         """Returns the current state of the RDP privacy accountant."""
-        current_eps, opt_alpha = self.convert_rdp_to_approx_dp(self.cumulative_rdp, self.target_delta)
+        current_eps, opt_alpha = self.convert_rdp_to_approx_dp(
+            self.cumulative_rdp, self.target_delta
+        )
         exhaustion_pct = min(100.0, (current_eps / self.target_epsilon) * 100.0)
 
         return RDPAccountantState(
@@ -158,8 +171,16 @@ class AdaptiveDPAutoScaler:
     def get_telemetry(self) -> AutoScalerTelemetry:
         """Returns real-time health telemetry and budget trajectory."""
         state = self.get_accountant_state()
-        active_sigma = self.calibration_history[-1].calibrated_sigma if self.calibration_history else self.nominal_sigma
-        active_clip = self.calibration_history[-1].gradient_clip_c if self.calibration_history else self.nominal_clip
+        active_sigma = (
+            self.calibration_history[-1].calibrated_sigma
+            if self.calibration_history
+            else self.nominal_sigma
+        )
+        active_clip = (
+            self.calibration_history[-1].gradient_clip_c
+            if self.calibration_history
+            else self.nominal_clip
+        )
 
         # Risk tier evaluation
         if state.budget_exhaustion_pct >= 100.0:
@@ -186,8 +207,20 @@ class AdaptiveDPAutoScaler:
             risk_tier=risk_tier,
             history=list(self.calibration_history[-10:]),
             audit_events=[
-                {"step": 1, "name": "Evaluate Rényi Divergence across 16 alpha orders", "status": "COMPLETED"},
-                {"step": 2, "name": "Dual minimization over (epsilon, delta) convex frontier", "status": "CONVERGED"},
-                {"step": 3, "name": "Dynamic noise sigma_t auto-scaled against loss velocity", "status": "CALIBRATED"},
+                {
+                    "step": 1,
+                    "name": "Evaluate Rényi Divergence across 16 alpha orders",
+                    "status": "COMPLETED",
+                },
+                {
+                    "step": 2,
+                    "name": "Dual minimization over (epsilon, delta) convex frontier",
+                    "status": "CONVERGED",
+                },
+                {
+                    "step": 3,
+                    "name": "Dynamic noise sigma_t auto-scaled against loss velocity",
+                    "status": "CALIBRATED",
+                },
             ],
         )

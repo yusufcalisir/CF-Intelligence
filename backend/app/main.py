@@ -389,6 +389,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     _redis_available = False
     try:
         import redis.asyncio as _aioredis
+
         _redis_url = settings.redis_url or "redis://localhost:6379"
         _r = _aioredis.from_url(_redis_url, socket_connect_timeout=1.0)
         await _r.ping()

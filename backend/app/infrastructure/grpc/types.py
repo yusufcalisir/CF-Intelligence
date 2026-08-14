@@ -102,8 +102,8 @@ class ECDHBroadcastRequest:
 
     bank_id: str
     round_id: int
-    public_key_bytes: bytes   # 32-byte raw X25519 public key
-    hmac_signature: bytes     # HMAC-SHA256 over (bank_id || round_id || pk)
+    public_key_bytes: bytes  # 32-byte raw X25519 public key
+    hmac_signature: bytes  # HMAC-SHA256 over (bank_id || round_id || pk)
     protocol_version: str = "2.0.0"
 
 
@@ -113,7 +113,7 @@ class ECDHBroadcastResponse:
 
     accepted: bool
     status_message: str
-    participant_count: int    # Number of active participants in this round
+    participant_count: int  # Number of active participants in this round
 
 
 @dataclass
@@ -139,7 +139,7 @@ class PeerKeysResponse:
 
     round_id: int
     peer_keys: list[PeerKeyEntry]
-    all_peers_ready: bool     # True when all expected participants have broadcast
+    all_peers_ready: bool  # True when all expected participants have broadcast
 
 
 # ---------------------------------------------------------------------------

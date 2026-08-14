@@ -19,8 +19,12 @@ _pilot_service = DesignPartnerPilotService()
 
 class IngestionValidationRequest(BaseModel):
     partner_name: str = Field(..., description="Name of the design partner bank or fintech")
-    schema_format: str = Field("ISO_20022", description="ISO_20022 | OPEN_BANKING_PSD2 | CUSTOM_CSV")
-    sample_records: list[dict[str, Any]] = Field(..., description="Sample un-hashed transaction records to scan for PII")
+    schema_format: str = Field(
+        "ISO_20022", description="ISO_20022 | OPEN_BANKING_PSD2 | CUSTOM_CSV"
+    )
+    sample_records: list[dict[str, Any]] = Field(
+        ..., description="Sample un-hashed transaction records to scan for PII"
+    )
 
 
 @router.post("/validate-ingest", status_code=status.HTTP_200_OK)
@@ -54,9 +58,16 @@ async def validate_data_ingestion(request: IngestionValidationRequest) -> dict[s
 
 @router.get("/evaluate-benchmark", status_code=status.HTTP_200_OK)
 async def evaluate_benchmark(
-    dataset: str = Query("paysim", description="Benchmark dataset name: 'paysim' | 'ieee_cis' | 'elliptic' | 'creditcard'"),
+    dataset: str = Query(
+        "paysim",
+        description="Benchmark dataset name: 'paysim' | 'ieee_cis' | 'elliptic' | 'creditcard'",
+    ),
     n_samples: int = Query(10_000, ge=1_000, le=100_000, description="Sample size to evaluate"),
-    daily_volume: int = Query(100_000, ge=10_000, description="Bank average daily transaction volume for economic modeling"),
+    daily_volume: int = Query(
+        100_000,
+        ge=10_000,
+        description="Bank average daily transaction volume for economic modeling",
+    ),
 ) -> dict[str, Any]:
     """Runs evidence-based evaluation on real/semi-real benchmark datasets."""
     try:
@@ -95,6 +106,7 @@ async def get_pilot_readiness_checklist(
             partner_name=partner_name, jurisdiction=jurisdiction
         )
         from dataclasses import asdict
+
         return asdict(checklist)
     except Exception as exc:
         logger.error("Failed to generate readiness checklist: %s", exc)

@@ -11,7 +11,7 @@ class PQCKemAlgorithm(StrEnum):
     """NIST FIPS 203 Module Lattice Key Encapsulation Mechanism (ML-KEM) standards."""
 
     KYBER_512 = "Kyber512"
-    KYBER_768 = "Kyber768"    # NIST Security Level 3 (Default)
+    KYBER_768 = "Kyber768"  # NIST Security Level 3 (Default)
     KYBER_1024 = "Kyber1024"  # NIST Security Level 5
 
 

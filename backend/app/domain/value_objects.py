@@ -133,6 +133,7 @@ class SimulationConfig:
     adversarial_loss_weight: float = 0.5
 
     # Data
+    dataset: str = "synthetic"  # "synthetic", "paysim", "ieee_cis", "elliptic", "creditcard"
     bank_a_transactions: int = 50000
     bank_b_transactions: int = 30000
     bank_c_transactions: int = 20000

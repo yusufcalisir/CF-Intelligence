@@ -106,6 +106,30 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
             transition={{ duration: 0.3 }}
             className="space-y-4 border-t border-[var(--color-border-subtle)] pt-4"
           >
+            {/* Benchmark Dataset Selection */}
+            <div>
+              <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-3 uppercase tracking-wider flex items-center justify-between">
+                <span>Benchmark Dataset</span>
+                <span className="text-[10px] text-[var(--color-accent-emerald)] font-mono">Real Kaggle Engine</span>
+              </h4>
+              <select
+                value={config.dataset ?? 'synthetic'}
+                onChange={(e) => updateConfig('dataset', e.target.value as SimulationConfig['dataset'])}
+                className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md px-3 py-2 text-sm text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent-indigo)] transition-colors"
+              >
+                <option value="synthetic">Synthetic Multi-Bank Generator (10 features)</option>
+                <option value="paysim">PaySim Mobile Money (6.36M txns, 13 features)</option>
+                <option value="ieee_cis">IEEE-CIS Fraud Detection (590K txns, 378 features)</option>
+                <option value="elliptic">Elliptic Bitcoin AML Graph (203K txns, 166 features)</option>
+                <option value="creditcard">European Credit Card Fraud (284K txns, 29 features)</option>
+              </select>
+              {config.dataset && config.dataset !== 'synthetic' && (
+                <p className="text-[10px] text-[var(--color-accent-emerald)] mt-1">
+                  ✓ Real Kaggle benchmark dataset will be partitioned Non-IID across banks with dynamic PyTorch model sizing.
+                </p>
+              )}
+            </div>
+
             {/* FL Engine Selection */}
             <div>
               <h4 className="text-xs font-medium text-[var(--color-text-secondary)] mb-3 uppercase tracking-wider">

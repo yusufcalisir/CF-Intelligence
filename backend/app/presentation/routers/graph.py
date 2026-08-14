@@ -31,6 +31,7 @@ class StreamGraphEdgeRequest(BaseModel):
     rel_type: str = Field("TRANSACTS_WITH", description="Relationship type")
     amount: float = Field(100.0, description="Transaction amount")
 
+
 _graph_engine = GraphEngine()
 
 

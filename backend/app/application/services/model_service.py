@@ -13,6 +13,15 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 import torch
 import torch.nn as nn
+from sklearn.metrics import (
+    accuracy_score,
+    confusion_matrix,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
+)
 from torch.utils.data import DataLoader, TensorDataset
 
 from app.domain.value_objects import ModelWeights
@@ -83,9 +92,11 @@ class ModelService:
         """Return the active simulation ID if available."""
         return self._active_simulation_id
 
-    def create_model(self, dp_compatible: bool = False) -> FraudDetectionModel:
-        """Create a fresh model instance with random initialization."""
-        model = FraudDetectionModel(input_dim=NUM_FEATURES, dp_compatible=dp_compatible)
+    def create_model(
+        self, input_dim: int = NUM_FEATURES, dp_compatible: bool = False
+    ) -> FraudDetectionModel:
+        """Create a fresh model instance with dynamic input dimension and random initialization."""
+        model = FraudDetectionModel(input_dim=input_dim, dp_compatible=dp_compatible)
         return model.to(self.device)
 
     def train_local(
@@ -471,16 +482,6 @@ class ModelService:
         Returns a dict with accuracy, precision, recall, f1, auc_roc, loss,
         confusion_matrix, roc_fpr, roc_tpr, roc_thresholds, and fairness_counts.
         """
-        from sklearn.metrics import (
-            accuracy_score,
-            confusion_matrix,
-            f1_score,
-            precision_score,
-            recall_score,
-            roc_auc_score,
-            roc_curve,
-        )
-
         model.eval()
         with torch.no_grad():
             X_tensor = torch.FloatTensor(X_test).to(self.device)
@@ -499,11 +500,17 @@ class ModelService:
         preds = (probs >= 0.5).astype(int)
 
         # Handle edge case where test set has only one class
-        try:
-            auc = roc_auc_score(y_test, probs)
-            fpr, tpr, thresholds = roc_curve(y_test, probs)
-        except ValueError:
-            auc = 0.0
+        if len(np.unique(y_test)) >= 2:
+            try:
+                auc = float(roc_auc_score(y_test, probs))
+                fpr, tpr, thresholds = roc_curve(y_test, probs)
+            except Exception:
+                auc = 0.5
+                fpr = np.array([0.0, 1.0])
+                tpr = np.array([0.0, 1.0])
+                thresholds = np.array([1.0, 0.0])
+        else:
+            auc = 0.5
             fpr = np.array([0.0, 1.0])
             tpr = np.array([0.0, 1.0])
             thresholds = np.array([1.0, 0.0])
@@ -560,9 +567,10 @@ class ModelService:
         )
 
         adv_service = AdversarialDefenseService.get_instance()
+        adv_eval_size = min(500, len(X_test))
         test_dataset = TensorDataset(
-            torch.FloatTensor(X_test).to(self.device),
-            torch.FloatTensor(y_test).to(self.device),
+            torch.FloatTensor(X_test[:adv_eval_size]).to(self.device),
+            torch.FloatTensor(y_test[:adv_eval_size]).to(self.device),
         )
         test_loader = DataLoader(test_dataset, batch_size=64, shuffle=False)
         adv_report = adv_service.evaluate_adversarial_robustness(
@@ -574,8 +582,8 @@ class ModelService:
             "precision": float(precision_score(y_test, preds, zero_division=0)),
             "recall": float(recall_score(y_test, preds, zero_division=0)),
             "f1_score": float(f1_score(y_test, preds, zero_division=0)),
-            "auc_roc": float(auc),
-            "loss": float(loss),
+            "auc_roc": auc,
+            "loss": loss,
             "confusion_matrix": cm.tolist(),
             "roc_fpr": fpr.tolist(),
             "roc_tpr": tpr.tolist(),
@@ -675,7 +683,10 @@ class ModelService:
         return attributions.detach().cpu().numpy()
 
     def get_feature_importance(
-        self, model: FraudDetectionModel, X_ref: np.ndarray | None = None
+        self,
+        model: FraudDetectionModel,
+        X_ref: np.ndarray | None = None,
+        feature_names: list[str] | None = None,
     ) -> dict[str, float]:
         """Extract feature importance from the first layer weights.
 
@@ -686,7 +697,7 @@ class ModelService:
         from app.application.services.data_generator import FEATURE_NAMES
 
         if X_ref is None or len(X_ref) == 0:
-            first_layer = list(model.parameters())[0]  # Shape: [64, 10]
+            first_layer = list(model.parameters())[0]
             importance = first_layer.abs().mean(dim=0).detach().cpu().numpy()
         else:
             # Calculate Integrated Gradients on reference data
@@ -700,7 +711,14 @@ class ModelService:
         if max_imp > 0:
             importance = importance / max_imp
 
-        return {name: float(imp) for name, imp in zip(FEATURE_NAMES, importance, strict=False)}
+        if feature_names is not None and len(feature_names) == len(importance):
+            names = feature_names
+        elif len(importance) == len(FEATURE_NAMES):
+            names = FEATURE_NAMES
+        else:
+            names = [f"feature_{i + 1}" for i in range(len(importance))]
+
+        return {name: float(imp) for name, imp in zip(names, importance, strict=False)}
 
     def get_champion(self) -> FraudDetectionModel:
         """Retrieve or instantiate active champion model for production scoring."""

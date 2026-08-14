@@ -85,12 +85,14 @@ class DesignPartnerPilotService:
             for pii_name, pattern in PII_PATTERNS.items():
                 matched_samples = [v for v in sample_vals if pattern.search(v)]
                 if matched_samples:
-                    violations.append({
-                        "column": col,
-                        "pii_type": pii_name,
-                        "sample_count": len(matched_samples),
-                        "remediation": f"Apply type-salted HMAC-SHA256 on column '{col}' before ingestion.",
-                    })
+                    violations.append(
+                        {
+                            "column": col,
+                            "pii_type": pii_name,
+                            "sample_count": len(matched_samples),
+                            "remediation": f"Apply type-salted HMAC-SHA256 on column '{col}' before ingestion.",
+                        }
+                    )
                     break
 
         return PiiScanResult(
@@ -189,6 +191,7 @@ class DesignPartnerPilotService:
 
         # Compute scientific metrics
         from sklearn.metrics import roc_auc_score
+
         roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
         roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
         pr_fl = compute_pr_auc(y, y_prob_fl)
@@ -205,8 +208,11 @@ class DesignPartnerPilotService:
 
         # Synthetic vs Real Fidelity
         from app.application.services.data_generator import DataGenerator
+
         gen = DataGenerator(seed=42)
-        synth_data = gen.generate_bank_datasets(bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3)
+        synth_data = gen.generate_bank_datasets(
+            bank_a_size=n_samples // 3, bank_b_size=n_samples // 3, bank_c_size=n_samples // 3
+        )
         synth_features, synth_labels = synth_data["bank_a"]
         # Select numeric columns
         num_cols = synth_features.select_dtypes(include="number").columns
@@ -253,10 +259,14 @@ class DesignPartnerPilotService:
                     "pr_auc_gain": round(pr_fl - pr_local, 4),
                     "recall_at_01_fpr_gain": round(rec01_fl - rec01_local, 4),
                     "daily_fraud_loss_saved_dollars": round(
-                        cost_local.estimated_daily_fraud_loss_dollars - cost_fl.estimated_daily_fraud_loss_dollars, 2
+                        cost_local.estimated_daily_fraud_loss_dollars
+                        - cost_fl.estimated_daily_fraud_loss_dollars,
+                        2,
                     ),
                     "daily_investigation_saved_dollars": round(
-                        cost_local.estimated_daily_investigation_cost_dollars - cost_fl.estimated_daily_investigation_cost_dollars, 2
+                        cost_local.estimated_daily_investigation_cost_dollars
+                        - cost_fl.estimated_daily_investigation_cost_dollars,
+                        2,
                     ),
                     "net_daily_economic_benefit_dollars": round(
                         cost_local.total_daily_cost_dollars - cost_fl.total_daily_cost_dollars, 2

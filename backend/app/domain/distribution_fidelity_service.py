@@ -162,7 +162,9 @@ def audit_distribution_fidelity(
 
     avg_wd = float(np.mean(wasserstein_list)) if wasserstein_list else 0.0
     avg_js = float(np.mean(js_list)) if js_list else 0.0
-    overall_score = float(np.mean([m.fidelity_score for m in feature_metrics])) if feature_metrics else 0.5
+    overall_score = (
+        float(np.mean([m.fidelity_score for m in feature_metrics])) if feature_metrics else 0.5
+    )
 
     cov_drift = compute_covariance_drift(X_real, X_synth)
     imb_real = float(np.mean(y_real == 1))

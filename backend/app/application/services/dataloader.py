@@ -279,21 +279,23 @@ def load_paysim(
     err_orig = (new_bal_orig + amounts - old_bal_orig).astype(np.float32)
     err_dest = (old_bal_dest + amounts - new_bal_dest).astype(np.float32)
 
-    X = np.column_stack([
-        steps,
-        type_transfer,
-        type_cash_out,
-        type_payment,
-        type_debit,
-        type_cash_in,
-        amounts,
-        old_bal_orig,
-        new_bal_orig,
-        old_bal_dest,
-        new_bal_dest,
-        err_orig,
-        err_dest,
-    ])
+    X = np.column_stack(
+        [
+            steps,
+            type_transfer,
+            type_cash_out,
+            type_payment,
+            type_debit,
+            type_cash_in,
+            amounts,
+            old_bal_orig,
+            new_bal_orig,
+            old_bal_dest,
+            new_bal_dest,
+            err_orig,
+            err_dest,
+        ]
+    )
     y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
 
     # Shuffle
@@ -327,9 +329,17 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
                 df[f"type_{t}"] = 0.0
 
     # Ensure balance errors exist
-    if "errorBalanceOrig" not in df.columns and "oldbalanceOrg" in df.columns and "newbalanceOrig" in df.columns:
+    if (
+        "errorBalanceOrig" not in df.columns
+        and "oldbalanceOrg" in df.columns
+        and "newbalanceOrig" in df.columns
+    ):
         df["errorBalanceOrig"] = df["newbalanceOrig"] + df["amount"] - df["oldbalanceOrg"]
-    if "errorBalanceDest" not in df.columns and "oldbalanceDest" in df.columns and "newbalanceDest" in df.columns:
+    if (
+        "errorBalanceDest" not in df.columns
+        and "oldbalanceDest" in df.columns
+        and "newbalanceDest" in df.columns
+    ):
         df["errorBalanceDest"] = df["oldbalanceDest"] + df["amount"] - df["newbalanceDest"]
 
     available_cols = [c for c in PAYSIM_FEATURE_COLS if c in df.columns]
@@ -377,7 +387,13 @@ def load_ieee_cis(
         y = df["isFraud"].values.astype(int)
         feature_cols = [c for c in df.columns if c not in ("isFraud", "TransactionID")]
         X = df[feature_cols].fillna(0).values.astype(np.float32)
-        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_parquet", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": feature_cols,
+            "source": "real_parquet",
+            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        }
 
     if txn_csv.exists():
         logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
@@ -388,7 +404,13 @@ def load_ieee_cis(
         num_cols = df.select_dtypes(include="number").columns.tolist()
         num_cols = [c for c in num_cols if c not in ("isFraud", "TransactionID")]
         X = df[num_cols].fillna(0).values.astype(np.float32)
-        return {"X": X, "y": y, "feature_names": num_cols, "source": "real_csv", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": num_cols,
+            "source": "real_csv",
+            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        }
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
     logger.warning(
@@ -435,6 +457,7 @@ def load_ieee_cis(
 # Kaggle Credit Card Fraud (European Cardholders PCA Benchmark)
 # ===========================================================================
 
+
 def load_creditcard_fraud(
     path: Path | None = None,
     n_mock_txns: int = 5_000,
@@ -452,7 +475,13 @@ def load_creditcard_fraud(
         feature_cols = [c for c in df.columns if c not in ("Time", "Class")]
         X = df[feature_cols].values.astype(np.float32)
         y = df["Class"].values.astype(int)
-        return {"X": X, "y": y, "feature_names": feature_cols, "source": "real_csv", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": feature_cols,
+            "source": "real_csv",
+            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        }
 
     # Mock generation
     logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
@@ -462,12 +491,18 @@ def load_creditcard_fraud(
     X[:, -1] = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
     y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
     idx = rng.permutation(n_mock_txns)
-    return {"X": X[idx], "y": y[idx], "source": "mock_pca", "fraud_ratio": float(np.mean(np.asarray(y, dtype=float)))}
+    return {
+        "X": X[idx],
+        "y": y[idx],
+        "source": "mock_pca",
+        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+    }
 
 
 # ===========================================================================
 # LEAF Non-IID Dirichlet Partitioning Engine
 # ===========================================================================
+
 
 def partition_dataset_non_iid(
     X: np.ndarray,
@@ -489,39 +524,53 @@ def partition_dataset_non_iid(
     for c in classes:
         c_idx = np.where(y == c)[0]
         rng.shuffle(c_idx)
-        # Sample proportions from Dirichlet distribution
-        proportions = rng.dirichlet(np.repeat(alpha, num_banks))
-        # Normalize and split indices
-        splits = (np.cumsum(proportions) * len(c_idx)).astype(int)
-        splits = np.insert(splits, 0, 0)
+        if len(c_idx) < num_banks:
+            # If extremely rare class, distribute round-robin to ensure coverage
+            for i, idx_val in enumerate(c_idx):
+                bank_indices[i % num_banks].append(idx_val)
+        else:
+            # Sample proportions from Dirichlet distribution with minimum floor
+            proportions = rng.dirichlet(np.repeat(alpha, num_banks))
+            # Smooth proportions slightly to prevent 0-sample allocations on small slices
+            proportions = 0.8 * proportions + 0.2 * (1.0 / num_banks)
+            proportions = proportions / np.sum(proportions)
+            splits = (np.cumsum(proportions) * len(c_idx)).astype(int)
+            splits = np.insert(splits, 0, 0)
+            splits[-1] = len(c_idx)
 
-        for b in range(num_banks):
-            start = splits[b]
-            end = splits[b + 1] if b + 1 < len(splits) else len(c_idx)
-            bank_indices[b].extend(c_idx[start:end])
+            for b in range(num_banks):
+                start = splits[b]
+                end = splits[b + 1]
+                bank_indices[b].extend(c_idx[start:end])
 
     partitions = []
     for b in range(num_banks):
         b_idx = np.array(bank_indices[b], dtype=np.int64)
         if len(b_idx) > 0:
             rng.shuffle(b_idx)
-            partitions.append({
-                "bank_id": f"bank_{chr(ord('a') + b)}",
-                "X": X[b_idx],
-                "y": y[b_idx],
-                "n_samples": len(b_idx),
-                "fraud_count": int(np.sum(y[b_idx] == 1)),
-                "fraud_ratio": float(np.mean(y[b_idx] == 1)),
-            })
+            partitions.append(
+                {
+                    "bank_id": f"bank_{chr(ord('a') + b)}",
+                    "X": X[b_idx],
+                    "y": y[b_idx],
+                    "n_samples": len(b_idx),
+                    "fraud_count": int(np.sum(y[b_idx] == 1)),
+                    "fraud_ratio": float(np.mean(y[b_idx] == 1)),
+                }
+            )
         else:
-            partitions.append({
-                "bank_id": f"bank_{chr(ord('a') + b)}",
-                "X": np.empty((0, X.shape[1]), dtype=X.dtype),
-                "y": np.empty((0,), dtype=y.dtype),
-                "n_samples": 0,
-                "fraud_count": 0,
-                "fraud_ratio": 0.0,
-            })
+            # If any bank somehow had 0 samples, fallback to stratified slice from X
+            fallback_slice = np.arange(b, len(X), num_banks)
+            partitions.append(
+                {
+                    "bank_id": f"bank_{chr(ord('a') + b)}",
+                    "X": X[fallback_slice],
+                    "y": y[fallback_slice],
+                    "n_samples": len(fallback_slice),
+                    "fraud_count": int(np.sum(y[fallback_slice] == 1)),
+                    "fraud_ratio": float(np.mean(y[fallback_slice] == 1)),
+                }
+            )
 
     return partitions
 

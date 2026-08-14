@@ -39,9 +39,21 @@ class AMLAgenticCopilot:
         t_start = time.perf_counter()
 
         drivers = shap_drivers or [
-            {"feature": "velocity_24h", "impact": 0.38, "description": "Transaction velocity spike (5x 30-day baseline)"},
-            {"feature": "cross_border_hop", "impact": 0.29, "description": "High-risk jurisdiction layering hop"},
-            {"feature": "structuring_flag", "impact": 0.22, "description": "Amount $9,950 just below $10,000 CTR threshold"},
+            {
+                "feature": "velocity_24h",
+                "impact": 0.38,
+                "description": "Transaction velocity spike (5x 30-day baseline)",
+            },
+            {
+                "feature": "cross_border_hop",
+                "impact": 0.29,
+                "description": "High-risk jurisdiction layering hop",
+            },
+            {
+                "feature": "structuring_flag",
+                "impact": 0.22,
+                "description": "Amount $9,950 just below $10,000 CTR threshold",
+            },
         ]
 
         graph_meta = graph_metadata or {
@@ -72,7 +84,7 @@ class AMLAgenticCopilot:
 
         # ── Paragraph 3: SHAP Risk Attributions & Anomaly Drivers ───────────
         top_driver_lines = [
-            f"- **{d['feature']}** (+{d['impact']*100:.1f}% risk): {d.get('description', '')}"
+            f"- **{d['feature']}** (+{d['impact'] * 100:.1f}% risk): {d.get('description', '')}"
             for d in drivers[:3]
         ]
         p3 = (
@@ -111,7 +123,7 @@ class AMLAgenticCopilot:
             f"- **Compliance Checklist**: [x] Zero-PII Hash Verified  [x] SHAP Attributions Audited  [ ] Supervisor Signature Received\n"
         )
         if investigator_notes:
-            four_eyes += f"\n*Investigator Note*: \"{investigator_notes}\""
+            four_eyes += f'\n*Investigator Note*: "{investigator_notes}"'
 
         # Cryptographic lineage hash
         lineage_input = f"{case_id}:{risk_score}:{full_narrative}".encode()
@@ -121,7 +133,8 @@ class AMLAgenticCopilot:
         t_elapsed = (time.perf_counter() - t_start) * 1000.0
         logger.info(
             "Synthesized Agentic AML Copilot narrative for case %s (time=%.2fms)",
-            case_id, t_elapsed
+            case_id,
+            t_elapsed,
         )
 
         return AMLCopilotAnalysis(
