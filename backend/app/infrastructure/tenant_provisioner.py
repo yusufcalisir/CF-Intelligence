@@ -14,6 +14,8 @@ from app.infrastructure.database import (
     _tenant_initialized,
 )
 
+from app.infrastructure.storage.storage_utils import get_storage_dir
+
 logger = logging.getLogger(__name__)
 
 # Global singleton registry
@@ -76,7 +78,8 @@ class TenantProvisioner:
         VALID_TENANTS.discard(clean_tenant_id)
 
         if purge_database:
-            db_path = os.path.join(_STORAGE_ROOT, f"cfi_{clean_tenant_id}.db")
+            storage_dir = get_storage_dir()
+            db_path = os.path.join(storage_dir, f"cfi_{clean_tenant_id}.db")
             if os.path.exists(db_path):
                 try:
                     os.remove(db_path)

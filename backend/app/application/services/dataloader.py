@@ -21,13 +21,24 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
+from app.infrastructure.storage.storage_utils import get_storage_dir
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Storage paths (relative to the backend/ root when run as a script,
-# or resolved from the CWD when imported inside the FastAPI app).
+# Storage paths (relative to get_storage_dir() or local repository storage)
 # ---------------------------------------------------------------------------
-_DATASETS_ROOT = Path("storage/datasets")
+def _get_datasets_root() -> Path:
+    storage_root = Path(get_storage_dir()) / "datasets"
+    if storage_root.exists():
+        return storage_root
+    local_storage = Path("storage/datasets")
+    if local_storage.exists():
+        return local_storage
+    return storage_root
+
+
+_DATASETS_ROOT = _get_datasets_root()
 
 
 # ===========================================================================
@@ -90,7 +101,7 @@ def load_elliptic(
         return {"X": X, "y": y, "edges": edges, "source": "real"}
 
     # ---- Mock generation ----
-    logger.warning(
+    logger.info(
         "[Elliptic] Dataset not found at %s — generating synthetic mock (%d nodes, %d features)",
         root,
         n_mock_nodes,
@@ -162,7 +173,7 @@ def load_amlsim(
         return {"X": X, "y": y, "source": "real"}
 
     # ---- Mock generation ----
-    logger.warning(
+    logger.info(
         "[AMLSim] Dataset not found at %s — generating synthetic mock (%d txns)",
         root,
         n_mock_txns,
@@ -238,7 +249,7 @@ def load_paysim(
             return _process_paysim_dataframe(df, source="real_csv")
 
     # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
-    logger.warning(
+    logger.info(
         "[PaySim] Dataset not found at %s — generating high-fidelity mock (%d txns, M-Pesa schema)",
         root,
         n_mock_txns,
@@ -413,7 +424,7 @@ def load_ieee_cis(
         }
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
-    logger.warning(
+    logger.info(
         "[IEEE-CIS] Dataset not found at %s — generating high-fidelity mock (%d txns, %d features)",
         root,
         n_mock_txns,

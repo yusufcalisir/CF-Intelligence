@@ -44,6 +44,7 @@ from sqlalchemy.orm import DeclarativeBase
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
+from app.infrastructure.storage.storage_utils import get_storage_dir
 
 logger = logging.getLogger(__name__)
 
@@ -66,13 +67,8 @@ VALID_TENANTS = {"bank_a", "bank_b", "bank_c"}
 settings = get_settings()
 
 # ── Storage root for SQLite databases ─────────
-_STORAGE_ROOT = os.path.abspath(
-    os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "storage",
-    )
-)
-os.makedirs(_STORAGE_ROOT, exist_ok=True)
+# Backward-compatible reference pointing to guaranteed writable storage
+_STORAGE_ROOT = get_storage_dir()
 
 
 def _resolve_database_url(tenant: str | None) -> str:
@@ -82,8 +78,10 @@ def _resolve_database_url(tenant: str | None) -> str:
     * ``"bank_a"`` → bank_a's isolated database
     """
     if settings.database_type == "sqlite":
+        storage_dir = get_storage_dir()
+        os.makedirs(storage_dir, exist_ok=True)
         db_name = f"cfi_{tenant}.db" if tenant else "cfi_central.db"
-        db_path = os.path.join(_STORAGE_ROOT, db_name)
+        db_path = os.path.join(storage_dir, db_name)
         return f"sqlite+aiosqlite:///{db_path}"
 
     # PostgreSQL / CockroachDB: append tenant suffix to database name
@@ -195,10 +193,10 @@ async def init_tenant_tables(tenant: str | None) -> None:
                         },
                     ]
                     await conn.execute(insert(TenantConfigModel), demo_banks)
+        _tenant_initialized.add(tenant)
+        logger.info("Initialized tables for tenant=%s", tenant or "central")
     except Exception as exc:
         logger.warning("Could not initialize tenant tables for tenant=%s: %s", tenant, exc)
-    _tenant_initialized.add(tenant)
-    logger.info("Initialized tables for tenant=%s", tenant or "central")
 
 
 def get_session_factory(tenant: str | None = None) -> async_sessionmaker[AsyncSession]:

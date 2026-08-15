@@ -48,12 +48,25 @@ def get_storage_dir() -> str:
         _cached_storage_dir = default_dir
         return default_dir
     except OSError:
-        fallback = os.path.join(tempfile.gettempdir(), "cfi_storage")
-        os.makedirs(fallback, exist_ok=True)
-        _cached_storage_dir = fallback
-        logger.info(
-            "Primary storage path (%s) not writable; using fallback: %s",
-            default_dir,
-            fallback,
-        )
-        return fallback
+        try:
+            fallback = os.path.join(tempfile.gettempdir(), "cfi_storage")
+            os.makedirs(fallback, exist_ok=True)
+            test_file = os.path.join(fallback, ".write_test")
+            with open(test_file, "w", encoding="utf-8") as f:
+                f.write("probe")
+            os.remove(test_file)
+            _cached_storage_dir = fallback
+            logger.info(
+                "Primary storage path (%s) not writable; using fallback: %s",
+                default_dir,
+                fallback,
+            )
+            return fallback
+        except OSError:
+            ultimate_fallback = tempfile.mkdtemp(prefix="cfi_storage_")
+            _cached_storage_dir = ultimate_fallback
+            logger.warning(
+                "Fallback storage path not writable; created unique temp directory: %s",
+                ultimate_fallback,
+            )
+            return ultimate_fallback
