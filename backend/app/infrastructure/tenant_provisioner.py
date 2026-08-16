@@ -7,13 +7,11 @@ import os
 
 from app.domain.tenant_management import TenantRecord, TenantRegistry, TenantStatus
 from app.infrastructure.database import (
-    _STORAGE_ROOT,
     VALID_TENANTS,
     Base,
     _get_or_create_engine,
     _tenant_initialized,
 )
-
 from app.infrastructure.storage.storage_utils import get_storage_dir
 
 logger = logging.getLogger(__name__)
