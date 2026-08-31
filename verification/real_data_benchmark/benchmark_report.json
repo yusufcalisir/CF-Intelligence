@@ -1,0 +1,26 @@
+{
+  "dataset": "Elliptic Bitcoin Dataset",
+  "source_type": "real",
+  "total_nodes": 46564,
+  "total_edges": 234355,
+  "illicit_node_count": 4545,
+  "illicit_rate_percent": 9.76,
+  "evaluated_test_nodes": 9313,
+  "metrics": {
+    "federated_graph_pipeline": {
+      "roc_auc": 0.9758,
+      "pr_auc": 0.8746,
+      "recall_at_01_fpr": 0.806
+    },
+    "isolated_single_bank_baseline": {
+      "roc_auc": 0.733,
+      "pr_auc": 0.2543,
+      "recall_at_01_fpr": 0.5239
+    },
+    "federated_advantage": {
+      "pr_auc_gain": 0.6203,
+      "roc_auc_gain": 0.2428,
+      "recall_gain": 0.2821
+    }
+  }
+}
