@@ -481,7 +481,21 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (46k nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** | **+$11,400 / day** |
 | **[LEAF Non-IID](https://leaf.cmu.edu/)** | Dirichlet Skew ($\alpha = 0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** | **+$15,750 / day** |
 
-> *The standalone Elliptic benchmark runner is available at `scripts/run_elliptic_benchmark.py` and publishes audit output to [`verification/real_data_benchmark/`](verification/real_data_benchmark/).*
+---
+
+### 15.3 Executable Benchmark & Verification CLI Tooling
+
+All benchmark measurements and verification suites can be directly reproduced via standalone CLI scripts:
+
+| Benchmark / Evaluation Target | CLI Command | Evaluated Capabilities & Output |
+| :--- | :--- | :--- |
+| **Real Elliptic AML Graph** | `python scripts/run_elliptic_benchmark.py` | Benchmarks real Bitcoin transaction graph (46.5k nodes, 234k edges) through GraphSAGE vs. isolated baseline. Generates [`verification/real_data_benchmark/`](verification/real_data_benchmark/). |
+| **Full Multi-Dataset Suite** | `python benchmark.py` | Evaluates 6-model matrix (Local, Pooled, FedAvg, FedProx, FedGNN, DP) + PaySim (6.36M), IEEE-CIS (20k), Elliptic with distribution fidelity audit. |
+| **9-Configuration Matrix (C1–C9)** | `python scripts/run_benchmark.py --samples 1000 --rounds 5` | Compares PR-AUC, ROC-AUC, F1, Recall@1% FPR, transmitted payload (MB), and DP epsilon consumption across 9 predefined architectural variants. |
+| **Enterprise ISO 20022 Stress Test** | `python scripts/run_enterprise_stress_test.py --banks 5 --target-tps 10000 --duration 10` | High-throughput concurrent stream simulation of `pacs.008` messages measuring peak TPS, p50/p99 latency, and error rates. Generates `reports/`. |
+| **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 28 AST boundary mutants (relational, Byzantine scale, Four-Eyes bypass) across frontend & backend with 100% mutant kill rate. |
+| **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch`. |
+| **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
 
 ---
 

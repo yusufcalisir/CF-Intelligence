@@ -10,7 +10,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
+import sys
 from typing import Any
+
+# Ensure backend directory is in sys.path
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "backend")))
 
 # ruff: noqa: I001, E402
 from app.domain.benchmark_runner import BenchmarkRunner  # type: ignore # pyright: ignore[reportMissingImports]
