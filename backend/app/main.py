@@ -670,9 +670,17 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
     _lock = Lock()
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        client_ip = request.client.host if request.client else "unknown"
+        # Extract real client IP considering trusted reverse proxy headers (Vercel, Cloudflare, AWS ALB)
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = (
+            request.headers.get("cf-connecting-ip")
+            or request.headers.get("x-real-ip")
+            or (forwarded.split(",")[0].strip() if forwarded else None)
+            or (request.client.host if request.client else "unknown")
+        )
         now = time.time()
         cutoff = now - self._WINDOW_SECONDS
+
 
         with self._lock:
             # Periodic pruning of expired entries when dictionary size exceeds threshold
@@ -702,16 +710,109 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
                         "detail": f"Request burst limit exceeded ({self._MAX_REQUESTS_PER_WINDOW} reqs/{int(self._WINDOW_SECONDS)}s). Temporarily throttled.",
                         "instance": request.url.path,
                     },
-                    headers={"Retry-After": "10", "X-DDoS-Throttled": "true"},
+                    headers={
+                        "Retry-After": str(int(self._WINDOW_SECONDS)),
+                        "X-DDoS-Throttled": "true",
+                        "X-RateLimit-Limit": str(self._MAX_REQUESTS_PER_WINDOW),
+                        "X-RateLimit-Remaining": "0",
+                        "X-RateLimit-Reset": str(int(now + self._WINDOW_SECONDS)),
+                    },
                     media_type="application/problem+json",
                 )
             history.append(now)
             self._requests[client_ip] = history
 
-        return await call_next(request)
+        response = await call_next(request)
+        response.headers["X-RateLimit-Limit"] = str(self._MAX_REQUESTS_PER_WINDOW)
+        response.headers["X-RateLimit-Remaining"] = str(max(0, self._MAX_REQUESTS_PER_WINDOW - len(history)))
+        return response
 
 
 app.add_middleware(DDoSProtectionMiddleware)
+
+
+# ── Multi-Tenant Broken Access Control (BOLA/IDOR) Middleware ────────────────
+# Enforces tenant boundary isolation at the HTTP middleware layer:
+# Prevents a bank user from accessing another bank's data simply by tampering
+# with bank_id parameters in the URL, query string, or request context.
+class TenantAccessControlMiddleware(BaseHTTPMiddleware):
+    """Enforces multi-tenant broken access control (BOLA/IDOR) prevention across all routes."""
+
+    _EXEMPT_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/ws/", "/api/v1/onboarding")
+
+    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        if any(request.url.path.startswith(p) for p in self._EXEMPT_PREFIXES):
+            return await call_next(request)
+
+        # 1. Extract caller tenant identity and roles from OIDC JWT, X-Tenant-ID, X-Bank-ID, or X-API-Key
+        caller_tenant: str | None = None
+        caller_roles: list[str] = []
+
+        auth = request.headers.get("authorization") or request.headers.get("Authorization") or ""
+        if auth.startswith("Bearer "):
+            token = auth[7:].strip()
+            try:
+                from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+                auth_helper = OIDCAuthenticator()
+                valid, claims, _ = auth_helper.decode_and_validate_token(token)
+                if valid and claims:
+                    caller_tenant = claims.bank_id
+                    caller_roles = claims.roles
+            except Exception:
+                pass
+
+        if not caller_tenant:
+            caller_tenant = (
+                request.headers.get("X-Tenant-ID")
+                or request.headers.get("x-tenant-id")
+                or request.headers.get("X-Bank-ID")
+                or request.headers.get("x-bank-id")
+            )
+
+        if not caller_tenant:
+            api_key = request.headers.get("X-API-Key") or request.headers.get("x-api-key") or ""
+            if api_key and ":" in api_key:
+                parts = api_key.split(":")
+                if len(parts) >= 2:
+                    caller_tenant = parts[1]
+
+        # 2. If caller tenant is bound, verify against target bank_id query param
+        if caller_tenant and not any(
+            r in caller_roles for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
+        ):
+            norm_caller = caller_tenant.lower().replace("-", "_").strip()
+
+            target_bank = request.query_params.get("bank_id")
+            if target_bank:
+                norm_target = target_bank.lower().replace("-", "_").strip()
+                if (
+                    norm_target not in ("global", "all", "system", "coordinator")
+                    and norm_target != norm_caller
+                ):
+                    logger.warning(
+                        "BOLA Access Denied: Tenant '%s' attempted cross-tenant access to bank '%s' on %s",
+                        caller_tenant,
+                        target_bank,
+                        request.url.path,
+                    )
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "type": "https://cfi-platform.org/errors/TenantAccessDenied",
+                            "title": "Cross-Tenant Broken Access Control Forbidden",
+                            "status": 403,
+                            "detail": f"Tenant '{caller_tenant}' is not authorized to access resources belonging to bank '{target_bank}'.",
+                            "instance": request.url.path,
+                        },
+                        media_type="application/problem+json",
+                    )
+
+        return await call_next(request)
+
+
+app.add_middleware(TenantAccessControlMiddleware)
+
 
 
 # ── Observability ─────────────────────────────

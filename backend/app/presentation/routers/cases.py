@@ -33,6 +33,7 @@ from app.application.services.case_service import (
     EvidenceRegistryService,
 )
 from app.application.services.idempotency import IdempotencyService
+from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import CasePriority, CaseStatus
 from app.domain.value_objects_copilot import CopilotQueryRequest, CopilotQueryResponse
 
@@ -148,13 +149,26 @@ async def create_case(
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
-async def get_case(case_id: str, actor: str = Query("analyst")) -> CaseResponse:
-    """Get case detail."""
+async def get_case(
+    case_id: str, actor: str = Query("analyst"), caller_tenant: TenantDep = None
+) -> CaseResponse:
+    """Get case detail with tenant isolation check."""
     case = _case_service.get_case(case_id)
     if not case:
         raise HTTPException(status_code=404, detail="Case not found")
+
+    if caller_tenant and case.alert_ids:
+        from app.presentation.routers.alerts import get_alert_service
+
+        alert_svc = get_alert_service()
+        for a_id in case.alert_ids:
+            a = alert_svc.get_alert(a_id)
+            if a:
+                enforce_tenant_isolation(caller_tenant, a.bank_id)
+
     AuditService().log_action(actor, "access_case", case_id)
     return _serialize_case(case)
+
 
 
 @router.patch("/{case_id}", response_model=CaseResponse)

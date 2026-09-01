@@ -19,6 +19,7 @@ from app.application.schemas.phase2 import (
 from app.application.services.case_service import AuditService
 from app.application.services.entity_resolution import EntityResolutionService
 from app.application.services.psi_service import PSIService
+from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import EntityType, RiskLevel
 
 logger = logging.getLogger(__name__)
@@ -37,14 +38,19 @@ async def list_entities(
     bank_id: str | None = Query(None),
     risk_level: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    caller_tenant: TenantDep = None,
 ) -> list[EntityResponse]:
-    """List entities with optional filters."""
+    """List entities with optional filters and tenant isolation checks."""
+    if caller_tenant and bank_id:
+        enforce_tenant_isolation(caller_tenant, bank_id)
+    effective_bank_id = bank_id or caller_tenant
+
     et = EntityType(entity_type) if entity_type else None
     rl = RiskLevel(risk_level) if risk_level else None
 
     entities = _entity_service.get_entities(
         entity_type=et,
-        bank_id=bank_id,
+        bank_id=effective_bank_id,
         risk_level=rl,
         limit=limit,
     )
@@ -67,9 +73,16 @@ async def list_entities(
 
 @router.get("/{entity_id}", response_model=EntityProfileResponse)
 async def get_entity_profile(
-    entity_id: str, actor: str = Query("analyst")
+    entity_id: str, actor: str = Query("analyst"), caller_tenant: TenantDep = None
 ) -> EntityProfileResponse:
-    """Get entity profile with cross-institution data."""
+    """Get entity profile with cross-institution data and tenant check."""
+    entity = _entity_service.get_entity(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, entity.bank_id)
+
     try:
         profile = _entity_service.build_entity_profile(entity_id)
         AuditService().log_action(actor, "query_entity", entity_id)
@@ -79,11 +92,16 @@ async def get_entity_profile(
 
 
 @router.get("/{entity_id}/relationships")
-async def get_entity_relationships(entity_id: str) -> list[dict]:
-    """Get direct relationships for an entity."""
+async def get_entity_relationships(
+    entity_id: str, caller_tenant: TenantDep = None
+) -> list[dict]:
+    """Get direct relationships for an entity with tenant check."""
     entity = _entity_service.get_entity(entity_id)
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, entity.bank_id)
 
     rels = [
         r
@@ -102,6 +120,7 @@ async def get_entity_relationships(entity_id: str) -> list[dict]:
         }
         for r in rels
     ]
+
 
 
 @router.post("/resolve", response_model=list[EntityResponse])

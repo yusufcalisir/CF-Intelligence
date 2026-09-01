@@ -27,24 +27,56 @@ from app.infrastructure.repositories.simulation_repository import SimulationRepo
 SettingsDep = Annotated[Settings, Depends(get_settings)]
 
 
-# ── Tenant Resolution ────────────────────────
+# ── Tenant Resolution & BOLA / ABAC Access Control ───
 async def resolve_tenant(request: Request) -> str | None:
     """Extract the bank tenant from the request and bind it to the active context.
 
     Resolution order:
-        1. ``X-Tenant-ID`` header (explicit override for internal services)
-        2. ``bank_id`` query parameter
+        1. ``Authorization`` Bearer JWT Token (OIDC claims)
+        2. ``X-Tenant-ID`` or ``X-Bank-ID`` headers (explicit identity)
         3. API key metadata embedded in the ``X-API-Key`` header
            (format: ``key_bank_a:bank_a:bank`` → tenant = ``bank_a``)
+        4. ``bank_id`` query parameter
 
     Returns the resolved tenant identifier or None for system-level access.
     """
-    # 1. Explicit header
-    tenant = request.headers.get("X-Tenant-ID")
+    tenant: str | None = None
+    is_privileged = False
 
-    # 2. Query parameter fallback
+    # 1. Bearer JWT Token (OIDC)
+    auth = request.headers.get("Authorization") or request.headers.get("authorization") or ""
+    if auth.startswith("Bearer "):
+        token = auth[7:].strip()
+        try:
+            from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
+
+            auth_helper = OIDCAuthenticator()
+            valid, claims, _ = auth_helper.decode_and_validate_token(token)
+            if valid and claims:
+                if any(
+                    r in claims.roles
+                    for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")
+                ):
+                    is_privileged = True
+                else:
+                    tenant = claims.bank_id
+        except Exception:
+            pass
+
+    # If privileged, caller has cross-institution authority (unrestricted)
+    if is_privileged:
+        req_bank = request.query_params.get("bank_id")
+        active_tenant.set(req_bank.strip() if req_bank else None)
+        return None
+
+    # 2. Explicit headers
     if not tenant:
-        tenant = request.query_params.get("bank_id")
+        tenant = (
+            request.headers.get("X-Tenant-ID")
+            or request.headers.get("x-tenant-id")
+            or request.headers.get("X-Bank-ID")
+            or request.headers.get("x-bank-id")
+        )
 
     # 3. API key metadata
     if not tenant:
@@ -54,13 +86,53 @@ async def resolve_tenant(request: Request) -> str | None:
             if len(parts) >= 2:
                 tenant = parts[1]
 
+    # 4. Query parameter fallback
+    if not tenant:
+        tenant = request.query_params.get("bank_id")
+
     # Set the context variable for downstream database routing
     if tenant:
-        active_tenant.set(tenant)
+        active_tenant.set(tenant.strip())
     else:
         active_tenant.set(None)
 
-    return tenant
+    return tenant.strip() if tenant else None
+
+
+
+def enforce_tenant_isolation(
+    caller_tenant: str | None,
+    resource_bank_id: str | None,
+    roles: list[str] | None = None,
+) -> None:
+    """Enforce ABAC / Broken Object-Level Authorization (BOLA) tenant isolation.
+
+    If a caller has an identified tenant, they are strictly forbidden from accessing
+    resources owned by another bank unless the resource is marked global or the caller
+    has privileged cross-institution roles (super_admin, cross_bank_investigator).
+    """
+    if not caller_tenant or not resource_bank_id:
+        return
+
+    if roles and any(r in roles for r in ("super_admin", "cross_bank_investigator", "compliance_auditor")):
+        return
+
+    norm_caller = caller_tenant.lower().replace("-", "_").strip()
+    norm_resource = resource_bank_id.lower().replace("-", "_").strip()
+
+    if norm_resource in ("global", "all", "system", "coordinator"):
+        return
+
+    if norm_caller != norm_resource:
+        from fastapi import HTTPException, status
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                f"Broken Access Control Prevention: Tenant '{caller_tenant}' is not authorized "
+                f"to access resources belonging to '{resource_bank_id}'."
+            ),
+        )
 
 
 TenantDep = Annotated[str | None, Depends(resolve_tenant)]

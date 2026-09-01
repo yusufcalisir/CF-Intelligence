@@ -23,6 +23,7 @@ from app.application.schemas.phase2 import (
 )
 from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.explainability_service import ExplainabilityService
+from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import AlertSeverity, AlertStatus
 
 logger = logging.getLogger(__name__)
@@ -43,8 +44,12 @@ async def list_alerts(
     severity: str | None = Query(None),
     status: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
+    caller_tenant: TenantDep = None,
 ) -> list[AlertResponse]:
-    """List fraud alerts with optional filters."""
+    """List fraud alerts with optional filters and broken access control checks."""
+    if caller_tenant and bank_id:
+        enforce_tenant_isolation(caller_tenant, bank_id)
+    effective_bank_id = bank_id or caller_tenant
     try:
         sev = AlertSeverity(severity) if severity else None
     except ValueError:
@@ -63,7 +68,7 @@ async def list_alerts(
         )
 
     alerts = _alert_service.get_alerts(
-        bank_id=bank_id,
+        bank_id=effective_bank_id,
         severity=sev,
         status=stat,
         limit=limit,
@@ -90,11 +95,14 @@ async def list_alerts(
 
 
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
-async def get_alert(alert_id: str) -> AlertResponse:
-    """Get alert detail."""
+async def get_alert(alert_id: str, caller_tenant: TenantDep = None) -> AlertResponse:
+    """Get alert detail with tenant isolation check."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     return AlertResponse(
         id=alert.id,
@@ -114,11 +122,14 @@ async def get_alert(alert_id: str) -> AlertResponse:
 
 
 @router.get("/alerts/{alert_id}/explain", response_model=ExplainabilityResponse)
-async def explain_alert(alert_id: str) -> ExplainabilityResponse:
-    """Get explainability report for an alert."""
+async def explain_alert(alert_id: str, caller_tenant: TenantDep = None) -> ExplainabilityResponse:
+    """Get explainability report for an alert with tenant isolation check."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     report = _explainability_service.explain_alert(alert)
     breakdown_list = report.risk_score_breakdown or []
@@ -148,11 +159,16 @@ async def explain_alert(alert_id: str) -> ExplainabilityResponse:
 
 
 @router.get("/explanation/{transaction_id}", response_model=ExplainabilityResponse)
-async def explain_transaction(transaction_id: str) -> ExplainabilityResponse:
-    """Get explainability report for an alert by transaction ID."""
+async def explain_transaction(
+    transaction_id: str, caller_tenant: TenantDep = None
+) -> ExplainabilityResponse:
+    """Get explainability report for an alert by transaction ID with tenant isolation check."""
     alert = _alert_service.get_alert_by_transaction_id(transaction_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found for this transaction ID")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     report = _explainability_service.explain_alert(alert)
     breakdown_list = report.risk_score_breakdown or []
@@ -218,11 +234,15 @@ async def intelligence_stats() -> IntelligenceStatsResponse:
 async def get_alert_counterfactuals(
     alert_id: str,
     target_score: float = Query(350.0, ge=50.0, le=800.0),
+    caller_tenant: TenantDep = None,
 ) -> CounterfactualExplanationResponse:
     """Get actionable counterfactual remediation paths for an alert."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     cf = _explainability_service.generate_counterfactuals(alert, target_score=target_score)
 
@@ -245,11 +265,16 @@ async def get_alert_counterfactuals(
 
 
 @router.get("/alerts/{alert_id}/decision-replay", response_model=DecisionReplayResponse)
-async def replay_alert_decision(alert_id: str) -> DecisionReplayResponse:
+async def replay_alert_decision(
+    alert_id: str, caller_tenant: TenantDep = None
+) -> DecisionReplayResponse:
     """Execute deterministic decision replay for regulatory inference audit."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     audit = _explainability_service.replay_inference_audit(alert)
 
@@ -280,11 +305,16 @@ async def replay_alert_decision(alert_id: str) -> DecisionReplayResponse:
 
 
 @router.get("/alerts/{alert_id}/gnn-explanation", response_model=GNNExplanationResponse)
-async def get_alert_gnn_explanation(alert_id: str) -> GNNExplanationResponse:
+async def get_alert_gnn_explanation(
+    alert_id: str, caller_tenant: TenantDep = None
+) -> GNNExplanationResponse:
     """Compute GNNExplainer graph attribution for the entity associated with an alert."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
         raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
     node_id = (
         alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}"
@@ -308,3 +338,4 @@ async def get_alert_gnn_explanation(alert_id: str) -> GNNExplanationResponse:
         ],
         primary_driver_text=gnn_exp.primary_driver_text,
     )
+
