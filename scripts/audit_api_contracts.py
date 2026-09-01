@@ -23,18 +23,21 @@ def audit():
     backend_routes = []
     for r in app.routes:
         if hasattr(r, "methods") and hasattr(r, "path"):
-            methods = [m for m in r.methods if m not in ("HEAD", "OPTIONS")]
+            methods = [m for m in getattr(r, "methods", []) if m not in ("HEAD", "OPTIONS")]
+            endpoint_name = getattr(r, "name", str(getattr(r, "endpoint", "")))
             backend_routes.append({
-                "path": r.path,
+                "path": getattr(r, "path", ""),
                 "methods": methods,
-                "endpoint": getattr(r, "name", str(r.endpoint))
+                "endpoint": endpoint_name,
             })
-        elif hasattr(r, "path"): # WebSockets
+        elif hasattr(r, "path"):  # WebSockets
+            endpoint_name = getattr(r, "name", str(getattr(r, "endpoint", "")))
             backend_routes.append({
-                "path": r.path,
+                "path": getattr(r, "path", ""),
                 "methods": ["WS"],
-                "endpoint": getattr(r, "name", str(r.endpoint))
+                "endpoint": endpoint_name,
             })
+
 
     print(f"Discovered {len(backend_routes)} Registered Backend Endpoints / WebSockets.\n")
 
