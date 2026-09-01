@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.application.schemas.phase2 import (
     AlertResponse,
@@ -25,6 +25,7 @@ from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.explainability_service import ExplainabilityService
 from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import AlertSeverity, AlertStatus
+from app.infrastructure.security.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["alerts"])
@@ -39,7 +40,9 @@ def get_alert_service() -> AlertIntelligenceService:
 
 
 @router.get("/alerts", response_model=list[AlertResponse])
+@limiter.limit("120/minute")
 async def list_alerts(
+    request: Request,
     bank_id: str | None = Query(None),
     severity: str | None = Query(None),
     status: str | None = Query(None),
@@ -95,7 +98,12 @@ async def list_alerts(
 
 
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
-async def get_alert(alert_id: str, caller_tenant: TenantDep = None) -> AlertResponse:
+@limiter.limit("120/minute")
+async def get_alert(
+    request: Request,
+    alert_id: str,
+    caller_tenant: TenantDep = None,
+) -> AlertResponse:
     """Get alert detail with tenant isolation check."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:
@@ -122,7 +130,12 @@ async def get_alert(alert_id: str, caller_tenant: TenantDep = None) -> AlertResp
 
 
 @router.get("/alerts/{alert_id}/explain", response_model=ExplainabilityResponse)
-async def explain_alert(alert_id: str, caller_tenant: TenantDep = None) -> ExplainabilityResponse:
+@limiter.limit("60/minute")
+async def explain_alert(
+    request: Request,
+    alert_id: str,
+    caller_tenant: TenantDep = None,
+) -> ExplainabilityResponse:
     """Get explainability report for an alert with tenant isolation check."""
     alert = _alert_service.get_alert(alert_id)
     if not alert:

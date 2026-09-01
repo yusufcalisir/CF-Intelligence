@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Request, status
 
 from app.application.schemas.simulation import (
     BankComparisonResponse,
@@ -23,6 +23,7 @@ from app.application.schemas.simulation import (
 )
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 from app.infrastructure.redis_store import RedisStore
+from app.infrastructure.security.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +40,9 @@ _simulation_events = RedisStore("sim_events")
     response_model=SimulationCreateResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
+@limiter.limit("10/minute")
 async def create_simulation(
+    request: Request,
     config: SimulationConfigRequest,
 ) -> SimulationCreateResponse:
     """Start a new federated learning simulation.
