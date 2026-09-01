@@ -1,15 +1,12 @@
 """Unit tests for universal safe metric evaluation functions across edge cases."""
 
 import numpy as np
-import pytest
 
 from app.domain.metrics_service import (
-    compute_pr_auc,
-    compute_recall_at_fpr,
     compute_scientific_benchmark,
     safe_f1_score,
-    safe_precision_recall_curve,
     safe_pr_auc_score,
+    safe_precision_recall_curve,
     safe_roc_auc_score,
 )
 

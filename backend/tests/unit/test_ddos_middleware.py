@@ -1,10 +1,10 @@
 """Unit tests for DDoSProtectionMiddleware memory pruning and rate limiting."""
 
 import time
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
+
 import pytest
 from fastapi import Request
-from starlette.datastructures import Headers
 
 from app.main import DDoSProtectionMiddleware
 
@@ -41,7 +41,7 @@ async def test_ddos_middleware_memory_pruning():
     async def call_next_mock(req):
         return MagicMock(status_code=200)
 
-    response = await middleware.dispatch(request, call_next_mock)
+    await middleware.dispatch(request, call_next_mock)
 
     # After dispatch, expired IPs should have been pruned
     assert len(middleware._requests) <= 2  # Only active IP (10.0.0.1) and new IP (10.0.0.2)
