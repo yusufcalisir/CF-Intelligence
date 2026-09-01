@@ -200,23 +200,46 @@ class SpectralAnomalyDetector:
         Returns:
             List of SpectralAnomalyReport per client, flagging poisoned nodes.
         """
-        if len(client_updates) < self.config.min_clients:
+        # 1. Pre-filter corrupted updates containing NaN or Inf before SVD matrix decomposition
+        reports: list[SpectralAnomalyReport] = []
+        clean_updates: dict[str, dict[str, Any]] = {}
+
+        for nid, update in client_updates.items():
+            vec = _flatten(update)
+            if not vec or not all(math.isfinite(x) for x in vec):
+                logger.warning(
+                    "Backdoor/Poisoning detected: node=%s contains non-finite/NaN weights. Quarantined immediately.",
+                    nid,
+                )
+                reports.append(
+                    SpectralAnomalyReport(
+                        node_id=nid,
+                        spectral_score=float("inf"),
+                        is_poisoned=True,
+                        reason="non_finite_or_nan_parameter_detected",
+                    )
+                )
+            else:
+                clean_updates[nid] = update
+
+        if len(clean_updates) < self.config.min_clients:
             logger.warning(
-                "Spectral defense: insufficient clients (%d < %d). Skipping SVD analysis.",
-                len(client_updates),
+                "Spectral defense: insufficient clean clients (%d < %d). Skipping SVD analysis.",
+                len(clean_updates),
                 self.config.min_clients,
             )
-            return [
-                SpectralAnomalyReport(
-                    node_id=nid,
-                    spectral_score=0.0,
-                    is_poisoned=False,
-                    reason="insufficient_clients_fallback",
+            for nid in clean_updates:
+                reports.append(
+                    SpectralAnomalyReport(
+                        node_id=nid,
+                        spectral_score=0.0,
+                        is_poisoned=False,
+                        reason="insufficient_clients_fallback",
+                    )
                 )
-                for nid in client_updates
-            ]
+            return reports
 
-        scores = self.compute_spectral_scores(client_updates)
+        scores = self.compute_spectral_scores(clean_updates)
         score_values = list(scores.values())
 
         mu = sum(score_values) / len(score_values)
@@ -231,8 +254,6 @@ class SpectralAnomalyDetector:
             threshold,
             self.config.spectral_threshold_multiplier,
         )
-
-        reports: list[SpectralAnomalyReport] = []
         for nid, score in scores.items():
             is_poisoned = score > threshold
             if is_poisoned:

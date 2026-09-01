@@ -131,6 +131,60 @@ class WebhookService:
 
         return delivered
 
+    @staticmethod
+    def validate_target_url(target_url: str) -> bool:
+        """Validates that webhook target URL has valid HTTP/HTTPS scheme."""
+        if not target_url or not isinstance(target_url, str):
+            return False
+        clean = target_url.strip().lower()
+        return clean.startswith(("http://", "https://"))
+
+    async def deliver_payload_async(
+        self,
+        target_url: str,
+        delivery: WebhookDeliveryPayload,
+        timeout: float = 3.0,
+    ) -> bool:
+        """Safely delivers a signed webhook payload with strict timeout and security headers."""
+        if not self.validate_target_url(target_url):
+            logger.warning("Rejected webhook delivery to invalid URL: %s", target_url)
+            return False
+
+        headers = {
+            "Content-Type": "application/json",
+            "User-Agent": "CF-Intelligence-Webhook/1.0",
+            "X-CFI-Event-Id": delivery.event_id,
+            "X-CFI-Event-Type": delivery.event_type.value,
+            "X-CFI-Signature-256": delivery.signature,
+            "X-CFI-Timestamp": delivery.timestamp.isoformat(),
+        }
+
+        try:
+            import httpx
+
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    target_url,
+                    json=delivery.payload,
+                    headers=headers,
+                )
+                logger.info(
+                    "Webhook delivery %s to %s returned HTTP %d",
+                    delivery.event_id,
+                    target_url,
+                    response.status_code,
+                )
+                return response.is_success
+        except Exception as exc:
+            logger.warning(
+                "Webhook delivery %s to %s failed (%s: %s)",
+                delivery.event_id,
+                target_url,
+                type(exc).__name__,
+                exc,
+            )
+            return False
+
     def get_subscriptions(self, tenant_id: str) -> list[WebhookSubscription]:
         """Retrieves tenant active webhook subscriptions."""
         return list(self._subscriptions.get(tenant_id, []))

@@ -138,9 +138,14 @@ class FastInferenceExplainer:
             logger.warning("Could not cache SHAP result in Redis (%s); using in-memory cache", exc)
 
         # Trigger webhook if URL provided
-        if webhook_url:
+        if webhook_url and isinstance(webhook_url, str) and webhook_url.strip().lower().startswith(("http://", "https://")):
             try:
-                httpx.post(webhook_url, json=res, timeout=3.0)
+                headers = {
+                    "Content-Type": "application/json",
+                    "User-Agent": "CF-Intelligence-Webhook/1.0",
+                    "X-CFI-Transaction-Id": transaction_id,
+                }
+                httpx.post(webhook_url, json=res, headers=headers, timeout=3.0)
                 logger.info(
                     "Delivered SHAP webhook callback to %s for tx '%s'", webhook_url, transaction_id
                 )
@@ -158,7 +163,13 @@ class FastInferenceExplainer:
         """Asynchronously requests SHAP explanation, checking Redis cache first for sub-millisecond hit."""
         redis_key = f"cfi:shap:{transaction_id}"
 
-        # 1. Check Redis cache hit
+        # 1. Fast Path: In-memory LRU cache hit
+        if redis_key in _local_shap_cache:
+            data = json.loads(_local_shap_cache[redis_key])
+            data["source"] = "LOCAL_CACHE_HIT"
+            return data
+
+        # 2. Medium Path: Redis cache hit
         cached_str: str | None = None
         try:
             client = get_redis_client()
@@ -172,9 +183,6 @@ class FastInferenceExplainer:
                     )
         except Exception as exc:
             logger.debug("Redis read error for key %s: %s", redis_key, exc)
-
-        if not cached_str and redis_key in _local_shap_cache:
-            cached_str = _local_shap_cache[redis_key]
 
         if cached_str:
             data = json.loads(cached_str)

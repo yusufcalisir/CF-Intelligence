@@ -192,8 +192,13 @@ class DesignPartnerPilotService:
         # Compute scientific metrics
         from sklearn.metrics import roc_auc_score
 
-        roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
-        roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
+        if len(np.unique(y)) >= 2:
+            roc_fl = round(float(roc_auc_score(y, y_prob_fl)), 4)
+            roc_local = round(float(roc_auc_score(y, y_prob_local)), 4)
+        else:
+            roc_fl = 0.5
+            roc_local = 0.5
+
         pr_fl = compute_pr_auc(y, y_prob_fl)
         pr_local = compute_pr_auc(y, y_prob_local)
         rec01_fl = compute_recall_at_fpr(y, y_prob_fl, target_fpr=0.001)

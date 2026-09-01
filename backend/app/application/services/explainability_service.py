@@ -380,6 +380,8 @@ class ExplainabilityService:
                     features.append({"feature": name, "contribution": float(contribution)})
                 return sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
 
+            except (ImportError, ModuleNotFoundError):
+                pass
             except Exception as e:
                 logger.warning(
                     "SHAP execution failed: %s. Falling back to analytical heuristic.", e

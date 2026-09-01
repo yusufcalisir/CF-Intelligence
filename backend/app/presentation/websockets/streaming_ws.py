@@ -36,7 +36,13 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
             from app.config import get_settings
 
             settings = get_settings()
-            r = aioredis.from_url(settings.redis_url, decode_responses=True)
+            r = aioredis.from_url(
+                settings.redis_url,
+                decode_responses=True,
+                socket_connect_timeout=0.5,
+                socket_timeout=1.0,
+                retry_on_timeout=False,
+            )
 
             # Replay stored events
             events_key = f"scenario:{scenario_id}:events"

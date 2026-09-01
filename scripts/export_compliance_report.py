@@ -32,6 +32,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_DIR = REPO_ROOT / "backend"
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 
 def _resolve_signing_key(env_var: str, hex_key: str | None) -> bytes:
     """Resolves the HMAC signing key from environment variable or hex CLI argument."""
@@ -249,7 +254,7 @@ def main(argv: list[str] | None = None) -> int:
         written.append(str(md_path))
 
     if not args.quiet:
-        overall = "COMPLIANT ✅" if cert.overall_compliant else "NON-COMPLIANT ❌"
+        overall = "COMPLIANT [PASS]" if cert.overall_compliant else "NON-COMPLIANT [FAIL]"
         print(f"Certificate ID  : {cert.cert_id}")
         print(f"Model Version   : {cert.model_version}")
         print(f"Issued At       : {cert.issued_at}")

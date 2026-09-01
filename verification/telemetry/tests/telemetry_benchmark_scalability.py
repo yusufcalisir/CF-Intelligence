@@ -24,6 +24,7 @@ if backend_path not in sys.path:
 
 import logging
 logging.getLogger("app.application.services.sla_monitor").setLevel(logging.ERROR)
+from app.application.services.sla_monitor import RealtimeSLAMonitor
 from app.infrastructure.logging.siem_exporter import SIEMAuditEvent, SIEMLogExporter
 from app.infrastructure.telemetry import TelemetryRegistry
 from app.infrastructure.telemetry.otel_tracer import OpenTelemetryTracer

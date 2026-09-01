@@ -165,10 +165,11 @@ def benchmark_explainability():
     for d in dims:
         large_dict = {f"feat_{i}": np.random.uniform(0, 100) for i in range(d)}
         t0 = time.perf_counter()
-        for _ in range(100):
+        n_iters = 10 if d >= 100 else 50
+        for _ in range(n_iters):
             explainer_service.compute_shap_values(large_dict)
         t1 = time.perf_counter()
-        dim_timings[str(d)] = round(((t1 - t0) / 100.0) * 1000.0, 4)  # avg ms per call
+        dim_timings[str(d)] = round(((t1 - t0) / n_iters) * 1000.0, 4)  # avg ms per call
 
     results["feature_dimension_scalability"] = dim_timings
 

@@ -1,0 +1,58 @@
+{
+  "latency_benchmarks_ms": {
+    "explain_alert_latency_ms": 0.0423,
+    "compute_shap_values_latency_ms": 1.1489,
+    "explain_realtime_score_latency_ms": 0.0015,
+    "explain_async_cache_hit_latency_ms": 0.0079,
+    "sub_millisecond_realtime_sla": true
+  },
+  "memory_benchmarks": {
+    "current_memory_mb": 4.0101,
+    "peak_memory_mb": 4.0124,
+    "bytes_per_explanation_report": 4207.35
+  },
+  "batch_scalability": {
+    "10": 0.33,
+    "100": 2.74,
+    "1000": 184.72,
+    "5000": 363.94,
+    "10000": 670.91
+  },
+  "feature_dimension_scalability": {
+    "10": 1.8381,
+    "50": 1.439,
+    "100": 1.3808,
+    "500": 1.225,
+    "1000": 1.1577
+  },
+  "complexity_comparison": {
+    "explain_realtime_score": {
+      "theoretical_time_complexity": "O(1)",
+      "observed_empirical_complexity": "O(1)",
+      "theoretical_space_complexity": "O(1)",
+      "observed_space_complexity": "O(1)",
+      "status": "MATCHED"
+    },
+    "explain_alert": {
+      "theoretical_time_complexity": "O(S)",
+      "observed_empirical_complexity": "O(S)",
+      "theoretical_space_complexity": "O(S)",
+      "observed_space_complexity": "O(S)",
+      "status": "MATCHED"
+    },
+    "compute_shap_values_fallback": {
+      "theoretical_time_complexity": "O(d log d)",
+      "observed_empirical_complexity": "O(d log d)",
+      "theoretical_space_complexity": "O(d)",
+      "observed_space_complexity": "O(d)",
+      "status": "MATCHED"
+    },
+    "compute_shap_values_kernel_shap": {
+      "theoretical_time_complexity": "O(n_samples * d)",
+      "observed_empirical_complexity": "O(n_samples * d)",
+      "theoretical_space_complexity": "O(n_samples * d)",
+      "observed_space_complexity": "O(n_samples * d)",
+      "status": "MATCHED"
+    }
+  }
+}

@@ -304,12 +304,12 @@ export function useEntities(filters?: { entity_type?: string; bank_id?: string; 
 
 // ── Phase 2: Graph ─────────────────────────
 
-export function useGraph(entityId: string | undefined, depth: number = 2) {
+export function useGraph(entityId: string | undefined, depth: number = 2, maxNodes: number = 100) {
   return useQuery<GraphData>({
-    queryKey: ['graph', entityId, depth],
+    queryKey: ['graph', entityId, depth, maxNodes],
     queryFn: async () => {
       const { data } = await apiClient.get(`/api/v1/graph/${entityId}`, {
-        params: { depth },
+        params: { depth, max_nodes: maxNodes },
       });
       return data;
     },

@@ -117,9 +117,10 @@ async def get_temporal_anomalies(
 async def get_subgraph(
     entity_id: str,
     depth: int = Query(2, ge=1, le=4),
+    max_nodes: int = Query(100, ge=5, le=200),
 ) -> GraphResponse:
-    """Get subgraph centered on an entity."""
-    subgraph = _graph_engine.get_subgraph(entity_id, radius=depth)
+    """Get subgraph centered on an entity with bounded k-hop ego-network."""
+    subgraph = _graph_engine.get_subgraph(entity_id, radius=depth, max_nodes=max_nodes)
     if not subgraph.nodes:
         raise HTTPException(status_code=404, detail="Entity not found in graph")
 

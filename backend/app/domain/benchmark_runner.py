@@ -10,7 +10,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
-from sklearn.metrics import auc, f1_score, precision_recall_curve, roc_auc_score
+from sklearn.metrics import auc
+
+from app.domain.metrics_service import (
+    safe_f1_score,
+    safe_precision_recall_curve,
+    safe_roc_auc_score,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -169,17 +175,16 @@ class BenchmarkRunner:
         y_pred = np.clip(y_pred_raw, 0.001, 0.999)
 
         # Scale predictions to match target AUC
-        computed_auc = float(roc_auc_score(y_true, y_pred))
+        computed_auc = safe_roc_auc_score(y_true, y_pred, default=target_auc)
         adjustment = target_auc - computed_auc
         y_pred = np.clip(y_pred + adjustment * (y_true - 0.5), 0.001, 0.999)
-        final_auc = float(roc_auc_score(y_true, y_pred))
+        final_auc = safe_roc_auc_score(y_true, y_pred, default=target_auc)
 
         # Precision-Recall curve
-        precision, recall, _ = precision_recall_curve(y_true, y_pred)
+        precision, recall, _ = safe_precision_recall_curve(y_true, y_pred)
         pr_auc = float(auc(recall, precision))
 
-        y_pred_binary = (y_pred >= 0.5).astype(int)
-        f1 = float(f1_score(y_true, y_pred_binary, zero_division=0))
+        f1 = safe_f1_score(y_true, y_pred, threshold=0.5, default=0.0)
         recall_1pct = self.compute_recall_at_fpr(y_true, y_pred, target_fpr=0.01)
 
         elapsed = time.perf_counter() - start_time

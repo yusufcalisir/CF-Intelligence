@@ -1,0 +1,48 @@
+{
+  "collection_latency_us": 0.26,
+  "collection_throughput_rps": 3848967.0,
+  "sla_aggregation_scaling": [
+    {
+      "n": 10,
+      "latency_ms": 0.027
+    },
+    {
+      "n": 100,
+      "latency_ms": 0.018
+    },
+    {
+      "n": 1000,
+      "latency_ms": 0.067
+    },
+    {
+      "n": 10000,
+      "latency_ms": 0.526
+    },
+    {
+      "n": 50000,
+      "latency_ms": 0.536
+    }
+  ],
+  "prom_serialization_ms": 14.842,
+  "cef_serialization_us": 2.23,
+  "syslog_serialization_us": 31.991,
+  "client_memory_scaling": [
+    {
+      "clients": 10,
+      "memory_mb": 0.0
+    },
+    {
+      "clients": 100,
+      "memory_mb": 0.02
+    },
+    {
+      "clients": 1000,
+      "memory_mb": 0.18
+    },
+    {
+      "clients": 5000,
+      "memory_mb": 0.88
+    }
+  ],
+  "telemetry_overhead_pct": 0.0026
+}

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1410%2F1410_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1492%2F1492_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)**
@@ -209,81 +209,139 @@ sequenceDiagram
 ```
 CF-Intelligence/
 ├── pyproject.toml                                   # Packaging and cfi-cli entrypoint
-├── Dockerfile                                       # Container specification
+├── Dockerfile                                       # Multi-stage production container specification
 ├── docker-compose.yml                               # Multi-container orchestration (API, Redis, Postgres, Kafka)
-├── Makefile                                         # Developer automation tasks
-├── backend/                                         # Clean Architecture FastAPI Backend
+├── docker-compose.multinode.yml                     # 3-Node distributed bank consortium cluster
+├── Makefile                                         # Developer & CI automation tasks
+├── benchmark.py                                     # Master multi-model & multi-dataset benchmark suite
+│
+├── backend/                                         # Clean Architecture Python 3.12 Backend
 │   ├── alembic.ini                                  # Alembic DB migration configuration
-│   ├── requirements.txt                             # Python dependencies
+│   ├── pyproject.toml                               # Backend dependency & pytest/coverage config
+│   ├── requirements.txt                             # Production Python dependencies
 │   ├── app/
 │   │   ├── config.py                                # Platform configuration & env management
 │   │   ├── dependencies.py                          # FastAPI Dependency Injection provider
-│   │   ├── main.py                                  # Application entrypoint & middleware
+│   │   ├── main.py                                  # Application entrypoint & middleware pipeline
+│   │   │
+│   │   ├── domain/                                  # Domain Models, Value Objects & Invariants
+│   │   │   ├── entities.py                          # Core domain entities (Bank, Transaction, Alert)
+│   │   │   ├── value_objects.py                     # Immutable value objects (NormalizedTransaction, etc.)
+│   │   │   ├── model_lifecycle.py                   # Champion / Challenger state machine
+│   │   │   ├── fuzzy_psi.py                         # Private Set Intersection algorithm
+│   │   │   ├── spectral_defense.py                  # Spectral anomaly poisoning defense
+│   │   │   ├── byzantine_defense.py                 # Multi-Krum, Trimmed Mean, Bulyan aggregators
+│   │   │   ├── ai_act_compliance.py                 # EU AI Act risk classification & policy rules
+│   │   │   ├── consortium_policy.py                 # Consortium governance rules & quorum
+│   │   │   ├── distribution_fidelity_service.py     # Jensen-Shannon distribution divergence auditor
+│   │   │   ├── realtime_explainer.py                # Sub-ms fast SHAP TreeExplainer
+│   │   │   └── case_management.py                   # Four-Eyes supervisor approval domain model
+│   │   │
 │   │   ├── application/
 │   │   │   └── services/                            # Application Use Cases & Core Services
-│   │   │       ├── alert_service.py                 # Real-time alert dispatching service
-│   │   │       ├── auto_rollback.py                 # Performance degradation auto-rollback engine
-│   │   │       ├── automated_retraining.py          # Drift-triggered retraining pipeline
-│   │   │       ├── bank_onboarding_service.py       # Bank institution onboarding service
+│   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
+│   │   │       ├── flower_engine.py                 # Flower framework FL integration
+│   │   │       ├── fl_dirichlet_partitioner.py      # Non-IID Dirichlet distribution partitioner
+│   │   │       ├── privacy_service.py               # Opacus Differential Privacy guard
+│   │   │       ├── privacy_audit_service.py         # Rényi DP budget tracking & MIA auditor
+│   │   │       ├── risk_engine.py                   # 9-Signal composite risk scoring engine
+│   │   │       ├── graph_embedding_service.py       # PyTorch GraphSAGE relational embedding generator
+│   │   │       ├── graph_analytics_service.py       # Entity graph multi-hop traversal service
+│   │   │       ├── coordinator_service.py           # Federation round coordinator & orchestrator
 │   │   │       ├── case_service.py                  # Core case state machine service
-│   │   │       ├── case_workbench.py                # 6-stage case management workbench
-│   │   │       ├── coordinator_service.py           # FL Coordinator orchestration service
-│   │   │       ├── data_generator.py                # Synthetic financial transaction generator
-│   │   │       ├── data_validator.py                # Ingestion schema & distribution validator
-│   │   │       ├── dataloader.py                    # Public benchmark loaders (Elliptic, PaySim, IEEE-CIS)
+│   │   │       ├── case_workbench.py                # 6-Stage case management workbench
 │   │   │       ├── drift_service.py                 # PSI and Jensen-Shannon drift detector
+│   │   │       ├── auto_rollback.py                 # Champion auto-rollback on drift/degradation
+│   │   │       ├── automated_retraining.py          # Automated model retraining trigger pipeline
 │   │   │       ├── elliptic_benchmark_service.py    # Elliptic graph benchmark evaluation service
 │   │   │       ├── entity_resolution.py             # Cross-bank fuzzy entity resolution service
-│   │   │       ├── explainability_service.py        # SHAP Kernel & feature attribution
-│   │   │       ├── financial_message_parser.py      # ISO 20022 XML financial message parser
-│   │   │       ├── fl_dirichlet_partitioner.py      # Dir(alpha) Non-IID data partitioner
-│   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine
-│   │   │       ├── fl_hyperparameter_optimizer.py   # Optuna Bayesian TPE hyperparameter optimizer
-│   │   │       ├── flower_engine.py                 # Flower FL framework integration
-│   │   │       ├── graph_analytics_service.py       # Entity graph analytics service
-│   │   │       ├── graph_embedding_service.py       # PyTorch GraphSAGE embedding generator
-│   │   │       ├── model_registry.py                # Champion/Challenger model registry
-│   │   │       ├── privacy_audit_service.py         # Privacy budget & empirical leakage auditor
-│   │   │       ├── privacy_service.py               # Opacus Differential Privacy guard
-│   │   │       ├── psi_service.py                   # Population Stability Index engine
+│   │   │       ├── explainability_service.py        # Real-time SHAP Kernel & feature attribution
+│   │   │       ├── financial_message_parser.py      # ISO 20022 (pacs.008, camt.053) & SWIFT MT103 parser
+│   │   │       ├── data_generator.py                # Synthetic multi-bank transaction generator
+│   │   │       ├── data_validator.py                # Ingestion schema & distribution validator
+│   │   │       ├── dataloader.py                    # Real dataset loaders (Elliptic, PaySim, IEEE-CIS)
+│   │   │       ├── bank_onboarding_service.py       # Institution onboarding & mTLS provisioning
+│   │   │       ├── alert_service.py                 # Real-time fraud alert dispatching engine
 │   │   │       ├── regulatory_reporter.py           # FinCEN BSA SAR XML report compiler
-│   │   │       ├── retention_engine.py              # Data retention TTL & erasure engine
-│   │   │       ├── risk_engine.py                   # 9-Signal composite risk scoring engine
+│   │   │       ├── retention_engine.py              # Data retention TTL & automated zeroization
 │   │   │       ├── simulation_service.py            # FL simulation and scenario runner
-│   │   │       └── sla_monitor.py                   # Latency p50/p95/p99 SLA monitor
-│   │   ├── domain/                                  # Domain Models & Value Objects
-│   │   │   ├── case_management.py                   # Case entity and supervisor signature
-│   │   │   ├── entities.py                          # Core entities (Bank, Transaction, Alert)
-│   │   │   ├── fuzzy_psi.py                         # Private Set Intersection algorithm
-│   │   │   ├── model_lifecycle.py                   # Champion / Challenger state machine
-│   │   │   ├── realtime_explainer.py                # Sub-ms fast SHAP explainer
-│   │   │   ├── spectral_defense.py                  # Spectral anomaly poisoning defense
-│   │   │   └── value_objects.py                     # Immutable value objects
-│   │   ├── infrastructure/                          # Infrastructure & Security Adapters
-│   │   │   ├── connectors/                          # Ingestion Connectors (ISO 20022, Kafka, REST)
-│   │   │   ├── database/                            # SQLAlchemy ORM and Alembic Migrations
-│   │   │   ├── gRPC/                                # gRPC protobuf services and client
-│   │   │   ├── security/                            # Security & PET Drivers
-│   │   │   │   ├── abac_engine.py                   # Attribute-Based Access Control engine
-│   │   │   │   ├── p2p_secagg_driver.py             # Curve25519 ECDH SecAgg driver
-│   │   │   │   ├── shamir_engine.py                 # Shamir (t, n) threshold secret sharing
-│   │   │   │   ├── vault_client.py                  # HashiCorp Vault PKI client
-│   │   │   │   ├── fhe_driver.py                    # [Research] TenSEAL CKKS FHE driver
-│   │   │   │   ├── pqc_secagg_driver.py             # [Research] Post-Quantum Kyber-768 SecAgg
-│   │   │   │   ├── tee_driver.py                    # [Research] Hardware TEE SGX/Nitro driver
-│   │   │   │   └── layer2_crosschain_bridge.py      # [Research] Cross-chain settlement bridge
-│   │   │   └── telemetry/                           # OpenTelemetry & Prometheus metrics
-│   │   └── presentation/                            # REST Routers & WebSockets
-│   │       ├── routers/                             # FastAPI REST Routers
-│   │       └── websockets/                          # Streaming WebSocket endpoints
-├── frontend/                                        # React / Vite TypeScript Web Console
-├── scripts/                                         # Test, verification, and benchmark runners
-│   ├── run_all_tests.py                             # Master test suite runner
-│   ├── run_all_verifications.py                     # Scientific verification test runner
-│   └── run_elliptic_benchmark.py                    # Elliptic graph benchmark CLI
+│   │   │       └── sla_monitor.py                   # Sub-100ms latency p50/p95/p99 SLA monitor
+│   │   │
+│   │   ├── infrastructure/                          # Infrastructure & External Adapters
+│   │   │   ├── connectors/                          # ISO 20022, Kafka, and REST ingestion adapters
+│   │   │   ├── database/                            # SQLAlchemy ORM, engine & Alembic migrations
+│   │   │   ├── grpc/                                # Protobuf service definitions & gRPC transport
+│   │   │   ├── repositories/                        # Clean Architecture data persistence repositories
+│   │   │   ├── feature_store/                       # Redis online feature store & offline aggregations
+│   │   │   ├── disaster_recovery/                   # Multi-region active-passive failover coordinator
+│   │   │   ├── telemetry/                           # Prometheus metrics exporter & OpenTelemetry
+│   │   │   └── security/                            # Privacy-Enhancing Technologies & PKI Drivers
+│   │   │       ├── p2p_secagg_driver.py             # Curve25519 ECDH pairwise SecAgg driver
+│   │   │       ├── shamir_engine.py                 # Shamir (t, n) threshold secret sharing
+│   │   │       ├── abac_engine.py                   # Attribute-Based Access Control engine
+│   │   │       ├── vault_client.py                  # HashiCorp Vault PKI & secret manager
+│   │   │       ├── mtls_manager.py                  # mTLS certificate rotation & validation
+│   │   │       ├── perimeter_waf.py                 # Perimeter firewall & rate limiter
+│   │   │       ├── fhe_driver.py                    # [Research] TenSEAL CKKS FHE driver
+│   │   │       ├── pqc_secagg_driver.py             # [Research] Post-Quantum Kyber-768 SecAgg
+│   │   │       ├── tee_driver.py                    # [Research] Hardware TEE SGX/Nitro driver
+│   │   │       ├── zk_snark_verifier.py             # [Research] Groth16 zk-SNARK proof verifier
+│   │   │       └── layer2_crosschain_bridge.py      # [Research] Layer-2 cross-chain settlement bridge
+│   │   │
+│   │   └── presentation/                            # REST Endpoints & WebSockets
+│   │       ├── routers/                             # FastAPI modular routers (predict, cases, banks, etc.)
+│   │       └── websockets/                          # Real-time telemetry & transaction streaming
+│   │
+│   └── tests/                                       # Comprehensive Test Suite (1,105+ Tests)
+│       ├── unit/                                    # Unit tests for domain, application & security
+│       ├── integration/                             # End-to-end API, gRPC & database integration tests
+│       ├── mutation/                                # AST boundary & fault injection mutant suites
+│       └── property/                                # Hypothesis property-based invariance tests
+│
+├── frontend/                                        # React 18 / Vite TypeScript Web Console
+│   ├── src/
+│   │   ├── pages/                                   # Dashboard, Security, Observability, Case Workbench
+│   │   ├── components/                              # Modular UI components, ErrorBoundary & visualizer
+│   │   ├── api/                                     # TanStack Query clients & REST schemas
+│   │   ├── services/                                # WebSocket feeds & real-time telemetry handlers
+│   │   └── utils/                                   # Cryptographic helpers, formatters & mutant killers
+│   └── tests/                                       # Vitest & Testing Library Suite (387+ Tests)
+│
+├── contracts/                                       # Hardhat EVM Smart Contracts [Research]
+│   ├── contracts/                                   # ConsortiumIncentiveSettlement.sol, GnosisSafe
+│   └── test/                                        # Hardhat Mocha/Chai contract unit tests
+│
+├── deployments/                                     # Infrastructure as Code (IaC) & Cloud
+│   ├── terraform/                                   # Multi-cloud AWS/GCP Terraform IaC modules
+│   ├── helm/                                        # Kubernetes Helm charts for distributed cluster
+│   ├── argocd/                                      # GitOps continuous delivery manifests
+│   └── grafana/                                     # Pre-configured Grafana observability dashboards
+│
+├── scripts/                                         # Test, Verification, Benchmark & CLI Runners
+│   ├── cfi_cli.py                                   # Bank onboarding & self-service sandbox CLI
+│   ├── audit_api_contracts.py                       # REST endpoint, schema & status code auditor
+│   ├── export_compliance_report.py                  # EU AI Act & SR 11-7 regulatory audit exporter
+│   ├── run_benchmark.py                             # 9-configuration comparative benchmark (C1–C9)
+│   ├── run_elliptic_benchmark.py                    # Elliptic graph benchmark runner
+│   ├── run_enterprise_stress_test.py                # ISO 20022 payment stream stress benchmark
+│   ├── run_all_verifications.py                     # Scientific verification test runner (17 modules)
+│   ├── run_mutation_tests.py                        # AST boundary & Byzantine mutant fault test runner
+│   ├── run_coverage_audit.py                        # 4-tier statement, branch & line coverage audit
+│   └── run_all_tests.py                             # Master automated test suite runner
+│
 ├── docs/                                            # Technical Architecture Specifications
+│   ├── architecture.md                              # End-to-end distributed system architecture
+│   ├── system_design.md                             # High-level design & data flow blueprints
+│   ├── threat_model.md                              # STRIDE & PET threat model analysis
+│   └── aml-platform.md                              # Anti-Money Laundering operational specification
+│
 └── verification/                                    # Subsystem Self-Verification Reports (17 Modules)
-    └── real_data_benchmark/                         # Elliptic Bitcoin Dataset Benchmark Report
+    ├── federated_learning/                          # FL engine mathematical invariance audits
+    ├── differential_privacy/                        # Opacus DP & Rényi moment bounds audit
+    ├── secure_aggregation/                          # Curve25519 SecAgg zero-sum masking audit
+    ├── zero_trust_pki/                              # Vault PKI & ABAC authorization audit
+    ├── graph_intelligence/                          # PyTorch GraphSAGE relational embedding audit
+    └── real_data_benchmark/                         # Real Elliptic Bitcoin Graph Benchmark Report
 ```
 
 ---
@@ -421,6 +479,14 @@ $$\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times
 
 - **Active-Passive Multi-Region Failover (`region_failover.py`):** Automates standby region promotion upon primary heartbeat timeout (>15s), with target $\text{RTO} < 30\text{s}$.
 - **Operator CLI (`cfi_cli.py`):** Command-line tool for monitoring platform health, inspecting cluster status, and triggering administrative tasks.
+- **Production-Hardened Systemic Resilience:**
+  - *DDoS Memory Pruning:* Automatic IP timestamp sliding window cleanup preventing dictionary memory exhaustion (`_MAX_TRACKED_IPS = 1000`).
+  - *Byzantine Non-Finite Isolation:* Immediate client quarantining on `NaN`/`Inf` model updates and champion fallback in `fl_engine.py` and `spectral_defense.py`.
+  - *Universal Safe Evaluation:* Centralized `safe_roc_auc_score` and `safe_pr_auc_score` preventing single-class / empty-array evaluation crashes.
+  - *Multi-Tier Redis Caching:* In-memory LRU fast paths ($\sim 0.001\text{ms}$) with 0.1s socket connect timeouts and graceful degradation to local DB/PyTorch.
+  - *Developer Webhook Perimeter:* SSRF URL scheme sanitization, HMAC-SHA256 signature headers, and non-blocking bounded 3.0s timeouts (`deliver_payload_async`).
+  - *Graph Ego-Network Budget:* BFS traversal capped at 100 nodes max to prevent browser DOM and React Flow canvas thread freezing.
+  - *Frontend Error Boundaries:* Complete UI tree isolation with dark-themed recovery cards eliminating White Screen of Death (WSOD) risks.
 
 ---
 
@@ -466,7 +532,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.02 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Self-Verified (Internal Test Suite)` |
 | **Multi-Tenant Memory/DB Isolation**| **0 Leaks / 100% Isolated** | Isolated State | `test_multi_tenant_security_audit.py` | `Self-Verified (Internal Test Suite)` |
-| **Full Pytest Suite Pass Rate** | **1023 / 1023 passing** | 100% | Pytest Full Suite | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,492 / 1,492 passing** | 100% | 1,105 Backend Pytest + 387 Frontend Vitest | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -493,6 +559,8 @@ All benchmark measurements and verification suites can be directly reproduced vi
 | **Full Multi-Dataset Suite** | `python benchmark.py` | Evaluates 6-model matrix (Local, Pooled, FedAvg, FedProx, FedGNN, DP) + PaySim (6.36M), IEEE-CIS (20k), Elliptic with distribution fidelity audit. |
 | **9-Configuration Matrix (C1–C9)** | `python scripts/run_benchmark.py --samples 1000 --rounds 5` | Compares PR-AUC, ROC-AUC, F1, Recall@1% FPR, transmitted payload (MB), and DP epsilon consumption across 9 predefined architectural variants. |
 | **Enterprise ISO 20022 Stress Test** | `python scripts/run_enterprise_stress_test.py --banks 5 --target-tps 10000 --duration 10` | High-throughput concurrent stream simulation of `pacs.008` messages measuring peak TPS, p50/p99 latency, and error rates. Generates `reports/`. |
+| **End-to-End API Contract Audit** | `python scripts/audit_api_contracts.py` | Audits 100% of REST endpoints, Pydantic schemas, WebSocket streams, and status codes with zero orphaned routes. |
+| **EU AI Act & Governance Export** | `python scripts/export_compliance_report.py` | Generates standardized multi-page markdown compliance audit reports covering bias, explainability, and model governance. |
 | **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 28 AST boundary mutants (relational, Byzantine scale, Four-Eyes bypass) across frontend & backend with 100% mutant kill rate. |
 | **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch`. |
 | **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
@@ -667,10 +735,13 @@ pip install -r requirements.txt
 pytest tests/ -v
 ```
 
-### Step 3: Run the Elliptic AML Graph Benchmark
+### Step 3: Run Interactive Benchmark Suites
 ```bash
-# From workspace root
+# Run standalone Elliptic AML Bitcoin Graph benchmark
 python scripts/run_elliptic_benchmark.py
+
+# Run master multi-dataset benchmark suite (PaySim, IEEE-CIS, Elliptic)
+python benchmark.py
 ```
 
 ### Step 4: Launch Web Console
@@ -683,13 +754,13 @@ Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench
 
 ### Step 5: Master Test Suites Execution
 ```bash
-# Run backend test suite
+# Run full backend pytest suite (1,023+ tests)
 pytest backend/tests/ -v
 
-# Run scientific verification suite
+# Run master scientific invariant verification suite (17 modules)
 python scripts/run_all_verifications.py
 
-# Run frontend tests
+# Run full frontend vitest suite (387+ tests)
 npm --prefix frontend test
 ```
 

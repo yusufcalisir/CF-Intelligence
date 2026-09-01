@@ -107,6 +107,36 @@ class FederatedLearningEngine:
             if len(w.flat_weights) != ref_len:
                 raise ValueError(f"Parameter count mismatch at index {i}")
 
+        # Filter out corrupted client updates containing NaN or Inf weights (numerical overflow / poisoning)
+        clean_weights: list[ModelWeights] = []
+        clean_samples: list[int] = []
+        for i, (w, s) in enumerate(zip(client_weights, client_samples, strict=False)):
+            arr = np.asarray(w.flat_weights, dtype=np.float32)
+            if np.isfinite(arr).all():
+                clean_weights.append(w)
+                clean_samples.append(s)
+            else:
+                logger.warning(
+                    "Quarantining client update %d due to non-finite parameter weights (NaN/Inf detected)",
+                    i,
+                )
+
+        if not clean_weights:
+            logger.error(
+                "All %d client updates contained non-finite weights (NaN/Inf). Fallback to previous global weights.",
+                len(client_weights),
+            )
+            if global_weights is not None:
+                return global_weights
+            # Clean zero-fallback to prevent poisoning
+            return ModelWeights(
+                layer_shapes=ref_shapes,
+                flat_weights=[0.0] * ref_len,
+            )
+
+        client_weights = clean_weights
+        client_samples = clean_samples
+
         if len(client_weights) == 1:
             return client_weights[0]
 

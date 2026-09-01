@@ -356,8 +356,9 @@ class GraphEngine:
         self,
         center_entity_id: str,
         radius: int = 2,
+        max_nodes: int = 100,
     ) -> GraphSubgraph:
-        """Extract a subgraph centered on an entity."""
+        """Extract a subgraph centered on an entity with bounded node budget."""
         if self.db_type in ("neo4j", "memgraph") and self.driver:
             nodes_dict = {}
             rels_dict = {}
@@ -365,9 +366,10 @@ class GraphEngine:
                 result = session.run(
                     "MATCH (s:Entity {id: $center_id}) "
                     "OPTIONAL MATCH p = (s)-[*1..$radius]-(n:Entity) "
-                    "RETURN s, collect(p) as paths",
+                    "RETURN s, collect(p)[..$max_nodes] as paths",
                     center_id=center_entity_id,
                     radius=radius,
+                    max_nodes=max_nodes,
                 )
                 record = result.single()
                 if not record:
@@ -386,7 +388,7 @@ class GraphEngine:
                         relationship = _neo4j_rel_to_relationship(rel)
                         rels_dict[relationship.id] = relationship
 
-            node_ids = list(nodes_dict.keys())
+            node_ids = list(nodes_dict.keys())[:max_nodes]
 
             # Build React Flow nodes
             nodes = []
@@ -478,12 +480,13 @@ class GraphEngine:
         if not center_entity_val:
             return GraphSubgraph(center_entity_id=center_entity_id, depth=radius)
 
-        # Collect nodes via BFS
+        # Collect nodes via BFS bounded by max_nodes
         fb_visited: set[str] = {center_entity_id}
         fb_queue: deque[tuple[str, int]] = deque([(center_entity_id, 0)])
         fb_node_ids: list[str] = [center_entity_id]
+        bounded_max_nodes = max(1, min(max_nodes, 200))
 
-        while fb_queue:
+        while fb_queue and len(fb_node_ids) < bounded_max_nodes:
             current_id, current_depth = fb_queue.popleft()
             if current_depth >= radius:
                 continue
@@ -492,6 +495,8 @@ class GraphEngine:
                     fb_visited.add(neighbor_id)
                     fb_node_ids.append(neighbor_id)
                     fb_queue.append((neighbor_id, current_depth + 1))
+                    if len(fb_node_ids) >= bounded_max_nodes:
+                        break
 
         # Build React Flow nodes
         nodes = []

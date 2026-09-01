@@ -328,6 +328,11 @@ def get_redis_client() -> Any | None:
 
         settings = get_settings()
         url = getattr(settings, "redis_url", None) or "redis://localhost:6379/0"
-        return redis.from_url(url)
+        return redis.from_url(
+            url,
+            socket_connect_timeout=0.1,
+            socket_timeout=0.2,
+            retry_on_timeout=False,
+        )
     except Exception:
         return None

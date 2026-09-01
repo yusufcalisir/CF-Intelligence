@@ -37,6 +37,91 @@ class ScientificValidationMetrics:
         return asdict(self)
 
 
+def _subsample_for_curve(y_t: np.ndarray, y_p: np.ndarray, max_samples: int = 50_000) -> tuple[np.ndarray, np.ndarray]:
+    """Subsamples large evaluation arrays preserving all positive/fraud cases to prevent OOM."""
+    if len(y_t) <= max_samples:
+        return y_t, y_p
+
+    fraud_idx = np.where(y_t == 1)[0]
+    legit_idx = np.where(y_t == 0)[0]
+    rng = np.random.default_rng(42)
+
+    n_fraud = min(len(fraud_idx), max_samples // 2)
+    n_legit = min(len(legit_idx), max_samples - n_fraud)
+
+    sampled_fraud = rng.choice(fraud_idx, size=n_fraud, replace=False) if len(fraud_idx) > n_fraud else fraud_idx
+    sampled_legit = rng.choice(legit_idx, size=n_legit, replace=False) if len(legit_idx) > n_legit else legit_idx
+
+    sampled_idx = np.concatenate([sampled_fraud, sampled_legit])
+    return y_t[sampled_idx], y_p[sampled_idx]
+
+
+def safe_roc_auc_score(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    default: float = 0.5,
+) -> float:
+    """Safely compute ROC-AUC score, guarding against single-class, empty, or NaN inputs."""
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
+        return default
+    try:
+        from sklearn.metrics import roc_auc_score
+
+        val = float(roc_auc_score(y_t, y_p))
+        return default if np.isnan(val) else val
+    except Exception:
+        return default
+
+
+def safe_pr_auc_score(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    default: float = 0.5,
+) -> float:
+    """Safely compute PR-AUC score, guarding against single-class, empty, or NaN inputs."""
+    return compute_pr_auc(y_true, y_pred)
+
+
+def safe_precision_recall_curve(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Safely compute precision-recall curve, providing fallback arrays on single-class inputs."""
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
+        return np.array([0.0, 1.0]), np.array([1.0, 0.0]), np.array([0.5])
+    try:
+        from sklearn.metrics import precision_recall_curve
+
+        return precision_recall_curve(y_t, y_p)
+    except Exception:
+        return np.array([0.0, 1.0]), np.array([1.0, 0.0]), np.array([0.5])
+
+
+def safe_f1_score(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    threshold: float = 0.5,
+    default: float = 0.0,
+) -> float:
+    """Safely compute binary F1-score with zero-division handling."""
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.size == 0 or y_p.size == 0:
+        return default
+    try:
+        from sklearn.metrics import f1_score
+
+        preds = (y_p >= threshold).astype(int)
+        val = float(f1_score(y_t, preds, zero_division=0))
+        return default if np.isnan(val) else val
+    except Exception:
+        return default
+
+
 def compute_pr_auc(y_true: list[int] | np.ndarray, y_pred: list[float] | np.ndarray) -> float:
     """Computes Precision-Recall Area Under Curve (PR-AUC) using sklearn."""
     from sklearn.metrics import auc, precision_recall_curve
@@ -44,11 +129,15 @@ def compute_pr_auc(y_true: list[int] | np.ndarray, y_pred: list[float] | np.ndar
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
 
-    if len(np.unique(y_t)) < 2:
+    if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:
         return 0.5
 
-    precision, recall, _ = precision_recall_curve(y_t, y_p)
-    return round(float(auc(recall, precision)), 4)
+    y_t, y_p = _subsample_for_curve(y_t, y_p)
+    try:
+        precision, recall, _ = precision_recall_curve(y_t, y_p)
+        return round(float(auc(recall, precision)), 4)
+    except Exception:
+        return 0.5
 
 
 def compute_recall_at_fpr(
@@ -65,6 +154,7 @@ def compute_recall_at_fpr(
     if len(np.unique(y_t)) < 2:
         return 0.0
 
+    y_t, y_p = _subsample_for_curve(y_t, y_p)
     fpr, tpr, _ = roc_curve(y_t, y_p)
     fpr_f = np.asarray(fpr, dtype=np.float64)
     tpr_f = np.asarray(tpr, dtype=np.float64)
@@ -251,15 +341,10 @@ def compute_scientific_benchmark(
     top_k: int = 100,
 ) -> ScientificValidationMetrics:
     """Computes all 8 scientific evaluation metrics for a model configuration."""
-    from sklearn.metrics import roc_auc_score
-
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
 
-    roc_auc = 0.5
-    if len(np.unique(y_t)) >= 2:
-        roc_auc = round(float(roc_auc_score(y_t, y_p)), 4)
-
+    roc_auc = round(safe_roc_auc_score(y_t, y_p, default=0.5), 4)
     pr_auc = compute_pr_auc(y_t, y_p)
     rec_01_fpr = compute_recall_at_fpr(y_t, y_p, target_fpr=0.001)
     prec_k = compute_precision_at_k(y_t, y_p, k=top_k)

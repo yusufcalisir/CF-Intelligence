@@ -414,16 +414,10 @@ class ModelEvaluationEngine:
         ]
         avg_chall_latency = sum(chall_latencies) / len(chall_latencies) if chall_latencies else 0.0
 
-        from sklearn.metrics import auc, precision_recall_curve, roc_auc_score
+        from app.domain.metrics_service import safe_pr_auc_score, safe_roc_auc_score
 
-        champ_auc = 0.5
-        champ_pr_auc = 0.5
-        try:
-            champ_auc = float(roc_auc_score(y_true, y_pred_champ))
-            prec, rec, _ = precision_recall_curve(y_true, y_pred_champ)
-            champ_pr_auc = float(auc(rec, prec))
-        except Exception:
-            pass
+        champ_auc = safe_roc_auc_score(y_true, y_pred_champ, default=0.5)
+        champ_pr_auc = safe_pr_auc_score(y_true, y_pred_champ, default=0.5)
 
         champ_fp = 0
         champ_tn = 0
@@ -442,12 +436,8 @@ class ModelEvaluationEngine:
             y_true_chall = [
                 r["actual_label"] for r in records if r["challenger_version"] is not None
             ]
-            try:
-                chall_auc = float(roc_auc_score(y_true_chall, y_pred_chall))
-                prec, rec, _ = precision_recall_curve(y_true_chall, y_pred_chall)
-                chall_pr_auc = float(auc(rec, prec))
-            except Exception:
-                pass
+            chall_auc = safe_roc_auc_score(y_true_chall, y_pred_chall, default=0.5)
+            chall_pr_auc = safe_pr_auc_score(y_true_chall, y_pred_chall, default=0.5)
 
             chall_fp = 0
             chall_tn = 0

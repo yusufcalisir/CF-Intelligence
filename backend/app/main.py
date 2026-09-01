@@ -661,10 +661,11 @@ app.add_middleware(MTLSVerificationMiddleware)
 # Implements sliding-window token bucket rate limiting for burst attack detection
 # and volumetric request flood prevention at the L7 application layer.
 class DDoSProtectionMiddleware(BaseHTTPMiddleware):
-    """Enforce sliding-window L7 volumetric flood protection per client IP."""
+    """Enforce sliding-window L7 volumetric flood protection per client IP with bounded memory pruning."""
 
     _WINDOW_SECONDS = 10.0
     _MAX_REQUESTS_PER_WINDOW = 100
+    _MAX_TRACKED_IPS = 1000  # Threshold to trigger expired IP pruning
     _requests: dict[str, list[float]] = {}
     _lock = Lock()
 
@@ -674,6 +675,15 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
         cutoff = now - self._WINDOW_SECONDS
 
         with self._lock:
+            # Periodic pruning of expired entries when dictionary size exceeds threshold
+            if len(self._requests) > self._MAX_TRACKED_IPS:
+                cleaned: dict[str, list[float]] = {}
+                for ip, timestamps in self._requests.items():
+                    valid_ts = [t for t in timestamps if t > cutoff]
+                    if valid_ts:
+                        cleaned[ip] = valid_ts
+                self._requests = cleaned
+
             history = [t for t in self._requests.get(client_ip, []) if t > cutoff]
             if len(history) >= self._MAX_REQUESTS_PER_WINDOW:
                 self._requests[client_ip] = history

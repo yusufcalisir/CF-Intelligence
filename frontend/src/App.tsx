@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import ErrorBoundary from './components/common/ErrorBoundary';
 import Layout from './components/layout/Layout';
 import LandingPage from './pages/LandingPage';
 import Dashboard from './pages/Dashboard';
@@ -46,165 +47,167 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Routes>
-          {/* Enterprise SaaS Landing Page */}
-          <Route path="/" element={<LandingPage />} />
+        <ErrorBoundary fallbackTitle="Federated Fraud Intelligence Platform Error">
+          <Routes>
+            {/* Enterprise SaaS Landing Page */}
+            <Route path="/" element={<LandingPage />} />
 
-          <Route element={<Layout />}>
-            {/* Live Operations & FL Consortium */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route
-              path="/operations"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <LiveOperationsView />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/operations/:id"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <LiveOperationsView />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/simulation/:id"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <LiveOperationsView />
-                </Suspense>
-              }
-            />
+            <Route element={<Layout />}>
+              {/* Live Operations & FL Consortium */}
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route
+                path="/operations"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <LiveOperationsView />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/operations/:id"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <LiveOperationsView />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/simulation/:id"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <LiveOperationsView />
+                  </Suspense>
+                }
+              />
 
-            {/* Scientific Validation & Benchmarks */}
-            <Route
-              path="/benchmarks"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <BenchmarkHubPage />
-                </Suspense>
-              }
-            />
+              {/* Scientific Validation & Benchmarks */}
+              <Route
+                path="/benchmarks"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <BenchmarkHubPage />
+                  </Suspense>
+                }
+              />
 
-            {/* Phase 2: AML Intelligence Platform */}
-            <Route
-              path="/investigation"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <InvestigationDashboard />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/alerts"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <AlertsPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/cases"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <CasesPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/cases/:caseId"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <CaseDetailPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/rules"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <PoliciesPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/policies"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <PoliciesPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/psi"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <PsiPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/security"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <SecurityPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/observability"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <ObservabilityPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/scenarios"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <ScenariosPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/graph"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <GraphPage />
-                </Suspense>
-              }
-            />
+              {/* Phase 2: AML Intelligence Platform */}
+              <Route
+                path="/investigation"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <InvestigationDashboard />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/alerts"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <AlertsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/cases"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <CasesPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/cases/:caseId"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <CaseDetailPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/rules"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PoliciesPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/policies"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PoliciesPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/psi"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PsiPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/security"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <SecurityPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/observability"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <ObservabilityPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/scenarios"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <ScenariosPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/graph"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <GraphPage />
+                  </Suspense>
+                }
+              />
 
-            {/* Enterprise Platform & Onboarding */}
-            <Route
-              path="/onboarding"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <BankOnboardingPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/coordinator"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <CoordinatorPage />
-                </Suspense>
-              }
-            />
-            <Route
-              path="/privacy-defense"
-              element={
-                <Suspense fallback={<PageFallback />}>
-                  <PrivacyDefensePage />
-                </Suspense>
-              }
-            />
-          </Route>
-        </Routes>
+              {/* Enterprise Platform & Onboarding */}
+              <Route
+                path="/onboarding"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <BankOnboardingPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/coordinator"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <CoordinatorPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/privacy-defense"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <PrivacyDefensePage />
+                  </Suspense>
+                }
+              />
+            </Route>
+          </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   );

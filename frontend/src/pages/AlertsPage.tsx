@@ -303,7 +303,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                   <span>📊</span> Kernel SHAP Feature Attribution
                 </h4>
                 <div className="space-y-2.5">
-                  {report.top_features.slice(0, 5).map((f, i) => {
+                  {(report.top_features || []).slice(0, 5).map((f, i) => {
                     const anyF = f as any;
                     const rawVal =
                       typeof anyF.contribution === 'number'
