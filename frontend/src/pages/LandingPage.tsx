@@ -223,6 +223,7 @@ const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
 
 // ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
 const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar'>('home');
   const [alertTick, setAlertTick] = useState(0);
 
@@ -242,7 +243,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
     home: 'dashboard',
     gnn: 'investigation',
     privacy: 'privacy-defense',
-    bft: 'operations',
+    bft: 'security',
     sar: 'cases',
   };
 
@@ -316,10 +317,18 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500/60" />
             <div className="w-2.5 h-2.5 rounded-full bg-emerald-500/70" />
           </div>
-          <div className="px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1.5 border border-white/5 truncate">
-            <span className="text-slate-600">🔒</span>
-            cfi-platform.com/{tabUrlPaths[activeTab]}
-          </div>
+          <button
+            type="button"
+            onClick={() => navigate(`/${tabUrlPaths[activeTab]}`)}
+            title={`Click to open https://cf-intelligence.vercel.app/${tabUrlPaths[activeTab]}`}
+            className="group px-2 sm:px-3 py-0.5 rounded-md bg-white/4 text-[9px] sm:text-[10px] font-mono text-slate-400 flex items-center gap-1 border border-white/5 truncate cursor-pointer hover:bg-white/10 hover:border-indigo-500/40 transition-all text-left"
+          >
+            <span className="text-emerald-400 text-[10px] shrink-0">🔒</span>
+            <span className="text-slate-400 truncate">https://cf-intelligence.vercel.app/</span>
+            <span className="text-indigo-400 font-bold bg-indigo-500/15 px-1 py-0.5 rounded group-hover:text-indigo-300 shrink-0">
+              {tabUrlPaths[activeTab]}
+            </span>
+          </button>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
           <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -346,6 +355,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             </button>
           ))}
         </div>
+
 
         {/* DYNAMIC TAB VIEW CONTENT */}
         <div className="flex-1 p-2.5 sm:p-3.5 min-w-0 flex flex-col justify-between overflow-x-hidden">
@@ -1879,7 +1889,7 @@ export default function LandingPage() {
               <div className="rounded-2xl sm:rounded-3xl bg-[#03030c] border border-white/8 p-4 sm:p-6 overflow-x-auto mb-8 sm:mb-10 shadow-2xl max-w-full">
                 <pre className="text-[11px] sm:text-xs font-mono text-indigo-200/90 leading-relaxed whitespace-pre min-w-0">
                   {activeApiTab === 'curl' && `# Trigger a new federated training round across consortium bank nodes
-curl -X POST https://api.cfi-platform.com/v1/rounds \\
+curl -X POST https://cf-intelligence.vercel.app/api/v1/simulations \\
   -H "Authorization: Bearer cfi_api_key_991823" \\
   -H "Content-Type: application/json" \\
   -d '{
@@ -1916,13 +1926,14 @@ import { CFIClient } from '@cfi/sdk';
 
 const client = new CFIClient({
   apiKey: 'cfi_api_key_991823',
-  baseUrl: 'https://api.cfi-platform.com'
+  baseUrl: 'https://cf-intelligence.vercel.app'
 });
 
 // Trigger training round
 const session = await client.rounds.start({
   consortiumId: 'cfi-prod-001',
   nodeIds: ['jpmorgan-01', 'hsbc-02', 'deutsche-03'],
+
   privacyConfig: { targetEpsilon: 1.0, targetDelta: 1e-5 },
   byzantineDefense: 'krum',
 });
