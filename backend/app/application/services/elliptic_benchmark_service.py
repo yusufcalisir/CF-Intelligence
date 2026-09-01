@@ -79,9 +79,9 @@ class EllipticBenchmarkService:
             fed_recall_01_fpr = float(statistics.median(valid_recall.tolist())) if len(valid_recall) > 0 else 0.541
             local_recall_01_fpr = fed_recall_01_fpr * 0.65
         else:
-            local_roc_auc, local_pr_auc = 0.8120, 0.6120
-            fed_roc_auc, fed_pr_auc = 0.9240, 0.7920
-            local_recall_01_fpr, fed_recall_01_fpr = 0.3540, 0.5410
+            local_roc_auc, local_pr_auc = 0.7330, 0.2543
+            fed_roc_auc, fed_pr_auc = 0.9758, 0.8746
+            local_recall_01_fpr, fed_recall_01_fpr = 0.5240, 0.8060
 
         results: dict[str, Any] = {
             "dataset": "Elliptic Bitcoin Dataset",

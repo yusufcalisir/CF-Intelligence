@@ -51,7 +51,7 @@ const STAGES: StageInfo[] = [
   {
     id: 3,
     label: 'PyTorch GAT & Rényi DP Noise Calibration',
-    subtext: 'Computing 8-head structural embeddings with Opacus (ε=0.50, δ=1e-5)',
+    subtext: 'Computing 8-head structural embeddings with Opacus (ε=1.0, δ=1e-5)',
     tag: '12.8k Graphs · Active',
     icon: Layers,
     color: '#06b6d4',

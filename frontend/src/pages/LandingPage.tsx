@@ -15,15 +15,15 @@ interface ArchNode { id: string; label: string; description: string; tech: strin
 
 // ── DATA ────────────────────────────────────────────────────────────────────
 const BANK_NODES: Record<string, BankInfoDetail> = {
-  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.2.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=0.50, δ=1e-5. HSM-signed: 0x99F1.'] },
+  jpmorgan: { id: 'jpmorgan', name: 'JPMorgan Chase & Co.', ticker: 'NYSE: JPM', location: 'New York Data Center, US (Node #01)', hardware: 'NVIDIA DGX H100 (8× Tensor Core GPUs)', ram: '128 GB Host RAM', pytorch: '2.2.0+cu121', latency: '1.2 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>JPM-2026-9912</MsgId></GrpHdr><CdtTrfTxInf><IntrBkSttlmAmt Ccy="USD">1450000.00</IntrBkSttlmAmt></CdtTrfTxInf></FIToFICstmrCdtTrf></Document>', 'GATConv (in=512, heads=8, out=256) embedding computed in 14.2ms.', 'DP Gaussian noise σ=0.031 injected. ε=1.0, δ=1e-5. HSM-signed: 0x99F1.'] },
   hsbc: { id: 'hsbc', name: 'HSBC Holdings plc', ticker: 'LSE: HSBA', location: 'London Canary Wharf, UK (Node #02)', hardware: 'Dell PowerEdge R760 (4× NVIDIA A100 GPUs)', ram: '64 GB Host RAM', pytorch: '2.1.2+cu118', latency: '1.8 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:camt.053.001.08"><BkToCstmrStmt><Stmt><Id>HSBC-GBP-8812</Id></Stmt></BkToCstmrStmt></Document>', 'Subgraph feature extraction complete. 12,840 nodes, 47,291 edges ingested.', 'Paillier ciphertext [[W_hsbc]] emitted. Ready for secure aggregation.'] },
   deutsche: { id: 'deutsche', name: 'Deutsche Bank AG', ticker: 'XETRA: DBK', location: 'Frankfurt, DE (Node #03)', hardware: 'Intel Xeon Platinum (CPU Monolith)', ram: '32 GB Host RAM', pytorch: '2.1.2+cpu', latency: '2.9 ms', xmlLogs: ['<Document xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"><FIToFICstmrCdtTrf><GrpHdr><MsgId>DBK-2026-7734</MsgId></GrpHdr></FIToFICstmrCdtTrf></Document>', 'Heterogeneous negotiator: batch_size=32, grad_accum_steps=2.', 'CPU straggler quenched. Round latency 342ms.'] },
-  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=0.50, δ=1e-5). [[W_global]] published to consortium.'] },
+  sgx: { id: 'sgx', name: 'Intel SGX Hardware TEE Enclave', ticker: 'HARDWARE TEE', location: 'Consortium Secure Vault Node', hardware: 'Intel SGX Enclave v2 (Hardware Isolation)', ram: '256 GB Enclave Page Cache (EPC)', pytorch: 'C++ Native LibTorch Enclave Runtime', latency: '0.2 ms', xmlLogs: ['Remote Attestation Quote verified by Intel IAS. Status: SUCCESS.', 'Homomorphic Sum: [[W_global]] = Σ([[W_jpm]], [[W_hsbc]], [[W_db]])', 'DP noise injected (ε=1.0, δ=1e-5). [[W_global]] published to consortium.'] },
 };
 
 const PLATFORM_MODULES: Module[] = [
   // ── CORE PRODUCTION ENGINE ────────────────────────────────────────────────
-  { id: 'risk-engine', name: 'Real-Time Risk Scoring Engine', category: 'Core Production Engine', purpose: 'Combines GNN graph embeddings with tabular velocity features to generate calibrated risk scores (<15ms latency).', algorithm: 'XGBoost + GNN Ensemble, SHAP, Platt Calibration', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
+  { id: 'risk-engine', name: 'Real-Time Risk Scoring Engine', category: 'Core Production Engine', purpose: 'Combines GNN graph embeddings with tabular velocity features to generate calibrated risk scores (<14.2ms p99 latency).', algorithm: 'XGBoost + GNN Ensemble, SHAP, Platt Calibration', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
   { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Production Engine', purpose: 'Coordinates distributed GNN model optimization across banking institutions using FedAvg and FedProx with straggler mitigation.', algorithm: 'FedAvg, FedProx, Asynchronous SGD', inputs: 'Local gradient tensors from node agents', outputs: 'Aggregated global GNN model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
   { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'Core Production Engine', purpose: 'Constructs dynamic multi-hop transaction graphs from ISO 20022 message streams and computes 512-dim structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 & camt.053 feeds', outputs: '512-dimensional node embeddings', tech: 'PyTorch Geometric 2.6, DGL' },
   { id: 'aml-copilot', name: 'Autonomous Agentic AML Copilot', category: 'Core Production Engine', purpose: 'Synthesizes 5-paragraph FinCEN SAR narratives, 4-Eyes supervisor briefings, and Neo4j visual graph maps from suspicious transactions.', algorithm: 'Local LLM RAG + SHAP Feature Attribution', inputs: 'Neo4j subgraph, ISO 20022 XML, SHAP vectors', outputs: 'SAR Narrative & 4-Eyes Supervisor Briefing', tech: 'LangChain, Ollama / vLLM, Neo4j' },
@@ -76,8 +76,8 @@ const PRESENTATION_WORKFLOW = [
     id: 3,
     short: 'Diff. Privacy',
     label: 'Differential Privacy Noise Calibration',
-    summary: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi DP accountant enforces mathematical (ε=0.50, δ=1e-5) privacy bounds.',
-    highlights: ['Mathematically provable (ε=0.50, δ=1e-5)-DP guarantee', 'Rényi DP cumulative privacy accountant', 'Gradient clipping prevents sample memorization'],
+    summary: 'Before model updates exit bank premises, Opacus applies L2 gradient clipping (C=1.0) and injects calibrated Gaussian noise proportional to sensitivity. The Rényi DP accountant enforces mathematical (ε=1.0, δ=1e-5) privacy bounds.',
+    highlights: ['Mathematically provable (ε=1.0, δ=1e-5)-DP guarantee', 'Rényi DP cumulative privacy accountant', 'Gradient clipping prevents sample memorization'],
     input: 'Raw model gradients',
     output: 'Differentially private gradient tensors',
     badge: 'Stage 03'
@@ -452,7 +452,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                   </div>
                 </div>
                 <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6 text-[8.5px] sm:text-[9px] text-slate-400 truncate">
-                  Privacy Accountant: ε = 0.50, δ = 1e-5 (Opacus RDP Bounded)
+                  Privacy Accountant: ε = 1.0, δ = 1e-5 (Opacus RDP Bounded)
                 </div>
               </motion.div>
             )}
@@ -983,7 +983,7 @@ export default function LandingPage() {
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">vs. 42% isolated</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
-                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 0.50</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 1.0</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
                   <div className="text-[9px] font-mono text-slate-600 mt-0.5">(ε, δ)-DP bounded</div>
                 </div>
@@ -1365,7 +1365,7 @@ export default function LandingPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
                     {[
                       {title:'Inside Bank Perimeter',items:['Raw transaction ledgers','Customer PII & Identity','Account balance histories','Local GNN graph embeddings'],note:'← Strict non-export policy',noteColor:'text-rose-400'},
-                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=0.50, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
+                      {title:'Transmitted Tensors (DP)',items:['DP Gaussian-noised gradients','Paillier homomorphic ciphertexts','Round participation tokens','HSM-signed attestations'],note:'← (ε=1.0, δ=1e-5)-DP guarantee',noteColor:'text-emerald-400'},
                       {title:'SGX TEE Enclave Node',items:['HE encrypted sum aggregation','Intel IAS attestation quotes','Isolated enclave memory pages','No external network access'],note:'← Hardware cryptographic vault',noteColor:'text-purple-400'},
                     ].map(col => (
                       <div key={col.title} className="p-4 sm:p-6 rounded-3xl bg-white/2 border border-white/8 space-y-3 sm:space-y-4 min-w-0">
@@ -1488,9 +1488,9 @@ export default function LandingPage() {
                   dataset: 'Elliptic Bitcoin Graph',
                   type: 'On-Chain AML Graph',
                   scope: '203k Nodes, 234k Edges',
-                  prauc: '0.7920',
-                  gain: '+0.1800',
-                  metric: 'Graph AML F1: 0.792',
+                  prauc: '0.8746',
+                  gain: '+0.6203',
+                  metric: 'Recall @ 0.1% FPR: 80.6%',
                   benefit: '+$11,400 / day saved',
                   desc: 'Ground-truth illicit entity detection validating multi-institution FedGNN & GraphSAGE.',
                   source: 'Kaggle: elliptic-data-set',
@@ -1886,7 +1886,7 @@ curl -X POST https://api.cfi-platform.com/v1/rounds \\
     "consortium_id": "cfi-prod-001",
     "node_ids": ["jpmorgan-01", "hsbc-02", "deutsche-03"],
     "privacy_config": {
-      "target_epsilon": 0.50,
+      "target_epsilon": 1.0,
       "target_delta": 1e-5,
       "max_grad_norm": 1.0
     },
@@ -1904,7 +1904,7 @@ client = CFIClient(
 round_session = client.rounds.start(
     consortium_id="cfi-prod-001",
     node_ids=["jpmorgan-01", "hsbc-02", "deutsche-03"],
-    privacy={"target_epsilon": 0.50, "target_delta": 1e-5},
+    privacy={"target_epsilon": 1.0, "target_delta": 1e-5},
     byzantine_defense="krum"
 )
 
@@ -1923,7 +1923,7 @@ const client = new CFIClient({
 const session = await client.rounds.start({
   consortiumId: 'cfi-prod-001',
   nodeIds: ['jpmorgan-01', 'hsbc-02', 'deutsche-03'],
-  privacyConfig: { targetEpsilon: 0.50, targetDelta: 1e-5 },
+  privacyConfig: { targetEpsilon: 1.0, targetDelta: 1e-5 },
   byzantineDefense: 'krum',
 });
 

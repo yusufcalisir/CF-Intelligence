@@ -754,7 +754,7 @@ Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench
 
 ### Step 5: Master Test Suites Execution
 ```bash
-# Run full backend pytest suite (1,023+ tests)
+# Run full backend pytest suite (1,105+ tests)
 pytest backend/tests/ -v
 
 # Run master scientific invariant verification suite (17 modules)

@@ -3,7 +3,7 @@
 Executes all test suites across the repository:
 1. Frontend Suite (Vitest: 57 test files, 125 integration/view/component/E2E tests)
 2. Frontend Visual Regression Suite (Playwright: 36 visual snapshot tests across 4 viewports)
-3. Backend Suite (Pytest: 1023+ unit, integration, chaos, and property-based tests)
+3. Backend Suite (Pytest: 1105+ unit, integration, chaos, and property-based tests)
 4. Scientific Verification Suite (Pytest + Reference audits across all 17 modules)
 5. EVM Smart Contracts Suite (Hardhat: Shapley token settlements)
 
