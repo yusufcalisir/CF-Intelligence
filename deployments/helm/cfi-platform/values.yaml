@@ -166,7 +166,10 @@ bankNode:
 
 # ─── Database (PostgreSQL) ────────────────────────────────────────────────────
 database:
-  url: "postgresql://cfi_user:changeme@postgresql:5432/cfi_platform"
+  # Connection string placeholder — actual credentials injected at deploy time
+  # via Kubernetes Secret referenced by secretName below.
+  # Do NOT hardcode real credentials here; set DATABASE_URL in the Secret.
+  url: "postgresql://cfi_user:REPLACE_VIA_SECRET@postgresql:5432/cfi_platform"
   secretName: cfi-db-credentials
 
 # ─── Message Queue (Kafka) ───────────────────────────────────────────────────

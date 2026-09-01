@@ -138,7 +138,7 @@ class SecurityComplianceEngine:
 
         # CC6.2: All DB connections use TLS (DATABASE_URL contains sslmode=require)
         db_url = os.getenv(
-            "DATABASE_URL", "postgresql://cfi_user:cfi_pass@localhost:5432/cfi_db?sslmode=require"
+            "DATABASE_URL", "postgresql://localhost:5432/cfi_db?sslmode=require"  # no credentials in default
         )
         cc6_2_status = (
             "PASS"
