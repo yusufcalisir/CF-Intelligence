@@ -1,0 +1,131 @@
+version: 2
+
+updates:
+  # ──────────────────────────────────────────────────────────────────────────
+  # Python backend – pip ecosystem
+  # ──────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "backend"
+    commit-message:
+      prefix: "deps(backend)"
+    groups:
+      # Group ML stack together to reduce PR noise
+      ml-stack:
+        patterns:
+          - "torch"
+          - "opacus"
+          - "tenseal"
+          - "optuna"
+          - "scikit-learn"
+          - "numpy"
+          - "pandas"
+          - "shap"
+          - "mlflow"
+          - "numba"
+          - "llvmlite"
+      # Group observability packages
+      observability:
+        patterns:
+          - "opentelemetry-*"
+          - "prometheus-*"
+      # Group FastAPI ecosystem
+      fastapi-ecosystem:
+        patterns:
+          - "fastapi"
+          - "uvicorn"
+          - "pydantic"
+          - "pydantic-settings"
+    ignore:
+      # torch major version bumps require manual validation against CUDA/ROCm
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      # tenseal pinned to specific cryptographic ABI
+      - dependency-name: "tenseal"
+        update-types: ["version-update:semver-major"]
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # JavaScript / TypeScript frontend – npm ecosystem
+  # ──────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "security"
+      - "frontend"
+    commit-message:
+      prefix: "deps(frontend)"
+    groups:
+      # Group React ecosystem together
+      react-ecosystem:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "react-router-dom"
+          - "@types/react"
+          - "@types/react-dom"
+      # Group testing toolchain
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "@testing-library/*"
+          - "@playwright/*"
+          - "playwright"
+          - "jsdom"
+      # Group Vite & build tooling
+      vite-build:
+        patterns:
+          - "vite"
+          - "@vitejs/*"
+          - "typescript"
+          - "typescript-eslint"
+          - "eslint"
+          - "eslint-*"
+      # Group TailwindCSS
+      tailwind:
+        patterns:
+          - "tailwindcss"
+          - "@tailwindcss/*"
+          - "postcss"
+          - "autoprefixer"
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # GitHub Actions – keep CI action versions up-to-date
+  # ──────────────────────────────────────────────────────────────────────────
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "monday"
+      time: "07:00"
+      timezone: "Europe/Istanbul"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "ci(actions)"
+    groups:
+      github-actions:
+        patterns:
+          - "actions/*"
+          - "docker/*"
+          - "aquasecurity/*"
+          - "azure/*"
+          - "hashicorp/*"

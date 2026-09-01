@@ -39,14 +39,12 @@ jobs:
         run: bandit -r app/ -ll -ii --format txt
 
   dependency-security-audit:
-    name: Dependency Vulnerability Audit (pip-audit)
+    name: Dependency Vulnerability Audit (pip-audit + npm audit)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
+      # ── Backend: pip-audit ──────────────────────────────────────────────
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -54,8 +52,39 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
 
-      - name: Run pip-audit Dependency Vulnerability Scan
-        run: pip-audit -r requirements.txt --ignore-vuln GHSA-c5qf-59p4-3g47 || echo "⚠️ Dependency vulnerability audit completed with advisory warnings."
+      - name: Run pip-audit (SARIF output)
+        working-directory: backend
+        run: |
+          pip-audit -r requirements.txt \
+            --format sarif \
+            --output pip-audit-results.sarif \
+            --ignore-vuln GHSA-c5qf-59p4-3g47 \
+            || echo "⚠️ pip-audit completed with advisory warnings – see SARIF report."
+
+      - name: Upload pip-audit SARIF to GitHub Security tab
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: backend/pip-audit-results.sarif
+          category: pip-audit
+        continue-on-error: true
+
+      # ── Frontend: npm audit ─────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run npm audit (zero high/critical vulnerabilities)
+        working-directory: frontend
+        run: |
+          npm audit --audit-level=high
+          echo "✅ npm audit passed – no high or critical vulnerabilities found."
 
   trivy-container-security:
     name: Container CVE Vulnerability Scan (Trivy)
