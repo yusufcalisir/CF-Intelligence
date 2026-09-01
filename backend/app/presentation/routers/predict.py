@@ -15,7 +15,7 @@ import uuid
 from typing import Any
 
 import torch
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.application.services.alert_service import AlertIntelligenceService
@@ -25,7 +25,8 @@ from app.application.services.model_registry import ModelEvaluationEngine, Model
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
-from app.dependencies import SessionDep  # noqa: TC001
+from app.dependencies import SessionDep, TenantDep, enforce_tenant_isolation
+from app.infrastructure.security.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["prediction"])
@@ -205,11 +206,14 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
 
 
 @router.post("/predict", response_model=TransactionPredictResponse)
+@limiter.limit("60/minute")
 async def predict_transaction(
+    request: Request,
     payload: TransactionPredictRequest,
     session: SessionDep,
     background_tasks: BackgroundTasks,
     x_api_key: str | None = Header(None, alias="X-API-Key"),
+    caller_tenant: TenantDep = None,
 ) -> TransactionPredictResponse:
     """Evaluate a transaction in real-time.
 
@@ -217,6 +221,9 @@ async def predict_transaction(
     evaluates fraud probability, computes composite risk score, and
     generates alerts if fraud is suspected.
     """
+    if caller_tenant and payload.bank_id:
+        enforce_tenant_isolation(caller_tenant, payload.bank_id)
+
     # 1. Resolve active model weights state dict
     state_dict = None
     active_entry = None
@@ -601,7 +608,7 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
 
 
 @router.post(
-    "/transactions/score",
+    "/score-transaction",
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
 )
@@ -610,9 +617,12 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
 )
+@limiter.limit("60/minute")
 async def score_transaction(
+    request: Request,
     payload: ScoreTransactionRequest,
     x_bank_id: str | None = Header(None, alias="X-Bank-ID"),
+    caller_tenant: TenantDep = None,
 ) -> ScoreTransactionResponse:
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()

@@ -485,6 +485,29 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
+# ── Endpoint-Specific Rate Limiting (slowapi) ─────────────────────────────────
+from app.infrastructure.security.rate_limiter import RateLimitExceeded, limiter
+
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    """Handle slowapi rate limit exceeded exceptions with RFC 7807 problem details."""
+    return JSONResponse(
+        status_code=429,
+        content={
+            "type": "https://cfi-platform.org/errors/RateLimitExceeded",
+            "title": "Endpoint Rate Limit Exceeded",
+            "status": 429,
+            "detail": f"Rate limit exceeded: {exc.detail}",
+            "instance": request.url.path,
+        },
+        headers={"Retry-After": "60", "X-RateLimit-Exceeded": "true"},
+        media_type="application/problem+json",
+    )
+
+
 # ── CORS ──────────────────────────────────────
 # Allow all origins and disable credentials to avoid any CORS issues on Vercel preview/production links.
 app.add_middleware(
@@ -494,6 +517,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 
 # ── Global Exception Handler (RFC 7807 Compliant) ─────────────────────────────
