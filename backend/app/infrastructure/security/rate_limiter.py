@@ -6,10 +6,12 @@ Vercel Edge (X-Forwarded-For, X-Real-IP), and local development.
 
 from __future__ import annotations
 
-from fastapi import Request
+from typing import TYPE_CHECKING
+
 from slowapi import Limiter
-from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
+
+if TYPE_CHECKING:
+    from fastapi import Request
 
 
 def get_real_client_ip(request: Request) -> str:
@@ -30,4 +32,5 @@ limiter = Limiter(
     default_limits=["120/minute"],
     headers_enabled=False,
 )
+
 

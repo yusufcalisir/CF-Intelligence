@@ -24,6 +24,7 @@ def client():
 def test_real_ip_resolution_with_cloudflare_header():
     """Test that get_real_client_ip prioritizes CF-Connecting-IP over other headers."""
     from unittest.mock import MagicMock
+
     from fastapi import Request
 
     req = MagicMock(spec=Request)
@@ -41,6 +42,7 @@ def test_real_ip_resolution_with_cloudflare_header():
 def test_real_ip_resolution_with_x_forwarded_for():
     """Test that get_real_client_ip extracts first client IP from X-Forwarded-For when CF header absent."""
     from unittest.mock import MagicMock
+
     from fastapi import Request
 
     req = MagicMock(spec=Request)

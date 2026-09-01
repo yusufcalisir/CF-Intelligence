@@ -1,6 +1,5 @@
 """Cross-reference all FastAPI backend routes against frontend API calls."""
 
-import os
 import re
 import sys
 from pathlib import Path
@@ -12,7 +11,8 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.main import app
+from app.main import app  # noqa: E402
+
 
 def audit():
     print("=" * 80)

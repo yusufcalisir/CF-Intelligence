@@ -9,11 +9,7 @@ Supported datasets:
 from __future__ import annotations
 
 import argparse
-import hashlib
 import logging
-import os
-import shutil
-import sys
 import zipfile
 from pathlib import Path
 

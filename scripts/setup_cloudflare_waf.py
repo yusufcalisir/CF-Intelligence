@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import sys
 import urllib.request
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)-7s | %(message)s")

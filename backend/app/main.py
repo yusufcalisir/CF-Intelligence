@@ -486,9 +486,13 @@ app = FastAPI(
 )
 
 # ── Endpoint-Specific Rate Limiting (slowapi) ─────────────────────────────────
-from app.infrastructure.security.rate_limiter import RateLimitExceeded, limiter
+from slowapi.errors import RateLimitExceeded
+
+from app.infrastructure.security.rate_limiter import limiter
 
 app.state.limiter = limiter
+
+
 
 
 @app.exception_handler(RateLimitExceeded)
