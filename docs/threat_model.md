@@ -533,6 +533,34 @@ The platform validates operational continuity, throughput, and zero-deadlock rec
 - **FedAsync Staleness Attenuation**: Applies polynomial attenuation factor $S(\tau) = (1 + \tau)^{-\alpha}$ to downweight delayed updates, preserving global model convergence ($F_1 = 93.2\%$).
 - **Operational Guarantee**: Zero training round deadlocks under straggler delays or 40% network node dropouts.
 
+---
+
+## 19. Multi-Tenant Broken Object Level Authorization (BOLA) & Layer-7 DDoS Threat Surface
+
+The platform incorporates comprehensive defenses against Broken Object Level Authorization (OWASP API1:2023) and Unrestricted Resource Consumption (OWASP API4:2023):
+
+### 19.1 Broken Object Level Authorization & IDOR (Information Disclosure & Elevation of Privilege)
+* **Threat**: Malicious or rogue bank employee attempts to inspect alerts, transaction history, or entity graphs belonging to another bank by tampering with URL parameters (`?bank_id=bank_b`) or direct resource IDs (`GET /api/v1/alerts/{bank_b_alert_id}`).
+* **Mitigations**:
+  * **OIDC & Cryptographic Tenant Identification**: Decodes claims (`sub`, `bank_id`, `roles`) from cryptographically verified JWT bearer tokens, `X-Tenant-ID`, and `X-Bank-ID` headers.
+  * **Interception Middleware (`TenantAccessControlMiddleware`)**: Global FastAPI middleware rejects cross-tenant URL query parameter tampering with `HTTP 403 Forbidden` (`https://cfi-platform.org/errors/TenantAccessDenied`).
+  * **Endpoint-Level Authorization (`enforce_tenant_isolation`)**: All presentation routers enforce strict tenant match between caller and resource owner. Unscoped queries automatically default to the caller's tenant scope.
+  * **Audited Consortium Role Bypass**: Only users with explicit cross-institution roles (`super_admin`, `cross_bank_investigator`, `compliance_auditor`) can access multi-bank subgraphs.
+
+### 19.2 Volumetric L7 DDoS & Resource Exhaustion (Denial of Service)
+* **Threat**: Automated adversary scripts bombard computationally heavy endpoints (`/api/v1/predict`, `/api/v1/simulations`) to cause CPU exhaustion, thread starvation, or memory leakage.
+* **Mitigations**:
+  * **Layer 1 (Cloudflare Perimeter)**: Cloudflare Anycast DDoS absorption, Bot Fight Mode, Browser Integrity Checks, and 60 req/10s rate limiting on `/api/*`.
+  * **Layer 2 (Vercel Edge Network)**: Distributed V8 Edge Middleware (`frontend/middleware.ts`) using `@upstash/ratelimit` sliding window (20 req/min for ML inference, 60 req/min for general API) with static asset bypass and fail-open resilience.
+  * **Layer 3 (FastAPI Application)**: In-process `slowapi` rate limiting (`rate_limiter.py`) reading `CF-Connecting-IP` / `X-Real-IP`, paired with bounded memory pruning (`DDoSProtectionMiddleware`) capping active tracking to 1,000 IPs to prevent memory exhaustion.
+
+| STRIDE Category | Threat Vector | Platform Defense-in-Depth Mitigation |
+| :--- | :--- | :--- |
+| **Information Disclosure** | Cross-tenant IDOR / BOLA query tampering | `TenantAccessControlMiddleware` + `enforce_tenant_isolation` (403 Forbidden) |
+| **Denial of Service** | Volumetric ML inference / simulation flooding | Cloudflare WAF + Vercel Edge `@upstash/ratelimit` + FastAPI `slowapi` (429) |
+| **Elevation of Privilege** | Tenant impersonation via forged header | OIDC RSA signature validation + Vault ABAC clearance enforcement |
+
+
 
 
 

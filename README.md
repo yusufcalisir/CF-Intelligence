@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1492%2F1492_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1498%2F1498_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)**
@@ -29,7 +29,7 @@
 | [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [19. API Blueprints](#19-api-endpoint-blueprints--json-schemas) | [26. Author & Maintenance](#26-author-and-maintenance) |
 | [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | | |
 | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | | |
-| [10. Real-Time Scoring Gateway](#10-real-time-scoring-gateway--sla-monitoring) | | |
+| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway--rate-limiting) | | |
 | [11. Case Management & SAR](#11-human-in-the-loop-workbench--regulatory-reporting) | | |
 | [12. Disaster Recovery & SRE](#12-disaster-recovery-high-availability--sre-operations) | | |
 
@@ -78,6 +78,7 @@ The core production path focuses on seven defensible engineering components:
 - **Byzantine Consensus:** `Multi-Krum`, `Trimmed Mean`, and `Bulyan` aggregators paired with Spectral SVD backdoor filtering.
 - **Graph Intelligence:** PyTorch `GraphSAGE` relational embeddings and MinHash LSH Private Set Intersection (Fuzzy PSI) for entity resolution.
 - **Real-Time Composite Scoring:** Sub-100ms inference gateway combining 9 statistical, behavioral, and topological signals.
+- **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Edge Middleware $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
 - **Explainability & Governance:** Real-time SHAP feature attributions and a 6-stage case management workbench with automated FinCEN BSA SAR XML compilation.
 
 *Note: Exploratory cryptographic research modules (zk-SNARK attestation, TenSEAL CKKS FHE, Post-Quantum Kyber-768, Hardware TEE drivers, EVM incentive contracts, and Cross-Chain bridges) are isolated in the [Research & Exploratory Modules](#20-research--exploratory-modules) section.*
@@ -121,6 +122,8 @@ The core production path focuses on seven defensible engineering components:
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                       Real-Time Scoring & Operational Serving                        │
 │  - Real-Time Scoring Gateway (<100ms SLA, P99 Latency Monitor)                       │
+│  - Multi-Layer Perimeter Defense: Cloudflare WAF + Vercel Edge + slowapi Rate Limit  │
+│  - Broken Access Control (BOLA/IDOR) Multi-Tenant Isolation Middleware               │
 │  - Fast SHAP TreeExplainer & Counterfactual Feature Sensitivity                      │
 │  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML      │
 └──────────────────────────────────────────────────────────────────────────────────────┘
@@ -221,8 +224,8 @@ CF-Intelligence/
 │   ├── requirements.txt                             # Production Python dependencies
 │   ├── app/
 │   │   ├── config.py                                # Platform configuration & env management
-│   │   ├── dependencies.py                          # FastAPI Dependency Injection provider
-│   │   ├── main.py                                  # Application entrypoint & middleware pipeline
+│   │   ├── dependencies.py                          # FastAPI Dependency Injection & Tenant Resolution
+│   │   ├── main.py                                  # Application entrypoint & BOLA/DDoS middleware
 │   │   │
 │   │   ├── domain/                                  # Domain Models, Value Objects & Invariants
 │   │   │   ├── entities.py                          # Core domain entities (Bank, Transaction, Alert)
@@ -282,6 +285,7 @@ CF-Intelligence/
 │   │   │       ├── vault_client.py                  # HashiCorp Vault PKI & secret manager
 │   │   │       ├── mtls_manager.py                  # mTLS certificate rotation & validation
 │   │   │       ├── perimeter_waf.py                 # Perimeter firewall & rate limiter
+│   │   │       ├── rate_limiter.py                  # slowapi granular endpoint rate limiting
 │   │   │       ├── fhe_driver.py                    # [Research] TenSEAL CKKS FHE driver
 │   │   │       ├── pqc_secagg_driver.py             # [Research] Post-Quantum Kyber-768 SecAgg
 │   │   │       ├── tee_driver.py                    # [Research] Hardware TEE SGX/Nitro driver
@@ -292,13 +296,14 @@ CF-Intelligence/
 │   │       ├── routers/                             # FastAPI modular routers (predict, cases, banks, etc.)
 │   │       └── websockets/                          # Real-time telemetry & transaction streaming
 │   │
-│   └── tests/                                       # Comprehensive Test Suite (1,105+ Tests)
-│       ├── unit/                                    # Unit tests for domain, application & security
+│   └── tests/                                       # Comprehensive Test Suite (1,111+ Tests)
+│       ├── unit/                                    # Unit tests for domain, BOLA, slowapi & security
 │       ├── integration/                             # End-to-end API, gRPC & database integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites
 │       └── property/                                # Hypothesis property-based invariance tests
 │
 ├── frontend/                                        # React 18 / Vite TypeScript Web Console
+│   ├── middleware.ts                                # Vercel Edge Middleware (@upstash/ratelimit)
 │   ├── src/
 │   │   ├── pages/                                   # Dashboard, Security, Observability, Case Workbench
 │   │   ├── components/                              # Modular UI components, ErrorBoundary & visualizer
@@ -312,13 +317,15 @@ CF-Intelligence/
 │   └── test/                                        # Hardhat Mocha/Chai contract unit tests
 │
 ├── deployments/                                     # Infrastructure as Code (IaC) & Cloud
-│   ├── terraform/                                   # Multi-cloud AWS/GCP Terraform IaC modules
+│   ├── terraform/                                   # Multi-cloud AWS/GCP & Cloudflare WAF IaC
+│   │   └── cloudflare/                              # Cloudflare WAF, TLS 1.3 & Rate Limiting IaC
 │   ├── helm/                                        # Kubernetes Helm charts for distributed cluster
 │   ├── argocd/                                      # GitOps continuous delivery manifests
 │   └── grafana/                                     # Pre-configured Grafana observability dashboards
 │
 ├── scripts/                                         # Test, Verification, Benchmark & CLI Runners
 │   ├── cfi_cli.py                                   # Bank onboarding & self-service sandbox CLI
+│   ├── setup_cloudflare_waf.py                      # Automated Cloudflare Layer 1 perimeter CLI
 │   ├── audit_api_contracts.py                       # REST endpoint, schema & status code auditor
 │   ├── export_compliance_report.py                  # EU AI Act & SR 11-7 regulatory audit exporter
 │   ├── run_benchmark.py                             # 9-configuration comparative benchmark (C1–C9)
@@ -328,6 +335,7 @@ CF-Intelligence/
 │   ├── run_mutation_tests.py                        # AST boundary & Byzantine mutant fault test runner
 │   ├── run_coverage_audit.py                        # 4-tier statement, branch & line coverage audit
 │   └── run_all_tests.py                             # Master automated test suite runner
+
 │
 ├── docs/                                            # Technical Architecture Specifications
 │   ├── architecture.md                              # End-to-end distributed system architecture
@@ -460,10 +468,39 @@ $$\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times
 
 ---
 
-## 10. Real-Time Scoring Gateway & SLA Monitoring
+## 10. Multi-Layer Defense Gateway, Broken Access Control & Rate Limiting
 
-- **REST Inference Endpoint (`POST /v1/inference/score`):** Processes normalized transactions and returns an actionable decision (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-100ms latency.
-- **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus metrics.
+The platform enforces a zero-trust multi-layer perimeter and application defense architecture designed to withstand volumetric denial-of-service, automated scraping, and broken access control exploits without degrading core ML scoring throughput:
+
+```mermaid
+flowchart LR
+    Client["Client / Scraper / Attacker"] --> L1["1. Cloudflare Anycast Edge\n• L3/L4 DDoS Mitigation\n• Bot Fight Mode & Managed Challenge\n• Custom WAF Rules & TLS 1.3 Strict\n• Rate Limit: 60 req/10s on /api/*"]
+    
+    L1 --> L2["2. Vercel Edge Middleware\n• V8 Isolate Distributed Execution (<5ms)\n• @upstash/ratelimit Sliding Window\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
+    
+    L2 --> L3["3. FastAPI Application Layer\n• slowapi Granular Route Quotas\n• TenantAccessControlMiddleware (BOLA/IDOR)\n• ML Predict: 60/min | FL Sim: 10/min\n• DDoSProtectionMiddleware (100 req/10s)"]
+```
+
+### 10.1 Multi-Layer Perimeter & Gateway Architecture
+
+| Layer | Component | Engine / Implementation | Enforced Protection & Limits | Response Code |
+| :--- | :--- | :--- | :--- | :---: |
+| **Layer 1** | **Cloudflare Perimeter** | Anycast WAF & Bot Management (`deployments/terraform/cloudflare/`) | L3/L4 DDoS absorption, Bot Fight Mode, TLS 1.3 Strict, 60 reqs / 10s on `/api/*`. | `403 Challenge` / `429` |
+| **Layer 2** | **Vercel Edge Network** | Distributed Edge Middleware (`frontend/middleware.ts`) | `@upstash/ratelimit` global sliding window: 20 reqs/min for ML inference, 60 reqs/min for general API. | `429 Too Many Requests` |
+| **Layer 3** | **FastAPI Application** | `slowapi` & `DDoSProtectionMiddleware` (`backend/app/infrastructure/security/rate_limiter.py`) | In-process granular quotas (`/predict`: 60/min, `/simulations`: 10/min) with bounded IP table pruning. | `429 Too Many Requests` |
+
+### 10.2 Broken Object Level Authorization (BOLA/IDOR) Multi-Tenant Isolation
+
+To eliminate Broken Access Control (OWASP API1:2023), the platform implements cryptographic tenant verification across all alert, entity, and case presentation endpoints:
+- **Tenant Identity Extraction:** Decodes OIDC JWT bearer tokens (`sub`, `bank_id`, `roles`), `X-Tenant-ID`, and `X-Bank-ID` headers with cross-bank investigator bypass (`super_admin`, `cross_bank_investigator`, `compliance_auditor`).
+- **Middleware Interception:** `TenantAccessControlMiddleware` intercepts incoming requests, blocking cross-tenant URL parameter tampering (`?bank_id=other_bank`) with `HTTP 403 Forbidden` (`https://cfi-platform.org/errors/TenantAccessDenied`).
+- **Endpoint-Level Isolation:** Routers invoke `enforce_tenant_isolation(caller_tenant, target_bank_id)` to ensure callers can never inspect foreign bank alert payloads or graph entities.
+
+### 10.3 Real-Time Scoring Gateway & SLA Monitoring
+
+- **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-100ms latency.
+- **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
+
 
 ---
 
@@ -532,7 +569,8 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.02 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Self-Verified (Internal Test Suite)` |
 | **Multi-Tenant Memory/DB Isolation**| **0 Leaks / 100% Isolated** | Isolated State | `test_multi_tenant_security_audit.py` | `Self-Verified (Internal Test Suite)` |
-| **Full Test Suite Pass Rate** | **1,492 / 1,492 passing** | 100% | 1,105 Backend Pytest + 387 Frontend Vitest | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,498 / 1,498 passing** | 100% | 1,111 Backend Pytest + 387 Frontend Vitest | `Self-Verified (Internal Test Suite)` |
+
 
 ---
 

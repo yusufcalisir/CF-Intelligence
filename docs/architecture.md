@@ -69,14 +69,17 @@ Concrete implementation of dependencies. Adapts foreign libraries and databases.
     *   `rest_connector.py`: HTTP REST adapter supporting mTLS, OAuth2, HMAC payload signing, and real-time webhook ingestion.
     *   `factory.py`: Configuration-driven `BankConnectorFactory` resolving per-bank connector implementations.
 *   `security/smart_contract_driver.py`: Web3 & CBDC settlement driver executing automated token disbursements (`wCBDC`, `USDC`, `e-TRY`) on `ConsortiumIncentiveSettlement.sol` based on LOO Shapley values.
+*   `security/rate_limiter.py`: Granular endpoint rate limiting singleton powered by `slowapi` and `limits`, with reverse-proxy real IP resolution (`CF-Connecting-IP`, `X-Real-IP`, `X-Forwarded-For`).
 *   `grpc/`: High-Performance Bidirectional Streaming gRPC Transport Layer over HTTP/2 defined via `fl_service.proto` (`RegisterClient`, `Heartbeat` streaming, `StreamModelParameters` chunking, `DownloadGlobalModel` chunking).
 *   `telemetry.py`: Bypasses metrics or mounts a `/metrics` ASGI app for Prometheus based on configurations.
 *   `celery_app.py`: Background worker queue for handling long-running PyTorch training loops without blocking FastAPI.
 
 ### 2.4 Presentation Layer (`backend/app/presentation/`)
 Interactions with clients.
-*   `routers/*.py`: FastAPI REST API endpoints verifying request formats via Pydantic schemas.
+*   `main.py`: Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception) and `DDoSProtectionMiddleware` (sliding-window rate limiting with bounded memory pruning).
+*   `routers/*.py`: FastAPI REST API endpoints verifying request formats via Pydantic schemas, enforcing `@limiter.limit(...)` and `enforce_tenant_isolation(...)`.
 *   `websockets/*.py`: Persistent WebSocket connections sending training round progress and scenario replay events.
+
 
 ---
 

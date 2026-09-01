@@ -162,7 +162,45 @@ sequenceDiagram
 
 * **W3C Trace Context Propagation**: Propagates `traceparent` (`00-{trace_id}-{span_id}-01`) and `tracestate` headers across HTTP, gRPC, and AMQP channels.
 * **OpenTelemetry Exporters**: Exports traces via OTLP/gRPC to Jaeger/Tempo (`:4317`) and Prometheus gauges (`/metrics`).
-* **Cloud Orchestration**: Infrastructure is containerized with Helm charts (`helm/cfi-platform/`) and ArgoCD GitOps manifests (`argocd/application.yaml`) for multi-tenant Kubernetes deployment.
+### 3.10 Multi-Layer Perimeter & Gateway Defense-in-Depth Architecture
+
+The platform enforces a 3-layer perimeter defense architecture to withstand volumetric attacks, malicious scraping, and distributed denial-of-service attempts without overloading core ML scoring engines:
+
+```mermaid
+flowchart LR
+    Client["Client / Bot / Attacker"] --> L1["1. Cloudflare Anycast Edge\n• L3/L4 DDoS Mitigation\n• Bot Fight Mode & Managed Challenge\n• WAF Rules & TLS 1.3 Strict\n• Rate Limit: 60 req/10s on /api/*"]
+    
+    L1 --> L2["2. Vercel Edge Middleware\n• V8 Isolate Execution (<5ms)\n• @upstash/ratelimit Distributed Limiter\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
+    
+    L2 --> L3["3. FastAPI Application Layer\n• slowapi Granular Route Quotas\n• ML Predict: 60 req/min\n• FL Simulation: 10 req/min\n• DDoSProtectionMiddleware (Memory Pruned)"]
+```
+
+1. **Layer 1 (Cloudflare Perimeter)**:
+   - Automated L3/L4 volumetric attack absorption on Cloudflare's global Anycast network.
+   - Bot Fight Mode, Browser Integrity Checks, and Custom WAF Rules challenging high-threat score traffic.
+   - Terraform IaC templates available in `deployments/terraform/cloudflare/`.
+2. **Layer 2 (Vercel Edge Network)**:
+   - Distributed Edge Middleware (`frontend/middleware.ts`) powered by `@upstash/ratelimit` and `@upstash/redis`.
+   - Halts flooding traffic before it ever leaves the edge or incurs downstream compute costs.
+3. **Layer 3 (FastAPI Application Layer)**:
+   - In-process `slowapi` limiter singleton (`backend/app/infrastructure/security/rate_limiter.py`) reading `CF-Connecting-IP` / `X-Real-IP`.
+   - Endpoint-specific quotas: `/api/v1/predict` (60 req/min), `/api/v1/simulations` (10 req/min), `/api/v1/alerts` (120 req/min).
+
+---
+
+### 3.11 Broken Object Level Authorization (BOLA/IDOR) & Multi-Tenant Isolation
+
+To prevent Broken Access Control (OWASP API1:2023), the platform implements cryptographic tenant isolation across all presentation routers:
+
+1. **Tenant Identity Resolution Hierarchy**:
+   - `Authorization: Bearer <JWT>`: Decoded via `OIDCAuthenticator` to extract subject claims, bank affiliations, and role assignments.
+   - `X-Tenant-ID` / `X-Bank-ID`: Explicit enterprise tenant headers.
+   - API Key metadata: `key_id:bank_id:role`.
+2. **Interception & Enforcement Middleware**:
+   - `TenantAccessControlMiddleware` intercepts incoming requests and rejects cross-tenant URL parameter tampering (`?bank_id=other_bank`) with `HTTP 403 Forbidden` (`https://cfi-platform.org/errors/TenantAccessDenied`).
+   - Routers invoke `enforce_tenant_isolation(caller_tenant, target_bank_id)` across alert, entity, and case endpoints.
+3. **Role-Based Cross-Institution Bypass**:
+   - Authorized consortium roles (`super_admin`, `cross_bank_investigator`, `compliance_auditor`) are granted audited access across institutional boundaries.
 
 ---
 
@@ -174,3 +212,4 @@ CFI includes a complete observability stack:
 *   **Prometheus:** Scrapes `/metrics` from all microservices, tracking API latency, active Celery tasks, and memory budgets.
 *   **MLflow:** Logs learning metrics (accuracy, precision, recall, loss, AUC-ROC) to a local server at `http://localhost:5000` for deep comparison.
 *   **Grafana:** Pre-built CFI Overview dashboard visualizing platform metrics in real time.
+
