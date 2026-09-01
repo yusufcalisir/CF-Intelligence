@@ -70,7 +70,7 @@ class FederatedLearningEngine:
     def aggregate_parameters(
         self,
         client_weights: list[ModelWeights],
-        client_samples: list[int],
+        client_samples: list[int] | None = None,
         method: AggregationMethod = AggregationMethod.FED_AVG_WEIGHTED,
         global_weights: ModelWeights | None = None,
         simulation_id: str | None = None,
@@ -106,6 +106,16 @@ class FederatedLearningEngine:
                 raise ValueError(f"Layer shape mismatch at index {i}")
             if len(w.flat_weights) != ref_len:
                 raise ValueError(f"Parameter count mismatch at index {i}")
+
+        if client_samples is None:
+            client_samples = [1] * len(client_weights)
+        elif len(client_samples) != len(client_weights):
+            logger.warning(
+                "client_samples length (%d) mismatch with client_weights (%d); using uniform weighting",
+                len(client_samples),
+                len(client_weights),
+            )
+            client_samples = [1] * len(client_weights)
 
         # Filter out corrupted client updates containing NaN or Inf weights (numerical overflow / poisoning)
         clean_weights: list[ModelWeights] = []
