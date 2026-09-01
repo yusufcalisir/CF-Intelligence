@@ -74,14 +74,35 @@ def test_realtime_sla_monitor_percentiles_and_violations() -> None:
 
 
 def test_shap_cache_hit_returns_immediately() -> None:
-    """Verifies that prepopulated Redis SHAP key yields sub-millisecond cache hit."""
+    """Verifies that prepopulated Redis SHAP key yields cache hit (Redis mocked for CI)."""
+    import json
+    from unittest.mock import MagicMock, patch
+
     explainer = FastInferenceExplainer()
     tx_id = "tx_cached_99"
+    feature_vector = {"amount": 5000.0}
 
-    # Compute and populate cache first
-    explainer.compute_shap(tx_id, {"amount": 5000.0})
+    # Build the serialized payload that Redis would return
+    cached_payload = json.dumps({
+        "transaction_id": tx_id,
+        "status": "COMPLETED",
+        "source": "COMPUTED",
+        "shap_values": [],
+    }).encode()
 
-    res = explainer.explain_async(tx_id, {"amount": 5000.0})
+    mock_redis = MagicMock()
+    mock_redis.get.return_value = cached_payload
+
+    with patch("app.domain.realtime_explainer.get_redis_client", return_value=mock_redis):
+        # Populate the Redis mock (setex is a no-op on MagicMock)
+        explainer.compute_shap(tx_id, feature_vector)
+
+        # Clear the local LRU cache entry so explain_async must reach the Redis path
+        from app.domain.realtime_explainer import _local_shap_cache
+        _local_shap_cache.pop(f"cfi:shap:{tx_id}", None)
+
+        res = explainer.explain_async(tx_id, feature_vector)
+
     assert res["transaction_id"] == tx_id
     assert res["status"] == "COMPLETED"
     assert res["source"] == "REDIS_CACHE"
