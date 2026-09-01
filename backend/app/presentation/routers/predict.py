@@ -613,10 +613,11 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
     status_code=status.HTTP_200_OK,
 )
 @router.post(
-    "/v1/transactions/score",
+    "/transactions/score",
     response_model=ScoreTransactionResponse,
     status_code=status.HTTP_200_OK,
 )
+
 @limiter.limit("60/minute")
 async def score_transaction(
     request: Request,
