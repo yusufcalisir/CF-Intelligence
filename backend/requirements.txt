@@ -50,7 +50,7 @@ pyjwt>=2.8.0,<3.0.0
 # Security-pinned transitive dependencies
 # (explicitly floored to prevent vulnerable versions being resolved)
 starlette>=1.3.1                # security: CVE-2026-48710 (Host header injection), CVE-2026-54282 (SSRF), CVE-2026-54283 (DoS)
-cryptography>=50.0.0            # security: CVE-2026-69247 (Bleichenbacher oracle), CVE-2026-69249 (DoS via cert chain)
+cryptography>=50.0.1            # security: CVE-2026-69247 (Bleichenbacher oracle), CVE-2026-69249 (DoS via cert chain)
 
 # Observability (OpenTelemetry + Prometheus)
 opentelemetry-api>=1.27.0,<2.0.0
