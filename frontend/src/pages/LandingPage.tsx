@@ -40,6 +40,135 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'crosschain-bridge', name: 'Cross-Chain Settlement Bridge', category: 'Frontier R&D Lab', purpose: 'Prototyping multi-ledger liquidity routing for Shapley incentive distribution across EVM rollups and institutional CBDC networks.', algorithm: 'Chainlink CCIP EVM2AnyMessage & LayerZero V2', inputs: 'Shapley utility scores & institutional CBDC wallets', outputs: 'Multi-ledger atomic transaction receipts (<1s SLA)', tech: 'Chainlink CCIP, LayerZero, Daml Interop' },
 ];
 
+const MODULE_SPECS_EXTRA: Record<string, {
+  sla: string;
+  security: string;
+  compliance: string;
+  actionRoute: string;
+  actionLabel: string;
+  tensorSample: string;
+  statusBadge: string;
+}> = {
+  'risk-engine': {
+    sla: '< 14.2 ms (p99 latency)',
+    security: 'HMAC-SHA256 Tokenized Inputs',
+    compliance: 'ISO 20022 pacs.008 Screening',
+    actionRoute: '/investigation',
+    actionLabel: 'Launch Risk Investigation',
+    tensorSample: 'Tensor: [batch, 512] structural embedding ⊕ [batch, 32] velocity features → P(fraud) ∈ [0, 1]',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'fl-engine': {
+    sla: '5.99M params/sec aggregation',
+    security: 'Curve25519 Pairwise Masked Updates',
+    compliance: 'FedAvg / FedProx Convergence',
+    actionRoute: '/operations',
+    actionLabel: 'Open FL Coordinator',
+    tensorSample: 'Parameter Delta: ΔW_k = W_k^{(t)} - W^{(t-1)} → Aggregated: W^{(t)} = Σ (n_k/n) ΔW_k',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'gnn-engine': {
+    sla: '< 15 ms / batch graph build',
+    security: 'Zero Raw PII Graph Nodes & Edges',
+    compliance: '8-Head GATConv (Graph Attention)',
+    actionRoute: '/graph',
+    actionLabel: 'Inspect Graph Topology',
+    tensorSample: 'Graph Tensor: Adjacency A ∈ R^{N×N}, Feature Matrix X ∈ R^{N×F} → Node Embedding h_v ∈ R^{512}',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'aml-copilot': {
+    sla: '< 850 ms SAR XML synthesis',
+    security: 'Local On-Premise LLM RAG Runtime',
+    compliance: 'FinCEN BSA SAR 5-Paragraph Spec',
+    actionRoute: '/cases',
+    actionLabel: 'Open Case Management',
+    tensorSample: 'Prompt Context: {SubGraph, ISO20022 XML, SHAP Attribution} → Formatted SAR XML + 4-Eyes Briefing',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'adaptive-dp': {
+    sla: 'Real-time per-round auto calibration',
+    security: 'Rényi DP (ε=1.0, δ=1e-5) Guarantee',
+    compliance: 'PRV Numerical Dual Accountant',
+    actionRoute: '/privacy-defense',
+    actionLabel: 'Inspect Privacy Budget',
+    tensorSample: 'Noise Calibration: σ_t = DualMin(ε_target, ΔL_t), Perturbation: g_t ~ N(0, σ_t^2 C^2 I)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'bft-agg': {
+    sla: '< 45 ms Byzantine poisoning filter',
+    security: 'Krum & Trimmed Mean f < n/2 Defense',
+    compliance: 'Cosine Gradient Anomaly Rejection',
+    actionRoute: '/security',
+    actionLabel: 'Open Byzantine Defense Lab',
+    tensorSample: 'Distance Score: s_i = Σ_{j ∈ S_i} ||g_i - g_j||^2 → Selected Gradient: g* = argmin_{g_i} s_i',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'secure-agg': {
+    sla: '< 25 ms hardware-isolated aggregation',
+    security: 'Intel SGX Enclave v2 Hardware TEE',
+    compliance: 'Paillier Additive Homomorphic Scheme',
+    actionRoute: '/security',
+    actionLabel: 'Inspect SGX Enclave Vault',
+    tensorSample: 'Homomorphic Sum: [[W_global]] = [[W_jpm]] ⊕ [[W_hsbc]] ⊕ [[W_db]] (Decrypted only in SGX)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'telemetry': {
+    sla: 'Sub-5ms WebSocket live broadcast',
+    security: 'Mutual TLS (mTLS) Transport Channel',
+    compliance: 'Prometheus & OpenTelemetry Standard',
+    actionRoute: '/observability',
+    actionLabel: 'Open Live Observability',
+    tensorSample: 'Telemetry Stream: {round: 47, accuracy: 0.942, loss: 0.124, eps_spent: 0.50, active_nodes: 3}',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'bank-connector': {
+    sla: '< 5 ms schema validation pipeline',
+    security: 'Strict XSD Validation & Type Bounds',
+    compliance: 'ISO 20022 pacs.008 & camt.053 XML',
+    actionRoute: '/onboarding',
+    actionLabel: 'View Bank Connectors',
+    tensorSample: 'Raw Ingestion: XML pacs.008.001.08 → Validated NormalizedTransaction Schema (HMAC Tokenized)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'pqc-secagg': {
+    sla: '< 35 ms lattice key encapsulation',
+    security: 'NIST FIPS 203 (Kyber-768 KEM)',
+    compliance: 'NIST FIPS 204 (Dilithium-3 Signatures)',
+    actionRoute: '/security',
+    actionLabel: 'Inspect Post-Quantum Module',
+    tensorSample: 'Quantum KEM: (pk, sk) ← Kyber768.KeyGen(), (c, K) ← Encaps(pk), Pairwise Secret K Established',
+    statusBadge: 'FRONTIER R&D LAB',
+  },
+  'zk-snark-verifier': {
+    sla: '< 5 ms constant-time O(1) proof verify',
+    security: 'BN254 Elliptic Curve Bilinear Pairing',
+    compliance: 'Groth16 Zero-Knowledge Verification',
+    actionRoute: '/security',
+    actionLabel: 'Inspect zk-SNARK Verifier',
+    tensorSample: 'Bilinear Pairing: e(A, B) = e(α, β) · e(x, γ) · e(C, δ) (Verifies gradient norm bound ≤ C)',
+    statusBadge: 'FRONTIER R&D LAB',
+  },
+  'unlearning-engine': {
+    sla: '< 120 ms selective unlearning erasure',
+    security: 'P_MIA ≤ 0.52 (Near-Random Guessing)',
+    compliance: 'First-Order Hessian Inversion Steps',
+    actionRoute: '/security',
+    actionLabel: 'Inspect Federated Unlearning',
+    tensorSample: 'Hessian Inversion: W_{unlearn} = W_t + H^{-1} ∇L_{evicted}(W_t) (GDPR Right-to-be-Forgotten)',
+    statusBadge: 'FRONTIER R&D LAB',
+  },
+  'crosschain-bridge': {
+    sla: '< 1.0 s multi-ledger settlement SLA',
+    security: 'Chainlink CCIP EVM2AnyMessage Routing',
+    compliance: 'LayerZero V2 Multi-Ledger Standard',
+    actionRoute: '/security',
+    actionLabel: 'Inspect Cross-Chain Bridge',
+    tensorSample: 'Shapley Settlement: φ_i → EVM2AnyMessage(dest: Arbitrum/Optimism, token: wCBDC, amount: φ_i * R)',
+    statusBadge: 'FRONTIER R&D LAB',
+  },
+};
+
+
 const ARCH_NODES: ArchNode[] = [
   { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 18', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
   { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
@@ -585,7 +714,9 @@ export default function LandingPage() {
   const [isBenchmarkModalOpen, setIsBenchmarkModalOpen] = useState(false);
   const [activeBankDrawer, setActiveBankDrawer] = useState<BankInfoDetail | null>(null);
   const [activeModule, setActiveModule] = useState<Module | null>(PLATFORM_MODULES[0] ?? null);
+  const [moduleFilter, setModuleFilter] = useState<'ALL' | 'CORE' | 'FRONTIER'>('ALL');
   const [activeArchNode, setActiveArchNode] = useState<ArchNode | null>(ARCH_NODES[0] ?? null);
+
   const [activeWorkflowStep, setActiveWorkflowStep] = useState<number>(1);
   const [activeApiTab, setActiveApiTab] = useState<'curl' | 'python' | 'ts'>('curl');
   const [activePrivacyTab, setActivePrivacyTab] = useState<'flow' | 'threat' | 'compliance'>('flow');
@@ -1178,62 +1309,171 @@ export default function LandingPage() {
         ══════════════════════════════════════════════════════════ */}
         <section id="product" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
-            <div className="max-w-3xl mb-8 sm:mb-10 min-w-0">
-              <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-                Engine Specifications
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-8 sm:mb-10 min-w-0">
+              <div className="max-w-3xl min-w-0">
+                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                  Engine Specifications & Architecture
+                </div>
+                <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Platform Engineering Capabilities</h2>
+                <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
+                  Inspect platform component specifications, mathematical algorithms, tensor input/output contracts, and real-time execution invariants.
+                </p>
               </div>
-              <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Platform Engineering Capabilities</h2>
-              <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                Inspect platform component specifications, algorithms, input/output tensors, and stack requirements.
-              </p>
-            </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
-              <div className="lg:col-span-4 space-y-2 w-full min-w-0">
-                {PLATFORM_MODULES.map(mod => (
+              {/* Category Filter Pills */}
+              <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-white/8 shrink-0 self-start md:self-end">
+                {[
+                  { id: 'ALL', label: 'All (13)' },
+                  { id: 'CORE', label: 'Core Engine (9)' },
+                  { id: 'FRONTIER', label: 'Frontier Lab (4)' },
+                ].map(tab => (
                   <button
-                    key={mod.id}
-                    onClick={() => setActiveModule(mod)}
-                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
-                      activeModule?.id === mod.id
-                        ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                        : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                    key={tab.id}
+                    onClick={() => {
+                      setModuleFilter(tab.id as any);
+                      const filtered = PLATFORM_MODULES.filter(m => 
+                        tab.id === 'ALL' ? true : tab.id === 'CORE' ? m.category.includes('Core') : m.category.includes('Frontier')
+                      );
+                      const first = filtered[0];
+                      if (first && (!activeModule || !filtered.some(m => m.id === activeModule.id))) {
+                        setActiveModule(first);
+                      }
+                    }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+                      moduleFilter === tab.id
+                        ? 'bg-indigo-600 text-white shadow-[0_0_12px_rgba(99,102,241,0.4)]'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                     }`}
                   >
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold truncate">{mod.name}</div>
-                      <div className="text-[9.5px] font-mono text-slate-500 truncate">{mod.category}</div>
-                    </div>
+                    {tab.label}
                   </button>
                 ))}
               </div>
+            </div>
 
-              {activeModule && (
-                <div className="lg:col-span-8 p-4 sm:p-6 rounded-2xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden">
-                  <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
-                    <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">{activeModule.category}</span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeModule.name}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{activeModule.purpose}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-mono w-full min-w-0">
-                    {[
-                      { label: 'Algorithm',  value: activeModule.algorithm },
-                      { label: 'Technology', value: activeModule.tech },
-                      { label: 'Inputs',     value: activeModule.inputs },
-                      { label: 'Outputs',    value: activeModule.outputs },
-                    ].map(row => (
-                      <div key={row.label} className="p-3 rounded-xl bg-[#03030c] border border-white/6 min-w-0">
-                        <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">{row.label}</div>
-                        <div className="text-slate-200 break-words">{row.value}</div>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0 items-start">
+              {/* Left Column: Filtered List with Clean Scrollbar */}
+              <div className="lg:col-span-4 space-y-2 w-full min-w-0 max-h-[640px] overflow-y-auto pr-1">
+                {PLATFORM_MODULES.filter(m =>
+                  moduleFilter === 'ALL' ? true : moduleFilter === 'CORE' ? m.category.includes('Core') : m.category.includes('Frontier')
+                ).map(mod => {
+                  const isSelected = activeModule?.id === mod.id;
+                  const isCore = mod.category.includes('Core');
+                  return (
+                    <button
+                      key={mod.id}
+                      onClick={() => setActiveModule(mod)}
+                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
+                          : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-semibold truncate flex items-center gap-2">
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
+                          <span className="truncate">{mod.name}</span>
+                        </div>
+                        <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
                       </div>
-                    ))}
+                      <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Right Column: Rich Detailed Card (No Empty Void) */}
+              {activeModule && (() => {
+                const currentExtra = MODULE_SPECS_EXTRA[activeModule.id];
+                return (
+                  <div className="lg:col-span-8 p-5 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-5 w-full min-w-0 shadow-2xl">
+                    {/* Card Header & Action */}
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-white/8 pb-4 min-w-0">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                            {activeModule.category}
+                          </span>
+                          <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded ${
+                            activeModule.category.includes('Core') 
+                              ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
+                              : 'text-purple-400 bg-purple-500/10 border border-purple-500/20'
+                          }`}>
+                            {currentExtra?.statusBadge ?? 'VERIFIED'}
+                          </span>
+                        </div>
+                        <h3 className="text-lg sm:text-xl font-bold text-slate-100">{activeModule.name}</h3>
+                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{activeModule.purpose}</p>
+                      </div>
+
+                      {currentExtra && (
+                        <button
+                          onClick={() => navigate(currentExtra.actionRoute)}
+                          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] shrink-0 cursor-pointer self-start sm:self-auto"
+                        >
+                          <span>{currentExtra.actionLabel}</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* 4 Core Specification Tiles */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono w-full min-w-0">
+                      {[
+                        { label: 'Algorithm / Optimization', value: activeModule.algorithm, color: 'border-indigo-500/20 bg-indigo-950/15' },
+                        { label: 'Technology Stack & Engine', value: activeModule.tech, color: 'border-cyan-500/20 bg-cyan-950/15' },
+                        { label: 'Input Message / Tensor Contract', value: activeModule.inputs, color: 'border-amber-500/20 bg-amber-950/15' },
+                        { label: 'Output Tensor / Actionable Decision', value: activeModule.outputs, color: 'border-emerald-500/20 bg-emerald-950/15' },
+                      ].map(row => (
+                        <div key={row.label} className={`p-3.5 rounded-xl border ${row.color} min-w-0`}>
+                          <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
+                          <div className="text-slate-200 text-xs break-words leading-relaxed">{row.value}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Engineering Guarantees & Real-Time SLAs */}
+                    {currentExtra && (
+                      <div className="space-y-3 pt-2">
+                        <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+                          Engineering Invariants & Operational SLA
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+                            <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
+                            <div className="text-slate-200 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+                            <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
+                            <div className="text-indigo-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
+                          </div>
+                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+                            <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
+                            <div className="text-emerald-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
+                          </div>
+                        </div>
+
+                        {/* Tensor Transformation & Contract Blueprint */}
+                        <div className="p-3 rounded-xl bg-[#03030c] border border-white/8 font-mono">
+                          <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+                            <span>Dataflow Transformation Blueprint</span>
+                            <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
+                          </div>
+                          <div className="text-indigo-200 text-[11px] sm:text-xs break-all leading-relaxed bg-black/40 p-2 rounded-lg border border-white/4">
+                            {currentExtra.tensorSample}
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                );
+              })()}
+
             </div>
           </FadeSection>
         </section>
+
 
         {/* ══════════════════════════════════════════════════════════
             SECTION 5 — PLATFORM / NODE INSPECTOR (#platform)
