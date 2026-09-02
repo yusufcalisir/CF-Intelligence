@@ -48,6 +48,20 @@ _CSP_DIRECTIVES = "; ".join(
     ]
 )
 
+_DOCS_CSP_DIRECTIVES = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com",
+        "img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com",
+        "font-src 'self' https://fonts.gstatic.com data:",
+        "connect-src 'self' https://cdn.jsdelivr.net https://* wss://*",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "base-uri 'self'",
+    ]
+)
+
 _SECURITY_HEADERS: dict[str, str] = {
     # Prevents all external resource loading; this is an API backend
     "Content-Security-Policy": _CSP_DIRECTIVES,
@@ -69,8 +83,8 @@ _SECURITY_HEADERS: dict[str, str] = {
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     """Starlette/FastAPI middleware that appends security headers to every response.
 
-    Existing headers set by individual routes are preserved; only absent headers
-    are added, so routes that intentionally override (e.g. /docs) are not broken.
+    Existing headers set by individual routes are preserved; docs routes (/docs,
+    /redoc, /scalar) receive tailored CSP headers allowing Swagger and Scalar CDN assets.
     """
 
     async def dispatch(
@@ -79,8 +93,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         call_next: Callable[[Request], Awaitable[Response]],
     ) -> Response:
         response: Response = await call_next(request)
-        for header, value in _SECURITY_HEADERS.items():
-            # Only set if not already present — preserves intentional overrides
-            if header not in response.headers:
+        path = request.url.path
+        is_docs_route = path in ("/openapi.json",) or any(
+            path.startswith(p) for p in ("/docs", "/redoc", "/scalar")
+        )
+
+        headers_to_apply = dict(_SECURITY_HEADERS)
+        if is_docs_route:
+            headers_to_apply["Content-Security-Policy"] = _DOCS_CSP_DIRECTIVES
+
+        for header, value in headers_to_apply.items():
+            if header not in response.headers or (is_docs_route and header == "Content-Security-Policy"):
                 response.headers[header] = value
         return response
+
+
