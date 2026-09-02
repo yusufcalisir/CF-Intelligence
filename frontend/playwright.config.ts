@@ -8,7 +8,7 @@ import process from 'node:process';
  */
 export default defineConfig({
   testDir: './',
-  testMatch: ['e2e-responsive/**/*.spec.ts', 'e2e-visual/**/*.spec.ts', 'e2e-a11y/**/*.spec.ts'],
+  testMatch: ['e2e-responsive/**/*.spec.ts', 'e2e-visual/**/*.spec.ts', 'e2e-a11y/**/*.spec.ts', 'e2e-workflows/**/*.spec.ts'],
   snapshotDir: './e2e-visual/snapshots',
   snapshotPathTemplate: '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
   fullyParallel: false,
