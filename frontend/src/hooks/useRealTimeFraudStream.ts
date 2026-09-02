@@ -4,15 +4,29 @@ import type { LiveStreamTransaction } from '../stores/useLiveAlertStore';
 
 function getWebSocketUrl(): string {
   if (typeof window === 'undefined') return '';
-  const isHttps = window.location.protocol === 'https:';
-  const protocol = isHttps ? 'wss:' : 'ws:';
-  
-  // In development, connect to FastAPI backend on 8000 if running locally, otherwise use origin
-  if (window.location.port === '5173' || window.location.port === '3000') {
+  if (import.meta.env.VITE_WS_URL) {
+    return import.meta.env.VITE_WS_URL.replace(/\/+$/, '') + '/ws/telemetry';
+  }
+  if (import.meta.env.VITE_API_URL) {
+    const apiUrl = import.meta.env.VITE_API_URL;
+    const wsProto = apiUrl.startsWith('https') ? 'wss:' : 'ws:';
+    const host = apiUrl.replace(/^https?:\/\//, '').replace(/\/+$/, '');
+    return `${wsProto}//${host}/ws/telemetry`;
+  }
+  // Local development fallback
+  if (window.location.port === '5173' || window.location.port === '3000' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+    const isHttps = window.location.protocol === 'https:';
+    const protocol = isHttps ? 'wss:' : 'ws:';
     return `${protocol}//127.0.0.1:8000/ws/telemetry`;
   }
-  return `${protocol}//${window.location.host}/ws/telemetry`;
+  if (window.location.hostname.includes('hf.space')) {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/ws/telemetry`;
+  }
+  // Production fallback to live Hugging Face Spaces backend
+  return 'wss://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/ws/telemetry';
 }
+
 
 /**
  * Global Real-Time WebSocket Hook for Platform Telemetry and Fraud Alert Streaming.
