@@ -514,14 +514,22 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
     )
 
 
-# ── CORS ──────────────────────────────────────
-# Allow all origins and disable credentials to avoid any CORS issues on Vercel preview/production links.
+# ── CORS (Strict Whitelist — No Wildcards) ────────────────────────────────────
+# Wildcard origins are strictly prohibited to prevent cross-origin browser abuse.
+# Only authenticated platform frontend domains and verified preview regexes are allowed.
+_cors_origins = [
+    origin.strip()
+    for origin in settings.cors_allowed_origins.split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
+    allow_origins=_cors_origins,
+    allow_origin_regex=settings.cors_allow_origin_regex,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allow_headers=["*"],
+    expose_headers=["Retry-After", "X-RateLimit-Exceeded"],
 )
 
 # ── HTTP Security Headers ─────────────────────────────────────────────────────

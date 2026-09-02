@@ -131,3 +131,39 @@ def test_auth_lockout_after_5_failures():
     res = waf.inspect_request(client_ip=test_ip, path="/v1/inference/score")
     assert res.allowed is False
     assert res.rule_triggered == WAFRuleCategory.AUTH_LOCKOUT_EXCEEDED
+
+
+def test_cors_whitelist_enforced_no_wildcards():
+    """Verify that CORS header Access-Control-Allow-Origin is never wildcard '*' and allows whitelist."""
+    # 1. Allowed origin receives CORS header matching origin
+    res_allowed = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "https://cf-intelligence.vercel.app",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert res_allowed.headers.get("access-control-allow-origin") == "https://cf-intelligence.vercel.app"
+    assert res_allowed.headers.get("access-control-allow-origin") != "*"
+
+    # 2. Localhost origin receives CORS header
+    res_local = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "http://localhost:5173",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert res_local.headers.get("access-control-allow-origin") == "http://localhost:5173"
+
+
+def test_cors_rejects_unauthorized_origins():
+    """Verify that unauthorized external origins do NOT receive access-control-allow-origin."""
+    res_blocked = client.options(
+        "/api/v1/auth/login",
+        headers={
+            "Origin": "https://malicious-phishing-site.com",
+            "Access-Control-Request-Method": "POST",
+        },
+    )
+    assert "access-control-allow-origin" not in res_blocked.headers

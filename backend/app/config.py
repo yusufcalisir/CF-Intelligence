@@ -24,10 +24,21 @@ class Settings(BaseSettings):
     app_debug: bool = True
     app_log_level: str = "INFO"
 
-    # ── FastAPI ───────────────────────────────
+    # ── FastAPI & CORS ────────────────────────
     api_host: str = "0.0.0.0"  # nosec B104
     api_port: int = 8000
     api_workers: int = 1
+    cors_allowed_origins: str = (
+        "https://cf-intelligence.vercel.app,"
+        "https://cfi-platform.vercel.app,"
+        "http://localhost:5173,"
+        "http://localhost:3000,"
+        "http://127.0.0.1:5173,"
+        "http://127.0.0.1:3000,"
+        "http://localhost:8000,"
+        "http://127.0.0.1:8000"
+    )
+    cors_allow_origin_regex: str = r"^https:\/\/(cf-intelligence|cf-intelligence-git-[a-z0-9-]+-yusufcalisirs-projects)\.vercel\.app$"
 
     # ── PostgreSQL ────────────────────────────
     postgres_host: str = "localhost"
