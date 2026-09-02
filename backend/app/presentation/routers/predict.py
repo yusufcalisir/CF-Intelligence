@@ -370,8 +370,10 @@ async def predict_transaction(
         chall_prob = None
         chall_latency = None
         challenger_ver = None
+        active_entry = None
         if payload.simulation_id:
             manifest = _registry._load_manifest(payload.simulation_id)
+            active_entry = next((e for e in manifest if e.get("status") == "active"), None)
             challenger_entry = next((e for e in manifest if e.get("status") == "challenger"), None)
             if challenger_entry:
                 challenger_ver = challenger_entry["version"]
