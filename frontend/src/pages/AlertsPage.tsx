@@ -192,7 +192,7 @@ function AlertCard({
       <div className="flex items-center gap-4 mb-2">
         <div>
           <div className="text-2xl font-bold" style={{ color: severityColor }}>
-            {alert.risk_score.toFixed(0)}
+            {(alert.risk_score ?? 0).toFixed(0)}
           </div>
           <div className="text-[10px] uppercase text-[var(--color-text-muted)]">Risk Score</div>
         </div>
@@ -200,7 +200,7 @@ function AlertCard({
           <div className="h-2 bg-[var(--color-surface-alt)] rounded-full overflow-hidden">
             <motion.div
               initial={{ width: 0 }}
-              animate={{ width: `${alert.risk_score / 10}%` }}
+              animate={{ width: `${(alert.risk_score ?? 0) / 10}%` }}
               transition={{ delay: index * 0.05 + 0.2, duration: 0.5 }}
               className="h-full rounded-full"
               style={{ backgroundColor: severityColor }}
@@ -208,13 +208,13 @@ function AlertCard({
           </div>
         </div>
         <div className="text-right">
-          <div className="text-sm font-mono">{(alert.confidence * 100).toFixed(1)}%</div>
+          <div className="text-sm font-mono">{((alert.confidence ?? 0) * 100).toFixed(1)}%</div>
           <div className="text-[10px] uppercase text-[var(--color-text-muted)]">Confidence</div>
         </div>
       </div>
 
       <div className="flex flex-wrap gap-1">
-        {alert.reason_codes.map((code) => (
+        {(alert.reason_codes ?? []).map((code) => (
           <span
             key={code}
             className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--color-surface-alt)] text-[var(--color-text-muted)]"
@@ -288,7 +288,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                   <span>⚠️</span> Risk Factors
                 </h4>
                 <ul className="space-y-1.5">
-                  {report.risk_factors.map((factor, i) => (
+                  {(report.risk_factors ?? []).map((factor, i) => (
                     <li key={i} className="text-xs flex items-start gap-2 bg-rose-500/10 border border-rose-500/20 p-2 rounded-lg text-rose-200 font-medium leading-normal">
                       <span className="text-rose-400 font-bold shrink-0 mt-0.5">•</span>
                       <span>{factor}</span>
@@ -337,15 +337,15 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
               </div>
 
               {/* Signal Breakdown */}
-              {report.risk_score_breakdown.length > 0 && (
+              {(report.risk_score_breakdown ?? []).length > 0 && (
                 <div>
                   <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center gap-1.5">
                     <span>⚡</span> 9-Signal Composite Pipeline
                   </h4>
                   <div className="space-y-2.5">
-                    {report.risk_score_breakdown
+                    {(report.risk_score_breakdown ?? [])
                       .slice()
-                      .sort((a, b) => b.contribution - a.contribution)
+                      .sort((a, b) => (b.contribution ?? 0) - (a.contribution ?? 0))
                       .slice(0, 5)
                       .map((sig, i) => (
                         <div key={i} className="text-xs space-y-1">
@@ -354,13 +354,13 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                               {sig.signal_name.replace(/_/g, ' ').replace('rules', '')}
                             </span>
                             <span className="font-mono text-emerald-400 font-bold">
-                              {(sig.contribution * 100).toFixed(0)}%
+                              {((sig.contribution ?? 0) * 100).toFixed(0)}%
                             </span>
                           </div>
                           <div className="h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
                             <div
                               className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-teal-400 to-emerald-400"
-                              style={{ width: `${Math.max(3, sig.contribution * 100)}%` }}
+                              style={{ width: `${Math.max(3, (sig.contribution ?? 0) * 100)}%` }}
                             />
                           </div>
                         </div>
@@ -411,7 +411,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                   Actionable Remediation Statements
                 </h4>
                 <div className="space-y-2">
-                  {cfReport.changes.map((change, i) => (
+                  {(cfReport.changes ?? []).map((change, i) => (
                     <div key={i} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1">
                       <div className="flex items-center justify-between font-bold text-slate-200 capitalize">
                         <span>{change.feature.replace(/_/g, ' ')}</span>
@@ -447,7 +447,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-slate-400">Model Baseline AUC</span>
-                  <span className="font-mono font-bold text-slate-200">{(auditReport.model_auc * 100).toFixed(1)}%</span>
+                  <span className="font-mono font-bold text-slate-200">{((auditReport.model_auc ?? 0) * 100).toFixed(1)}%</span>
                 </div>
                 <div className="flex items-center justify-between pt-1.5 border-t border-slate-800">
                   <span className="text-slate-400">Inference Audit Match</span>
@@ -466,7 +466,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                   9-Signal Replay Execution Trace
                 </h4>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-                  {auditReport.policy_rules_evaluated.map((rule, i) => (
+                  {(auditReport.policy_rules_evaluated ?? []).map((rule, i) => (
                     <div key={i} className="flex items-center justify-between p-2 bg-slate-900/80 rounded-lg border border-slate-800">
                       <div className="flex items-center gap-2 min-w-0">
                         <span
@@ -480,7 +480,7 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                         </span>
                       </div>
                       <div className="font-mono text-[10px] text-right font-bold text-emerald-400 shrink-0">
-                        +{(rule.contribution * 1000).toFixed(0)} pts
+                        +{((rule.contribution ?? 0) * 1000).toFixed(0)} pts
                       </div>
                     </div>
                   ))}
@@ -503,11 +503,11 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
               <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
                 <div className="flex justify-between font-bold">
                   <span className="text-slate-300">Target Node ID</span>
-                  <span className="font-mono text-cyan-400">{gnnReport.node_id.slice(0, 14)}</span>
+                  <span className="font-mono text-cyan-400">{gnnReport.node_id?.slice(0, 14) ?? 'N/A'}</span>
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>2-Hop Subgraph</span>
-                  <span className="font-semibold text-slate-200">{gnnReport.subgraph_nodes_count} nodes • {gnnReport.subgraph_edges_count} edges</span>
+                  <span className="font-semibold text-slate-200">{gnnReport.subgraph_nodes_count ?? 0} nodes • {gnnReport.subgraph_edges_count ?? 0} edges</span>
                 </div>
                 <p className="text-[11px] text-teal-300 font-medium pt-1.5 border-t border-slate-800">
                   {gnnReport.primary_driver_text}
@@ -519,12 +519,12 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
                   Top Graph Edge Contributors
                 </h4>
                 <div className="space-y-2">
-                  {gnnReport.top_contributing_edges.map((edge, i) => (
+                  {(gnnReport.top_contributing_edges ?? []).map((edge, i) => (
                     <div key={i} className="p-2.5 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
                       <div className="flex items-center justify-between font-mono text-[11px] font-bold text-slate-200">
-                        <span className="text-indigo-400 capitalize">{edge.relationship_type.replace(/_/g, ' ')}</span>
+                        <span className="text-indigo-400 capitalize">{(edge.relationship_type ?? '').replace(/_/g, ' ')}</span>
                         <span className="text-emerald-400 font-bold">
-                          {(edge.contribution_percentage ?? (edge.weight * 100)).toFixed(0)}%
+                          {(edge.contribution_percentage ?? ((edge.weight ?? 0) * 100)).toFixed(0)}%
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
