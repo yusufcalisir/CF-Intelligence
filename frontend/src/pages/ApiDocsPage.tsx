@@ -409,6 +409,7 @@ export default function ApiDocsPage() {
 
   const docsUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/docs';
   const scalarUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/scalar';
+  const redocUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/redoc';
 
   const handleCopyCode = () => {
     const code = generateSdkCode(selectedEndpoint, selectedLang);
@@ -428,21 +429,16 @@ export default function ApiDocsPage() {
         const elapsed = Math.round(performance.now() - start);
         setExecutionResult({ statusCode: res.status, latencyMs: elapsed, data: res.data });
       } else if (selectedEndpoint.method === 'POST') {
-        const res = await apiClient.post(selectedEndpoint.path, selectedEndpoint.requestBodySample);
+        const res = await apiClient.post(selectedEndpoint.path, selectedEndpoint.requestBodySample ?? {});
         const elapsed = Math.round(performance.now() - start);
         setExecutionResult({ statusCode: res.status, latencyMs: elapsed, data: res.data });
-      } else {
-        // WebSocket synthetic probe
-        const elapsed = Math.round(performance.now() - start + 2);
-        setExecutionResult({ statusCode: 101, latencyMs: elapsed, data: selectedEndpoint.responseBodySample });
       }
-    } catch {
-      // Return representative sandbox response for local preview
-      const elapsed = Math.round(performance.now() - start + 3);
+    } catch (err: any) {
+      const elapsed = Math.round(performance.now() - start);
       setExecutionResult({
-        statusCode: 200,
+        statusCode: err.response?.status ?? 500,
         latencyMs: elapsed,
-        data: selectedEndpoint.responseBodySample,
+        data: err.response?.data ?? { error: err.message },
       });
     } finally {
       setIsExecuting(false);
@@ -450,38 +446,62 @@ export default function ApiDocsPage() {
   };
 
   const handleDownloadSpec = () => {
-    const jsonStr = JSON.stringify(API_ENDPOINTS, null, 2);
+    const jsonStr = JSON.stringify(
+      {
+        openapi: '3.1.0',
+        info: {
+          title: 'Collaborative Fraud Intelligence API',
+          version: '2.4.1',
+          description: 'Privacy-Preserving Federated Learning & Consortium AML API Specification',
+        },
+        paths: API_ENDPOINTS.reduce((acc, ep) => {
+          acc[ep.path] = {
+            [ep.method.toLowerCase()]: {
+              summary: ep.title,
+              description: ep.description,
+              responses: {
+                '200': {
+                  description: 'Successful Operation',
+                },
+              },
+            },
+          };
+          return acc;
+        }, {} as Record<string, any>),
+      },
+      null,
+      2
+    );
+
     const blob = new Blob([jsonStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'cfi_openapi_3.1_specification.json';
+    a.download = 'cfi-openapi-spec.json';
     a.click();
     URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto text-slate-100 w-full">
+    <div className="space-y-6 max-w-7xl mx-auto w-full pb-12">
       {/* Top Banner */}
-      <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0d1238]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
-              <Code2 className="w-6 h-6" />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-white/10 bg-slate-900/80 shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0">
+            <Code2 className="w-6 h-6" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-xl font-bold text-white tracking-tight">
+                Developer & API Reference Portal
+              </h1>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                OpenAPI 3.1
+              </span>
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-black text-slate-100 tracking-tight">
-                  Developer & API Reference Portal
-                </h1>
-                <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                  OpenAPI 3.1
-                </span>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
-                Bank Integration SDK generator, multi-language code snippets, and live interactive API request sandbox
-              </p>
-            </div>
+            <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+              Bank Integration SDK generator, multi-language code snippets, and live interactive API request sandbox
+            </p>
           </div>
         </div>
 
@@ -500,6 +520,15 @@ export default function ApiDocsPage() {
             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
           >
             <span>Scalar Portal</span>
+            <ExternalLink className="w-3.5 h-3.5" />
+          </a>
+          <a
+            href={redocUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all"
+          >
+            <span>ReDoc</span>
             <ExternalLink className="w-3.5 h-3.5" />
           </a>
           <a

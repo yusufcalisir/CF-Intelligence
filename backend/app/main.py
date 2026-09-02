@@ -938,24 +938,39 @@ async def root() -> dict:
 
 @app.get("/scalar", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_api_reference() -> HTMLResponse:
-    """Serve modern dark-themed Scalar API Reference documentation."""
+    """Serve modern dark-themed Scalar API Reference documentation in 3-column layout."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
     html_content = """<!doctype html>
-<html>
+<html lang="en">
   <head>
-    <title>CF-Intelligence | Interactive Scalar API Reference</title>
+    <title>CF-Intelligence | Enterprise API Reference</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      body { margin: 0; background-color: #07091e; }
+      :root {
+        --scalar-font: 'Inter', system-ui, -apple-system, sans-serif;
+        --scalar-font-code: 'JetBrains Mono', monospace;
+      }
+      body {
+        margin: 0;
+        background-color: #0b0f19;
+        font-family: var(--scalar-font);
+      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #0b0f19; }
+      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #334155; }
     </style>
   </head>
   <body>
     <script
       id="api-reference"
       data-url="/openapi.json"
-      data-configuration='{"theme":"purple","layout":"modern","darkMode":true,"showSidebar":true}'
+      data-configuration='{"theme":"deepSpace","layout":"classic","darkMode":true,"showSidebar":true,"hideModels":false,"searchHotKey":"k","defaultHttpClient":{"targetKey":"python","clientKey":"httpx"}}'
       src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest">
     </script>
   </body>
@@ -964,6 +979,7 @@ async def scalar_api_reference() -> HTMLResponse:
         content=html_content,
         headers={"Content-Security-Policy": _DOCS_CSP_DIRECTIVES},
     )
+
 
 
 @app.get("/favicon.ico", include_in_schema=False)
