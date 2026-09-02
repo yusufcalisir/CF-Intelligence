@@ -496,8 +496,6 @@ from app.infrastructure.security.rate_limiter import limiter
 app.state.limiter = limiter
 
 
-
-
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """Handle slowapi rate limit exceeded exceptions with RFC 7807 problem details."""
@@ -539,7 +537,6 @@ app.add_middleware(
 # SecurityHeadersMiddleware is added AFTER CORSMiddleware so CORS headers are
 # set first and security headers wrap the final outbound response.
 app.add_middleware(SecurityHeadersMiddleware)
-
 
 
 # ── Global Exception Handler (RFC 7807 Compliant & Production Sanitized) ──────
