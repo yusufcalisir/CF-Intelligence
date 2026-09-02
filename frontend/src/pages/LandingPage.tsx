@@ -704,6 +704,184 @@ const ChevronDown = () => (
   </svg>
 );
 
+const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; className?: string }) => (
+  <svg
+    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-500'} ${className}`}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <polyline points="6 9 12 15 18 9" />
+  </svg>
+);
+
+// Helper for Workflow Step Detail Card
+const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { step: typeof PRESENTATION_WORKFLOW[0] }) {
+  return (
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 shadow-2xl">
+      <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2 min-w-0">
+        <div className="min-w-0">
+          <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
+            {step.badge} of 08
+          </span>
+          <h3 className="text-base sm:text-xl font-bold text-slate-100 mt-0.5 truncate">{step.label}</h3>
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 shrink-0">
+          Production Pipeline
+        </span>
+      </div>
+
+      <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
+        {step.summary}
+      </p>
+
+      {/* Highlights Bullet List */}
+      <div className="space-y-2 pt-1 min-w-0">
+        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
+        <div className="space-y-1.5 font-sans text-xs text-slate-300 min-w-0">
+          {step.highlights.map(hl => (
+            <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/5 min-w-0">
+              <span className="text-indigo-400 font-bold shrink-0">✓</span>
+              <span className="break-words">{hl}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Data Input/Output Specifications */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
+        <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
+          <div className="text-indigo-300 font-semibold truncate">{step.input}</div>
+        </div>
+        <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
+          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
+          <div className="text-emerald-400 font-semibold truncate">{step.output}</div>
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// Helper for Module Detail Card
+const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { mod: Module; onNavigate: (path: string) => void }) {
+  const currentExtra = MODULE_SPECS_EXTRA[mod.id];
+  return (
+    <div className="p-4 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 shadow-2xl">
+      {/* Card Header & Action */}
+      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-white/8 pb-4 min-w-0">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+              {mod.category}
+            </span>
+            <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded ${
+              mod.category.includes('Core') 
+                ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
+                : 'text-purple-400 bg-purple-500/10 border border-purple-500/20'
+            }`}>
+              {currentExtra?.statusBadge ?? 'VERIFIED'}
+            </span>
+          </div>
+          <h3 className="text-base sm:text-xl font-bold text-slate-100">{mod.name}</h3>
+          <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{mod.purpose}</p>
+        </div>
+
+        {currentExtra && (
+          <button
+            onClick={() => onNavigate(currentExtra.actionRoute)}
+            className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] shrink-0 cursor-pointer self-start sm:self-auto"
+          >
+            <span>{currentExtra.actionLabel}</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* 4 Core Specification Tiles */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 text-xs font-mono w-full min-w-0">
+        {[
+          { label: 'Algorithm / Optimization', value: mod.algorithm, color: 'border-indigo-500/20 bg-indigo-950/15' },
+          { label: 'Technology Stack & Engine', value: mod.tech, color: 'border-cyan-500/20 bg-cyan-950/15' },
+          { label: 'Input Message / Tensor Contract', value: mod.inputs, color: 'border-amber-500/20 bg-amber-950/15' },
+          { label: 'Output Tensor / Actionable Decision', value: mod.outputs, color: 'border-emerald-500/20 bg-emerald-950/15' },
+        ].map(row => (
+          <div key={row.label} className={`p-3 sm:p-3.5 rounded-xl border ${row.color} min-w-0`}>
+            <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
+            <div className="text-slate-200 text-xs break-words leading-relaxed">{row.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Engineering Guarantees & Real-Time SLAs */}
+      {currentExtra && (
+        <div className="space-y-3 pt-2">
+          <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
+            Engineering Invariants & Operational SLA
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+              <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
+              <div className="text-slate-200 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+              <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
+              <div className="text-indigo-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
+            </div>
+            <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
+              <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
+              <div className="text-emerald-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
+            </div>
+          </div>
+
+          {/* Tensor Transformation & Contract Blueprint */}
+          <div className="p-3 rounded-xl bg-[#03030c] border border-white/8 font-mono">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+              <span>Dataflow Transformation Blueprint</span>
+              <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
+            </div>
+            <div className="text-indigo-200 text-[11px] sm:text-xs break-all leading-relaxed bg-black/40 p-2 rounded-lg border border-white/4">
+              {currentExtra.tensorSample}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+});
+
+// Helper for Arch Node Detail Card
+const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: ArchNode }) {
+  return (
+    <div className="p-4 sm:p-6 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden shadow-2xl">
+      <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
+        <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
+        <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{node.label}</h3>
+        <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{node.description}</p>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
+        {[
+          { label: 'Responsibilities', items: node.responsibilities, dot: 'text-indigo-400' },
+          { label: 'Protocols',        items: node.protocols,       dot: 'text-purple-400' },
+          { label: 'Technology',       items: node.tech,            dot: 'text-cyan-400' },
+        ].map(col => (
+          <div key={col.label} className="min-w-0">
+            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
+            <ul className="space-y-1">
+              {col.items.map(it => (
+                <li key={it} className="text-slate-300 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+});
+
 // ── MAIN LANDING PAGE ────────────────────────────────────────────────────────
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -1233,72 +1411,62 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
-              {/* Left Selector List */}
-              <div className="lg:col-span-4 space-y-2 w-full min-w-0">
-                {PRESENTATION_WORKFLOW.map(step => (
-                  <button
-                    key={step.id}
-                    onClick={() => setActiveWorkflowStep(step.id)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
-                      activeWorkflowStep === step.id
-                        ? 'bg-indigo-600/15 border-indigo-500/40 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
-                        : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
-                    }`}
-                  >
-                    <span className={`w-5 sm:w-6 h-5 sm:h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
-                      activeWorkflowStep === step.id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white/5 text-slate-400'
-                    }`}>
-                      {step.id}
-                    </span>
-                    <span className="text-xs font-semibold truncate">{step.short}</span>
-                  </button>
-                ))}
+              {/* Left Selector List (Desktop) & Accordion List (Mobile) */}
+              <div className="lg:col-span-4 space-y-2.5 w-full min-w-0">
+                {PRESENTATION_WORKFLOW.map(step => {
+                  const isActive = activeWorkflowStep === step.id;
+                  return (
+                    <div key={step.id} className="space-y-2.5">
+                      <button
+                        onClick={() => setActiveWorkflowStep(step.id)}
+                        className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
+                          isActive
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                            : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center text-[11px] sm:text-xs font-mono font-bold shrink-0 ${
+                            isActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white/5 text-slate-400'
+                          }`}>
+                            {step.id}
+                          </span>
+                          <span className="text-xs font-semibold truncate">{step.short}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="lg:hidden">
+                            <AccordionChevron isOpen={isActive} />
+                          </span>
+                          <span className="hidden lg:inline text-xs font-mono text-slate-600 group-hover:text-slate-400">
+                            {isActive ? '→' : ''}
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Mobile Inline Expanded Detail Card */}
+                      <div className="lg:hidden">
+                        <AnimatePresence>
+                          {isActive && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.22, ease: 'easeOut' }}
+                              className="overflow-hidden"
+                            >
+                              <WorkflowStepDetailCard step={step} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
-              {/* Right Executive Presentation Card */}
-              <div className="lg:col-span-8 w-full min-w-0">
-                <div className="p-4 sm:p-7 rounded-2xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-6 w-full min-w-0 overflow-hidden">
-                  <div className="flex flex-wrap items-center justify-between border-b border-white/6 pb-3 sm:pb-4 gap-2 min-w-0">
-                    <div className="min-w-0">
-                      <span className="text-[9px] sm:text-[10px] font-mono font-bold text-indigo-400 uppercase tracking-widest">
-                        {currentWorkflowStep.badge} of 08
-                      </span>
-                      <h3 className="text-base sm:text-xl font-bold text-slate-100 mt-0.5 truncate">{currentWorkflowStep.label}</h3>
-                    </div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-mono font-semibold bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 shrink-0">
-                      Production Pipeline
-                    </span>
-                  </div>
-
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed font-sans">
-                    {currentWorkflowStep.summary}
-                  </p>
-
-                  {/* Highlights Bullet List */}
-                  <div className="space-y-2 pt-1 min-w-0">
-                    <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
-                    <div className="space-y-1.5 font-sans text-xs text-slate-300 min-w-0">
-                      {currentWorkflowStep.highlights.map(hl => (
-                        <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/5 min-w-0">
-                          <span className="text-indigo-400 font-bold shrink-0">✓</span>
-                          <span className="break-words">{hl}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Data Input/Output Specifications */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
-                    <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-                      <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
-                      <div className="text-indigo-300 font-semibold truncate">{currentWorkflowStep.input}</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-                      <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
-                      <div className="text-emerald-400 font-semibold truncate">{currentWorkflowStep.output}</div>
-                    </div>
-                  </div>
-                </div>
+              {/* Right Executive Presentation Card (Desktop Only) */}
+              <div className="hidden lg:block lg:col-span-8 w-full min-w-0">
+                <WorkflowStepDetailCard step={currentWorkflowStep} />
               </div>
             </div>
           </FadeSection>
@@ -1353,123 +1521,65 @@ export default function LandingPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0 items-start">
-              {/* Left Column: Filtered List with Clean Scrollbar */}
-              <div className="lg:col-span-4 space-y-2 w-full min-w-0 max-h-[640px] overflow-y-auto pr-1">
+              {/* Left Column: Filtered List with Clean Scrollbar & Mobile Accordion */}
+              <div className="lg:col-span-4 space-y-2.5 w-full min-w-0 max-h-none lg:max-h-[640px] lg:overflow-y-auto pr-0 lg:pr-1">
                 {PLATFORM_MODULES.filter(m =>
                   moduleFilter === 'ALL' ? true : moduleFilter === 'CORE' ? m.category.includes('Core') : m.category.includes('Frontier')
                 ).map(mod => {
                   const isSelected = activeModule?.id === mod.id;
                   const isCore = mod.category.includes('Core');
                   return (
-                    <button
-                      key={mod.id}
-                      onClick={() => setActiveModule(mod)}
-                      className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
-                        isSelected
-                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
-                          : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
-                      }`}
-                    >
-                      <div className="min-w-0 pr-2">
-                        <div className="text-xs font-semibold truncate flex items-center gap-2">
-                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
-                          <span className="truncate">{mod.name}</span>
+                    <div key={mod.id} className="space-y-2.5">
+                      <button
+                        onClick={() => setActiveModule(mod)}
+                        className={`w-full flex items-center justify-between px-3.5 py-3 rounded-xl border text-left transition-all cursor-pointer min-w-0 group ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_25px_rgba(99,102,241,0.25)]'
+                            : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                        }`}
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="text-xs font-semibold truncate flex items-center gap-2">
+                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
+                            <span className="truncate">{mod.name}</span>
+                          </div>
+                          <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
                         </div>
-                        <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="lg:hidden">
+                            <AccordionChevron isOpen={isSelected} />
+                          </span>
+                          <span className="hidden lg:inline">
+                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                          </span>
+                        </div>
+                      </button>
+
+                      {/* Mobile Inline Expanded Detail Card */}
+                      <div className="lg:hidden">
+                        <AnimatePresence>
+                          {isSelected && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.22, ease: 'easeOut' }}
+                              className="overflow-hidden"
+                            >
+                              <ModuleDetailCard mod={mod} onNavigate={navigate} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                      <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}`} />
-                    </button>
+                    </div>
                   );
                 })}
               </div>
 
-              {/* Right Column: Rich Detailed Card (No Empty Void) */}
-              {activeModule && (() => {
-                const currentExtra = MODULE_SPECS_EXTRA[activeModule.id];
-                return (
-                  <div className="lg:col-span-8 p-5 sm:p-7 rounded-2xl bg-gradient-to-b from-[#090920] to-[#040410] border border-white/10 backdrop-blur-xl space-y-5 w-full min-w-0 shadow-2xl">
-                    {/* Card Header & Action */}
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-white/8 pb-4 min-w-0">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1.5">
-                          <span className="text-[9.5px] font-mono font-bold text-indigo-400 uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
-                            {activeModule.category}
-                          </span>
-                          <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded ${
-                            activeModule.category.includes('Core') 
-                              ? 'text-emerald-400 bg-emerald-500/10 border border-emerald-500/20' 
-                              : 'text-purple-400 bg-purple-500/10 border border-purple-500/20'
-                          }`}>
-                            {currentExtra?.statusBadge ?? 'VERIFIED'}
-                          </span>
-                        </div>
-                        <h3 className="text-lg sm:text-xl font-bold text-slate-100">{activeModule.name}</h3>
-                        <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mt-1 font-sans">{activeModule.purpose}</p>
-                      </div>
-
-                      {currentExtra && (
-                        <button
-                          onClick={() => navigate(currentExtra.actionRoute)}
-                          className="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] transition-all shadow-[0_0_15px_rgba(99,102,241,0.3)] shrink-0 cursor-pointer self-start sm:self-auto"
-                        >
-                          <span>{currentExtra.actionLabel}</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* 4 Core Specification Tiles */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono w-full min-w-0">
-                      {[
-                        { label: 'Algorithm / Optimization', value: activeModule.algorithm, color: 'border-indigo-500/20 bg-indigo-950/15' },
-                        { label: 'Technology Stack & Engine', value: activeModule.tech, color: 'border-cyan-500/20 bg-cyan-950/15' },
-                        { label: 'Input Message / Tensor Contract', value: activeModule.inputs, color: 'border-amber-500/20 bg-amber-950/15' },
-                        { label: 'Output Tensor / Actionable Decision', value: activeModule.outputs, color: 'border-emerald-500/20 bg-emerald-950/15' },
-                      ].map(row => (
-                        <div key={row.label} className={`p-3.5 rounded-xl border ${row.color} min-w-0`}>
-                          <div className="text-slate-400 text-[9px] uppercase font-bold tracking-wider mb-1">{row.label}</div>
-                          <div className="text-slate-200 text-xs break-words leading-relaxed">{row.value}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    {/* Engineering Guarantees & Real-Time SLAs */}
-                    {currentExtra && (
-                      <div className="space-y-3 pt-2">
-                        <div className="text-[10px] font-mono text-slate-400 uppercase tracking-wider font-semibold">
-                          Engineering Invariants & Operational SLA
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
-                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-                            <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
-                            <div className="text-slate-200 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
-                          </div>
-                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-                            <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
-                            <div className="text-indigo-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
-                          </div>
-                          <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-                            <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
-                            <div className="text-emerald-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
-                          </div>
-                        </div>
-
-                        {/* Tensor Transformation & Contract Blueprint */}
-                        <div className="p-3 rounded-xl bg-[#03030c] border border-white/8 font-mono">
-                          <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
-                            <span>Dataflow Transformation Blueprint</span>
-                            <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
-                          </div>
-                          <div className="text-indigo-200 text-[11px] sm:text-xs break-all leading-relaxed bg-black/40 p-2 rounded-lg border border-white/4">
-                            {currentExtra.tensorSample}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
+              {/* Right Column: Rich Detailed Card (Desktop Only) */}
+              <div className="hidden lg:block lg:col-span-8 w-full min-w-0">
+                {activeModule && <ModuleDetailCard mod={activeModule} onNavigate={navigate} />}
+              </div>
             </div>
           </FadeSection>
         </section>
@@ -1533,8 +1643,48 @@ export default function LandingPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 w-full min-w-0">
-              <div className="lg:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-2.5 w-full min-w-0">
+            {/* Mobile Accordion View (< lg) */}
+            <div className="lg:hidden space-y-2.5 w-full min-w-0">
+              {ARCH_NODES.map(node => {
+                const isSelected = activeArchNode?.id === node.id;
+                return (
+                  <div key={node.id} className="space-y-2.5">
+                    <button
+                      onClick={() => setActiveArchNode(node)}
+                      className={`w-full flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
+                        isSelected
+                          ? 'bg-gradient-to-r from-indigo-600/20 via-indigo-600/10 to-transparent border-indigo-500/50 text-slate-100 shadow-[0_0_20px_rgba(99,102,241,0.2)]'
+                          : 'bg-white/2 border-white/6 text-slate-400 hover:text-slate-200 hover:bg-white/5 hover:border-white/12'
+                      }`}
+                    >
+                      <div className="min-w-0 pr-2">
+                        <div className="text-xs font-semibold mb-0.5 truncate">{node.label}</div>
+                        <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                      </div>
+                      <AccordionChevron isOpen={isSelected} />
+                    </button>
+
+                    <AnimatePresence>
+                      {isSelected && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          transition={{ duration: 0.22, ease: 'easeOut' }}
+                          className="overflow-hidden"
+                        >
+                          <ArchNodeDetailCard node={node} />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Desktop Side-by-Side Grid View (>= lg) */}
+            <div className="hidden lg:grid lg:grid-cols-12 gap-8 w-full min-w-0">
+              <div className="lg:col-span-5 grid grid-cols-2 gap-2.5 w-full min-w-0">
                 {ARCH_NODES.map(node => (
                   <button
                     key={node.id}
@@ -1551,31 +1701,9 @@ export default function LandingPage() {
                 ))}
               </div>
 
-              {activeArchNode && (
-                <div className="lg:col-span-7 p-4 sm:p-6 rounded-2xl bg-white/2 border border-white/8 backdrop-blur-xl space-y-4 sm:space-y-5 w-full min-w-0 overflow-hidden">
-                  <div className="border-b border-white/6 pb-3 sm:pb-4 min-w-0">
-                    <span className="text-[9.5px] font-mono text-indigo-400 uppercase tracking-wider">Service Node</span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">{activeArchNode.label}</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed mt-1.5 font-sans">{activeArchNode.description}</p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono w-full min-w-0">
-                    {[
-                      { label: 'Responsibilities', items: activeArchNode.responsibilities, dot: 'text-indigo-400' },
-                      { label: 'Protocols',        items: activeArchNode.protocols,       dot: 'text-purple-400' },
-                      { label: 'Technology',       items: activeArchNode.tech,            dot: 'text-cyan-400' },
-                    ].map(col => (
-                      <div key={col.label} className="min-w-0">
-                        <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
-                        <ul className="space-y-1">
-                          {col.items.map(it => (
-                            <li key={it} className="text-slate-300 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
-                          ))}
-                        </ul>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="lg:col-span-7 w-full min-w-0">
+                {activeArchNode && <ArchNodeDetailCard node={activeArchNode} />}
+              </div>
             </div>
           </FadeSection>
         </section>
