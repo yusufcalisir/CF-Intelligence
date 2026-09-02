@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
@@ -930,6 +930,33 @@ async def root() -> dict:
         "service": app_title,
         "version": "0.2.0",
         "docs": "/docs",
+        "scalar": "/scalar",
         "health": "/health",
         "service_name": service_name or "monolith",
     }
+
+
+@app.get("/scalar", include_in_schema=False, response_class=HTMLResponse)
+async def scalar_api_reference() -> HTMLResponse:
+    """Serve modern dark-themed Scalar API Reference documentation."""
+    html_content = """<!doctype html>
+<html>
+  <head>
+    <title>CF-Intelligence | Interactive Scalar API Reference</title>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body { margin: 0; background-color: #07091e; }
+    </style>
+  </head>
+  <body>
+    <script
+      id="api-reference"
+      data-url="/openapi.json"
+      data-configuration='{"theme":"purple","layout":"modern","darkMode":true,"showSidebar":true}'
+      src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest">
+    </script>
+  </body>
+</html>"""
+    return HTMLResponse(content=html_content)
+
