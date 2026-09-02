@@ -30,11 +30,40 @@ router = APIRouter(prefix="/api/v1/onboarding", tags=["Bank Onboarding"])
 class BankRegisterRequest(BaseModel):
     """Payload to register a new bank node."""
 
-    bank_id: str = Field(..., description="Unique bank node identifier (e.g. bank_alpha)")
-    legal_name: str = Field(..., description="Legal institution name")
-    jurisdiction: str = Field(..., description="ISO 3166-1 alpha-2 country code (e.g. TR, US, DE)")
-    contact_email: str = Field(..., description="Primary security contact email")
-    data_residency_region: str = Field(..., description="Regulatory cloud region (e.g. eu-west-1)")
+    bank_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique bank node identifier (e.g. bank_alpha)",
+    )
+    legal_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=256,
+        description="Legal institution name",
+    )
+    jurisdiction: str = Field(
+        ...,
+        min_length=2,
+        max_length=2,
+        pattern=r"^[A-Z]{2}$",
+        description="ISO 3166-1 alpha-2 country code (e.g. TR, US, DE)",
+    )
+    contact_email: str = Field(
+        ...,
+        min_length=5,
+        max_length=254,
+        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
+        description="Primary security contact email (RFC 5322 format)",
+    )
+    data_residency_region: str = Field(
+        ...,
+        min_length=3,
+        max_length=32,
+        pattern=r"^[a-z0-9\-]+$",
+        description="Regulatory cloud region (e.g. eu-west-1)",
+    )
 
 
 class BankOnboardingBundleResponse(BaseModel):

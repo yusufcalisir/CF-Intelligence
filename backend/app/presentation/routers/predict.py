@@ -577,12 +577,18 @@ async def predict_transaction(
 
 
 class TransactionFeedbackRequest(BaseModel):
-    transaction_id: str
+    transaction_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique transaction identifier",
+    )
     actual_label: int = Field(
         ..., ge=0, le=1, description="Actual outcome (0 for legitimate, 1 for fraud)"
     )
-    simulation_id: str | None = None
-    simulationId: str | None = None  # noqa: N815
+    simulation_id: str | None = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.]*$")
+    simulationId: str | None = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.]*$")  # noqa: N815
 
     @property
     def effective_simulation_id(self) -> str:

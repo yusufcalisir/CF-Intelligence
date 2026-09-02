@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     import numpy as np
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.application.services.data_generator import DataGenerator
 from app.application.services.model_service import ModelService
@@ -116,9 +116,25 @@ _client_state = BankClientState()
 
 
 class BankInitializeRequest(BaseModel):
-    bank_id: str
-    num_transactions: int
-    seed: int | None = 42
+    bank_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique bank node identifier",
+    )
+    num_transactions: int = Field(
+        ...,
+        ge=10,
+        le=1_000_000,
+        description="Number of synthetic transactions to generate [10, 1M]",
+    )
+    seed: int | None = Field(
+        42,
+        ge=0,
+        le=2**32 - 1,
+        description="RNG seed for reproducible data generation",
+    )
 
 
 class ModelWeightsSchema(BaseModel):
@@ -128,17 +144,21 @@ class ModelWeightsSchema(BaseModel):
 
 class BankTrainRequest(BaseModel):
     weights: ModelWeightsSchema
-    learning_rate: float
-    batch_size: int
-    epochs: int
+    learning_rate: float = Field(..., gt=0.0, le=1.0)
+    batch_size: int = Field(..., ge=1, le=8192)
+    epochs: int = Field(..., ge=1, le=200)
     enable_dp: bool
-    dp_epsilon: float
-    dp_delta: float
-    dp_max_grad_norm: float
-    dp_mode: str = "opacus"
-    fedprox_mu: float = 0.0
-    moon_mu: float = 0.0
-    moon_temperature: float = 0.5
+    dp_epsilon: float = Field(..., gt=0.0, le=100.0)
+    dp_delta: float = Field(..., gt=0.0, le=1.0)
+    dp_max_grad_norm: float = Field(..., gt=0.0, le=100.0)
+    dp_mode: str = Field(
+        "opacus",
+        max_length=32,
+        pattern=r"^[a-zA-Z_]+$",
+    )
+    fedprox_mu: float = Field(0.0, ge=0.0, le=10.0)
+    moon_mu: float = Field(0.0, ge=0.0, le=10.0)
+    moon_temperature: float = Field(0.5, gt=0.0, le=10.0)
     prev_local_weights: ModelWeightsSchema | None = None
 
 

@@ -25,17 +25,56 @@ router = APIRouter(prefix="/v1/inference", tags=["Real-Time Inference"])
 class RealtimeInferenceRequest(BaseModel):
     """Schema for online transaction authorization requests."""
 
-    transaction_id: str = Field(..., json_schema_extra={"example": "tx_88992211"})
-    amount: float = Field(..., ge=0.0, json_schema_extra={"example": 1250.50})
-    currency: str = Field("USD", json_schema_extra={"example": "USD"})
-    source_account: str = Field(..., json_schema_extra={"example": "acc_src_991"})
-    target_account: str = Field(..., json_schema_extra={"example": "acc_dst_002"})
-    merchant_category: str = Field(
-        "general_retail", json_schema_extra={"example": "crypto_exchange"}
+    transaction_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        json_schema_extra={"example": "tx_88992211"},
     )
-    velocity_1h: int = Field(1, ge=0, json_schema_extra={"example": 3})
+    amount: float = Field(
+        ...,
+        ge=0.0,
+        le=1_000_000_000.0,
+        json_schema_extra={"example": 1250.50},
+    )
+    currency: str = Field(
+        "USD",
+        min_length=3,
+        max_length=3,
+        pattern=r"^[A-Z]{3}$",
+        json_schema_extra={"example": "USD"},
+    )
+    source_account: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        json_schema_extra={"example": "acc_src_991"},
+    )
+    target_account: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        json_schema_extra={"example": "acc_dst_002"},
+    )
+    merchant_category: str = Field(
+        "general_retail",
+        min_length=2,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        json_schema_extra={"example": "crypto_exchange"},
+    )
+    velocity_1h: int = Field(
+        1,
+        ge=0,
+        le=10_000,
+        json_schema_extra={"example": 3},
+    )
     force_fallback: bool = Field(
-        False, description="Simulate model timeout/failure to test fallback engine."
+        False,
+        description="Simulate model timeout/failure to test fallback engine.",
     )
 
 

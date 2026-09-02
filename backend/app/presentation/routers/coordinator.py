@@ -21,12 +21,43 @@ router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator"])
 
 
 class HandshakeRequest(BaseModel):
-    bank_id: str = Field(..., description="Unique bank tenant ID")
-    pytorch_version: str = Field(..., description="PyTorch installation version")
-    python_version: str = Field(..., description="Python execution runtime version")
-    hardware_type: str = Field(..., description="Available accelerator e.g. cuda or cpu")
-    ram_gb: float = Field(..., description="Installed RAM in gigabytes")
-    device_count: int = Field(default=1, description="Number of available GPUs")
+    bank_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique bank tenant ID",
+    )
+    pytorch_version: str = Field(
+        ...,
+        max_length=32,
+        pattern=r"^[0-9]+\.[0-9]+.*$",
+        description="PyTorch installation version",
+    )
+    python_version: str = Field(
+        ...,
+        max_length=32,
+        pattern=r"^[0-9]+\.[0-9]+.*$",
+        description="Python execution runtime version",
+    )
+    hardware_type: str = Field(
+        ...,
+        max_length=32,
+        pattern=r"^[a-zA-Z0-9_]+$",
+        description="Available accelerator e.g. cuda or cpu",
+    )
+    ram_gb: float = Field(
+        ...,
+        ge=0.5,
+        le=8192.0,
+        description="Installed RAM in gigabytes [0.5, 8192]",
+    )
+    device_count: int = Field(
+        default=1,
+        ge=0,
+        le=64,
+        description="Number of available GPUs [0, 64]",
+    )
 
 
 class HandshakeResponse(BaseModel):
@@ -38,7 +69,12 @@ class HandshakeResponse(BaseModel):
 
 
 class HeartbeatRequest(BaseModel):
-    bank_id: str
+    bank_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+    )
 
 
 class HeartbeatResponse(BaseModel):

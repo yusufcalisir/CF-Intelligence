@@ -2,11 +2,29 @@
 
 Request/response models for alerts, cases, entities, graph,
 scenarios, and intelligence.
+
+Validation invariants:
+  - No string field accepts more than its semantic maximum.
+  - Numeric fields carry explicit ge/le or gt/lt bounds.
+  - Enum-like strings are restricted via Literal or pattern.
+  - Injected control characters are stripped by a root validator.
 """
 
-from typing import Any
+from __future__ import annotations
 
-from pydantic import BaseModel, Field
+import re
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field, field_validator
+
+# ── Shared sentinel regex (strips ASCII control chars) ────────────────────────
+_SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _strip_control(value: str) -> str:
+    """Remove ASCII control characters that have no legitimate use in API text."""
+    return _SAFE_TEXT_RE.sub("", value)
+
 
 # ── Alerts ────────────────────────────────────
 
@@ -58,26 +76,80 @@ class SharedIntelligenceResponse(BaseModel):
 
 # ── Cases ─────────────────────────────────────
 
+_CASE_PRIORITIES = Literal["p1_critical", "p2_high", "p3_medium", "p4_low"]
+_CASE_STATUSES = Literal[
+    "open", "in_review", "escalated", "pending_sar", "closed", "dismissed"
+]
+
 
 class CaseCreateRequest(BaseModel):
-    title: str = Field(..., max_length=256, description="Title of the investigation case")
-    priority: str = Field("p3_medium", max_length=64, description="Priority level of the case")
-    alert_ids: list[str] = Field(default_factory=list, description="Associated alert IDs")
+    title: str = Field(
+        ...,
+        min_length=3,
+        max_length=256,
+        description="Title of the investigation case",
+    )
+    priority: _CASE_PRIORITIES = Field(  # type: ignore[valid-type]
+        "p3_medium",
+        description="Priority level: p1_critical | p2_high | p3_medium | p4_low",
+    )
+    alert_ids: list[str] = Field(
+        default_factory=list,
+        description="Associated alert IDs (max 200)",
+    )
+
+    @field_validator("title")
+    @classmethod
+    def sanitize_title(cls, v: str) -> str:
+        return _strip_control(v)
+
+    @field_validator("alert_ids")
+    @classmethod
+    def limit_alert_ids(cls, v: list[str]) -> list[str]:
+        if len(v) > 200:
+            raise ValueError("alert_ids may not contain more than 200 items")
+        return v
 
 
 class CaseNoteRequest(BaseModel):
-    author: str = Field("analyst", max_length=128, description="Author identifier")
-    content: str = Field(..., max_length=4096, description="Note content text")
+    author: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        description="Author identifier",
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+    content: str = Field(
+        ...,
+        min_length=1,
+        max_length=4096,
+        description="Note content text",
+    )
+
+    @field_validator("content")
+    @classmethod
+    def sanitize_content(cls, v: str) -> str:
+        return _strip_control(v)
 
 
 class CaseStatusRequest(BaseModel):
-    status: str
-    actor: str = "analyst"
-    supervisor_signature: str | None = None
+    status: _CASE_STATUSES  # type: ignore[valid-type]
+    actor: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+    supervisor_signature: str | None = Field(None, max_length=512)
 
 
 class CaseLinkAlertRequest(BaseModel):
-    alert_id: str
+    alert_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+    )
 
 
 class CaseNoteResponse(BaseModel):
@@ -127,6 +199,8 @@ class CaseSummaryResponse(BaseModel):
 
 # ── Entities ──────────────────────────────────
 
+_ENTITY_TYPES = Literal["customer", "merchant", "device", "account", "ip_address"]
+
 
 class EntityResponse(BaseModel):
     id: str
@@ -158,7 +232,13 @@ class EntityProfileResponse(BaseModel):
 
 
 class EntityResolveRequest(BaseModel):
-    privacy_hash: str
+    privacy_hash: str = Field(
+        ...,
+        min_length=16,
+        max_length=128,
+        pattern=r"^[a-fA-F0-9]+$",
+        description="HMAC-SHA256 hex digest of the entity's canonical identifier",
+    )
 
 
 class CrossInstitutionMatchResponse(BaseModel):
@@ -222,8 +302,19 @@ class ScenarioInfoResponse(BaseModel):
 
 
 class ScenarioStartRequest(BaseModel):
-    scenario_type: str
-    speed_multiplier: float = Field(default=1.0, ge=0.1, le=10.0)
+    scenario_type: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Scenario type identifier (e.g. layering_attack, smurfing)",
+    )
+    speed_multiplier: float = Field(
+        default=1.0,
+        ge=0.1,
+        le=10.0,
+        description="Playback speed multiplier [0.1, 10.0]",
+    )
 
 
 class ScenarioStartResponse(BaseModel):
@@ -259,15 +350,32 @@ class RiskWeightsResponse(BaseModel):
 
 
 class RiskWeightsUpdateRequest(BaseModel):
-    ml_prediction: float = 0.25
-    velocity_rules: float = 0.15
-    merchant_reputation: float = 0.10
-    country_risk: float = 0.10
-    device_anomaly: float = 0.08
-    customer_history: float = 0.10
-    previous_alerts: float = 0.08
-    chargeback_history: float = 0.07
-    behavior_anomaly: float = 0.07
+    ml_prediction: float = Field(0.25, ge=0.0, le=1.0)
+    velocity_rules: float = Field(0.15, ge=0.0, le=1.0)
+    merchant_reputation: float = Field(0.10, ge=0.0, le=1.0)
+    country_risk: float = Field(0.10, ge=0.0, le=1.0)
+    device_anomaly: float = Field(0.08, ge=0.0, le=1.0)
+    customer_history: float = Field(0.10, ge=0.0, le=1.0)
+    previous_alerts: float = Field(0.08, ge=0.0, le=1.0)
+    chargeback_history: float = Field(0.07, ge=0.0, le=1.0)
+    behavior_anomaly: float = Field(0.07, ge=0.0, le=1.0)
+
+    @field_validator(
+        "ml_prediction",
+        "velocity_rules",
+        "merchant_reputation",
+        "country_risk",
+        "device_anomaly",
+        "customer_history",
+        "previous_alerts",
+        "chargeback_history",
+        "behavior_anomaly",
+    )
+    @classmethod
+    def weight_precision(cls, v: float) -> float:
+        if not (0.0 <= v <= 1.0):
+            raise ValueError("Risk weight must be in [0.0, 1.0]")
+        return round(v, 6)
 
 
 # ── Investigation Dashboard ──────────────────
@@ -288,11 +396,27 @@ class DashboardStatsResponse(BaseModel):
 
 
 class PSIRequest(BaseModel):
-    bank_a_id: str
-    bank_b_id: str
-    entity_type: str | None = None
+    bank_a_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Source bank node ID",
+    )
+    bank_b_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Target bank node ID",
+    )
+    entity_type: str | None = Field(
+        None,
+        max_length=32,
+        pattern=r"^[a-zA-Z_]+$",
+    )
     enable_fuzzy: bool = False
-    fuzzy_threshold: int = 3
+    fuzzy_threshold: int = Field(3, ge=1, le=10)
 
 
 class PSIMatch(BaseModel):
@@ -327,9 +451,27 @@ class PSIResponse(BaseModel):
 
 
 class EntityFuzzyResolveRequest(BaseModel):
-    query_name: str
-    entity_type: str = "customer"
-    threshold: float = 0.70
+    query_name: str = Field(
+        ...,
+        min_length=2,
+        max_length=256,
+        description="Entity name or alias to fuzzy-match",
+    )
+    entity_type: _ENTITY_TYPES = Field(  # type: ignore[valid-type]
+        "customer",
+        description="Entity type filter",
+    )
+    threshold: float = Field(
+        0.70,
+        ge=0.0,
+        le=1.0,
+        description="Minimum Jaro-Winkler similarity score [0.0, 1.0]",
+    )
+
+    @field_validator("query_name")
+    @classmethod
+    def sanitize_query(cls, v: str) -> str:
+        return _strip_control(v)
 
 
 class EntityFuzzyResolveMatch(BaseModel):
@@ -345,7 +487,12 @@ class EntityFuzzyResolveResponse(BaseModel):
 
 
 class RiskPropagationRequest(BaseModel):
-    decay_factor: float = 0.85
+    decay_factor: float = Field(
+        0.85,
+        ge=0.0,
+        le=1.0,
+        description="PageRank-style decay factor [0.0, 1.0]",
+    )
 
 
 class RiskPropagationResponse(BaseModel):
@@ -372,13 +519,49 @@ class TemporalAnomalyResponse(BaseModel):
 
 # ── Evidence & Audit ──────────────────────────
 
+_EVIDENCE_TYPES = Literal[
+    "document", "kyc_profile", "ledger_proof", "screenshot", "log_excerpt"
+]
+
 
 class EvidenceRequest(BaseModel):
-    evidence_type: str  # "document" | "kyc_profile" | "ledger_proof"
-    title: str
-    file_path: str
-    content: str
-    uploaded_by: str = "analyst"
+    evidence_type: _EVIDENCE_TYPES  # type: ignore[valid-type]
+    title: str = Field(
+        ...,
+        min_length=3,
+        max_length=256,
+        description="Evidence item title",
+    )
+    file_path: str = Field(
+        ...,
+        max_length=512,
+        description="Relative storage path (no traversal sequences)",
+    )
+    content: str = Field(
+        ...,
+        max_length=65536,
+        description="Evidence content or summary text (max 64 KiB)",
+    )
+    uploaded_by: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+
+    @field_validator("file_path")
+    @classmethod
+    def no_path_traversal(cls, v: str) -> str:
+        if ".." in v or v.startswith("/") or "\\" in v:
+            raise ValueError(
+                "file_path must be a relative path without traversal sequences"
+            )
+        return v
+
+    @field_validator("title", "content")
+    @classmethod
+    def sanitize_text(cls, v: str) -> str:
+        return _strip_control(v)
 
 
 class EvidenceResponse(BaseModel):
@@ -403,27 +586,70 @@ class InvestigatorAuditLogResponse(BaseModel):
 
 
 class SessionDurationRequest(BaseModel):
-    investigator: str
-    duration_seconds: float
-    time_window_end: str
+    investigator: str = Field(
+        ...,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+    duration_seconds: float = Field(
+        ...,
+        ge=0.0,
+        le=86400.0,
+        description="Session duration in seconds (max 24 h)",
+    )
+    time_window_end: str = Field(
+        ...,
+        max_length=32,
+        description="ISO 8601 datetime string",
+    )
 
 
 # ── Business Rules (Policy Engine) ────────────
 
+_RULE_ACTIONS = Literal[
+    "BLOCK_TRANSACTION",
+    "FLAG_HIGH_RISK",
+    "REQUIRE_MFA",
+    "ALERT_ANALYST",
+    "ALLOW",
+    "REVIEW",
+]
+
 
 class BusinessRuleCreateRequest(BaseModel):
-    rule_name: str
-    condition: dict = Field(..., description="Condition JSON AST (e.g. {'and': [...]})")
-    action: str = Field(
-        "BLOCK_TRANSACTION", description="Action to trigger (e.g. BLOCK_TRANSACTION)"
+    rule_name: str = Field(
+        ...,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9 _\-]+$",
+        description="Human-readable rule name",
+    )
+    condition: dict = Field(
+        ...,
+        description="Condition JSON AST (e.g. {'and': [...]})",
+    )
+    action: _RULE_ACTIONS = Field(  # type: ignore[valid-type]
+        "BLOCK_TRANSACTION",
+        description="Action to trigger",
     )
     is_active: bool = True
 
+    @field_validator("rule_name")
+    @classmethod
+    def sanitize_rule_name(cls, v: str) -> str:
+        return _strip_control(v)
+
 
 class BusinessRuleUpdateRequest(BaseModel):
-    rule_name: str | None = None
+    rule_name: str | None = Field(
+        None,
+        min_length=3,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9 _\-]+$",
+    )
     condition: dict | None = None
-    action: str | None = None
+    action: _RULE_ACTIONS | None = None  # type: ignore[valid-type]
     is_active: bool | None = None
 
 

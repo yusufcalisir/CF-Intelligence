@@ -13,12 +13,37 @@ router = APIRouter(prefix="/api/v1/settlement", tags=["settlement"])
 
 
 class SettlementTriggerRequest(BaseModel):
-    epoch_id: str
-    contributions: dict[str, float]
+    epoch_id: str = Field(
+        ...,
+        min_length=3,
+        max_length=64,
+        pattern=r"^[a-zA-Z0-9_\-]+$",
+        description="Unique epoch identifier",
+    )
+    contributions: dict[str, float] = Field(
+        ...,
+        description="Bank ID to contribution score mapping",
+    )
     quarantine_statuses: dict[str, bool] = Field(default_factory=dict)
-    audit_proof_hash: str
-    total_pool_usd: float = 100000.0
-    currency: str = "wCBDC"
+    audit_proof_hash: str = Field(
+        ...,
+        min_length=16,
+        max_length=128,
+        pattern=r"^[a-fA-F0-9]+$",
+        description="Keccak-256 hex audit proof hash",
+    )
+    total_pool_usd: float = Field(
+        100000.0,
+        ge=0.0,
+        le=1_000_000_000.0,
+        description="Total USD pool amount [0, 1B]",
+    )
+    currency: str = Field(
+        "wCBDC",
+        max_length=16,
+        pattern=r"^[a-zA-Z0-9]+$",
+        description="Currency code (e.g. wCBDC, USDC)",
+    )
 
 
 @router.get("/contract-info")
@@ -54,15 +79,32 @@ async def trigger_settlement(payload: SettlementTriggerRequest) -> dict[str, Any
 
 
 class MultiSigProposeRequest(BaseModel):
-    proposer_wallet: str
-    action_type: str
-    epoch_id: int
+    proposer_wallet: str = Field(
+        ...,
+        min_length=10,
+        max_length=64,
+        pattern=r"^0x[a-fA-F0-9]{40}$",
+        description="EIP-55 checksummed Ethereum wallet address (0x + 40 hex chars)",
+    )
+    action_type: str = Field(
+        ...,
+        max_length=64,
+        pattern=r"^[A-Z_]+$",
+        description="Action type enum string e.g. QUARANTINE_BANK",
+    )
+    epoch_id: int = Field(..., ge=0, le=1_000_000)
     payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class MultiSigConfirmRequest(BaseModel):
-    tx_id: int
-    owner_wallet: str
+    tx_id: int = Field(..., ge=0, le=1_000_000)
+    owner_wallet: str = Field(
+        ...,
+        min_length=10,
+        max_length=64,
+        pattern=r"^0x[a-fA-F0-9]{40}$",
+        description="EIP-55 checksummed Ethereum wallet address",
+    )
 
 
 @router.get("/multisig/proposals")
