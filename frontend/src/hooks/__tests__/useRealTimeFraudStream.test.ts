@@ -58,12 +58,14 @@ describe('useLiveAlertStore Unit Tests', () => {
     const state = useLiveAlertStore.getState();
     expect(state.totalStreamedTransactions).toBe(101);
     expect(state.activeAlertToasts.length).toBe(1);
-    expect(state.activeAlertToasts[0].risk_score).toBe(942);
-    expect(state.activeAlertToasts[0].severity).toBe('critical');
+    const firstToast = state.activeAlertToasts[0]!;
+    expect(firstToast.risk_score).toBe(942);
+    expect(firstToast.severity).toBe('critical');
 
     // Dismiss toast
-    const toastId = state.activeAlertToasts[0].id;
+    const toastId = firstToast.id;
     store.dismissToast(toastId);
     expect(useLiveAlertStore.getState().activeAlertToasts.length).toBe(0);
+
   });
 });

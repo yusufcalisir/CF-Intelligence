@@ -56,8 +56,8 @@ export function useRealTimeFraudStream() {
 
       mockIntervalRef.current = setInterval(() => {
         if (!isMounted) return;
-        const item = typologies[Math.floor(Math.random() * typologies.length)];
-        const bank = banks[Math.floor(Math.random() * banks.length)];
+        const item = typologies[Math.floor(Math.random() * typologies.length)] ?? typologies[0]!;
+        const bank = banks[Math.floor(Math.random() * banks.length)] ?? 'bank_alpha';
         const txn: LiveStreamTransaction = {
           transaction_id: `txn_${Math.floor(Date.now() % 1000000).toString().padStart(6, '0')}`,
           bank_id: bank,
@@ -71,6 +71,7 @@ export function useRealTimeFraudStream() {
         };
         pushStreamEvent(txn);
       }, 5000);
+
     }
 
     function connect() {

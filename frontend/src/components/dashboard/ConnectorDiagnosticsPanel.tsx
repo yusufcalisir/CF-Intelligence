@@ -159,7 +159,13 @@ export default function ConnectorDiagnosticsPanel() {
       setActiveProbeResult(result);
     } catch {
       // Fallback probe simulation for local testing
-      const target = connectors.find((c) => c.connector_id === connectorId) || connectors[0];
+      const target = connectors.find((c) => c.connector_id === connectorId) || connectors[0] || {
+        connector_id: connectorId,
+        name: connectorId,
+        latency_ms: 12.4,
+        protocol: 'TCP/TLS',
+        endpoint: 'cluster.internal',
+      };
       setActiveProbeResult({
         connector_id: connectorId,
         name: target.name,
@@ -177,6 +183,7 @@ export default function ConnectorDiagnosticsPanel() {
     } finally {
       setProbingConnectorId(null);
     }
+
   };
 
   return (

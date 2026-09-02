@@ -82,9 +82,11 @@ describe('ConnectorDiagnosticsPanel Component Tests', () => {
     const testButtons = screen.getAllByRole('button', { name: /Test Connection Ping/i });
     expect(testButtons.length).toBeGreaterThan(0);
 
-    fireEvent.click(testButtons[0]);
+    const firstButton = testButtons[0] as HTMLElement;
+    fireEvent.click(firstButton);
 
     await waitFor(() => {
+
       expect(screen.getByText(/Handshake Execution Trace/i)).toBeInTheDocument();
       expect(screen.getByText(/SASL_SSL Handshake completed/i)).toBeInTheDocument();
     });

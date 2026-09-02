@@ -7,16 +7,11 @@ import {
   Play,
   Download,
   ExternalLink,
-  Shield,
-  Zap,
   Lock,
-  Layers,
-  FileText,
-  Server,
-  Radio,
   RefreshCw,
   Terminal,
 } from 'lucide-react';
+
 import { apiClient } from '../api/client';
 
 interface ApiEndpointSpec {
@@ -401,8 +396,9 @@ func main() {
 }
 
 export default function ApiDocsPage() {
-  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpointSpec>(API_ENDPOINTS[0]);
+  const [selectedEndpoint, setSelectedEndpoint] = useState<ApiEndpointSpec>(API_ENDPOINTS[0]!);
   const [selectedLang, setSelectedLang] = useState<SupportedLanguage>('curl');
+
   const [copiedCode, setCopiedCode] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionResult, setExecutionResult] = useState<{
