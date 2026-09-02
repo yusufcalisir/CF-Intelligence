@@ -939,6 +939,8 @@ async def root() -> dict:
 @app.get("/scalar", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_api_reference() -> HTMLResponse:
     """Serve modern dark-themed Scalar API Reference documentation."""
+    from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
+
     html_content = """<!doctype html>
 <html>
   <head>
@@ -958,5 +960,9 @@ async def scalar_api_reference() -> HTMLResponse:
     </script>
   </body>
 </html>"""
-    return HTMLResponse(content=html_content)
+    return HTMLResponse(
+        content=html_content,
+        headers={"Content-Security-Policy": _DOCS_CSP_DIRECTIVES},
+    )
+
 
