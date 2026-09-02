@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
+from app.infrastructure.security.security_headers import SecurityHeadersMiddleware
 from app.presentation.routers import (
     alerts,
     bank_client,
@@ -521,6 +522,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── HTTP Security Headers ─────────────────────────────────────────────────────
+# Injected on every response: CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy.
+# NOTE: Starlette executes middleware in LIFO order (last added = outermost).
+# SecurityHeadersMiddleware is added AFTER CORSMiddleware so CORS headers are
+# set first and security headers wrap the final outbound response.
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 
