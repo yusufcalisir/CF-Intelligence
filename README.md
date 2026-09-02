@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1515%2F1515_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1388%2F1388_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)**
@@ -508,7 +508,7 @@ CF-Intelligence/
 │   │   ├── utils/                                   # Cryptographic helpers, number formatters & mutant killers
 │   │   └── e2e/                                     # Playwright end-to-end browser user workflow specs
 │   │
-│   └── tests/                                       # Vitest & React Testing Library Suite (387+ Tests)
+│   └── tests/                                       # Vitest & React Testing Library Suite (236 Tests)
 │
 ├── sdk/                                             # Official Consortium Client SDK
 │   └── python/                                      # Python 3.10+ Integration SDK (`cfi-connector-sdk`)
@@ -852,7 +852,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.02 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Self-Verified (Internal Test Suite)` |
 | **Multi-Tenant Memory/DB Isolation**| **0 Leaks / 100% Isolated** | Isolated State | `test_multi_tenant_security_audit.py` | `Self-Verified (Internal Test Suite)` |
-| **Full Test Suite Pass Rate** | **1,498 / 1,498 passing** | 100% | 1,111 Backend Pytest + 387 Frontend Vitest | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,388 / 1,388 passing** | 100% | 1,128 Backend Pytest + 236 Frontend Vitest + 24 SDK/Contract Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -953,32 +953,83 @@ The reports below document the internal scientific verification suites validatin
 
 ### 19.1 Real-Time Transaction Risk Scoring
 
-**Request (`POST /v1/inference/score`):**
+**Normalized Transaction Scoring Request (`POST /api/v1/score-transaction`):**
 ```json
 {
   "transaction_id": "txn_88492049281",
-  "source_bank_id": "bank_alpha",
+  "account_id": "DE89370400440532013000",
   "amount": 250000.0,
   "currency": "EUR",
-  "sender_account": "DE89370400440532013000",
-  "receiver_account": "GB29NWBK60161331926819",
-  "merchant_category": "crypto_exchange",
-  "device_fingerprint": "dev_fp_993810a"
+  "merchant_id": "crypto_exchange_01",
+  "country": "US",
+  "device_id": "dev_fp_993810a"
 }
 ```
 
-**Response (HTTP 200 OK):**
+**Normalized Transaction Scoring Response (HTTP 200 OK):**
 ```json
 {
-  "transaction_id": "txn_88492049281",
-  "composite_risk_score": 895.4,
+  "risk_score": 895,
+  "risk_level": "HIGH",
   "decision": "BLOCK",
-  "confidence": 0.984,
-  "top_risk_signals": [
-    {"signal_name": "S_velocity", "score": 980.0, "weight": 0.20},
-    {"signal_name": "S_graph", "score": 920.0, "weight": 0.15}
+  "model_version": "v2.4.1",
+  "explanations": [
+    {"feature": "velocity", "contribution": 0.38},
+    {"feature": "transaction_amount", "contribution": 0.29},
+    {"feature": "merchant_risk_score", "contribution": 0.18}
+  ],
+  "related_entities": [
+    {"entity_type": "merchant", "risk": "HIGH"}
   ],
   "latency_ms": 14.2
+}
+```
+
+**Full-Feature Inference Request (`POST /api/v1/predict`):**
+```json
+{
+  "transaction_amount": 250000.0,
+  "merchant_category": "crypto",
+  "country_code": "US",
+  "device_type": "web_browser",
+  "velocity": 12.5,
+  "hour_of_day": 3,
+  "merchant_risk_score": 0.85,
+  "customer_history_score": 0.12,
+  "chargeback_count": 4,
+  "account_age_days": 14,
+  "bank_id": "bank_alpha"
+}
+```
+
+**Full-Feature Inference Response (HTTP 200 OK):**
+```json
+{
+  "fraud_probability": 0.942,
+  "risk_score": 895.4,
+  "is_fraud_suspected": true,
+  "risk_level": "CRITICAL",
+  "policy_action": "BLOCK",
+  "triggered_rules": [
+    "HIGH_VELOCITY_SUSPICIOUS_MERCHANT",
+    "NEW_ACCOUNT_HIGH_VALUE_CRYPTO"
+  ],
+  "breakdown": [
+    {
+      "signal_name": "S_velocity",
+      "weight": 0.20,
+      "raw_value": 12.5,
+      "normalized_score": 980.0,
+      "explanation": "High velocity transfer burst within 1 hour"
+    },
+    {
+      "signal_name": "S_graph",
+      "weight": 0.15,
+      "raw_value": 0.88,
+      "normalized_score": 920.0,
+      "explanation": "GraphSAGE embedding anomaly detected across entity cluster"
+    }
+  ]
 }
 ```
 
@@ -1119,13 +1170,13 @@ Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench
 
 ### Step 5: Master Test Suites Execution
 ```bash
-# Run full backend pytest suite (1,105+ tests)
+# Run full backend pytest suite (1,128 tests)
 pytest backend/tests/ -v
 
-# Run master scientific invariant verification suite (17 modules)
+# Run master scientific invariant verification suite (18 modules)
 python scripts/run_all_verifications.py
 
-# Run full frontend vitest suite (387+ tests)
+# Run full frontend vitest suite (236 tests)
 npm --prefix frontend test
 ```
 
