@@ -454,3 +454,95 @@ Implement a hybrid two-stage inference ensemble:
 ### Tradeoff
 
 * Graph construction requires maintaining an in-memory or graph database (Neo4j / NetworkX) edge index. Real-time inference latency is kept strictly below $15\text{ms}$ by bounding subgraph sampling to $k=2$ hops and caching node embeddings in Redis.
+
+---
+
+## ED-019: Enterprise Authentication & Brute-Force Lockout Defense
+
+**Date**: 2026-09-01  
+**Status**: Accepted
+
+### Context
+
+Financial API gateways are prime targets for credential stuffing, password spraying, and dictionary attacks. Permissive authentication models (long-lived stateless JWTs without refresh rotation or lockout mechanics) expose institutions to credential replay and brute-force account compromises.
+
+### Decision
+
+Implement a multi-tier authentication defense suite (`auth_service.py`, `password_hasher.py`):
+1. **Adaptive Bcrypt Password Hashing**: Enforce `bcrypt` with work factor `cost=12` (4,096 rounds) and per-password cryptographic salts. Disallow plaintext, MD5, or unsalted SHA digests.
+2. **Short-Lived Access Tokens (15 Minutes)**: Issue JWT access tokens with an enforced 900-second lifespan signed via HMAC-SHA256 (RFC 7518).
+3. **Single-Use Refresh Token Rotation**: Refresh tokens (7-day validity) are single-use. Exchanging a refresh token via `POST /api/v1/auth/refresh` immediately invalidates the previous refresh token and issues a new pair, detecting and mitigating replay attacks.
+4. **Brute-Force Account & IP Lockout**: Track consecutive authentication failures across username and client IP sliding windows. After **5 failed attempts**, the user and IP are temporarily locked out for **15 minutes (900 seconds)**, returning HTTP `429 Too Many Requests` with `Retry-After: 900`.
+
+### Tradeoff
+
+* Stateful tracking of failed attempts and refresh token revocation requires memory or Redis lookup on authentication endpoints.
+* Bcrypt work factor `cost=12` introduces ~80-120ms CPU computation per login attempt, which naturally rate-limits brute force attempts while remaining imperceptible to interactive users.
+
+---
+
+## ED-020: Production Error Sanitization & Sentry Tracing (RFC 7807)
+
+**Date**: 2026-09-01  
+**Status**: Accepted
+
+### Context
+
+Default unhandled exception handlers in modern web frameworks often return stack traces, internal filesystem paths (`C:\Users\...`, `/var/app/...`), database schema column names, or raw SQL queries to API clients. In banking environments, this information disclosure aids attackers in mapping backend internals.
+
+### Decision
+
+Implement global production error sanitization middleware (`error_handler.py`):
+1. **Zero Information Leakage in Production**: When `app_env="production"` or `app_debug=False`, all unhandled 500 exceptions are stripped of traceback details and replaced with a uniform generic error message (`"Something went wrong. An unexpected internal error occurred."`).
+2. **RFC 7807 Problem Details**: Responses adhere to standard Problem Details for HTTP APIs (`type`, `title`, `status`, `detail`, `instance`, `incident_id`).
+3. **Trace Correlation & Sentry Integration**: Each exception generates a unique incident ID (`inc_<timestamp>_<uuid>`) returned in both response body and `X-Incident-ID` header. Full diagnostics and tracebacks are logged strictly server-side and dispatched to Sentry with attached incident context.
+
+### Tradeoff
+
+* Debugging in production requires cross-referencing the client's `incident_id` in server logs or Sentry rather than reading error bodies directly from HTTP responses.
+
+---
+
+## ED-021: Strict Perimeter Security (Zero Wildcard CORS & Header Hardening)
+
+**Date**: 2026-09-01  
+**Status**: Accepted
+
+### Context
+
+Allowing wildcard CORS (`allow_origins=["*"]`) in banking APIs enables cross-origin browser requests from arbitrary third-party web pages, violating financial isolation boundaries. Similarly, missing HTTP security headers leaves the web console vulnerable to clickjacking, MIME-sniffing, and protocol downgrade attacks.
+
+### Decision
+
+1. **Zero Wildcard CORS**: Restrict `allow_origins` to explicitly enumerated production domains (`https://cf-intelligence.vercel.app`, `https://cfi-platform.vercel.app`), local development ports, and authenticated Vercel preview deployment regex patterns. Wildcard `*` is strictly rejected at application startup.
+2. **HTTP Security Headers Injection (`security_headers.py`)**: Outbound HTTP responses automatically enforce:
+   * `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+   * `X-Content-Type-Options: nosniff`
+   * `X-Frame-Options: DENY`
+   * `Content-Security-Policy: default-src 'self' ...`
+   * `Referrer-Policy: strict-origin-when-cross-origin`
+
+### Tradeoff
+
+* Cross-origin requests from newly added staging domains require explicit whitelist configuration in environment variables (`CORS_ALLOWED_ORIGINS`).
+
+---
+
+## ED-022: Sub-100ms Inference SLA Verification via Concurrent Load Harness
+
+**Date**: 2026-09-02  
+**Status**: Accepted
+
+### Context
+
+High-throughput payment switches mandate sub-100ms p99 inference SLAs. Relying solely on isolated single-request unit test assertions fails to capture real-world concurrency bottlenecks, thread pool contention, database migration lock contention, and garbage collection pauses.
+
+### Decision
+
+1. **In-Memory Model Caching & Synchronous Thread Execution**: Cache PyTorch model instances in memory (`predict.py`), perform CPU forward passes synchronously without spawning unnecessary threadpool hops, and offload non-critical telemetry/alert persistence to FastAPI `BackgroundTasks`.
+2. **Database Single-Flight Lock**: Introduce a single-flight mutex lock during tenant SQLite database initialization (`backend/app/infrastructure/database/__init__.py`), preventing concurrent migration lock collisions under multi-tenant load.
+3. **Automated Concurrent Load Testing (`scripts/run_load_test.py`, `scripts/locustfile.py`)**: Codify a 1,000-request multi-tenant concurrent load testing runner measuring p50, p90, p95, and p99 percentiles under sustained payment streams.
+
+### Tradeoff
+
+* In-memory model caching requires explicit invalidation hooks (`_cached_serving_model = None`) whenever a new model checkpoint is promoted by the canary gate.

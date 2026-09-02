@@ -6,39 +6,100 @@ The Real-Time Fraud Scoring Gateway provides online transaction authorization fo
 
 ## 📌 Endpoint Overview
 
-- **Endpoint**: `POST /v1/inference/score`
+The scoring gateway exposes three production REST endpoints configured under `/api/v1`:
+
+1. **`POST /api/v1/score-transaction`**: Standard core banking transaction scoring endpoint with normalized transaction payload, entity resolution, and feature attributions.
+2. **`POST /api/v1/predict`**: Full-feature vector inference endpoint returning detailed multi-signal composite risk breakdowns and rule engine triggers.
+3. **`POST /api/v1/realtime-inference/score`**: Ultra-low-latency streaming scoring endpoint backed by TorchScript JIT caching and automatic heuristic fallback.
+
 - **Content-Type**: `application/json`
-- **SLA**: $<100\text{ms}$ ($p95$) latency guarantee backed by automatic heuristic fallback.
+- **SLA**: $<100\text{ms}$ ($p99$) latency guarantee backed by automatic heuristic fallback.
 
 ---
 
-## 📥 Request Body Schema
+## 📥 Request & Response Schemas
 
+### 1. Normalized Transaction Scoring (`POST /api/v1/score-transaction`)
+
+**Request Payload:**
 ```json
 {
   "transaction_id": "tx_88992211",
+  "account_id": "acc_src_991",
   "amount": 1250.50,
-  "currency": "USD",
-  "source_account": "acc_src_991",
-  "target_account": "acc_dst_002",
-  "merchant_category": "crypto_exchange",
-  "velocity_1h": 3,
-  "force_fallback": false
+  "currency": "EUR",
+  "merchant_id": "crypto_exchange_01",
+  "country": "US",
+  "device_id": "dev_fp_993810a"
 }
 ```
 
----
-
-## 📤 Response Schema
-
+**Response Payload (HTTP 200 OK):**
 ```json
 {
-  "transaction_id": "tx_88992211",
-  "risk_score": 0.40,
-  "decision": "REVIEW",
-  "latency_ms": 4.12,
-  "evaluated_by": "ML_MODEL",
-  "explanation": "ML Model: High-risk merchant"
+  "risk_score": 895,
+  "risk_level": "HIGH",
+  "decision": "BLOCK",
+  "model_version": "v2.4.1",
+  "explanations": [
+    {"feature": "velocity", "contribution": 0.38},
+    {"feature": "transaction_amount", "contribution": 0.29},
+    {"feature": "merchant_risk_score", "contribution": 0.18}
+  ],
+  "related_entities": [
+    {"entity_type": "merchant", "risk": "HIGH"}
+  ],
+  "latency_ms": 14.2
+}
+```
+
+### 2. Full-Feature Composite Inference (`POST /api/v1/predict`)
+
+**Request Payload:**
+```json
+{
+  "transaction_amount": 250000.0,
+  "merchant_category": "crypto",
+  "country_code": "US",
+  "device_type": "web_browser",
+  "velocity": 12.5,
+  "hour_of_day": 3,
+  "merchant_risk_score": 0.85,
+  "customer_history_score": 0.12,
+  "chargeback_count": 4,
+  "account_age_days": 14,
+  "bank_id": "bank_alpha"
+}
+```
+
+**Response Payload (HTTP 200 OK):**
+```json
+{
+  "fraud_probability": 0.942,
+  "risk_score": 895.4,
+  "is_fraud_suspected": true,
+  "risk_level": "CRITICAL",
+  "policy_action": "BLOCK",
+  "triggered_rules": [
+    "HIGH_VELOCITY_SUSPICIOUS_MERCHANT",
+    "NEW_ACCOUNT_HIGH_VALUE_CRYPTO"
+  ],
+  "breakdown": [
+    {
+      "signal_name": "S_velocity",
+      "weight": 0.20,
+      "raw_value": 12.5,
+      "normalized_score": 980.0,
+      "explanation": "High velocity transfer burst within 1 hour"
+    },
+    {
+      "signal_name": "S_graph",
+      "weight": 0.15,
+      "raw_value": 0.88,
+      "normalized_score": 920.0,
+      "explanation": "GraphSAGE embedding anomaly detected across entity cluster"
+    }
+  ]
 }
 ```
 
@@ -48,9 +109,9 @@ The Real-Time Fraud Scoring Gateway provides online transaction authorization fo
 
 | Decision | Risk Score Range | Action Executed |
 | :--- | :--- | :--- |
-| **`ALLOW`** | $0.00 \le \text{Score} < 0.35$ | Transaction authorized immediately. |
-| **`REVIEW`** | $0.35 \le \text{Score} < 0.70$ | Transaction held for analyst investigation. |
-| **`BLOCK`** | $0.70 \le \text{Score} \le 1.00$ | Transaction rejected immediately. |
+| **`ALLOW`** | $0 \le \text{Score} < 300$ | Transaction authorized immediately. |
+| **`REVIEW`** | $300 \le \text{Score} < 700$ | Transaction flagged for Four-Eyes analyst investigation. |
+| **`BLOCK`** | $700 \le \text{Score} \le 1000$ | Transaction rejected immediately and alert dispatched. |
 
 ---
 

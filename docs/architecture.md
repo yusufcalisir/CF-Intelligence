@@ -49,10 +49,13 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `services/federated_unlearning_engine.py`: Confidential federated unlearning engine performing First-Order Hessian Inversion and Sub-sampled Newton Steps parameter erasure for revoked banks.
 *   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, and Canary Gates.
 
-### 2.3 Infrastructure Layer (`backend/app/infrastructure/`)
-Concrete implementation of dependencies. Adapts foreign libraries and databases.
-
-*   `database.py` & `models.py`: SQLAlchemy 2.0 async engine and relational database tables.
+*   `security/auth_service.py`: Enterprise authentication service issuing 15-minute short-lived JWT access tokens, single-use refresh token rotation, and 5-fail brute force lockout protection.
+*   `security/password_hasher.py`: Bcrypt password hashing engine (`cost=12`, 4,096 rounds) with per-password cryptographic salts.
+*   `security/error_handler.py`: Global production error sanitization middleware (RFC 7807 problem details, zero stack trace leakage, unique incident ID correlation, and Sentry telemetry hook).
+*   `security/security_headers.py`: Comprehensive HTTP security headers (CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff) and strict CORS whitelist enforcement.
+*   `feature_store/`: Low-latency online feature store (`redis_store.py`, `feast_store.py`) and rolling velocity/amount aggregators (<5ms retrieval).
+*   `disaster_recovery/`: Multi-region active-passive failover manager (`region_failover.py`, RTO < 30s, RPO = 0) and automated cryptographic backup verifier.
+*   `database/` & `models.py`: SQLAlchemy 2.0 async engine and relational database tables with PostgreSQL schema and SQLite tenant isolation.
 *   `redis_store.py`: A fault-tolerant state manager. It synchronizes simulation configurations and round metrics to Redis. If Redis is unreachable, it falls back to a thread-safe, in-memory cache to maintain liveness.
 *   `security/p2p_secagg_driver.py` & `shamir_engine.py`: Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 *   `security/pqc_secagg_driver.py`: NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
@@ -76,8 +79,8 @@ Concrete implementation of dependencies. Adapts foreign libraries and databases.
 
 ### 2.4 Presentation Layer (`backend/app/presentation/`)
 Interactions with clients.
-*   `main.py`: Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception) and `DDoSProtectionMiddleware` (sliding-window rate limiting with bounded memory pruning).
-*   `routers/*.py`: FastAPI REST API endpoints verifying request formats via Pydantic schemas, enforcing `@limiter.limit(...)` and `enforce_tenant_isolation(...)`.
+*   `main.py`: Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware`, `SecurityHeadersMiddleware`, and `ProductionErrorHandler`.
+*   `routers/*.py`: 31 modular FastAPI REST API endpoints verifying request formats via Pydantic schemas, enforcing `@limiter.limit(...)` and `enforce_tenant_isolation(...)`.
 *   `websockets/*.py`: Persistent WebSocket connections sending training round progress and scenario replay events.
 
 

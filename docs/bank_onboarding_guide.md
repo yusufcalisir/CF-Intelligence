@@ -8,7 +8,7 @@ This guide details the end-to-end process for onboarding a new financial institu
 
 Before initiating node registration, the institution's IT/Security team must verify:
 - **Outbound Network Access:** Outbound TCP port `50051` (gRPC mTLS) open to `coordinator.cf-intelligence.io`.
-- **Admin Access:** API key or administrative credentials to issue onboarding calls to `/v1/admin/banks/register`.
+- **Admin Access:** API key or administrative credentials to issue onboarding calls to `/api/v1/onboarding/register`.
 - **System Requirements:** Python 3.12+, Docker/Kubernetes container runtime, and at least 4 GB RAM / 2 vCPUs for local training.
 
 ---
@@ -46,7 +46,7 @@ iptables -A OUTPUT -p tcp --dport 50051 -j DROP
 Issue a registration request to the central coordinator admin endpoint:
 
 ```bash
-curl -X POST https://api.cf-intelligence.io/v1/admin/banks/register \
+curl -X POST https://api.cf-intelligence.io/api/v1/onboarding/register \
   -H "Content-Type: application/json" \
   -d '{
     "bank_id": "bank_alpha",
