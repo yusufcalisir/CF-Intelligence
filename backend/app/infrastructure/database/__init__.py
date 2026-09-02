@@ -223,11 +223,15 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     factory = get_session_factory(tenant)
     async with factory() as session:
         if tenant and settings.database_type != "sqlite":
-            from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+            from app.infrastructure.database.tenant_provisioner import (
+                _pg_quote_identifier,
+                sanitize_bank_id,
+            )
 
             try:
                 clean_id = sanitize_bank_id(tenant)
-                await session.execute(text(f"SET search_path TO tenant_{clean_id}, public"))
+                q_schema = _pg_quote_identifier(f"tenant_{clean_id}")
+                await session.execute(text(f"SET search_path TO {q_schema}, public"))
             except Exception as exc:
                 logger.warning("Could not set search_path for tenant_%s: %s", tenant, exc)
         try:
@@ -246,8 +250,11 @@ async def get_tenant_session(bank_id: str) -> AsyncGenerator[AsyncSession, None]
 
     async with factory() as session:
         if settings.database_type != "sqlite":
+            from app.infrastructure.database.tenant_provisioner import _pg_quote_identifier
+
             try:
-                await session.execute(text(f"SET search_path TO tenant_{clean_bank_id}, public"))
+                q_schema = _pg_quote_identifier(f"tenant_{clean_bank_id}")
+                await session.execute(text(f"SET search_path TO {q_schema}, public"))
             except Exception as exc:
                 logger.warning("Could not set search_path for tenant_%s: %s", clean_bank_id, exc)
         try:

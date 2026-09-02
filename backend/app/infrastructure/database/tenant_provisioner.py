@@ -26,20 +26,86 @@ logger = logging.getLogger(__name__)
 global_tenant_registry = TenantRegistry()
 
 
+
+# PostgreSQL reserved words that must never appear as schema/role identifiers.
+# This list is not exhaustive but covers the most dangerous ones.
+_PG_RESERVED_KEYWORDS: frozenset[str] = frozenset(
+    {
+        "all", "analyse", "analyze", "and", "any", "array", "as", "asc",
+        "asymmetric", "both", "case", "cast", "check", "collate", "column",
+        "constraint", "create", "cross", "current_catalog", "current_date",
+        "current_role", "current_schema", "current_time", "current_timestamp",
+        "current_user", "default", "deferrable", "desc", "distinct", "do",
+        "drop", "else", "end", "except", "false", "fetch", "for", "foreign",
+        "from", "grant", "group", "having", "in", "initially", "inner",
+        "intersect", "into", "lateral", "leading", "limit", "localtime",
+        "localtimestamp", "not", "null", "offset", "on", "only", "or",
+        "order", "placing", "primary", "references", "returning", "right",
+        "schema", "select", "session_user", "some", "symmetric", "table",
+        "then", "to", "trailing", "true", "union", "unique", "user", "using",
+        "variadic", "verbose", "when", "where", "window", "with",
+        # Extra SQL injection keywords not in the PG reserved list above
+        "delete", "insert", "update", "exec", "execute", "xp_",
+    }
+)
+
+# Maximum length for a PostgreSQL identifier (NAMEDATALEN - 1)
+_PG_MAX_IDENTIFIER_LEN: int = 63
+
+
 def sanitize_bank_id(bank_id: str) -> str:
     """Sanitize bank_id to prevent SQL injection in schema/role DDL statements.
 
-    Must contain only lowercase alphanumeric characters and underscores.
+    Enforces:
+      - Non-empty string
+      - Maximum length of 48 chars (leaves room for the ``tenant_`` prefix +
+        ``_role`` suffix to stay within PostgreSQL's 63-char NAMEDATALEN limit)
+      - Lowercase alphanumeric characters and underscores only (``^[a-z0-9_]+$``)
+      - Must not start with a digit (PostgreSQL identifier rule)
+      - Must not be a PostgreSQL reserved keyword
     """
     if not bank_id or not isinstance(bank_id, str):
         raise ValueError("Invalid bank_id: must be a non-empty string.")
 
     clean_id = bank_id.lower().strip()
+
+    if len(clean_id) > 48:
+        raise ValueError(
+            f"bank_id '{bank_id}' exceeds 48-character maximum (PostgreSQL identifier limit)."
+        )
+
     if not re.match(r"^[a-z0-9_]+$", clean_id):
         raise ValueError(
-            f"Invalid bank_id format '{bank_id}' for schema name. Must contain only alphanumeric characters and underscores."
+            f"Invalid bank_id format '{bank_id}' for schema name. "
+            "Must contain only lowercase alphanumeric characters and underscores."
         )
+
+    if clean_id[0].isdigit():
+        raise ValueError(
+            f"bank_id '{bank_id}' must not start with a digit (PostgreSQL identifier rule)."
+        )
+
+    if clean_id in _PG_RESERVED_KEYWORDS:
+        raise ValueError(
+            f"bank_id '{bank_id}' is a reserved PostgreSQL keyword and cannot be used as an identifier."
+        )
+
     return clean_id
+
+
+def _pg_quote_identifier(identifier: str) -> str:
+    """Return a safely double-quoted PostgreSQL identifier.
+
+    Double-quoting is the PostgreSQL-standard defence for DDL identifiers
+    that cannot be passed as bind parameters (CREATE SCHEMA, GRANT, SET).
+    Any embedded double-quote characters are escaped by doubling them.
+
+    The input MUST already have been validated by ``sanitize_bank_id`` — this
+    function is a belt-and-suspenders measure, not a primary sanitizer.
+    """
+    # Escape any embedded double-quotes (shouldn't exist after sanitize, but be safe)
+    escaped = identifier.replace('"', '""')
+    return f'"{escaped}"'
 
 
 class TenantProvisioner:
@@ -64,10 +130,13 @@ class TenantProvisioner:
         if settings.database_type != "sqlite":
             try:
                 async with engine.begin() as conn:
-                    # 1. CREATE SCHEMA
-                    await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {schema_name}"))
+                    q_schema = _pg_quote_identifier(schema_name)
+                    q_role = _pg_quote_identifier(role_name)
 
-                    # 2. CREATE ROLE if not exists
+                    # 1. CREATE SCHEMA
+                    await conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS {q_schema}"))
+
+                    # 2. CREATE ROLE if not exists (password is a bind parameter — never interpolated)
                     res = await conn.execute(
                         text("SELECT 1 FROM pg_roles WHERE rolname = :role_name"),
                         {"role_name": role_name},
@@ -75,30 +144,35 @@ class TenantProvisioner:
                     if not res.scalar():
                         await conn.execute(
                             text(
-                                f"CREATE ROLE {role_name} WITH NOINHERIT LOGIN PASSWORD :password"
+                                f"CREATE ROLE {q_role} WITH NOINHERIT LOGIN PASSWORD :password"
                             ),
                             {"password": role_password},
                         )
 
                     # 3. GRANT USAGE ON SCHEMA
-                    await conn.execute(text(f"GRANT USAGE ON SCHEMA {schema_name} TO {role_name}"))
+                    await conn.execute(
+                        text(f"GRANT USAGE ON SCHEMA {q_schema} TO {q_role}")
+                    )
 
                     # 4. GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES
                     await conn.execute(
                         text(
-                            f"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA {schema_name} TO {role_name}"
+                            f"GRANT SELECT, INSERT, UPDATE, DELETE "
+                            f"ON ALL TABLES IN SCHEMA {q_schema} TO {q_role}"
                         )
                     )
 
                     # 5. ALTER DEFAULT PRIVILEGES
                     await conn.execute(
                         text(
-                            f"ALTER DEFAULT PRIVILEGES IN SCHEMA {schema_name} GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {role_name}"
+                            f"ALTER DEFAULT PRIVILEGES IN SCHEMA {q_schema} "
+                            f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {q_role}"
                         )
                     )
             except Exception as exc:
                 logger.warning(
-                    "PostgreSQL engine unreachable for schema DDL execution (%s). Tracking schema '%s' in provisioner memory.",
+                    "PostgreSQL engine unreachable for schema DDL execution (%s). "
+                    "Tracking schema '%s' in provisioner memory.",
                     exc,
                     schema_name,
                 )
@@ -126,7 +200,8 @@ class TenantProvisioner:
         try:
             async with engine.begin() as conn:
                 if settings.database_type != "sqlite":
-                    await conn.execute(text(f"SET search_path TO {schema_name}, public"))
+                    q_schema = _pg_quote_identifier(schema_name)
+                    await conn.execute(text(f"SET search_path TO {q_schema}, public"))
                 await conn.run_sync(Base.metadata.create_all)
         except Exception as exc:
             logger.warning(
