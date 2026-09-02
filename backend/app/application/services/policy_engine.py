@@ -154,9 +154,7 @@ class PolicyEngineService:
             created_at=datetime.now(UTC),
             updated_at=datetime.now(UTC),
         )
-        add_result = session.add(rule)
-        if hasattr(add_result, "__await__"):
-            await add_result
+        session.add(rule)
         await session.commit()
         if hasattr(session, "refresh"):
             res = session.refresh(rule)

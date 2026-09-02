@@ -127,6 +127,7 @@ class TestPolicyEngineServiceBranches:
     async def test_policy_engine_service_crud(self):
         service = PolicyEngineService()
         mock_session = AsyncMock()
+        mock_session.add = MagicMock()
 
         # 1. create_rule
         rule = await service.create_rule(
