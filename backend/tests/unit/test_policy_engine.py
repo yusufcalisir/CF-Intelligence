@@ -125,13 +125,16 @@ class TestPolicyGatewayScreening:
 
     @pytest.mark.anyio
     async def test_api_predict_dynamic_rules(self) -> None:
+        from app.application.services.policy_engine import invalidate_policy_cache
         from app.dependencies import get_session
         from app.main import app
+
+        invalidate_policy_cache()
 
         mock_rule = BusinessRuleModel(
             id="rule-456",
             rule_name="api_blocking_test_rule",
-            condition={"field": "composite_risk_score", "operator": ">=", "value": 300.0},
+            condition={"field": "merchant_category", "operator": "==", "value": "crypto"},
             action="BLOCK_TRANSACTION",
             is_active=True,
         )
@@ -142,7 +145,10 @@ class TestPolicyGatewayScreening:
         mock_result.scalars.return_value.all.return_value = [mock_rule]
         mock_session.execute.return_value = mock_result
 
-        app.dependency_overrides[get_session] = lambda: mock_session
+        async def _mock_session_gen():
+            yield mock_session
+
+        app.dependency_overrides[get_session] = _mock_session_gen
 
         with TestClient(app) as test_client:
             payload = {

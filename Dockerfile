@@ -31,18 +31,22 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/backend" \
-    APP_ENV="production"
+    APP_ENV="production" \
+    CFI_STORAGE_DIR="/app/storage"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 10001 cfi \
     && useradd -u 10001 -g cfi -s /bin/sh cfi \
-    && mkdir -p /app/storage /app/logs \
-    && chown -R cfi:cfi /app
+    && mkdir -p /app/storage /app/logs /tmp/cfi_storage \
+    && chmod -R 777 /app/storage /app/logs /tmp/cfi_storage \
+    && chown -R cfi:cfi /app /tmp/cfi_storage
 
 COPY --from=builder /opt/venv /opt/venv
-COPY backend /app/backend
+COPY --chown=cfi:cfi backend /app/backend
+
+RUN chmod -R 777 /app/storage /app/logs /tmp/cfi_storage
 
 USER cfi
 

@@ -156,7 +156,10 @@ class PolicyEngineService:
         )
         session.add(rule)
         await session.commit()
-        await session.refresh(rule)
+        if hasattr(session, "refresh"):
+            res = session.refresh(rule)
+            if hasattr(res, "__await__"):
+                await res
         logger.info("Created business rule: %s (%s)", rule_name, action)
         return rule
 

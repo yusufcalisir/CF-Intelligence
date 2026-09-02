@@ -520,12 +520,21 @@ class TemporalAnomalyResponse(BaseModel):
 # ── Evidence & Audit ──────────────────────────
 
 _EVIDENCE_TYPES = Literal[
-    "document", "kyc_profile", "ledger_proof", "screenshot", "log_excerpt"
+    "document",
+    "kyc_profile",
+    "ledger_proof",
+    "screenshot",
+    "log_excerpt",
+    "TRANSACTION_LEDGER",
+    "NETWORK_GRAPH",
+    "SWIFT_LOG",
+    "IP_INTELLIGENCE",
+    "KYC_DOCUMENT",
 ]
 
 
 class EvidenceRequest(BaseModel):
-    evidence_type: _EVIDENCE_TYPES  # type: ignore[valid-type]
+    evidence_type: _EVIDENCE_TYPES = "document"  # type: ignore[valid-type]
     title: str = Field(
         ...,
         min_length=3,
@@ -546,7 +555,7 @@ class EvidenceRequest(BaseModel):
         "analyst",
         min_length=1,
         max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9 _\-\.@]+$",
     )
 
     @field_validator("file_path")
@@ -590,7 +599,7 @@ class SessionDurationRequest(BaseModel):
         ...,
         min_length=1,
         max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9 _\-\.@]+$",
     )
     duration_seconds: float = Field(
         ...,
@@ -609,9 +618,13 @@ class SessionDurationRequest(BaseModel):
 
 _RULE_ACTIONS = Literal[
     "BLOCK_TRANSACTION",
+    "BLOCK",
     "FLAG_HIGH_RISK",
+    "FLAG_CRITICAL",
     "REQUIRE_MFA",
+    "ESCALATE_TO_SAR",
     "ALERT_ANALYST",
+    "HOLD",
     "ALLOW",
     "REVIEW",
 ]

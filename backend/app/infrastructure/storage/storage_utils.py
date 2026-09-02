@@ -16,57 +16,67 @@ def get_storage_dir() -> str:
 
     Resolves in order:
     1. CFI_STORAGE_DIR environment variable
-    2. Default `<repo>/backend/storage` directory
-    3. Fallback OS temp directory `tempfile.gettempdir()/cfi_storage` (for read-only containers like HF Spaces)
+    2. Container `/app/storage` directory
+    3. Project root storage directories
+    4. Fallback OS temp directory `tempfile.gettempdir()/cfi_storage`
+    5. Emergency unique temp directory
     """
     global _cached_storage_dir
-    if _cached_storage_dir is not None:
-        return _cached_storage_dir
+    if _cached_storage_dir is not None and os.path.isdir(_cached_storage_dir):
+        try:
+            probe = os.path.join(_cached_storage_dir, f".write_probe_{os.getpid()}")
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write("probe")
+            os.remove(probe)
+            return _cached_storage_dir
+        except OSError:
+            _cached_storage_dir = None
 
+    candidates: list[str] = []
+
+    # 1. Explicit env var
     env_dir = os.environ.get("CFI_STORAGE_DIR")
     if env_dir:
-        target = os.path.abspath(env_dir)
+        candidates.append(os.path.abspath(env_dir))
+
+    # 2. Container standard storage paths
+    candidates.append("/app/storage")
+    candidates.append("/tmp/cfi_storage")
+
+    # 3. Project root directory candidates
+    here = os.path.abspath(__file__)
+    curr = here
+    for _ in range(5):
+        curr = os.path.dirname(curr)
+        candidates.append(os.path.join(curr, "storage"))
+        candidates.append(os.path.join(curr, "backend", "storage"))
+
+    # 4. OS temp directories
+    candidates.append(os.path.join(tempfile.gettempdir(), "cfi_storage"))
+    candidates.append(os.path.join(tempfile.gettempdir(), "storage"))
+
+    for target in candidates:
         try:
             os.makedirs(target, exist_ok=True)
+            try:
+                os.chmod(target, 0o777)
+            except OSError:
+                pass
+            probe = os.path.join(target, f".write_probe_{os.getpid()}")
+            with open(probe, "w", encoding="utf-8") as f:
+                f.write("probe")
+            os.remove(probe)
             _cached_storage_dir = target
             return target
         except OSError:
-            pass
+            continue
 
-    default_dir = os.path.abspath(
-        os.path.join(
-            os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))),
-            "storage",
-        )
-    )
+    # 5. Emergency unique temp directory
+    emergency = tempfile.mkdtemp(prefix="cfi_storage_")
     try:
-        os.makedirs(default_dir, exist_ok=True)
-        test_file = os.path.join(default_dir, ".write_test")
-        with open(test_file, "w", encoding="utf-8") as f:
-            f.write("probe")
-        os.remove(test_file)
-        _cached_storage_dir = default_dir
-        return default_dir
+        os.chmod(emergency, 0o777)
     except OSError:
-        try:
-            fallback = os.path.join(tempfile.gettempdir(), "cfi_storage")
-            os.makedirs(fallback, exist_ok=True)
-            test_file = os.path.join(fallback, ".write_test")
-            with open(test_file, "w", encoding="utf-8") as f:
-                f.write("probe")
-            os.remove(test_file)
-            _cached_storage_dir = fallback
-            logger.info(
-                "Primary storage path (%s) not writable; using fallback: %s",
-                default_dir,
-                fallback,
-            )
-            return fallback
-        except OSError:
-            ultimate_fallback = tempfile.mkdtemp(prefix="cfi_storage_")
-            _cached_storage_dir = ultimate_fallback
-            logger.warning(
-                "Fallback storage path not writable; created unique temp directory: %s",
-                ultimate_fallback,
-            )
-            return ultimate_fallback
+        pass
+    _cached_storage_dir = emergency
+    logger.warning("Fallback storage path not writable; created unique temp directory: %s", emergency)
+    return emergency
