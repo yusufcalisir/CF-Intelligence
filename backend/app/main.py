@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
@@ -65,9 +65,8 @@ from app.presentation.websockets import streaming_ws, training_ws
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
-    from starlette.responses import Response
-
 # ── Logging ───────────────────────────────────
+
 settings = get_settings()
 
 # ── Structured JSON Logging ────────────────────────────────────────────────────
