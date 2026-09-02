@@ -898,6 +898,37 @@ export function useValidateDataIngestion() {
   });
 }
 
+// ── Connector Diagnostics & Infrastructure Health ────
+
+export function useConnectorDiagnostics() {
+  return useQuery<import('./types').DiagnosticsOverviewResponse>({
+    queryKey: ['connector-diagnostics'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/diagnostics/connectors');
+      return data;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useTestConnector() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    import('./types').ConnectorTestProbeResult,
+    Error,
+    { connector_id: string }
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/diagnostics/test-connector', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['connector-diagnostics'] });
+    },
+  });
+}
+
+
 
 
 

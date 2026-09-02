@@ -6,9 +6,10 @@ import {
   useActiveAlerts,
   useTriggerAutoRetrain,
 } from '../api/queries';
+import ConnectorDiagnosticsPanel from '../components/dashboard/ConnectorDiagnosticsPanel';
 
 export default function ObservabilityPage() {
-  const [activeTab, setActiveTab] = useState<'drift' | 'calibration' | 'alerts' | 'telemetry'>('drift');
+  const [activeTab, setActiveTab] = useState<'drift' | 'calibration' | 'alerts' | 'telemetry' | 'connectors'>('drift');
   const [simulatedSevereDrift, setSimulatedSevereDrift] = useState(false);
 
   const { data: driftData, isLoading: isDriftLoading } = useDriftAnalysis(simulatedSevereDrift);
@@ -118,13 +119,14 @@ export default function ObservabilityPage() {
         </div>
       )}
 
-      {/* 4-Tab Navigation */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 border-b border-[var(--color-border)] pb-3">
+      {/* 5-Tab Navigation */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 border-b border-[var(--color-border)] pb-3">
         {[
           { id: 'drift', icon: '📈', title: 'Model Drift Analytics', subtitle: 'KS & PSI Drift' },
           { id: 'calibration', icon: '🎯', title: 'Calibration Curve', subtitle: 'Brier & Reliability' },
           { id: 'alerts', icon: '🚨', title: 'Prometheus Alerts', subtitle: 'Alertmanager Quorum' },
           { id: 'telemetry', icon: '📊', title: 'Loki & OpenTelemetry', subtitle: 'Trace & Log Pipeline' },
+          { id: 'connectors', icon: '🔌', title: 'Enterprise Connectors', subtitle: 'Kafka, Vault & KMS' },
         ].map((tab) => (
           <button
             key={tab.id}
@@ -143,6 +145,7 @@ export default function ObservabilityPage() {
           </button>
         ))}
       </div>
+
 
       {/* Tab 1: Feature & Concept Drift Table */}
       {activeTab === 'drift' && (
@@ -480,6 +483,10 @@ export default function ObservabilityPage() {
           </div>
         </div>
       )}
+
+      {/* Tab 5: Enterprise Connectors Diagnostics */}
+      {activeTab === 'connectors' && <ConnectorDiagnosticsPanel />}
     </div>
   );
 }
+

@@ -1080,3 +1080,37 @@ export interface PiiValidationResponse {
   status: string;
   guidance: string;
 }
+
+// ── Connector Diagnostics & Infrastructure Health ────
+
+export interface ConnectorHealthSummary {
+  connector_id: string;
+  name: string;
+  category: string;
+  status: 'HEALTHY' | 'DEGRADED' | 'SANDBOX_ACTIVE' | 'OFFLINE';
+  latency_ms: number;
+  endpoint: string;
+  protocol: string;
+  version: string;
+  last_checked: string;
+  details: Record<string, any>;
+}
+
+export interface DiagnosticsOverviewResponse {
+  total_connectors: number;
+  healthy_connectors: number;
+  avg_latency_ms: number;
+  connectors: ConnectorHealthSummary[];
+}
+
+export interface ConnectorTestProbeResult {
+  connector_id: string;
+  name: string;
+  success: boolean;
+  round_trip_ms: number;
+  status_code: number;
+  handshake_summary: string;
+  diagnostics_log: string[];
+  payload_sample: Record<string, any>;
+}
+

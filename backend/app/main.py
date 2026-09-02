@@ -41,6 +41,7 @@ from app.presentation.routers import (
     compliance,
     coordinator,
     dashboard,
+    diagnostics,
     entities,
     graph,
     health,
@@ -846,6 +847,7 @@ from app.presentation.routers import design_partner, onboarding
 
 app.include_router(onboarding.router)
 app.include_router(design_partner.router)
+app.include_router(diagnostics.router)
 
 
 # ── Service Mode Specific Routers ──────────────
