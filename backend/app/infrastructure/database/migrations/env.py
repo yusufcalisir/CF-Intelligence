@@ -9,7 +9,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import create_async_engine
 
-from alembic import context
+from alembic import context  # type: ignore[attr-defined]
 from app.config import get_settings
 from app.infrastructure.database import Base
 

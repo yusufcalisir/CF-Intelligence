@@ -11,7 +11,7 @@ from pathlib import Path
 
 from alembic.config import Config
 
-from alembic import command
+from alembic import command  # type: ignore[attr-defined]
 from app.config import get_settings
 
 logger = logging.getLogger(__name__)

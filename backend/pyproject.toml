@@ -28,7 +28,7 @@ disallow_untyped_defs = false
 plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
-module = ["celery.*", "redis.*"]
+module = ["celery.*", "redis.*", "alembic", "alembic.*", "tenseal.*", "opacus.*", "shap.*", "optuna.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]
