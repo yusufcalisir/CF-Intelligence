@@ -966,3 +966,10 @@ async def scalar_api_reference() -> HTMLResponse:
     )
 
 
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon() -> Response:
+    """Return empty 204 No Content for browser favicon requests."""
+    return Response(status_code=204)
+
+
+

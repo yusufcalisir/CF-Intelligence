@@ -51,16 +51,17 @@ _CSP_DIRECTIVES = "; ".join(
 _DOCS_CSP_DIRECTIVES = "; ".join(
     [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://unpkg.com",
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com",
-        "img-src 'self' data: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com",
-        "font-src 'self' https://fonts.gstatic.com data:",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com https://*",
+        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*",
+        "img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*",
+        "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:",
         "connect-src 'self' https://cdn.jsdelivr.net https://* wss://*",
         "frame-ancestors 'none'",
         "form-action 'self'",
         "base-uri 'self'",
     ]
 )
+
 
 _SECURITY_HEADERS: dict[str, str] = {
     # Prevents all external resource loading; this is an API backend
