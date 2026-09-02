@@ -7,7 +7,7 @@ allowing the coordinator to trigger local training and validation over HTTP.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import numpy as np
@@ -376,13 +376,10 @@ async def evaluate_global_weights(payload: BankEvaluateRequest) -> BankEvaluateR
         model = _model_service.create_model(dp_compatible=False)
         model = _model_service.set_parameters(model, input_weights)
 
-        eval_result = cast(
-            "dict[str, Any]",
-            _model_service.evaluate(
-                model,
-                _client_state.X_test,
-                _client_state.y_test,
-            ),
+        eval_result = _model_service.evaluate(
+            model,
+            _client_state.X_test,
+            _client_state.y_test,
         )
 
         return BankEvaluateResponse(
