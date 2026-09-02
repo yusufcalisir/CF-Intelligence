@@ -118,8 +118,8 @@ export const BenchmarkHubPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-          <div className="flex items-center gap-1.5 bg-[#090a1f]/90 border border-white/10 rounded-2xl p-1.5 shadow-xl w-max sm:w-full lg:w-auto">
+        <div className="w-full lg:w-auto">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:flex lg:items-center gap-1.5 bg-[#090a1f]/90 border border-white/10 rounded-2xl p-1.5 shadow-xl w-full lg:w-auto">
             {[
               { id: 'benchmarks', label: 'Real Benchmarks' },
               { id: 'confusion_matrix', label: 'Confusion & Cost' },
@@ -129,13 +129,13 @@ export const BenchmarkHubPage: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as 'benchmarks' | 'confusion_matrix' | 'fidelity' | 'pilot_sandbox')}
-                className={`whitespace-nowrap shrink-0 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer active:scale-95 ${
+                className={`w-full lg:w-auto text-center flex items-center justify-center px-2.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold rounded-xl transition-all cursor-pointer active:scale-95 ${
                   activeTab === tab.id
                     ? 'bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 text-white shadow-[0_0_20px_rgba(99,102,241,0.35)]'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
                 }`}
               >
-                {tab.label}
+                <span className="truncate sm:whitespace-normal">{tab.label}</span>
               </button>
             ))}
           </div>
