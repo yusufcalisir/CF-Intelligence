@@ -595,6 +595,19 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 - **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-100ms latency.
 - **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
 
+### 10.7 STRIDE Threat Model & Attack Surface Summary
+
+The platform enforces concrete, test-verified defenses across all 6 STRIDE attack categories (detailed in [docs/threat_model.md](docs/threat_model.md)):
+
+| STRIDE Pillar | Threat Persona | Target Asset | Attack Technique | Technical Defense | Test Evidence |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| **Spoofing** | Compromised Node / Attacker | Node Identity & API | Forged cert / tenant header | Vault PKI mTLS (`mtls_manager.py`) + Bcrypt cost=12 (`password_hasher.py`) + 15m JWT & 5-fail lockout | `test_auth_security.py` |
+| **Tampering** | Byzantine Bank / Attacker | Model Weights & DB | Sign-flip / backdoor / SQLi | Bulyan/Krum aggregation (`fl_engine.py`) + Spectral SVD (`spectral_defense.py`) + ORM DDL quoting | `test_byzantine_resilience.py` |
+| **Repudiation** | Rogue Analyst / Bank | Case Workflow | Denying case closure/signature | Four-Eyes dual supervisor signatures (`case_workbench.py`) + Tamper-evident SHA-256 audit ledger | `test_case_workbench_four_eyes.py` |
+| **Info Disclosure** | Honest-but-Curious Server | Raw PII & Gradients | Gradient Inversion (DLG) / MIA | Opacus DP ($\epsilon=1.0, \delta=10^{-5}$) + Curve25519 SecAgg + BOLA 403 + Production error sanitization | `test_error_sanitization.py` |
+| **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Edge + `slowapi`) + Finite tensor validation | `test_rate_limiter_memory.py` |
+| **Privilege Escalation** | Rogue Internal User | Model Promotion / SAR | Unauthorized model promotion | ABAC policy engine (`abac_engine.py`) + SR 11-7 holdout PR-AUC $\ge$ champion gate | `test_abac_engine.py` |
+
 
 ---
 

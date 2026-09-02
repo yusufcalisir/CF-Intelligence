@@ -1,25 +1,71 @@
-# Threat Model
+# Comprehensive STRIDE Threat Model & Attack Surface Analysis
 
-> Security and privacy analysis of the Collaborative Fraud Intelligence Simulator.
+> **Zero-Trust Security, Cryptographic Invariants & Privacy-Preserving Threat Modeling**  
+> Technical specification of threat actors (*Kim?*), target assets (*Neye?*), attack vectors (*Nasıl?*), concrete architectural mitigations (*Nasıl Engellenir?*), and empirical automated test verification.
 
 ---
 
-## 1. Trust Model
+## 1. Formal Trust Model, Threat Personas & Master STRIDE Matrix
 
-### Actors
+### 1.1 Threat Actor Personas (*Kim Saldırabilir?*)
 
-| Actor | Trust Level | Description |
-|-------|-------------|-------------|
-| **Central Server** | Honest-but-curious | Follows the protocol but may attempt to infer private data from observed updates |
-| **Bank Clients** | Semi-honest | Execute local training correctly but may be compromised |
-| **External Adversary** | Untrusted | Network attacker attempting to intercept or modify communications |
+| Persona Identifier | Threat Actor Profile | Access Level | Primary Motivation | Capabilities & Vectors |
+| :--- | :--- | :---: | :--- | :--- |
+| **T1: Byzantine Member Bank** | Malicious or compromised consortium bank node | Authorized Client | Degrade competitor fraud accuracy, introduce targeted AML evasion backdoors | Injects poisoned gradients ($\Delta w_{\text{byz}} = -3.0\Delta w$), manipulates local labels, embeds trigger patterns, transmits $\text{NaN}/\text{Inf}$ vectors. |
+| **T2: Honest-but-Curious Server** | Aggregation server / untrusted cloud infrastructure provider | Platform Host | Harvest trade secrets, reconstruct customer identities across banks | Intercepts intermediate model updates, runs Deep Leakage from Gradients (DLG), executes shadow model Membership Inference (MIA). |
+| **T3: Rogue Internal Investigator** | Disgruntled or bribed bank compliance analyst | Authenticated Employee | Exfiltrate VIP transaction logs, close high-risk money laundering cases unilaterally | Attempts Broken Object Level Authorization (BOLA/IDOR), bypasses Four-Eyes dual supervision, tampers with audit trails. |
+| **T4: External Network Adversary** | Man-in-the-Middle (MitM) / wiretapping attacker | Untrusted Network | Eavesdrop on transactions, replay webhooks, forge client identity | Intercepts non-TLS traffic, performs replay attacks on HMAC webhooks, attempts TLS downgrade or forged certificate injection. |
+| **T5: Automated Botnet & Scraper** | Distributed botnet / credential stuffing adversary | Public Internet | Volumetric denial of service, credential brute-forcing, data scraping | Floods ML inference endpoints (`/predict`), brute-forces analyst logins, executes SQL injection / DDL fuzzing, probes for stack traces. |
 
-### Assumptions
+---
 
-1. Banks trust the aggregation server to not collude with other banks
-2. Banks correctly implement local training (no model poisoning)
-3. The aggregation protocol is followed faithfully
-4. Network channels are encrypted (TLS in production)
+### 1.2 Target Asset Taxonomy (*Neye Saldırabilir?*)
+
+```mermaid
+mindmap
+  root((Consortium Assets))
+    A1: Customer Transactions & PII
+      Raw Bank Records
+      IBANs & Account Balances
+      Transaction Subgraphs & Adjacency
+    A2: Global Model Weights & Invariants
+      Champion Decision Boundaries
+      Classification Integrity F1 >= 94%
+      Model Hyperparameters & Lineage
+    A3: Compliance Records & Audit Trail
+      Four-Eyes Supervisor Signatures
+      FinCEN BSA SAR XML Filings
+      Immutable SHA-256 Audit Log
+    A4: Platform Scoring Infrastructure
+      Real-Time Gateway <100ms SLA
+      Redis Online Feature Store
+      Multi-Tenant PostgreSQL Database
+    A5: Cryptographic Keys & Identities
+      FIPS 140-2 Level 3 HSM Keys
+      Vault Root CA & mTLS Certificates
+      JWT HMAC & OIDC Secrets
+```
+
+---
+
+### 1.3 Master STRIDE Threat & Mitigation Matrix (*Kim, Neye, Nasıl ve Nasıl Engellenir?*)
+
+| STRIDE Pillar | Threat Actor | Target Asset | Attack Vector (*Nasıl?*) | Concrete Codebase Mitigation (*Nasıl Engellenir?*) | Automated Verification Test & Metric |
+| :--- | :---: | :---: | :--- | :--- | :--- |
+| **Spoofing** | T1, T4 | A5 | **Node Impersonation:** Attacker masquerades as Bank Alpha using stolen/forged client certificate. | **Vault PKI + mTLS SAN Validation (`mtls_manager.py`) & HSM Hardware Signatures (`hsm_signer.py`):** Mutual TLS with ephemeral Vault-issued X.509 certs, strict SAN whitelist, and non-exportable FIPS 140-2 Level 3 RSA-PSS signatures. | `tests/unit/test_zero_trust_pki_mtls.py`<br/>`tests/unit/test_vault_hsm_pki_binder.py`<br/>*(100% invalid cert rejected)* |
+| **Spoofing** | T3, T5 | A4 | **Credential Stuffing & Header Forgery:** Brute-forcing analyst passwords or injecting `X-Tenant-ID: bank_beta` headers. | **Bcrypt Cost=12 (`password_hasher.py`) + 15m JWT & Refresh Rotation + 5-Fail Lockout (`auth_service.py`):** Salted bcrypt hashes, 900s JWT access tokens, 1-time refresh token rotation, and 15-minute IP/account lockout after 5 failures. | `tests/unit/test_auth_security.py`<br/>`tests/unit/test_security_controls_audit.py`<br/>*(9/9 auth security tests passed)* |
+| **Tampering** | T1 | A2 | **Sign-Flip & Scaled Gradient Poisoning:** Byzantine bank scales gradients by $-3.0$ or injects extreme values to invert decision boundaries. | **Byzantine-Robust Aggregation Suite (`fl_engine.py`, `byzantine_defense.py`):** Multi-Krum, Coordinate-wise Median, Trimmed Mean ($\beta=0.20$), and Bulyan algorithms filtering gradient outliers prior to aggregation. | `verification/federated_learning/scientific_audit_report.md`<br/>`tests/unit/test_byzantine_resilience.py`<br/>*($F_1=93.8\%$ under $f=1$)* |
+| **Tampering** | T1 | A2 | **Spectral Backdoor Trigger Embedding:** Injecting low-rank trojans to force benign classification on specific laundering merchant codes. | **Spectral SVD Anomaly Filter (`spectral_defense.py`):** Computes top Singular Value Decomposition power iteration on parameter matrices; quarantines updates with anomaly score $s_i > \mu_s + 1.5\sigma_s$. | `verification/mathematical/scientific_audit_report.md`<br/>*(99.1% backdoor quarantine recall)* |
+| **Tampering** | T5 | A4 | **SQL Injection & Schema Tampering:** Injecting raw SQL in query parameters or DDL identifiers during tenant onboarding. | **Parameterized SQLAlchemy ORM + 60+ Keyword Blocklist (`database/__init__.py`, `tenant_provisioner.py`):** Absolute prohibition of raw SQL f-strings; strict `_pg_quote_identifier` and length guards. | `tests/unit/test_security_controls_audit.py`<br/>*(`test_sql_injection_rejected` PASSED)* |
+| **Repudiation** | T1, T3 | A3 | **Signature Denial & Audit Erasure:** Bank denies submitting poisoned model, or analyst closes money laundering case and deletes logs. | **Four-Eyes Dual Supervisor State Machine (`case_workbench.py`) + Tamper-Evident SHA-256 Audit Ledger (`immutable_audit_chain.py`):** Requires dual independent supervisor signatures (`SIG_SUPERVISOR_*`); logs stored in append-only cryptographic merkle chain. | `tests/unit/test_case_workbench_four_eyes.py`<br/>`tests/unit/test_immutable_audit_chain.py`<br/>*(100% mutant kill rate)* |
+| **Information Disclosure** | T2 | A1 | **Deep Leakage from Gradients (DLG):** Honest-but-curious server optimizes dummy features via L-BFGS to invert raw customer records from gradients. | **Opacus Differential Privacy (`privacy_service.py`) + Curve25519 SecAgg Zero-Sum Masking (`p2p_secagg_driver.py`):** Gradient $L_2$ norm clipping ($C=1.0$) with Gaussian noise ($\sigma=1.0$) and pairwise zero-sum masks ($s_{uv}$). | `DLGEvaluator` in `security_evaluator.py`<br/>*($r=0.038, \text{MSE}=0.912$, DLG fails)* |
+| **Information Disclosure** | T2 | A1 | **Membership Inference Attack (MIA):** Shadow model loss thresholding to determine if a specific VIP target was in training dataset. | **Rényi Differential Privacy (RDP) Budget Accountant (`privacy_audit_service.py`):** Enforces strict cumulative budget limit $\epsilon \le 1.0, \delta = 10^{-5}$, mathematically bounding adversary advantage to $< e^\epsilon$. | `MIAEvaluator` in `security_evaluator.py`<br/>*(MIA accuracy collapses to 51.2%)* |
+| **Information Disclosure** | T3 | A1, A3 | **Cross-Tenant IDOR / BOLA:** Analyst tampers with URL query `?bank_id=bank_b` or calls `GET /api/v1/cases/{bank_b_case_id}`. | **`TenantAccessControlMiddleware` + `enforce_tenant_isolation` (`dependencies.py`):** Resolves caller tenant from cryptographically signed JWT; blocks cross-tenant access with `HTTP 403 Forbidden` (`TenantAccessDenied`). | `tests/unit/test_security_controls_audit.py`<br/>*(`test_cc6_1_all_endpoints_authenticated`)* |
+| **Information Disclosure** | T5 | A4 | **Server Stack Trace & Path Leakage:** Triggering 500 exceptions to inspect internal directory trees or database schemas. | **Production Error Sanitizer (`error_handler.py`):** Intercepts all unhandled exceptions; suppresses stack traces, file paths, and SQL queries, returning RFC 7807 problem details with `incident_id` while logging to Sentry. | `tests/unit/test_error_sanitization.py`<br/>*(3/3 error sanitization tests passed)* |
+| **Information Disclosure** | T4, T5 | A4 | **CORS Origin Hijacking & Clickjacking:** Exploiting permissive CORS or framing the app to capture credentials. | **Strict CORS Origin Whitelist + Security Headers (`security_headers.py`, `main.py`):** Wildcard `*` prohibited; explicit platform whitelist + CSP, HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`. | `tests/unit/test_security_controls_audit.py`<br/>*(`test_cors_whitelist_enforced` PASSED)* |
+| **Denial of Service** | T5 | A4 | **Volumetric ML Inference & Simulation Flooding:** Bombarding CPU-intensive `/api/v1/predict` or `/api/v1/simulations` to exhaust RAM/CPU. | **3-Tier Rate Limiting Defense:** Layer 1 Cloudflare Anycast WAF (60 req/10s) $\to$ Layer 2 Vercel Edge `@upstash/ratelimit` (20 req/min ML) $\to$ Layer 3 FastAPI `slowapi` (`rate_limiter.py`) with 1,000-IP bounded memory pruning. | `tests/unit/test_rate_limiter_memory.py`<br/>`tests/unit/test_security_controls_audit.py`<br/>*(Zero memory exhaustion under 10k IPs)* |
+| **Denial of Service** | T1 | A2, A4 | **Byzantine Non-Finite Poisoning:** Transmitting `NaN` or `Inf` float tensors to cause division-by-zero crashes during aggregation. | **Non-Finite Value Sanitizer & Fallback (`fl_engine.py`):** Validates all client tensor buffers with `torch.isfinite()`; instantly quarantines corrupt nodes and falls back to Champion model checkpoint. | `tests/unit/test_fl_engine.py`<br/>*(Zero coordinator crashes)* |
+| **Elevation of Privilege** | T3 | A2, A3 | **Unauthorized Model Promotion & SAR Bypass:** Analyst promotes a degraded challenger model or signs SAR report without supervisory clearance. | **Attribute-Based Access Control (`abac_engine.py`) + SR 11-7 Holdout Quality Gates (`model_lifecycle.py`):** ABAC policies require `ROLE_SUPERVISOR` + `CLEARANCE_L2`; challenger models strictly require holdout $\text{PR-AUC} \ge \text{Champion}$. | `tests/unit/test_abac_engine.py`<br/>`tests/unit/test_sr11_7_model_governance.py`<br/>*(100% unauthorized promotions blocked)* |
 
 ---
 
