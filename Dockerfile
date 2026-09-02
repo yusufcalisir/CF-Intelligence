@@ -32,23 +32,24 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH" \
     PYTHONPATH="/app/backend" \
     APP_ENV="production" \
+    HOME="/home/user" \
     CFI_STORAGE_DIR="/app/storage"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     && rm -rf /var/lib/apt/lists/* \
-    && groupadd -g 10001 cfi \
-    && useradd -u 10001 -g cfi -s /bin/sh cfi \
-    && mkdir -p /app/storage /app/logs /tmp/cfi_storage \
-    && chmod -R 777 /app/storage /app/logs /tmp/cfi_storage \
-    && chown -R cfi:cfi /app /tmp/cfi_storage
+    && groupadd -g 1000 user \
+    && useradd -u 1000 -g user -m -d /home/user -s /bin/sh user \
+    && mkdir -p /home/user /app/storage /app/logs /tmp/cfi_storage \
+    && chmod -R 777 /home/user /app /tmp/cfi_storage \
+    && chown -R user:user /home/user /app /tmp/cfi_storage
 
 COPY --from=builder /opt/venv /opt/venv
-COPY --chown=cfi:cfi backend /app/backend
+COPY --chown=user:user backend /app/backend
 
-RUN chmod -R 777 /app/storage /app/logs /tmp/cfi_storage
+RUN chmod -R 777 /home/user /app/storage /app/logs /tmp/cfi_storage
 
-USER cfi
+USER user
 
 EXPOSE 7860
 
@@ -56,4 +57,5 @@ HEALTHCHECK --interval=10s --timeout=3s --start-period=30s --retries=5 \
     CMD curl -f http://localhost:7860/health || exit 1
 
 CMD ["gunicorn", "app.main:app", "-w", "1", "-k", "uvicorn.workers.UvicornWorker", "-b", "0.0.0.0:7860"]
+
 
