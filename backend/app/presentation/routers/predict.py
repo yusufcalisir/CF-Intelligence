@@ -346,13 +346,11 @@ async def predict_transaction(
                 account_age_days=payload.account_age_days,
             )
 
-        input_dim = (
-            model.network[0].in_features
-            if hasattr(model, "network")
-            and len(model.network) > 0
-            and hasattr(model.network[0], "in_features")
-            else NUM_FEATURES
-        )
+        network = getattr(model, "network", None)
+        first_layer = None
+        if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(network) > 0:
+            first_layer = network[0]
+        input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
         if input_tensor.shape[1] < input_dim:
             input_tensor = torch.nn.functional.pad(
