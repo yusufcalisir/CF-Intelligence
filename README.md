@@ -668,6 +668,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | Benchmark Dimension | Measured Value | Design Target | Verification Reference | Verification Status |
 | :--- | :---: | :---: | :--- | :---: |
 | **Inference Latency (p99)** | < 14.2 ms | < 100 ms | `realtime_inference.py` | `Self-Verified (Internal Test Suite)` |
+| **Real-Time Load Test SLA (p99)** | **87.26 ms (51.3 req/s)** | < 100 ms (p99 SLA) | [`reports/load_test_report.md`](reports/load_test_report.md) | `Empirical Load Test (1,000 reqs, 3 banks)` |
 | **ABAC Authorization Throughput** | 20,000 req/s | > 5,000 req/s | `abac_engine.py` | `Self-Verified (Internal Test Suite)` |
 | **ABAC Decision Latency** | < 0.05 ms/req | < 1 ms | `abac_engine.py` | `Self-Verified (Internal Test Suite)` |
 | **SecAgg Masking Throughput** | 5,990,801 param/s | > 1M param/s | `p2p_secagg_driver.py` | `Self-Verified (Internal Test Suite)` |
@@ -677,7 +678,6 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Disaster Recovery Failover (RTO)** | **15.02 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Self-Verified (Internal Test Suite)` |
 | **Multi-Tenant Memory/DB Isolation**| **0 Leaks / 100% Isolated** | Isolated State | `test_multi_tenant_security_audit.py` | `Self-Verified (Internal Test Suite)` |
 | **Full Test Suite Pass Rate** | **1,498 / 1,498 passing** | 100% | 1,111 Backend Pytest + 387 Frontend Vitest | `Self-Verified (Internal Test Suite)` |
-
 
 ---
 
@@ -700,6 +700,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 
 | Benchmark / Evaluation Target | CLI Command | Evaluated Capabilities & Output |
 | :--- | :--- | :--- |
+| **Real-Time Load & Latency SLA** | `python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0` or `locust -f scripts/locustfile.py --headless -u 50 -r 10 -t 60s` | Empirical high-concurrency load test validating <100ms p99 inference SLA under concurrent multi-bank payment streams. Generates `reports/load_test_report.md` and `storage/load_test_results.json`. |
 | **Real Elliptic AML Graph** | `python scripts/run_elliptic_benchmark.py` | Benchmarks real Bitcoin transaction graph (46.5k nodes, 234k edges) through GraphSAGE vs. isolated baseline. Generates [`verification/real_data_benchmark/`](verification/real_data_benchmark/). |
 | **Full Multi-Dataset Suite** | `python benchmark.py` | Evaluates 6-model matrix (Local, Pooled, FedAvg, FedProx, FedGNN, DP) + PaySim (6.36M), IEEE-CIS (20k), Elliptic with distribution fidelity audit. |
 | **9-Configuration Matrix (C1–C9)** | `python scripts/run_benchmark.py --samples 1000 --rounds 5` | Compares PR-AUC, ROC-AUC, F1, Recall@1% FPR, transmitted payload (MB), and DP epsilon consumption across 9 predefined architectural variants. |

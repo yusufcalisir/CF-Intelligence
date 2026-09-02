@@ -66,12 +66,13 @@ opentelemetry-instrumentation-fastapi>=0.48b0
 prometheus-client>=0.21.0,<1.0.0
 prometheus-fastapi-instrumentator>=8.0.0,<9.0.0  # 8.x supports starlette>=1.x (7.x required starlette<1.0.0)
 
-# Testing
+# Testing & Load Benchmarking
 pytest>=9.0.3                    # security: CVE-2025-71176 (privilege escalation via /tmp/pytest-of-{user})
 pytest-asyncio>=1.0.0,<2.0.0   # 1.0+ required for pytest>=9 (0.26 was last 0.x, 0.27 was never released)
 pytest-cov>=6.0.0,<7.0.0
 httpx>=0.27.0,<1.0.0
 hypothesis>=6.0.0,<7.0.0
+locust>=2.32.0,<3.0.0
 
 # Linting & type checking
 ruff>=0.7.0,<1.0.0

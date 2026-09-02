@@ -130,6 +130,11 @@ def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
     return _tenant_engines[tenant]
 
 
+import asyncio
+
+_init_lock = asyncio.Lock()
+
+
 async def init_tenant_tables(tenant: str | None) -> None:
     """Create all ORM tables in the tenant's database if not already initialized.
 
@@ -137,66 +142,69 @@ async def init_tenant_tables(tenant: str | None) -> None:
     """
     if tenant in _tenant_initialized:
         return
-    eng = _get_or_create_engine(tenant)
-    try:
-        async with eng.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            if tenant is None:
-                # Seed default demo banks if tenant_configs table is empty
-                from datetime import UTC, datetime
+    async with _init_lock:
+        if tenant in _tenant_initialized:
+            return
+        eng = _get_or_create_engine(tenant)
+        try:
+            async with eng.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+                if tenant is None:
+                    # Seed default demo banks if tenant_configs table is empty
+                    from datetime import UTC, datetime
 
-                from sqlalchemy import insert, select
+                    from sqlalchemy import insert, select
 
-                from app.infrastructure.models import TenantConfigModel
+                    from app.infrastructure.models import TenantConfigModel
 
-                result = await conn.execute(select(TenantConfigModel.bank_id).limit(1))
-                if result.first() is None:
-                    demo_banks = [
-                        {
-                            "bank_id": "bank_alpha",
-                            "legal_name": "JPMorgan Chase & Co.",
-                            "jurisdiction": "US",
-                            "contact_email": "compliance@jpmorgan.com",
-                            "data_residency_region": "us-east-1",
-                            "status": "active",
-                            "cert_fingerprint": "sha256_jpm_01",
-                            "vault_key_path": "transit/keys/tenant_bank_alpha",
-                            "schema_provisioned": 1,
-                            "created_at": datetime.now(UTC),
-                            "activated_at": datetime.now(UTC),
-                        },
-                        {
-                            "bank_id": "bank_beta",
-                            "legal_name": "HSBC Holdings plc",
-                            "jurisdiction": "GB",
-                            "contact_email": "compliance@hsbc.co.uk",
-                            "data_residency_region": "eu-west-2",
-                            "status": "active",
-                            "cert_fingerprint": "sha256_hsbc_02",
-                            "vault_key_path": "transit/keys/tenant_bank_beta",
-                            "schema_provisioned": 1,
-                            "created_at": datetime.now(UTC),
-                            "activated_at": datetime.now(UTC),
-                        },
-                        {
-                            "bank_id": "bank_gamma",
-                            "legal_name": "Deutsche Bank AG",
-                            "jurisdiction": "DE",
-                            "contact_email": "compliance@db.com",
-                            "data_residency_region": "eu-central-1",
-                            "status": "active",
-                            "cert_fingerprint": "sha256_db_03",
-                            "vault_key_path": "transit/keys/tenant_bank_gamma",
-                            "schema_provisioned": 1,
-                            "created_at": datetime.now(UTC),
-                            "activated_at": datetime.now(UTC),
-                        },
-                    ]
-                    await conn.execute(insert(TenantConfigModel), demo_banks)
-        _tenant_initialized.add(tenant)
-        logger.info("Initialized tables for tenant=%s", tenant or "central")
-    except Exception as exc:
-        logger.warning("Could not initialize tenant tables for tenant=%s: %s", tenant, exc)
+                    result = await conn.execute(select(TenantConfigModel.bank_id).limit(1))
+                    if result.first() is None:
+                        demo_banks = [
+                            {
+                                "bank_id": "bank_alpha",
+                                "legal_name": "JPMorgan Chase & Co.",
+                                "jurisdiction": "US",
+                                "contact_email": "compliance@jpmorgan.com",
+                                "data_residency_region": "us-east-1",
+                                "status": "active",
+                                "cert_fingerprint": "sha256_jpm_01",
+                                "vault_key_path": "transit/keys/tenant_bank_alpha",
+                                "schema_provisioned": 1,
+                                "created_at": datetime.now(UTC),
+                                "activated_at": datetime.now(UTC),
+                            },
+                            {
+                                "bank_id": "bank_beta",
+                                "legal_name": "HSBC Holdings plc",
+                                "jurisdiction": "GB",
+                                "contact_email": "compliance@hsbc.co.uk",
+                                "data_residency_region": "eu-west-2",
+                                "status": "active",
+                                "cert_fingerprint": "sha256_hsbc_02",
+                                "vault_key_path": "transit/keys/tenant_bank_beta",
+                                "schema_provisioned": 1,
+                                "created_at": datetime.now(UTC),
+                                "activated_at": datetime.now(UTC),
+                            },
+                            {
+                                "bank_id": "bank_gamma",
+                                "legal_name": "Deutsche Bank AG",
+                                "jurisdiction": "DE",
+                                "contact_email": "compliance@db.com",
+                                "data_residency_region": "eu-central-1",
+                                "status": "active",
+                                "cert_fingerprint": "sha256_db_03",
+                                "vault_key_path": "transit/keys/tenant_bank_gamma",
+                                "schema_provisioned": 1,
+                                "created_at": datetime.now(UTC),
+                                "activated_at": datetime.now(UTC),
+                            },
+                        ]
+                        await conn.execute(insert(TenantConfigModel), demo_banks)
+            _tenant_initialized.add(tenant)
+            logger.info("Initialized tables for tenant=%s", tenant or "central")
+        except Exception as exc:
+            logger.warning("Could not initialize tenant tables for tenant=%s: %s", tenant, exc)
 
 
 def get_session_factory(tenant: str | None = None) -> async_sessionmaker[AsyncSession]:

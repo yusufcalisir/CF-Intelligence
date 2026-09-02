@@ -47,8 +47,66 @@ _eval_engine = ModelEvaluationEngine(_registry)
 _risk_engine = RiskScoringEngine()
 _alert_service = AlertIntelligenceService()
 _explainability_service = ExplainabilityService()
-
 _feature_store = FeatureStoreService()
+
+_cached_serving_model: torch.nn.Module | None = None
+_cached_serving_model_mtime: float = 0.0
+
+
+def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Module:
+    """Resolve and cache active serving neural network model in memory."""
+    global _cached_serving_model, _cached_serving_model_mtime
+    if simulation_id:
+        active_entry = _registry.get_active_version(simulation_id)
+        if not active_entry:
+            versions = _registry.list_versions(simulation_id)
+            if versions:
+                active_entry = max(versions, key=lambda x: x["version"])
+        if not active_entry:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No trained models found for simulation ID: {simulation_id}",
+            )
+        state_dict = _registry.load_version(simulation_id, active_entry["version"])
+        model = _model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        model.load_state_dict(state_dict)
+        model.eval()
+        return model
+
+    global_path = os.path.join(_registry.storage_dir, "global_model.pt")
+    if not os.path.exists(global_path):
+        os.makedirs(_registry.storage_dir, exist_ok=True)
+        default_m = _model_service.create_model()
+        torch.save(default_m.state_dict(), global_path)
+        _cached_serving_model = default_m
+        _cached_serving_model_mtime = time.time()
+        _cached_serving_model.eval()
+        return _cached_serving_model
+
+    current_mtime = os.path.getmtime(global_path)
+    if _cached_serving_model is None or current_mtime > _cached_serving_model_mtime:
+        state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
+        dp_compatible = True
+        for key in state_dict:
+            if "running_mean" in key or "running_var" in key:
+                dp_compatible = False
+                break
+        input_dim = NUM_FEATURES
+        for weight_key in ("network.0.weight", "module.network.0.weight"):
+            if (
+                weight_key in state_dict
+                and hasattr(state_dict[weight_key], "shape")
+                and len(state_dict[weight_key].shape) >= 2
+            ):
+                input_dim = int(state_dict[weight_key].shape[1])
+                break
+        model = _model_service.create_model(input_dim=input_dim, dp_compatible=dp_compatible)
+        model.load_state_dict(state_dict)
+        model.eval()
+        _cached_serving_model = model
+        _cached_serving_model_mtime = current_mtime
+
+    return _cached_serving_model
 
 # Global reference bounds for min-max scaling of single transactions
 REFERENCE_BOUNDS = {
@@ -224,80 +282,9 @@ async def predict_transaction(
     if caller_tenant and payload.bank_id:
         enforce_tenant_isolation(caller_tenant, payload.bank_id)
 
-    # 1. Resolve active model weights state dict
-    state_dict = None
-    active_entry = None
-    if payload.simulation_id:
-        # Load from registry version
-        active_entry = _registry.get_active_version(payload.simulation_id)
-        if not active_entry:
-            versions = _registry.list_versions(payload.simulation_id)
-            if versions:
-                active_entry = max(versions, key=lambda x: x["version"])
-
-        if not active_entry:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No trained models found for simulation ID: {payload.simulation_id}",
-            )
-        try:
-            state_dict = _registry.load_version(payload.simulation_id, active_entry["version"])
-        except Exception as e:
-            logger.error(
-                "Failed to load versioned model for simulation %s: %s", payload.simulation_id, e
-            )
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Error loading registered model version: {e}",
-            )
-    else:
-        # Load default serving model path
-        global_path = os.path.join(_registry.storage_dir, "global_model.pt")
-        if not os.path.exists(global_path):
-            try:
-                os.makedirs(_registry.storage_dir, exist_ok=True)
-                default_m = _model_service.create_model()
-                torch.save(default_m.state_dict(), global_path)
-                state_dict = default_m.state_dict()
-            except Exception as e:
-                logger.error("Failed to initialize baseline serving model: %s", e)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error initializing baseline model: {e}",
-                )
-        else:
-            try:
-                state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
-            except Exception as e:
-                logger.error("Failed to load serving model: %s", e)
-                raise HTTPException(
-                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Error loading served model file: {e}",
-                )
-
-    # 2. Determine DP model compatibility and dynamic input_dim based on layer parameter keys/shapes
-    dp_compatible = True
-    for key in state_dict:
-        if "running_mean" in key or "running_var" in key:
-            dp_compatible = False
-            break
-
-    input_dim = NUM_FEATURES
-    for weight_key in ("network.0.weight", "module.network.0.weight"):
-        if (
-            weight_key in state_dict
-            and hasattr(state_dict[weight_key], "shape")
-            and len(state_dict[weight_key].shape) >= 2
-        ):
-            input_dim = int(state_dict[weight_key].shape[1])
-            break
-
-    # 3. Instantiate model and perform forward pass
+    # 1. Resolve cached active model instance
     try:
-        model = _model_service.create_model(input_dim=input_dim, dp_compatible=dp_compatible)
-        model.load_state_dict(state_dict)
-        model.eval()
-
+        model = _get_cached_serving_model(payload.simulation_id)
         bank_id = payload.bank_id or "serving_client"
         txn_id = str(uuid.uuid4())
         # Use stable entity hash to demonstrate velocity windows on repeated requests
@@ -359,6 +346,13 @@ async def predict_transaction(
                 account_age_days=payload.account_age_days,
             )
 
+        input_dim = (
+            model.network[0].in_features
+            if hasattr(model, "network")
+            and len(model.network) > 0
+            and hasattr(model.network[0], "in_features")
+            else NUM_FEATURES
+        )
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
         if input_tensor.shape[1] < input_dim:
             input_tensor = torch.nn.functional.pad(
@@ -367,9 +361,9 @@ async def predict_transaction(
         elif input_tensor.shape[1] > input_dim:
             input_tensor = input_tensor[:, :input_dim]
 
-        # Measure Champion Latency (offloaded to threadpool to avoid blocking event loop)
+        # Measure Champion Latency
         champ_start = time.perf_counter()
-        champ_prob = await asyncio.to_thread(_eval_model, model, input_tensor)
+        champ_prob = _eval_model(model, input_tensor)
         champ_latency = (time.perf_counter() - champ_start) * 1000
 
         # Measure Challenger Latency (Shadow Deployment)
@@ -414,7 +408,7 @@ async def predict_transaction(
                         chall_tensor = chall_tensor[:, :chall_input_dim]
 
                     chall_start = time.perf_counter()
-                    chall_prob = await asyncio.to_thread(_eval_model, chall_model, chall_tensor)
+                    chall_prob = _eval_model(chall_model, chall_tensor)
                     chall_latency = (time.perf_counter() - chall_start) * 1000
                 except Exception as exc:
                     logger.warning(
@@ -471,18 +465,20 @@ async def predict_transaction(
     is_fraud_suspected = score >= 600.0
     risk_level = (
         "CRITICAL"
-        if score >= 800.0
-        else ("HIGH" if score >= 600.0 else ("MEDIUM" if score >= 300.0 else "LOW"))
+        if score >= 850.0
+        else "HIGH"
+        if score >= 700.0
+        else "MEDIUM"
+        if score >= 500.0
+        else "LOW"
     )
 
-    # 5. Alert Triggering and Collaboration
+    # 5. Generate and publish alert in the shared intelligence layer if fraud suspected
     alert_details = None
     if is_fraud_suspected:
         try:
-            # Map input parameters into AlertIntelligence txn dictionary format
             features_dict = {
                 "transaction_id": txn_id,
-                "velocity": payload.velocity,
                 "merchant_category": payload.merchant_category,
                 "country_code": payload.country_code,
                 "device_type": payload.device_type,
@@ -503,8 +499,8 @@ async def predict_transaction(
 
             if alerts:
                 active_alert = alerts[0]
-                # Publish anonymized indicator to the shared intelligence layer
-                _alert_service.publish_intelligence(active_alert)
+                # Publish anonymized indicator to the shared intelligence layer in background
+                background_tasks.add_task(_alert_service.publish_intelligence, active_alert)
 
                 # Generate the SHAP attribution explanation report
                 explanation_report = _explainability_service.explain_alert(

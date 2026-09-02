@@ -93,6 +93,18 @@ def evaluate_condition(condition: dict[str, Any], context: dict[str, Any]) -> bo
     return False
 
 
+_ACTIVE_RULES_CACHE: list[BusinessRuleModel] | None = None
+_ACTIVE_RULES_CACHE_TIME: float = 0.0
+_CACHE_TTL: float = 5.0
+
+
+def invalidate_policy_cache() -> None:
+    """Invalidate the in-memory policy rules cache."""
+    global _ACTIVE_RULES_CACHE, _ACTIVE_RULES_CACHE_TIME
+    _ACTIVE_RULES_CACHE = None
+    _ACTIVE_RULES_CACHE_TIME = 0.0
+
+
 class PolicyEngineService:
     """Manages business policies and executes active transaction screening rules."""
 
@@ -106,14 +118,22 @@ class PolicyEngineService:
         return list(res.scalars().all())
 
     async def get_active_rules(self, session: AsyncSession) -> list[BusinessRuleModel]:
-        """Fetch active policy rules for real-time transaction screening."""
+        """Fetch active policy rules for real-time transaction screening (cached)."""
+        global _ACTIVE_RULES_CACHE, _ACTIVE_RULES_CACHE_TIME
+        now = datetime.now(UTC).timestamp()
+        if _ACTIVE_RULES_CACHE is not None and (now - _ACTIVE_RULES_CACHE_TIME) < _CACHE_TTL:
+            return _ACTIVE_RULES_CACHE
+
         stmt = (
             select(BusinessRuleModel)
             .where(BusinessRuleModel.is_active.is_(True))
             .order_by(BusinessRuleModel.rule_name)
         )
         res = await session.execute(stmt)
-        return list(res.scalars().all())
+        rules = list(res.scalars().all())
+        _ACTIVE_RULES_CACHE = rules
+        _ACTIVE_RULES_CACHE_TIME = now
+        return rules
 
     async def create_rule(
         self,
@@ -124,15 +144,19 @@ class PolicyEngineService:
         is_active: bool = True,
     ) -> BusinessRuleModel:
         """Create and persist a new dynamic business rule."""
+        invalidate_policy_cache()
         rule = BusinessRuleModel(
             id=str(uuid.uuid4()),
             rule_name=rule_name,
             condition=condition,
             action=action,
             is_active=is_active,
+            created_at=datetime.now(UTC),
+            updated_at=datetime.now(UTC),
         )
         session.add(rule)
         await session.commit()
+        await session.refresh(rule)
         logger.info("Created business rule: %s (%s)", rule_name, action)
         return rule
 
@@ -163,6 +187,7 @@ class PolicyEngineService:
 
         rule.updated_at = datetime.now(UTC)
         await session.commit()
+        invalidate_policy_cache()
         logger.info("Updated business rule: %s", rule.rule_name)
         return rule
 
@@ -176,6 +201,7 @@ class PolicyEngineService:
 
         await session.delete(rule)
         await session.commit()
+        invalidate_policy_cache()
         logger.info("Deleted business rule ID: %s", rule_id)
         return True
 
