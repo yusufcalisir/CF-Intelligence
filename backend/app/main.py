@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings
+from app.infrastructure.security.error_handler import format_safe_error_response
 from app.infrastructure.security.security_headers import SecurityHeadersMiddleware
 from app.presentation.routers import (
     alerts,
@@ -541,35 +542,13 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 
 
-# ── Global Exception Handler (RFC 7807 Compliant) ─────────────────────────────
+# ── Global Exception Handler (RFC 7807 Compliant & Production Sanitized) ──────
 # Ensures ALL unhandled runtime exceptions return structured JSON (HTTP 500).
-# Supports RFC 7807 application/problem+json when requested via Accept header.
+# In production: Strips stack traces, internal file paths, and database details.
+# Returns generic user message + correlation incident ID while logging full traceback server-side.
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    logger.error(
-        "Unhandled exception on %s %s: %s",
-        request.method,
-        request.url.path,
-        exc,
-        exc_info=True,
-    )
-    accept = request.headers.get("accept", "")
-    media_type = (
-        "application/problem+json" if "application/problem+json" in accept else "application/json"
-    )
-
-    problem_details = {
-        "type": f"https://cfi-platform.org/errors/{type(exc).__name__}",
-        "title": "Internal Server Error",
-        "status": 500,
-        "detail": str(exc) or "An unhandled internal server error occurred",
-        "instance": request.url.path,
-    }
-    return JSONResponse(
-        status_code=500,
-        content=problem_details,
-        media_type=media_type,
-    )
+    return format_safe_error_response(request, exc, status_code=500)
 
 
 # ── Content-Type Enforcement Middleware ───────────────────────────────────────

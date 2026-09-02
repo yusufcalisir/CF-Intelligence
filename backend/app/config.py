@@ -96,10 +96,13 @@ class Settings(BaseSettings):
     vault_token: str = "vault_token_dev_2026"
     immutable_audit_chain_enabled: bool = True
 
-    # ── Observability (OpenTelemetry) ─────────
+    # ── Observability (OpenTelemetry & Sentry) ─────────
     otel_enabled: bool = False
     otel_exporter_otlp_endpoint: str = "http://jaeger:4317"
     otel_service_name: str = "cfi-backend"
+    sentry_dsn: str = ""
+    sentry_environment: str = "production"
+    sentry_traces_sample_rate: float = 0.1
 
     # ── MLflow Experiment Tracking ────────────
     mlflow_enabled: bool = True
