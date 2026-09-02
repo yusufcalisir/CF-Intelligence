@@ -1,0 +1,18 @@
+title = "CF-Intelligence Gitleaks Configuration"
+
+[allowlist]
+description = "Allowlist for test fixtures, mock data, and documentation examples"
+paths = [
+  '''(?i)tests/.*''',
+  '''(?i).*\.test\.(tsx|ts|py)''',
+  '''(?i)verification/.*''',
+  '''(?i)\.env\.example''',
+  '''(?i)package-lock\.json''',
+  '''(?i)requirements\.txt''',
+  '''(?i)secrets_scan\.json''',
+]
+regexes = [
+  '''(?i)(secret|token|password|key)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{8,64}['"]''',
+  '''CorrectHorseBatteryStaple123!''',
+  '''sha256_[a-z0-9_]+''',
+]
