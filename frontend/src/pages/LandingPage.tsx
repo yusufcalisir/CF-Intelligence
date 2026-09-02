@@ -2218,9 +2218,28 @@ export default function LandingPage() {
                 <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-indigo-400 uppercase tracking-widest mb-2">Developer & Integration Suite</div>
                 <h2 className="text-2xl sm:text-4xl font-bold text-slate-100 tracking-tight">Enterprise REST API & SDK Specs</h2>
                 <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                  CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.0 REST endpoints for orchestration, compliance audit, and SIEM integrations.
+                  CF-Intelligence provides high-throughput gRPC channels for bank agents and OpenAPI 3.1 REST endpoints for orchestration, compliance audit, and SIEM integrations.
                 </p>
+                <div className="flex flex-wrap items-center gap-3 mt-4">
+                  <a
+                    href="/developer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-mono text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all cursor-pointer"
+                  >
+                    <span>⚡ Launch Interactive API Playground</span>
+                    <span>→</span>
+                  </a>
+                  <a
+                    href="/scalar"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-mono text-xs font-semibold transition-all"
+                  >
+                    <span>📖 Open Scalar Reference</span>
+                    <span className="text-slate-500">↗</span>
+                  </a>
+                </div>
               </div>
+
 
               {/* Integration Features Banner */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4 mb-6 sm:mb-8 w-full min-w-0">
@@ -2331,6 +2350,7 @@ telemetry.on('round.stage', (evt) => {
                     { method: 'POST', path: '/api/v1/security/bridge/disburse', desc: 'Cross-Chain Settlement: disburse Leave-One-Out Shapley incentive payouts via Chainlink CCIP', req: 'epoch_id, pool_amount, currency', res: 'routes, gas_fees_usd, audit_hash' },
                     { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier σ_t via Rényi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
                     { method: 'GET',  path: '/api/v1/audit/records',     desc: 'Query immutable SHA-256 cryptographic audit chain records', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
+                    { method: 'GET',  path: '/api/v1/diagnostics/connectors', desc: 'Enterprise Connector Diagnostics: probe health for Kafka, Vault, KMS, Splunk, Redis & PostgreSQL', req: 'none (HTTP GET)', res: 'connectors array, latency_ms, status: HEALTHY' },
                     { method: 'WS',   path: '/ws/telemetry',             desc: 'Bi-directional WebSocket streaming live training rounds & risk alerts', req: 'jwt_token', res: 'JSON event telemetry stream' },
                   ].map(row => (
                     <div key={row.path} className="p-4 sm:p-5 hover:bg-white/3 transition-colors space-y-2 w-full min-w-0">

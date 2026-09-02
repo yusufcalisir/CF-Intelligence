@@ -9,10 +9,10 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1388%2F1388_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1402%2F1402_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)**
+**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
 
 ---
 
@@ -328,7 +328,9 @@ CF-Intelligence/
 │   │   │       ├── idempotency.py                   # Distributed request deduplication & idempotency keys
 │   │   │       ├── label_feedback_pipeline.py       # Human-in-the-loop analyst feedback ingestion
 │   │   │       ├── streaming_engine.py              # Low-latency Kafka / Redis streaming processor
+│   │   │       ├── connector_diagnostics_service.py # Enterprise connector health, transport ping & probe engine
 │   │   │       └── support_diagnostics.py           # Automated health diagnostics & support bundle generator
+
 │   │   │
 │   │   ├── infrastructure/                          # Infrastructure & External Technology Adapters
 │   │   │   ├── security/                            # Enterprise Security Suite & Cryptographic Drivers
@@ -423,7 +425,7 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 31 Modular FastAPI Routers
+│   │       ├── routers/                             # 32 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
@@ -448,6 +450,7 @@ CF-Intelligence/
 │   │       │   ├── psd2.py                          # Open Banking PSD2 / SCA compliance & risk API
 │   │       │   ├── rules.py                         # Business rule engine management & threshold tuning API
 │   │       │   ├── settlement.py                    # Consortium token settlement & incentive distribution API
+│   │       │   ├── diagnostics.py                   # Enterprise connector diagnostics & active test probes API
 │   │       │   ├── webhook_gateway.py               # Asynchronous webhook registration & HMAC verification API
 │   │       │   ├── design_partner.py                # Enterprise design partner portal & trial provisioning API
 │   │       │   ├── maintenance_cron.py              # Automated background maintenance, cache eviction & zeroization
@@ -852,7 +855,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.02 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Self-Verified (Internal Test Suite)` |
 | **Multi-Tenant Memory/DB Isolation**| **0 Leaks / 100% Isolated** | Isolated State | `test_multi_tenant_security_audit.py` | `Self-Verified (Internal Test Suite)` |
-| **Full Test Suite Pass Rate** | **1,388 / 1,388 passing** | 100% | 1,128 Backend Pytest + 236 Frontend Vitest + 24 SDK/Contract Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,402 / 1,402 passing** | 100% | 1,139 Backend Pytest + 244 Frontend Vitest + 6 Playwright E2E + 13 Smart Contract Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1076,6 +1079,96 @@ The reports below document the internal scientific verification suites validatin
   "ip_failure_count": 0
 }
 ```
+
+### 19.3 Enterprise Connector Diagnostics & Live Probes
+
+**List Connector Health Status (`GET /api/v1/diagnostics/connectors`):**
+```json
+{
+  "status": "healthy",
+  "total_connectors": 7,
+  "healthy_connectors": 7,
+  "degraded_connectors": 0,
+  "unhealthy_connectors": 0,
+  "connectors": [
+    {
+      "id": "kafka_stream",
+      "name": "Apache Kafka (Distributed Event Bus)",
+      "category": "STREAMING",
+      "status": "HEALTHY",
+      "endpoint": "kafka.internal:9092",
+      "latency_ms": 4.2,
+      "last_checked": "2026-09-02T14:35:00Z"
+    },
+    {
+      "id": "vault_pki",
+      "name": "HashiCorp Vault (PKI & Secrets)",
+      "category": "SECURITY",
+      "status": "HEALTHY",
+      "endpoint": "https://vault.internal:8200",
+      "latency_ms": 6.8,
+      "last_checked": "2026-09-02T14:35:00Z"
+    }
+  ]
+}
+```
+
+**Execute On-Demand Connector Ping Probe (`POST /api/v1/diagnostics/test-connector`):**
+```json
+{
+  "connector_id": "splunk_hec"
+}
+```
+
+**Probe Response (HTTP 200 OK):**
+```json
+{
+  "connector_id": "splunk_hec",
+  "status": "HEALTHY",
+  "latency_ms": 11.4,
+  "handshake_trace": [
+    "DNS resolution: splunk.internal -> 10.200.4.15",
+    "TCP SYN/ACK established on port 8088",
+    "TLS 1.3 handshake: ECDHE-RSA-AES256-GCM-SHA384",
+    "HEC Token validation probe: HTTP 200 OK (Channel active)"
+  ],
+  "timestamp": "2026-09-02T14:35:10Z"
+}
+```
+
+### 19.4 Real-Time WebSocket Telemetry Stream
+
+**Connection Endpoint:** `ws://localhost:8000/ws/telemetry` (or `wss://...` in production)
+
+**Inbound Client Subscription Message:**
+```json
+{
+  "action": "subscribe",
+  "channels": ["transactions", "alerts", "heartbeat"]
+}
+```
+
+**Outbound Real-Time Fraud Alert Event Broadcast:**
+```json
+{
+  "type": "FRAUD_ALERT",
+  "transaction_id": "txn_live_994821",
+  "bank_id": "bank_alpha",
+  "amount": 250000.0,
+  "currency": "EUR",
+  "risk_score": 942,
+  "decision": "BLOCK_AND_ESCALATE",
+  "reason": "Velocity surge detected across 3 consortium nodes within 90 seconds",
+  "timestamp": "2026-09-02T14:35:15Z"
+}
+```
+
+### 19.5 Interactive Developer Portal & Scalar API Gateway
+
+- **Dark-Themed Scalar Gateway:** `GET /scalar` (Renders modern `@scalar/api-reference` targeting `/openapi.json`).
+- **Interactive Multi-Language SDK Portal:** Route `/developer` and `/api-docs` provides client generator for **cURL**, **Python (httpx)**, **Node.js (axios)**, **Java (OkHttp)**, and **Go (net/http)** with live in-browser execution runner.
+- **OpenAPI 3.1 JSON Specification:** Available via `GET /openapi.json` or exported directly via the Developer Portal UI.
+
 
 ---
 

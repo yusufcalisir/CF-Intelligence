@@ -48,6 +48,7 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `services/aml_agentic_copilot.py`: Autonomous BSA/AML RAG narrative generator synthesizing 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
 *   `services/federated_unlearning_engine.py`: Confidential federated unlearning engine performing First-Order Hessian Inversion and Sub-sampled Newton Steps parameter erasure for revoked banks.
 *   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, and Canary Gates.
+*   `services/connector_diagnostics_service.py`: Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
 
 *   `security/auth_service.py`: Enterprise authentication service issuing 15-minute short-lived JWT access tokens, single-use refresh token rotation, and 5-fail brute force lockout protection.
 *   `security/password_hasher.py`: Bcrypt password hashing engine (`cost=12`, 4,096 rounds) with per-password cryptographic salts.
@@ -78,10 +79,11 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `celery_app.py`: Background worker queue for handling long-running PyTorch training loops without blocking FastAPI.
 
 ### 2.4 Presentation Layer (`backend/app/presentation/`)
-Interactions with clients.
-*   `main.py`: Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware`, `SecurityHeadersMiddleware`, and `ProductionErrorHandler`.
-*   `routers/*.py`: 31 modular FastAPI REST API endpoints verifying request formats via Pydantic schemas, enforcing `@limiter.limit(...)` and `enforce_tenant_isolation(...)`.
-*   `websockets/*.py`: Persistent WebSocket connections sending training round progress and scenario replay events.
+Interactions with clients and consortium banking nodes.
+*   `main.py`: Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware`, `SecurityHeadersMiddleware`, `ProductionErrorHandler`, and the dark-themed `@scalar/api-reference` gateway at `GET /scalar`.
+*   `routers/*.py`: 32 modular FastAPI REST API endpoints verifying request formats via Pydantic schemas, enforcing `@limiter.limit(...)`, `enforce_tenant_isolation(...)`, and on-demand adapter probes (`diagnostics.py`).
+*   `websockets/streaming_ws.py` & `training_ws.py`: Persistent WebSocket channels broadcasting real-time high-risk fraud alerts (`/ws/telemetry`), telemetry ticks, and live federated training weight updates.
+
 
 
 ---
