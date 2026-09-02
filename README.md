@@ -109,7 +109,7 @@ The core production path focuses on seven defensible engineering components:
 │                      Byzantine-Robust Server Coordinator Engine                      │
 │  - Aggregators: FedAvg / FedProx (mu=0.01) / SCAFFOLD (Control Variates) / Bulyan    │
 │  - Anomaly Filter: Spectral SVD Top Eigenvalue Backdoor Trigger Detection            │
-│  - Non-IID Partitioner: Dirichlet Dir(alpha) Distribution Modeling                 │
+│  - Non-IID Partitioner: Dirichlet Dir(alpha) Distribution Modeling                   │
 └──────────────────────────────────────────┬───────────────────────────────────────────┘
                                            │ Candidate Global Weights
                                            ▼
