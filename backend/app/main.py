@@ -33,6 +33,7 @@ from app.config import get_settings
 from app.infrastructure.security.security_headers import SecurityHeadersMiddleware
 from app.presentation.routers import (
     alerts,
+    auth,
     bank_client,
     banks,
     cases,
@@ -926,6 +927,7 @@ else:
     app.include_router(streaming_ws.router)
     app.include_router(psd2.router)
     app.include_router(security.router)
+    app.include_router(auth.router)
     app.include_router(monitoring.router)
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)

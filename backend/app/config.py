@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     oidc_enabled: bool = True
     oidc_issuer_url: str = "https://auth.cfi-platform.internal/realms/cfi"
     oidc_client_id: str = "cfi-api"
-    oidc_jwt_signing_secret: str = "cfi_oidc_jwt_secret_key_2026"
+    oidc_jwt_signing_secret: str = "cfi_oidc_jwt_secret_key_2026_enterprise_hs256"
 
     abac_enabled: bool = True
     vault_enabled: bool = False
