@@ -85,11 +85,8 @@ def _resolve_database_url(tenant: str | None) -> str:
             os.makedirs(storage_dir, exist_ok=True)
             os.chmod(storage_dir, 0o777)  # nosec B103
         db_name = f"cfi_{tenant}.db" if tenant else "cfi_central.db"
-        db_path = os.path.abspath(os.path.join(storage_dir, db_name))
-        clean_path = db_path.replace("\\", "/")
-        if not clean_path.startswith("/"):
-            clean_path = f"/{clean_path}"
-        return f"sqlite+aiosqlite://{clean_path}"
+        db_path = os.path.abspath(os.path.join(storage_dir, db_name)).replace("\\", "/")
+        return f"sqlite+aiosqlite:///{db_path}"
 
     # PostgreSQL / CockroachDB: append tenant suffix to database name
     base_db = settings.postgres_db
