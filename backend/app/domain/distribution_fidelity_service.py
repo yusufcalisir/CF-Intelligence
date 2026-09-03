@@ -46,7 +46,7 @@ class DistributionFidelityReport:
     class_imbalance_ratio_real: float
     class_imbalance_ratio_synth: float
     feature_metrics: list[FeatureFidelityMetric]
-    degradation_metrics: dict[str, float]
+    degradation_metrics: dict[str, Any]
     summary_verdict: str  # "HIGH_FIDELITY" | "MODERATE_SHIFT" | "EXTREME_SHIFT"
 
     def to_dict(self) -> dict[str, Any]:
@@ -121,7 +121,7 @@ def audit_distribution_fidelity(
     y_synth: np.ndarray,
     feature_names: list[str] | None = None,
     dataset_name: str = "PaySim (M-Pesa Real Benchmark)",
-    degradation_metrics: dict[str, float] | None = None,
+    degradation_metrics: dict[str, Any] | None = None,
 ) -> DistributionFidelityReport:
     """Audit statistical fidelity between real benchmark data and synthetic generator data."""
     num_features = min(X_real.shape[1], X_synth.shape[1])

@@ -553,7 +553,12 @@ class ExplainabilityService:
                         best_desc = desc
                         best_orig = orig_val
 
-            if best_candidate and best_score < current_score:
+            if (
+                best_candidate is not None
+                and best_feat is not None
+                and best_desc is not None
+                and best_score < current_score
+            ):
                 working_txn, working_ml = best_candidate
                 applied_features.add(best_feat)
 
