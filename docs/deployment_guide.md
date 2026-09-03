@@ -1,12 +1,77 @@
-# 🌐 Multi-Node Network-Isolated Deployment Guide
+# 🌐 Enterprise Deployment Guide: From Single-Node On-Premises to Multi-Node Mesh
 
-This guide details the deployment of the **Collaborative Fraud Intelligence (CFI)** platform in a multi-container, network-isolated topology using `docker-compose.multinode.yml`.
-
-Unlike single-process simulations, this architecture enforces strict network isolation boundaries between participating financial institutions (`bank-a`, `bank-b`) and the central coordinator.
+This comprehensive guide details the deployment of the **Collaborative Fraud Intelligence (CFI)** platform across two deployment models:
+1. **Part 1: One-Click Enterprise On-Premises Production Stack (`docker-compose.yml`)** — The unified production stack for hosting the security gateway, frontend SPA, backend API, PostgreSQL 16, and Redis 7.2 on an enterprise bank server in under 30 seconds.
+2. **Part 2: Multi-Node Network-Isolated Distributed Cluster (`docker-compose.multinode.yml`)** — The multi-container distributed topology enforcing strict subnet isolation across distinct bank institutions.
 
 ---
 
-## 🏗️ Architecture Overview
+# Part 1: One-Click Enterprise On-Premises Stack (`docker-compose.yml`)
+
+## 1.1 Architectural Topology
+
+```
+[ Bank Network / Corporate Browser / Core Banking ESB ]
+        │
+        ▼ (Port 80 / 443)
+  ┌─────────────────────────────────────────────────────────────┐
+  │ 1. Enterprise Nginx Gateway (`cfi-gateway`)                 │
+  │    • Same-Origin Routing: eliminates browser CORS           │
+  │    • WebSocket Keepalive: 86400s timeout on /ws/*           │
+  │    • Hardened Headers: HSTS, CSP, X-Frame-Options: SAMEORIGIN│
+  └──────────────────────┬──────────────────────────────────────┘
+                         │
+        ┌────────────────┴────────────────┐
+        ▼ (/ and /assets/*)               ▼ (/api/* and /ws/*)
+  ┌───────────────────────────┐     ┌───────────────────────────┐
+  │ 2. Frontend Web Container │     │ 3. Backend API & Engine   │
+  │    (`cfi-frontend`)       │     │    (`cfi-api-server`)     │
+  │    • Multi-stage Alpine   │     │    • Python 3.12, Gunicorn│
+  │    • HTML5 pushstate SPA  │     │    • Non-root user (1000) │
+  └───────────────────────────┘     └─────────────┬─────────────┘
+                                                  │
+                         ┌────────────────────────┴────────────────────────┐
+                         ▼ (State / Relational)                            ▼ (Cache / Events)
+  ┌───────────────────────────────────────────────┐ ┌───────────────────────────────────────────────┐
+  │ 4. PostgreSQL 16 Enterprise Database          │ │ 5. Redis 7.2 Cache & Message Broker           │
+  │    (`cfi-postgres`)                           │ │    (`cfi-redis`)                              │
+  │    • Idempotent init SQL (01-init.sql)        │ │    • Protected mode auth, AOF persistence     │
+  │    • pg_isready healthcheck gating            │ │    • Memory ceiling (512MB volatile-lru)      │
+  └───────────────────────────────────────────────┘ └───────────────────────────────────────────────┘
+```
+
+## 1.2 Step-by-Step Operator Instructions
+
+### Step 1: Generate Cryptographically Secure Production Secrets
+Run the platform secrets generator to populate `.env` with 256-bit random tokens:
+```bash
+python scripts/generate_secrets.py
+```
+
+### Step 2: Pre-Flight Configuration Verification
+Assert zero Compose syntax drift and verify service manifest integrity:
+```bash
+python scripts/verify_docker_deployment.py
+```
+
+### Step 3: Launch Enterprise Stack
+Spin up all 5 production containers:
+```bash
+docker compose up -d --build
+```
+
+### Step 4: Verify Live Service Health
+Check container health statuses:
+```bash
+docker compose ps
+```
+All containers (`cfi-gateway`, `cfi-frontend`, `cfi-api-server`, `cfi-postgres`, `cfi-redis`) should transition to `healthy`.
+
+---
+
+# Part 2: Multi-Node Network-Isolated Deployment (`docker-compose.multinode.yml`)
+
+## 2.1 Architecture Overview
 
 ```
 Bank A Private Subnet (bank-a-net)          Bank B Private Subnet (bank-b-net)

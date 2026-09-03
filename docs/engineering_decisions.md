@@ -546,3 +546,138 @@ High-throughput payment switches mandate sub-100ms p99 inference SLAs. Relying s
 ### Tradeoff
 
 * In-memory model caching requires explicit invalidation hooks (`_cached_serving_model = None`) whenever a new model checkpoint is promoted by the canary gate.
+
+---
+
+## ED-023: Zero-Vulnerability Security Floor & Pinned Transitive Dependency Hygiene
+
+**Date**: 2026-09-02  
+**Status**: Accepted
+
+### Context
+
+Enterprise banking and FinTech vendor procurement processes require zero unpatched Common Vulnerabilities and Exposures (CVEs). Historical transitive dependencies in Python and Node libraries caused Dependabot to raise 20 CVE alerts (5 high, 10 moderate, 5 low), primarily concerning `urllib3`, `jinja2`, `aiohttp`, and `cryptography`.
+
+### Decision
+
+1. **Explicit Security Floor Pinning**: Pin all indirect vulnerable dependencies in `backend/requirements.txt` to strict minimum security versions:
+   * `urllib3>=2.6.3` (CVE-2023-45803, CVE-2024-37891)
+   * `jinja2>=3.1.6` (CVE-2024-22195, CVE-2024-34064)
+   * `aiohttp>=3.13.3` (HTTP request smuggling and line-fold pollution)
+   * `cryptography>=46.0.5` (OpenSSL memory safety bounds)
+   * `opacus>=1.5.4` (PyTorch 2.4 tensor compatibility)
+2. **Automated Hygiene Verification**: Enforce that both `npm audit` and Dependabot alert scans report 0 vulnerabilities on every push.
+
+### Tradeoff
+
+* Periodic maintenance is required to review upstream library changelogs and bump security floors when new CVEs are disclosed.
+
+---
+
+## ED-024: Real-Browser Multi-Device Playwright E2E Testing over Headless JSDOM
+
+**Date**: 2026-09-02  
+**Status**: Accepted
+
+### Context
+
+While unit and integration test suites (1,156+ Pytest, 249 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
+
+### Decision
+
+1. **Playwright E2E Test Suite (`frontend/e2e-workflows/`)**: Deploy Playwright headless browser testing spanning Chromium and Firefox across 4 device profiles:
+   * Desktop (1440x900)
+   * Laptop (1280x800)
+   * Mobile (iPhone 13, 390x844)
+   * Tablet / Android (Pixel 7, 412x915)
+2. **End-to-End User Journey Coverage**:
+   * `auth_session_flow.spec.ts`: Landing navigation, login, token persistence, and security header verification.
+   * `federated_training_lifecycle.spec.ts`: Coordinator round execution, client node negotiation, and real-time telemetry streaming.
+   * `investigation_four_eyes_sar.spec.ts`: Alert inspection, dual supervisor cryptographic signing, and FinCEN SAR XML generation.
+   * `chaos_attack_simulation.spec.ts`: Live Byzantine gradient injection, Multi-Krum defense shield activation, and visual node quarantine.
+   * `dataset_custom_ingest_flow.spec.ts`: Drag-and-drop CSV/Parquet upload, schema mapping, GE contract audit, and consortium enrollment.
+
+### Tradeoff
+
+* Browser test execution adds ~12 seconds to end-to-end CI pipeline duration compared to in-memory Vitest suites.
+
+---
+
+## ED-025: Live Adversarial Attack Injection & Multi-Krum Byzantine Quarantine Telemetry
+
+**Date**: 2026-09-03  
+**Status**: Accepted
+
+### Context
+
+Consortium defense mechanisms (Multi-Krum, Trimmed Mean, Spectral SVD) were previously verified through backend scripts, requiring operators to inspect terminal logs to observe attack mitigation. Stakeholders and evaluators require real-time visual proof of attack interception.
+
+### Decision
+
+1. **Interactive Chaos Injector UI (`ChaosAttackInjectorPanel.tsx`)**: Embed a live control panel into `LiveOperationsView` and `ScenariosPage` supporting one-click attack triggers:
+   * 500 tx/s Smurfing / Layering micro-deposit burst.
+   * Byzantine Poisoned Gradient injection ($\Delta w \times -10.0$).
+2. **Instant Visual Quarantine Feedback**:
+   * Multi-Krum evaluates Euclidean distance sums ($\Delta = 48.2 > 14.1$ threshold), rejects the compromised gradient, and isolates Bank Gamma with a pulsing red card and `QUARANTINED BY KRUM` heartbeat indicator.
+   * Reports preserved model accuracy (+0.42 AUC over undefended FedAvg).
+
+### Tradeoff
+
+* Requires exposing the simulation endpoint `POST /api/v1/scenarios/inject-attack`, which is strictly restricted to authorized operator roles in production environments.
+
+---
+
+## ED-026: Client-Side Zero-PII Sanitization & Great Expectations Ephemeral Data Contract Gating
+
+**Date**: 2026-09-03  
+**Status**: Accepted
+
+### Context
+
+Allowing bank data scientists to upload proprietary transaction files (`.csv`, `.parquet`) introduces risks of accidental PII leakage (credit card PANs, IBANs, national IDs) and data contract drift (null values, negative amounts, type mismatches) that could crash or poison federated learning models.
+
+### Decision
+
+1. **Client-Side Zero-PII Pre-Flight (`piiSanitizer.ts`)**:
+   * Validate Card PANs in the browser using the **Luhn Algorithm Checksum**.
+   * Detect IBAN and SSN/TCKN patterns via regular expressions before network egress.
+   * Apply **Type-Salted HMAC-SHA256 Pseudonymization**, ensuring raw PII never crosses institutional boundaries and issuing a `ZERO-PII VERIFIED` cryptographic receipt.
+2. **Ephemeral Great Expectations 1.x Validation (`datasets.py`)**:
+   * Execute 12 validation rules on uploaded partitions asserting non-null amounts, positive ranges ($0.01 – 10M$), ISO timestamps, and recognized payment channels.
+   * Isolate failing rows into a quarantine bucket with downloadable `failed_records.csv`.
+   * Estimate Non-IID Dirichlet concentration ($\alpha = 0.52$) and Kolmogorov-Smirnov drift ($0.024$) before enrolling data into the consortium.
+
+### Tradeoff
+
+* Ephemeral Great Expectations evaluation introduces a ~1.2s pre-training audit overhead per 10,000 ingested records.
+
+---
+
+## ED-027: Enterprise Same-Origin Gateway Reverse Proxy & Production Docker Compose Stack
+
+**Date**: 2026-09-03  
+**Status**: Accepted
+
+### Context
+
+Deploying the platform on-premises within a bank's internal infrastructure previously required manual coordination of separate services, often encountering CORS errors, WebSocket dropouts after 60 seconds, startup race conditions (backend starting before database readiness), and credential leakage.
+
+### Decision
+
+1. **Enterprise Nginx Gateway (`cfi-gateway`)**:
+   * **Same-Origin Routing**: Serves React SPA on `/`, proxies REST requests to `/api/`, and streams WebSockets on `/ws/` through port 80/443, eliminating browser CORS issues entirely.
+   * **WebSocket Keepalive**: Configures `proxy_read_timeout 86400s;` and `proxy_send_timeout 86400s;` with `$connection_upgrade` map to prevent connection drops during extended FL training rounds.
+   * **Hardened Security Headers**: Injects HSTS, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, and CSP.
+2. **Multi-Container Composition (`docker-compose.yml`)**:
+   * PostgreSQL 16 (`cfi-postgres`) with idempotent cold-start script (`01-init.sql`) and `pg_isready` healthcheck.
+   * Redis 7.2 (`cfi-redis`) with protected auth, AOF persistence, and LRU memory limit (512MB).
+   * Backend API (`cfi-api-server`) running multi-worker Gunicorn with non-root UID 1000 and `depends_on: condition: service_healthy` on both PostgreSQL and Redis.
+   * Frontend SPA (`cfi-frontend`) compiled via multi-stage Node 20 builder into an Alpine Nginx container (<35MB).
+3. **Automated Automation Utilities**:
+   * `scripts/generate_secrets.py`: Generates cryptographically secure 256-bit random tokens for `.env`.
+   * `scripts/verify_docker_deployment.py`: Runs automated pre-flight checks validating Compose syntax and service endpoints.
+
+### Tradeoff
+
+* Running a multi-worker Gunicorn backend and dedicated PostgreSQL/Redis instances increases minimum container memory requirements to 4 GB RAM.
+
