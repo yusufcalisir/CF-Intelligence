@@ -344,7 +344,7 @@ class FederatedLearningServicer:
 
         # 4. Persistence to gradient_submissions DB table
         await self._persist_gradient_submission(
-            round_id=str(request.round_id),
+            round_id=request.round_id,
             bank_id=request.bank_id,
             gradient_hash=gradient_hash,
             dp_epsilon_used=request.dp_epsilon_used,
@@ -356,7 +356,7 @@ class FederatedLearningServicer:
         audit_chain.append_event(
             event_type="GRADIENT_RECEIVED",
             actor=request.bank_id,
-            target_id=str(request.round_id),
+            target_id=request.round_id,
             details={
                 "gradient_hash": gradient_hash,
                 "dp_epsilon": request.dp_epsilon_used,
@@ -366,7 +366,7 @@ class FederatedLearningServicer:
         )
 
         # 6. Quorum Check & Aggregation Trigger
-        round_key = str(request.round_id)
+        round_key = request.round_id
         if round_key not in self.round_submissions:
             self.round_submissions[round_key] = []
 

@@ -85,10 +85,12 @@ async def test_full_onboarding_pipeline_sets_active(
     # Cryptographically verify the issued X.509 certificate and private key
     from cryptography import x509
     from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa as _rsa
 
     parsed_cert = x509.load_pem_x509_certificate(cert.encode("utf-8"))
     parsed_key = serialization.load_pem_private_key(key.encode("utf-8"), password=None)
     assert parsed_cert.subject.rfc4514_string() == "CN=bank_test2.client.cf-intelligence.io"
+    assert isinstance(parsed_key, _rsa.RSAPrivateKey)
     assert parsed_key.key_size == 2048
 
     await service.provision_tenant_schema("bank_test2")
@@ -99,7 +101,7 @@ async def test_full_onboarding_pipeline_sets_active(
     assert activated.status == BankStatus.ACTIVE
     assert activated.schema_provisioned
     assert activated.vault_key_path == "transit/keys/tenant_bank_test2"
-    assert activated.cert_fingerprint.startswith("SHA256:")
+    assert activated.cert_fingerprint is not None and activated.cert_fingerprint.startswith("SHA256:")
 
 
 @pytest.mark.asyncio
@@ -133,7 +135,11 @@ async def test_two_banks_receive_distinct_x509_certificates(db_session: AsyncSes
     # Assert distinct certificates and public key material
     assert cert1 != cert2
     assert key1 != key2
-    assert x509_1.public_key().public_numbers().n != x509_2.public_key().public_numbers().n
+    from cryptography.hazmat.primitives.asymmetric import rsa as _rsa
+    pub1 = x509_1.public_key()
+    pub2 = x509_2.public_key()
+    assert isinstance(pub1, _rsa.RSAPublicKey) and isinstance(pub2, _rsa.RSAPublicKey)
+    assert pub1.public_numbers().n != pub2.public_numbers().n
     assert x509_1.fingerprint(hashes.SHA256()) != x509_2.fingerprint(hashes.SHA256())
 
 
