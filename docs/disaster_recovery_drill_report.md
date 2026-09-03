@@ -42,6 +42,9 @@ To scientifically validate the contractual disaster recovery guarantees in [`doc
 * **Effective Measured RTO**: **$15.02\text{ seconds}$** (Target: $<30.0\text{ seconds}$).
 * **Effective Measured RPO**: **$0\text{ transactions lost}$** (Target: $0$).
 
+> [!NOTE]
+> **Methodological Scope:** This measurement reflects an in-memory state transition drill (`chaos_dr_drill.py`) consisting of a configured $15.0\text{s}$ baseline heartbeat timeout plus ~10-20ms logical promotion; it is a logical simulation drill, not a measurement of live multi-region cloud infrastructure DNS cutover.
+
 ---
 
 ## 3. Automated Test Suite Reference
