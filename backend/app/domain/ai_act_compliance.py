@@ -565,7 +565,7 @@ def generate_transparency_report(model_id: str) -> bytes:
         canvas_cls = pdfgen_canvas.Canvas
 
         buffer = BytesIO()
-        c = canvas_cls(buffer, pagesize=letter)
+        c = canvas_cls(buffer, pagesize=letter, pageCompression=0)
         c.setFont("Helvetica-Bold", 16)
         c.drawString(50, 750, title)
         c.setFont("Helvetica", 10)

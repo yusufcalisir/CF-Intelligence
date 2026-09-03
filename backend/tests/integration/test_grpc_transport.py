@@ -13,6 +13,7 @@ from app.infrastructure.grpc.servicer import FederatedLearningServicer
 async def test_grpc_mtls_handshake_succeeds() -> None:
     """Verifies gRPC client registration and session token issuance under valid mTLS cert."""
     servicer = FederatedLearningServicer()
+    servicer.register_bank_fingerprint("bank_alpha", "SHA256:valid_cert_fingerprint_hash_12345")
     client = GRPCBankClient(servicer=servicer)
 
     res = await client.register(

@@ -51,21 +51,41 @@ class TestCounterfactualEngine:
         assert "transaction_amount" in features_changed or "country_code" in features_changed
 
     def test_counterfactual_executes_real_risk_engine_search(self):
-        """Verifies that counterfactual remediated_score is computed by real RiskScoringEngine."""
+        """Verifies that counterfactual remediated_score is computed by real RiskScoringEngine and strictly clears target threshold."""
         from app.application.services.risk_engine import RiskScoringEngine
 
         svc = ExplainabilityService()
         engine = RiskScoringEngine()
         alert = _make_sample_alert(risk_score=850.0)
+        target_threshold = 350.0
 
-        cf = svc.generate_counterfactuals(alert, target_score=350.0, risk_engine=engine)
+        result = svc.generate_counterfactuals(alert, target_score=target_threshold, risk_engine=engine)
 
-        assert cf.original_score == 850.0
-        assert cf.remediated_score < 850.0
-        assert cf.is_cleared is True
-        assert len(cf.changes) >= 1
-        assert isinstance(cf.remediated_score, float)
-        assert cf.remediated_score <= 350.0
+        assert result.original_score == 850.0
+        assert result.remediated_score <= target_threshold
+        assert result.is_cleared is True
+        assert len(result.changes) >= 1
+        assert isinstance(result.remediated_score, float)
+
+    def test_counterfactual_honest_failure_when_unreachable(self):
+        """Verifies that when target threshold is deliberately unreachable within the search budget (e.g. 10.0),
+        the search reports failure honestly rather than forcing a fake cleared status.
+        """
+        from app.application.services.risk_engine import RiskScoringEngine
+
+        svc = ExplainabilityService()
+        engine = RiskScoringEngine()
+        alert = _make_sample_alert(risk_score=850.0)
+        unreachable_target = 10.0
+
+        result = svc.generate_counterfactuals(alert, target_score=unreachable_target, risk_engine=engine)
+
+        # Confirm search reports failure honestly
+        assert result.original_score == 850.0
+        assert result.is_cleared is False
+        assert result.remediated_score <= result.original_score
+        assert result.remediated_score > unreachable_target
+        assert "did not reach" in result.summary_text
 
 
 class TestDecisionReplayAudit:

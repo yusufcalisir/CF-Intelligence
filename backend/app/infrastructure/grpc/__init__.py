@@ -2,7 +2,7 @@
 
 from app.infrastructure.grpc.client import GRPCBankClient
 from app.infrastructure.grpc.server import GRPCServerManager
-from app.infrastructure.grpc.servicer import FederatedLearningServicer
+from app.infrastructure.grpc.servicer import FederatedLearningServicer, register_bank_fingerprint
 from app.infrastructure.grpc.types import (
     AggregationAck,
     ClientHeartbeat,
@@ -28,4 +28,5 @@ __all__ = [
     "ModelChunk",
     "ModelDownloadRequest",
     "ParameterChunk",
+    "register_bank_fingerprint",
 ]

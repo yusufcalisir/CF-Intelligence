@@ -87,24 +87,63 @@ class InvestigatorCaseWorkbenchService:
             notes=f"Escalated: {reason}",
         )
 
-    def resolve_case(
+    def add_supervisor_signature(
         self,
         case_id: str,
-        determination: InvestigatorCaseStatus,
         supervisor_signature: str,
         actor_id: str,
-        notes: str = "Final resolution determination",
+        notes: str = "Recorded supervisor authorization signature",
     ) -> FraudCaseRecord:
-        """Resolves a case with Four-Eyes supervisor dual-authorization signature."""
+        """Records a supervisor signature, transitioning to PENDING_SECOND_SIGNATURE if first signature."""
         if case_id not in self._cases:
             raise KeyError(f"Case '{case_id}' does not exist.")
 
         record = self._cases[case_id]
+        if record.status in (
+            InvestigatorCaseStatus.UNDER_INVESTIGATION,
+            InvestigatorCaseStatus.ESCALATED,
+        ):
+            return self.state_machine.transition_case(
+                record=record,
+                target_status=InvestigatorCaseStatus.PENDING_SECOND_SIGNATURE,
+                actor_id=actor_id,
+                supervisor_signatures=[supervisor_signature],
+                notes=notes,
+            )
+
+        # If already in PENDING_SECOND_SIGNATURE, record the second signature
+        if supervisor_signature not in record.supervisor_signatures:
+            record.supervisor_signatures.append(supervisor_signature)
+        return record
+
+    def resolve_case(
+        self,
+        case_id: str,
+        determination: InvestigatorCaseStatus,
+        supervisor_signature: str | None = None,
+        actor_id: str = "SUPERVISOR",
+        notes: str = "Final resolution determination",
+        second_supervisor_signature: str | None = None,
+        supervisor_signatures: list[str] | None = None,
+    ) -> FraudCaseRecord:
+        """Resolves a case with Four-Eyes supervisor dual-authorization signatures."""
+        if case_id not in self._cases:
+            raise KeyError(f"Case '{case_id}' does not exist.")
+
+        record = self._cases[case_id]
+        sigs: list[str] = []
+        if supervisor_signatures:
+            sigs.extend(supervisor_signatures)
+        if supervisor_signature:
+            sigs.append(supervisor_signature)
+        if second_supervisor_signature:
+            sigs.append(second_supervisor_signature)
+
         return self.state_machine.transition_case(
             record=record,
             target_status=determination,
             actor_id=actor_id,
-            supervisor_signature=supervisor_signature,
+            supervisor_signatures=sigs,
             notes=notes,
         )
 

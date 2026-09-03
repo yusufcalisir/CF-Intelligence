@@ -826,14 +826,15 @@ flowchart LR
 | :--- | :--- | :--- | :--- | :---: |
 | **Layer 1** | **Cloudflare Perimeter** | Anycast WAF & Bot Management (`deployments/terraform/cloudflare/`) | L3/L4 DDoS absorption, Bot Fight Mode, TLS 1.3 Strict, 60 reqs / 10s on `/api/*`. | `403 Challenge` / `429` |
 | **Layer 2** | **Vercel Edge Network** | Distributed Edge Middleware (`frontend/middleware.ts`) | `@upstash/ratelimit` global sliding window: 20 reqs/min for ML inference, 60 reqs/min for general API. | `429 Too Many Requests` |
-| **Layer 3** | **FastAPI Application** | `slowapi` & `DDoSProtectionMiddleware` (`backend/app/infrastructure/security/rate_limiter.py`) | In-process granular quotas (`/predict`: 60/min, `/simulations`: 10/min) with bounded IP table pruning. | `429 Too Many Requests` |
+| **Layer 3** | **FastAPI Application** | `slowapi` & `DDoSProtectionMiddleware` (`backend/app/main.py`) | In-process granular quotas (`/predict`: 60/min, `/simulations`: 10/min) and sliding-window burst protection (100 req/10s) with 5,000 IP hard ceiling eviction. | `429 Too Many Requests` |
 
-### 10.2 Broken Object Level Authorization (BOLA/IDOR) Multi-Tenant Isolation
+### 10.2 Broken Object Level Authorization (BOLA/IDOR) & gRPC Cross-Tenant Isolation
 
 To eliminate Broken Access Control (OWASP API1:2023), the platform implements cryptographic tenant verification across all alert, entity, and case presentation endpoints:
 - **Tenant Identity Extraction:** Decodes OIDC JWT bearer tokens (`sub`, `bank_id`, `roles`), `X-Tenant-ID`, and `X-Bank-ID` headers with cross-bank investigator bypass (`super_admin`, `cross_bank_investigator`, `compliance_auditor`).
 - **Middleware Interception:** `TenantAccessControlMiddleware` intercepts incoming requests, blocking cross-tenant URL parameter tampering (`?bank_id=other_bank`) with `HTTP 403 Forbidden` (`https://cfi-platform.org/errors/TenantAccessDenied`).
 - **Endpoint-Level Isolation:** Routers invoke `enforce_tenant_isolation(caller_tenant, target_bank_id)` to ensure callers can never inspect foreign bank alert payloads or graph entities.
+- **gRPC mTLS Cross-Tenant Registration:** In the gRPC transport servicer (`servicer.py`), certificate fingerprints are bound authoritatively at onboarding time (`issue_mtls_certificate`), not on first gRPC contact — this closes the trust-on-first-use race condition where an unregistered attacker could claim a bank identity before the legitimate bank onboards. Note: this still relies on a self-signed certificate model rather than a full CA chain of trust (Vault PKI root CA signature verification is not yet implemented); that remains a known scope limitation.
 
 ### 10.3 Enterprise Authentication & Brute-Force Lockout Defense (`auth_service.py` & `password_hasher.py`)
 
@@ -893,8 +894,8 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
 
 ## 11. Human-in-the-Loop Workbench & Regulatory Reporting
 
-- **6-Stage Case Workbench (`case_workbench.py`):** Manages alert review lifecycles (`NEW` $\to$ `UNDER_REVIEW` $\to$ `SAR_PENDING` $\to$ `CLOSED`) with Four-Eyes Dual Supervisor Signature validation (`SIG_SUPERVISOR_*`).
-- **FinCEN BSA SAR XML Compiler (`regulatory_reporter.py`):** Generates compliant Suspicious Activity Report (SAR) XML schema documents for regulatory e-filing.
+- **6-Stage Case Workbench (`case_workbench.py`):** Manages alert review lifecycles (`NEW` $\to$ `ASSIGNED` $\to$ `UNDER_INVESTIGATION` $\to$ `PENDING_SECOND_SIGNATURE` $\to$ `RESOLVED_CONFIRMED_FRAUD` / `RESOLVED_FALSE_POSITIVE`, with optional `ESCALATED`) enforcing Four-Eyes dual supervisor signature authorization. Resolving a case strictly requires two distinct supervisor identities (`SIG_SUPERVISOR_<ID1>`, `SIG_SUPERVISOR_<ID2>`); single signatures and duplicate signers are cryptographically rejected.
+- **FinCEN BSA SAR XML Compiler (`regulatory_reporter.py`):** Generates compliant Suspicious Activity Report (SAR) XML documents validated against the official FinCEN BSA XML Schema 2.0 (`backend/schemas/FinCEN_SAR_2.0.xsd`) using `lxml.etree.XMLSchema`.
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records.
 
 ---
@@ -904,7 +905,7 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
 - **Active-Passive Multi-Region Failover (`region_failover.py`):** Automates standby region promotion upon primary heartbeat timeout (>15s), with target $\text{RTO} < 30\text{s}$.
 - **Operator CLI (`cfi_cli.py`):** Command-line tool for monitoring platform health, inspecting cluster status, and triggering administrative tasks.
 - **Production-Hardened Systemic Resilience:**
-  - *DDoS Memory Pruning:* Automatic IP timestamp sliding window cleanup preventing dictionary memory exhaustion (`_MAX_TRACKED_IPS = 1000`).
+  - *DDoS Memory Pruning:* Automatic IP timestamp sliding window cleanup preventing dictionary memory exhaustion (`_MAX_TRACKED_IPS = 1000`), backed by LRU hard ceiling eviction bound at `_HARD_CEILING_TRACKED_IPS = 5000` concurrent active IPs.
   - *Byzantine Non-Finite Isolation:* Immediate client quarantining on `NaN`/`Inf` model updates and champion fallback in `fl_engine.py` and `spectral_defense.py`.
   - *Universal Safe Evaluation:* Centralized `safe_roc_auc_score` and `safe_pr_auc_score` preventing single-class / empty-array evaluation crashes.
   - *Multi-Tier Redis Caching:* In-memory LRU fast paths ($\sim 0.001\text{ms}$) with 0.1s socket connect timeouts and graceful degradation to local DB/PyTorch.

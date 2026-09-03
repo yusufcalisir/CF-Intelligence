@@ -42,6 +42,15 @@ MAX_EPSILON = 10.0
 DEFAULT_QUORUM = 3
 
 
+# Authoritative bank node certificate fingerprints registered during onboarding: bank_id -> cert_fingerprint
+_AUTHORITATIVE_BANK_FINGERPRINTS: dict[str, str] = {}
+
+
+def register_bank_fingerprint(bank_id: str, cert_fingerprint: str) -> None:
+    """Authoritatively register an authorized bank certificate fingerprint at onboarding time."""
+    _AUTHORITATIVE_BANK_FINGERPRINTS[bank_id.lower().strip()] = cert_fingerprint.strip()
+
+
 class FederatedLearningServicer:
     """gRPC Servicer handling client registration, streaming heartbeats, parameter aggregation, and model downloads."""
 
@@ -60,11 +69,51 @@ class FederatedLearningServicer:
         self.share_store: dict[int, dict[tuple[str, str], EncryptedShareBundle]] = {}
         # Dropout shares store: round_id -> { reporting_bank -> DropoutRecoveryRequest }
         self.dropout_share_store: dict[int, dict[str, DropoutRecoveryRequest]] = {}
+        # Registered bank node certificate fingerprints: bank_id -> cert_fingerprint
+        self.registered_fingerprints: dict[str, str] = dict(_AUTHORITATIVE_BANK_FINGERPRINTS)
+
+    def register_bank_fingerprint(self, bank_id: str, cert_fingerprint: str) -> None:
+        """Authoritatively registers an authorized certificate fingerprint for an onboarding bank node."""
+        key = bank_id.lower().strip()
+        fp = cert_fingerprint.strip()
+        self.registered_fingerprints[key] = fp
+        _AUTHORITATIVE_BANK_FINGERPRINTS[key] = fp
+
+    async def _lookup_authoritative_fingerprint(self, bank_key: str) -> str | None:
+        """Looks up authoritative fingerprint in memory, falling back to durable DB record in TenantConfigModel."""
+        if bank_key in self.registered_fingerprints:
+            return self.registered_fingerprints[bank_key]
+        if bank_key in _AUTHORITATIVE_BANK_FINGERPRINTS:
+            fp = _AUTHORITATIVE_BANK_FINGERPRINTS[bank_key]
+            self.registered_fingerprints[bank_key] = fp
+            return fp
+
+        try:
+            from sqlalchemy import select
+            from app.infrastructure.database import get_session_factory
+            from app.infrastructure.models import TenantConfigModel
+
+            session_factory = get_session_factory()
+            async with session_factory() as session:
+                stmt = select(TenantConfigModel.cert_fingerprint).where(
+                    TenantConfigModel.bank_id == bank_key
+                )
+                res = await session.execute(stmt)
+                db_fp = res.scalar_one_or_none()
+                if db_fp:
+                    cleaned = db_fp.strip()
+                    self.registered_fingerprints[bank_key] = cleaned
+                    _AUTHORITATIVE_BANK_FINGERPRINTS[bank_key] = cleaned
+                    return cleaned
+        except Exception as exc:
+            logger.debug("Database lookup for tenant fingerprint unavailable: %s", exc)
+
+        return None
 
     async def RegisterClient(  # noqa: N802
         self, request: ClientRegisterRequest
     ) -> ClientRegisterResponse:
-        """RPC 1: Register client node, validate certificate fingerprint, and issue session token."""
+        """RPC 1: Register client node, validate certificate fingerprint against authoritative onboarding records."""
         logger.info(
             "gRPC RegisterClient request from bank_id=%s, bank_name=%s, fp=%s",
             request.bank_id,
@@ -72,13 +121,58 @@ class FederatedLearningServicer:
             request.certificate_fingerprint,
         )
 
-        # Certificate validation check
-        if request.certificate_fingerprint.startswith(
-            "INVALID"
-        ) or request.certificate_fingerprint.startswith("REVOKED"):
+        presented_fp = request.certificate_fingerprint.strip()
+        bank_key = request.bank_id.lower().strip()
+
+        # 1. Certificate revocation/invalid format check
+        if presented_fp.startswith("INVALID") or presented_fp.startswith("REVOKED"):
             logger.warning(
-                "Rejected gRPC registration for node %s due to invalid/revoked certificate",
+                "Rejected gRPC registration for node %s due to invalid/revoked certificate (%s)",
                 request.bank_id,
+                presented_fp,
+            )
+            return ClientRegisterResponse(
+                session_token="",
+                assigned_cluster_id=-1,
+                is_accepted=False,
+            )
+
+        # 2. Anti-spoofing: Check if this fingerprint is already bound to a DIFFERENT registered bank
+        known_fingerprints = {**_AUTHORITATIVE_BANK_FINGERPRINTS, **self.registered_fingerprints}
+        for reg_bank, reg_fp in known_fingerprints.items():
+            if reg_bank != bank_key and reg_fp.lower() == presented_fp.lower():
+                logger.warning(
+                    "Cross-tenant certificate spoofing rejected: bank '%s' presented fingerprint registered to '%s'",
+                    request.bank_id,
+                    reg_bank,
+                )
+                return ClientRegisterResponse(
+                    session_token="",
+                    assigned_cluster_id=-1,
+                    is_accepted=False,
+                )
+
+        # 3. Authoritative Onboarding Check (Strictly No TOFU):
+        # Reject outright if bank was never onboarded via issue_mtls_certificate
+        expected_fp = await self._lookup_authoritative_fingerprint(bank_key)
+        if expected_fp is None:
+            logger.warning(
+                "Rejected gRPC registration for un-onboarded bank '%s': no certificate issued during onboarding",
+                request.bank_id,
+            )
+            return ClientRegisterResponse(
+                session_token="",
+                assigned_cluster_id=-1,
+                is_accepted=False,
+            )
+
+        # 4. Fingerprint Match Check: Presented fingerprint must match authoritative record
+        if expected_fp.lower() != presented_fp.lower():
+            logger.warning(
+                "Certificate fingerprint mismatch for bank '%s': expected %s, got %s",
+                request.bank_id,
+                expected_fp,
+                presented_fp,
             )
             return ClientRegisterResponse(
                 session_token="",
@@ -92,7 +186,7 @@ class FederatedLearningServicer:
         self.active_sessions[request.bank_id] = {
             "session_token": session_token,
             "bank_name": request.bank_name,
-            "cert_fp": request.certificate_fingerprint,
+            "cert_fp": presented_fp,
             "cluster_id": cluster_id,
             "status": "REGISTERED",
         }

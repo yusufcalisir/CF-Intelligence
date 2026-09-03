@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-XSD_SCHEMA_PATH = Path(__file__).parent.parent.parent / "schemas" / "FinCEN_SAR_2.0.xsd"
+XSD_SCHEMA_PATH = Path(__file__).resolve().parents[3] / "schemas" / "FinCEN_SAR_2.0.xsd"
 
 
 class SARValidationError(Exception):
@@ -32,7 +32,7 @@ class RegulatoryReporterService:
 
     @staticmethod
     def validate_sar_xml_structure(raw_xml: str) -> None:
-        """Validate XML structure and mandatory tags against FinCEN SAR 2.0 schema requirements."""
+        """Validate XML structure, mandatory tags, and execute schema validation against FinCEN SAR 2.0 XSD."""
         try:
             root = ET.fromstring(raw_xml)  # nosec B314
         except Exception as e:
@@ -77,6 +77,27 @@ class RegulatoryReporterService:
         if not required_activity.issubset(activity_tags):
             missing = required_activity - activity_tags
             raise SARValidationError(f"Activity missing mandatory fields: {missing}")
+
+        # Real FinCEN SAR 2.0 XSD schema validation via lxml
+        if XSD_SCHEMA_PATH.exists():
+            try:
+                from lxml import etree  # nosec B410
+
+                with open(XSD_SCHEMA_PATH, "rb") as f:
+                    schema_doc = etree.XML(f.read())
+                schema = etree.XMLSchema(schema_doc)
+                doc = etree.fromstring(raw_xml.encode("utf-8"))
+                if not schema.validate(doc):
+                    err_msgs = [f"Line {err.line}: {err.message}" for err in schema.error_log]
+                    raise SARValidationError(
+                        f"FinCEN SAR 2.0 XSD schema validation failed: {'; '.join(err_msgs)}"
+                    )
+            except ImportError:
+                logger.warning("lxml library not installed; skipped formal XSD schema validation.")
+            except SARValidationError:
+                raise
+            except Exception as exc:
+                raise SARValidationError(f"XSD validation execution error: {exc}") from exc
 
     @classmethod
     def generate_sar_xml(

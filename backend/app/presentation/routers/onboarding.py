@@ -194,8 +194,22 @@ async def register_bank(
             payload.bank_id,
             exc,
         )
-        fake_cert = f"-----BEGIN CERTIFICATE-----\nCERT_DATA_{payload.bank_id.upper()}\n-----END CERTIFICATE-----"
-        fake_key = f"-----BEGIN PRIVATE KEY-----\nKEY_DATA_{payload.bank_id.upper()}\n-----END PRIVATE KEY-----"
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+
+        from app.infrastructure.security.cert_generator import generate_self_signed_pem
+
+        cert_pem, key_pem = generate_self_signed_pem(
+            common_name=f"{payload.bank_id.lower()}.client.cf-intelligence.io",
+            days_valid=365,
+        )
+        x509_cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"))
+        fingerprint = f"SHA256:{x509_cert.fingerprint(hashes.SHA256()).hex()}"
+
+        from app.infrastructure.grpc.servicer import register_bank_fingerprint
+
+        register_bank_fingerprint(payload.bank_id, fingerprint)
+
         config_yaml = (
             f'bank_id: "{payload.bank_id}"\n'
             f'legal_name: "{payload.legal_name}"\n'
@@ -209,9 +223,9 @@ async def register_bank(
             jurisdiction=payload.jurisdiction,
             contact_email=payload.contact_email,
             data_residency_region=payload.data_residency_region,
-            cert_fingerprint="demo_fingerprint_" + payload.bank_id,
-            mtls_cert_pem=fake_cert,
-            mtls_key_pem=fake_key,
+            cert_fingerprint=fingerprint,
+            mtls_cert_pem=cert_pem,
+            mtls_key_pem=key_pem,
             connector_config_yaml=config_yaml,
             coordinator_endpoint="https://coordinator.cf-intelligence.io:50051",
         )

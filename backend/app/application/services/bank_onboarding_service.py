@@ -83,22 +83,23 @@ class BankOnboardingService:
         return self._to_entity(model)
 
     async def issue_mtls_certificate(self, bank_id: str) -> tuple[str, str]:
-        """Issue mTLS client certificate and private key PEM pair for a bank node.
+        """Issue real X.509 mTLS client certificate and private key PEM pair for a bank node.
 
         Returns:
             tuple[str, str]: (cert_pem, key_pem)
         """
-        # Generate synthetic/self-signed PEM structure for mTLS
-        # In production with Vault, this calls Vault PKI secrets engine
-        fake_key = (
-            f"-----BEGIN PRIVATE KEY-----\nKEY_DATA_{bank_id.upper()}\n-----END PRIVATE KEY-----"
-        )
-        fake_cert = (
-            f"-----BEGIN CERTIFICATE-----\nCERT_DATA_{bank_id.upper()}\n-----END CERTIFICATE-----"
-        )
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
 
-        fingerprint = hashlib.sha256(fake_cert.encode()).hexdigest()
-        expires_at = datetime.now(UTC)
+        from app.infrastructure.security.cert_generator import generate_self_signed_pem
+
+        common_name = f"{bank_id.lower()}.client.cf-intelligence.io"
+        cert_pem, key_pem = generate_self_signed_pem(common_name=common_name, days_valid=365)
+
+        # Parse generated X.509 certificate to extract exact SHA-256 fingerprint and expiration
+        x509_cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"))
+        fingerprint = f"SHA256:{x509_cert.fingerprint(hashes.SHA256()).hex()}"
+        expires_at = x509_cert.not_valid_after_utc
 
         await self.session.execute(
             update(TenantConfigModel)
@@ -107,8 +108,17 @@ class BankOnboardingService:
         )
         await self.session.commit()
 
-        logger.info("Issued mTLS cert for bank_id=%s fingerprint=%s", bank_id, fingerprint[:12])
-        return fake_cert, fake_key
+        # Authoritatively bind certificate fingerprint in servicer registry at onboarding time
+        from app.infrastructure.grpc.servicer import register_bank_fingerprint
+
+        register_bank_fingerprint(bank_id, fingerprint)
+
+        logger.info(
+            "Issued real X.509 mTLS cert for bank_id=%s fingerprint=%s",
+            bank_id,
+            fingerprint[:16],
+        )
+        return cert_pem, key_pem
 
     async def provision_tenant_schema(self, bank_id: str) -> None:
         """Provision schema tables for the bank tenant."""

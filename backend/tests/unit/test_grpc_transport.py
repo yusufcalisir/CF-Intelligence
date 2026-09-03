@@ -19,6 +19,7 @@ from app.infrastructure.grpc.types import (
 async def test_grpc_client_registration() -> None:
     """Verifies client node gRPC registration and session token issuance."""
     servicer = FederatedLearningServicer()
+    servicer.register_bank_fingerprint("bank_alpha", "SHA256:112233445566")
     client = GRPCBankClient(servicer=servicer)
 
     response = await client.register(

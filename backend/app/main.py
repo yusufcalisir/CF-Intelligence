@@ -682,11 +682,12 @@ app.add_middleware(MTLSVerificationMiddleware)
 # Implements sliding-window token bucket rate limiting for burst attack detection
 # and volumetric request flood prevention at the L7 application layer.
 class DDoSProtectionMiddleware(BaseHTTPMiddleware):
-    """Enforce sliding-window L7 volumetric flood protection per client IP with bounded memory pruning."""
+    """Enforce sliding-window L7 volumetric flood protection per client IP with bounded memory pruning and hard ceiling eviction."""
 
     _WINDOW_SECONDS = 10.0
     _MAX_REQUESTS_PER_WINDOW = 100
     _MAX_TRACKED_IPS = 1000  # Threshold to trigger expired IP pruning
+    _HARD_CEILING_TRACKED_IPS = 5000  # Hard ceiling: oldest active IPs evicted if active count exceeds ceiling
     _requests: dict[str, list[float]] = {}
     _lock = Lock()
 
@@ -702,7 +703,6 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
         now = time.time()
         cutoff = now - self._WINDOW_SECONDS
 
-
         with self._lock:
             # Periodic pruning of expired entries when dictionary size exceeds threshold
             if len(self._requests) > self._MAX_TRACKED_IPS:
@@ -711,6 +711,16 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
                     valid_ts = [t for t in timestamps if t > cutoff]
                     if valid_ts:
                         cleaned[ip] = valid_ts
+
+                # If active entries still exceed hard ceiling, evict oldest-active IPs first (LRU bound)
+                if len(cleaned) > self._HARD_CEILING_TRACKED_IPS:
+                    sorted_ips = sorted(
+                        cleaned.items(),
+                        key=lambda item: max(item[1]) if item[1] else 0.0,
+                        reverse=True,
+                    )
+                    cleaned = dict(sorted_ips[: self._HARD_CEILING_TRACKED_IPS])
+
                 self._requests = cleaned
 
             history = [t for t in self._requests.get(client_ip, []) if t > cutoff]

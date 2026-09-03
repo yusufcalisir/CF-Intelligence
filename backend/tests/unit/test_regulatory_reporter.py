@@ -39,6 +39,38 @@ def test_sar_xml_passes_xsd_validation() -> None:
     assert "<TotalRiskScore>0.96</TotalRiskScore>" in xml_str
 
 
+def test_sar_xml_fails_when_violating_xsd_schema() -> None:
+    """Verify that XML payload missing mandatory XSD schema child element raises SARValidationError."""
+    # Build XML with mandatory FinCEN XSD element missing (e.g. missing ReportingInstitution)
+    invalid_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<EFilingSubmission xmlns="http://www.fincen.gov/spec/bsa">
+  <SubmissionHeader>
+    <ActivityType>SAR</ActivityType>
+    <SubmissionType>New</SubmissionType>
+    <CreatedTimestamp>2026-09-03T20:00:00Z</CreatedTimestamp>
+  </SubmissionHeader>
+  <Activity>
+    <ActivityID>case_test_bad</ActivityID>
+    <ActivityStatus>CLOSED_CONFIRMED</ActivityStatus>
+    <!-- Missing ReportingInstitution element mandated by FinCEN XSD schema -->
+    <Subjects>
+      <Subject><EntityPrivacyHash>hash_123</EntityPrivacyHash></Subject>
+    </Subjects>
+    <SuspiciousActivityDetails>
+      <TotalRiskScore>0.95</TotalRiskScore>
+      <Priority>P1_CRITICAL</Priority>
+      <AlertIds><AlertId>alt_1</AlertId></AlertIds>
+    </SuspiciousActivityDetails>
+    <Narrative><Summary>Test</Summary></Narrative>
+  </Activity>
+</EFilingSubmission>"""
+
+    with pytest.raises(SARValidationError) as exc_info:
+        RegulatoryReporterService.validate_sar_xml_structure(invalid_xml)
+
+    assert "FinCEN SAR 2.0 XSD schema validation failed" in str(exc_info.value) or "missing mandatory" in str(exc_info.value).lower()
+
+
 def test_sar_rejected_for_unresolved_case() -> None:
     """Call generate_sar_xml for an open / under investigation case, assert SARValidationError is raised."""
     open_case = Case(

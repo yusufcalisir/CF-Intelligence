@@ -345,7 +345,7 @@ class TenantConfigModel(Base):
     # PENDING_VERIFICATION | ACTIVE | SUSPENDED | OFFBOARDED
     status: Mapped[str] = mapped_column(String(25), nullable=False, default="pending_verification")
     # SHA-256 fingerprint of the current mTLS certificate
-    cert_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    cert_fingerprint: Mapped[str | None] = mapped_column(String(96), nullable=True)
     cert_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # Vault transit key path for this tenant's encryption
     vault_key_path: Mapped[str | None] = mapped_column(String(255), nullable=True)

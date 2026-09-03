@@ -43,7 +43,7 @@ def test_investigator_case_lifecycle_and_assignment() -> None:
 
 
 def test_case_resolution_requires_four_eyes_supervisor_signature() -> None:
-    """Test blocking case resolution when Four-Eyes supervisor signature is missing."""
+    """Test blocking case resolution when Four-Eyes supervisor signature is missing or single."""
     service = InvestigatorCaseWorkbenchService()
     record = service.create_case(
         title="Card Testing Ring",
@@ -52,7 +52,7 @@ def test_case_resolution_requires_four_eyes_supervisor_signature() -> None:
     service.assign_investigator(record.case_id, "analyst_sarah")
     service.transition_to_investigation(record.case_id, "analyst_sarah")
 
-    # 1. Attempt resolution without valid supervisor signature -> Fails
+    # 1. Attempt resolution with invalid format -> Fails
     with pytest.raises(InvalidCaseTransitionError) as exc_info:
         service.resolve_case(
             case_id=record.case_id,
@@ -62,15 +62,69 @@ def test_case_resolution_requires_four_eyes_supervisor_signature() -> None:
         )
     assert "Four-Eyes supervisor dual-authorization signature required" in str(exc_info.value)
 
-    # 2. Resolution with valid supervisor signature -> Succeeds
+    # 2. Attempt resolution with only ONE supervisor signature -> Fails (Strict Dual-Control)
+    with pytest.raises(InvalidCaseTransitionError) as exc_info_single:
+        service.resolve_case(
+            case_id=record.case_id,
+            determination=InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD,
+            supervisor_signature="SIG_SUPERVISOR_99001",
+            actor_id="supervisor_mike",
+        )
+    assert "requires 2 distinct supervisor signatures (got 1" in str(exc_info_single.value)
+
+    # 3. Attempt resolution with the SAME supervisor signing twice -> Fails (Duplicate Signer)
+    with pytest.raises(InvalidCaseTransitionError) as exc_info_dup:
+        service.resolve_case(
+            case_id=record.case_id,
+            determination=InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD,
+            supervisor_signature="SIG_SUPERVISOR_99001",
+            second_supervisor_signature="SIG_SUPERVISOR_99001",
+            actor_id="supervisor_mike",
+        )
+    assert "duplicate signer identity '99001' rejected" in str(exc_info_dup.value)
+
+    # 4. Resolution with TWO DISTINCT supervisor signatures -> Succeeds
     resolved = service.resolve_case(
         case_id=record.case_id,
         determination=InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD,
         supervisor_signature="SIG_SUPERVISOR_99001",
-        actor_id="supervisor_mike",
+        second_supervisor_signature="SIG_SUPERVISOR_88002",
+        actor_id="supervisor_dan",
     )
     assert resolved.status == InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD
-    assert resolved.supervisor_signature == "SIG_SUPERVISOR_99001"
+    assert "SIG_SUPERVISOR_99001" in resolved.supervisor_signatures
+    assert "SIG_SUPERVISOR_88002" in resolved.supervisor_signatures
+    assert len(resolved.supervisor_signatures) == 2
+
+
+def test_case_dual_control_stepwise_workflow() -> None:
+    """Test asynchronous dual-control signing with intermediate PENDING_SECOND_SIGNATURE state."""
+    service = InvestigatorCaseWorkbenchService()
+    record = service.create_case(
+        title="Layering Wire Scheme",
+        alert_ids=["alt_601", "alt_602"],
+    )
+    service.assign_investigator(record.case_id, "analyst_bob")
+    service.transition_to_investigation(record.case_id, "analyst_bob")
+
+    # Step 1: Supervisor Alice applies first signature -> Transitions to PENDING_SECOND_SIGNATURE
+    step1 = service.add_supervisor_signature(
+        case_id=record.case_id,
+        supervisor_signature="SIG_SUPERVISOR_ALICE",
+        actor_id="supervisor_alice",
+    )
+    assert step1.status == InvestigatorCaseStatus.PENDING_SECOND_SIGNATURE
+    assert step1.supervisor_signatures == ["SIG_SUPERVISOR_ALICE"]
+
+    # Step 2: Supervisor Bob applies second signature and resolves
+    resolved = service.resolve_case(
+        case_id=record.case_id,
+        determination=InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD,
+        second_supervisor_signature="SIG_SUPERVISOR_BOB",
+        actor_id="supervisor_bob",
+    )
+    assert resolved.status == InvestigatorCaseStatus.RESOLVED_CONFIRMED_FRAUD
+    assert resolved.supervisor_signatures == ["SIG_SUPERVISOR_ALICE", "SIG_SUPERVISOR_BOB"]
 
 
 def test_case_blocks_illegal_stage_jumps() -> None:
