@@ -444,8 +444,7 @@ class ExplainabilityService:
         from app.application.services.risk_engine import RiskScoringEngine
 
         engine = risk_engine or RiskScoringEngine()
-        orig_score = float(alert.risk_score)
-        target_score = float(target_score)
+        orig_score = alert.risk_score
 
         # 1. Resolve or reconstruct base transaction features
         if transaction:
@@ -455,7 +454,7 @@ class ExplainabilityService:
                 or (alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}")
             )
         else:
-            entity_hash = str(alert.involved_entity_ids[0]) if alert.involved_entity_ids else f"entity_{alert.id[:8]}"
+            entity_hash = alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}"
             top_feat_dict = {
                 f.get("feature"): f.get("contribution")
                 for f in alert.top_features
@@ -487,7 +486,7 @@ class ExplainabilityService:
                 engine.register_alert(entity_hash)
 
         # Initial evaluation through the real engine
-        base_ml = float(alert.model_confidence or max(0.1, min(0.99, orig_score / 1000.0)))
+        base_ml = alert.model_confidence or max(0.1, min(0.99, orig_score / 1000.0))
         initial_eval = engine.score_transaction(working_txn, ml_prediction=base_ml, entity_hash=entity_hash)
         current_score = initial_eval.score
 
