@@ -1,66 +1,150 @@
-version: '3.8'
+# ==============================================================================
+# Enterprise Production Multi-Container Orchestration Specification
+# Privacy-Preserving Cross-Bank Fraud Detection Consortium (CFI)
+# Usage:
+#   Quick Start: docker compose up -d --build
+#   With Observability: docker compose --profile monitoring up -d --build
+# ==============================================================================
 
 services:
-  api-server:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    image: cfi-intelligence/backend:latest
-    container_name: cfi-api-server
+  # ── 1. Enterprise Security Gateway & Reverse Proxy ──────────────────────────
+  gateway:
+    image: nginx:1.27-alpine
+    container_name: cfi-gateway
     restart: unless-stopped
     ports:
-      - "8000:8000"
-      - "50051:50051"
-    environment:
-      - APP_ENV=production
-      - REDIS_URL=redis://redis-store:6379/0
-      - TELEMETRY_ENABLED=true
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - "${CFI_PORT_HTTP:-80}:80"
+      - "${CFI_PORT_HTTPS:-443}:443"
+    volumes:
+      - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
-      redis-store:
+      backend:
+        condition: service_healthy
+      frontend:
         condition: service_healthy
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/gateway-health"]
       interval: 10s
       timeout: 3s
       retries: 3
 
-  redis-store:
+  # ── 2. Frontend Web Container (React 18 SPA) ────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.frontend
+    image: cfi-intelligence/frontend:latest
+    container_name: cfi-frontend
+    restart: unless-stopped
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── 3. Backend API & Federated ML Engine ────────────────────────────────────
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    image: cfi-intelligence/backend:latest
+    container_name: cfi-api-server
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD:-cfi_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}@redis:6379/0
+      - SECRET_KEY=${SECRET_KEY:-cfi_super_secret_jwt_key_2026_enterprise_floor}
+      - TELEMETRY_ENABLED=true
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - storage-data:/app/storage
+      - logs-data:/app/logs
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
+
+  # ── 4. PostgreSQL 16 Enterprise Database ────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cfi-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cfi_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cfi_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-cfi_fraud_db}
+    ports:
+      - "${CFI_PORT_PG:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres/01-init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cfi_admin} -d ${POSTGRES_DB:-cfi_fraud_db}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 5. Redis 7.2 Cache & Message Broker ─────────────────────────────────────
+  redis:
     image: redis:7.2-alpine
     container_name: cfi-redis
     restart: unless-stopped
-    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy volatile-lru
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}
+      --appendonly yes
+      --maxmemory 512mb
+      --maxmemory-policy volatile-lru
     ports:
-      - "6379:6379"
+      - "${CFI_PORT_REDIS:-6379}:6379"
     volumes:
       - redis-data:/data
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 3
 
+  # ── 6. (Optional) OpenTelemetry Collector ───────────────────────────────────
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.95.0
     container_name: cfi-otel-collector
+    profiles: ["monitoring"]
     restart: unless-stopped
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
       - ./docker/otel/otel-collector-config.yaml:/etc/otelcol/config.yaml
     ports:
-      - "4317:4317" # OTLP gRPC
-      - "4318:4318" # OTLP HTTP
-      - "8889:8889" # Prometheus metrics exporter
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
     networks:
       - cfi-network
 
+  # ── 7. (Optional) Prometheus Metrics Engine ─────────────────────────────────
   prometheus:
     image: prom/prometheus:v2.50.1
     container_name: cfi-prometheus
+    profiles: ["monitoring"]
     restart: unless-stopped
     volumes:
       - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
@@ -70,13 +154,15 @@ services:
     networks:
       - cfi-network
 
+  # ── 8. (Optional) Grafana Operations Dashboard ──────────────────────────────
   grafana:
     image: grafana/grafana-oss:10.3.3
     container_name: cfi-grafana
+    profiles: ["monitoring"]
     restart: unless-stopped
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - ./docker/grafana/provisioning:/etc/grafana/provisioning
@@ -93,6 +179,9 @@ networks:
     driver: bridge
 
 volumes:
+  postgres-data:
   redis-data:
+  storage-data:
+  logs-data:
   prometheus-data:
   grafana-data:
