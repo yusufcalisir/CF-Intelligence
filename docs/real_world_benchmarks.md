@@ -98,14 +98,14 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 
 Under real-world distributions and calibrated noise injection ($\varepsilon = 1.0, \delta = 10^{-5}$), the platform measures both standalone single-bank baselines and collaborative federated models:
 
-| Benchmark Dataset | Architecture | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Precision @ 100 | Daily Net ROI (100k txns) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **PaySim (M-Pesa)** | **Federated GNN + FedAvg** | **0.8420** | **0.9120** | **62.4%** | **94.0%** | **+$14,250 / day** |
-| PaySim (M-Pesa) | Isolated Single-Bank Model | 0.6940 | 0.8350 | 43.2% | 72.0% | Baseline ($29,880 loss) |
-| **IEEE-CIS (Vesta)** | **Federated GNN + FedProx** | **0.8120** | **0.8980** | **58.9%** | **91.0%** | **+$18,900 / day** |
-| IEEE-CIS (Vesta) | Isolated Single-Bank Model | 0.6510 | 0.8140 | 37.5% | 66.0% | Baseline ($34,500 loss) |
-| **Elliptic Bitcoin** | **FedGNN (GraphSAGE + SecAgg)** | **0.8746** | **0.9758** | **80.6%** | **94.0%** | **+$11,400 / day** |
-| Elliptic Bitcoin | Isolated Local GNN | 0.2543 | 0.7330 | 52.4% | 61.0% | Baseline ($24,200 loss) |
+| Benchmark Dataset | Architecture | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Precision @ 100 |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **PaySim (M-Pesa)** | **Federated GNN + FedAvg** | **0.8420** | **0.9120** | **62.4%** | **94.0%** |
+| PaySim (M-Pesa) | Isolated Single-Bank Model | 0.6940 | 0.8350 | 43.2% | 72.0% |
+| **IEEE-CIS (Vesta)** | **Federated GNN + FedProx** | **0.8120** | **0.8980** | **58.9%** | **91.0%** |
+| IEEE-CIS (Vesta) | Isolated Single-Bank Model | 0.6510 | 0.8140 | 37.5% | 66.0% |
+| **Elliptic Bitcoin** | **FedGNN (GraphSAGE + SecAgg)** | **0.8746** | **0.9758** | **80.6%** | **94.0%** |
+| Elliptic Bitcoin | Isolated Local GNN | 0.2543 | 0.7330 | 52.4% | 61.0% |
 
 ---
 

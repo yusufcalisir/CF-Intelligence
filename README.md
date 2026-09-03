@@ -838,11 +838,11 @@ The platform enforces concrete, test-verified defenses across all 6 STRIDE attac
 | STRIDE Pillar | Threat Persona | Target Asset | Attack Technique | Technical Defense | Test Evidence |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Spoofing** | Compromised Node / Attacker | Node Identity & API | Forged cert / tenant header | Vault PKI mTLS (`mtls_manager.py`) + Bcrypt cost=12 (`password_hasher.py`) + 15m JWT & 5-fail lockout | `test_auth_security.py` |
-| **Tampering** | Byzantine Bank / Attacker | Model Weights & DB | Sign-flip / backdoor / SQLi | Bulyan/Krum aggregation (`fl_engine.py`) + Spectral SVD (`spectral_defense.py`) + ORM DDL quoting | `test_byzantine_resilience.py` |
-| **Repudiation** | Rogue Analyst / Bank | Case Workflow | Denying case closure/signature | Four-Eyes dual supervisor signatures (`case_workbench.py`) + Tamper-evident SHA-256 audit ledger | `test_case_workbench_four_eyes.py` |
+| **Tampering** | Byzantine Bank / Attacker | Model Weights & DB | Sign-flip / backdoor / SQLi | Bulyan/Krum aggregation (`fl_engine.py`) + Spectral SVD (`spectral_defense.py`) + ORM DDL quoting | `test_byzantine_defense_validation.py` |
+| **Repudiation** | Rogue Analyst / Bank | Case Workflow | Denying case closure/signature | Four-Eyes dual supervisor signatures (`case_workbench.py`) + Tamper-evident SHA-256 audit ledger | `test_case_management_workbench.py` |
 | **Info Disclosure** | Honest-but-Curious Server | Raw PII & Gradients | Gradient Inversion (DLG) / MIA | Opacus DP ($\epsilon=1.0, \delta=10^{-5}$) + Curve25519 SecAgg + BOLA 403 + Production error sanitization | `test_error_sanitization.py` |
-| **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Edge + `slowapi`) + Finite tensor validation | `test_rate_limiter_memory.py` |
-| **Privilege Escalation** | Rogue Internal User | Model Promotion / SAR | Unauthorized model promotion | ABAC policy engine (`abac_engine.py`) + SR 11-7 holdout PR-AUC $\ge$ champion gate | `test_abac_engine.py` |
+| **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Edge + `slowapi`) + Finite tensor validation | `test_ddos_middleware.py` |
+| **Privilege Escalation** | Rogue Internal User | Model Promotion / SAR | Unauthorized model promotion | ABAC policy engine (`abac_engine.py`) + SR 11-7 holdout PR-AUC $\ge$ champion gate | `test_enterprise_security_suite.py` |
 
 ### 10.8 Automated Security Floor Hardening & Zero-Vulnerability Dependency Perimeter
 
@@ -933,12 +933,12 @@ All benchmark measurements are derived from the integrated test suite executed a
 
 Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates against canonical open benchmark datasets using precision-recall metrics suited for severe class imbalance:
 
-| Benchmark Dataset | Domain & Scale | Federated PR-AUC | Single-Bank PR-AUC | Recall @ 0.1% FPR | False Alarm Reduction | Net Economic Benefit (100k txns/day) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Mobile Money (6.36M txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** | **+$14,250 / day** |
-| **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | E-Commerce / Cards (590k txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** | **+$18,900 / day** |
-| **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (46k nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** | **+$11,400 / day** |
-| **[LEAF Non-IID](https://leaf.cmu.edu/)** | Dirichlet Skew ($\alpha = 0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** | **+$15,750 / day** |
+| Benchmark Dataset | Domain & Scale | Federated PR-AUC | Single-Bank PR-AUC | Recall @ 0.1% FPR | False Alarm Reduction |
+| :--- | :--- | :---: | :---: | :---: | :---: |
+| **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Mobile Money (6.36M txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** |
+| **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | E-Commerce / Cards (590k txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** |
+| **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (46k nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** |
+| **[LEAF Non-IID](https://leaf.cmu.edu/)** | Dirichlet Skew ($\alpha = 0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** |
 
 ---
 

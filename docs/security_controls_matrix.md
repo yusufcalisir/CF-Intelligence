@@ -14,14 +14,14 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`SOC2-CC6.1.3`** | SOC 2 Type II | Brute-force account & IP lockout (5 failed attempts -> 15 min lock) | `EnterpriseAuthService` (`auth_service.py`) | `test_auth_security.py` | `PASS` |
 | **`SOC2-CC6.1.4`** | SOC 2 Type II | Strict CORS whitelist (zero wildcard `*`) & HTTP security headers | `SecurityHeadersMiddleware`, `config.py` | `test_security_headers.py` | `PASS` |
 | **`SOC2-CC6.2`** | SOC 2 Type II | Multi-Tenant BOLA Isolation & OIDC Scoped Tenant Access | `TenantAccessControlMiddleware` (`main.py`) | `test_tenant_isolation.py` | `PASS` |
-| **`SOC2-CC6.3`** | SOC 2 Type II | Attribute-Based Access Control (ABAC) with granular tenant rules | `ABACPolicyEngine` (`abac_engine.py`) | `test_abac_engine.py` | `PASS` |
+| **`SOC2-CC6.3`** | SOC 2 Type II | Attribute-Based Access Control (ABAC) with granular tenant rules | `ABACPolicyEngine` (`abac_engine.py`) | `test_enterprise_security_suite.py` | `PASS` |
 | **`SOC2-CC6.6`** | SOC 2 Type II | TLS 1.3 in transit & AES-256-GCM envelope encryption at rest | `TenantKMSEngine`, `VaultClient` | `test_tenant_kms_metering.py` | `PASS` |
 | **`SOC2-CC6.7.1`** | SOC 2 Type II | Production error sanitization (RFC 7807, zero stack trace leakage) | `ProductionErrorHandler` (`error_handler.py`) | `test_error_sanitization.py` | `PASS` |
-| **`SOC2-CC6.8`** | SOC 2 Type II | Multi-Layer L7 DDoS protection & `slowapi` granular rate limiting | `DDoSProtectionMiddleware`, `rate_limiter.py` | `test_rate_limiter_memory.py` | `PASS` |
+| **`SOC2-CC6.8`** | SOC 2 Type II | Multi-Layer L7 DDoS protection & `slowapi` granular rate limiting | `DDoSProtectionMiddleware`, `rate_limiter.py` | `test_ddos_middleware.py` | `PASS` |
 | **`SOC2-CC7.2`** | SOC 2 Type II | Tamper-evident append-only SHA-256 cryptographic audit chain | `ImmutableAuditChain` (`immutable_audit_chain.py`) | `test_immutable_audit_chain.py` | `PASS` |
-| **`ISO27001-A.9.4.2`** | ISO 27001 | Four-Eyes supervisor dual-authorization signature on case closure | `CaseLifecycleStateMachine` (`case_workbench.py`) | `test_case_workbench_four_eyes.py` | `PASS` |
+| **`ISO27001-A.9.4.2`** | ISO 27001 | Four-Eyes supervisor dual-authorization signature on case closure | `CaseLifecycleStateMachine` (`case_workbench.py`) | `test_case_management_workbench.py` | `PASS` |
 | **`ISO27001-A.12.1.2`** | ISO 27001 | Gaussian DP noise ($\epsilon \le 1.0, \delta = 10^{-5}$) & Rényi accounting | `OpacusDPGuard`, `PrivacyAuditService` | `test_privacy_service.py` | `PASS` |
-| **`ISO27001-A.12.6.1`** | ISO 27001 | Formal STRIDE threat model covering 6 attack pillars | `docs/threat_model.md` | `test_byzantine_resilience.py` | `PASS` |
+| **`ISO27001-A.12.6.1`** | ISO 27001 | Formal STRIDE threat model covering 6 attack pillars | `docs/threat_model.md` | `test_byzantine_defense_validation.py` | `PASS` |
 | **`SOC2-CC6.9`** | SOC 2 Type II | Zero-Vulnerability Supply Chain Security & Pinned Security Floor | `backend/requirements.txt`, Dependabot Policy | `pytest backend/tests/` | `PASS` |
 | **`GDPR-ART-25`** | GDPR Art. 25 | Privacy by Design: Client-Side Luhn PAN & Type-Salted HMAC Sanitization | `piiSanitizer.ts`, `DatasetDropzone.tsx` | `test_dataset_ingestor.py` | `PASS` |
 | **`ISO27001-A.12.1.3`**| ISO 27001 | Great Expectations 1.x Data Contract Gating & Quarantine Isolation | `datasets.py`, Great Expectations Suite | `test_dataset_ingestor.py` | `PASS` |

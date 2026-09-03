@@ -37,7 +37,7 @@ CF-Intelligence addresses three distinct financial market segments, each charact
 ### 2.4. CF-Intelligence Solution & ROI Impact
 * **Solution**: Turnkey edge container deployment (`cfi-agent`) that connects directly to local core banking ledgers, trains locally on private GPU/CPU nodes, and benefits from global collaborative model updates without sharing a single customer record.
 * **Quantified ROI**:
-  * **+19.2% Recall Gain**: Catches $\$14,250 - \$18,900$ in previously missed daily fraud per 100k transactions.
+  * **+19.2% Recall Gain**: Significantly improves detection of previously missed fraudulent transactions per 100k transactions without sharing raw PII.
   * **-64.7% Reduction in False Positives**: Drastically cuts customer support call volume.
 
 ---
