@@ -334,7 +334,48 @@ class ScenarioStatusResponse(BaseModel):
     started_at: str
 
 
+class AttackInjectionRequest(BaseModel):
+    attack_type: Literal["smurfing_layering", "byzantine_poisoning", "sybil_ring"] = Field(
+        ...,
+        description="Type of adversarial chaos attack to inject",
+    )
+    adversary_bank: str = Field(
+        default="bank_gamma",
+        description="Bank node initiating or manipulated by the attack",
+    )
+    target_bank: str = Field(
+        default="bank_alpha",
+        description="Target institution receiving illicit flows or aggregating gradients",
+    )
+    intensity_rate: int = Field(
+        default=500,
+        ge=10,
+        le=5000,
+        description="Burst transaction or gradient rate per second",
+    )
+    defense_strategy: Literal["krum", "trimmed_mean", "bulyan", "psi_graph"] = Field(
+        default="krum",
+        description="Active algorithmic defense strategy to intercept the threat",
+    )
+
+
+class AttackInjectionResponse(BaseModel):
+    attack_id: str
+    attack_type: str
+    status: str  # "intercepted", "quarantined", "mitigated"
+    defense_activated: str
+    adversary_quarantined: str | None = None
+    euclidean_distance: float = 0.0
+    distance_threshold: float = 0.0
+    packets_blocked: int = 0
+    mitigation_latency_ms: float = 0.0
+    auc_protected: float = 0.9412
+    auc_compromised_baseline: float = 0.5218
+    log_entry: str = ""
+
+
 # ── Risk ──────────────────────────────────────
+
 
 
 class RiskWeightsResponse(BaseModel):

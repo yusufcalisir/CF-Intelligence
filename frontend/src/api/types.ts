@@ -518,6 +518,30 @@ export interface StreamingEvent {
   scenario_id: string;
 }
 
+export interface AttackInjectionRequest {
+  attack_type: 'smurfing_layering' | 'byzantine_poisoning' | 'sybil_ring';
+  adversary_bank?: string;
+  target_bank?: string;
+  intensity_rate?: number;
+  defense_strategy?: 'krum' | 'trimmed_mean' | 'bulyan' | 'psi_graph';
+}
+
+export interface AttackInjectionResponse {
+  attack_id: string;
+  attack_type: string;
+  status: 'intercepted' | 'quarantined' | 'mitigated';
+  defense_activated: string;
+  adversary_quarantined: string | null;
+  euclidean_distance: number;
+  distance_threshold: number;
+  packets_blocked: number;
+  mitigation_latency_ms: number;
+  auc_protected: number;
+  auc_compromised_baseline: number;
+  log_entry: string;
+}
+
+
 export interface DashboardStats {
   total_alerts: number;
   critical_alerts: number;

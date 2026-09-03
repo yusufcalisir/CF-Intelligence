@@ -16,6 +16,8 @@ import type {
   ScenarioInfo,
   ScenarioStartResponse,
   ScenarioStatus,
+  AttackInjectionRequest,
+  AttackInjectionResponse,
   SharedIntelligence,
   SimulationConfig,
   SimulationCreateResponse,
@@ -366,6 +368,15 @@ export function useScenarioStatus(scenarioId: string | undefined) {
     },
     retry: 2,
     retryDelay: 1000,
+  });
+}
+
+export function useInjectAttack() {
+  return useMutation<AttackInjectionResponse, Error, AttackInjectionRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/scenarios/inject-attack', payload);
+      return data;
+    },
   });
 }
 

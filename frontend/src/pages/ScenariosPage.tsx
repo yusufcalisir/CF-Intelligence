@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useScenarios, useStartScenario, useScenarioStatus } from '../api/queries';
+import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
 import { BANK_NAMES } from '../api/types';
 
 export default function ScenariosPage() {
@@ -74,6 +75,9 @@ export default function ScenariosPage() {
         />
         <span className="text-sm font-mono font-bold w-12 text-left sm:text-right">{speed}x</span>
       </motion.div>
+
+      {/* Interactive Chaos & Live Attack Simulator */}
+      <ChaosAttackInjectorPanel />
 
       {/* Active Scenario Status */}
       {status && (

@@ -13,12 +13,13 @@ import { IncentiveRegistryPanel } from '../components/dashboard/IncentiveRegistr
 import { SecureHardwarePanel } from '../components/dashboard/SecureHardwarePanel';
 import StreamingGNNPanel from '../components/dashboard/StreamingGNNPanel';
 import DatasetTrainingConfigPanel, { type TrainingMode } from '../components/DatasetTrainingConfigPanel';
+import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
 import { DATASET_PROFILES, type DatasetProfile } from '../utils/datasetProfiles';
 
 interface BankNode {
   id: string;
   name: string;
-  status: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED';
+  status: 'ACTIVE' | 'OFFLINE' | 'SUSPENDED' | 'QUARANTINED';
   tier: string;
   lastHeartbeat: string;
 }
@@ -77,6 +78,25 @@ export default function LiveOperationsView() {
   const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(DATASET_PROFILES.paysim);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+
+  const handleQuarantineChange = (bankId: string | null) => {
+    setBankNodes((prev) =>
+      prev.map((b) => {
+        if (bankId && b.id === bankId) {
+          return {
+            ...b,
+            status: 'QUARANTINED',
+            lastHeartbeat: 'DROPPED BY KRUM (Δ 48.2 > 14.1)',
+          };
+        }
+        return {
+          ...b,
+          status: 'ACTIVE',
+          lastHeartbeat: b.id === 'bank_alpha' ? 'Just now' : b.id === 'bank_beta' ? '2s ago' : '5s ago',
+        };
+      })
+    );
+  };
 
   // WebSocket live telemetry listener with automatic fallback & simulation
   useEffect(() => {
@@ -581,6 +601,9 @@ export default function LiveOperationsView() {
         </div>
       </div>
 
+      {/* Live Chaos & Attack Injection Simulator Panel */}
+      <ChaosAttackInjectorPanel onQuarantineChange={handleQuarantineChange} />
+
       {/* Bank Nodes Health Grid */}
       <div className="glass-card p-3.5 sm:p-5 md:p-6 min-w-0">
         <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)] mb-4">
@@ -591,7 +614,14 @@ export default function LiveOperationsView() {
             const roundData = roundHistory[roundHistory.length - 1];
             const bankAuc = idx === 0 ? roundData?.bankA : idx === 1 ? roundData?.bankB : roundData?.bankC;
             return (
-              <div key={bank.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-slate-900/40 flex flex-col justify-between gap-3 min-w-0">
+              <div
+                key={bank.id}
+                className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 min-w-0 ${
+                  bank.status === 'QUARANTINED'
+                    ? 'border-rose-500/80 bg-rose-950/30 shadow-[0_0_25px_rgba(244,63,94,0.3)] ring-1 ring-rose-500/40'
+                    : 'border-[var(--color-border)] bg-slate-900/40'
+                }`}
+              >
                 <div className="flex items-start justify-between gap-2 min-w-0">
                   <div className="min-w-0 flex-1">
                     <p className="font-bold text-[var(--color-text-primary)] text-sm truncate">{bank.name}</p>
@@ -601,10 +631,12 @@ export default function LiveOperationsView() {
                     className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                       bank.status === 'ACTIVE'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                        : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        : bank.status === 'QUARANTINED'
+                          ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
                     }`}
                   >
-                    ● {bank.status}
+                    ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
                   </span>
                 </div>
                 {bankAuc !== undefined && (
