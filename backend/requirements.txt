@@ -50,12 +50,18 @@ slowapi>=0.1.10,<1.0.0
 bcrypt>=4.0.0,<5.0.0
 
 # Security-pinned transitive dependencies
-# (explicitly floored to prevent vulnerable versions being resolved)
+# (explicitly floored to resolve Dependabot alerts and prevent vulnerable resolutions)
 starlette>=1.3.1                # security: CVE-2026-48710 (Host header injection), CVE-2026-54282 (SSRF), CVE-2026-54283 (DoS)
-# NOTE: cryptography>=50.0.0 cannot be pinned here because mlflow>=3.11.0
-# requires cryptography<50. Upgrading mlflow to >=3.11.0 (closing 45 CVEs)
-# takes priority. Track cryptography CVE-2026-69247 / CVE-2026-69249 for
-# resolution once mlflow lifts its upper bound.
+cryptography>=49.0.0            # security: PYSEC-2026-3554, PYSEC-2026-3553, GHSA-537c-gmf6-5ccf (compatible with mlflow <50.0)
+ray>=2.56.0                     # security: PYSEC-2026-2273 (remote code execution vulnerability in Ray dashboard / worker)
+urllib3>=2.2.2                  # security: CVE-2024-37891 (proxy authorization header leak)
+jinja2>=3.1.4                   # security: CVE-2024-34064 (HTML attribute injection)
+aiohttp>=3.10.11                # security: CVE-2024-52304 (request smuggling), CVE-2024-52303
+tornado>=6.4.2                  # security: CVE-2024-52804 (cookie parsing vulnerability)
+certifi>=2024.7.4               # security: root certificate authority updates
+setuptools>=70.0.0              # security: CVE-2024-6345 (remote code execution via package download)
+werkzeug>=3.0.6                 # security: CVE-2024-34069 (DoS via multipart form data)
+
 
 # Observability (OpenTelemetry + Prometheus)
 opentelemetry-api>=1.27.0,<2.0.0

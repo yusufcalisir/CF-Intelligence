@@ -22,5 +22,20 @@
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "hardhat": "^2.22.18"
+  },
+  "overrides": {
+    "undici": "^6.21.1",
+    "ws": "^8.18.0",
+    "fast-uri": "^3.0.6",
+    "lodash": "^4.17.21",
+    "serialize-javascript": "^6.0.2",
+    "tmp": "^0.2.3",
+    "qs": "^6.14.0",
+    "cookie": "^0.7.2",
+    "bn.js": "^4.12.3",
+    "diff": "^5.2.0",
+    "uuid": "^9.0.1",
+    "elliptic": "^6.6.1"
   }
 }
+
