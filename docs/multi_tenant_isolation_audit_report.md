@@ -22,6 +22,9 @@ To guarantee strict compliance with **SOC 2 Type II (Trust Services Criteria CC6
 │ SQL Injection in Tenant Identity  │ Regex Alphanumeric Normalization    │ BLOCKED (✓)  │
 │ Redis Cache Key Collusion         │ Namespaced Keys (`cfi:tenant:<id>:*`)│ ISOLATED (✓) │
 │ Database Session Pool Bleed       │ Dynamic Engine Factory per Tenant   │ ISOLATED (✓) │
+│ Async Coroutine Context Bleed     │ 50 Interleaved Async Tasks          │ BLOCKED (✓)  │
+│ Cross-Tenant Cache Exfiltration   │ Active Barrier Penetration Mock     │ BLOCKED (✓)  │
+│ Cross-Tenant Query Exfiltration   │ Boundary Filter Violation Check     │ BLOCKED (✓)  │
 └───────────────────────────────────┴─────────────────────────────────────┴──────────────┘
 ```
 
@@ -34,5 +37,5 @@ The multi-tenant isolation security tests are codified in:
 
 ```bash
 pytest backend/tests/unit/test_multi_tenant_security_audit.py -v
-# 3 passed in 0.22s (100% Pass)
+# 6 passed (100% Pass)
 ```

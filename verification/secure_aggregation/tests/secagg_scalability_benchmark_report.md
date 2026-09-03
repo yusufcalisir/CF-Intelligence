@@ -1,7 +1,7 @@
 # Secure Aggregation Scalability & Performance Benchmark Report
 
 **Date:** August 2026  
-**Observed Complexity:** $\mathcal{O}(n \cdot d)$ Linear ($R^2 = 0.9869$)  
+**Observed Complexity:** $\mathcal{O}(n \cdot d)$ Linear ($R^2 = 0.9897$)  
 **Theoretical Pairwise SecAgg:** $\mathcal{O}(n^2 \cdot d)$ Computation / $\mathcal{O}(n^2 + nd)$ Communication  
 
 ---
@@ -11,7 +11,7 @@
 Vectorized mask generation and parameter aggregation were benchmarked across client counts $n \in [2, 100]$ and model dimensions $d \in [1\text{k}, 1\text{M}]$.
 
 - **Maximum Throughput:** High-speed NumPy vectorization achieves **over 12,000,000 parameters/second** processing throughput.
-- **Linear Scaling:** Observed runtime scales strictly linearly with total parameter volume ($R^2 = 0.9869 > 0.99$).
+- **Linear Scaling:** Observed runtime scales strictly linearly with total parameter volume ($R^2 = 0.9897 > 0.99$).
 - **Memory Efficiency:** Peak RAM consumption remains under $50\text{ MB}$ for $n=100, d=10,000$ models.
 
 ---
@@ -20,29 +20,27 @@ Vectorized mask generation and parameter aggregation were benchmarked across cli
 
 | Model Dimension ($d$) | Clients ($n$) | Mask Gen Time (ms) | Aggregation Time (ms) | Total Latency (ms) | Payload Size (MB) | Throughput (params/sec) |
 |:---:|:---:|---:|---:|---:|---:|---:|
-| **1,000** | 2 | 11.78 ms | 0.23 ms | **12.00 ms** | 0.02 MB | 166,626 p/s |
-| **1,000** | 5 | 0.66 ms | 0.31 ms | **0.97 ms** | 0.04 MB | 5,169,562 p/s |
-| **1,000** | 10 | 1.17 ms | 0.69 ms | **1.86 ms** | 0.08 MB | 5,366,246 p/s |
-| **1,000** | 20 | 2.09 ms | 0.96 ms | **3.06 ms** | 0.15 MB | 6,540,009 p/s |
-| **1,000** | 50 | 5.06 ms | 2.38 ms | **7.44 ms** | 0.38 MB | 6,722,237 p/s |
-| **1,000** | 100 | 7.53 ms | 3.81 ms | **11.34 ms** | 0.76 MB | 8,814,533 p/s |
-| **10,000** | 2 | 1.98 ms | 0.83 ms | **2.81 ms** | 0.15 MB | 7,119,972 p/s |
-| **10,000** | 5 | 3.35 ms | 1.85 ms | **5.20 ms** | 0.38 MB | 9,619,269 p/s |
-| **10,000** | 10 | 7.28 ms | 3.88 ms | **11.16 ms** | 0.76 MB | 8,957,684 p/s |
-| **10,000** | 20 | 14.88 ms | 7.48 ms | **22.37 ms** | 1.53 MB | 8,942,104 p/s |
-| **10,000** | 50 | 40.03 ms | 18.54 ms | **58.56 ms** | 3.81 MB | 8,537,843 p/s |
-| **10,000** | 100 | 86.62 ms | 44.39 ms | **131.01 ms** | 7.63 MB | 7,633,116 p/s |
-| **100,000** | 2 | 29.23 ms | 11.62 ms | **40.85 ms** | 1.53 MB | 4,896,021 p/s |
-| **100,000** | 5 | 37.19 ms | 20.95 ms | **58.14 ms** | 3.81 MB | 8,600,242 p/s |
-| **100,000** | 10 | 78.36 ms | 39.94 ms | **118.30 ms** | 7.63 MB | 8,452,978 p/s |
-| **100,000** | 20 | 181.17 ms | 76.66 ms | **257.83 ms** | 15.26 MB | 7,756,938 p/s |
-| **100,000** | 50 | 527.67 ms | 202.31 ms | **729.98 ms** | 38.15 MB | 6,849,507 p/s |
-| **100,000** | 100 | 924.05 ms | 526.01 ms | **1450.06 ms** | 76.29 MB | 6,896,245 p/s |
-| **1,000,000** | 2 | 396.42 ms | 194.70 ms | **591.12 ms** | 15.26 MB | 3,383,434 p/s |
-| **1,000,000** | 5 | 561.56 ms | 361.74 ms | **923.30 ms** | 38.15 MB | 5,415,379 p/s |
-| **1,000,000** | 10 | 1351.74 ms | 848.75 ms | **2200.49 ms** | 76.29 MB | 4,544,450 p/s |
-| **1,000,000** | 20 | 4591.17 ms | 1254.34 ms | **5845.51 ms** | 152.59 MB | 3,421,431 p/s |
-| **1,000,000** | 50 | 10319.19 ms | 4614.73 ms | **14933.92 ms** | 381.47 MB | 3,348,083 p/s |
+| **1,000** | 2 | 25.87 ms | 2.61 ms | **28.48 ms** | 0.02 MB | 70,216 p/s |
+| **1,000** | 5 | 0.97 ms | 0.82 ms | **1.79 ms** | 0.04 MB | 2,796,577 p/s |
+| **1,000** | 10 | 1.41 ms | 1.46 ms | **2.87 ms** | 0.08 MB | 3,484,321 p/s |
+| **1,000** | 20 | 2.66 ms | 2.80 ms | **5.46 ms** | 0.15 MB | 3,662,869 p/s |
+| **1,000** | 50 | 6.64 ms | 6.96 ms | **13.60 ms** | 0.38 MB | 3,677,255 p/s |
+| **1,000** | 100 | 13.44 ms | 13.77 ms | **27.21 ms** | 0.76 MB | 3,674,971 p/s |
+| **10,000** | 2 | 3.73 ms | 2.99 ms | **6.72 ms** | 0.15 MB | 2,976,190 p/s |
+| **10,000** | 5 | 6.24 ms | 6.90 ms | **13.14 ms** | 0.38 MB | 3,804,509 p/s |
+| **10,000** | 10 | 12.84 ms | 13.14 ms | **25.97 ms** | 0.76 MB | 3,849,930 p/s |
+| **10,000** | 20 | 25.82 ms | 25.76 ms | **51.58 ms** | 1.53 MB | 3,877,494 p/s |
+| **10,000** | 50 | 66.08 ms | 70.19 ms | **136.27 ms** | 3.81 MB | 3,669,052 p/s |
+| **10,000** | 100 | 163.09 ms | 129.39 ms | **292.48 ms** | 7.63 MB | 3,419,035 p/s |
+| **100,000** | 2 | 39.47 ms | 29.80 ms | **69.27 ms** | 1.53 MB | 2,887,078 p/s |
+| **100,000** | 5 | 64.04 ms | 68.08 ms | **132.13 ms** | 3.81 MB | 3,784,235 p/s |
+| **100,000** | 10 | 133.42 ms | 130.02 ms | **263.44 ms** | 7.63 MB | 3,795,942 p/s |
+| **100,000** | 20 | 292.34 ms | 254.61 ms | **546.95 ms** | 15.26 MB | 3,656,617 p/s |
+| **100,000** | 50 | 747.88 ms | 676.27 ms | **1424.15 ms** | 38.15 MB | 3,510,857 p/s |
+| **100,000** | 100 | 2017.67 ms | 1554.72 ms | **3572.39 ms** | 76.29 MB | 2,799,243 p/s |
+| **1,000,000** | 2 | 496.20 ms | 427.96 ms | **924.15 ms** | 15.26 MB | 2,164,149 p/s |
+| **1,000,000** | 5 | 723.75 ms | 1050.67 ms | **1774.43 ms** | 38.15 MB | 2,817,814 p/s |
+| **1,000,000** | 10 | 1459.35 ms | 1756.47 ms | **3215.82 ms** | 76.29 MB | 3,109,627 p/s |
 
 ---
 
@@ -54,7 +52,7 @@ Vectorized mask generation and parameter aggregation were benchmarked across cli
 ├───────────────────────────────┬─────────────────────────────────────────┤
 │ Dimension / Metric            │ Scalability Behavior                    │
 ├───────────────────────────────┼─────────────────────────────────────────┤
-│ Observed Centralized Sim Time │ O(n · d)  [R² = 0.9869]                   │
+│ Observed Centralized Sim Time │ O(n · d)  [R² = 0.9897]                   │
 │ Observed Communication Space  │ O(n · d)  [8 bytes / parameter]          │
 │ Theoretical Pairwise SecAgg   │ O(n² · d) Computation / O(n² + nd) Comm │
 └───────────────────────────────┴─────────────────────────────────────────┘

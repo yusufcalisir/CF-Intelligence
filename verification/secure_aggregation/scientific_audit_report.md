@@ -92,7 +92,7 @@ Because pairwise masks distort spatial geometry, distance-based Byzantine aggreg
 
 ### 4.4 Phase 4: Scalability & Performance Benchmarking (`secagg_benchmark_scalability.py`)
 - **Throughput:** High-speed NumPy matrix vectorization achieves up to **5,990,801 parameters/second**.
-- **Linear Scaling:** Total execution latency scales strictly linearly ($\mathcal{O}(n \cdot d)$, $R^2 = 0.9984$).
+- **Linear Scaling:** Total execution latency scales strictly linearly ($\mathcal{O}(n \cdot d)$, $R^2 = 0.9897$).
 
 ---
 

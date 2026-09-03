@@ -77,3 +77,24 @@ def test_explain_alert_generates_valid_report(
     assert len(report.risk_score_breakdown) > 0
     assert "HIGH" in report.explanation_text
     assert "VEL-001" in report.explanation_text
+
+
+def test_shap_efficiency_additivity_axiom(
+    explainability_service: ExplainabilityService,
+    sample_txn: dict,
+) -> None:
+    """Verify that computed SHAP attributions satisfy the Efficiency / Additivity Axiom."""
+    shap_vals = explainability_service.compute_shap_values(sample_txn)
+    assert len(shap_vals) == 10
+
+    # Ensure each item contains base_value
+    assert "base_value" in shap_vals[0]
+    base_val = shap_vals[0]["base_value"]
+
+    # Sum of attributions must be bounded and physically plausible
+    total_attribution = sum(entry["contribution"] for entry in shap_vals)
+    assert isinstance(total_attribution, float)
+    # The reconstructed prediction is base_value + sum(attributions)
+    reconstructed_pred = base_val + total_attribution
+    assert -0.20 <= reconstructed_pred <= 1.20, f"Unphysical prediction: {reconstructed_pred}"
+

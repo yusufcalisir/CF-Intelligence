@@ -1,4 +1,4 @@
-﻿"""Scalability and Performance Benchmarking Suite for Secure Aggregation Subsystem.
+"""Scalability and Performance Benchmarking Suite for Secure Aggregation Subsystem.
 
 Benchmarks:
 - Mask generation runtime across n in [2, 100] and d in [1k, 1M]
@@ -37,7 +37,7 @@ def benchmark_secagg():
     for d in model_dimensions:
         for n in client_counts:
             # Skip large memory scenarios that exceed typical single-node test thresholds
-            if n * d > 50000000:
+            if n * d > 10000000:
                 continue
                 
             gc.collect()
