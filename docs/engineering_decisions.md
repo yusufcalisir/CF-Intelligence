@@ -385,7 +385,7 @@ Implement a configurable Strategy Factory supporting **FedProx**, **SCAFFOLD**, 
 
 ---
 
-## ED-016: Byzantine-Robust Aggregators (Multi-Krum & Trimmed Mean vs Adversarial Poisoning)
+## ED-016: Byzantine-Robust Aggregators (Krum, Trimmed Mean & Bulyan vs Adversarial Poisoning)
 
 **Date**: 2026-08-14  
 **Status**: Accepted
@@ -401,12 +401,12 @@ Standard linear weighted averaging ($\sum \frac{n_k}{n} \mathbf{w}_k$) provides 
 ### Decision
 
 Implement Byzantine-tolerant aggregation defenses with theoretical breakdown guarantees:
-1. **Multi-Krum (Blanchard et al., 2017)**: Computes pairwise Euclidean distances $d(\mathbf{w}_i, \mathbf{w}_j)$ across all client gradient submissions and selects the top $m$ candidate models that minimize the cumulative distance to their $n - f - 2$ closest neighbors (where $f < n/2$ is the tolerated number of Byzantine nodes).
+1. **Krum & Bulyan (Blanchard et al., 2017; El Mhamdi et al., 2018)**: Single **Krum** (`AggregationMethod.KRUM`) computes pairwise squared Euclidean distances across all client parameter submissions and selects the single representative model minimizing cumulative distance to its $n - f - 2$ closest neighbors. **Bulyan** (`AggregationMethod.BULYAN`) combines Krum-style scoring to select the top $n - 2f$ candidates and subsequently applies coordinate-wise trimmed mean on that subset, achieving the strongest resilience against colluding adversaries.
 2. **Coordinate-wise Trimmed Mean & Median (Yin et al., 2018)**: Sorts coordinate values across all received client vectors and discards the top and bottom $\beta$ fraction (e.g. $\beta = 0.20$) before computing the arithmetic mean per parameter, neutralizing extreme magnitude manipulation.
 
 ### Tradeoff
 
-* Multi-Krum incurs an $\mathcal{O}(n^2 \cdot d)$ computational cost for pairwise distance calculation over $d$ parameters. For models with $> 1\text{M}$ weights, distance matrix computation is parallelized across worker threads.
+* Krum distance scoring incurs an $\mathcal{O}(n^2 \cdot d)$ computational cost for pairwise distance calculation over $d$ parameters. For models with $> 1\text{M}$ weights, distance matrix computation is parallelized across worker threads.
 
 ---
 
@@ -594,7 +594,7 @@ While unit and integration test suites (1,156+ Pytest, 249 Vitest) verified isol
    * `auth_session_flow.spec.ts`: Landing navigation, login, token persistence, and security header verification.
    * `federated_training_lifecycle.spec.ts`: Coordinator round execution, client node negotiation, and real-time telemetry streaming.
    * `investigation_four_eyes_sar.spec.ts`: Alert inspection, dual supervisor cryptographic signing, and FinCEN SAR XML generation.
-   * `chaos_attack_simulation.spec.ts`: Live Byzantine gradient injection, Multi-Krum defense shield activation, and visual node quarantine.
+   * `chaos_attack_simulation.spec.ts`: Live Byzantine gradient injection, Krum defense shield activation, and visual node quarantine.
    * `dataset_custom_ingest_flow.spec.ts`: Drag-and-drop CSV/Parquet upload, schema mapping, GE contract audit, and consortium enrollment.
 
 ### Tradeoff
@@ -603,14 +603,14 @@ While unit and integration test suites (1,156+ Pytest, 249 Vitest) verified isol
 
 ---
 
-## ED-025: Live Adversarial Attack Injection & Multi-Krum Byzantine Quarantine Telemetry
+## ED-025: Live Adversarial Attack Injection & Krum Byzantine Quarantine Telemetry
 
 **Date**: 2026-09-03  
 **Status**: Accepted
 
 ### Context
 
-Consortium defense mechanisms (Multi-Krum, Trimmed Mean, Spectral SVD) were previously verified through backend scripts, requiring operators to inspect terminal logs to observe attack mitigation. Stakeholders and evaluators require real-time visual proof of attack interception.
+Consortium defense mechanisms (Krum, Bulyan, Trimmed Mean, Spectral SVD) were previously verified through backend scripts, requiring operators to inspect terminal logs to observe attack mitigation. Stakeholders and evaluators require real-time visual proof of attack interception.
 
 ### Decision
 
@@ -618,7 +618,7 @@ Consortium defense mechanisms (Multi-Krum, Trimmed Mean, Spectral SVD) were prev
    * 500 tx/s Smurfing / Layering micro-deposit burst.
    * Byzantine Poisoned Gradient injection ($\Delta w \times -10.0$).
 2. **Instant Visual Quarantine Feedback**:
-   * Multi-Krum evaluates Euclidean distance sums ($\Delta = 48.2 > 14.1$ threshold), rejects the compromised gradient, and isolates Bank Gamma with a pulsing red card and `QUARANTINED BY KRUM` heartbeat indicator.
+   * Krum evaluates Euclidean distance sums ($\Delta = 48.2 > 14.1$ threshold), rejects the compromised gradient, and isolates Bank Gamma with a pulsing red card and `QUARANTINED BY KRUM` heartbeat indicator.
    * Reports preserved model accuracy (+0.42 AUC over undefended FedAvg).
 
 ### Tradeoff

@@ -136,13 +136,13 @@ $$
 
 *Purpose:* Attenuates parameter updates from asynchronous straggler banks based on round staleness $\tau$.
 
-#### 12. Krum & Multi-Krum Selection Score
+#### 12. Krum & Bulyan Selection Score
 
 $$
 s_i = \sum_{i \to j} \|w_i - w_j\|^2
 $$
 
-*Purpose:* Selects candidate updates minimizing sum of Euclidean distances to nearest $K-f-2$ neighbors.
+*Purpose:* Evaluates candidate updates minimizing sum of Euclidean distances to nearest $K-f-2$ neighbors (used for single selection in Krum, and candidate subset selection in Bulyan).
 
 #### 13. Trimmed Mean Coordinate Outlier Trimming
 

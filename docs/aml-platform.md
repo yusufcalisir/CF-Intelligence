@@ -106,9 +106,9 @@ The platform includes a real-time scenario simulator to showcase how collaborati
 5. **Interactive Smurfing / Layering High-Velocity Burst (500 tx/s)**:
    * *Behavior*: Syndicate executes high-frequency sub-threshold transfers ($4,850 – $9,950) across Bank Alpha, Bank Beta, and Bank Gamma.
    * *Outcome*: Intercepted in real time via GraphSAGE relational embeddings and MinHash LSH Private Set Intersection.
-6. **Byzantine Poisoned Gradient Injection & Multi-Krum Quarantine**:
+6. **Byzantine Poisoned Gradient Injection & Krum Quarantine**:
    * *Behavior*: Compromised participant node (Bank Gamma) injects maliciously scaled, inverted weights ($\Delta w \times -10.0$) during federated aggregation.
-   * *Outcome*: Multi-Krum defense shield detects Euclidean distance anomaly ($\Delta = 48.2 > 14.1$), rejects the gradient, triggers visual node quarantine (`QUARANTINED BY KRUM`), and preserves global model AUC (+0.42).
+   * *Outcome*: Krum defense shield detects Euclidean distance anomaly ($\Delta = 48.2 > 14.1$), rejects the gradient, triggers visual node quarantine (`QUARANTINED BY KRUM`), and preserves global model AUC (+0.42).
 
 ---
 

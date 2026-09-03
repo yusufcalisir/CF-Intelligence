@@ -25,7 +25,7 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`SOC2-CC6.9`** | SOC 2 Type II | Zero-Vulnerability Supply Chain Security & Pinned Security Floor | `backend/requirements.txt`, Dependabot Policy | `pytest backend/tests/` | `PASS` |
 | **`GDPR-ART-25`** | GDPR Art. 25 | Privacy by Design: Client-Side Luhn PAN & Type-Salted HMAC Sanitization | `piiSanitizer.ts`, `DatasetDropzone.tsx` | `test_dataset_ingestor.py` | `PASS` |
 | **`ISO27001-A.12.1.3`**| ISO 27001 | Great Expectations 1.x Data Contract Gating & Quarantine Isolation | `datasets.py`, Great Expectations Suite | `test_dataset_ingestor.py` | `PASS` |
-| **`ISO27001-A.14.2.9`**| ISO 27001 | Interactive Byzantine Gradient Injection & Multi-Krum Quarantine Shield | `scenarios.py`, `ChaosAttackInjectorPanel.tsx` | `test_attack_injector.py` | `PASS` |
+| **`ISO27001-A.14.2.9`**| ISO 27001 | Interactive Byzantine Gradient Injection & Krum Quarantine Shield | `scenarios.py`, `ChaosAttackInjectorPanel.tsx` | `test_attack_injector.py` | `PASS` |
 | **`GDPR-ART-6`** | GDPR Art. 6 | Zero raw PII data pooling; federated gradient exchange only | `FederatedLearningEngine` (`fl_engine.py`) | `test_fl_engine.py` | `PASS` |
 | **`GDPR-ART-17`** | GDPR Art. 17 | Automated TTL data purging, cryptographic zeroization & unlearning | `AutomatedRetentionEngine`, `FederatedUnlearningEngine` | `test_federated_unlearning.py` | `PASS` |
 | **`SR-11-7-GOV`** | Fed SR 11-7 | Model risk management, concept drift detection & champion gate | `ModelGovernanceService`, `CanaryQualityGate` | `test_sr11_7_model_governance.py` | `PASS` |

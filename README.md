@@ -58,7 +58,7 @@ The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** addresses th
 │   └──────────────────────────┬─────────────────────────────┘                     │
 │                              ▼                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
-│   │ Byzantine Coordinator: FedProx/SCAFFOLD + Multi-Krum   │ (Drift & Poisoning) │
+│   │ Byzantine Coordinator: FedProx/SCAFFOLD + Krum/Bulyan  │ (Drift & Poisoning) │
 │   └──────────────────────────┬─────────────────────────────┘                     │
 │                              ▼                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
@@ -75,7 +75,7 @@ The core production path focuses on seven defensible engineering components:
 - **Federated Learning Engines:** `FedAvg`, `FedProx`, and `SCAFFOLD` optimization handling extreme Non-IID Dirichlet label skew ($\alpha \le 0.50$).
 - **Differential Privacy Guard:** Local gradient perturbation via Opacus with Gaussian noise and Rényi DP accounting ($\epsilon = 1.0, \delta = 10^{-5}$).
 - **Secure Aggregation (SecAgg):** Peer-to-peer Curve25519 Diffie-Hellman pairwise zero-sum masking for masked parameter aggregation.
-- **Byzantine Consensus:** `Multi-Krum`, `Trimmed Mean`, and `Bulyan` aggregators paired with Spectral SVD backdoor filtering.
+- **Byzantine Consensus:** `Krum` (single representative selection), `Trimmed Mean`, and `Bulyan` (Krum candidate selection + coordinate trimmed mean) aggregators paired with Spectral SVD backdoor filtering.
 - **Graph Intelligence:** PyTorch `GraphSAGE` relational embeddings and MinHash LSH Private Set Intersection (Fuzzy PSI) for entity resolution.
 - **Real-Time Composite Scoring:** Sub-100ms inference gateway combining 9 statistical, behavioral, and topological signals.
 - **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Edge Middleware $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
@@ -147,7 +147,7 @@ flowchart TD
     end
 
     subgraph Coordinator["3. Byzantine Coordinator & Aggregation"]
-        Agg["🛡️ Byzantine-Robust Aggregation<br/><i>FedProx · SCAFFOLD · Multi-Krum · Trimmed Mean · Bulyan</i>"]
+        Agg["🛡️ Byzantine-Robust Aggregation<br/><i>FedProx · SCAFFOLD · Krum · Trimmed Mean · Bulyan</i>"]
         SVD["🔍 Spectral SVD Poisoning Filter<br/><i>Cosine Distance & Top Eigenvalue Anomaly Check</i>"]
         Canary["🚦 Canary Quality Gate<br/><i>Holdout Dataset Evaluation (PR-AUC / Recall@0.1% FPR)</i>"]
     end
@@ -253,7 +253,7 @@ CF-Intelligence/
 │   │   │   ├── value_objects_bridge.py              # Layer-2 cross-chain settlement bridge envelopes
 │   │   │   ├── model_lifecycle.py                   # Champion / Challenger state machine & rollback policies
 │   │   │   ├── model_governance.py                  # SR 11-7 model risk governance, bias audit & audit trail
-│   │   │   ├── byzantine_defense.py                 # Multi-Krum, Trimmed Mean, Bulyan & Coordinate Median rules
+│   │   │   ├── byzantine_defense.py                 # Krum, Trimmed Mean, Bulyan & Coordinate Median rules
 │   │   │   ├── spectral_defense.py                  # Spectral SVD top eigenvalue backdoor anomaly filter
 │   │   │   ├── fuzzy_psi.py                         # MinHash LSH Private Set Intersection algorithm
 │   │   │   ├── psi_service.py                       # Zero-PII cross-bank entity intersection engine
@@ -283,7 +283,7 @@ CF-Intelligence/
 │   │   │
 │   │   ├── application/
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
-│   │   │       ├── fl_engine.py                     # Core PyTorch Federated Learning engine (FedAvg/FedProx/SCAFFOLD)
+│   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
 │   │   │       ├── flower_engine.py                 # Flower framework FL integration & simulation bridge
 │   │   │       ├── flower_p2p_engine.py             # Peer-to-peer decentralized Flower transport
 │   │   │       ├── fl_dirichlet_partitioner.py      # Non-IID Dirichlet label skew partitioner (alpha <= 0.50)
@@ -331,7 +331,7 @@ CF-Intelligence/
 │   │   │       ├── webhook_service.py               # HMAC-SHA256 signed asynchronous webhook dispatcher
 │   │   │       ├── zero_downtime_deployer.py        # Rolling zero-downtime model deployment coordinator
 │   │   │       ├── model_registry.py                # Model versioning, lineage tracking & canary promoter
-│   │   │       ├── model_service.py                 # Champion/Challenger runtime evaluation & hot-reloading
+│   │   │       ├── model_service.py                 # Local client training (FedProx proximal loss, SCAFFOLD drift correction, Opacus DP)
 │   │   │       ├── adversarial_service.py           # Adversarial attack simulation (sign-flip, label-flip, backdoor)
 │   │   │       ├── consortium_service.py            # Multi-bank consortium voting & policy management
 │   │   │       ├── etl_service.py                   # Batch ETL pipeline & feature precomputation
@@ -668,11 +668,11 @@ The platform includes an interactive enterprise ingestion studio allowing bank d
 
 ## 5. Federated Learning Engines & Non-IID Optimization
 
-### 5.1 Core Federated Learning Engine (`fl_engine.py`)
+### 5.1 Core Federated Learning Engine (`fl_engine.py` & `model_service.py`)
 Orchestrates multi-client federated training rounds supporting 7 optimization strategies:
 1. **FedAvg:** Standard weighted parameter averaging based on client dataset size.
-2. **FedProx:** Adds a proximal regularization penalty ($\mu \frac{1}{2} \|w - w^t\|^2$) to restrict local update drift under Non-IID statistical skew.
-3. **SCAFFOLD:** Uses client and server control variates ($c_i, c$) to correct gradient trajectories against client drift.
+2. **FedProx:** Adds a client-side proximal regularization penalty ($\frac{\mu}{2} \|w - w^t\|^2$ in `model_service.py:train_local`) during local training to restrict update drift under Non-IID statistical skew; server-side aggregation in `fl_engine.py` performs standard weighted averaging.
+3. **SCAFFOLD:** Corrects client-side gradient trajectories against drift ($g_i \leftarrow g_i - c_i + c$ in `model_service.py`) using control variates; server-side aggregation in `fl_engine.py` evaluates weighted parameter averaging while tracking global variate states.
 4. **FedAdam & FedYogi:** Server-side adaptive optimization with momentum.
 5. **FedAdagrad:** Adaptive gradient server-side learning rate scaling.
 6. **MOON (Model-Contrastive FL):** Contrastive representation learning between local and global representations.
@@ -718,10 +718,10 @@ Implements zero-sum pairwise vector perturbation based on the Bonawitz et al. pr
 
 ### 7.1 Byzantine-Robust Aggregator Suite (`fl_engine.py`)
 Resists adversarial or compromised client updates using robust aggregation rules:
-- **Multi-Krum:** Selects client updates that minimize the sum of Euclidean distances to the closest $n - f - 2$ neighbors.
+- **Krum:** Selects the single client update that minimizes the sum of squared Euclidean distances to the closest $n - f - 2$ neighbors.
 - **Trimmed Mean:** Computes coordinate-wise averages after trimming the top and bottom $\beta$ fraction of outlier values.
 - **Coordinate-Wise Median:** Computes the element-wise median across parameter updates.
-- **Bulyan:** Combines Multi-Krum candidate selection with coordinate-wise trimmed mean.
+- **Bulyan:** Combines Krum candidate selection (selecting the $n - 2f$ lowest-distance candidates) with coordinate-wise trimmed mean.
 
 ### 7.2 Spectral SVD Backdoor Defense (`spectral_defense.py`)
 Computes top Singular Value Decomposition (SVD) on parameter matrices to detect and quarantine anomalous gradient trajectories and backdoor triggers prior to aggregation.
@@ -735,7 +735,7 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
   - GraphSAGE relational graph embeddings and MinHash LSH Private Set Intersection intercept the syndicate, demonstrating immediate velocity threshold escalation.
 - **Byzantine Poisoned Gradient Attack ($\Delta w \times -10.0$):**
   - Simulates a compromised bank node (Bank Gamma) injecting inverted, malicious parameter weights to degrade the global model.
-  - The **Multi-Krum Defense Shield** evaluates neighbor Euclidean distance sums ($\Delta = 48.2$, exceeding the distance threshold of $14.1$).
+  - The **Krum / Bulyan Defense Shield** evaluates neighbor Euclidean distance sums ($\Delta = 48.2$, exceeding the distance threshold of $14.1$).
   - The malicious gradient is rejected, Bank Gamma is isolated with an immediate visual quarantine badge (`QUARANTINED BY KRUM`), and global model accuracy is preserved with $+0.42$ ROC-AUC protection over undefended FedAvg.
 
 ---
@@ -752,22 +752,25 @@ Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer enti
 
 ## 9. 9-Signal Composite Risk Engine & Model Explainability
 
-### 9.1 Composite Risk Scoring Engine (`risk_engine.py`)
+### 9.1 Composite Risk Scoring Engine (`risk_engine.py` & `value_objects_phase2.py`)
 Combines 9 independent risk signals into a unified risk score ($0 - 1000$):
 
-$$\text{Risk Score} = \min\left(1000, \max\left(0, \sum_{i=1}^{9} w_i S_i \times 1000\right)\right)$$
+$$\text{Risk Score} = \text{round}\left(\min\left(1.0, \frac{\sum_{i=1}^{9} w_i S_i}{\sum_{i=1}^{9} w_i}\right) \times 1000, 1\right) \quad \text{where } \sum_{i=1}^{9} w_i = 1.00$$
 
-| Signal | Identifier | Description | Weight |
+| Signal Name | Identifier | What It Evaluates in `risk_engine.py` | Weight |
 |:---|:---|:---|:---:|
-| **Local Model Probability** | $S_{\text{local}}$ | Local classifier inference score | 0.25 |
-| **Cross-Bank Velocity** | $S_{\text{velocity}}$ | Rapid multi-institution transfer frequency | 0.20 |
-| **Graph Centrality** | $S_{\text{graph}}$ | GraphSAGE embedding anomaly / PageRank | 0.15 |
-| **Laundering Typology** | $S_{\text{typology}}$ | Rule match for smurfing, layering, or circular flow | 0.10 |
-| **Amount Z-Score** | $S_{\text{amount}}$ | Statistical deviation from account history | 0.08 |
-| **Device Risk** | $S_{\text{device}}$ | Suspicious IP, proxy, or fingerprint change | 0.07 |
-| **Temporal Clustering** | $S_{\text{temporal}}$ | Unusual off-hours transaction burst | 0.05 |
-| **Mule Probability** | $S_{\text{mule}}$ | Rapid pass-through dormancy pattern | 0.05 |
-| **Structuring Index** | $S_{\text{structuring}}$ | Proximity to $10,000 threshold | 0.05 |
+| `ml_prediction` | $S_{\text{ml}}$ | Supervised ML model fraud probability confidence ($0.0 - 1.0$) output by local/global neural classifier | 0.25 |
+| `velocity_rules` | $S_{\text{velocity}}$ | Hourly transaction frequency ($v$ txns/hr), normalized via $\min(1.0, \max(0.0, (v - 2) / 8))$; $\ge 10$ txns/hr is max risk | 0.15
+| `merchant_reputation` | $S_{\text{merchant}}$ | Blends merchant individual risk score ($60\%$) with category risk ($40\%$) from FATF lookup table `MERCHANT_RISK` | 0.10 |
+| `country_risk` | $S_{\text{country}}$ | Evaluates originating ISO-2 country jurisdiction against FATF watchlist lookup table `COUNTRY_RISK` | 0.10 |
+| `customer_history` | $S_{\text{history}}$ | Inverted customer tenure score ($1.0 - \text{history}$), adding $+0.30$ risk penalty if account age $< 30$ days | 0.10 |
+| `device_anomaly` | $S_{\text{device}}$ | Originating channel/device risk heuristic (`phone_banking`=0.40, `atm`=0.35, `web`=0.15, `mobile`=0.10, `pos`=0.05) | 0.08 |
+| `previous_alerts` | $S_{\text{alerts}}$ | Entity's historical AML alert frequency from in-memory ledger, normalized via $\min(1.0, \text{count} / 5)$ ($5+$ alerts $\to 1.0$) | 0.08 |
+| `chargeback_history` | $S_{\text{chargeback}}$ | Entity's historical chargeback dispute rate, normalized via $\min(1.0, \text{rate} \times 10)$ ($10\%$ chargeback $\to 1.0$) | 0.07 |
+| `behavior_anomaly` | $S_{\text{behavior}}$ | Statistical amount deviation from entity baseline ($Z$-score $z = \|x - \mu\| / \sigma$), normalized via $\min(1.0, \max(0.0, (z - 1) / 3))$ | 0.07 |
+
+> [!NOTE]
+> **Architectural Clarification on Graph Intelligence (GraphSAGE):** Graph-based anomaly detection (FedGNN / GraphSAGE embeddings and PageRank centrality) is implemented as an independent, asynchronous graph intelligence pipeline ([Section 8](#8-graph-intelligence--fuzzy-entity-resolution), `graph_analytics_service.py`, `streaming_gnn_model.py`), operating on multi-hop consortium transaction subgraphs. It is **not** one of the 9 signals evaluated in the real-time synchronous composite risk engine (`risk_engine.py`).
 
 ### 9.2 Fast Model Explainability (`explainability_service.py` & `realtime_explainer.py`)
 - **Fast SHAP Explainer:** Computes TreeExplainer / Kernel SHAP Shapley feature attributions to provide interpretable explanations for operational risk decisions.
@@ -885,10 +888,12 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
 ## 13. Design Decisions & Trade-Offs
 
 ### 13.1 FedProx & SCAFFOLD vs. Naive FedAvg for Non-IID Banking Partitions
-In realistic cross-bank consortia, member institutions exhibit severe statistical heterogeneity (Dirichlet skew $\alpha \le 0.50$): a retail-focused bank primarily processes domestic point-of-sale transactions, whereas a commercial bank processes large cross-border corporate wires. In naive `FedAvg`, this Non-IID distribution causes severe *client drift*, where local SGD trajectories pull client weights toward disparate local minima, destabilizing global model convergence. `FedProx` counters this by introducing a proximal regularization penalty $\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|^2$ that dynamically penalizes local weights that stray too far from the global consensus. For scenarios with higher variance, `SCAFFOLD` maintains client and server control variates ($c_i, c$) that estimate gradient drift directions and apply trajectory corrections directly during backpropagation, stabilizing convergence even under extreme class skew at the cost of doubling communication states.
+In realistic cross-bank consortia, member institutions exhibit severe statistical heterogeneity (Dirichlet skew $\alpha \le 0.50$): a retail-focused bank primarily processes domestic point-of-sale transactions, whereas a commercial bank processes large cross-border corporate wires. In naive `FedAvg`, this Non-IID distribution causes severe *client drift*, where local SGD trajectories pull client weights toward disparate local minima, destabilizing global model convergence. `FedProx` counters this by introducing a proximal regularization penalty $\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|^2$ that dynamically penalizes local weights that stray too far from the global consensus. Specifically, this proximal penalty is implemented client-side in `model_service.py`'s `train_local` method as a PyTorch loss regularization term added to local cross-entropy loss; the server-side aggregation for FedProx in `fl_engine.py` is standard sample-weighted parameter averaging, identical to FedAvg.
 
-### 13.2 Byzantine-Robust Aggregators: Multi-Krum vs. Trimmed Mean vs. Bulyan
-Standard coordinate averaging has a breakdown point of $0\%$: a single compromised client sending adversarially scaled or sign-flipped gradients ($-\gamma \nabla \mathcal{L}$) can degrade or hijack the global model. To defend against adversarial bank updates, the coordinator implements three distinct Byzantine-robust aggregation strategies, each offering a specific trade-off between robustness, assumption requirements, and computational cost. `Multi-Krum` operates on Euclidean distances across full parameter vectors, selecting updates closest to their neighbor cluster; it provably tolerates up to $f < n/2$ attackers with $O(n^2 \cdot d)$ complexity but can struggle with benign Non-IID variance. Coordinate-wise `Trimmed Mean` trims the top and bottom $\beta$ fraction per coordinate, offering fast $O(n \log n \cdot d)$ computation and robustness against individual parameter extremes, but requires coordinate independence. `Bulyan` combines both by running Multi-Krum to select a trusted subset of $n - 2f$ candidates and then computing coordinate-wise trimmed mean, achieving the strongest known adversarial resilience at the cost of requiring $n \ge 4f + 3$ participants.
+For scenarios with higher variance, `SCAFFOLD` maintains client and server control variates ($c_i, c$) that estimate gradient drift directions and apply trajectory corrections ($g_i \leftarrow g_i - c_i + c$) directly during local backpropagation in `model_service.py`. *Implementation Note:* The server-side aggregation step for SCAFFOLD in `fl_engine.py` currently performs a weighted average identical to FedAvg; the drift-correction mechanism operates during client-side local training via gradient correction ($c_i, c$), while server-side variate tracking ($\bar{c}$) is stored in memory but not yet fed back into the cross-round connector layer end-to-end.
+
+### 13.2 Byzantine-Robust Aggregators: Krum vs. Trimmed Mean vs. Bulyan
+Standard coordinate averaging has a breakdown point of $0\%$: a single compromised client sending adversarially scaled or sign-flipped gradients ($-\gamma \nabla \mathcal{L}$) can degrade or hijack the global model. To defend against adversarial bank updates, the coordinator implements three distinct Byzantine-robust aggregation strategies, each offering a specific trade-off between robustness, assumption requirements, and computational cost. `Krum` (`AggregationMethod.KRUM` in `fl_engine.py`) operates on Euclidean distances across full parameter vectors, selecting the single representative client update that minimizes the sum of squared distances to its $n - f - 2$ closest neighbors; it provably tolerates up to $f < n/2$ attackers with $O(n^2 \cdot d)$ complexity but can struggle with benign Non-IID variance. Coordinate-wise `Trimmed Mean` trims the top and bottom $\beta$ fraction per coordinate, offering fast $O(n \log n \cdot d)$ computation and robustness against individual parameter extremes, but requires coordinate independence. `Bulyan` (`AggregationMethod.BULYAN`) combines both by using Krum-style scoring to select a trusted candidate subset of $n - 2f$ clients and then computing coordinate-wise trimmed mean on that selected subset, achieving the strongest known adversarial resilience at the cost of requiring $n \ge 4f + 3$ participants.
 
 ### 13.3 Differential Privacy Budget Calibration ($\epsilon = 1.0, \delta = 10^{-5}$)
 The differential privacy budget is calibrated to balance concrete empirical protection against Membership Inference Attacks (MIA) with actionable fraud detection utility. In production-like fraud scenarios characterized by extreme class imbalance ($0.01\% - 0.1\%$ fraud prevalence), setting $\epsilon < 0.1$ injects excessive Gaussian noise into gradient updates, causing fraud recall to collapse below $30\%$. Conversely, setting $\epsilon > 10.0$ offers negligible mathematical defense against gradient reconstruction attacks. We select $\epsilon = 1.0$ and $\delta = 10^{-5}$ (strictly smaller than $1/N$) as our baseline operating point, where empirical MIA success remains bounded below $52.4\%$ (approaching random guessing) while preserving $\ge 62.4\%$ Recall at $0.1\%$ False Positive Rate. Privacy loss across multiple training rounds is tracked using Rényi Differential Privacy (RDP) moments accounting, achieving tight sub-linear $O(\sqrt{T})$ composition rather than pessimistic linear summation ($\sum \epsilon_t$).
@@ -904,6 +909,7 @@ For protecting parameter updates in transit between banks and the aggregation co
 > - **Synthetic & Public Benchmark Basis:** This platform has been developed and evaluated using synthetic multi-bank data generators and canonical public research datasets (Elliptic, PaySim, IEEE-CIS). It has **not been deployed in live banking production**.
 > - **Exploratory Concepts, Not Certified Compliance:** Discussions of regulatory frameworks (e.g., GDPR, EU AI Act, Bank Secrecy Act) reflect architectural design inspirations and conceptual models. The platform is **not independently certified** by any compliance or auditing body.
 > - **Single-Maintainer Project:** This repository is an independent technical portfolio and research codebase conceived and maintained by a single engineer (**Yusuf Çalışır**), demonstrating end-to-end distributed system design, privacy-enhancing technologies, and anti-fraud architectures.
+> - **Algorithmic Verification Scope & Precision Gaps:** While core cryptographic invariants (e.g., SecAgg zero-sum cancellation, differential privacy Gaussian noise bounds, and Krum neighbor distance scoring) are verified with exact numeric unit tests, certain algorithmic modules are validated via integration-level behavioral tests rather than closed-form numerical assertions. Specifically: (1) `FedProx` tests verify that local training completes over 2 epochs and returns a valid model under $\mu = 10.0$, but do not assert an exact numerical proximal-term loss value; (2) `RiskScoringEngine` tests verify that all 9 signals are produced, weights sum to 1.0, and risk thresholds behave ordinally (e.g., score $> 800$ for high-risk inputs), but do not assert exact weighted-sum arithmetic for a deterministic input vector.
 
 ---
 
@@ -1259,7 +1265,7 @@ The reports below document the internal scientific verification suites validatin
   "attack_type": "byzantine_poisoning",
   "target_bank": "bank_gamma",
   "intensity": 0.85,
-  "defense_applied": "Multi-Krum Geometric Median Gating",
+  "defense_applied": "Krum Robust Byzantine Aggregation",
   "node_quarantined": true,
   "quarantine_reason": "Gradient distance anomaly delta=48.2 exceeded threshold 14.1",
   "affected_transactions": 0,
@@ -1463,7 +1469,7 @@ python scripts/run_all_verifications.py
 
 This platform was engineered using a human-directed pair-programming workflow leveraging modern AI coding tools as productivity accelerators:
 
-- **Human Lead Systems Architecture & Domain Engineering:** All core system topology designs, algorithmic selections (`FedProx`, `SCAFFOLD`, `Multi-Krum`, `GraphSAGE`), mathematical formulations, threat modeling, regulatory alignment patterns, and domain abstractions were conceived, designed, and directed by the author (**Yusuf Çalışır**).
+- **Human Lead Systems Architecture & Domain Engineering:** All core system topology designs, algorithmic selections (`FedProx`, `SCAFFOLD`, `Krum / Bulyan`, `GraphSAGE`), mathematical formulations, threat modeling, regulatory alignment patterns, and domain abstractions were conceived, designed, and directed by the author (**Yusuf Çalışır**).
 - **AI-Assisted Productivity Tooling:** AI foundation models (Claude, Gemini, and Antigravity) were utilized as interactive engineering tools for boilerplate synthesis, expanding test fixtures, drafting documentation, and diagnosing edge-case regressions:
 
 | Engineering Responsibility | Primary Ownership | AI Collaboration Scope |
