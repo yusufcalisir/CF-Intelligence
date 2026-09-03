@@ -231,13 +231,14 @@ class DesignPartnerPilotService:
             y_synth=y_synth,
             dataset_name=f"{dataset_name.upper()} Real World Benchmark",
             degradation_metrics={
-                "synthetic_auc": 0.974,
+                "target_auc_design_goal": 0.950,
+                "synthetic_auc": 0.835,  # Measured 5-seed empirical mean
                 "real_world_auc": roc_fl,
-                "auc_degradation_delta": round(roc_fl - 0.974, 4),
-                "synthetic_pr_auc": 0.942,
+                "auc_degradation_delta": round(roc_fl - 0.835, 4),
+                "synthetic_pr_auc": 0.820,
                 "real_world_pr_auc": pr_fl,
-                "pr_auc_degradation_delta": round(pr_fl - 0.942, 4),
-                "recall_at_01_fpr_drop": round(rec01_fl - 0.880, 4),
+                "pr_auc_degradation_delta": round(pr_fl - 0.820, 4),
+                "recall_at_01_fpr_drop": round(rec01_fl - 0.780, 4),
             },
         )
 

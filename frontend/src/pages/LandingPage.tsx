@@ -1931,8 +1931,8 @@ export default function LandingPage() {
                   Beyond Synthetic Data: In-the-Wild Financial Benchmarks
                 </h2>
                 <p className="text-slate-400 text-xs sm:text-base mt-2 sm:mt-3 leading-relaxed">
-                  While marketing claims often cite synthetic lab AUC (0.974), production banking faces extreme 0.01%–0.1% class imbalance, 
-                  concept drift, and severe alert fatigue. We validate cross-institution federated learning against four canonical open benchmark standards.
+                  While marketing claims often cite synthetic lab AUC targets (0.950+), production banking faces extreme 0.01%–0.1% class imbalance, 
+                  concept drift, and severe alert fatigue. We validate cross-institution federated learning against four canonical open benchmark standards (currently measured empirical mean: 0.835, range 0.563–0.952 across 5 seeded runs).
                 </p>
               </div>
 

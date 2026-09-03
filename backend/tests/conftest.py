@@ -2,6 +2,11 @@
 
 from typing import Any
 
+try:
+    import pyarrow  # Pre-load pyarrow on Windows to initialize C++ DLLs cleanly
+except ImportError:
+    pass
+
 import pytest
 
 from tests.factories.data_factory import TestDataFactory

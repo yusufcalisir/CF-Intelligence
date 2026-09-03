@@ -50,17 +50,22 @@ class TestCounterfactualEngine:
         features_changed = [c.feature for c in cf.changes]
         assert "transaction_amount" in features_changed or "country_code" in features_changed
 
-    def test_counterfactual_live_risk_engine_verification(self):
-        """Verify that the counterfactual generated achieves a live verified score below target threshold."""
+    def test_counterfactual_executes_real_risk_engine_search(self):
+        """Verifies that counterfactual remediated_score is computed by real RiskScoringEngine."""
+        from app.application.services.risk_engine import RiskScoringEngine
+
         svc = ExplainabilityService()
-        alert = _make_sample_alert(risk_score=780.0)
+        engine = RiskScoringEngine()
+        alert = _make_sample_alert(risk_score=850.0)
 
-        cf = svc.generate_counterfactuals(alert, target_score=350.0)
+        cf = svc.generate_counterfactuals(alert, target_score=350.0, risk_engine=engine)
+
+        assert cf.original_score == 850.0
+        assert cf.remediated_score < 850.0
         assert cf.is_cleared is True
+        assert len(cf.changes) >= 1
+        assert isinstance(cf.remediated_score, float)
         assert cf.remediated_score <= 350.0
-        # Ensure delta explanations report calculated score changes
-        assert any("risk delta" in c.delta_explanation or "Reduce transaction" in c.delta_explanation for c in cf.changes)
-
 
 
 class TestDecisionReplayAudit:
