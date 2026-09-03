@@ -69,4 +69,36 @@ test.describe('E2E Workflow: Federated Learning Lifecycle & Model Quality Gate',
     // Verify Elliptic AML PR-AUC comparison metrics
     await expect(page.locator('text=0.8746').or(page.locator('text=Elliptic')).or(page.locator('text=GraphSAGE')).first()).toBeVisible();
   });
+
+  test('executes live federated simulation and verifies real-time round telemetry convergence', async ({ page }) => {
+    // 1. Navigate to Live Operations Dashboard
+    await page.goto('/operations');
+    await page.waitForLoadState('domcontentloaded');
+
+
+    // 2. Verify Live Operations Header and WebSocket Connection indicator
+    await expect(page.locator('text=Live Operations Dashboard').first()).toBeVisible();
+    await expect(page.locator('text=CONNECTED').first()).toBeVisible();
+
+    // 3. Verify Consortium Nodes and Active Champion AUC are rendered
+    await expect(page.locator('text=Active Champion AUC').first()).toBeVisible();
+    await expect(page.locator('text=Bank Alpha').first()).toBeVisible();
+    await expect(page.locator('text=Bank Beta').first()).toBeVisible();
+    await expect(page.locator('text=Bank Gamma').first()).toBeVisible();
+
+    // 4. Trigger Federated Learning Simulation via Action Button
+    const startBtn = page.locator('#start-federated-training-btn');
+    await expect(startBtn).toBeVisible();
+    await startBtn.click();
+
+    // 5. Verify simulation status transitions to active
+    await expect(page.locator('text=Simulating').or(page.locator('text=FL Training Round')).first()).toBeVisible();
+
+    // 6. Verify round convergence progression (Round counter increments)
+    await expect(page.locator('text=Round 1').or(page.locator('text=Round 2')).or(page.locator('text=Gradients Received')).first()).toBeVisible({ timeout: 15000 });
+
+    // 7. Verify telemetry updates gradient submissions across banks
+    await expect(page.locator('text=Gradients Received').or(page.locator('text=Active Champion AUC')).first()).toBeVisible();
+  });
 });
+

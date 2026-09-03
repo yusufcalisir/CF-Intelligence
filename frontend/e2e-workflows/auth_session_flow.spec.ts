@@ -52,7 +52,26 @@ test.describe('E2E Workflow: Authentication & Session Token Lifecycle', () => {
         }),
       });
     });
+
+    // Intercept Dashboard executive stats endpoint
+    await page.route('**/api/v1/dashboard/stats*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          total_alerts: 1420,
+          critical_alerts: 48,
+          open_cases: 19,
+          total_entities: 8750,
+          shared_intelligence_items: 640,
+          graph_clusters: 28,
+          active_scenarios: 12,
+          cross_institution_matches: 134,
+        }),
+      });
+    });
   });
+
 
   test('executes landing navigation to dashboard and verifies authenticated dashboard state', async ({ page }) => {
     // 1. Load root landing page
@@ -68,12 +87,16 @@ test.describe('E2E Workflow: Authentication & Session Token Lifecycle', () => {
     // 3. Verify route reaches dashboard
     await page.goto('/dashboard');
     await page.waitForURL('**/dashboard', { timeout: 15000 });
-    await expect(page.locator('text=Consortium').or(page.locator('text=Federation')).or(page.locator('text=Platform')).or(page.locator('header')).first()).toBeVisible();
+    await expect(page.locator('header').first()).toBeVisible();
 
-    // 4. Verify header displays active layout
-    const header = page.locator('header').first();
-    await expect(header).toBeVisible();
+    // 4. Verify executive dashboard elements
+    await expect(page.locator('text=Collaborative Fraud Intelligence').first()).toBeVisible();
+    await expect(page.locator('text=Participating Institutions').first()).toBeVisible();
+    await expect(page.locator('text=Recent Simulations').first()).toBeVisible();
   });
+
+
+
 
   test('validates security headers and zero token leakage in DOM', async ({ page }) => {
     await page.goto('/dashboard');

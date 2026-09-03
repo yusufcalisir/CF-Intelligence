@@ -15,6 +15,9 @@
     "test:unit": "vitest run src/components src/utils src/services src/api",
     "test:responsive": "vite build && playwright test e2e-responsive",
     "test:e2e:workflows": "playwright test e2e-workflows --project=desktop-1440-chromium",
+    "test:e2e:workflows:firefox": "playwright test e2e-workflows --project=laptop-1280-firefox",
+    "test:e2e:workflows:all": "playwright test e2e-workflows",
+
     "test:visual": "vite build && playwright test e2e-visual --project=desktop-1440-chromium",
     "test:visual:update": "vite build && playwright test e2e-visual --project=desktop-1440-chromium --update-snapshots",
     "test:a11y": "vite build && playwright test e2e-a11y --project=desktop-1440-chromium",
