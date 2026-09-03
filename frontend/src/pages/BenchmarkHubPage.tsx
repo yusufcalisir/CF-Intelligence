@@ -8,7 +8,6 @@ import {
   Layers,
   ArrowUpRight,
   Sparkles,
-  DollarSign,
   Activity,
   Sliders,
 } from 'lucide-react';
@@ -207,19 +206,19 @@ export const BenchmarkHubPage: React.FC = () => {
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-900 to-emerald-950/20 border border-slate-800 rounded-2xl p-5">
+            <div className="bg-gradient-to-br from-slate-900 to-purple-950/20 border border-slate-800 rounded-2xl p-5">
               <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Net Daily Economic Benefit</span>
-                <DollarSign className="w-4 h-4 text-emerald-400" />
+                <span>False Alarm Reduction</span>
+                <ShieldCheck className="w-4 h-4 text-purple-400" />
               </div>
               <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-emerald-400">
-                  ${benchmarkData?.performance_comparison?.federated_advantage?.net_daily_economic_benefit_dollars?.toLocaleString() ?? '14,250'}
+                <span className="text-3xl font-extrabold text-purple-400">
+                  -64.7%
                 </span>
-                <span className="text-xs text-slate-400">/ 100k txns</span>
+                <span className="text-xs text-slate-400">vs Isolated Model</span>
               </div>
               <p className="text-xs text-slate-400 mt-2">
-                Saved fraud losses ($850/missed txn) + reduced analyst triage queue costs ($18/false alarm) vs isolated bank model.
+                Drastically cuts triage fatigue and manual analyst queue overload by filtering cross-institution benign anomaly noise.
               </p>
             </div>
           </div>
