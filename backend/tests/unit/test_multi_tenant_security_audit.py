@@ -73,6 +73,7 @@ def test_redis_namespace_key_enclosure() -> None:
 def test_cross_tenant_resource_access_attempt_strictly_blocked() -> None:
     """Verifies that an authenticated tenant attempting to query another bank's resource is rejected with HTTP 403 Forbidden."""
     from fastapi import HTTPException
+
     from app.dependencies import enforce_tenant_isolation
 
     # Bank A attempting to access Bank B's case or alert

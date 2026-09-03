@@ -90,6 +90,7 @@ class FederatedLearningServicer:
 
         try:
             from sqlalchemy import select
+
             from app.infrastructure.database import get_session_factory
             from app.infrastructure.models import TenantConfigModel
 

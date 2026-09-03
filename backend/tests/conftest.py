@@ -1,11 +1,13 @@
 """Test configuration and shared fixtures."""
 
+import contextlib
+import importlib.util
 from typing import Any
 
-try:
-    import pyarrow  # Pre-load pyarrow on Windows to initialize C++ DLLs cleanly
-except ImportError:
-    pass
+# Pre-load pyarrow on Windows to initialize C++ DLLs cleanly before pytest collects tests
+if importlib.util.find_spec("pyarrow") is not None:
+    with contextlib.suppress(ImportError):
+        import pyarrow as _pyarrow  # noqa: F401
 
 import pytest
 

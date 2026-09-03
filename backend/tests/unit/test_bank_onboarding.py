@@ -84,7 +84,7 @@ async def test_full_onboarding_pipeline_sets_active(
 
     # Cryptographically verify the issued X.509 certificate and private key
     from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives import serialization
 
     parsed_cert = x509.load_pem_x509_certificate(cert.encode("utf-8"))
     parsed_key = serialization.load_pem_private_key(key.encode("utf-8"), password=None)
