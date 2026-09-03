@@ -144,7 +144,8 @@ const API_ENDPOINTS: ApiEndpointSpec[] = [
     },
     requestBodySample: {
       case_id: 'CASE-98492',
-      supervisor_signature: 'SIG_SUPERVISOR_ALPHA_9941',
+      first_supervisor_signature: 'SIG_SUPERVISOR_ALICE_9941',
+      second_supervisor_signature: 'SIG_SUPERVISOR_BOB_8820',
       include_narrative: true,
       include_graph_lineage: true,
     },

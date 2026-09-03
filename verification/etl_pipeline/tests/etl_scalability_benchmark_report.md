@@ -7,10 +7,10 @@
 
 | Sample Volume ($N$) | Anonymization Latency (ms) | Dirichlet Partitioning Latency (ms) | Total Throughput (samples/sec) | Scaling Complexity |
 |:---:|:---:|:---:|:---:|:---:|
-| **1,000** | 12.53 ms | 1.42 ms | **71,692 samples/sec** | $\mathcal{O}(N)$ Linear |
-| **10,000** | 89.02 ms | 3.37 ms | **108,237 samples/sec** | $\mathcal{O}(N)$ Linear |
-| **50,000** | 572.13 ms | 9.8 ms | **85,920 samples/sec** | $\mathcal{O}(N)$ Linear |
-| **100,000** | 822.08 ms | 33.39 ms | **116,895 samples/sec** | $\mathcal{O}(N)$ Linear |
+| **1,000** | 11.2 ms | 2.35 ms | **73,785 samples/sec** | $\mathcal{O}(N)$ Linear |
+| **10,000** | 55.55 ms | 2.0 ms | **173,758 samples/sec** | $\mathcal{O}(N)$ Linear |
+| **50,000** | 282.38 ms | 8.22 ms | **172,057 samples/sec** | $\mathcal{O}(N)$ Linear |
+| **100,000** | 573.63 ms | 18.45 ms | **168,896 samples/sec** | $\mathcal{O}(N)$ Linear |
 
 ## Key Performance Observations
 

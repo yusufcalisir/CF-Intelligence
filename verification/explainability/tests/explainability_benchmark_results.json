@@ -1,29 +1,29 @@
 {
   "latency_benchmarks_ms": {
-    "explain_alert_latency_ms": 0.0423,
-    "compute_shap_values_latency_ms": 1.1489,
-    "explain_realtime_score_latency_ms": 0.0015,
-    "explain_async_cache_hit_latency_ms": 0.0079,
+    "explain_alert_latency_ms": 0.0478,
+    "compute_shap_values_latency_ms": 12.6172,
+    "explain_realtime_score_latency_ms": 0.0016,
+    "explain_async_cache_hit_latency_ms": 0.0037,
     "sub_millisecond_realtime_sla": true
   },
   "memory_benchmarks": {
-    "current_memory_mb": 4.0101,
-    "peak_memory_mb": 4.0124,
-    "bytes_per_explanation_report": 4207.35
+    "current_memory_mb": 4.006,
+    "peak_memory_mb": 4.0084,
+    "bytes_per_explanation_report": 4203.12
   },
   "batch_scalability": {
-    "10": 0.33,
-    "100": 2.74,
-    "1000": 184.72,
-    "5000": 363.94,
-    "10000": 670.91
+    "10": 0.56,
+    "100": 4.75,
+    "1000": 240.17,
+    "5000": 617.48,
+    "10000": 814.35
   },
   "feature_dimension_scalability": {
-    "10": 1.8381,
-    "50": 1.439,
-    "100": 1.3808,
-    "500": 1.225,
-    "1000": 1.1577
+    "10": 11.6791,
+    "50": 12.3384,
+    "100": 14.0872,
+    "500": 14.8142,
+    "1000": 15.2702
   },
   "complexity_comparison": {
     "explain_realtime_score": {

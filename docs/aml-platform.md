@@ -160,7 +160,7 @@ To satisfy national Financial Intelligence Unit (FIU) standards (e.g. FinCEN, MA
 - Allowed state transitions: `Escalated` -> `SAR Filed` and `SAR Filed` -> `Closed Confirmed`.
 
 ### 2. Automatic E-Filing Report Generation
-- **FinCEN XML Compiler**: Transitions into `SAR_FILED` status trigger the `RegulatoryReporterService` to compile case details, timeline events, investigator notes, and suspect hashes into a fully schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file.
+- **FinCEN XML Compiler**: Transitions into `SAR_FILED` status trigger the `RegulatoryReporterService` to compile case details, timeline events, investigator notes, and suspect hashes into a fully schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file (`EFilingSubmission`), validated against the FinCEN BSA 2.0 XML Schema Definition (`xsd/fincen_bsa_sar_v2.0.xsd`).
 - Files are persisted locally under `storage/regulatory_filings/` and exposed via secure FastAPI download endpoints (`/api/v1/cases/{case_id}/sar-report`).
 
 ### 3. Cryptographic Timeline Audit Chain
@@ -180,8 +180,8 @@ To support full-lineage auditing, secure dual-authorization, and role-based trac
 - Exposed in the user interface under the Case Details page, allowing investigators to upload documents and view registered records with their hashes.
 
 ### 2. Multi-Signature Gating (Four-Eyes Principle)
-- **Closure Validation**: Gated final case closure statuses (`CLOSED_CONFIRMED` and `CLOSED_FALSE_POSITIVE`) behind supervisor approval.
-- **Secondary Signature Verification**: Status change API requests require a valid `supervisor_signature` key that must not be empty and must be different from the analyst actor's name.
+- **Closure Validation**: Gated final case closure statuses (`RESOLVED_CONFIRMED_FRAUD` and `RESOLVED_FALSE_POSITIVE`) strictly behind dual supervisor approval.
+- **Dual Independent Signatures**: State transitions require two distinct supervisor signatures (`first_supervisor_signature` and `second_supervisor_signature`, matching `SIG_SUPERVISOR_<ID>`). If only one signature is provided, the case transitions into `PENDING_SECOND_SIGNATURE` awaiting secondary independent supervisor sign-off. Signatures with identical supervisor identities are rejected.
 
 ### 3. Investigator Role Auditing
 - **Compliance Activity Logging**: Active logs track analyst actions including case accesses (`access_case`), entity profile queries (`query_entity`), cross-bank resolution requests (`cross_bank_resolve`), and Private Set Intersection matching (`cross_bank_psi`).

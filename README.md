@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1415%2F1415_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1419%2F1419_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
@@ -472,7 +472,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,156+ Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (1,160 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (100% kill rate)
@@ -964,7 +964,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Memory/DB Isolation**| **4/4 Tenant Isolation Tests Passing** | Strict Isolation (403 BOLA rejection) | `test_multi_tenant_security_audit.py` | `Self-Verified (Input sanitization, ContextVar session isolation, Redis namespace enclosure, cross-tenant 403 enforcement)` |
-| **Full Test Suite Pass Rate** | **1,418 / 1,418 passing** | 100% | 1,159 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,419 / 1,419 passing** | 100% | 1,160 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -988,7 +988,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 | Benchmark / Evaluation Target | CLI Command | Evaluated Capabilities & Output |
 | :--- | :--- | :--- |
 | **Real-Time Load & Latency SLA** | `python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0` or `locust -f scripts/locustfile.py --headless -u 50 -r 10 -t 60s` | Empirical high-concurrency load test validating <100ms p99 inference SLA under concurrent multi-bank payment streams. Generates `reports/load_test_report.md` and `storage/load_test_results.json`. |
-| **Playwright Real-Browser E2E** | `npx playwright test e2e-workflows --project=desktop-1440-chromium` | 10 headless browser workflows across Chromium and Firefox verifying authentication lifecycles, live FL training round telemetry, Four-Eyes SAR signing, Byzantine chaos attack injection, and custom dataset ingestion. |
+| **Playwright Real-Browser E2E** | `npm --prefix frontend run test:e2e:workflows` | 10 headless browser workflows across Chromium and Firefox verifying authentication lifecycles, live FL training round telemetry, Four-Eyes SAR signing, Byzantine chaos attack injection, and custom dataset ingestion. |
 | **Enterprise Docker Deployment** | `python scripts/verify_docker_deployment.py` | Automated pre-flight and runtime smoke test verifying zero Compose syntax drift, PostgreSQL 16 cold-start schema, Redis 7.2 ping, Nginx security headers, and WebSocket keepalive routing. |
 | **Real Elliptic AML Graph** | `python scripts/run_elliptic_benchmark.py` | Benchmarks real Bitcoin transaction graph (46.5k nodes, 234k edges) through GraphSAGE vs. isolated baseline. Generates [`verification/real_data_benchmark/`](verification/real_data_benchmark/). |
 | **Full Multi-Dataset Suite** | `python benchmark.py` | Evaluates 6-model matrix (Local, Pooled, FedAvg, FedProx, FedGNN, DP) + PaySim (6.36M), IEEE-CIS (20k), Elliptic with distribution fidelity audit. |
@@ -1484,18 +1484,20 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,415+ Tests)
+### Step 5: Master Test Suites Execution (1,419 Tests)
 ```bash
-# 1. Run full backend pytest suite (1,156+ tests)
+# (Ensure commands are executed from the repository root directory)
+# 1. Run full backend pytest suite (1,160 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (249 tests across 78 test files)
 npm --prefix frontend test
 
 # 3. Run Playwright real-browser multi-device E2E suite (10 browser tests)
-npx playwright test e2e-workflows --project=desktop-1440-chromium
+npm --prefix frontend run test:e2e:workflows
+# or from frontend directory: npx playwright test e2e-workflows --project=desktop-1440-chromium
 
-# 4. Run master scientific invariant verification suite (18 modules)
+# 4. Run master scientific invariant verification suite (18 modules, 307 tests)
 python scripts/run_all_verifications.py
 ```
 
