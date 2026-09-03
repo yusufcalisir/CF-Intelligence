@@ -5,7 +5,7 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
-import { Settings2, FlaskConical, Zap } from 'lucide-react';
+import { Settings2, FlaskConical, Zap, FileUp } from 'lucide-react';
 import ModelRegistryPanel from '../components/dashboard/ModelRegistryPanel';
 import FederatedTrainingAnimation from '../components/dashboard/FederatedTrainingAnimation';
 import ComplianceReportPanel from '../components/dashboard/ComplianceReportPanel';
@@ -14,6 +14,7 @@ import { SecureHardwarePanel } from '../components/dashboard/SecureHardwarePanel
 import StreamingGNNPanel from '../components/dashboard/StreamingGNNPanel';
 import DatasetTrainingConfigPanel, { type TrainingMode } from '../components/DatasetTrainingConfigPanel';
 import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
+import { DatasetIngestionStudioModal } from '../components/ingestion/DatasetIngestionStudioModal';
 import { DATASET_PROFILES, type DatasetProfile } from '../utils/datasetProfiles';
 
 interface BankNode {
@@ -78,6 +79,7 @@ export default function LiveOperationsView() {
   const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(DATASET_PROFILES.paysim);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
   const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
 
   const handleQuarantineChange = (bankId: string | null) => {
     setBankNodes((prev) =>
@@ -380,6 +382,15 @@ export default function LiveOperationsView() {
           {/* Training control buttons */}
           {!isTraining && trainingPhase !== 'completed' ? (
             <div className="flex items-center gap-2">
+              {/* Import Custom Dataset button */}
+              <button
+                id="import-custom-dataset-btn"
+                onClick={() => setIsIngestModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-sm"
+              >
+                <FileUp size={14} className="text-indigo-400" />
+                <span>Import Dataset</span>
+              </button>
               {/* Configure Dataset button */}
               <button
                 id="configure-dataset-btn"
@@ -663,6 +674,12 @@ export default function LiveOperationsView() {
       <IncentiveRegistryPanel banks={[]} />
       <SecureHardwarePanel simulation={{ id: 'live_prod_v2', status: 'completed', config: { hardware_isolation_mode: 'tee' }, rounds: Array.from({ length: 10 }) } as any} />
       <StreamingGNNPanel simulation={{ id: 'live_prod_v2', status: 'completed', config: { enable_streaming_gnn: true }, streaming_gnn_node_count: 1420, streaming_gnn_edge_count: 5890, streaming_gnn_loss_history: [0.45, 0.38, 0.31, 0.26, 0.22] } as any} />
+
+      {/* Real Dataset Ingestion Studio Modal */}
+      <DatasetIngestionStudioModal
+        isOpen={isIngestModalOpen}
+        onClose={() => setIsIngestModalOpen(false)}
+      />
     </div>
   );
 }

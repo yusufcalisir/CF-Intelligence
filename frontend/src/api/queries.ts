@@ -49,7 +49,14 @@ import type {
   RetrainTriggerResponse,
   ClientCapabilityItem,
   NegotiatedParamsResponse,
+  DatasetPreviewRequest,
+  DatasetPreviewResponse,
+  DatasetContractAuditRequest,
+  DatasetContractAuditResponse,
+  DatasetConsortiumEnrollRequest,
+  DatasetConsortiumEnrollResponse,
 } from './types';
+
 
 
 
@@ -938,6 +945,41 @@ export function useTestConnector() {
     },
   });
 }
+
+// ── Real Dataset Ingestion Studio Hooks ──────────
+
+export function useValidateDatasetPreview() {
+  return useMutation<DatasetPreviewResponse, Error, DatasetPreviewRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/datasets/validate-preview', payload);
+      return data;
+    },
+  });
+}
+
+export function useAuditDatasetContract() {
+  return useMutation<DatasetContractAuditResponse, Error, DatasetContractAuditRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/datasets/contract-audit', payload);
+      return data;
+    },
+  });
+}
+
+export function useEnrollDatasetConsortium() {
+  const queryClient = useQueryClient();
+  return useMutation<DatasetConsortiumEnrollResponse, Error, DatasetConsortiumEnrollRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/datasets/consortium-enroll', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['bank-distributions'] });
+      queryClient.invalidateQueries({ queryKey: ['coordinator-nodes'] });
+    },
+  });
+}
+
 
 
 

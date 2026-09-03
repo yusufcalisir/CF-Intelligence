@@ -1138,3 +1138,85 @@ export interface ConnectorTestProbeResult {
   payload_sample: Record<string, any>;
 }
 
+// ── Real Dataset Ingestion Studio Types ─────────────
+
+export interface ColumnMappingItem {
+  source_column: string;
+  target_signal: string;
+  data_type: string;
+  sample_values: any[];
+  is_required: boolean;
+  confidence_score: number;
+}
+
+export interface DatasetPreviewRequest {
+  filename: string;
+  file_format: 'csv' | 'parquet' | 'tsv' | 'gz';
+  raw_header: string[];
+  sample_rows: Record<string, any>[];
+  total_bytes?: number;
+}
+
+export interface DatasetPreviewResponse {
+  preview_id: string;
+  filename: string;
+  file_format: string;
+  inferred_delimiter: string;
+  row_count_estimate: number;
+  detected_columns: string[];
+  column_mappings: ColumnMappingItem[];
+  schema_compliance_ratio: number;
+  pii_violations_detected: number;
+  pii_masked_receipt: string;
+}
+
+export interface ExpectationCheckResult {
+  expectation_name: string;
+  column: string;
+  status: 'passed' | 'failed' | 'warning';
+  observed_value: any;
+  expected_threshold: string;
+  details: string;
+}
+
+export interface DatasetContractAuditRequest {
+  preview_id: string;
+  bank_id?: string;
+  column_mapping?: Record<string, string>;
+  quarantine_threshold_pct?: number;
+}
+
+export interface DatasetContractAuditResponse {
+  audit_id: string;
+  bank_id: string;
+  status: 'passed' | 'quarantined' | 'rejected';
+  total_records: number;
+  passed_records: number;
+  quarantined_records: number;
+  contract_checks: ExpectationCheckResult[];
+  overall_compliance_score: number;
+  fraud_ratio_detected: number;
+  dirichlet_alpha_estimate: number;
+  drift_ks_score: number;
+  quarantine_csv_download_url?: string | null;
+  audit_message: string;
+}
+
+export interface DatasetConsortiumEnrollRequest {
+  audit_id: string;
+  target_bank_id?: string;
+  allocation_mode?: 'replace_partition' | 'append_partition' | 'guest_node';
+  trigger_fl_round?: boolean;
+}
+
+export interface DatasetConsortiumEnrollResponse {
+  enrollment_id: string;
+  bank_id: string;
+  node_status: string;
+  records_enrolled: number;
+  features_dimension: number;
+  partition_assigned: string;
+  next_action_url: string;
+}
+
+

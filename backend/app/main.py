@@ -842,11 +842,13 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import design_partner, onboarding
+from app.presentation.routers import datasets, design_partner, onboarding
 
 app.include_router(onboarding.router)
 app.include_router(design_partner.router)
 app.include_router(diagnostics.router)
+app.include_router(datasets.router)
+
 
 
 # ── Service Mode Specific Routers ──────────────

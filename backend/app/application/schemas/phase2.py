@@ -785,3 +785,86 @@ class GNNExplanationResponse(BaseModel):
     subgraph_edges_count: int
     top_contributing_edges: list[EdgeContributionSchema] = []
     primary_driver_text: str = ""
+
+
+# ── Real Dataset Ingestion Studio Schemas ─────────
+
+
+class ColumnMappingItem(BaseModel):
+    source_column: str
+    target_signal: str
+    data_type: str
+    sample_values: list[Any] = []
+    is_required: bool = False
+    confidence_score: float = 1.0
+
+
+class DatasetPreviewRequest(BaseModel):
+    filename: str = Field(..., max_length=256)
+    file_format: Literal["csv", "parquet", "tsv", "gz"] = "csv"
+    raw_header: list[str] = []
+    sample_rows: list[dict[str, Any]] = []
+    total_bytes: int = Field(default=0, ge=0)
+
+
+class DatasetPreviewResponse(BaseModel):
+    preview_id: str
+    filename: str
+    file_format: str
+    inferred_delimiter: str = ","
+    row_count_estimate: int
+    detected_columns: list[str]
+    column_mappings: list[ColumnMappingItem]
+    schema_compliance_ratio: float
+    pii_violations_detected: int = 0
+    pii_masked_receipt: str = ""
+
+
+class ExpectationCheckResult(BaseModel):
+    expectation_name: str
+    column: str
+    status: Literal["passed", "failed", "warning"]
+    observed_value: Any
+    expected_threshold: str
+    details: str = ""
+
+
+class DatasetContractAuditRequest(BaseModel):
+    preview_id: str
+    bank_id: str = "bank_alpha"
+    column_mapping: dict[str, str] = {}
+    quarantine_threshold_pct: float = Field(default=5.0, ge=0.0, le=100.0)
+
+
+class DatasetContractAuditResponse(BaseModel):
+    audit_id: str
+    bank_id: str
+    status: Literal["passed", "quarantined", "rejected"]
+    total_records: int
+    passed_records: int
+    quarantined_records: int
+    contract_checks: list[ExpectationCheckResult]
+    overall_compliance_score: float
+    fraud_ratio_detected: float
+    dirichlet_alpha_estimate: float
+    drift_ks_score: float
+    quarantine_csv_download_url: str | None = None
+    audit_message: str
+
+
+class DatasetConsortiumEnrollRequest(BaseModel):
+    audit_id: str
+    target_bank_id: str = "bank_alpha"
+    allocation_mode: Literal["replace_partition", "append_partition", "guest_node"] = "replace_partition"
+    trigger_fl_round: bool = False
+
+
+class DatasetConsortiumEnrollResponse(BaseModel):
+    enrollment_id: str
+    bank_id: str
+    node_status: str
+    records_enrolled: int
+    features_dimension: int
+    partition_assigned: str
+    next_action_url: str
+
