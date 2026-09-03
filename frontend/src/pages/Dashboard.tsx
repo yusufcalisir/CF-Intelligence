@@ -40,6 +40,65 @@ export default function Dashboard() {
         </p>
       </motion.div>
 
+      {/* Enterprise Platform Quick Actions */}
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.1 }}
+        className="grid grid-cols-1 sm:grid-cols-3 gap-3 shrink-0 mb-2"
+      >
+        <button
+          type="button"
+          onClick={() => navigate('/scenarios')}
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-rose-950/40 to-slate-900/60 border border-rose-500/25 hover:border-rose-500/50 transition-all text-left group shadow-lg cursor-pointer"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-rose-300 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-rose-500/20 text-rose-400">💥</span>
+              Chaos & Attack Simulator
+            </span>
+            <span className="text-[10px] font-mono font-bold text-rose-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Inject 500 tx/s smurfing bursts & Byzantine poisoned gradients to test Multi-Krum shield.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/operations?openIngest=true')}
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-indigo-950/40 to-slate-900/60 border border-indigo-500/25 hover:border-indigo-500/50 transition-all text-left group shadow-lg cursor-pointer"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-indigo-300 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-indigo-500/20 text-indigo-400">📁</span>
+              Import Bank Dataset
+            </span>
+            <span className="text-[10px] font-mono font-bold text-indigo-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Client-side Zero-PII sanitization & 12-rule Great Expectations data contract gating.
+          </p>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate('/developer')}
+          className="p-3.5 rounded-2xl bg-gradient-to-br from-cyan-950/40 to-slate-900/60 border border-cyan-500/25 hover:border-cyan-500/50 transition-all text-left group shadow-lg cursor-pointer"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-cyan-300 flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-cyan-500/20 text-cyan-400">🐳</span>
+              On-Premises Docker Stack
+            </span>
+            <span className="text-[10px] font-mono font-bold text-cyan-400/80 group-hover:translate-x-0.5 transition-transform">→</span>
+          </div>
+          <p className="text-[11px] text-slate-400 leading-snug">
+            Production compose manifests with Same-Origin Gateway, Postgres 16 & Redis 7.2.
+          </p>
+        </button>
+      </motion.div>
+
       {/* Bank Cards */}
       <div className="shrink-0 mb-2">
         <h2 className="text-xs font-semibold text-[var(--color-text-muted)] uppercase tracking-wider mb-3">

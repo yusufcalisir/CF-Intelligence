@@ -15,6 +15,7 @@ import {
   FileText,
   ChevronDown,
 } from 'lucide-react';
+import { DatasetIngestionStudioModal } from '../components/ingestion/DatasetIngestionStudioModal';
 
 interface OnboardingFormData {
   bank_id: string;
@@ -65,6 +66,7 @@ export default function BankOnboardingPage() {
   const [generatedYaml, setGeneratedYaml] = useState<string>('');
   const [nodeStatus, setNodeStatus] = useState<'PENDING' | 'ACTIVE'>('PENDING');
   const [isCliCopied, setIsCliCopied] = useState(false);
+  const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
 
   const handleInputChange = (field: keyof OnboardingFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -689,18 +691,35 @@ differential_privacy:
                 <span className="font-bold">ACTIVE (100% HEALTHY)</span>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                <button
+                  type="button"
+                  id="onboarding-import-dataset-btn"
+                  onClick={() => setIsIngestModalOpen(true)}
+                  className="w-full sm:w-auto px-5 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <FileText className="w-4 h-4" />
+                  <span>Import Bank Transactions (CSV / Parquet)</span>
+                </button>
                 <Link
                   to="/operations"
                   className="w-full sm:w-auto px-6 py-3 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/25 inline-flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <span>View Live Operations Dashboard</span>
+                  <span>View Live Operations</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
           )}
         </motion.div>
+      )}
+
+      {/* Dataset Ingestion Studio Modal */}
+      {isIngestModalOpen && (
+        <DatasetIngestionStudioModal
+          isOpen={isIngestModalOpen}
+          onClose={() => setIsIngestModalOpen(false)}
+        />
       )}
     </div>
   );

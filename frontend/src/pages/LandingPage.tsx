@@ -32,6 +32,9 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
+  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time Multi-Krum defense shield quarantine (Δ=48.2 > 14.1) and +0.42 AUC protection.', algorithm: 'Multi-Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
+  { id: 'dataset-ingestor', name: 'Real Dataset Ingestion Studio', category: 'Core Production Engine', purpose: 'Drag-and-drop CSV/Parquet file ingestor with client-side Zero-PII sanitization (Luhn PAN check, IBAN/TCKN regex, HMAC hashing) and 12-rule Great Expectations data contract gating.', algorithm: 'Luhn PAN Checksum, Type-Salted HMAC-SHA256, Great Expectations 1.x', inputs: 'Bank transactions CSV / Parquet dumps', outputs: 'Validated consortium partition, Dirichlet alpha estimate', tech: 'Great Expectations 1.x, WebAssembly, HMAC-SHA256' },
+  { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 18 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
 
   // ── FRONTIER LAB (ADVANCED R&D TRACK) ─────────────────────────────────────
   { id: 'pqc-secagg', name: 'Post-Quantum Cryptography PQC', category: 'Frontier R&D Lab', purpose: 'Researches lattice-based key exchanges for inter-bank P2P SecAgg against future quantum decryption threats (NIST FIPS 203/204).', algorithm: 'CRYSTALS-Kyber-768 KEM + Dilithium-3 Signatures', inputs: 'Lattice public key vectors & encrypted pairwise shares', outputs: 'Quantum-safe decrypted global model gradient', tech: 'NIST FIPS 203/204, liboqs, HKDF-SHA256' },
@@ -128,6 +131,33 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionRoute: '/onboarding',
     actionLabel: 'View Bank Connectors',
     tensorSample: 'Raw Ingestion: XML pacs.008.001.08 → Validated NormalizedTransaction Schema (HMAC Tokenized)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'chaos-simulator': {
+    sla: '< 15 ms attack detection & quarantine',
+    security: 'Multi-Krum Euclidean Distance Shield',
+    compliance: 'Byzantine Fault Tolerance (f < n/2)',
+    actionRoute: '/operations',
+    actionLabel: 'Launch Chaos Simulator',
+    tensorSample: 'Gradient Distance: ||Δw_k - Σ w_j|| = 48.2 > 14.1 → QUARANTINED BY KRUM',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'dataset-ingestor': {
+    sla: '< 1.2 s per 10k rows contract audit',
+    security: 'Client-Side Luhn PAN & Type-Salted HMAC',
+    compliance: 'Great Expectations 1.x Data Contracts',
+    actionRoute: '/operations?openIngest=true',
+    actionLabel: 'Open Ingestion Studio',
+    tensorSample: 'Zero-PII Receipt: {luhn: PASSED, iban_hash: 0x8a92...bc, dirichlet_alpha: 0.524}',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'docker-stack': {
+    sla: '< 30 s cold-boot container convergence',
+    security: 'Same-Origin Proxy & Non-Root Containers',
+    compliance: 'SOC2 / PCI-DSS On-Premises Isolation',
+    actionRoute: '/developer',
+    actionLabel: 'View Deployment Specs',
+    tensorSample: 'Compose Mesh: [Gateway :80] → [Frontend :80] ⊕ [FastAPI :8000] ⊕ [Postgres :5432] ⊕ [Redis :6379]',
     statusBadge: 'ACTIVE PRODUCTION',
   },
   'pqc-secagg': {
@@ -353,7 +383,7 @@ const HighEndConsortiumSVG = memo(function HighEndConsortiumSVG() {
 // ── 2026 DASHBOARD PREVIEW WIDGET WITH INTERACTIVE SIDEBAR NAV ───────────────
 const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ flRound, accuracy }: { flRound: number; accuracy: number }) {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'gnn' | 'privacy' | 'bft' | 'sar' | 'chaos' | 'ingest'>('home');
   const [alertTick, setAlertTick] = useState(0);
 
   useEffect(() => {
@@ -374,6 +404,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
     privacy: 'privacy-defense',
     bft: 'security',
     sar: 'cases',
+    chaos: 'scenarios',
+    ingest: 'operations?openIngest=true',
   };
 
   const sidebarButtons = [
@@ -431,6 +463,28 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
         <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+      )
+    },
+    {
+      id: 'chaos',
+      label: 'Chaos',
+      title: 'Interactive Chaos & Byzantine Attack Simulator',
+      color: 'bg-rose-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+        </svg>
+      )
+    },
+    {
+      id: 'ingest',
+      label: 'Ingest',
+      title: 'Real Dataset Ingestion Studio & Data Contracts',
+      color: 'bg-indigo-600',
+      icon: (
+        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
         </svg>
       )
     },
@@ -646,6 +700,61 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     </div>
                     <div className="text-slate-400 text-[8px] sm:text-[8.5px]">Multi-Bank Collusion — FinCEN SAR XML Exported</div>
                   </div>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'chaos' && (
+              <motion.div key="chaos" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-rose-600/10 border border-rose-500/20 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-rose-300 font-bold">Interactive Chaos & Attack Simulator</span>
+                    <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">LIVE DEFENSE</span>
+                  </div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Multi-Krum Shield (/scenarios)</div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-rose-500/20">
+                    <div className="text-slate-500">Byzantine Vector</div>
+                    <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-emerald-500/20">
+                    <div className="text-slate-500">Defense Shield</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">Multi-Krum (Δ=48.2)</div>
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-rose-950/30 border border-rose-500/30 text-rose-300 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                    Bank Gamma: QUARANTINED BY KRUM
+                  </span>
+                  <span className="font-bold text-emerald-400">+0.42 AUC Protected</span>
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'ingest' && (
+              <motion.div key="ingest" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-2.5 text-[9.5px] sm:text-[10px] font-mono min-w-0">
+                <div className="p-2.5 sm:p-3 rounded-xl bg-indigo-600/10 border border-indigo-500/20 space-y-0.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-indigo-300 font-bold">Real Dataset Ingestion Studio</span>
+                    <span className="text-[8px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">ZERO-PII VERIFIED</span>
+                  </div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Great Expectations 1.x Gated Pipeline (/operations)</div>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Luhn Algorithm PAN</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">100% Sanitized</div>
+                  </div>
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
+                    <div className="text-slate-500">Data Contract Audit</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">12 / 12 Passed</div>
+                  </div>
+                </div>
+                <div className="p-2 rounded-lg bg-indigo-950/30 border border-indigo-500/30 text-indigo-300 flex items-center justify-between text-[8.5px] sm:text-[9px]">
+                  <span>Non-IID Dirichlet Skew:</span>
+                  <span className="font-bold text-indigo-200">α = 0.524 (Balanced)</span>
                 </div>
               </motion.div>
             )}

@@ -309,6 +309,9 @@ export default function LiveOperationsView() {
       // Auto-start uses paysim defaults for backward compatibility
       startSimulatedTraining(DATASET_PROFILES.paysim);
     }
+    if (location.search.includes('openIngest=true')) {
+      setIsIngestModalOpen(true);
+    }
   }, [id, location.pathname, location.search]);
 
   // Tooltip style shared across charts
