@@ -103,6 +103,12 @@ The platform includes a real-time scenario simulator to showcase how collaborati
 4. **Card Testing**:
    * *Behavior*: Cards are tested with sub-$5 transactions at different merchants/banks.
    * *Outcome*: Individual banks ignore the minor transactions. Graph correlation links the test charges to reveal the card testing ring before large-scale card draining occurs.
+5. **Interactive Smurfing / Layering High-Velocity Burst (500 tx/s)**:
+   * *Behavior*: Syndicate executes high-frequency sub-threshold transfers ($4,850 – $9,950) across Bank Alpha, Bank Beta, and Bank Gamma.
+   * *Outcome*: Intercepted in real time via GraphSAGE relational embeddings and MinHash LSH Private Set Intersection.
+6. **Byzantine Poisoned Gradient Injection & Multi-Krum Quarantine**:
+   * *Behavior*: Compromised participant node (Bank Gamma) injects maliciously scaled, inverted weights ($\Delta w \times -10.0$) during federated aggregation.
+   * *Outcome*: Multi-Krum defense shield detects Euclidean distance anomaly ($\Delta = 48.2 > 14.1$), rejects the gradient, triggers visual node quarantine (`QUARANTINED BY KRUM`), and preserves global model AUC (+0.42).
 
 ---
 
@@ -136,6 +142,7 @@ All incoming feeds (ISO XML, SWIFT MT103, REST webhooks, streaming queues, EOD f
 * **Streaming Payment Connector (`StreamingPaymentConnector`)**: Ingests high-volume continuous payment events from Kafka, RabbitMQ, or Redis streams, updating the in-memory graph stream and streaming GAT models.
 * **ISO 20022 & SWIFT Message Parser (`ISO20022MessagingConnector`)**: Financial message parser supporting ISO 20022 MX (`pacs.008.001.08` & `pacs.009` XML) and legacy SWIFT MT103/MT202 records.
 * **Batch EOD File Connector (`BatchEODFileConnector`)**: End-Of-Day file parser for batch CSV and Parquet transaction dumps.
+* **Real Dataset Ingestion Studio & Data Contract Validator (`datasets.py` & `piiSanitizer.ts`)**: Interactive drag-and-drop CSV/Parquet ingestion pipeline featuring client-side Zero-PII sanitization (Luhn PAN check, IBAN/TCKN regex, Type-Salted HMAC tokenization) and 12-rule Great Expectations data contract audits.
 * **Core Banking System REST Adapter (`RESTBankConnector`)**: Dynamically handles OAuth2 Client Credentials authentication token refresh, mTLS certificate validation, HMAC payload signing, and real-time webhook ingestion.
 * **Message Queue AMQP Connector (`RabbitMQBankConnector`)**: Subscribes asynchronously to CBS AMQP queues (using `pika`) with graceful fallback if the broker is offline.
 

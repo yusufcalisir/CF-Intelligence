@@ -141,6 +141,21 @@ Expected output:
 
 ---
 
+## 5b. Web UI Onboarding & Dataset Ingestion Studio (`/onboarding`)
+
+In addition to CLI automation, financial institutions can onboard directly via the browser-based **Bank Node Onboarding Wizard**:
+
+1. **Step 1: Institutional Legal & Regional Profile**: Select bank ID, legal entity name, regulatory jurisdiction (e.g. `TR`, `EU`, `US`), and data residency region (`eu-west-1`, `us-east-1`, `ap-southeast-1`).
+2. **Step 2: Review Registration Details**: Institutional data sovereignty and privacy verification check.
+3. **Step 3: Cryptographic mTLS X.509 Credentials**: Automated browser-side certificate and private key generation with SHA-256 fingerprint validation.
+4. **Step 4: Bank Daemon Configuration**: Auto-generated YAML configuration (`bank_{id}.yaml`) ready for 1-click download.
+5. **Step 5: Node Quorum Activation & Initial Ingestion**: Confirms active quorum status (100% healthy) and provides a direct launcher for the **Real Dataset Ingestion Studio**:
+   - **Drag-and-Drop Ingestion**: Upload transactions via CSV or Parquet.
+   - **Client-Side Zero-PII Sanitization**: Validates PANs using the Luhn checksum, strips IBAN/TCKN via regex, and tokenizes account identifiers with type-salted HMAC-SHA256.
+   - **Great Expectations Contract Gating**: 12 automated checks (schema validation, non-null bounds, range tests, Non-IID Dirichlet $\alpha$ skew, and KS drift).
+
+---
+
 ## 6a. How Gradient Submission Works
 
 > [!NOTE]
