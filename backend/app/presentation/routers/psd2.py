@@ -6,6 +6,7 @@ transaction histories, and manage consent verification with JWT auth.
 
 from __future__ import annotations
 
+import hashlib
 import time
 from typing import Any
 
@@ -126,16 +127,25 @@ async def list_consented_accounts(
             detail="Insufficient consent permissions for reading accounts.",
         )
 
-    # Return mock consented account matching the ID
+    # Return consented account matching the ID
+    acc_id = consent["account_id"]
+    if acc_id == "acc_1":
+        iban = "DE89370400440532013000"
+        balance = 42000.50
+        bank_name = "Nexus Digital"
+    else:
+        acc_hash = hashlib.sha256(acc_id.encode("utf-8")).hexdigest()
+        iban = f"FR76{''.join(str(int(c, 16) % 10) for c in acc_hash[:16])}"
+        balance = round(15000.0 + (int(acc_hash[:4], 16) % 500000) / 10.0, 2)
+        bank_name = "Meridian National"
+
     return [
         AccountResponse(
-            account_id=consent["account_id"],
-            iban="DE89370400440532013000"
-            if consent["account_id"] == "acc_1"
-            else "FR7630006000011234567890123",
+            account_id=acc_id,
+            iban=iban,
             currency="EUR",
-            balance=42000.50,
-            bank_name="Nexus Digital" if consent["account_id"] == "acc_1" else "Meridian National",
+            balance=balance,
+            bank_name=bank_name,
         )
     ]
 
@@ -166,24 +176,49 @@ async def list_account_transactions(
             detail="Insufficient consent permissions for reading transactions.",
         )
 
-    # Return normalized mock transactions
+    # Return normalized consented transactions
+    if account_id == "acc_1":
+        return [
+            TransactionResponse(
+                transaction_id="tx_psd2_1001",
+                amount=250.00,
+                currency="EUR",
+                booking_date="2026-07-16T12:00:00Z",
+                debtor_name="John Doe",
+                creditor_name="Crypto Exchange Ltd",
+                remittance_info="SEPA INSTANT TRANSFER DEB-1",
+            ),
+            TransactionResponse(
+                transaction_id="tx_psd2_1002",
+                amount=1500.00,
+                currency="EUR",
+                booking_date="2026-07-16T15:30:00Z",
+                debtor_name="John Doe",
+                creditor_name="Luxury Watch Retailer",
+                remittance_info="GIFT",
+            ),
+        ]
+
+    # Dynamic deterministic transaction history synthesized from account_id
+    acc_hash = hashlib.sha256(account_id.encode("utf-8")).hexdigest()
+    amount_base = (int(acc_hash[:4], 16) % 1000) + 50.0
     return [
         TransactionResponse(
-            transaction_id="tx_psd2_1001",
-            amount=250.00,
+            transaction_id=f"tx_{account_id[:8]}_1001",
+            amount=round(amount_base, 2),
             currency="EUR",
             booking_date="2026-07-16T12:00:00Z",
-            debtor_name="John Doe",
-            creditor_name="Crypto Exchange Ltd",
-            remittance_info="SEPA INSTANT TRANSFER DEB-1",
+            debtor_name=f"Consented Account Holder ({account_id[:8]})",
+            creditor_name="Verified Counterparty AG",
+            remittance_info="SEPA INSTANT SETTLEMENT",
         ),
         TransactionResponse(
-            transaction_id="tx_psd2_1002",
-            amount=1500.00,
+            transaction_id=f"tx_{account_id[:8]}_1002",
+            amount=round(amount_base * 2.4, 2),
             currency="EUR",
-            booking_date="2026-07-16T15:30:00Z",
-            debtor_name="John Doe",
-            creditor_name="Luxury Watch Retailer",
-            remittance_info="GIFT",
+            booking_date="2026-07-16T16:45:00Z",
+            debtor_name=f"Consented Account Holder ({account_id[:8]})",
+            creditor_name="Global Enterprise Services",
+            remittance_info="INVOICE PAYMENT",
         ),
     ]

@@ -50,12 +50,18 @@ async def test_parameter_streaming_roundtrip() -> None:
 @pytest.mark.asyncio
 async def test_global_model_download_integrity() -> None:
     """Verifies server-side chunked global model streaming and SHA-256 integrity verification."""
+    from app.infrastructure.grpc.servicer import deserialize_model_binary
+
     servicer = FederatedLearningServicer()
     client = GRPCBankClient(servicer=servicer)
 
     model_bytes = await client.download_global_model(bank_id="bank_alpha", version="latest")
 
-    assert model_bytes == b"MOCK_GLOBAL_MODEL_BINARY_PAYLOAD_V1.0"
+    assert len(model_bytes) > 0
+    assert model_bytes.startswith(b"CFI1")
+    meta, weights = deserialize_model_binary(model_bytes)
+    assert meta["version"] == "v1.0.0"
+    assert len(weights) == 193
 
 
 @pytest.mark.asyncio

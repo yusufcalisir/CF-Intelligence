@@ -35,9 +35,9 @@ class AttestationReport:
 
 
 class TEEDriver:
-    """Driver simulating hardware isolation and Remote Attestation for TEE (Intel SGX / AWS Nitro).
-
-    Allows computing averages of parameters inside secure, isolated enclave memory.
+    """SoftwareEmulatedTEEDriver: Cryptographic software emulator modeling Intel SGX / AWS Nitro
+    Enclave Remote Attestation (MRENCLAVE/MRSIGNER measurement structures and memory sealing)
+    for zero-hardware cloud and local sandbox deployments.
     """
 
     # Static hashes simulating enclave code layout measurements

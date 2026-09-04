@@ -35,9 +35,9 @@ export default function Header({ onMenuClick }: HeaderProps) {
               Live WS ({latencyMs}ms)
             </span>
           ) : status === 'mock_active' ? (
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="WebSocket disconnected. Serving deterministic simulated sandbox telemetry.">
               <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
-              Live Stream Active
+              Simulated Stream (Offline)
             </span>
           ) : status === 'connecting' ? (
             <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-400 border border-amber-500/30">

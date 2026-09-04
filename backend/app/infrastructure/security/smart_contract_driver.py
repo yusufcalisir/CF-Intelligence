@@ -83,7 +83,9 @@ CONTRACT_ABI = [
 
 
 class SmartContractSettlementDriver:
-    """Driver managing Web3 EVM Smart Contract execution for consortium incentive settlement."""
+    """ConsortiumSettlementLedgerSimulator: EVM-compatible off-chain settlement driver modeling
+    ConsortiumIncentiveSettlement.sol token disbursements and Gnosis Safe 2-of-3 multi-sig governance.
+    """
 
     _instance: "SmartContractSettlementDriver | None" = None
 
@@ -119,7 +121,7 @@ class SmartContractSettlementDriver:
     def _get_bank_wallet(self, bank_name: str) -> str:
         if bank_name in self.bank_wallets:
             return self.bank_wallets[bank_name]
-        # Generate deterministic mock address from name
+        # Generate deterministic wallet address from institution name
         hasher = hashlib.sha256(bank_name.encode("utf-8")).hexdigest()
         return f"0x{hasher[:40]}"
 

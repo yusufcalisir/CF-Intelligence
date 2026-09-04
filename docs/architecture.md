@@ -62,7 +62,9 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `security/pqc_secagg_driver.py`: NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
 *   `security/layer2_crosschain_bridge.py`: Chainlink CCIP `EVM2AnyMessage` and LayerZero V2 multi-ledger settlement bridge for Arbitrum, Optimism, Canton, and Hyperledger Fabric.
 *   `security/adaptive_dp_autoscaler.py`: Rényi Differential Privacy (RDP) and PRV numerical dual accountant with loss-velocity dynamic Gaussian noise auto-scaling.
-*   `security/vault_hsm_pki_binder.py`: HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11.
+*   `security/hsm_signer.py`: Pluggable PKCS#11 hardware signer driver and `SoftwareHSMSignerEngine` emulator enforcing non-exportable private key handles and session PIN authentication.
+*   `security/tee_driver.py`: Pluggable Confidential Computing driver and `SoftwareEmulatedTEEDriver` modeling Intel SGX / AWS Nitro remote attestation (`MRENCLAVE`) and memory sealing.
+*   `security/vault_hsm_pki_binder.py`: HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11 (with SoftHSM2 development fallback).
 *   `security/gnosis_multisig_coordinator.py`: Gnosis Safe 2-of-3 threshold multi-sig coordinator governance driver with EIP-712 structured data signatures.
 *   `security/zk_snark_verifier.py` & `zk_circuits/`: Groth16 zk-SNARK model weight attestation driver over BN254 curve with Poseidon hashing and $O(1)$ constant-time bilinear pairing proof verification.
 *   `connectors/`: Production Bank Connector sub-system implementing Hexagonal Ports & Adapters:
@@ -174,6 +176,7 @@ The platform enforces a strict Zero-Mock Policy in production:
 - All legacy mock generators (`data_generator.py`) and mock connectors (`mock_connector.py`, `mq_skeleton_connector.py`) are deprecated and rejected by [`BankConnectorFactory`](file:///backend/app/infrastructure/connectors/factory.py).
 - Requesting `connector_type="mock"` or `"mq_skeleton"` raises an explicit `ValueError`.
 - Production connector types (`open_banking`, `psd2`, `parquet`, `rabbitmq`, `kafka`, `iso20022`, `rest`) consume real institutional data streams without synthetic fallbacks.
+- **Open Banking Presentation Router Scope**: The `/api/v1/psd2/*` presentation endpoints serve as an XS2A testbed sandbox that deterministically synthesizes account balances and historical transactions via SHA-256 derivation per `account_id` (with `acc_1` preserved for integration test fixtures). Live enterprise integrations ingest PSD2 records through the production `OpenBankingConnector` via Berlin Group NextGenPSD2 REST endpoints with real OAuth2/mTLS eIDAS credentials.
 
 ### 3.8 Redis Online Feature Store & Feast Integration (`redis_store.py`, `feast_store.py`)
 - **Redis Online Feature Store (`RedisFeatureStore`)**: Implements low-latency (<5ms) online feature serving with Redis connection pooling (`max_connections=20`), pipeline batch execution (`batch_set_features`, `batch_get_features`), TTL key expiration (`EXPIRE 86400`), and automatic memory cache fallback for standalone execution.

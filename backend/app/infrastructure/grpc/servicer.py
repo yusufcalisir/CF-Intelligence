@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
+import struct
 import uuid
 import zlib
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from app.infrastructure.grpc.types import (
     AggregationAck,
@@ -34,7 +38,7 @@ from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChai
 from app.infrastructure.security.signature_verifier import SignatureVerifier
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncIterable
+    from collections.abc import AsyncIterable, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -43,12 +47,43 @@ DEFAULT_QUORUM = 3
 
 
 # Authoritative bank node certificate fingerprints registered during onboarding: bank_id -> cert_fingerprint
-_AUTHORITATIVE_BANK_FINGERPRINTS: dict[str, str] = {}
+_AUTHORITATIVE_BANK_FINGERPRINTS: dict[str, str] = {
+    "bank_alpha": "SHA256:4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+    "bank_beta": "SHA256:1f2e3d4c5b6a7f8e9d0c1b2a3f4e5d6c7b8a9f0e1d2c3b4a5f6e7d8c9b0a1f2e",
+    "bank_gamma": "SHA256:9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b3c2d1e0f9a8b",
+}
+
+
+def serialize_model_binary(
+    layer_shapes: Sequence[tuple[int, ...]],
+    flat_weights: Sequence[float],
+    version: str = "v1.0.0",
+) -> bytes:
+    """Serializes model weights and layer shapes into standardized CFI1 binary payload."""
+    meta_json = json.dumps({"version": version, "shapes": [list(s) for s in layer_shapes]}).encode("utf-8")
+    weights_arr = np.asarray(flat_weights, dtype=np.float32)
+    header = struct.pack("!4sI", b"CFI1", len(meta_json))
+    return header + meta_json + weights_arr.tobytes()
+
+
+def deserialize_model_binary(payload: bytes) -> tuple[dict[str, Any], Any]:
+    """Deserializes a binary model payload into metadata dict and numpy weights array."""
+    if len(payload) < 8:
+        raise ValueError("Payload too short for model binary")
+    magic, meta_len = struct.unpack("!4sI", payload[:8])
+    if magic != b"CFI1":
+        raise ValueError(f"Invalid model binary magic header: {magic!r}")
+    meta = json.loads(payload[8 : 8 + meta_len].decode("utf-8"))
+    weights = np.frombuffer(payload[8 + meta_len :], dtype=np.float32)
+    return meta, weights
 
 
 def register_bank_fingerprint(bank_id: str, cert_fingerprint: str) -> None:
     """Authoritatively register an authorized bank certificate fingerprint at onboarding time."""
     _AUTHORITATIVE_BANK_FINGERPRINTS[bank_id.lower().strip()] = cert_fingerprint.strip()
+
+
+register_authoritative_bank_fingerprint = register_bank_fingerprint
 
 
 class FederatedLearningServicer:
@@ -57,8 +92,12 @@ class FederatedLearningServicer:
     def __init__(self) -> None:
         self.active_sessions: dict[str, dict[str, Any]] = {}
         self.chunk_buffers: dict[str, list[ParameterChunk]] = {}
+        # Baseline model architecture (input_dim=10, hidden_dim=16, output_dim=1 -> 193 parameters)
+        init_shapes: list[tuple[int, ...]] = [(16, 10), (16,), (1, 16), (1,)]
+        rng = np.random.default_rng(42)
+        init_weights: list[float] = rng.normal(0.0, 0.1, size=193).tolist()
         self.global_models: dict[str, bytes] = {
-            "latest": b"MOCK_GLOBAL_MODEL_BINARY_PAYLOAD_V1.0",
+            "latest": serialize_model_binary(init_shapes, init_weights, "v1.0.0"),
         }
         self.current_round: int = 1
         self.round_submissions: dict[str, list[dict[str, Any]]] = {}

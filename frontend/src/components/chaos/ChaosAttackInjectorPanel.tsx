@@ -25,6 +25,7 @@ export default function ChaosAttackInjectorPanel({
   const [activeAttack, setActiveAttack] = useState<AttackInjectionResponse | null>(null);
   const [selectedDefense, setSelectedDefense] = useState<'krum' | 'trimmed_mean' | 'bulyan'>('krum');
   const [intensity, setIntensity] = useState(500);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
   const intensityInputId = useId();
 
   const handleLaunchSmurfing = async () => {
@@ -36,11 +37,13 @@ export default function ChaosAttackInjectorPanel({
         intensity_rate: intensity,
         defense_strategy: 'psi_graph',
       });
+      setIsOfflineMode(false);
       setActiveAttack(res);
       onAttackTriggered?.(res);
       onQuarantineChange?.(null);
     } catch {
       // Offline / fallback mock handling
+      setIsOfflineMode(true);
       const fallbackRes: AttackInjectionResponse = {
         attack_id: `ATK-SMURF-${Date.now().toString().slice(-4)}`,
         attack_type: 'smurfing_layering',
@@ -53,7 +56,7 @@ export default function ChaosAttackInjectorPanel({
         mitigation_latency_ms: 4.2,
         auc_protected: 0.9385,
         auc_compromised_baseline: 0.6120,
-        log_entry: `Smurfing burst of ${intensity} tx/s across Bank Alpha intercepted. ${intensity * 3} sub-threshold transfers quarantined.`,
+        log_entry: `[Offline Sandbox] Smurfing burst of ${intensity} tx/s across Bank Alpha intercepted. ${intensity * 3} sub-threshold transfers quarantined.`,
       };
       setActiveAttack(fallbackRes);
       onAttackTriggered?.(fallbackRes);
@@ -69,11 +72,13 @@ export default function ChaosAttackInjectorPanel({
         intensity_rate: intensity,
         defense_strategy: selectedDefense,
       });
+      setIsOfflineMode(false);
       setActiveAttack(res);
       onAttackTriggered?.(res);
       onQuarantineChange?.('bank_gamma');
     } catch {
       // Offline / fallback mock handling
+      setIsOfflineMode(true);
       const fallbackRes: AttackInjectionResponse = {
         attack_id: `ATK-BYZ-${Date.now().toString().slice(-4)}`,
         attack_type: 'byzantine_poisoning',
@@ -86,7 +91,7 @@ export default function ChaosAttackInjectorPanel({
         mitigation_latency_ms: 3.8,
         auc_protected: 0.9412,
         auc_compromised_baseline: 0.5218,
-        log_entry: `Byzantine poisoned gradient from Bank Gamma rejected by ${selectedDefense.toUpperCase()} (dist 48.2 > cutoff 14.1).`,
+        log_entry: `[Offline Sandbox] Byzantine poisoned gradient from Bank Gamma rejected by ${selectedDefense.toUpperCase()} (dist 48.2 > cutoff 14.1).`,
       };
       setActiveAttack(fallbackRes);
       onAttackTriggered?.(fallbackRes);
@@ -96,6 +101,7 @@ export default function ChaosAttackInjectorPanel({
 
   const handleReset = () => {
     setActiveAttack(null);
+    setIsOfflineMode(false);
     onQuarantineChange?.(null);
   };
 
@@ -137,6 +143,11 @@ export default function ChaosAttackInjectorPanel({
               >
                 {activeAttack ? 'CRITICAL THREAT INJECTED' : 'CONSORTIUM NOMINAL'}
               </span>
+              {isOfflineMode && (
+                <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
+                  OFFLINE SANDBOX
+                </span>
+              )}
             </div>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
               Inject real-world Byzantine gradient poisoning and 500 tx/s smurfing storms to test Krum & LSH-PSI defenses.

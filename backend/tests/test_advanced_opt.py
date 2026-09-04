@@ -60,27 +60,27 @@ def _make_client_weights(n: int = 3, dim: int = 100, noise: float = 0.1) -> list
 
 
 class TestEllipticLoader:
-    def test_mock_returns_correct_shape(self):
+    def test_mock_returns_correct_shape(self, tmp_path):
         rng = np.random.default_rng(0)
-        result = load_elliptic(n_mock_nodes=500, rng=rng)
+        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=500, rng=rng)
         assert result["source"] == "mock"
         assert result["X"].shape == (500, 166)
         assert result["y"].shape == (500,)
         assert isinstance(result["edges"], list)
 
-    def test_mock_labels_are_binary(self):
-        result = load_elliptic(n_mock_nodes=1000, rng=np.random.default_rng(1))
+    def test_mock_labels_are_binary(self, tmp_path):
+        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=1000, rng=np.random.default_rng(1))
         unique = set(result["y"].tolist())
         assert unique <= {0, 1}
 
-    def test_mock_illicit_ratio_approximately_correct(self):
-        result = load_elliptic(n_mock_nodes=5000, rng=np.random.default_rng(2))
+    def test_mock_illicit_ratio_approximately_correct(self, tmp_path):
+        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=5000, rng=np.random.default_rng(2))
         illicit_frac = result["y"].mean()
         # Within ±1% of the stated 2% ratio
         assert abs(illicit_frac - 0.021) < 0.015
 
-    def test_mock_has_edges(self):
-        result = load_elliptic(n_mock_nodes=200, rng=np.random.default_rng(3))
+    def test_mock_has_edges(self, tmp_path):
+        result = load_elliptic(path=tmp_path / "nonexistent", n_mock_nodes=200, rng=np.random.default_rng(3))
         assert len(result["edges"]) > 0
 
 

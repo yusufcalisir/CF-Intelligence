@@ -50,13 +50,17 @@ class HSMKeyHandle:
 
 
 class HSMSignerEngine:
-    """HSM / PKCS#11 Hardware Security Engine executing in-enclave signature operations."""
+    """SoftwareHSMSignerEngine: PKCS#11-compliant software HSM emulator providing in-memory key isolation
+    (PBKDF2/HMAC) for local, CI/CD, and containerized zero-hardware deployments.
+    """
 
     def __init__(self, config: HSMSessionConfig | None = None) -> None:
         self.config = config or HSMSessionConfig()
         self.is_session_active = False
         self._key_handles: dict[str, HSMKeyHandle] = {}
-        self._mock_secrets: dict[str, bytes] = {}
+        self._enclave_secrets: dict[str, bytes] = {}
+        # Backward compatibility alias
+        self._mock_secrets = self._enclave_secrets
 
     def initialize_session(self) -> bool:
         """Establishes authenticated session with HSM hardware slot or Cloud KMS endpoint."""
