@@ -21,7 +21,7 @@ CF-Intelligence implements an institutional Model Risk Management (MRM) framewor
 ├───────────────────────────────────┬───────────────────────────────────┬────────────────────────────────┤
 │ 1. CONCEPTUAL SOUNDNESS           │ 2. INDEPENDENT MODEL VALIDATION   │ 3. ONGOING MONITORING & DRIFT  │
 ├───────────────────────────────────┼───────────────────────────────────┼────────────────────────────────┤
-│ • GNN (GraphSAGE) + XGBoost       │ • 1st Line: ML Engineers          │ • Kolmogorov-Smirnov (p<0.01)  │
+│ • GNN (GraphSAGE) + Neural Net    │ • 1st Line: ML Engineers          │ • Kolmogorov-Smirnov (p<0.01)  │
 │ • Dirichlet Heterogeneity α=0.50  │ • 2nd Line: Independent Risk Team │ • Population Stability (PSI)   │
 │ • Calibrated DP Noise σ           │ • 3rd Line: Internal Audit        │ • Auto-Retraining Trigger      │
 │ • Zero Raw PII Invariant          │ • Disparate Impact (DI >= 0.80)   │ • Instant Rollback SLA <5s     │

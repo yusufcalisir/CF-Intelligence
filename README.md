@@ -124,7 +124,7 @@ The core production path focuses on seven defensible engineering components:
 │  - Real-Time Scoring Gateway (<100ms SLA, P99 Latency Monitor)                       │
 │  - Multi-Layer Perimeter Defense: Cloudflare WAF + Vercel Edge + slowapi Rate Limit  │
 │  - Broken Access Control (BOLA/IDOR) Multi-Tenant Isolation Middleware               │
-│  - Fast SHAP TreeExplainer & Counterfactual Feature Sensitivity                      │
+│  - Fast SHAP Explanations (KernelExplainer) & Counterfactual Feature Sensitivity      │
 │  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML      │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -261,7 +261,7 @@ CF-Intelligence/
 │   │   │   ├── consortium_policy.py                 # Consortium governance rules, quorum & voting invariants
 │   │   │   ├── consortium_governance.py             # Node membership lifecycle & cryptographic attestation
 │   │   │   ├── distribution_fidelity_service.py     # Jensen-Shannon & Wasserstein distribution divergence auditor
-│   │   │   ├── realtime_explainer.py                # Sub-ms fast SHAP TreeExplainer & feature attributions
+│   │   │   ├── realtime_explainer.py                # Sub-ms fast decision attribution & cached async SHAP engine
 │   │   │   ├── case_management.py                   # Four-Eyes dual supervisor approval state machine
 │   │   │   ├── security_evaluator.py                # Membership Inference Attack (MIA) privacy evaluator
 │   │   │   ├── regional_governance.py               # Cross-jurisdiction data sovereignty & residency guards
@@ -487,7 +487,7 @@ CF-Intelligence/
 │   │   ├── chaos_attack_simulation.spec.ts          # Interactive Byzantine gradient injection & Krum quarantine
 │   │   └── dataset_custom_ingest_flow.spec.ts       # CSV/Parquet drag-and-drop & GE data contract gating
 │   ├── src/
-│   │   ├── pages/                                   # 17 Enterprise Web Console Views
+│   │   ├── pages/                                   # 18 Enterprise Web Console Views
 │   │   │   ├── LandingPage.tsx                      # High-converting SaaS landing page, interactive demo & feature matrices
 │   │   │   ├── Dashboard.tsx                        # Executive KPI dashboard, risk distributions & fraud metrics
 │   │   │   ├── LiveOperationsView.tsx               # Real-time transaction streaming terminal & manual transaction scoring
@@ -501,7 +501,8 @@ CF-Intelligence/
 │   │   │   ├── PrivacyDefensePage.tsx               # Differential Privacy budget gauges & Membership Inference defense
 │   │   │   ├── CoordinatorPage.tsx                  # Federated learning coordinator console & client node status
 │   │   │   ├── BankOnboardingPage.tsx               # Self-service bank consortium onboarding & mTLS certificate wizard
-│   │   │   ├── BenchmarkHubPage.tsx                 # Real-time benchmark comparison hub (FL vs. Isolated vs. Pooled)
+│   │   │   ├── BenchmarkHubPage.tsx                 # Real-time benchmark comparison hub (FL vs. Isolated across 4 open datasets)
+│   │   │   ├── ApiDocsPage.tsx                      # Interactive API documentation portal & live OpenAPI request runner (/developer)
 │   │   │   ├── PoliciesPage.tsx                     # Dynamic AML risk policy rule manager & threshold tuning
 │   │   │   ├── PsiPage.tsx                          # Private Set Intersection (Fuzzy PSI) cross-bank entity lookup
 │   │   │   └── ScenariosPage.tsx                    # Pre-packaged fraud typology attack scenario simulator
@@ -977,7 +978,7 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Mobile Money (6.36M txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** |
 | **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | E-Commerce / Cards (590k txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** |
 | **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (46k nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** |
-| **[LEAF Non-IID](https://leaf.cmu.edu/)** | Dirichlet Skew ($\alpha = 0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** |
+| **[Credit Card Fraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)** | European Cards PCA (284k txns, LEAF $\alpha=0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** |
 
 ---
 
@@ -1026,7 +1027,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
    Cross-border banking secrecy and data protection statutes prohibit pooling raw customer records across institutions. The platform addresses this through federated learning: raw transactions remain within the local banking node, and only differentially private gradients ($\epsilon = 1.0, \delta = 10^{-5}$) and zero-sum masked vectors are transmitted.
 
 2. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
-   High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time TreeExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases.
+   High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases.
 
 3. **Suspicious Activity Electronic Reporting (Bank Secrecy Act / FinCEN):**  
    Anti-money laundering statutes require standardized electronic filings for suspicious transactions. The platform provides automated compilation of normalized transactions and typology risk factors into compliant FinCEN BSA Suspicious Activity Report (SAR) XML schema documents.

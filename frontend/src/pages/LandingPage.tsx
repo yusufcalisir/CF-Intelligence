@@ -23,7 +23,7 @@ const BANK_NODES: Record<string, BankInfoDetail> = {
 
 const PLATFORM_MODULES: Module[] = [
   // ── CORE PRODUCTION ENGINE ────────────────────────────────────────────────
-  { id: 'risk-engine', name: 'Real-Time Risk Scoring Engine', category: 'Core Production Engine', purpose: 'Combines GNN graph embeddings with tabular velocity features to generate calibrated risk scores (<14.2ms p99 latency).', algorithm: 'XGBoost + GNN Ensemble, SHAP, Platt Calibration', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'XGBoost 2.0, SHAP, Platt Calibration' },
+  { id: 'risk-engine', name: 'Real-Time Risk Scoring Engine', category: 'Core Production Engine', purpose: 'Combines GNN graph embeddings with 9-signal tabular velocity and anomaly features to generate calibrated risk scores (<14.2ms p99 latency).', algorithm: '9-Signal Neural Risk Engine + GNN, SHAP KernelExplainer, Platt Calibration', inputs: 'GNN structural embeddings, transaction features', outputs: 'Calibrated Risk Score [0-1], SHAP vectors', tech: 'PyTorch, 9-Signal Composite Engine, shap.KernelExplainer, Platt Scaling' },
   { id: 'fl-engine', name: 'Federated Learning Engine', category: 'Core Production Engine', purpose: 'Coordinates distributed GNN model optimization across banking institutions using FedAvg and FedProx with straggler mitigation.', algorithm: 'FedAvg, FedProx, Asynchronous SGD', inputs: 'Local gradient tensors from node agents', outputs: 'Aggregated global GNN model weights', tech: 'PyTorch 2.2, gRPC, Protocol Buffers' },
   { id: 'gnn-engine', name: 'Graph Neural Network Engine', category: 'Core Production Engine', purpose: 'Constructs dynamic multi-hop transaction graphs from ISO 20022 message streams and computes 512-dim structural embeddings.', algorithm: 'GAT (Graph Attention Network), GraphSAGE', inputs: 'ISO 20022 XML pacs.008 & camt.053 feeds', outputs: '512-dimensional node embeddings', tech: 'PyTorch Geometric 2.6, DGL' },
   { id: 'aml-copilot', name: 'Autonomous Agentic AML Copilot', category: 'Core Production Engine', purpose: 'Synthesizes 5-paragraph FinCEN SAR narratives, 4-Eyes supervisor briefings, and Neo4j visual graph maps from suspicious transactions.', algorithm: 'Local LLM RAG + SHAP Feature Attribution', inputs: 'Neo4j subgraph, ISO 20022 XML, SHAP vectors', outputs: 'SAR Narrative & 4-Eyes Supervisor Briefing', tech: 'LangChain, Ollama / vLLM, Neo4j' },
@@ -275,9 +275,9 @@ const PRESENTATION_WORKFLOW = [
     id: 7,
     short: 'Risk Engine',
     label: 'Calibrated Risk Scoring & SHAP Explanations',
-    summary: 'Global GNN embeddings are passed into an XGBoost ensemble classifier to generate calibrated risk scores [0-1]. The SHAP TreeExplainer computes human-interpretable feature attributions for fraud analysts.',
-    highlights: ['Ensemble GNN + XGBoost classifier', 'SHAP TreeExplainer for full decision transparency', 'False Positive Rate reduced by 5× (31% → 6.1%)'],
-    input: '512-dim GNN embeddings',
+    summary: 'Global GNN embeddings and 9-signal transaction telemetry are scored through the federated neural risk engine to generate calibrated risk scores [0-1]. The SHAP KernelExplainer computes mathematically additive feature attributions for fraud analysts.',
+    highlights: ['9-Signal Composite Neural Risk Engine', 'SHAP KernelExplainer for full decision transparency', 'False Positive Rate reduced by 5× (31% → 6.1%)'],
+    input: '512-dim GNN embeddings + 9 signals',
     output: 'Risk Score [0-1] + SHAP breakdown',
     badge: 'Stage 07'
   },

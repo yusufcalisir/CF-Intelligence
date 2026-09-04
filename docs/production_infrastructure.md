@@ -51,7 +51,7 @@ While local developers use `docker-compose.yml` for offline testing, **productio
 ## 3. End-to-End Live Observability & Telemetry Architecture
 
 1. **OpenTelemetry (OTel) Distributed Tracing**:
-   Every credit transfer scoring request is injected with a `traceparent` header (W3C standard), tracing spans across API Gateway ($1.2\text{ms}$) $\to$ GNN Embedding Inference ($8.4\text{ms}$) $\to$ XGBoost Calibration ($3.6\text{ms}$) $\to$ Response ($<14.2\text{ms}$ total).
+   Every credit transfer scoring request is injected with a `traceparent` header (W3C standard), tracing spans across API Gateway ($1.2\text{ms}$) $\to$ GNN Embedding Inference ($8.4\text{ms}$) $\to$ 9-Signal Composite Risk Calibration ($3.6\text{ms}$) $\to$ Response ($<14.2\text{ms}$ total).
 2. **Prometheus Metrics Pipeline**:
    Exposes real-time Prometheus endpoints on `:9090/metrics`:
    * `cfi_scoring_latency_seconds_bucket` (p50, p95, p99 histograms).
