@@ -586,7 +586,7 @@ Before promotion to `PRODUCTION`, two mandatory gating criteria are enforced:
 
 1. **Dual Sign-Off Gate**: Both `ml_engineer` and `compliance_officer` roles must have approved the checkpoint (SR 11-7 model risk policy).
 2. **HSM Signature Envelope Verification**: The signature is verified over the canonical payload:
-   $$\text{Payload} = \text{model\_id} : \text{version} : \text{weights\_sha256} : \text{hyperparams\_sha256} : \text{dataset\_hash} : \text{dp\_epsilon}$$
+   $$\text{Payload} = \text{model-id} : \text{version} : \text{weights-sha256} : \text{hyperparams-sha256} : \text{dataset-hash} : \text{dp-epsilon}$$
 
 If either verification fails, `promote_to_production()` raises `ModelGovernanceError` or `InvalidSignatureError`.
 

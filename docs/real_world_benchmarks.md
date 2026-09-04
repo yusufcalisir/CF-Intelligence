@@ -131,7 +131,7 @@ The `distribution_fidelity_service.py` module continuously quantifies the mathem
 3. **Kolmogorov-Smirnov Test ($D_{\text{KS}}, p\text{-value}$)**:
    $$D_{\text{KS}} = \sup_x |F_{\text{real}}(x) - F_{\text{synth}}(x)|$$
 4. **Performance Degradation Index ($\Delta_{\text{deg}}$)**:
-   $$\Delta_{\text{PR-AUC}} = \text{PR-AUC}_{\text{real\_world}} - \text{PR-AUC}_{\text{synthetic\_lab}} = 0.8420 - 0.9420 = -0.1000$$
+   $$\Delta_{\text{PR-AUC}} = \text{PR-AUC}_{\text{real-world}} - \text{PR-AUC}_{\text{synthetic-lab}} = 0.8420 - 0.9420 = -0.1000$$
 
 ---
 

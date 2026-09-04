@@ -309,8 +309,8 @@ The 16-dimensional MinHash vector is stored directly in the entity's `attributes
 2. **Independent DH-PSI per Attribute**: Standard Diffie-Hellman commutative exponentiation is executed independently over each attribute's `PrivacyPreservingIdentifier` hash:
    $$Z_a^{(\text{attr})} = \left( H(\text{attr}_a) \right)^{k_b \cdot k_a} \pmod p$$
 3. **k-of-n Threshold Gate**: A cross-bank pair is declared a match if:
-   $$\left| \text{matched\_attrs} \right| \ge k \quad (\text{default: } k = 3 \text{ of } n = 5)$$
-4. **Similarity Score**: The output match record includes a continuous overlap score $= |\text{matched\_attrs}| / n$.
+   $$\left| \text{matched attrs} \right| \ge k \quad (\text{default: } k = 3 \text{ of } n = 5)$$
+4. **Similarity Score**: The output match record includes a continuous overlap score $= |\text{matched attrs}| / n$.
 
 #### Stage 4 — Central LSH Registry (`EntityResolutionService.resolve_fuzzy_entities()`)
 

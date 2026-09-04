@@ -174,7 +174,7 @@ In addition to CLI automation, financial institutions can onboard directly via t
 3. **Cryptographic Payload Compression & Signing**:
    - The masked gradient tensor is compressed using `zlib`.
    - The node signs the payload digest using its HSM / PKI private key (ECDSA P-256 / RSA-PSS):
-     $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round\_id} \mathbin{\Vert} \text{bank\_id} \mathbin{\Vert} \text{SHA-256}(\text{compressed\_gradient})\Big)$$
+     $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round-id} \mathbin{\Vert} \text{bank-id} \mathbin{\Vert} \text{SHA-256}(\text{compressed-gradient})\Big)$$
    - The coordinator verifies the signature via `SignatureVerifier` before storing in `gradient_submissions` and logging to the `ImmutableAuditChain`.
 
 4. **Quorum Aggregation**:
