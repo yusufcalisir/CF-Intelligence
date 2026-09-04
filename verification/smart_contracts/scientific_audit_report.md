@@ -41,7 +41,7 @@ The verification suite encompasses:
 ## 3. Mathematical Correctness & Protocol Invariants
 
 ### 3.1 Leave-One-Out (LOO) Federated Shapley Incentive Payout
-For a consortium of $N$ bank participants, let $v(S)$ denote the validation accuracy of the global model trained on client subset $S \subseteq \{1, \dots, N\}$. The Leave-One-Out contribution $\phi_i^{\text{LOO}}$ for bank $i$ is defined as:
+For a consortium of $N$ bank participants, let $v(S)$ denote the validation accuracy of the global model trained on client subset $S \subseteq \{1, \dots, N\}$. Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations. The Leave-One-Out contribution $\phi_i^{\text{LOO}}$ for bank $i$ is defined as:
 $$\phi_i^{\text{LOO}} = v(N) - v(N \setminus \{i\})$$
 
 To ensure non-negative payouts and normalize basis points (10,000 basis points = 100%):
