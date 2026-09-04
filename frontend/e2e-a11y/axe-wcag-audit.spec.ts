@@ -53,6 +53,11 @@ test.describe('Automated Axe-Core WCAG 2.1 AA Accessibility Audits', () => {
     if (await demoBtn.isVisible()) {
       await demoBtn.click();
       await page.waitForSelector('[role="dialog"]');
+      // Wait for modal entrance animation to settle so contrast is evaluated at full opacity
+      await page.waitForFunction(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return dialog && parseFloat(window.getComputedStyle(dialog).opacity) >= 0.95;
+      });
 
       const accessibilityScanResults = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])
@@ -71,10 +76,15 @@ test.describe('Automated Axe-Core WCAG 2.1 AA Accessibility Audits', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const benchmarkBtn = page.getByRole('button', { name: /empirical benchmark/i }).first();
+    const benchmarkBtn = page.getByRole('button', { name: /inspect benchmark suite|explore benchmark hub|empirical benchmark/i }).first();
     if (await benchmarkBtn.isVisible()) {
       await benchmarkBtn.click();
       await page.waitForSelector('[role="dialog"]');
+      // Wait for modal entrance animation to settle so contrast is evaluated at full opacity
+      await page.waitForFunction(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return dialog && parseFloat(window.getComputedStyle(dialog).opacity) >= 0.95;
+      });
 
       const accessibilityScanResults = await new AxeBuilder({ page })
         .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

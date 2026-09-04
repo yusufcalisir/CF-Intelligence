@@ -531,7 +531,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
               className={`w-6 sm:w-7 h-6 sm:h-7 rounded-lg sm:rounded-xl flex items-center justify-center transition-all cursor-pointer ${
                 activeTab === btn.id
                   ? `${btn.color} text-white shadow-[0_0_16px_rgba(99,102,241,0.6)] scale-105`
-                  : 'text-slate-500 hover:text-slate-200 hover:bg-white/5'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
               }`}
             >
               {btn.icon}
@@ -563,9 +563,9 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
                   </div>
                 </div>
-                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-500">
+                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-400">
                   <span>* Illustrative simulation preview</span>
-                  <span className="text-indigo-400/70">Synthetic Convergence Ticker</span>
+                  <span className="text-indigo-300 font-medium">Synthetic Convergence Ticker</span>
                 </div>
 
                 <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2 min-w-0">
@@ -605,19 +605,19 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Total Alerts</div>
+                    <div className="text-slate-400">Total Alerts</div>
                     <div className="text-amber-400 font-bold mt-0.5">48 (12 Critical)</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Open Cases</div>
+                    <div className="text-slate-400">Open Cases</div>
                     <div className="text-indigo-400 font-bold mt-0.5">8 Active Cases</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Entities</div>
+                    <div className="text-slate-400">Entities</div>
                     <div className="text-teal-400 font-bold mt-0.5">142 Network Nodes</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Graph Clusters</div>
+                    <div className="text-slate-400">Graph Clusters</div>
                     <div className="text-pink-400 font-bold mt-0.5">5 High-Risk Subgraphs</div>
                   </div>
                 </div>
@@ -662,11 +662,11 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Live FL Round</div>
+                    <div className="text-slate-400">Live FL Round</div>
                     <div className="text-cyan-400 font-bold mt-0.5">Round #5 / 10</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Champion Model AUC</div>
+                    <div className="text-slate-400">Champion Model AUC</div>
                     <div className="text-emerald-400 font-bold mt-0.5">0.885 ROC-AUC</div>
                   </div>
                 </div>
@@ -719,11 +719,11 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-rose-500/20">
-                    <div className="text-slate-500">Byzantine Vector</div>
+                    <div className="text-slate-400">Byzantine Vector</div>
                     <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-emerald-500/20">
-                    <div className="text-slate-500">Defense Shield</div>
+                    <div className="text-slate-400">Defense Shield</div>
                     <div className="text-emerald-400 font-bold mt-0.5">Multi-Krum (Δ=48.2)</div>
                   </div>
                 </div>
@@ -748,11 +748,11 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Luhn Algorithm PAN</div>
+                    <div className="text-slate-400">Luhn Algorithm PAN</div>
                     <div className="text-emerald-400 font-bold mt-0.5">100% Sanitized</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-white/6">
-                    <div className="text-slate-500">Data Contract Audit</div>
+                    <div className="text-slate-400">Data Contract Audit</div>
                     <div className="text-emerald-400 font-bold mt-0.5">12 / 12 Passed</div>
                   </div>
                 </div>
@@ -764,7 +764,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             )}
           </AnimatePresence>
 
-          <div className="text-[8px] sm:text-[9px] font-mono text-slate-500 text-center border-t border-white/5 pt-1.5">
+          <div className="text-[8px] sm:text-[9px] font-mono text-slate-400 text-center border-t border-white/5 pt-1.5">
             Click sidebar icons ({sidebarButtons.map(b => b.label).join(' · ')}) to inspect live platform modules
           </div>
         </div>
@@ -812,14 +812,14 @@ const ArrowRight = ({ className = 'w-3.5 h-3.5' }: { className?: string }) => (
   </svg>
 );
 const ChevronDown = () => (
-  <svg className="w-3 h-3 text-slate-500 group-hover:text-slate-300 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+  <svg className="w-3 h-3 text-slate-400 group-hover:text-slate-300 transition-transform group-hover:rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
     <polyline points="6 9 12 15 18 9" />
   </svg>
 );
 
 const AccordionChevron = ({ isOpen, className = '' }: { isOpen: boolean; className?: string }) => (
   <svg
-    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-500'} ${className}`}
+    className={`w-3.5 h-3.5 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-indigo-400' : 'text-slate-400'} ${className}`}
     viewBox="0 0 24 24"
     fill="none"
     stroke="currentColor"
@@ -853,7 +853,7 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
 
       {/* Highlights Bullet List */}
       <div className="space-y-2 pt-1 min-w-0">
-        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-500">Key Engineering & Privacy Highlights</div>
+        <div className="text-[9px] sm:text-[10px] font-mono uppercase tracking-wider text-slate-400">Key Engineering & Privacy Highlights</div>
         <div className="space-y-1.5 font-sans text-xs text-slate-300 min-w-0">
           {step.highlights.map(hl => (
             <div key={hl} className="flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl bg-white/3 border border-white/5 min-w-0">
@@ -867,11 +867,11 @@ const WorkflowStepDetailCard = memo(function WorkflowStepDetailCard({ step }: { 
       {/* Data Input/Output Specifications */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 w-full min-w-0">
         <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Input</div>
+          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Input</div>
           <div className="text-indigo-300 font-semibold truncate">{step.input}</div>
         </div>
         <div className="p-3 rounded-xl bg-[#03030c] border border-white/6 font-mono text-xs min-w-0">
-          <div className="text-[8.5px] sm:text-[9px] text-slate-500 uppercase tracking-wider mb-0.5">Data Output</div>
+          <div className="text-[8.5px] sm:text-[9px] text-slate-400 uppercase tracking-wider mb-0.5">Data Output</div>
           <div className="text-emerald-400 font-semibold truncate">{step.output}</div>
         </div>
       </div>
@@ -937,22 +937,22 @@ const ModuleDetailCard = memo(function ModuleDetailCard({ mod, onNavigate }: { m
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
             <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-500 uppercase">Target Execution SLA</div>
+              <div className="text-[9px] text-slate-400 uppercase">Target Execution SLA</div>
               <div className="text-slate-200 font-bold mt-0.5 truncate text-[11px]">{currentExtra.sla}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-500 uppercase">Cryptographic Invariant</div>
+              <div className="text-[9px] text-slate-400 uppercase">Cryptographic Invariant</div>
               <div className="text-indigo-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.security}</div>
             </div>
             <div className="p-2.5 rounded-xl bg-white/3 border border-white/6">
-              <div className="text-[9px] text-slate-500 uppercase">Compliance Standard</div>
+              <div className="text-[9px] text-slate-400 uppercase">Compliance Standard</div>
               <div className="text-emerald-300 font-bold mt-0.5 truncate text-[11px]">{currentExtra.compliance}</div>
             </div>
           </div>
 
           {/* Tensor Transformation & Contract Blueprint */}
           <div className="p-3 rounded-xl bg-[#03030c] border border-white/8 font-mono">
-            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1 flex items-center justify-between">
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1 flex items-center justify-between">
               <span>Dataflow Transformation Blueprint</span>
               <span className="text-indigo-400 font-bold text-[8.5px]">PYTORCH / FASTAPI CONTRACT</span>
             </div>
@@ -982,7 +982,7 @@ const ArchNodeDetailCard = memo(function ArchNodeDetailCard({ node }: { node: Ar
           { label: 'Technology',       items: node.tech,            dot: 'text-cyan-400' },
         ].map(col => (
           <div key={col.label} className="min-w-0">
-            <div className="text-[9px] text-slate-500 uppercase tracking-wider mb-1.5">{col.label}</div>
+            <div className="text-[9px] text-slate-400 uppercase tracking-wider mb-1.5">{col.label}</div>
             <ul className="space-y-1">
               {col.items.map(it => (
                 <li key={it} className="text-slate-300 flex items-center gap-1.5 truncate"><span className={`${col.dot} shrink-0`}>•</span><span className="truncate">{it}</span></li>
@@ -1116,7 +1116,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
                   isCapabilitiesDropdownOpen ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Core Platform Suite
                   </div>
                   {[
@@ -1133,9 +1133,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1158,7 +1158,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
                   openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Security & Topology
                   </div>
                   {[
@@ -1174,9 +1174,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1199,7 +1199,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
                   openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Empirical Proof Suite
                   </div>
                   {[
@@ -1215,9 +1215,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1240,7 +1240,7 @@ export default function LandingPage() {
                 <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
                   openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
                 }`}>
-                  <div className="text-[9.5px] font-mono text-slate-500 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
+                  <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Integration & Contracts
                   </div>
                   {[
@@ -1256,9 +1256,9 @@ export default function LandingPage() {
                     >
                       <div>
                         <div className="font-semibold text-slate-200 group-hover/item:text-indigo-300">{sub.label}</div>
-                        <div className="text-[10px] text-slate-500 font-mono">{sub.desc}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">{sub.desc}</div>
                       </div>
-                      <span className="text-slate-600 group-hover/item:text-indigo-400 text-xs">→</span>
+                      <span className="text-slate-400 group-hover/item:text-indigo-400 text-xs">→</span>
                     </a>
                   ))}
                 </div>
@@ -1349,7 +1349,7 @@ export default function LandingPage() {
                         {item.label}
                       </span>
                     </div>
-                    <span className="text-slate-600 group-hover:text-indigo-400 transition-colors shrink-0">
+                    <span className="text-slate-400 group-hover:text-indigo-400 transition-colors shrink-0">
                       <ArrowRight />
                     </span>
                   </motion.button>
@@ -1369,7 +1369,7 @@ export default function LandingPage() {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </button>
 
-                <div className="flex items-center justify-between text-[11px] font-mono text-slate-500 px-1 pt-1">
+                <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-1 pt-1">
                   <span>CF-Intelligence Network</span>
                   <span className="text-emerald-400 font-semibold flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
@@ -1413,17 +1413,17 @@ export default function LandingPage() {
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">94.2%</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Detection Gain</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">vs. 42% isolated</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">vs. 42% isolated</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">ε = 1.0</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">Differential Privacy</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">(ε, δ)-DP bounded</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">(ε, δ)-DP bounded</div>
                 </div>
                 <div className="p-3.5 sm:p-4 rounded-2xl bg-white/3 border border-white/8 backdrop-blur-xl min-w-0">
                   <div className="text-xl sm:text-2xl font-black font-mono bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">5× Gain</div>
                   <div className="text-[11px] text-slate-400 font-medium mt-0.5 sm:mt-1">FPR Reduction</div>
-                  <div className="text-[9px] font-mono text-slate-600 mt-0.5">31% → 6.1% FPR</div>
+                  <div className="text-[9px] font-mono text-slate-400 mt-0.5">31% → 6.1% FPR</div>
                 </div>
               </div>
 
@@ -1498,7 +1498,7 @@ export default function LandingPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-2xl sm:text-4xl font-extrabold font-mono text-indigo-400">{card.stat}</span>
-                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-500 bg-white/4 px-2 py-0.5 rounded border border-white/6">{card.tag}</span>
+                    <span className="text-[9px] sm:text-[10px] font-mono text-slate-400 bg-white/4 px-2 py-0.5 rounded border border-white/6">{card.tag}</span>
                   </div>
                   <h3 className="text-sm sm:text-base font-bold text-slate-200">{card.label}</h3>
                   <p className="text-xs sm:text-sm text-slate-400 leading-relaxed font-sans">{card.desc}</p>
@@ -1551,7 +1551,7 @@ export default function LandingPage() {
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isActive} />
                           </span>
-                          <span className="hidden lg:inline text-xs font-mono text-slate-600 group-hover:text-slate-400">
+                          <span className="hidden lg:inline text-xs font-mono text-slate-400 group-hover:text-slate-200">
                             {isActive ? '→' : ''}
                           </span>
                         </div>
@@ -1657,14 +1657,14 @@ export default function LandingPage() {
                             <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${isSelected ? 'bg-indigo-400 ring-2 ring-indigo-400/30' : isCore ? 'bg-indigo-500/40' : 'bg-purple-500/40'}`} />
                             <span className="truncate">{mod.name}</span>
                           </div>
-                          <div className="text-[9.5px] font-mono text-slate-500 truncate mt-0.5 ml-3.5">{mod.category}</div>
+                          <div className="text-[9.5px] font-mono text-slate-400 truncate mt-0.5 ml-3.5">{mod.category}</div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="lg:hidden">
                             <AccordionChevron isOpen={isSelected} />
                           </span>
                           <span className="hidden lg:inline">
-                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-600 group-hover:text-slate-400'}`} />
+                            <ArrowRight className={`w-3.5 h-3.5 shrink-0 transition-transform ${isSelected ? 'text-indigo-400 translate-x-0.5' : 'text-slate-400 group-hover:text-slate-300'}`} />
                           </span>
                         </div>
                       </button>
@@ -1726,13 +1726,13 @@ export default function LandingPage() {
                 >
                   <div className="flex items-center justify-between">
                     <span className="px-2 py-0.5 rounded text-[9.5px] sm:text-[10px] font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20">READY</span>
-                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-500">{bank.latency}</span>
+                    <span className="text-[9.5px] sm:text-[10px] font-mono text-slate-400">{bank.latency}</span>
                   </div>
                   <div>
                     <h3 className="text-xs sm:text-sm font-bold text-slate-200 truncate">{bank.name}</h3>
-                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-600 mt-0.5 truncate">{bank.ticker}</div>
+                    <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 mt-0.5 truncate">{bank.ticker}</div>
                   </div>
-                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-500 border-t border-white/6 pt-2 leading-snug break-words">
+                  <div className="text-[10.5px] sm:text-[11px] font-mono text-slate-400 border-t border-white/6 pt-2 leading-snug break-words">
                     {bank.hardware}
                   </div>
                 </motion.div>
@@ -1773,7 +1773,7 @@ export default function LandingPage() {
                     >
                       <div className="min-w-0 pr-2">
                         <div className="text-xs font-semibold mb-0.5 truncate">{node.label}</div>
-                        <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                        <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                       </div>
                       <AccordionChevron isOpen={isSelected} />
                     </button>
@@ -1810,7 +1810,7 @@ export default function LandingPage() {
                     }`}
                   >
                     <div className="text-xs font-semibold mb-1 truncate">{node.label}</div>
-                    <div className="text-[9.5px] font-mono text-slate-500 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
+                    <div className="text-[9.5px] font-mono text-slate-400 leading-snug truncate">{node.tech.slice(0, 2).join(' · ')}</div>
                   </button>
                 ))}
               </div>
@@ -1911,7 +1911,7 @@ export default function LandingPage() {
                           <span className="text-xs font-mono font-bold text-slate-200 truncate">{row.standard}</span>
                           <span className="text-[9.5px] font-mono font-bold text-emerald-400 shrink-0">{row.status}</span>
                         </div>
-                        <p className="text-xs text-slate-500 leading-relaxed font-sans">{row.detail}</p>
+                        <p className="text-xs text-slate-400 leading-relaxed font-sans">{row.detail}</p>
                       </div>
                     ))}
                   </div>
@@ -2006,7 +2006,7 @@ export default function LandingPage() {
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[10px] font-mono">
                       <span className="text-indigo-400 font-bold uppercase tracking-wider">{item.type}</span>
-                      <span className="text-slate-500">{item.source.split(':')[0]}</span>
+                      <span className="text-slate-400">{item.source.split(':')[0]}</span>
                     </div>
                     <h3 className="text-base font-bold text-slate-100">{item.dataset}</h3>
                     <div className="text-[11px] font-mono text-slate-400">{item.scope}</div>
@@ -2021,7 +2021,7 @@ export default function LandingPage() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-slate-500">{item.metric.split(':')[0]}:</span>
+                      <span className="text-slate-400">{item.metric.split(':')[0]}:</span>
                       <span className="text-indigo-300 font-semibold">{item.metric.split(':')[1]}</span>
                     </div>
                     <div className="p-2 rounded-lg bg-emerald-950/20 border border-emerald-900/30 text-[11px] text-emerald-300 font-semibold text-center">
@@ -2130,18 +2130,18 @@ export default function LandingPage() {
                     <h3 className="text-lg font-bold text-slate-100">{card.segment}</h3>
                     <div className="space-y-2 text-xs">
                       <div>
-                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Core Pain Point:</span>
+                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Core Pain Point:</span>
                         <p className="text-slate-300 font-sans leading-relaxed">{card.pain}</p>
                       </div>
                       <div>
-                        <span className="text-slate-500 font-mono text-[10px] uppercase block">Compliance Profile:</span>
+                        <span className="text-slate-400 font-mono text-[10px] uppercase block">Compliance Profile:</span>
                         <p className="text-indigo-300 font-mono text-[11px]">{card.compliance}</p>
                       </div>
                     </div>
                   </div>
 
                   <div className="pt-4 border-t border-white/6 space-y-2">
-                    <span className="text-slate-500 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
+                    <span className="text-slate-400 font-mono text-[10px] uppercase block">CF-Intelligence Value:</span>
                     <p className="text-slate-300 text-xs leading-relaxed">{card.solution}</p>
                     <div className="p-2 rounded-xl bg-white/3 border border-white/8 text-[11px] font-mono font-bold text-emerald-400 text-center">
                       {card.roi}
@@ -2312,7 +2312,7 @@ export default function LandingPage() {
                       <h4 className="text-xs font-bold text-slate-100">{item.title}</h4>
                       <p className="text-[11px] text-slate-400 leading-relaxed font-sans">{item.desc}</p>
                     </div>
-                    <div className="text-[9px] font-mono text-slate-500 truncate pt-2 border-t border-white/5">
+                    <div className="text-[9px] font-mono text-slate-400 truncate pt-2 border-t border-white/5">
                       Ref: {item.ref}
                     </div>
                   </div>
@@ -2349,7 +2349,7 @@ export default function LandingPage() {
                     className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-200 font-mono text-xs font-semibold transition-all"
                   >
                     <span>📖 Open Scalar Reference</span>
-                    <span className="text-slate-500">↗</span>
+                    <span className="text-slate-400">↗</span>
                   </a>
                 </div>
               </div>
@@ -2479,12 +2479,12 @@ telemetry.on('round.stage', (evt) => {
                           </span>
                           <span className="text-indigo-300 font-bold text-xs sm:text-sm break-all">{row.path}</span>
                         </div>
-                        <span className="text-[9.5px] text-slate-500 font-mono shrink-0">v1 endpoint</span>
+                        <span className="text-[9.5px] text-slate-400 font-mono shrink-0">v1 endpoint</span>
                       </div>
                       <p className="text-xs text-slate-400 font-sans leading-relaxed break-words">{row.desc}</p>
-                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-500 pt-1.5 border-t border-white/4 min-w-0">
-                        <div className="truncate"><span className="text-slate-600">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
-                        <div className="truncate"><span className="text-slate-600">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
+                      <div className="flex flex-wrap gap-3 sm:gap-4 text-[9.5px] sm:text-[10px] text-slate-400 pt-1.5 border-t border-white/4 min-w-0">
+                        <div className="truncate"><span className="text-slate-400">Payload Request:</span> <span className="text-slate-300">{row.req}</span></div>
+                        <div className="truncate"><span className="text-slate-400">Response Data:</span> <span className="text-emerald-400">{row.res}</span></div>
                       </div>
                     </div>
                   ))}
@@ -2525,7 +2525,7 @@ telemetry.on('round.stage', (evt) => {
 
                 {/* Email Address Display Box */}
                 <div className="p-3.5 rounded-2xl bg-[#03030c] border border-white/8 space-y-2.5 font-mono min-w-0">
-                  <div className="text-[9px] text-slate-500 uppercase tracking-wider">Official Inquiries & Support</div>
+                  <div className="text-[9px] text-slate-400 uppercase tracking-wider">Official Inquiries & Support</div>
                   <div className="flex items-center justify-between gap-2 min-w-0">
                     <span className="text-indigo-300 font-bold text-xs sm:text-sm truncate">ysfcals@gmail.com</span>
                     <button
@@ -2546,7 +2546,7 @@ telemetry.on('round.stage', (evt) => {
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-200" />
                 </a>
 
-                <div className="text-[10px] font-mono text-slate-500 text-center">
+                <div className="text-[10px] font-mono text-slate-400 text-center">
                   Guaranteed response within 24 hours for banking inquiries & architecture reviews.
                 </div>
               </div>
@@ -2697,7 +2697,7 @@ function BankDetailsDrawerModal({
             <h3 id="bank-drawer-title" className="text-base sm:text-lg font-bold text-slate-100 mt-0.5 truncate">
               {bank.name}
             </h3>
-            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-500 mt-0.5 truncate">
+            <div id="bank-drawer-desc" className="text-xs font-mono text-slate-400 mt-0.5 truncate">
               {bank.location}
             </div>
           </div>
@@ -2720,7 +2720,7 @@ function BankDetailsDrawerModal({
             { k: 'Status', v: 'READY (On-Premises Agent)' },
           ].map((row) => (
             <div key={row.k} className="p-3 rounded-xl bg-white/3 border border-white/8 min-w-0">
-              <div className="text-slate-500 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
+              <div className="text-slate-400 text-[8.5px] sm:text-[9px] uppercase tracking-wider mb-0.5">
                 {row.k}
               </div>
               <div className="text-slate-200 truncate">{row.v}</div>
@@ -2729,7 +2729,7 @@ function BankDetailsDrawerModal({
         </div>
 
         <div className="min-w-0">
-          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-500 uppercase tracking-wider mb-2.5">
+          <div className="text-[9.5px] sm:text-[10px] font-mono text-slate-400 uppercase tracking-wider mb-2.5">
             ISO 20022 Stream Log
           </div>
           <div className="rounded-2xl bg-[#03030c] border border-white/8 p-3.5 sm:p-4 space-y-2.5 font-mono text-[10.5px] sm:text-[11px] text-slate-400 overflow-x-auto max-w-full">
