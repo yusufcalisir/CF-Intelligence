@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1419%2F1419_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1417%2F1417_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
@@ -537,7 +537,7 @@ CF-Intelligence/
 │   │   │   └── piiSanitizer.ts                      # Luhn algorithm, IBAN/TCKN regex & Type-Salted HMAC Zero-PII sanitizer
 │   │   └── e2e/                                     # Playwright end-to-end browser user workflow specs
 │   │
-│   └── tests/                                       # Vitest & React Testing Library Suite (249 Tests)
+│   └── tests/                                       # Vitest & React Testing Library Suite (247 Tests across 77 Files)
 │
 ├── sdk/                                             # Official Consortium Client SDK
 │   └── python/                                      # Python 3.10+ Integration SDK (`cfi-connector-sdk`)
@@ -964,7 +964,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Memory/DB Isolation**| **4/4 Tenant Isolation Tests Passing** | Strict Isolation (403 BOLA rejection) | `test_multi_tenant_security_audit.py` | `Self-Verified (Input sanitization, ContextVar session isolation, Redis namespace enclosure, cross-tenant 403 enforcement)` |
-| **Full Test Suite Pass Rate** | **1,419 / 1,419 passing** | 100% | 1,160 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,417 / 1,417 passing** | 100% | 1,160 Backend Pytest + 247 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1484,13 +1484,13 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,419 Tests)
+### Step 5: Master Test Suites Execution (1,417 Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
 # 1. Run full backend pytest suite (1,160 tests)
 pytest backend/tests/ -v
 
-# 2. Run full frontend vitest suite (249 tests across 78 test files)
+# 2. Run full frontend vitest suite (247 tests across 77 test files)
 npm --prefix frontend test
 
 # 3. Run Playwright real-browser multi-device E2E suite (10 browser tests)
