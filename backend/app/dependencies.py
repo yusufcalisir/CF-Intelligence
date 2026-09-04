@@ -237,10 +237,22 @@ KMSServiceDep = Annotated[KMSService, Depends(get_kms_service)]
 TenantMeteringDep = Annotated[TenantMeteringService, Depends(get_tenant_metering_service)]
 
 
+def get_optional_tenant_metering_service() -> TenantMeteringService | None:
+    """Return a TenantMeteringService instance, or None if unavailable."""
+    return get_tenant_metering_service()
+
+
+# Annotated must stay outermost so FastAPI extracts Depends() correctly.
+# Using Optional[Annotated[...]] breaks FastAPI's dependency injection.
+OptionalTenantMeteringDep = Annotated[
+    TenantMeteringService | None, Depends(get_optional_tenant_metering_service)
+]
+
+
 async def enforce_tenant_quota(
     request: Request,
     tenant_id: TenantDep = None,
-    metering: TenantMeteringDep | None = None,
+    metering: OptionalTenantMeteringDep = None,
 ) -> str:
     """FastAPI dependency enforcing tenant resource quotas before request execution.
 
