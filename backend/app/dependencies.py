@@ -240,7 +240,7 @@ TenantMeteringDep = Annotated[TenantMeteringService, Depends(get_tenant_metering
 async def enforce_tenant_quota(
     request: Request,
     tenant_id: TenantDep = None,
-    metering: TenantMeteringDep = None,
+    metering: TenantMeteringDep | None = None,
 ) -> str:
     """FastAPI dependency enforcing tenant resource quotas before request execution.
 
