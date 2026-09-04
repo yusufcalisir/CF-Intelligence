@@ -182,10 +182,17 @@ export default function ScenariosPage() {
                   <button
                     onClick={() => handleStart(scenario.type)}
                     disabled={startScenario.isPending || status?.status === 'running'}
-                    className="px-4 py-2 text-sm font-semibold rounded-lg text-white hover:opacity-90 disabled:opacity-50 transition-opacity w-full sm:w-auto shrink-0 text-center"
+                    className="h-11 min-h-[44px] px-5 text-sm font-semibold rounded-xl text-white hover:opacity-90 disabled:opacity-50 transition-all w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 cursor-pointer shadow-md"
                     style={{ background: SCENARIO_GRADIENTS[scenario.type] || SCENARIO_GRADIENTS.fraud_ring }}
                   >
-                    {startScenario.isPending ? 'Starting...' : '▶ Run'}
+                    {startScenario.isPending ? (
+                      <>
+                        <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                        <span>Starting...</span>
+                      </>
+                    ) : (
+                      <span>▶ Run</span>
+                    )}
                   </button>
                 </div>
               </div>

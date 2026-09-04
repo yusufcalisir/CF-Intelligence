@@ -130,15 +130,24 @@ export const Predictor: React.FC = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-gradient-to-r from-cyan-500 to-purple-600 font-medium text-xs text-white shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            className="w-full h-11 min-h-[44px] rounded-xl bg-gradient-to-r from-cyan-500 to-purple-600 font-semibold text-xs text-white shadow-lg shadow-cyan-500/20 hover:opacity-90 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
           >
-            <Send className="h-3.5 w-3.5" />
-            <span>{loading ? 'Evaluating Payload...' : 'Evaluate Transaction Risk'}</span>
+            {loading ? (
+              <>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Evaluating Payload...</span>
+              </>
+            ) : (
+              <>
+                <Send className="h-3.5 w-3.5 shrink-0" />
+                <span>Evaluate Transaction Risk</span>
+              </>
+            )}
           </button>
         </form>
 
         {/* Prediction Results Inspector */}
-        <div className="lg:col-span-5 glass-card rounded-xl p-5 border border-slate-800 space-y-4">
+        <div className="lg:col-span-5 glass-card rounded-xl p-5 border border-slate-800 flex flex-col justify-between min-h-[220px]">
           <h3 className="font-semibold text-xs text-slate-200 uppercase tracking-wider border-b border-slate-800 pb-2">
             Evaluation Result
           </h3>
@@ -172,7 +181,7 @@ export const Predictor: React.FC = () => {
               )}
             </div>
           ) : (
-            <div className="text-center py-12 text-slate-500 text-xs">
+            <div className="text-center py-12 text-slate-500 text-xs min-h-[160px] flex items-center justify-center">
               Submit transaction payload to view GNN risk score and SHAP feature attributions.
             </div>
           )}

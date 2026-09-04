@@ -49,9 +49,16 @@ export default function ObservabilityPage() {
           <button
             onClick={handleRetrain}
             disabled={triggerRetrain.isPending}
-            className="px-4 py-2 text-xs font-bold rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 shadow-md transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap"
+            className="w-full sm:w-auto h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-indigo-600 text-white hover:bg-indigo-500 shadow-md transition-all flex items-center justify-center gap-2 shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
-            {triggerRetrain.isPending ? 'Initiating FL Round...' : '🔄 Trigger Automated Re-training'}
+            {triggerRetrain.isPending ? (
+              <>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Initiating FL Round...</span>
+              </>
+            ) : (
+              <span>🔄 Trigger Automated Re-training</span>
+            )}
           </button>
         </div>
       </div>

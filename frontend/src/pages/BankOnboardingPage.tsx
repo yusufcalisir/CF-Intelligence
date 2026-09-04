@@ -438,7 +438,7 @@ differential_privacy:
           <div className="flex justify-end pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(2)}
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-indigo-600 to-purple-600 hover:brightness-110 transition-all shadow-lg shadow-indigo-600/25 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
             >
               <span>Continue to Step 2</span>
               <ArrowRight className="w-4 h-4" />
@@ -486,7 +486,7 @@ differential_privacy:
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/10">
             <button
               onClick={() => setStep(1)}
-              className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-400 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-1.5 cursor-pointer"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-semibold text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 transition flex items-center justify-center gap-2 cursor-pointer border border-white/10 shrink-0 whitespace-nowrap"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to Step 1</span>
@@ -494,16 +494,16 @@ differential_privacy:
             <button
               onClick={handleRegisterSubmit}
               disabled={isSubmitting}
-              className="px-6 py-2.5 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto h-11 min-h-[44px] px-6 rounded-xl text-xs sm:text-sm font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:brightness-110 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
             >
               {isSubmitting ? (
                 <>
-                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <span className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full shrink-0" />
                   <span>Issuing X.509 Credentials...</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck className="w-4 h-4" />
+                  <ShieldCheck className="w-4 h-4 shrink-0" />
                   <span>Confirm & Issue Credentials ✓</span>
                 </>
               )}

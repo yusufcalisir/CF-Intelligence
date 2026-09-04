@@ -300,20 +300,20 @@ export default function SecurityPage() {
           </div>
         </div>
 
-        <div className="flex items-center shrink-0">
+        <div className="flex items-center shrink-0 w-full sm:w-auto">
           <button
             onClick={() => verifyChain.mutate()}
             disabled={verifyChain.isPending}
-            className="w-full md:w-auto px-4 py-2.5 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-50 shrink-0"
+            className="w-full sm:w-auto h-11 min-h-[44px] px-4 text-xs font-bold rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 border border-emerald-400/30 cursor-pointer disabled:opacity-50 shrink-0 whitespace-nowrap"
           >
             {verifyChain.isPending ? (
               <>
-                <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent" />
+                <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent shrink-0" />
                 <span>Verifying Hashes...</span>
               </>
             ) : (
               <>
-                <Lock className="w-3.5 h-3.5 text-emerald-200" />
+                <Lock className="w-3.5 h-3.5 text-emerald-200 shrink-0" />
                 <span>Verify SHA-256 Audit Chain</span>
               </>
             )}
@@ -326,28 +326,28 @@ export default function SecurityPage() {
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className={`p-4 rounded-xl border flex items-center justify-between ${
+          className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0 ${
             verifyChain.data.is_valid
               ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
               : 'bg-red-500/10 border-red-500/30 text-red-400'
           }`}
         >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">{verifyChain.data.is_valid ? '✓' : '⚠️'}</span>
-            <div>
-              <div className="font-bold text-sm">
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-2xl shrink-0">{verifyChain.data.is_valid ? '✓' : '⚠️'}</span>
+            <div className="min-w-0">
+              <div className="font-bold text-sm truncate">
                 {verifyChain.data.is_valid
                   ? 'Cryptographic Audit Chain Intact (100% SHA-256 Hash Match)'
                   : 'RETROSPECTIVE TAMPERING DETECTED!'}
               </div>
-              <div className="text-xs opacity-90">
+              <div className="text-xs opacity-90 truncate">
                 {verifyChain.data.is_valid
                   ? `Verified ${verifyChain.data.total_records} events from Genesis Block. Tail Hash: ${verifyChain.data.last_hash.slice(0, 16)}...`
                   : `Broken at index #${verifyChain.data.broken_index}: ${verifyChain.data.tamper_reason}`}
               </div>
             </div>
           </div>
-          <span className="text-[10px] font-mono px-2 py-1 bg-black/30 rounded">
+          <span className="text-[10px] font-mono px-2 py-1 bg-black/30 rounded self-start sm:self-auto shrink-0">
             {verifyChain.data.verified_at}
           </span>
         </motion.div>
@@ -1258,9 +1258,19 @@ export default function SecurityPage() {
                     <button
                       onClick={handleGeneratePQCKeypair}
                       disabled={isPqcLoading}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full h-11 min-h-[44px] px-4 rounded-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0 disabled:opacity-50"
                     >
-                      {isPqcLoading ? 'Generating Lattice Keys...' : '🔑 Generate Kyber-768 + Dilithium-3 Keypair'}
+                      {isPqcLoading ? (
+                        <>
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span>Deriving Lattice Keys...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🔑</span>
+                          <span>Generate Kyber-768 + Dilithium-3 Keypair</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -1276,7 +1286,7 @@ export default function SecurityPage() {
                   <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Lattice Keypair Telemetry & Public Keys</h4>
 
                   {pqcResult ? (
-                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono">
+                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">KEM Algorithm:</span>
                         <span className="text-indigo-300 font-bold">{pqcResult.kem_algorithm}</span>
@@ -1299,8 +1309,11 @@ export default function SecurityPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
-                      Click <strong>Generate Kyber-768 + Dilithium-3 Keypair</strong> to derive NIST lattice public keys.
+                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[220px] flex flex-col items-center justify-center space-y-2">
+                      <span className="text-lg">🛡️</span>
+                      <div>
+                        Click <strong>Generate Kyber-768 + Dilithium-3 Keypair</strong> to derive NIST lattice public keys.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1361,9 +1374,19 @@ export default function SecurityPage() {
                     <button
                       onClick={handleDisburseCrossChain}
                       disabled={isBridgeLoading}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full h-11 min-h-[44px] px-4 rounded-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0 disabled:opacity-50"
                     >
-                      {isBridgeLoading ? 'Relaying CCIP Messages...' : '🚀 Execute CCIP Multi-Ledger Payout'}
+                      {isBridgeLoading ? (
+                        <>
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span>Relaying CCIP Messages...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>🚀</span>
+                          <span>Execute CCIP Multi-Ledger Payout</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -1379,8 +1402,8 @@ export default function SecurityPage() {
                   <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">Multi-Ledger Route Receipts & CCIP Message IDs</h4>
 
                   {bridgeResult ? (
-                    <div className="space-y-3">
-                      <div className="p-3 rounded-xl bg-black/40 border border-[var(--color-border)] flex items-center justify-between text-xs font-mono">
+                    <div className="space-y-3 min-h-[180px]">
+                      <div className="p-3 rounded-xl bg-black/40 border border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between text-xs font-mono gap-2">
                         <div>
                           <span className="text-[var(--color-text-muted)]">Total Disbursed: </span>
                           <span className="text-emerald-400 font-bold">{bridgeResult.total_pool_amount.toLocaleString()} {bridgeResult.pool_currency}</span>
@@ -1423,8 +1446,11 @@ export default function SecurityPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-8 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
-                      Click <strong>Execute CCIP Multi-Ledger Payout</strong> to trigger atomic cross-chain incentive disbursements across Arbitrum, Optimism, Canton, and Fabric.
+                    <div className="p-8 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[180px] flex flex-col items-center justify-center space-y-2">
+                      <span className="text-lg">🌉</span>
+                      <div>
+                        Click <strong>Execute CCIP Multi-Ledger Payout</strong> to trigger atomic cross-chain incentive disbursements across Arbitrum, Optimism, Canton, and Fabric.
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1499,9 +1525,19 @@ export default function SecurityPage() {
                     <button
                       onClick={handleCalibrateRDP}
                       disabled={isRdpLoading}
-                      className="w-full py-2.5 px-4 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2"
+                      className="w-full h-11 min-h-[44px] px-4 rounded-xl font-bold bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-lg transition-all text-xs cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0 disabled:opacity-50"
                     >
-                      {isRdpLoading ? 'Optimizing RDP Dual Bounds...' : '⚡ Auto-Scale Round Noise (σ_t)'}
+                      {isRdpLoading ? (
+                        <>
+                          <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                          <span>Optimizing RDP Bounds...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>⚡</span>
+                          <span>Auto-Scale Round Noise (σ_t)</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -1517,7 +1553,7 @@ export default function SecurityPage() {
                   <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">RDP Accountant Telemetry & Dual Minimization</h4>
 
                   {rdpResult ? (
-                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono">
+                    <div className="p-4 rounded-xl bg-black/30 border border-[var(--color-border)] space-y-3 text-xs font-mono min-h-[220px] flex flex-col justify-between">
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
                         <span className="text-[var(--color-text-muted)]">Calibrated Noise Multiplier (σ_t):</span>
                         <span className="text-cyan-400 font-bold">{rdpResult.calibrated_sigma.toFixed(3)}</span>
@@ -1540,8 +1576,11 @@ export default function SecurityPage() {
                       </div>
                     </div>
                   ) : (
-                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
-                      Click <strong>Auto-Scale Round Noise (σ_t)</strong> to compute the optimal convex dual Rényi privacy bound.
+                    <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl min-h-[220px] flex flex-col items-center justify-center space-y-2">
+                      <span className="text-lg">📈</span>
+                      <div>
+                        Click <strong>Auto-Scale Round Noise (σ_t)</strong> to compute the optimal convex dual Rényi privacy bound.
+                      </div>
                     </div>
                   )}
                 </div>

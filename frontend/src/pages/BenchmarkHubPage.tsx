@@ -695,13 +695,20 @@ export const BenchmarkHubPage: React.FC = () => {
                 />
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <button
                   onClick={handlePiiValidation}
                   disabled={validatePiiMutation.isPending}
-                  className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg transition-all"
+                  className="h-11 min-h-[44px] px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
                 >
-                  {validatePiiMutation.isPending ? 'Scanning...' : 'Scan for Raw PII Leakage'}
+                  {validatePiiMutation.isPending ? (
+                    <>
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span>Scanning...</span>
+                    </>
+                  ) : (
+                    <span>Scan for Raw PII Leakage</span>
+                  )}
                 </button>
                 <button
                   onClick={() => {
@@ -715,7 +722,7 @@ export const BenchmarkHubPage: React.FC = () => {
                       )
                     );
                   }}
-                  className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition-all border border-slate-700"
+                  className="h-11 min-h-[44px] px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition-all border border-slate-700 flex items-center justify-center whitespace-nowrap shrink-0 cursor-pointer"
                 >
                   Inject Simulated PII Violation
                 </button>

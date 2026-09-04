@@ -85,10 +85,12 @@ function ScoreMeter({ value, max = 1, label }: { value: number; max?: number; la
       : 'from-rose-500 to-red-400 shadow-[0_0_10px_rgba(244,63,94,0.5)]';
 
   return (
-    <div className="space-y-1.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400 font-mono text-[11px]">{label}</span>
-        <span className="font-mono font-bold text-slate-200">
+    <div className="space-y-1.5 w-full min-w-0">
+      <div className="flex items-center justify-between gap-2 text-xs min-w-0">
+        <span className="text-slate-400 font-mono text-[11px] truncate min-w-0 flex-1" title={label}>
+          {label}
+        </span>
+        <span className="font-mono font-bold text-slate-200 shrink-0 whitespace-nowrap text-right">
           {(value * 100).toFixed(1)}% <span className="text-slate-500 font-normal">({pct}/100)</span>
         </span>
       </div>
@@ -222,32 +224,40 @@ function AttackAuditPanel() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 min-w-0">
         {/* Card 1: MIA */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-indigo-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-indigo-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-indigo-500" />
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 font-bold">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 1
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Shokri et al.</span>
+              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Shokri et al.</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm">Membership Inference Attack (MIA)</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+              Membership Inference Attack (MIA)
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Assesses whether an adversary can infer if a specific bank transaction was present in local training datasets via shadow loss disparities.
             </p>
           </div>
 
           {miaResult ? (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
               <ScoreMeter value={miaResult.membership_leakage_asr} label="Attack Success Rate (ASR)" />
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
-                <span className="text-[11px] font-mono text-slate-400">Audit Classification:</span>
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Classification:</span>
                 <RiskBadge tier={miaResult.risk_tier as RiskTier} />
+              </div>
+              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
+                <span>Train: {miaResult.num_train_samples_audited} samples</span>
+                <span>Test: {miaResult.num_test_samples_audited} samples</span>
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 text-center py-6">
-              <span className="text-xs font-mono text-slate-400">Audit not executed yet</span>
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+              <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
+              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
 
@@ -255,53 +265,57 @@ function AttackAuditPanel() {
             id="btn-run-mia-audit"
             onClick={() => auditMIA.mutate({ train_losses: SAMPLE_TRAIN_LOSSES, test_losses: SAMPLE_TEST_LOSSES })}
             disabled={auditMIA.isPending}
-            className="w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50"
+            className="w-full h-11 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/20 disabled:opacity-50 shrink-0 whitespace-nowrap"
           >
             {auditMIA.isPending ? (
               <>
-                <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                <span>Simulating MIA Attack...</span>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Simulating MIA...</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5" />
-                <span>Run Membership Inference Audit</span>
+                <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+                <span>Run MIA Audit</span>
               </>
             )}
           </button>
         </div>
 
         {/* Card 2: Model Inversion */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-sky-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-sky-500/40 transition-all">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-sky-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-sky-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-sky-500" />
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 2
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Fredrikson et al.</span>
+              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Fredrikson et al.</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm">Model Inversion & Reconstruction</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+              Model Inversion & Reconstruction
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Audits if shared gradient norms allow adversaries to reconstruct sensitive transaction feature distributions and client account balances.
             </p>
           </div>
 
           {invResult ? (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
               <ScoreMeter value={invResult.reconstruction_risk_score} label="Reconstruction Risk" />
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
-                <span className="text-[11px] font-mono text-slate-400">Risk Tier:</span>
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Risk Tier:</span>
                 <RiskBadge tier={invResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5">
+              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Mean Norm: {invResult.mean_gradient_norm.toFixed(3)}</span>
                 <span>σ: {invResult.std_gradient_norm.toFixed(3)}</span>
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 text-center py-6">
-              <span className="text-xs font-mono text-slate-400">Audit not executed yet</span>
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+              <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
+              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
 
@@ -309,53 +323,57 @@ function AttackAuditPanel() {
             id="btn-run-model-inversion-audit"
             onClick={() => auditInversion.mutate({ gradient_norms: SAMPLE_GRAD_NORMS })}
             disabled={auditInversion.isPending}
-            className="w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-600/20 disabled:opacity-50"
+            className="w-full h-11 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white shadow-lg shadow-sky-600/20 disabled:opacity-50 shrink-0 whitespace-nowrap"
           >
             {auditInversion.isPending ? (
               <>
-                <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                <span>Auditing Gradient Inversion...</span>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Auditing Inversion...</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5" />
-                <span>Run Model Inversion Audit</span>
+                <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+                <span>Run Inversion Audit</span>
               </>
             )}
           </button>
         </div>
 
         {/* Card 3: DLG */}
-        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all">
+        <div className="glass-card p-4 sm:p-5 rounded-2xl border border-emerald-500/20 bg-[#080a21]/90 flex flex-col justify-between gap-4 min-w-0 relative overflow-hidden group hover:border-emerald-500/40 transition-all h-full">
           <div className="absolute top-0 inset-x-0 h-0.5 bg-emerald-500" />
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold">
+            <div className="flex items-center justify-between gap-2 min-w-0">
+              <span className="text-[10px] font-mono uppercase tracking-wider text-emerald-400 font-bold whitespace-nowrap shrink-0">
                 Attack Vector 3
               </span>
-              <span className="text-[10px] font-mono text-slate-400">Zhu et al. (NeurIPS)</span>
+              <span className="text-[10px] font-mono text-slate-400 whitespace-nowrap shrink-0">Zhu et al. (NeurIPS)</span>
             </div>
-            <h3 className="font-bold text-slate-100 text-sm">Deep Leakage from Gradients (DLG)</h3>
-            <p className="text-xs text-slate-400 leading-relaxed">
+            <h3 className="font-bold text-slate-100 text-sm leading-snug h-10 flex items-center">
+              Deep Leakage from Gradients (DLG)
+            </h3>
+            <p className="text-xs text-slate-400 leading-relaxed min-h-[48px] sm:min-h-[52px]">
               Verifies whether shared gradient vectors correlate closely enough to synthesize exact transaction raw data without DP noise injection.
             </p>
           </div>
 
           {dlgResult ? (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-3">
-              <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage Correlation" />
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-white/5">
-                <span className="text-[11px] font-mono text-slate-400">Audit Status:</span>
+            <div className="h-[148px] min-h-[148px] p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 flex flex-col justify-between">
+              <ScoreMeter value={dlgResult.dlg_leakage_score} label="Pearson Leakage" />
+              <div className="flex items-center justify-between gap-2 pt-2 border-t border-white/5 min-w-0">
+                <span className="text-[11px] font-mono text-slate-400 whitespace-nowrap">Audit Status:</span>
                 <RiskBadge tier={dlgResult.risk_tier as RiskTier} />
               </div>
-              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5">
+              <div className="text-[10px] font-mono text-slate-400 flex justify-between pt-1 border-t border-white/5 min-w-0">
                 <span>Audited Weights:</span>
                 <span className="text-emerald-300 font-bold">{dlgResult.params_audited} params</span>
               </div>
             </div>
           ) : (
-            <div className="p-3.5 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 text-center py-6">
-              <span className="text-xs font-mono text-slate-400">Audit not executed yet</span>
+            <div className="h-[148px] min-h-[148px] p-4 rounded-xl bg-[#02030a]/50 border border-dashed border-white/10 flex flex-col items-center justify-center text-center space-y-1.5">
+              <ShieldAlert className="w-5 h-5 text-slate-500/60 shrink-0" />
+              <span className="text-xs font-mono font-medium text-slate-400">Audit Not Executed</span>
+              <span className="text-[10px] text-slate-500 font-mono">Run audit below to evaluate privacy leakage</span>
             </div>
           )}
 
@@ -363,17 +381,17 @@ function AttackAuditPanel() {
             id="btn-run-dlg-audit"
             onClick={() => auditDLG.mutate({ original_gradients: SAMPLE_ORIG_GRADS, received_gradients: SAMPLE_RECV_GRADS })}
             disabled={auditDLG.isPending}
-            className="w-full py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50"
+            className="w-full h-11 min-h-[44px] rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-lg shadow-emerald-600/20 disabled:opacity-50 shrink-0 whitespace-nowrap"
           >
             {auditDLG.isPending ? (
               <>
-                <span className="h-3 w-3 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                <span>Computing DLG Leakage...</span>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Computing DLG...</span>
               </>
             ) : (
               <>
-                <Play className="w-3.5 h-3.5" />
-                <span>Run DLG Gradient Audit</span>
+                <Play className="w-3.5 h-3.5 shrink-0 fill-current" />
+                <span>Run DLG Audit</span>
               </>
             )}
           </button>

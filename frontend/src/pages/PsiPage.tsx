@@ -336,16 +336,17 @@ export default function PsiPage() {
               <button
                 type="submit"
                 disabled={runPSIMutation.isPending || logsRunning}
-                className="w-full bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-bold py-2.5 px-4 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 border border-indigo-400/20 shadow-lg shadow-indigo-900/20"
+                className="w-full h-11 min-h-[44px] bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 disabled:opacity-50 text-white font-bold px-4 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 border border-indigo-400/20 shadow-lg shadow-indigo-900/20 whitespace-nowrap shrink-0 cursor-pointer"
               >
                 {runPSIMutation.isPending || logsRunning ? (
                   <>
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                    Executing PSI Protocol...
+                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0"></span>
+                    <span>Executing PSI Protocol...</span>
                   </>
                 ) : (
                   <>
-                    <span>🔐</span> Run Private Set Intersection
+                    <span>🔐</span>
+                    <span>Run Private Set Intersection</span>
                   </>
                 )}
               </button>
@@ -548,14 +549,19 @@ export default function PsiPage() {
           <button
             type="submit"
             disabled={fuzzyResolveMutation.isPending}
-            className="w-full bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-bold py-2 rounded-lg text-sm transition-all duration-200 flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer"
+            className="w-full h-11 min-h-[44px] bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-bold px-4 rounded-xl text-sm transition-all duration-200 flex items-center justify-center gap-2 border border-slate-700 cursor-pointer whitespace-nowrap shrink-0"
           >
             {fuzzyResolveMutation.isPending ? (
-              <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin"></span>
+              <>
+                <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin shrink-0"></span>
+                <span>Resolving Matches...</span>
+              </>
             ) : (
-              <span>🔍</span>
+              <>
+                <span>🔍</span>
+                <span>Resolve Fuzzy Matches</span>
+              </>
             )}
-            Resolve Fuzzy Matches
           </button>
         </form>
 
