@@ -66,7 +66,7 @@ class TelemetryRegistry:
     def get_tracer(self, name: str = "cfi-platform") -> Any:
         """Return OpenTelemetry tracer or a lightweight fallback context manager."""
         if OPENTELEMETRY_AVAILABLE and trace is not None:
-            return trace.get_tracer(name)
+            return getattr(trace, "get_tracer")(name)
         return DummyTracer()
 
     def record_inference_latency(self, latency_ms: float, decision: str = "ALLOW") -> None:

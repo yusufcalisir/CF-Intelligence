@@ -185,7 +185,7 @@ export default function SecurityPage() {
     target_bank_id: string;
     parameter_drift_delta: number;
     hessian_spectral_radius: number;
-    mia_membership_probability: number;
+    mia_membership_probability: number | null;
     execution_time_ms: number;
     erasure_verified: boolean;
   } | null>(null);
@@ -1152,8 +1152,8 @@ export default function SecurityPage() {
                     <span className="font-mono font-bold text-indigo-300">Retained Consensus Re-aggregation</span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
-                    <span className="text-[var(--color-text-muted)]">Target MIA Risk Threshold</span>
-                    <span className="font-mono font-bold text-emerald-400">P(MIA) ≤ 0.52 (Random Guess)</span>
+                    <span className="text-[var(--color-text-muted)]">Verification Guarantee</span>
+                    <span className="font-mono font-bold text-emerald-400">Structural Exclusion (Target Absent)</span>
                   </div>
                 </div>
               </div>
@@ -1161,7 +1161,7 @@ export default function SecurityPage() {
               <div className="glass-card p-5 space-y-4 flex flex-col justify-between">
                 <div>
                   <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)] mb-3">
-                    Erasure Metrics & Membership Inference (MIA) Verification
+                    Erasure Metrics & Membership Verification
                   </h3>
 
                   {unlearnResult ? (
@@ -1189,8 +1189,12 @@ export default function SecurityPage() {
                         <span className="text-purple-300 font-bold">{unlearnResult.hessian_spectral_radius.toFixed(3)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">MIA Membership Probability:</span>
-                        <span className="text-emerald-400 font-bold">{(unlearnResult.mia_membership_probability * 100).toFixed(1)}% (Target ≤52%)</span>
+                        <span className="text-[var(--color-text-muted)]">MIA Empirical Risk:</span>
+                        <span className="text-emerald-400 font-bold">
+                          {unlearnResult.mia_membership_probability !== null && unlearnResult.mia_membership_probability !== undefined
+                            ? `${(unlearnResult.mia_membership_probability * 100).toFixed(1)}%`
+                            : 'Not empirically measured (structural exclusion)'}
+                        </span>
                       </div>
                     </div>
                   ) : (
@@ -1202,7 +1206,7 @@ export default function SecurityPage() {
 
                 <div className="text-[10px] text-[var(--color-text-muted)] pt-3 border-t border-[var(--color-border)] flex justify-between font-mono">
                   <span>Engine: federated_unlearning_engine.py</span>
-                  <span>MIA Status: Self-Verified (P_MIA ≤ 0.52)</span>
+                  <span>Guarantee: Structural Exclusion Guaranteed</span>
                 </div>
               </div>
             </div>

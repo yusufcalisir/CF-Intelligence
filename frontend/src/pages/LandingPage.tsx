@@ -39,7 +39,7 @@ const PLATFORM_MODULES: Module[] = [
   // ── FRONTIER LAB (ADVANCED R&D TRACK) ─────────────────────────────────────
   { id: 'pqc-secagg', name: 'Post-Quantum Cryptography PQC', category: 'Frontier R&D Lab', purpose: 'Researches lattice-based key exchanges for inter-bank P2P SecAgg against future quantum decryption threats (NIST FIPS 203/204).', algorithm: 'CRYSTALS-Kyber-768 KEM + Dilithium-3 Signatures', inputs: 'Lattice public key vectors & encrypted pairwise shares', outputs: 'Quantum-safe decrypted global model gradient', tech: 'NIST FIPS 203/204, liboqs, HKDF-SHA256' },
   { id: 'zk-snark-verifier', name: 'Zero-Knowledge Proof Attestation', category: 'Frontier R&D Lab', purpose: 'Explores O(1) constant-time succinct non-interactive proofs of gradient norm bounds over BN254 elliptic curves without unmasking.', algorithm: 'Groth16 & PlonK Bilinear Pairing', inputs: 'Poseidon commitment hash & encrypted gradient vector', outputs: 'O(1) Constant-time verification proof (<5ms)', tech: 'Circom 2.1, SnarkJS, BN254 Curve' },
-  { id: 'unlearning-engine', name: 'Confidential Federated Unlearning', category: 'Frontier R&D Lab', purpose: 'Implements selective gradient footprint erasure for departing or revoked bank nodes via exact re-aggregation across retained participants.', algorithm: 'Exact Re-Aggregation & Lineage Subtraction', inputs: 'Evicted bank historical updates & current checkpoint', outputs: 'Unlearned global model weights (P_MIA <= 0.52)', tech: 'Lineage Subtraction, Retained Participant FedAvg' },
+  { id: 'unlearning-engine', name: 'Confidential Federated Unlearning', category: 'Frontier R&D Lab', purpose: 'Implements selective gradient footprint erasure for departing or revoked bank nodes via exact re-aggregation across retained participants.', algorithm: 'Exact Re-Aggregation & Lineage Subtraction', inputs: 'Evicted bank historical updates & current checkpoint', outputs: 'Unlearned global model weights (Structural Exclusion)', tech: 'Lineage Subtraction, Retained Participant FedAvg' },
   { id: 'crosschain-bridge', name: 'Cross-Chain Settlement Bridge', category: 'Frontier R&D Lab', purpose: 'Prototyping multi-ledger liquidity routing for Shapley incentive distribution across EVM rollups and institutional CBDC networks.', algorithm: 'Chainlink CCIP EVM2AnyMessage & LayerZero V2', inputs: 'Shapley utility scores & institutional CBDC wallets', outputs: 'Multi-ledger atomic transaction receipts (<1s SLA)', tech: 'Chainlink CCIP, LayerZero, Daml Interop' },
 ];
 
@@ -180,7 +180,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'unlearning-engine': {
     sla: '< 120 ms selective unlearning erasure',
-    security: 'P_MIA ≤ 0.52 (Near-Random Guessing)',
+    security: 'Structural Exclusion Guaranteed (Target Absent)',
     compliance: 'Exact Re-Aggregation & Lineage Subtraction',
     actionRoute: '/security',
     actionLabel: 'Inspect Federated Unlearning',

@@ -8,13 +8,12 @@ import ipaddress
 import json
 import logging
 import socket
-import urllib.parse
-from urllib.parse import urlparse
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
+from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -215,16 +214,14 @@ class WebhookService:
         try:
             ip_str = host_lower.strip("[]")
             ip_obj = ipaddress.ip_address(ip_str)
-            if (
+            return not (
                 ip_obj.is_private
                 or ip_obj.is_loopback
                 or ip_obj.is_link_local
                 or ip_obj.is_reserved
                 or ip_obj.is_multicast
                 or ip_obj.is_unspecified
-            ):
-                return False
-            return True
+            )
         except ValueError:
             pass
 

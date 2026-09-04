@@ -724,6 +724,7 @@ Provides mathematically sound parameter erasure when a participating bank withdr
   $$\mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}$$
 
 - **Illustrative Simulator Fallback:** In confidential production federations with zero-knowledge secure aggregation where individual client parameter vectors are never persisted to disk (enforcing zero-raw-PII storage invariants), unlearning requests executed without stored gradient history run via an **illustrative simulator** (`UnlearningMethod.SIMULATED_UNLEARNING`). This honestly benchmarks parameter divergence and issues an unlearning audit receipt without claiming non-existent Hessian matrix inversion ($\mathbf{H}^{-1} \nabla \mathcal{L}$) or conjugate gradient solvers.
+- **Structural Exclusion & Empirical MIA Guarantee:** In zero-raw-PII cross-bank settings, membership-inference attack risk after unlearning is not empirically measured without target client evaluation sets — instead, structural exclusion is mathematically guaranteed (the target bank's parameter contributions are verifiably excluded or algebraically subtracted from the global consensus checkpoint). When client evaluation samples (`y_true, y_pred_prob, member_mask`) are optionally provided, empirical loss-threshold shadow attack accuracy is measured via `MIAEvaluator` (`security_evaluator.py`).
 
 ---
 

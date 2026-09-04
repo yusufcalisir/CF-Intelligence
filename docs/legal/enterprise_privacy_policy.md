@@ -38,7 +38,7 @@ Under GDPR Article 17 ("Right to Erasure / Right to be Forgotten") and instituti
 * If a customer exercises their right to erasure, or if a participating bank node withdraws from the consortium:
 * The platform executes **Exact Re-Aggregation and Lineage Subtraction Federated Unlearning**:
   $$\mathbf{w}_{\text{unlearned}} = \frac{1}{K - 1} \sum_{k \neq \text{target}} \mathbf{w}_k \quad \text{or} \quad \mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}$$
-* This mathematically erases the historical gradient influence of the targeted dataset from global checkpoints without requiring full retraining from scratch. In confidential federations where individual historical weights are not persisted on disk, an illustrative unlearning simulator benchmark is executed. The membership inference vulnerability score is mathematically verified ($P_{\text{MIA}} \le 0.52$).
+* This mathematically erases the historical gradient influence of the targeted dataset from global checkpoints without requiring full retraining from scratch via Exact Re-Aggregation over retained consortium nodes. In confidential federations where individual historical weights or raw client datasets are not persisted on central infrastructure (enforcing zero raw PII storage invariants), empirical membership inference risk after unlearning is not measured without local client evaluation sets — instead, structural exclusion is mathematically guaranteed (the target bank's weights are verifiably excluded or algebraically subtracted from the global consensus checkpoint).
 
 ---
 

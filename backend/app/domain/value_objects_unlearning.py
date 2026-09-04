@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-import numpy as np
+if TYPE_CHECKING:
+    import numpy as np
 
 
 class UnlearningMethod(StrEnum):
@@ -41,7 +42,7 @@ class FederatedUnlearningResult:
     unlearned_model_l2_norm: float
     parameter_drift_delta: float
     hessian_spectral_radius: float
-    mia_membership_probability: float  # <=0.52 indicates indistinguishable from random guessing
+    mia_membership_probability: float | None  # Genuine MIAEvaluator empirical result, or None if evaluation samples not provided
     execution_time_ms: float
     erasure_verified: bool
     lineage_hash: str
