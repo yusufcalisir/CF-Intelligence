@@ -69,3 +69,56 @@ def test_tenant_metering_and_quota_enforcement() -> None:
     assert summary["daily_inferences"] == 5
     assert summary["monthly_fl_rounds"] == 1
     assert summary["estimated_cost_usd"] > 0
+
+
+def test_tenant_metering_api_quota_enforcement_429() -> None:
+    """Test that requests exceeding configured tenant quota are rejected with HTTP 429 at API boundary."""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from app.application.services.tenant_metering import (
+        TenantQuotaLimits,
+        get_tenant_metering_service,
+    )
+    from app.presentation.routers.predict import router as predict_router
+
+    app = FastAPI()
+    app.include_router(predict_router)
+    client = TestClient(app)
+    metering = get_tenant_metering_service()
+
+    # Configure low quota for test tenant bank_metered
+    tenant = "bank_metered"
+    metering.set_quota_limits(tenant, TenantQuotaLimits(max_daily_inferences=2))
+    # Reset usage
+    usage = metering.get_usage(tenant)
+    usage.daily_inferences = 0
+
+    headers = {"X-Tenant-ID": tenant, "X-Bank-ID": tenant}
+    payload = {
+        "transaction_id": "tx_test_metering_001",
+        "account_id": "acc_test_123",
+        "amount": 100.0,
+        "currency": "EUR",
+        "merchant_id": "merch_grocery_1",
+        "country": "US",
+        "device_id": "dev_test_abc",
+    }
+
+    # Request 1: within quota -> 200 OK
+    resp1 = client.post("/api/v1/score-transaction", json=payload, headers=headers)
+    assert resp1.status_code == 200
+
+    # Request 2: within quota -> 200 OK
+    payload["transaction_id"] = "tx_test_metering_002"
+    resp2 = client.post("/api/v1/score-transaction", json=payload, headers=headers)
+    assert resp2.status_code == 200
+
+    # Request 3: exceeded quota (2/2) -> 429 Too Many Requests
+    payload["transaction_id"] = "tx_test_metering_003"
+    resp3 = client.post("/api/v1/score-transaction", json=payload, headers=headers)
+    assert resp3.status_code == 429
+    assert "Daily inference quota exceeded" in resp3.json()["detail"]
+    assert resp3.headers.get("X-Quota-Exceeded") == "true"
+
+

@@ -194,5 +194,5 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 
 ### Regulatory Compliance Mappings for Institutional IT Committees:
 * **GDPR Article 6 & KVKK Article 5**: Lawful basis preserved; zero raw PII exits the bank data plane.
-* **GDPR Article 17 (Right to Erasure)**: First-Order Hessian Inversion unlearning erases historical gradient influence if an institution departs.
+* **GDPR Article 17 (Right to Erasure)**: Exact Re-Aggregation and Lineage Subtraction federated unlearning erases historical parameter contributions if an institution departs or exercises revocation.
 * **EU AI Act Article 10 & 15**: Certified bias auditing, disparate impact evaluation ($DI \ge 0.80$), and robust accuracy standards.

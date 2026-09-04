@@ -46,7 +46,7 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `services/entity_resolution.py`: Computes deterministic one-way HMAC-SHA256 privacy hashes for account and device identifiers.
 *   `services/explainability_service.py`: Computes SHAP attributions using `shap.KernelExplainer` with analytical fallbacks.
 *   `services/aml_agentic_copilot.py`: Autonomous BSA/AML RAG narrative generator synthesizing 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
-*   `services/federated_unlearning_engine.py`: Confidential federated unlearning engine performing First-Order Hessian Inversion and Sub-sampled Newton Steps parameter erasure for revoked banks.
+*   `services/federated_unlearning_engine.py`: Confidential federated unlearning engine performing Exact Re-Aggregation across retained participants and Lineage Subtraction parameter erasure for revoked or departing banks without retraining from scratch.
 *   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, and Canary Gates.
 *   `services/connector_diagnostics_service.py`: Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
 

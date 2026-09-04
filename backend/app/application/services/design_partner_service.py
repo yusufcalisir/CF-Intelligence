@@ -135,7 +135,7 @@ class DesignPartnerPilotService:
                 "standard": "Right to Erasure & Unlearning",
                 "clause": "GDPR Art 17 (Right to be Forgotten)",
                 "status": "PASSED",
-                "evidence": "First-order Hessian inversion gradient unlearning engine verified.",
+                "evidence": "Exact Re-Aggregation and Lineage Subtraction unlearning engine verified.",
             },
         ]
 

@@ -179,7 +179,7 @@ export default function SecurityPage() {
 
   // Confidential Unlearning state
   const [unlearnBankId, setUnlearnBankId] = useState('bank_gamma');
-  const [unlearnMethod, setUnlearnMethod] = useState('FIRST_ORDER_HESSIAN_INVERSION');
+  const [unlearnMethod, setUnlearnMethod] = useState('EXACT_REAGGREGATION');
   const [isUnlearningLoading, setIsUnlearningLoading] = useState(false);
   const [unlearnResult, setUnlearnResult] = useState<{
     target_bank_id: string;
@@ -1101,12 +1101,12 @@ export default function SecurityPage() {
                     <span>♻️ Bank Revocation & Gradient Erasure Console</span>
                   </h3>
                   <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-purple-500/15 text-purple-400 border border-purple-500/30 font-mono">
-                    FIRST-ORDER HESSIAN INVERSION
+                    EXACT RE-AGGREGATION
                   </span>
                 </div>
 
                 <p className="text-xs text-[var(--color-text-muted)] leading-relaxed">
-                  Erases historical parameter contributions of an evicted or compromised bank from live PyTorch model checkpoints using <strong>Sub-sampled Newton Steps (H⁻¹ ∇L)</strong> without retraining from scratch.
+                  Erases historical parameter contributions of an evicted or compromised bank from live PyTorch model checkpoints using <strong>Exact Re-Aggregation across retained participants</strong> without full retraining from scratch.
                 </p>
 
                 <div className="space-y-3">
@@ -1130,9 +1130,9 @@ export default function SecurityPage() {
                         onChange={(e) => setUnlearnMethod(e.target.value)}
                         className="w-full px-2.5 py-1.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-xs font-mono"
                       >
-                        <option value="FIRST_ORDER_HESSIAN_INVERSION">First-Order Hessian Inversion</option>
-                        <option value="SUB_SAMPLED_NEWTON_STEPS">Sub-sampled Newton Steps</option>
+                        <option value="EXACT_REAGGREGATION">Exact Re-Aggregation (Retained Clients)</option>
                         <option value="EXACT_LINEAGE_SUBTRACTION">Exact Lineage Subtraction</option>
+                        <option value="SIMULATED_UNLEARNING">Standalone Illustrative Simulator</option>
                       </select>
                     </div>
                   </div>
@@ -1142,14 +1142,14 @@ export default function SecurityPage() {
                     disabled={isUnlearningLoading}
                     className="w-full py-2 bg-gradient-to-r from-red-600 to-purple-600 hover:from-red-500 hover:to-purple-500 text-white font-bold text-xs rounded-lg transition-all shadow-md shadow-red-600/20 cursor-pointer disabled:opacity-50"
                   >
-                    {isUnlearningLoading ? '⏳ Executing Hessian Inversion Erasure...' : '⚡ Trigger Model Weight Erasure'}
+                    {isUnlearningLoading ? '⏳ Executing Weight Erasure...' : '⚡ Trigger Model Weight Erasure'}
                   </button>
                 </div>
 
                 <div className="space-y-2 text-xs pt-2">
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
-                    <span className="text-[var(--color-text-muted)]">Solver Method</span>
-                    <span className="font-mono font-bold text-indigo-300">Conjugate Gradient (H⁻¹ v)</span>
+                    <span className="text-[var(--color-text-muted)]">Unlearning Mechanism</span>
+                    <span className="font-mono font-bold text-indigo-300">Retained Consensus Re-aggregation</span>
                   </div>
                   <div className="flex justify-between p-2.5 rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)]">
                     <span className="text-[var(--color-text-muted)]">Target MIA Risk Threshold</span>
@@ -1185,7 +1185,7 @@ export default function SecurityPage() {
                         <span className="text-amber-400 font-bold">{unlearnResult.parameter_drift_delta.toFixed(4)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
-                        <span className="text-[var(--color-text-muted)]">Hessian Spectral Radius (λ_max):</span>
+                        <span className="text-[var(--color-text-muted)]">Spectral Radius Bound (λ_max):</span>
                         <span className="text-purple-300 font-bold">{unlearnResult.hessian_spectral_radius.toFixed(3)}</span>
                       </div>
                       <div className="p-2.5 rounded bg-black/40 border border-[var(--color-border)] flex justify-between">
@@ -1195,7 +1195,7 @@ export default function SecurityPage() {
                     </div>
                   ) : (
                     <div className="p-6 text-center text-xs text-[var(--color-text-muted)] border border-dashed border-[var(--color-border)] rounded-xl">
-                      Select an evicted bank and click <strong>Trigger Model Weight Erasure</strong> to execute Hessian inversion parameter removal.
+                      Select an evicted bank and click <strong>Trigger Model Weight Erasure</strong> to execute exact consensus unlearning or illustrative simulation.
                     </div>
                   )}
                 </div>

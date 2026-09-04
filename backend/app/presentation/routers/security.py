@@ -306,18 +306,18 @@ _unlearning_engine = FederatedUnlearningEngine()
 
 class UnlearnBankRequest(BaseModel):
     target_bank_id: str = "bank_gamma"
-    unlearning_method: str = UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION.value
+    unlearning_method: str = UnlearningMethod.EXACT_REAGGREGATION.value
     start_round: int = 1
     end_round: int = 42
 
 
 @router.post("/unlearn")
 async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
-    """Trigger exact or approximate federated model weight unlearning for an evicted bank."""
+    """Trigger exact federated model weight unlearning or simulated baseline for an evicted bank."""
     method_enum = (
         UnlearningMethod(req.unlearning_method)
         if req.unlearning_method in UnlearningMethod._value2member_map_
-        else UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION
+        else UnlearningMethod.EXACT_REAGGREGATION
     )
     res = _unlearning_engine.unlearn_bank_contributions(
         target_bank_id=req.target_bank_id,
@@ -335,6 +335,7 @@ async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
         "erasure_verified": res.erasure_verified,
         "lineage_hash": res.lineage_hash,
         "audit_log": res.audit_log,
+        "retained_banks": res.retained_banks,
     }
 
 
@@ -346,7 +347,7 @@ async def get_unlearning_status() -> dict[str, Any]:
         "supported_methods": [m.value for m in UnlearningMethod],
         "total_unlearning_runs": _unlearning_engine.unlearning_runs_count,
         "target_mia_threshold": 0.52,
-        "hessian_inversion_solver": "Conjugate Gradient (H^-1 v)",
+        "unlearning_mechanism": "Exact Re-aggregation / Lineage Subtraction",
     }
 
 

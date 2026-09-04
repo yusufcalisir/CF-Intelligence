@@ -158,3 +158,91 @@ def test_support_diagnostic_bundle_compilation_and_pii_redaction(tmp_path: Path)
     assert bundle.bundle_id.startswith("diag_")
     assert len(bundle.checksum_sha256) == 64
     assert Path(bundle.bundle_filepath).exists()
+
+
+def test_comprehensive_pii_redaction_matrix() -> None:
+    """Assert all PII categories from the Phase 6 audit matrix are redacted."""
+    compiler = SupportDiagnosticCompiler()
+
+    # Matrix items:
+    # 1. Email
+    email_sample = "Security notification sent to analyst.jane@securebank.com."
+    redacted_email, n_e = compiler.redact_pii_with_count(email_sample)
+    assert "analyst.jane@securebank.com" not in redacted_email
+    assert n_e == 1
+
+    # 2. Turkish IBAN
+    tr_iban_sample = "Funds cleared through TR100000000000000000000001."
+    redacted_tr, n_tr = compiler.redact_pii_with_count(tr_iban_sample)
+    assert "TR100000000000000000000001" not in redacted_tr
+    assert n_tr == 1
+
+    # 3. German/Generic International IBAN (Phase 6 audit finding)
+    de_iban_sample = "Target clearing IBAN DE89370400440532013000 confirmed."
+    redacted_de, n_de = compiler.redact_pii_with_count(de_iban_sample)
+    assert "DE89370400440532013000" not in redacted_de
+    assert n_de == 1
+
+    # 4. Payment Card PAN (Luhn-validated Visa number)
+    pan_sample = "Transaction on card 4532015112830366 processed at POS."
+    redacted_pan, n_pan = compiler.redact_pii_with_count(pan_sample)
+    assert "4532015112830366" not in redacted_pan
+    assert n_pan == 1
+
+    # 5. Non-card 16-digit sequence with invalid Luhn checksum (should not false positive)
+    non_card_sample = "Audit event identifier 1111222233334445 logged."
+    redacted_non_card, _ = compiler.redact_pii_with_count(non_card_sample)
+    assert "1111222233334445" in redacted_non_card
+
+    # 6. Bank Account Numbers (Prefixed and Labeled)
+    acc_sample = "Debtor account ACC_884719203 transferred to account: 991827364."
+    redacted_acc, n_acc = compiler.redact_pii_with_count(acc_sample)
+    assert "ACC_884719203" not in redacted_acc
+    assert "991827364" not in redacted_acc
+    assert n_acc == 2
+
+    # 7. Phone Numbers (Turkish and International)
+    phone_sample = "Customer hotline: +90 555 123 4567, backup line: +1 555 987 6543."
+    redacted_phone, n_phone = compiler.redact_pii_with_count(phone_sample)
+    assert "+90 555 123 4567" not in redacted_phone
+    assert "+1 555 987 6543" not in redacted_phone
+    assert n_phone >= 2
+
+    # 8. Contextual Customer Name (Heuristic)
+    name_sample = "Incident reported by Customer Name: John Doe during session."
+    redacted_name, n_name = compiler.redact_pii_with_count(name_sample)
+    assert "John Doe" not in redacted_name
+    assert n_name == 1
+
+
+def test_compile_diagnostic_bundle_with_real_log_source(tmp_path: Path) -> None:
+    """Assert compile_diagnostic_bundle processes real multi-line log files with true redaction counts."""
+    compiler = SupportDiagnosticCompiler()
+
+    log_file = tmp_path / "raw_app.log"
+    log_lines = [
+        "2026-09-04 10:00:01 INFO [Auth] User user@bank.com authenticated from 10.0.0.1",
+        "2026-09-04 10:00:02 INFO [Tx] Originating account ACC_112233445 sent $500",
+        "2026-09-04 10:00:03 INFO [Swift] Routing to DE89370400440532013000",
+        "2026-09-04 10:00:04 INFO [Card] Pre-auth on PAN 4532015112830366 accepted",
+        "2026-09-04 10:00:05 INFO [CRM] Ticket opened for Customer: Alice Smith",
+    ]
+    log_file.write_text("\n".join(log_lines), encoding="utf-8")
+
+    bundle = compiler.compile_diagnostic_bundle(
+        output_dir=tmp_path / "bundles",
+        log_source=log_file,
+        redact_pii=True,
+    )
+
+    assert bundle.redacted_logs_count == 5
+    payload = json.loads(Path(bundle.bundle_filepath).read_text(encoding="utf-8"))
+    assert payload["redacted_elements_count"] == 5
+
+    sanitized = payload["sanitized_logs"]
+    assert "user@bank.com" not in sanitized
+    assert "ACC_112233445" not in sanitized
+    assert "DE89370400440532013000" not in sanitized
+    assert "4532015112830366" not in sanitized
+    assert "Alice Smith" not in sanitized
+

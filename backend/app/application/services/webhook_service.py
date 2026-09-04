@@ -4,8 +4,12 @@
 from __future__ import annotations
 
 import hmac
+import ipaddress
 import json
 import logging
+import socket
+import urllib.parse
+from urllib.parse import urlparse
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -48,7 +52,10 @@ class WebhookDeliveryPayload:
 
 
 class WebhookService:
-    """Manages developer webhook subscriptions and HMAC-SHA256 payload signing."""
+    """Manages developer webhook subscriptions, HMAC-SHA256 payload signing,
+
+    receiver signature verification, and SSRF-hardened payload dispatch.
+    """
 
     def __init__(self) -> None:
         self._subscriptions: dict[str, list[WebhookSubscription]] = {}
@@ -59,7 +66,16 @@ class WebhookService:
         target_url: str,
         events: list[WebhookEventType],
     ) -> WebhookSubscription:
-        """Registers a developer webhook subscription endpoint and generates a secret key."""
+        """Registers a developer webhook subscription endpoint and generates a secret key.
+
+        Validates target URL upfront to reject dangerous SSRF targets (private IPs, loopback,
+        cloud metadata endpoints).
+        """
+        if not self.validate_target_url(target_url):
+            raise ValueError(
+                f"Invalid or disallowed webhook target URL (SSRF protection rejected: {target_url})"
+            )
+
         subscription_id = f"sub_{uuid.uuid4().hex[:8]}"
         secret_key = f"whsec_{uuid.uuid4().hex[:16]}"
 
@@ -92,6 +108,31 @@ class WebhookService:
             digestmod="sha256",
         ).hexdigest()
         return f"sha256={signature}"
+
+    @staticmethod
+    def verify_signature(
+        payload_bytes: bytes,
+        received_signature: str,
+        secret_key: str,
+    ) -> bool:
+        """Verifies that an incoming webhook signature matches the expected HMAC-SHA256 digest.
+
+        Uses constant-time comparison (hmac.compare_digest) to prevent timing attacks.
+        Supports both 'sha256=<hex>' format and raw hex signature strings.
+        """
+        if not received_signature or not secret_key:
+            return False
+        clean_sig = received_signature.strip()
+        expected_raw = hmac.new(
+            secret_key.encode("utf-8"),
+            payload_bytes,
+            digestmod="sha256",
+        ).hexdigest()
+        expected_prefixed = f"sha256={expected_raw}"
+
+        if clean_sig.startswith("sha256="):
+            return hmac.compare_digest(clean_sig, expected_prefixed)
+        return hmac.compare_digest(clean_sig, expected_raw)
 
     def dispatch_event(
         self,
@@ -132,12 +173,88 @@ class WebhookService:
         return delivered
 
     @staticmethod
-    def validate_target_url(target_url: str) -> bool:
-        """Validates that webhook target URL has valid HTTP/HTTPS scheme."""
-        if not target_url or not isinstance(target_url, str):
+    def validate_target_url(url: str) -> bool:
+        """Validates webhook target URL to prevent Server-Side Request Forgery (SSRF).
+
+        Enforces:
+        1. Scheme validation: strictly 'http' or 'https'.
+        2. Direct hostname blocking: rejects localhost, .local, .internal, .lan, .corp, .test, .onion.
+        3. IP literal inspection: blocks private (RFC 1918), loopback, link-local, multicast,
+           reserved, and unspecified IP literals.
+        4. DNS resolution validation: resolves hostname via socket.getaddrinfo and inspects all
+           resolved IP addresses to prevent DNS rebinding to internal/private IPs.
+        5. Fail-Closed Security Policy: if DNS resolution fails (socket.gaierror, socket.herror,
+           OSError), the URL is strictly REJECTED (returns False). Never falls back to allow-by-default
+           hostname heuristics, preventing DNS-evasion SSRF bypasses.
+        """
+        if not url or not isinstance(url, str):
             return False
-        clean = target_url.strip().lower()
-        return clean.startswith(("http://", "https://"))
+
+        try:
+            parsed = urlparse(url.strip())
+        except Exception:
+            return False
+
+        # 1. Scheme validation
+        if parsed.scheme.lower() not in ("http", "https"):
+            return False
+
+        hostname = parsed.hostname
+        if not hostname:
+            return False
+
+        host_lower = hostname.lower()
+
+        # 2. Block well-known internal/local hostnames directly
+        if host_lower in ("localhost", "localhost.localdomain") or host_lower.endswith(
+            (".local", ".internal", ".lan", ".corp", ".test", ".onion")
+        ):
+            return False
+
+        # 3. Check if hostname is an IP literal
+        try:
+            ip_str = host_lower.strip("[]")
+            ip_obj = ipaddress.ip_address(ip_str)
+            if (
+                ip_obj.is_private
+                or ip_obj.is_loopback
+                or ip_obj.is_link_local
+                or ip_obj.is_reserved
+                or ip_obj.is_multicast
+                or ip_obj.is_unspecified
+            ):
+                return False
+            return True
+        except ValueError:
+            pass
+
+        # 4. DNS resolution validation (DNS rebinding / resolving to internal IPs)
+        # Fail-closed: on resolution failure (socket.gaierror, socket.herror, OSError), reject URL immediately
+        try:
+            port = parsed.port or (443 if parsed.scheme.lower() == "https" else 80)
+            addr_info = socket.getaddrinfo(hostname, port, type=socket.SOCK_STREAM)
+            if not addr_info:
+                return False
+            for entry in addr_info:
+                sockaddr = entry[4]
+                ip_obj = ipaddress.ip_address(sockaddr[0])
+                if (
+                    ip_obj.is_private
+                    or ip_obj.is_loopback
+                    or ip_obj.is_link_local
+                    or ip_obj.is_reserved
+                    or ip_obj.is_multicast
+                    or ip_obj.is_unspecified
+                ):
+                    return False
+            return True
+        except (socket.gaierror, socket.herror, OSError) as exc:
+            logger.warning(
+                "SSRF validation rejected URL '%s': DNS resolution failed (fail-closed policy enforced): %s",
+                url,
+                exc,
+            )
+            return False
 
     async def deliver_payload_async(
         self,

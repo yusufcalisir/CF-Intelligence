@@ -40,7 +40,7 @@ The parties agree that all data leaving the Customer's on-premises perimeter or 
 3. **Sub-processors Restriction (GDPR Art. 28.3.d)**:
    The Processor shall not engage any third-party sub-processor for gradient aggregation without prior written consent from the Customer's Information Security Committee.
 4. **Data Deletion & Federated Unlearning (GDPR Art. 17 & 28.3.g)**:
-   Upon Customer termination or withdrawal from the consortium, the Processor shall execute **First-Order Hessian Inversion Federated Unlearning** to mathematically erase the Customer's historical gradient influence from the global model checkpoint within 48 hours.
+   Upon Customer termination or withdrawal from the consortium, the Processor shall execute **Exact Re-Aggregation and Lineage Subtraction Federated Unlearning** to mathematically erase the Customer's historical gradient influence from the global model checkpoint within 48 hours.
 5. **Security Audit & Verification Cooperation (GDPR Art. 28.3.h)**:
    The Processor shall maintain continuous automated audit logs chained via SHA-256 and make available real-time programmatic SOC 2 compliance evidence endpoints (`POST /v1/compliance/soc2-evidence`).
 

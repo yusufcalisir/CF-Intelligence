@@ -17,7 +17,12 @@ The Automated Retention & Erasure Engine enforces Time-To-Live (TTL) data purgin
 
 ## ⚖️ GDPR Article 17 Right-to-be-Forgotten Protocol
 
-When a customer submits a erasure request under GDPR Article 17:
+When a customer or institution submits an erasure request under GDPR Article 17:
 1. `execute_gdpr_right_to_be_forgotten` is invoked with the HMAC-SHA256 hashed entity identifier (`entity_id_hash`).
-2. All linked tenant records cross transaction tables, feature stores, and relationship graphs are zeroized.
-3. A SHA-256 signed `ErasureAuditRecord` is generated and committed to the immutable compliance ledger.
+2. **Physical Database Deletions**: Executes genuine SQL `DELETE` queries across:
+   - `EntityModel`: Hard-deletes matching entity rows (filtered by `bank_id` and `privacy_id`/`id`).
+   - `RelationshipModel`: Hard-deletes graph edges where `source_entity_id` or `target_entity_id` matches.
+   - `AlertModel`: Hard-deletes transaction alerts matching `transaction_id` or alert `id` for the tenant.
+3. **TTL Purging Wiring**: `purge_expired_records` executes SQL `DELETE` queries for `AlertModel` (`TRANSACTION_LOGS`, `INFERENCE_AUDITS`), `RelationshipModel` (`GRAPH_EDGES`), and `SharedIntelligenceModel` (`EXPLAINABILITY_REPORTS`).
+4. **Scope Limitation**: Other data categories (raw CSV/Parquet uploads, cases in `CaseModel`, SAR draft XML files, and model gradient checkpoints) are not yet wired to automated database purge tasks and remain governed by external storage and statutory retention rules.
+5. A SHA-256 signed `ErasureAuditRecord` is generated and committed to the immutable compliance ledger with actual rowcounts of erased database records.

@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
+
+import numpy as np
 
 
 class UnlearningMethod(StrEnum):
     """Supported federated model unlearning & gradient erasure strategies."""
 
+    EXACT_REAGGREGATION = "EXACT_REAGGREGATION"
     EXACT_LINEAGE_SUBTRACTION = "EXACT_LINEAGE_SUBTRACTION"
+    SIMULATED_UNLEARNING = "SIMULATED_UNLEARNING"
+    # Legacy aliases for API backward compatibility
     FIRST_ORDER_HESSIAN_INVERSION = "FIRST_ORDER_HESSIAN_INVERSION"
     SUB_SAMPLED_NEWTON_STEPS = "SUB_SAMPLED_NEWTON_STEPS"
 
@@ -20,7 +25,7 @@ class FederatedUnlearningRequest:
     """Request payload for triggering federated model unlearning for an evicted bank."""
 
     target_bank_id: str
-    unlearning_method: UnlearningMethod = UnlearningMethod.FIRST_ORDER_HESSIAN_INVERSION
+    unlearning_method: UnlearningMethod = UnlearningMethod.EXACT_REAGGREGATION
     start_round: int = 1
     end_round: int = 42
     verification_threshold_mia: float = 0.52
@@ -36,8 +41,10 @@ class FederatedUnlearningResult:
     unlearned_model_l2_norm: float
     parameter_drift_delta: float
     hessian_spectral_radius: float
-    mia_membership_probability: float  # <0.52 indicates indistinguishable from random guessing
+    mia_membership_probability: float  # <=0.52 indicates indistinguishable from random guessing
     execution_time_ms: float
     erasure_verified: bool
     lineage_hash: str
     audit_log: list[dict[str, Any]]
+    retained_banks: list[str] = field(default_factory=list)
+    unlearned_weights: np.ndarray | None = None

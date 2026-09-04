@@ -713,6 +713,18 @@ Implements zero-sum pairwise vector perturbation based on the Bonawitz et al. pr
 
 - **Shamir (t, n) Threshold Secret Sharing (`shamir_engine.py`):** Shares secret keys across Galois prime field $\mathbb{Z}_p$ to reconstruct dropout masks if a node disconnects during aggregation.
 
+### 6.3 Confidential Federated Unlearning (GDPR Art. 17) (`federated_unlearning_engine.py`)
+Provides mathematically sound parameter erasure when a participating bank withdraws from the consortium or when an entity exercises GDPR Article 17 ("Right to Erasure / Right to be Forgotten"):
+- **Exact Re-Aggregation:** Recomputes the global model parameters by evaluating FedAvg strictly over the stored model parameter contributions of all retained consortium members, excluding the targeted departing bank:
+  
+  $$\mathbf{w}_{\text{unlearned}} = \frac{1}{K - 1} \sum_{k \neq \text{target}} \mathbf{w}_k$$
+
+- **Lineage Subtraction:** When global consensus weights and the target bank's contribution are known from the immediate prior round, algebraically subtracts the target bank's influence without requiring full retraining from scratch:
+  
+  $$\mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}$$
+
+- **Illustrative Simulator Fallback:** In confidential production federations with zero-knowledge secure aggregation where individual client parameter vectors are never persisted to disk (enforcing zero-raw-PII storage invariants), unlearning requests executed without stored gradient history run via an **illustrative simulator** (`UnlearningMethod.SIMULATED_UNLEARNING`). This honestly benchmarks parameter divergence and issues an unlearning audit receipt without claiming non-existent Hessian matrix inversion ($\mathbf{H}^{-1} \nabla \mathcal{L}$) or conjugate gradient solvers.
+
 ---
 
 ## 7. Byzantine Poisoning Defense & Adversarial Robustness
@@ -860,9 +872,10 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
   - `X-Frame-Options: DENY`: Blocks clickjacking.
   - `Referrer-Policy: strict-origin-when-cross-origin`: Minimizes referrer leakage.
 
-### 10.6 Real-Time Scoring Gateway & SLA Monitoring
+### 10.6 Real-Time Scoring Gateway, Tenant Quotas & SLA Monitoring
 
 - **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-100ms latency.
+- **Tenant Quota Enforcement (`TenantMeteringService` & `dependencies.py`):** The `enforce_tenant_quota` dependency actively intercepts requests to `/api/v1/predict` and `/api/v1/score-transaction`, tracking monthly quota consumption per tenant tier (e.g., 100,000 monthly calls) and recording usage metrics (`record_inference`). When an institution breaches its quota ceiling, the gateway rejects the request with `HTTP 429 Too Many Requests` (`detail: "Tenant API quota limit exceeded"`). *Scope Note:* Metering is actively wired and enforced at the high-throughput inference gateway endpoints, rather than universally wrapping every internal admin or diagnostic probe.
 - **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
 
 ### 10.7 STRIDE Threat Model & Attack Surface Summary
@@ -891,13 +904,25 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
   - `opacus >= 1.5.4`: Resolves PyTorch 2.4 gradient tensor compatibility and guarantees mathematical DP noise precision.
 - **Enterprise npm Hygiene:** Frontend dependencies audit returns `0 vulnerabilities` across 38 direct and indirect packages.
 
+### 10.9 Developer Webhook Perimeter & Multi-Layer SSRF Defense (`webhook_service.py` & `webhook_gateway.py`)
+
+The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_PROMOTED`, `CASE_RESOLVED`) to external bank subscriber endpoints while maintaining strict SSRF perimeter isolation:
+- **Multi-Stage SSRF Validation (`validate_target_url`):** Enforced at both webhook registration (`POST /v1/webhooks/subscriptions`) and pre-dispatch delivery (`deliver_payload_async`):
+  - *Scheme Validation:* Restricts allowed protocols strictly to `http` and `https` (rejects `file://`, `ftp://`, `gopher://`).
+  - *IP-Range Blocking:* Blocks loopback (`127.0.0.0/8`, `::1`), link-local (`169.254.0.0/16`, `fe80::/10`), private RFC 1918 subnets (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`), multicast, and reserved IP literals.
+  - *DNS Resolution Inspection:* Resolves candidate hostnames via `socket.getaddrinfo` and inspects all resolved IP addresses against private/loopback/cloud metadata boundaries to prevent DNS rebinding.
+  - *Fail-Closed Security Policy:* If DNS resolution fails (`socket.gaierror`, `socket.herror`, `OSError`), the URL is strictly REJECTED (returns `False`). The gateway fails closed rather than allowing unverified domains through.
+- **Receiver-Side HMAC Signature Verification:** Payloads are signed with HMAC-SHA256 (`X-CFI-Signature-256`). Subscribers verify incoming webhooks using constant-time comparison (`WebhookService.verify_signature` with `hmac.compare_digest`) or via the `POST /v1/webhooks/verify` endpoint.
+- **Non-Blocking Delivery with Bounded Timeouts:** Deliveries run asynchronously with a strict 3.0s timeout and exponential backoff retry.
+
 ---
 
 ## 11. Human-in-the-Loop Workbench & Regulatory Reporting
 
 - **6-Stage Case Workbench (`case_workbench.py`):** Manages alert review lifecycles (`NEW` $\to$ `ASSIGNED` $\to$ `UNDER_INVESTIGATION` $\to$ `PENDING_SECOND_SIGNATURE` $\to$ `RESOLVED_CONFIRMED_FRAUD` / `RESOLVED_FALSE_POSITIVE`, with optional `ESCALATED`) enforcing Four-Eyes dual supervisor signature authorization. Resolving a case strictly requires two distinct supervisor identities (`SIG_SUPERVISOR_<ID1>`, `SIG_SUPERVISOR_<ID2>`); single signatures and duplicate signers are cryptographically rejected.
 - **FinCEN BSA SAR XML Compiler (`regulatory_reporter.py`):** Generates compliant Suspicious Activity Report (SAR) XML documents validated against the official FinCEN BSA XML Schema 2.0 (`backend/schemas/FinCEN_SAR_2.0.xsd`) using `lxml.etree.XMLSchema`.
-- **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records.
+- **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
+- **Support Diagnostics & PII Redaction (`support_diagnostics.py`):** Generates sanitized diagnostics bundles from multi-line log sources (strings, files, lists) prior to support export. Redacts international IBANs (generic format matching 2-letter country code + 2 check digits + alphanumeric account string), payment card numbers (validated via ISO/IEC 7812 Luhn MOD-10 checksum algorithm), Turkish/Generic National IDs (11-digit algorithmic validation), raw account numbers, phone numbers (international and domestic formats), and contextual customer names (`Customer Name: [REDACTED]`). *Scope Note:* Name redaction uses deterministic keyword-prefixed heuristic regex patterns (e.g. `Customer Name:`, `Account Holder:`, `Client Name:`), not true Named Entity Recognition (NER) ML models.
 
 ---
 
@@ -910,7 +935,7 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
   - *Byzantine Non-Finite Isolation:* Immediate client quarantining on `NaN`/`Inf` model updates and champion fallback in `fl_engine.py` and `spectral_defense.py`.
   - *Universal Safe Evaluation:* Centralized `safe_roc_auc_score` and `safe_pr_auc_score` preventing single-class / empty-array evaluation crashes.
   - *Multi-Tier Redis Caching:* In-memory LRU fast paths ($\sim 0.001\text{ms}$) with 0.1s socket connect timeouts and graceful degradation to local DB/PyTorch.
-  - *Developer Webhook Perimeter:* SSRF URL scheme sanitization, HMAC-SHA256 signature headers, and non-blocking bounded 3.0s timeouts (`deliver_payload_async`).
+  - *Developer Webhook Perimeter:* Multi-layer SSRF protection (scheme validation + IP-range blocking for loopback/link-local/RFC 1918/multicast + fail-closed DNS resolution validation at registration and pre-dispatch), constant-time HMAC-SHA256 signature verification (`verify_signature`), and non-blocking bounded 3.0s delivery timeouts (`deliver_payload_async`).
   - *Graph Ego-Network Budget:* BFS traversal capped at 100 nodes max to prevent browser DOM and React Flow canvas thread freezing.
   - *Frontend Error Boundaries:* Complete UI tree isolation with dark-themed recovery cards eliminating White Screen of Death (WSOD) risks.
 

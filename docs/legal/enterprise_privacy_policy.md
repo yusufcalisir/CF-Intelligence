@@ -36,9 +36,9 @@ CF-Intelligence operates under a strict **Zero-Knowledge Privacy by Design** fra
 
 Under GDPR Article 17 ("Right to Erasure / Right to be Forgotten") and institutional departure clauses:
 * If a customer exercises their right to erasure, or if a participating bank node withdraws from the consortium:
-* The platform executes **First-Order Hessian Inversion Federated Unlearning**:
-  $$\mathbf{w}_{\text{unlearned}} = \mathbf{w}_{\text{global}} - \mathbf{H}^{-1} \nabla \mathcal{L}_{\text{evicted}}(\mathbf{w})$$
-* This mathematically erases the historical gradient influence of the targeted dataset from global checkpoints without requiring full retraining from scratch. The membership inference vulnerability score is mathematically verified ($P_{\text{MIA}} \le 0.52$).
+* The platform executes **Exact Re-Aggregation and Lineage Subtraction Federated Unlearning**:
+  $$\mathbf{w}_{\text{unlearned}} = \frac{1}{K - 1} \sum_{k \neq \text{target}} \mathbf{w}_k \quad \text{or} \quad \mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}$$
+* This mathematically erases the historical gradient influence of the targeted dataset from global checkpoints without requiring full retraining from scratch. In confidential federations where individual historical weights are not persisted on disk, an illustrative unlearning simulator benchmark is executed. The membership inference vulnerability score is mathematically verified ($P_{\text{MIA}} \le 0.52$).
 
 ---
 

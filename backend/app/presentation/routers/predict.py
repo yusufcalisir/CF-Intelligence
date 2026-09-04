@@ -15,7 +15,7 @@ import uuid
 from typing import Any
 
 import torch
-from fastapi import APIRouter, BackgroundTasks, Header, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
 from app.application.services.alert_service import AlertIntelligenceService
@@ -25,7 +25,13 @@ from app.application.services.model_registry import ModelEvaluationEngine, Model
 from app.application.services.model_service import NUM_FEATURES, ModelService
 from app.application.services.risk_engine import RiskScoringEngine
 from app.config import get_settings
-from app.dependencies import SessionDep, TenantDep, enforce_tenant_isolation
+from app.dependencies import (
+    SessionDep,
+    TenantDep,
+    enforce_tenant_isolation,
+    enforce_tenant_quota,
+    get_tenant_metering_service,
+)
 from app.infrastructure.security.rate_limiter import limiter
 
 logger = logging.getLogger(__name__)
@@ -272,6 +278,7 @@ async def predict_transaction(
     background_tasks: BackgroundTasks,
     x_api_key: str | None = Header(None, alias="X-API-Key"),
     caller_tenant: TenantDep = None,
+    metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> TransactionPredictResponse:
     """Evaluate a transaction in real-time.
 
@@ -281,6 +288,9 @@ async def predict_transaction(
     """
     if caller_tenant and payload.bank_id:
         enforce_tenant_isolation(caller_tenant, payload.bank_id)
+
+    # 0. Record metered inference for tenant quota tracking
+    get_tenant_metering_service().record_inference(metered_tenant, 1)
 
     # 1. Resolve cached active model instance
     try:
@@ -626,9 +636,13 @@ async def score_transaction(
     payload: ScoreTransactionRequest,
     x_bank_id: str | None = Header(None, alias="X-Bank-ID"),
     caller_tenant: TenantDep = None,
+    metered_tenant: str = Depends(enforce_tenant_quota),
 ) -> ScoreTransactionResponse:
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()
+
+    # Record metered inference for tenant quota tracking
+    get_tenant_metering_service().record_inference(metered_tenant, 1)
 
     # Derive canonical merchant category from merchant_id for risk engine lookup
     _merchant_id_lower = payload.merchant_id.lower()

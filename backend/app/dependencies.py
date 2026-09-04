@@ -7,7 +7,7 @@ dependencies. Keeps route handlers thin and testable.
 from collections.abc import AsyncGenerator
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.application.services.data_generator import DataGenerator
@@ -17,6 +17,10 @@ from app.application.services.metrics_service import MetricsService
 from app.application.services.model_service import ModelService
 from app.application.services.privacy_service import PrivacyService
 from app.application.services.simulation_service import SimulationService
+from app.application.services.tenant_metering import (
+    TenantMeteringService,
+    get_tenant_metering_service,
+)
 from app.config import Settings, get_settings
 from app.infrastructure.database import active_tenant, get_async_session
 from app.infrastructure.repositories.bank_repository import BankRepository
@@ -228,3 +232,38 @@ FLEngineDep = Annotated[FederatedLearningEngine, Depends(get_fl_engine)]
 
 # ── KMS ───────────────────────────────────────
 KMSServiceDep = Annotated[KMSService, Depends(get_kms_service)]
+
+# ── Tenant Metering & Quota Enforcement ───────
+TenantMeteringDep = Annotated[TenantMeteringService, Depends(get_tenant_metering_service)]
+
+
+async def enforce_tenant_quota(
+    request: Request,
+    tenant_id: TenantDep = None,
+    metering: TenantMeteringDep = None,
+) -> str:
+    """FastAPI dependency enforcing tenant resource quotas before request execution.
+
+    Extracts tenant identity and evaluates usage limits.
+    Raises HTTP 429 Too Many Requests if quota is exceeded.
+    """
+    if metering is None:
+        metering = get_tenant_metering_service()
+
+    target_tenant = (
+        tenant_id
+        or request.headers.get("X-Tenant-ID")
+        or request.headers.get("X-Bank-ID")
+        or getattr(request.state, "tenant_id", None)
+        or "bank_alpha"
+    )
+
+    allowed, reason = metering.check_quota(target_tenant, "INFERENCE")
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=reason,
+            headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
+        )
+    return target_tenant
+

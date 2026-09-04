@@ -56,7 +56,7 @@
      `kubectl label node bank-gamma-agent cfi.network/quarantine=true`.
   3. Revoke Vault PKI mTLS client certificate:
      `vault write pki/revoke serial_number=<GAMMA_CERT_SERIAL>`.
-  4. Initiate **First-Order Hessian Inversion Unlearning** to erase compromised gradient contributions from latest checkpoint.
+  4. Initiate **Exact Re-Aggregation and Lineage Subtraction Unlearning** to erase compromised gradient contributions from latest checkpoint.
 
 ---
 

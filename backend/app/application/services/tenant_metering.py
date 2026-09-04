@@ -113,3 +113,12 @@ class TenantMeteringService:
             "max_monthly_fl_rounds": limits.max_monthly_fl_rounds,
             "estimated_cost_usd": round(estimated_cost_usd, 2),
         }
+
+
+_shared_tenant_metering_service = TenantMeteringService()
+
+
+def get_tenant_metering_service() -> TenantMeteringService:
+    """Returns the singleton TenantMeteringService instance."""
+    return _shared_tenant_metering_service
+
