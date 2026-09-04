@@ -318,11 +318,11 @@ Cross-bank federated collaboration requires economic incentives (Shapley payout 
 
 ### Decision
 
-Implement on-chain automated payouts using an EVM Solidity smart contract (`ConsortiumIncentiveSettlement.sol`) integrated via Web3 (`smart_contract_driver.py`).
+Implement on-chain automated settlement using an EVM Solidity smart contract (`ConsortiumIncentiveSettlement.sol`) integrated via Web3 (`smart_contract_driver.py`). Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations.
 
 ### Rationale
 
-1. **Decentralized Trust**: Payouts are executed on-chain via smart contracts using 18-decimal wei fixed math, removing central coordinator manipulation.
+1. **Decentralized Trust**: Settlement is executed on-chain via smart contracts using 18-decimal wei fixed math, preventing double-claiming and verifying pool conservation.
 2. **Automated Quarantine**: Nodes with negative contribution ($SV_i \le -0.05$) or zero variance update attacks are quarantined on-chain (`setNodeQuarantine()`), freezing their wallet claims.
 3. **Immutable Audit Binding**: Settlement transaction hashes (`settlement_tx_hash`) and block numbers are recorded immutably in the SHA-256 audit ledger.
 

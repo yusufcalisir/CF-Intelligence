@@ -513,9 +513,9 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
             </span>
           </button>
         </div>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-emerald-400 uppercase tracking-widest">LIVE</span>
+        <div className="flex items-center gap-1.5 shrink-0 px-2 py-0.5 rounded-md bg-indigo-500/10 border border-indigo-500/20" title="Client-side interactive preview simulating real-time federated convergence">
+          <span className="h-1.5 w-1.5 rounded-full bg-indigo-400 animate-pulse" />
+          <span className="text-[8px] sm:text-[9px] font-mono font-bold text-indigo-300 uppercase tracking-wider">Interactive Simulation</span>
         </div>
       </div>
 
@@ -562,6 +562,10 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <div className="text-[7.5px] sm:text-[8px] font-mono text-slate-400 uppercase">Stream Speed</div>
                     <div className="text-xs sm:text-sm font-bold font-mono text-cyan-400 mt-0.5">1.4 GB/s</div>
                   </div>
+                </div>
+                <div className="flex items-center justify-between px-1 text-[7.5px] sm:text-[8px] font-mono text-slate-500">
+                  <span>* Illustrative simulation preview</span>
+                  <span className="text-indigo-400/70">Synthetic Convergence Ticker</span>
                 </div>
 
                 <div className="rounded-xl border border-white/6 overflow-hidden bg-white/2 min-w-0">
@@ -1034,6 +1038,7 @@ export default function LandingPage() {
   const [flRound, setFlRound] = useState(47);
   const [accuracy, setAccuracy] = useState(94.2);
 
+  // Illustrative client-side simulation ticker for interactive hero dashboard preview
   useEffect(() => {
     const t = setInterval(() => {
       setFlRound(p => p + 1);

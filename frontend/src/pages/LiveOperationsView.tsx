@@ -5,7 +5,7 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
-import { Settings2, FlaskConical, Zap, FileUp } from 'lucide-react';
+import { Settings2, FlaskConical, Zap, FileUp, AlertTriangle } from 'lucide-react';
 import ModelRegistryPanel from '../components/dashboard/ModelRegistryPanel';
 import FederatedTrainingAnimation from '../components/dashboard/FederatedTrainingAnimation';
 import ComplianceReportPanel from '../components/dashboard/ComplianceReportPanel';
@@ -72,7 +72,8 @@ export default function LiveOperationsView() {
   const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>('pending');
   const [roundHistory, setRoundHistory] = useState<RoundData[]>([]);
   const [isTraining, setIsTraining] = useState(false);
-  const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [isOfflineDemoMode, setIsOfflineDemoMode] = useState(false);
+  const offlineDemoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Dataset-aware training state ──────────────────────────────────────────
@@ -120,10 +121,12 @@ export default function LiveOperationsView() {
     let ws: WebSocket | null = null;
     let isCleanedUp = false;
 
-    const startMockTicker = () => {
-      setWsStatus('CONNECTED');
-      if (!mockIntervalRef.current) {
-        mockIntervalRef.current = setInterval(() => {
+    // Explicit fallback ticker executed strictly when WebSocket disconnects
+    const generateOfflineDemoTicker = () => {
+      setWsStatus('RECONNECTING');
+      setIsOfflineDemoMode(true);
+      if (!offlineDemoIntervalRef.current) {
+        offlineDemoIntervalRef.current = setInterval(() => {
           setGradientSubmissions((prev) => (prev >= 3 ? 1 : prev + 1));
           setChampionAuc((prev) => Math.min(0.99, parseFloat((prev + (Math.random() * 0.002 - 0.001)).toFixed(4))));
         }, 5000);
@@ -132,7 +135,16 @@ export default function LiveOperationsView() {
 
     try {
       ws = new WebSocket(getWsUrl());
-      ws.onopen = () => { if (!isCleanedUp) setWsStatus('CONNECTED'); };
+      ws.onopen = () => {
+        if (!isCleanedUp) {
+          setWsStatus('CONNECTED');
+          setIsOfflineDemoMode(false);
+          if (offlineDemoIntervalRef.current) {
+            clearInterval(offlineDemoIntervalRef.current);
+            offlineDemoIntervalRef.current = null;
+          }
+        }
+      };
       ws.onmessage = (event) => {
         if (isCleanedUp) return;
         try {
@@ -165,11 +177,11 @@ export default function LiveOperationsView() {
         if (ws && ws.readyState !== WebSocket.CLOSED) {
           try { ws.close(); } catch { /* ignore */ }
         }
-        if (!isCleanedUp) startMockTicker();
+        if (!isCleanedUp) generateOfflineDemoTicker();
       };
-      ws.onclose = () => { if (!isCleanedUp) startMockTicker(); };
+      ws.onclose = () => { if (!isCleanedUp) generateOfflineDemoTicker(); };
     } catch {
-      startMockTicker();
+      generateOfflineDemoTicker();
     }
 
     return () => {
@@ -178,7 +190,7 @@ export default function LiveOperationsView() {
         ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null;
         try { ws.close(); } catch { /* ignore */ }
       }
-      if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);
+      if (offlineDemoIntervalRef.current) clearInterval(offlineDemoIntervalRef.current);
     };
   }, []);
 
@@ -343,13 +355,22 @@ export default function LiveOperationsView() {
             <div className="flex items-center gap-2 flex-wrap">
               <span
                 className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 self-start sm:self-auto ${
-                  wsStatus === 'CONNECTED'
+                  wsStatus === 'CONNECTED' && !isOfflineDemoMode
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
                 }`}
               >
-                ● {wsStatus}
+                ● {isOfflineDemoMode ? 'OFFLINE' : wsStatus}
               </span>
+              {isOfflineDemoMode && (
+                <span
+                  id="offline-demo-mode-badge"
+                  className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
+                >
+                  <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+                  <span>Offline Demo Mode (Connection Lost — Simulated)</span>
+                </span>
+              )}
               {/* Dataset + mode badges */}
               <span
                 className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 border"
@@ -447,6 +468,16 @@ export default function LiveOperationsView() {
         initialDataset={selectedProfile.id}
         initialMode={trainingMode}
       />
+
+      {/* Offline Fallback Banner */}
+      {isOfflineDemoMode && (
+        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
+          <AlertTriangle size={15} className="text-amber-400 shrink-0" />
+          <span>
+            <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker — this data is illustrative and not live production telemetry.
+          </span>
+        </div>
+      )}
 
       {/* Top Telemetry KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

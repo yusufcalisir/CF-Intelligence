@@ -155,13 +155,19 @@ class DesignPartnerPilotService:
             cryptographic_guarantees=crypto_guarantees,
         )
 
-    def evaluate_real_benchmark(
+    def evaluate_reference_benchmark(
         self,
         dataset_name: str = "paysim",
         n_samples: int = 10_000,
         daily_volume: int = 100_000,
     ) -> dict[str, Any]:
-        """Runs a complete real-world benchmark evaluation with confusion matrix & cost reporting."""
+        """Runs calibrated synthetic reference benchmark evaluation for institutional pilot sandboxes.
+
+        Note: When multi-GB external benchmark datasets (e.g. PaySim 6.36M transactions or
+        IEEE-CIS 590k records) are not locally mounted on disk, this evaluates calibrated empirical
+        reference distributions to model institutional performance trade-offs without requiring
+        multi-hour offline training runs during interactive API sessions.
+        """
         from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
 
         # Load real/mock benchmark
@@ -291,3 +297,17 @@ class DesignPartnerPilotService:
                 for p in partitions
             ],
         }
+
+    def evaluate_real_benchmark(
+        self,
+        dataset_name: str = "paysim",
+        n_samples: int = 10_000,
+        daily_volume: int = 100_000,
+    ) -> dict[str, Any]:
+        """Backwards-compatibility alias for evaluate_reference_benchmark."""
+        return self.evaluate_reference_benchmark(
+            dataset_name=dataset_name,
+            n_samples=n_samples,
+            daily_volume=daily_volume,
+        )
+

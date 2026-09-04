@@ -37,11 +37,17 @@ export const BenchmarkHubPage: React.FC = () => {
     )
   );
 
-  const { data: benchmarkData } = useBenchmarkEvaluation(
+  const { data: benchmarkData, isLoading } = useBenchmarkEvaluation(
     selectedDataset,
     sampleSize,
     dailyVolume
   );
+
+  const fpLocal = benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily;
+  const fpFL = benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily;
+  const falseAlarmReductionPct = (fpLocal !== undefined && fpFL !== undefined && fpLocal > 0)
+    ? (((fpLocal - fpFL) / fpLocal) * 100).toFixed(1)
+    : null;
 
   const { data: readinessData } = usePilotReadinessChecklist(partnerName, 'EU/TR/US');
   const validatePiiMutation = useValidateDataIngestion();
@@ -168,6 +174,14 @@ export const BenchmarkHubPage: React.FC = () => {
       {/* Main Tab Content */}
       {activeTab === 'benchmarks' && (
         <div className="space-y-6">
+          {/* Institutional Benchmark Notice */}
+          <div className="flex items-center gap-2.5 px-4 py-2.5 rounded-xl bg-indigo-950/30 border border-indigo-500/20 text-indigo-300 text-xs">
+            <Sparkles className="w-4 h-4 text-indigo-400 shrink-0" />
+            <span>
+              <strong>Calibrated Reference Benchmarks:</strong> Metrics reflect calibrated empirical reference distributions for institutional pilot evaluation ({datasetDescriptions[selectedDataset]?.title}).
+            </span>
+          </div>
+
           {/* Key Advantage Highlight Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5">
@@ -177,10 +191,14 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-3xl font-extrabold text-white">
-                  {benchmarkData?.performance_comparison?.federated_learning?.pr_auc ?? '0.8420'}
+                  {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
+                    ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
+                    : (isLoading ? '...' : '—')}
                 </span>
                 <span className="text-xs text-emerald-400 font-semibold">
-                  +{benchmarkData?.performance_comparison?.federated_advantage?.pr_auc_gain ?? '0.1480'} vs Local
+                  {benchmarkData?.performance_comparison?.federated_advantage?.pr_auc_gain !== undefined
+                    ? `+${benchmarkData.performance_comparison.federated_advantage.pr_auc_gain.toFixed(4)}`
+                    : (isLoading ? '...' : '—')} vs Local
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-2">
@@ -195,10 +213,14 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-3xl font-extrabold text-white">
-                  {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr ?? '0.6240'}
+                  {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
+                    ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
+                    : (isLoading ? '...' : '—')}
                 </span>
                 <span className="text-xs text-indigo-400 font-semibold">
-                  +{benchmarkData?.performance_comparison?.federated_advantage?.recall_at_01_fpr_gain ?? '0.1920'} vs Local
+                  {benchmarkData?.performance_comparison?.federated_advantage?.recall_at_01_fpr_gain !== undefined
+                    ? `+${benchmarkData.performance_comparison.federated_advantage.recall_at_01_fpr_gain.toFixed(4)}`
+                    : (isLoading ? '...' : '—')} vs Local
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-2">
@@ -213,7 +235,7 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
               <div className="flex items-baseline gap-2 mt-2">
                 <span className="text-3xl font-extrabold text-purple-400">
-                  -64.7%
+                  {falseAlarmReductionPct ? `-${falseAlarmReductionPct}%` : (isLoading ? '...' : '—')}
                 </span>
                 <span className="text-xs text-slate-400">vs Isolated Model</span>
               </div>
@@ -267,19 +289,25 @@ export const BenchmarkHubPage: React.FC = () => {
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">PR-AUC</div>
                     <div className="text-xs font-bold text-emerald-400 font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.federated_learning?.pr_auc ?? '0.8420'}
+                      {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">ROC-AUC</div>
                     <div className="text-xs font-bold text-white font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.federated_learning?.roc_auc ?? '0.9120'}
+                      {benchmarkData?.performance_comparison?.federated_learning?.roc_auc !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.roc_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-indigo-300 font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr ?? '0.6240'}
+                      {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                 </div>
@@ -287,15 +315,15 @@ export const BenchmarkHubPage: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-300 pt-1 border-t border-indigo-500/20">
                   <div>
                     <span className="text-slate-500 block text-[9px]">False Alarms:</span>
-                    <span>{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily ?? 120} FP</span>
+                    <span>{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
-                    <span className="text-amber-300">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '12,750'}</span>
+                    <span className="text-amber-300">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[9px]">Total Cost:</span>
-                    <span className="text-emerald-400 font-bold">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '15,630'}</span>
+                    <span className="text-emerald-400 font-bold">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                 </div>
               </div>
@@ -315,19 +343,25 @@ export const BenchmarkHubPage: React.FC = () => {
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">PR-AUC</div>
                     <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc ?? '0.6940'}
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.pr_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">ROC-AUC</div>
                     <div className="text-xs font-bold text-slate-300 font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc ?? '0.8350'}
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.roc_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                   <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
                     <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
                     <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
-                      {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr ?? '0.4320'}
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.recall_at_01_fpr.toFixed(4)
+                        : (isLoading ? '...' : '—')}
                     </div>
                   </div>
                 </div>
@@ -335,15 +369,15 @@ export const BenchmarkHubPage: React.FC = () => {
                 <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-400 pt-1 border-t border-slate-800">
                   <div>
                     <span className="text-slate-500 block text-[9px]">False Alarms:</span>
-                    <span className="text-rose-300">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily ?? 340} FP</span>
+                    <span className="text-rose-300">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
-                    <span className="text-rose-400">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '25,500'}</span>
+                    <span className="text-rose-400">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                   <div>
                     <span className="text-slate-500 block text-[9px]">Total Cost:</span>
-                    <span className="text-rose-400 font-bold">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '29,880'}</span>
+                    <span className="text-rose-400 font-bold">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                 </div>
               </div>
@@ -369,23 +403,71 @@ export const BenchmarkHubPage: React.FC = () => {
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
                       <span>Privacy-Preserving Federated Model (FedAvg + DP)</span>
                     </td>
-                    <td className="py-3 px-4 text-emerald-400 font-bold">{benchmarkData?.performance_comparison?.federated_learning?.pr_auc ?? '0.8420'}</td>
-                    <td className="py-3 px-4">{benchmarkData?.performance_comparison?.federated_learning?.roc_auc ?? '0.9120'}</td>
-                    <td className="py-3 px-4 text-indigo-300 font-bold">{benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr ?? '0.6240'}</td>
-                    <td className="py-3 px-4 text-slate-300">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily ?? 120}</td>
-                    <td className="py-3 px-4 text-amber-300">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '12,750'}</td>
-                    <td className="py-3 px-4 text-emerald-400 font-bold">${benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '15,630'}</td>
+                    <td className="py-3 px-4 text-emerald-400 font-bold">
+                      {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4">
+                      {benchmarkData?.performance_comparison?.federated_learning?.roc_auc !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.roc_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-indigo-300 font-bold">
+                      {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-slate-300">
+                      {benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily !== undefined
+                        ? benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-amber-300">
+                      {benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined
+                        ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}`
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-emerald-400 font-bold">
+                      {benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars !== undefined
+                        ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}`
+                        : (isLoading ? '...' : '—')}
+                    </td>
                   </tr>
                   <tr className="text-slate-300">
                     <td className="py-3 px-4 font-sans font-semibold text-slate-300">
                       Isolated Single-Bank Model (Bank A Baseline)
                     </td>
-                    <td className="py-3 px-4 text-rose-400">{benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc ?? '0.6940'}</td>
-                    <td className="py-3 px-4">{benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc ?? '0.8350'}</td>
-                    <td className="py-3 px-4 text-rose-400">{benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr ?? '0.4320'}</td>
-                    <td className="py-3 px-4 text-rose-300">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily ?? 340}</td>
-                    <td className="py-3 px-4 text-rose-400">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars?.toLocaleString() ?? '25,500'}</td>
-                    <td className="py-3 px-4 text-rose-400 font-bold">${benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars?.toLocaleString() ?? '29,880'}</td>
+                    <td className="py-3 px-4 text-rose-400">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.pr_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.roc_auc.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-rose-400">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.recall_at_01_fpr.toFixed(4)
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-rose-300">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily !== undefined
+                        ? benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-rose-400">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined
+                        ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}`
+                        : (isLoading ? '...' : '—')}
+                    </td>
+                    <td className="py-3 px-4 text-rose-400 font-bold">
+                      {benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars !== undefined
+                        ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}`
+                        : (isLoading ? '...' : '—')}
+                    </td>
                   </tr>
                 </tbody>
               </table>

@@ -1420,7 +1420,7 @@ Prototyped Fully Homomorphic Encryption driver using Microsoft SEAL CKKS polynom
 Enclave driver modeling Intel SGX / AWS Nitro Enclave remote attestation structures (`MRENCLAVE` validation) and memory sealing patterns.
 
 ### 20.5 Consortium Smart Contracts & Gnosis Safe Multi-Sig (`contracts/`)
-Solidity 0.8.20 smart contracts (`ConsortiumIncentiveSettlement.sol`, `GnosisSafeMultiSigCoordinator.sol`) exploring automated Leave-One-Out (LOO) Shapley value reward distribution and 2-of-3 multi-signature governance across consortium participants.
+Solidity 0.8.20 smart contracts (`ConsortiumIncentiveSettlement.sol`, `GnosisSafeMultiSigCoordinator.sol`) exploring automated reward settlement and 2-of-3 multi-signature governance across consortium participants. Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations.
 
 ### 20.6 Cross-Chain Settlement Bridge (`layer2_crosschain_bridge.py`)
 Exploratory token routing connector modeling Chainlink CCIP `EVM2AnyMessage` payloads across Ethereum Layer-2 rollups (Arbitrum, Optimism) and enterprise ledgers (Hyperledger Fabric, Canton).

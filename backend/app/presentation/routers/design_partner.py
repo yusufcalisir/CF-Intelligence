@@ -69,9 +69,9 @@ async def evaluate_benchmark(
         description="Bank average daily transaction volume for economic modeling",
     ),
 ) -> dict[str, Any]:
-    """Runs evidence-based evaluation on real/semi-real benchmark datasets."""
+    """Runs calibrated synthetic reference benchmark evaluation for institutional sandbox comparisons."""
     try:
-        res = _pilot_service.evaluate_real_benchmark(
+        res = _pilot_service.evaluate_reference_benchmark(
             dataset_name=dataset,
             n_samples=n_samples,
             daily_volume=daily_volume,
