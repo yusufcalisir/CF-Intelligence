@@ -189,7 +189,7 @@ def run_benchmark_suite() -> list[dict]:
 
     real_datasets = ["paysim", "ieee_cis", "elliptic"]
     for d_name in real_datasets:
-        eval_res = pilot.evaluate_real_benchmark(dataset_name=d_name, n_samples=5_000)
+        eval_res = pilot.evaluate_reference_benchmark(dataset_name=d_name, n_samples=5_000)
         perf = eval_res["performance_comparison"]
         fl_p = perf["federated_learning"]
         loc_p = perf["isolated_local_model"]

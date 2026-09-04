@@ -88,7 +88,7 @@ async def get_distribution_fidelity(
 ) -> dict[str, Any]:
     """Returns distribution shift, Wasserstein distance and degradation metrics between synthetic and real data."""
     try:
-        res = _pilot_service.evaluate_real_benchmark(dataset_name=dataset, n_samples=5_000)
+        res = _pilot_service.evaluate_reference_benchmark(dataset_name=dataset, n_samples=5_000)
         return res.get("distribution_fidelity", {})
     except Exception as exc:
         logger.error("Failed to compute distribution fidelity: %s", exc)

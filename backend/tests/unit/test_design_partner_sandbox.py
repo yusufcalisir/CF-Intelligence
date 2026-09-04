@@ -48,9 +48,9 @@ def test_pilot_readiness_checklist_generation():
     assert len(checklist.compliance_items) >= 5
 
 
-def test_evaluate_real_benchmark_paysim_and_ieee():
+def test_evaluate_reference_benchmark_paysim_and_ieee():
     pilot = DesignPartnerPilotService()
-    res = pilot.evaluate_real_benchmark(dataset_name="paysim", n_samples=3000)
+    res = pilot.evaluate_reference_benchmark(dataset_name="paysim", n_samples=3000)
 
     assert "performance_comparison" in res
     assert "distribution_fidelity" in res

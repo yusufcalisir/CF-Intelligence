@@ -298,16 +298,3 @@ class DesignPartnerPilotService:
             ],
         }
 
-    def evaluate_real_benchmark(
-        self,
-        dataset_name: str = "paysim",
-        n_samples: int = 10_000,
-        daily_volume: int = 100_000,
-    ) -> dict[str, Any]:
-        """Backwards-compatibility alias for evaluate_reference_benchmark."""
-        return self.evaluate_reference_benchmark(
-            dataset_name=dataset_name,
-            n_samples=n_samples,
-            daily_volume=daily_volume,
-        )
-
