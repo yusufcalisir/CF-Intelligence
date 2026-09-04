@@ -183,63 +183,98 @@ export const BenchmarkHubPage: React.FC = () => {
           </div>
 
           {/* Key Advantage Highlight Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>PR-AUC (Precision-Recall)</span>
-                <TrendingUp className="w-4 h-4 text-emerald-400" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Card 1: PR-AUC */}
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="text-xs font-semibold text-slate-300 truncate">PR-AUC (Precision-Recall)</span>
+                  <div className="p-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 shrink-0">
+                    <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-white">
+                    {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
+                      ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
+                      : (isLoading ? '...' : '—')}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                      <TrendingUp className="w-3 h-3 shrink-0" />
+                      {benchmarkData?.performance_comparison?.federated_advantage?.pr_auc_gain !== undefined
+                        ? `+${benchmarkData.performance_comparison.federated_advantage.pr_auc_gain.toFixed(4)}`
+                        : (isLoading ? '...' : '—')}
+                    </span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Local Model</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-white">
-                  {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
-                    ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
-                    : (isLoading ? '...' : '—')}
-                </span>
-                <span className="text-xs text-emerald-400 font-semibold">
-                  {benchmarkData?.performance_comparison?.federated_advantage?.pr_auc_gain !== undefined
-                    ? `+${benchmarkData.performance_comparison.federated_advantage.pr_auc_gain.toFixed(4)}`
-                    : (isLoading ? '...' : '—')} vs Local
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">
+
+              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Standard metric under extreme class imbalance. Shows FL's ability to minimize false positives without sacrificing recall.
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-900 to-slate-900 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>Recall @ 0.1% FPR</span>
-                <ShieldCheck className="w-4 h-4 text-indigo-400" />
+            {/* Card 2: Recall @ 0.1% FPR */}
+            <div className="bg-gradient-to-br from-slate-900 to-indigo-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="text-xs font-semibold text-slate-300 truncate">Recall @ 0.1% FPR</span>
+                  <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 shrink-0">
+                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-400" />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-white">
+                    {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
+                      ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
+                      : (isLoading ? '...' : '—')}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
+                      <TrendingUp className="w-3 h-3 shrink-0" />
+                      {benchmarkData?.performance_comparison?.federated_advantage?.recall_at_01_fpr_gain !== undefined
+                        ? `+${benchmarkData.performance_comparison.federated_advantage.recall_at_01_fpr_gain.toFixed(4)}`
+                        : (isLoading ? '...' : '—')}
+                    </span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Local Model</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-white">
-                  {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
-                    ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
-                    : (isLoading ? '...' : '—')}
-                </span>
-                <span className="text-xs text-indigo-400 font-semibold">
-                  {benchmarkData?.performance_comparison?.federated_advantage?.recall_at_01_fpr_gain !== undefined
-                    ? `+${benchmarkData.performance_comparison.federated_advantage.recall_at_01_fpr_gain.toFixed(4)}`
-                    : (isLoading ? '...' : '—')} vs Local
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">
+
+              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Percentage of true fraud captured when strictly limiting legitimate customer blockages to 1 in 1,000 transactions.
               </p>
             </div>
 
-            <div className="bg-gradient-to-br from-slate-900 to-purple-950/20 border border-slate-800 rounded-2xl p-5">
-              <div className="flex items-center justify-between text-xs text-slate-400">
-                <span>False Alarm Reduction</span>
-                <ShieldCheck className="w-4 h-4 text-purple-400" />
+            {/* Card 3: False Alarm Reduction */}
+            <div className="bg-gradient-to-br from-slate-900 to-purple-950/30 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between gap-2 min-w-0">
+                  <span className="text-xs font-semibold text-slate-300 truncate">False Alarm Reduction</span>
+                  <div className="p-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 shrink-0">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-3xl sm:text-4xl font-extrabold font-mono tracking-tight text-purple-300">
+                    {falseAlarmReductionPct ? `-${falseAlarmReductionPct}%` : (isLoading ? '...' : '—')}
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold font-mono bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap">
+                      <TrendingUp className="w-3 h-3 shrink-0 rotate-180" />
+                      {falseAlarmReductionPct ? `-${falseAlarmReductionPct}%` : (isLoading ? '...' : '—')}
+                    </span>
+                    <span className="text-xs text-slate-400 whitespace-nowrap">vs Isolated Model</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-baseline gap-2 mt-2">
-                <span className="text-3xl font-extrabold text-purple-400">
-                  {falseAlarmReductionPct ? `-${falseAlarmReductionPct}%` : (isLoading ? '...' : '—')}
-                </span>
-                <span className="text-xs text-slate-400">vs Isolated Model</span>
-              </div>
-              <p className="text-xs text-slate-400 mt-2">
+
+              <p className="text-xs text-slate-400 mt-4 leading-relaxed border-t border-white/5 pt-3">
                 Drastically cuts triage fatigue and manual analyst queue overload by filtering cross-institution benign anomaly noise.
               </p>
             </div>
@@ -664,7 +699,7 @@ export const BenchmarkHubPage: React.FC = () => {
         <div className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column: PII Ingestion Scanner Demo */}
-            <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
+            <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Lock className="w-5 h-5 text-indigo-400" />
@@ -685,17 +720,21 @@ export const BenchmarkHubPage: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="text-xs text-slate-400 font-semibold mb-1 block">Sample Ingestion JSON Payload</label>
+              <div className="flex-1 flex flex-col">
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs text-slate-400 font-semibold block">Sample Ingestion JSON Payload</label>
+                  <span className="text-[10px] font-mono text-slate-500">14 lines • Zero PII</span>
+                </div>
                 <textarea
-                  rows={8}
+                  rows={15}
                   value={piiScanInput}
                   onChange={(e) => setPiiScanInput(e.target.value)}
-                  className="w-full bg-slate-950 font-mono text-xs text-slate-300 border border-slate-800 rounded-lg p-3 focus:outline-none focus:border-indigo-500"
+                  className="w-full flex-1 min-h-[320px] bg-slate-950 font-mono text-xs text-slate-300 border border-slate-800 rounded-lg p-3.5 focus:outline-none focus:border-indigo-500 leading-relaxed resize-y"
+                  placeholder="Paste JSON sample records..."
                 />
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-1">
                 <button
                   onClick={handlePiiValidation}
                   disabled={validatePiiMutation.isPending}

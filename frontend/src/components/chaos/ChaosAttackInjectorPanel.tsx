@@ -173,15 +173,23 @@ export default function ChaosAttackInjectorPanel({
             <p className="text-xs text-[var(--color-text-secondary)] mt-1.5">
               Injects high-frequency ({intensity} tx/s) micro-transactions below the €10,000 reporting threshold to test autonomous LSH-PSI intersection.
             </p>
+
+            {/* Defense Specification */}
+            <div className="flex items-center gap-1.5 mt-2">
+              <span className="text-[10px] text-[var(--color-text-muted)] font-semibold">Defense:</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                LSH-PSI + GRAPHSAGE
+              </span>
+            </div>
           </div>
 
           <button
             id="inject-smurfing-attack-btn"
             disabled={injectAttackMutation.isPending}
             onClick={handleLaunchSmurfing}
-            className="w-full py-2 px-3 rounded-lg font-semibold text-xs text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
-            <Radio size={14} className="animate-pulse" />
+            <Radio size={14} className="animate-pulse shrink-0" />
             <span>Inject 500 tx/s Smurfing Burst</span>
           </button>
         </div>
@@ -224,10 +232,10 @@ export default function ChaosAttackInjectorPanel({
             id="inject-byzantine-attack-btn"
             disabled={injectAttackMutation.isPending}
             onClick={handleLaunchByzantine}
-            className="w-full py-2 px-3 rounded-lg font-semibold text-xs text-white bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm"
+            className="w-full h-11 min-h-[44px] px-3 rounded-xl font-semibold text-xs text-white bg-gradient-to-r from-rose-600 to-red-700 hover:from-rose-500 hover:to-red-600 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-50"
           >
-            <ShieldAlert size={14} className="animate-bounce" />
-            <span>Inject Byzantine Poisoning (Bank Gamma)</span>
+            <ShieldAlert size={14} className="animate-pulse shrink-0" />
+            <span>Inject Byzantine Poisoning</span>
           </button>
         </div>
       </div>

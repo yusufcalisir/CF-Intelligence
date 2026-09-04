@@ -20,7 +20,7 @@ describe('ChaosAttackInjectorPanel Component', () => {
     expect(screen.getByText('Live Chaos & Attack Simulator')).toBeInTheDocument();
     expect(screen.getByText('CONSORTIUM NOMINAL')).toBeInTheDocument();
     expect(screen.getByText('Inject 500 tx/s Smurfing Burst')).toBeInTheDocument();
-    expect(screen.getByText('Inject Byzantine Poisoning (Bank Gamma)')).toBeInTheDocument();
+    expect(screen.getByText('Inject Byzantine Poisoning')).toBeInTheDocument();
   });
 
   it('triggers Byzantine poisoned gradient attack and invokes quarantine callback', async () => {

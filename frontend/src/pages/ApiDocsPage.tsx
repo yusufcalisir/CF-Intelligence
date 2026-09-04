@@ -584,30 +584,30 @@ export default function ApiDocsPage() {
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full pb-12">
       {/* Top Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-white/10 bg-slate-900/80 shadow-2xl">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 p-5 rounded-2xl glass-card border border-white/10 bg-slate-900/80 shadow-2xl min-w-0">
+        <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/20 shrink-0">
             <Code2 className="w-6 h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-white tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-lg sm:text-xl font-bold text-white tracking-tight">
                 Developer & API Reference Portal
               </h1>
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0 whitespace-nowrap">
                 OpenAPI 3.1
               </span>
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 mt-0.5">
+            <p className="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl leading-relaxed">
               Bank Integration SDK generator, multi-language code snippets, and live interactive API request sandbox
             </p>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
           <button
             onClick={handleDownloadSpec}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition-all whitespace-nowrap cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export OpenAPI JSON</span>
@@ -616,7 +616,7 @@ export default function ApiDocsPage() {
             href={scalarUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 transition-all whitespace-nowrap"
           >
             <span>Scalar Portal</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -625,7 +625,7 @@ export default function ApiDocsPage() {
             href={redocUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all whitespace-nowrap"
           >
             <span>ReDoc</span>
             <ExternalLink className="w-3.5 h-3.5" />
@@ -634,7 +634,7 @@ export default function ApiDocsPage() {
             href={docsUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all"
+            className="h-9 min-h-[36px] flex items-center gap-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-white/10 transition-all whitespace-nowrap"
           >
             <span>Swagger UI</span>
             <ExternalLink className="w-3.5 h-3.5" />
