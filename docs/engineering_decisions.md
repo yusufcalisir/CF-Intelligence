@@ -581,7 +581,7 @@ Enterprise banking and FinTech vendor procurement processes require zero unpatch
 
 ### Context
 
-While unit and integration test suites (1,172 Pytest, 247 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
+While unit and integration test suites (1,172 Pytest, 249 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
 
 ### Decision
 
@@ -681,4 +681,31 @@ Deploying the platform on-premises within a bank's internal infrastructure previ
 ### Tradeoff
 
 * Running a multi-worker Gunicorn backend and dedicated PostgreSQL/Redis instances increases minimum container memory requirements to 4 GB RAM.
+
+---
+
+## ED-028: Live Operations Zero-Mock Telemetry & Redis Pub/Sub Round Streaming Architecture
+
+**Date**: 2026-09-05  
+**Status**: Accepted
+
+### Context
+
+Operational dashboards displaying federated training convergence, ROC curves, loss trajectories, and cross-bank performance comparisons previously relied on static snapshots or fallback heuristics when a simulation coordinator was idle. In enterprise banking production environments, operators and compliance auditors require authentic, empirical round metrics streamed directly from the distributed training orchestration engine.
+
+### Decision
+
+1. **Redis Pub/Sub Training Round Streaming (`/api/v1/training/ws/{simulation_id}`)**:
+   * Coordinator rounds broadcast structured JSON event envelopes (`training:{simulation_id}` and `training:live_prod_v2`) over Redis pub/sub immediately upon completing each federated aggregation step.
+   * Streaming payloads encapsulate global metrics (global ROC-AUC, round loss, training duration, client participants) and per-bank localized performance (individual AUC, loss, samples evaluated) for real-time client ingestion.
+2. **Convergence Round REST Introspection (`GET /api/v1/training/rounds/{simulation_id}`)**:
+   * Exposes round-by-round convergence metrics history for post-training audits, reproducible reporting, and cold-start frontend chart hydration.
+3. **Consortium 24-Hour Scoring Volume Aggregation (`GET /api/v1/banks/scoring-volume`)**:
+   * Computes aggregated transaction scoring throughput, anomaly rates, latency percentiles, and node active/degraded states across all registered banking participants.
+4. **Zero-Mock Verification UI Architecture (`LiveOperationsView.tsx`, `MetricsComparisonBarChart.tsx`)**:
+   * Wires operational HUD elements (multi-bank comparison bar charts, convergence loss charts, dynamic confusion matrix, SHAP feature importance) directly to backend WebSocket and REST endpoints with strict zero-mock data integrity.
+
+### Tradeoff
+
+* Real-time Redis pub/sub broadcasting requires active Redis connectivity and introduces ~2ms serialization overhead per completed federated round.
 

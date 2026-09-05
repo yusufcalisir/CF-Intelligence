@@ -21,6 +21,9 @@ To accelerate bank consortium onboarding and SIEM/Core Banking integration, the 
 | `POST /api/v1/psi/match` | HTTP/1.1 | mTLS + Bearer JWT | Fuzzy MinHash LSH Private Set Intersection cross-bank matching |
 | `POST /api/v1/coordinator/negotiate` | HTTP/1.1 | mTLS + Bearer JWT | Dynamic hardware & Non-IID Dirichlet hyperparameter negotiation |
 | `POST /api/v1/cases/export/fincen-xml`| HTTP/1.1 | Bearer JWT (4-Eyes) | FinCEN BSA SAR XML compilation & supervisor cryptographic signing |
+| `GET /api/v1/banks/scoring-volume` | HTTP/1.1 | Bearer JWT / API Key | 24-hour aggregated transaction scoring volume and metrics across consortium banks |
+| `GET /api/v1/training/rounds/{simulation_id}` | HTTP/1.1 | Bearer JWT | Training round convergence metrics: global AUC, round duration, per-bank AUC & loss |
+| `WS /api/v1/training/ws/{simulation_id}` | WebSocket / WSS | Bearer JWT | Redis pub/sub real-time streaming of federated training round events & metrics |
 | `GET /api/v1/diagnostics/connectors` | HTTP/1.1 | Bearer JWT / Admin | Probe health across Kafka, Vault, KMS, Splunk, Redis & PostgreSQL |
 | `POST /api/v1/diagnostics/test-connector` | HTTP/1.1 | Bearer JWT / Admin | On-demand live handshake ping test for specific enterprise adapter |
 
@@ -180,6 +183,29 @@ func ScoreTransaction(apiKey string, jsonPayload []byte) ([]byte, error) {
   "decision": "BLOCK_AND_ESCALATE",
   "reason": "Velocity surge detected across 3 consortium nodes within 90 seconds",
   "timestamp": "2026-09-02T14:35:15Z"
+}
+```
+
+### 4.4 Live Federated Training Round Streaming (`WS /api/v1/training/ws/{simulation_id}`)
+
+Streams real-time convergence envelopes as each federated aggregation round completes via Redis pub/sub (`training:{simulation_id}`):
+
+```json
+{
+  "round": 4,
+  "metrics": {
+    "round": 4,
+    "global_auc": 0.887,
+    "loss": 0.283,
+    "duration_sec": 3.42,
+    "participating_banks": 3,
+    "bank_metrics": {
+      "bank_alpha": {"auc": 0.892, "loss": 0.274, "samples": 12500},
+      "bank_beta": {"auc": 0.879, "loss": 0.291, "samples": 9800},
+      "bank_gamma": {"auc": 0.890, "loss": 0.284, "samples": 11200}
+    }
+  },
+  "timestamp": 1725580800.0
 }
 ```
 
