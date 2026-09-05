@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1429%2F1429_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1431%2F1431_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
@@ -514,15 +514,23 @@ CF-Intelligence/
 │   │   │   ├── Predictor.tsx                        # Live transaction simulation & risk scoring widget
 │   │   │   ├── ModelPerformanceModal.tsx            # Champion/Challenger model performance inspection modal
 │   │   │   ├── PlatformLaunchModal.tsx              # Guided platform launch & tenant configuration modal
+│   │   │   ├── FLRoundRunner.tsx                    # Multi-bank round orchestrator & real simulation launcher
 │   │   │   ├── chaos/                               # Live Adversarial Attack Simulator & Interactive Chaos
 │   │   │   │   └── ChaosAttackInjectorPanel.tsx     # 500 tx/s smurfing burst & Byzantine gradient poisoning panel
+│   │   │   ├── charts/                              # High-Performance Consortium Verification Charts
+│   │   │   │   ├── MetricsComparisonBarChart.tsx    # Multi-bank comparison across ROC-AUC, PR-AUC, F1, latency, FPR
+│   │   │   │   ├── ConfusionMatrix.tsx              # Dynamic classification threshold confusion matrix
+│   │   │   │   ├── ROCCurve.tsx                     # Empirical ROC curve overlay (Global FL vs. Local baselines)
+│   │   │   │   ├── FeatureImportance.tsx            # SHAP & tree feature importance attribution bars
+│   │   │   │   ├── LossChart.tsx                    # Multi-round training loss convergence curve
+│   │   │   │   └── MetricsRadar.tsx                 # Multi-axis consortium compliance & performance radar
 │   │   │   ├── ingestion/                           # Real Dataset Ingestion Studio & Schema Alignment
 │   │   │   │   ├── DatasetDropzone.tsx              # Drag-and-drop CSV/Parquet uploader with pre-flight check
 │   │   │   │   ├── SchemaMappingTable.tsx           # Interactive 9-signal canonical schema alignment preview
 │   │   │   │   ├── DataContractAuditCard.tsx        # Great Expectations (GE 1.x) validation audit scorecard
 │   │   │   │   ├── ConsortiumAssignmentPanel.tsx    # Multi-bank partition allocator & FL enrollment trigger
 │   │   │   │   └── DatasetIngestionStudioModal.tsx  # Master 4-step wizard modal for enterprise data ingestion
-│   │   │   └── ...                                  # UI badges, metric cards, charts, modals & data tables
+│   │   │   └── ...                                  # UI badges, metric cards, modals & data tables
 │   │   │
 │   │   ├── api/                                     # API Integration Layer
 │   │   │   ├── client.ts                            # Axios / Fetch client with JWT interception & retry logic
@@ -538,7 +546,7 @@ CF-Intelligence/
 │   │   │   └── piiSanitizer.ts                      # Luhn algorithm, IBAN/TCKN regex & Type-Salted HMAC Zero-PII sanitizer
 │   │   └── e2e/                                     # Playwright end-to-end browser user workflow specs
 │   │
-│   └── tests/                                       # Vitest & React Testing Library Suite (247 Tests across 77 Files)
+│   └── tests/                                       # Vitest & React Testing Library Suite (249 Tests across 78 Files)
 │
 ├── sdk/                                             # Official Consortium Client SDK
 │   └── python/                                      # Python 3.10+ Integration SDK (`cfi-connector-sdk`)
@@ -1001,7 +1009,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Memory/DB Isolation**| **4/4 Tenant Isolation Tests Passing** | Strict Isolation (403 BOLA rejection) | `test_multi_tenant_security_audit.py` | `Self-Verified (Input sanitization, ContextVar session isolation, Redis namespace enclosure, cross-tenant 403 enforcement)` |
-| **Full Test Suite Pass Rate** | **1,429 / 1,429 passing** | 100% | 1,172 Backend Pytest + 247 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,431 / 1,431 passing** | 100% | 1,172 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1423,7 +1431,73 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
+### 19.8 24-Hour Consortium Transaction Scoring Volume (`GET /api/v1/banks/scoring-volume`)
 
+Aggregates empirical hourly transaction velocity and volume across all onboarded consortium institutions for operational throughput monitoring:
+
+**Request (`GET /api/v1/banks/scoring-volume`):**
+```http
+GET /api/v1/banks/scoring-volume HTTP/1.1
+Host: api.cfi-platform.org
+Authorization: Bearer <jwt_token>
+```
+
+**Response (HTTP 200 OK):**
+```json
+[
+  {"time": "00:00", "volume": 1420},
+  {"time": "01:00", "volume": 890},
+  {"time": "02:00", "volume": 612},
+  {"time": "03:00", "volume": 480},
+  {"time": "12:00", "volume": 8920},
+  {"time": "14:00", "volume": 9410},
+  {"time": "23:00", "volume": 2150}
+]
+```
+
+### 19.9 Federated Training Convergence & Real-Time Event Streaming
+
+**1. Query Training Round Convergence (`GET /api/v1/training/rounds/{simulation_id}`):**
+```json
+[
+  {
+    "round_number": 1,
+    "total_rounds": 5,
+    "global_loss": 0.5412,
+    "auc": 0.8641,
+    "per_bank_auc": {
+      "bank_a": 0.8812,
+      "bank_b": 0.8540,
+      "bank_c": 0.8571
+    },
+    "per_bank_loss": {
+      "bank_a": 0.5210,
+      "bank_b": 0.5580,
+      "bank_c": 0.5446
+    },
+    "participating_banks": ["bank_a", "bank_b", "bank_c"],
+    "dropped_banks": [],
+    "duration_ms": 1420
+  }
+]
+```
+
+**2. Real-Time Training Event WebSocket Stream (`WS /api/v1/training/ws/{simulation_id}`):**
+Publishes real-time training iteration progress broadcast via internal Redis Pub/Sub (`training:{simulation_id}` and `training:live_prod_v2`):
+```json
+{
+  "event_type": "round_complete",
+  "data": {
+    "round": 3,
+    "total": 5,
+    "loss": 0.2841,
+    "auc": 0.9412,
+    "per_bank_auc": {"bank_a": 0.951, "bank_b": 0.932, "bank_c": 0.940},
+    "participants": ["bank_a", "bank_b", "bank_c"],
+    "duration_ms": 1380
+  }
+}
+```
 
 ---
 

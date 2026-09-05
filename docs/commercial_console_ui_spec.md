@@ -40,3 +40,5 @@ The Commercial Web Management Console delivers a premium glassmorphism UI with r
 
 4. **Live Operations & Ingestion (`/operations`)**:
    - Deep linking support via `?openIngest=true` to immediately trigger the Zero-PII sanitization and Great Expectations data contract studio.
+   - **Real-Time Verification Metrics Grid**: Live operational HUD rendering ROC Curve (Global FL vs. Local Baselines), Loss Convergence Chart, Dynamic Confusion Matrix, Feature Importance (SHAP/Tree), and Multi-Bank Metrics Comparison Bar Chart (`MetricsComparisonBarChart`) wired directly to backend simulation runs without mock fallbacks.
+
