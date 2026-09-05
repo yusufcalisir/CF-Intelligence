@@ -172,18 +172,18 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             # Authentic Bulyan: Multi-Krum candidate selection + coordinate-wise trimmed mean
             theta = max(1, len(all_updates) - 2)
             candidates = list(range(len(all_updates)))
-            selected = []
+            selected: list[int] = []
             for _ in range(theta):
-                scores = []
+                cand_scores: list[tuple[float, int]] = []
                 for i in candidates:
                     dists = sorted(
                         float(np.sum((all_updates[i] - all_updates[j]) ** 2))
                         for j in candidates
                         if i != j
                     )
-                    scores.append((sum(dists[:2]), i))
-                scores.sort(key=lambda x: x[0])
-                best_idx = scores[0][1]
+                    cand_scores.append((float(sum(dists[:2])), i))
+                cand_scores.sort(key=lambda x: x[0])
+                best_idx = cand_scores[0][1]
                 selected.append(best_idx)
                 candidates.remove(best_idx)
             s_updates = all_updates[selected]
@@ -191,15 +191,15 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             robust_agg = np.mean(sorted_s[1:-1], axis=0) if len(s_updates) > 2 else np.mean(s_updates, axis=0)
             defense_name = "Bulyan Robust Byzantine Aggregation"
         else:  # default krum
-            scores = []
+            krum_scores: list[float] = []
             for i in range(len(all_updates)):
                 dists = sorted(
                     float(np.sum((all_updates[i] - all_updates[j]) ** 2))
                     for j in range(len(all_updates))
                     if i != j
                 )
-                scores.append(sum(dists[:2]))
-            krum_idx = int(np.argmin(scores))
+                krum_scores.append(float(sum(dists[:2])))
+            krum_idx = int(np.argmin(krum_scores))
             robust_agg = all_updates[krum_idx]
             defense_name = "Krum Robust Byzantine Aggregation"
 
