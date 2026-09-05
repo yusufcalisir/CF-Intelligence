@@ -32,7 +32,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
-  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time Multi-Krum defense shield quarantine (Δ=48.2 > 14.1) and +0.42 AUC protection.', algorithm: 'Multi-Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
+  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time Multi-Krum defense shield quarantine (Δ=48.2 > 14.1) and +0.42 AUC resilience (monitored via live simulated demo proxy).', algorithm: 'Multi-Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
   { id: 'dataset-ingestor', name: 'Real Dataset Ingestion Studio', category: 'Core Production Engine', purpose: 'Drag-and-drop CSV/Parquet file ingestor with client-side Zero-PII sanitization (Luhn PAN check, IBAN/TCKN regex, HMAC hashing) and 12-rule Great Expectations data contract gating.', algorithm: 'Luhn PAN Checksum, Type-Salted HMAC-SHA256, Great Expectations 1.x', inputs: 'Bank transactions CSV / Parquet dumps', outputs: 'Validated consortium partition, Dirichlet alpha estimate', tech: 'Great Expectations 1.x, WebAssembly, HMAC-SHA256' },
   { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 18 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
 
@@ -713,7 +713,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                 <div className="p-2.5 sm:p-3 rounded-xl bg-rose-600/10 border border-rose-500/20 space-y-0.5">
                   <div className="flex items-center justify-between">
                     <span className="text-rose-300 font-bold">Interactive Chaos & Attack Simulator</span>
-                    <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">LIVE DEFENSE</span>
+                    <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
                   </div>
                   <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Multi-Krum Shield (/scenarios)</div>
                 </div>
@@ -732,7 +732,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     Bank Gamma: QUARANTINED BY KRUM
                   </span>
-                  <span className="font-bold text-emerald-400">+0.42 AUC Protected</span>
+                  <span className="font-bold text-emerald-400">+0.42 AUC (Simulated)</span>
                 </div>
               </motion.div>
             )}
