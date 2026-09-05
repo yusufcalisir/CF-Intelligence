@@ -581,7 +581,7 @@ Enterprise banking and FinTech vendor procurement processes require zero unpatch
 
 ### Context
 
-While unit and integration test suites (1,160 Pytest, 247 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
+While unit and integration test suites (1,172 Pytest, 247 Vitest) verified isolated business logic, they operated within synthetic JSDOM and mock HTTP environments. Critical end-to-end flows—such as session token propagation, live WebSocket telemetry convergence, Four-Eyes dual-supervisor SAR approval, and responsive layout stability—required verification against real browser rendering engines.
 
 ### Decision
 
