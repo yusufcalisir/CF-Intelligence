@@ -207,7 +207,10 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             np.dot(robust_agg, clean_consensus)
             / (np.linalg.norm(robust_agg) * np.linalg.norm(clean_consensus) + 1e-9)
         )
-        # Continuous downstream scoring proxy: accounts for cosine alignment and residual adversarial boundary strain
+        # Continuous downstream scoring proxy (Simulated Demo Indicator):
+        # Accounts for cosine alignment and residual adversarial boundary strain for interactive chaos testing.
+        # NOTE: This metric is a live continuous proxy demonstrating defense resilience in dynamic scenarios,
+        # not an offline holdout validation AUC measured on an external benchmark dataset.
         boundary_strain = euclidean_dist / (cutoff * 1200.0)
         auc_protected = round(
             max(0.9100, min(0.9600, 0.9418 - (1.0 - cos_robust) * 1.5 - boundary_strain)),

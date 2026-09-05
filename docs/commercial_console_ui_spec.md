@@ -27,7 +27,7 @@ The Commercial Web Management Console delivers a premium glassmorphism UI with r
 ## 🧭 Enterprise Workflows & Navigation Synergy
 
 1. **SaaS Landing Page (`/`)**:
-   - **Interactive Browser Mockup (`InteractiveDashboardPreview`)**: Includes live interactive tabs for Telemetry, GNN Graph, Privacy, BFT, SAR, **Chaos Attack Defense**, and **Dataset Ingestion**. Direct deep links route to `/scenarios` and `/operations?openIngest=true`.
+   - **Interactive Browser Mockup (`InteractiveDashboardPreview`)**: Includes live interactive tabs for Telemetry, GNN Graph, Privacy, BFT, SAR, **Chaos Attack Defense** (with explicit "Simulated Demo Proxy" labeling for real-time resilience telemetry), and **Dataset Ingestion**. Direct deep links route to `/scenarios` and `/operations?openIngest=true`.
    - **Platform Modules & Specs**: Lists 12 production modules with complete SLAs, compliance mappings, and live tensor signatures.
 
 2. **Consortium Dashboard (`/dashboard`)**:

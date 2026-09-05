@@ -369,8 +369,14 @@ class AttackInjectionResponse(BaseModel):
     distance_threshold: float = 0.0
     packets_blocked: int = 0
     mitigation_latency_ms: float = 0.0
-    auc_protected: float = 0.9412
-    auc_compromised_baseline: float = 0.5218
+    auc_protected: float = Field(
+        0.9412,
+        description="Continuous live demo indicator/proxy of model resilience under defense, modeled from cosine alignment and boundary strain (not offline holdout validation AUC).",
+    )
+    auc_compromised_baseline: float = Field(
+        0.5218,
+        description="Continuous baseline proxy estimating model degradation without Byzantine defense shield.",
+    )
     log_entry: str = ""
 
 

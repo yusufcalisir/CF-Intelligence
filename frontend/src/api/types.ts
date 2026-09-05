@@ -536,7 +536,9 @@ export interface AttackInjectionResponse {
   distance_threshold: number;
   packets_blocked: number;
   mitigation_latency_ms: number;
+  /** Simulated live demo indicator/proxy of model resilience under defense, modeled from cosine alignment and boundary strain (not offline holdout validation AUC). */
   auc_protected: number;
+  /** Simulated baseline AUC proxy showing hypothetical degradation under unmitigated attack. */
   auc_compromised_baseline: number;
   log_entry: string;
 }

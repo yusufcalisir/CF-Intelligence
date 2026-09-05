@@ -129,7 +129,7 @@ export default function ChaosAttackInjectorPanel({
             <ShieldAlert size={20} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <h3 className="text-base font-bold text-[var(--color-text-primary)]">
                 Live Chaos & Attack Simulator
               </h3>
@@ -143,6 +143,9 @@ export default function ChaosAttackInjectorPanel({
               >
                 {activeAttack ? 'CRITICAL THREAT INJECTED' : 'CONSORTIUM NOMINAL'}
               </span>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                SIMULATED DEMO
+              </span>
               {isOfflineMode && (
                 <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse">
                   OFFLINE SANDBOX
@@ -150,7 +153,7 @@ export default function ChaosAttackInjectorPanel({
               )}
             </div>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
-              Inject real-world Byzantine gradient poisoning and 500 tx/s smurfing storms to test Krum & LSH-PSI defenses.
+              Live chaos sandbox simulating real-world Byzantine gradient poisoning and 500 tx/s smurfing storms to test Krum, Bulyan & LSH-PSI defenses.
             </p>
           </div>
         </div>
@@ -306,20 +309,30 @@ export default function ChaosAttackInjectorPanel({
               </div>
 
               {/* Model AUC Protection */}
-              <div className="p-2.5 rounded-xl bg-black/30 border border-white/5">
-                <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
-                  <ShieldAlert size={11} className="text-indigo-400" /> Model Accuracy
-                </span>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs font-bold font-mono text-emerald-400">
-                    {activeAttack.auc_protected.toFixed(4)}
-                  </span>
-                  <span className="text-[10px] font-mono text-rose-400 line-through">
-                    {activeAttack.auc_compromised_baseline.toFixed(4)}
+              <div className="p-2.5 rounded-xl bg-black/30 border border-white/5 flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] text-[var(--color-text-muted)] uppercase font-semibold flex items-center gap-1">
+                      <ShieldAlert size={11} className="text-indigo-400" /> Model Accuracy
+                    </span>
+                    <span className="text-[9px] font-mono uppercase px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-semibold">
+                      Simulated
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs font-bold font-mono text-emerald-400">
+                      {activeAttack.auc_protected.toFixed(4)}
+                    </span>
+                    <span className="text-[10px] font-mono text-rose-400 line-through">
+                      {activeAttack.auc_compromised_baseline.toFixed(4)}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-emerald-400 font-semibold block">
+                    +{(activeAttack.auc_protected - activeAttack.auc_compromised_baseline).toFixed(2)} AUC Preserved
                   </span>
                 </div>
-                <span className="text-[10px] text-emerald-400 font-semibold">
-                  +{(activeAttack.auc_protected - activeAttack.auc_compromised_baseline).toFixed(2)} AUC Preserved
+                <span className="text-[9px] text-[var(--color-text-muted)] mt-1.5 leading-tight block border-t border-white/5 pt-1">
+                  * Live continuous proxy from cosine alignment (not holdout validation AUC).
                 </span>
               </div>
             </div>
@@ -328,6 +341,16 @@ export default function ChaosAttackInjectorPanel({
             <div className="mt-2.5 px-3 py-2 rounded-lg bg-black/40 border border-white/5 text-[11px] font-mono text-slate-300 flex items-center gap-2">
               <span className="text-rose-400 font-bold shrink-0">AUDIT:</span>
               <span className="truncate">{activeAttack.log_entry}</span>
+            </div>
+
+            {/* Simulation Disclaimer Banner */}
+            <div className="mt-2 px-3 py-1.5 rounded-lg bg-indigo-950/20 border border-indigo-500/20 text-[10px] text-indigo-300/80 flex items-center gap-2">
+              <span className="font-bold text-indigo-400 shrink-0 uppercase tracking-wider text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/20 border border-indigo-500/30">
+                Demo Notice
+              </span>
+              <span>
+                AUC metrics in this chaos sandbox are continuous live demo indicators modeled from gradient cosine similarity and boundary strain, demonstrating real-time defense resilience rather than offline holdout dataset evaluations.
+              </span>
             </div>
           </div>
         )}

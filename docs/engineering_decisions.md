@@ -619,11 +619,12 @@ Consortium defense mechanisms (Krum, Bulyan, Trimmed Mean, Spectral SVD) were pr
    * Byzantine Poisoned Gradient injection ($\Delta w \times -10.0$).
 2. **Instant Visual Quarantine Feedback**:
    * Krum evaluates Euclidean distance sums ($\Delta = 48.2 > 14.1$ threshold), rejects the compromised gradient, and isolates Bank Gamma with a pulsing red card and `QUARANTINED BY KRUM` heartbeat indicator.
-   * Reports preserved model accuracy (+0.42 AUC over undefended FedAvg).
+   * Reports preserved model resilience via a dynamic continuous proxy metric (+0.42 AUC over undefended FedAvg).
 
 ### Tradeoff
 
 * Requires exposing the simulation endpoint `POST /api/v1/scenarios/inject-attack`, which is strictly restricted to authorized operator roles in production environments.
+* **Simulated Telemetry vs Holdout AUC**: The panel computes a dynamic continuous proxy function (derived from gradient cosine alignment and boundary strain) to visualize model degradation and recovery in real-time demo scenarios; it is explicitly labeled as a "Simulated Demo Proxy" in both the UI and documentation to distinguish it from offline holdout dataset benchmarks.
 
 ---
 
