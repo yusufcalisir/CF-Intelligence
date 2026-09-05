@@ -1,10 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
-import MetricsRadar from '../MetricsRadar';
+import MetricsComparisonBarChart from '../MetricsComparisonBarChart';
 import type { BankResult } from '../../../api/types';
 
-describe('MetricsRadar Component Test Suite', () => {
-  it('renders metrics comparison bar chart across bank consortium', () => {
+describe('MetricsComparisonBarChart Component Test Suite', () => {
+  it('renders metrics comparison grouped bar chart across bank consortium', () => {
     const mockBanks: BankResult[] = [
       {
         id: 'jpmorgan_chase',
@@ -44,8 +44,9 @@ describe('MetricsRadar Component Test Suite', () => {
       },
     ];
 
-    render(<MetricsRadar banks={mockBanks} />);
+    render(<MetricsComparisonBarChart banks={mockBanks} />);
 
-    expect(screen.getByText(/Model Performance Comparison — All Banks|Metrics Overview/i)).toBeDefined();
+    expect(screen.getByText(/Model Performance Comparison — All Banks/i)).toBeDefined();
+    expect(screen.getByText(/Grouped Bar Chart/i)).toBeDefined();
   });
 });

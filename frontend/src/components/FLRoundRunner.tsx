@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Cpu, Play, Terminal, CheckCircle } from 'lucide-react';
+import { Cpu, Play, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, Legend } from 'recharts';
 import { FLRoundResult } from '../types';
 import { runFLSimulation } from '../services/api';
@@ -9,33 +9,39 @@ export const FLRoundRunner: React.FC = () => {
   const [numRounds, setNumRounds] = useState(10);
   const [epsilon, setEpsilon] = useState(2.0);
   const [isTraining, setIsTraining] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<FLRoundResult[]>([]);
   const [currentRound, setCurrentRound] = useState(0);
 
   const handleStartFLSimulation = async () => {
     setIsTraining(true);
+    setError(null);
     setResults([]);
     setCurrentRound(0);
 
-    const roundsData = await runFLSimulation({
-      num_rounds: numRounds,
-      local_epochs: 2,
-      learning_rate: 0.01,
-      algorithm,
-      dp_epsilon: epsilon,
-      dp_delta: 1e-5,
-    });
+    try {
+      const roundsData = await runFLSimulation({
+        num_rounds: numRounds,
+        local_epochs: 2,
+        learning_rate: 0.01,
+        algorithm,
+        dp_epsilon: epsilon,
+        dp_delta: 1e-5,
+      });
 
-    for (let i = 0; i < roundsData.length; i++) {
-      await new Promise((r) => setTimeout(r, 400));
-      const currentItem = roundsData[i];
-      if (currentItem) {
-        setResults((prev) => [...prev, currentItem]);
+      for (let i = 0; i < roundsData.length; i++) {
+        await new Promise((r) => setTimeout(r, 400));
+        const currentItem = roundsData[i];
+        if (currentItem) {
+          setResults((prev) => [...prev, currentItem]);
+        }
+        setCurrentRound(i + 1);
       }
-      setCurrentRound(i + 1);
+    } catch (err: any) {
+      setError(err?.message || 'Federated learning simulation failed');
+    } finally {
+      setIsTraining(false);
     }
-
-    setIsTraining(false);
   };
 
   const chartData = results.map((r) => ({
@@ -73,6 +79,22 @@ export const FLRoundRunner: React.FC = () => {
           <span>{isTraining ? `Training Round ${currentRound}/${numRounds}...` : 'Start FL Training Simulation'}</span>
         </button>
       </div>
+
+      {error && (
+        <div className="p-3.5 rounded-xl bg-rose-950/40 border border-rose-500/50 flex items-center gap-3 text-rose-300 text-xs">
+          <AlertTriangle className="h-4 w-4 text-rose-400 shrink-0" />
+          <div className="flex-1">
+            <span className="font-semibold text-rose-200">Simulation Error: </span>
+            <span>{error}</span>
+          </div>
+          <button
+            onClick={() => setError(null)}
+            className="text-xs text-rose-400 hover:text-rose-200 cursor-pointer font-bold px-1"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* FL Configuration Sidebar */}

@@ -47,4 +47,28 @@ describe('ConfusionMatrix Visualization Test Suite', () => {
     expect(getByText(/Confusion Matrix/i)).toBeDefined();
     expect(getByText(/JPMorgan Chase/i)).toBeDefined();
   });
+
+  it('renders operational decision matrix when passed direct matrix prop', () => {
+    const { getByText } = render(
+      <ConfusionMatrix
+        matrix={{
+          threshold: 0.5,
+          true_positives: 142,
+          false_positives: 18,
+          true_negatives: 8920,
+          false_negatives: 22,
+          precision: 0.8875,
+          recall: 0.8659,
+          fpr: 0.0020,
+          f1_score: 0.8765,
+        }}
+        title="Multi-Threshold Operational Decision Matrix"
+      />
+    );
+
+    expect(getByText(/Multi-Threshold Operational Decision Matrix/i)).toBeDefined();
+    expect(getByText(/142/)).toBeDefined();
+    expect(getByText(/8,920/)).toBeDefined();
+    expect(getByText(/Precision/i)).toBeDefined();
+  });
 });

@@ -16,7 +16,19 @@ import DatasetTrainingConfigPanel, { type TrainingMode } from '../components/Dat
 import ChaosAttackInjectorPanel from '../components/chaos/ChaosAttackInjectorPanel';
 import { DatasetIngestionStudioModal } from '../components/ingestion/DatasetIngestionStudioModal';
 import { DATASET_PROFILES, type DatasetProfile } from '../utils/datasetProfiles';
-import { useCreateSimulation } from '../api/queries';
+import ROCCurve from '../components/charts/ROCCurve';
+import ConfusionMatrix from '../components/charts/ConfusionMatrix';
+import LossChart from '../components/charts/LossChart';
+import FeatureImportance from '../components/charts/FeatureImportance';
+import MetricsComparisonBarChart from '../components/charts/MetricsComparisonBarChart';
+import {
+  useCreateSimulation,
+  useScoringVolume,
+  useSimulation,
+  useSimulations,
+  useTrainingRounds,
+} from '../api/queries';
+
 
 interface BankNode {
   id: string;
@@ -49,17 +61,6 @@ const DEFAULT_BANKS: BankNode[] = [
   { id: 'bank_gamma', name: 'Bank Gamma', status: 'ACTIVE', tier: 'Tier 2', lastHeartbeat: '5s ago' },
 ];
 
-const MOCK_SCORING_VOLUME = [
-  { time: '00:00', volume: 1250 },
-  { time: '04:00', volume: 890 },
-  { time: '08:00', volume: 3400 },
-  { time: '12:00', volume: 5600 },
-  { time: '16:00', volume: 4800 },
-  { time: '20:00', volume: 2900 },
-  { time: '24:00', volume: 1800 },
-];
-
-
 const TOTAL_ROUNDS = 10;
 
 export default function LiveOperationsView() {
@@ -76,6 +77,20 @@ export default function LiveOperationsView() {
   const [isOfflineDemoMode, setIsOfflineDemoMode] = useState(false);
   const offlineDemoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Real Backend Query Hooks ───────────────────────────────────────────────
+  const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
+  const { data: simulations } = useSimulations();
+  const activeSimId = id || simulations?.[0]?.id || 'sim_fed_01';
+  const { data: currentSim } = useSimulation(activeSimId);
+  const { data: trainingRounds } = useTrainingRounds(activeSimId);
+
+  const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
+  const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
+
+  const [selectedBankId, setSelectedBankId] = useState<string>('');
+  const [rocModelType, setRocModelType] = useState<'local' | 'federated'>('federated');
+  const activeBank = simBanks.find((b) => b.id === selectedBankId) || simBanks[0] || null;
 
   // ── Dataset-aware training state ──────────────────────────────────────────
   const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(DATASET_PROFILES.paysim);
@@ -103,7 +118,7 @@ export default function LiveOperationsView() {
     );
   };
 
-  // WebSocket live telemetry listener with automatic fallback & simulation
+  // WebSocket live telemetry listener with real backend telemetry binding
   useEffect(() => {
     const getWsUrl = () => {
       if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
@@ -127,12 +142,6 @@ export default function LiveOperationsView() {
     const generateOfflineDemoTicker = () => {
       setWsStatus('RECONNECTING');
       setIsOfflineDemoMode(true);
-      if (!offlineDemoIntervalRef.current) {
-        offlineDemoIntervalRef.current = setInterval(() => {
-          setGradientSubmissions((prev) => (prev >= 3 ? 1 : prev + 1));
-          setChampionAuc((prev) => Math.min(0.99, parseFloat((prev + (Math.random() * 0.002 - 0.001)).toFixed(4))));
-        }, 5000);
-      }
     };
 
     try {
@@ -150,28 +159,57 @@ export default function LiveOperationsView() {
       ws.onmessage = (event) => {
         if (isCleanedUp) return;
         try {
-          const data = JSON.parse(event.data);
-          if (data.event === 'round_started') {
-            setCurrentRound(data.round || 1);
+          const raw = JSON.parse(event.data);
+          const eventType = raw.event || raw.event_type;
+          const data = raw.data || raw;
+
+          if (eventType === 'round_started' || eventType === 'round_start') {
+            setCurrentRound(data.round || data.round_number || 1);
             setGradientSubmissions(0);
             setTrainingPhase('training_federated');
-          } else if (data.event === 'gradient_received') {
+          } else if (eventType === 'gradient_received') {
             setGradientSubmissions((prev) => prev + 1);
-          } else if (data.event === 'round_complete') {
-            if (data.auc) {
-              setChampionAuc(data.auc);
-              setRoundHistory((prev) => [
+          } else if (eventType === 'round_complete' || eventType === 'round_completed') {
+            const roundNum = data.round ?? data.round_number ?? 0;
+            const globalAuc = typeof data.auc === 'number' ? data.auc : (data.auc ? parseFloat(data.auc) : championAuc);
+            const roundLoss = typeof data.loss === 'number' ? data.loss : (data.loss ? parseFloat(data.loss) : (data.global_loss ?? data.round_loss ?? 0));
+            const perBank = data.per_bank_auc || {};
+
+            // Extract real per-bank AUC without fabricating or randomizing
+            const bankKeys = Object.keys(perBank);
+            const getBankVal = (preferredSub: string, defaultIdx: number) => {
+              for (const k of bankKeys) {
+                if (k.toLowerCase().includes(preferredSub.toLowerCase())) {
+                  return Number(perBank[k]);
+                }
+              }
+              const keyAtIdx = bankKeys[defaultIdx];
+              if (keyAtIdx && perBank[keyAtIdx] !== undefined) {
+                return Number(perBank[keyAtIdx]);
+              }
+              return globalAuc;
+            };
+
+            const bankA_auc = getBankVal('alpha', 0);
+            const bankB_auc = getBankVal('beta', 1);
+            const bankC_auc = getBankVal('gamma', 2);
+
+            setChampionAuc(globalAuc);
+            setCurrentRound(roundNum);
+            setRoundHistory((prev) => {
+              if (prev.some((r) => r.round === roundNum)) return prev;
+              return [
                 ...prev,
                 {
-                  round: data.round,
-                  auc: data.auc,
-                  bankA: parseFloat((data.auc - 0.01 + Math.random() * 0.02).toFixed(4)),
-                  bankB: parseFloat((data.auc - 0.015 + Math.random() * 0.02).toFixed(4)),
-                  bankC: parseFloat((data.auc - 0.008 + Math.random() * 0.015).toFixed(4)),
-                  loss: parseFloat(Math.max(0.05, 0.5 - data.round * 0.04).toFixed(4)),
+                  round: roundNum,
+                  auc: parseFloat(globalAuc.toFixed(4)),
+                  bankA: parseFloat(bankA_auc.toFixed(4)),
+                  bankB: parseFloat(bankB_auc.toFixed(4)),
+                  bankC: parseFloat(bankC_auc.toFixed(4)),
+                  loss: parseFloat(roundLoss.toFixed(4)),
                 },
-              ]);
-            }
+              ];
+            });
           }
         } catch { /* ignore non-json frames */ }
       };
@@ -642,26 +680,41 @@ export default function LiveOperationsView() {
 
         {/* 24-Hour Scoring Volume */}
         <div className="glass-card p-3.5 sm:p-5 md:p-6 flex flex-col min-w-0">
-          <div className="mb-4">
-            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
-            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/sec)</p>
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">24-Hour Transaction Scoring Volume</h3>
+              <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Real-time cross-bank fraud evaluation rate (trans/hour)</p>
+            </div>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+              LIVE AGGREGATION
+            </span>
           </div>
           <div className="h-48 min-w-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={MOCK_SCORING_VOLUME} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="var(--color-accent-indigo)" stopOpacity={0.6} />
-                    <stop offset="95%" stopColor="var(--color-accent-indigo)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
-                <XAxis dataKey="time" stroke="var(--color-text-muted)" fontSize={11} />
-                <YAxis stroke="var(--color-text-muted)" fontSize={11} />
-                <Tooltip contentStyle={tooltipStyle} />
-                <Area type="monotone" dataKey="volume" stroke="var(--color-accent-indigo)" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isScoringVolumeLoading ? (
+              <div className="h-full flex items-center justify-center text-xs text-[var(--color-text-muted)]">
+                Loading consortium transaction volume...
+              </div>
+            ) : scoringVolume && scoringVolume.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={scoringVolume} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="var(--color-accent-indigo)" stopOpacity={0.6} />
+                      <stop offset="95%" stopColor="var(--color-accent-indigo)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+                  <XAxis dataKey="time" stroke="var(--color-text-muted)" fontSize={11} />
+                  <YAxis stroke="var(--color-text-muted)" fontSize={11} />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <Area type="monotone" dataKey="volume" stroke="var(--color-accent-indigo)" fillOpacity={1} fill="url(#colorVolume)" strokeWidth={2} dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-xs text-[var(--color-text-muted)]">
+                No scoring volume recorded in the last 24 hours.
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -720,6 +773,97 @@ export default function LiveOperationsView() {
             );
           })}
         </div>
+      </div>
+
+      {/* Institutional Model Verification & Discrimination Analytics */}
+      <div className="glass-card p-3.5 sm:p-5 md:p-6 space-y-6 min-w-0 border border-slate-800">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
+          <div>
+            <div className="flex items-center gap-2 text-indigo-400 font-semibold text-xs tracking-wider uppercase mb-1">
+              <span className="p-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20">🔬</span>
+              Model Telemetry & Empirical Validation
+            </div>
+            <h3 className="text-base sm:text-lg font-bold text-[var(--color-text-primary)]">
+              Institutional Model Verification & Discrimination Analytics
+            </h3>
+            <p className="text-xs text-[var(--color-text-muted)] mt-0.5">
+              Live discrimination metrics, convergence tracking, and feature attribution across consortium members
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {simBanks.length > 0 && (
+              <select
+                value={selectedBankId || simBanks[0]?.id}
+                onChange={(e) => setSelectedBankId(e.target.value)}
+                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-400"
+              >
+                {simBanks.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
+              <button
+                type="button"
+                onClick={() => setRocModelType('federated')}
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
+                  rocModelType === 'federated'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Federated
+              </button>
+              <button
+                type="button"
+                onClick={() => setRocModelType('local')}
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
+                  rocModelType === 'local'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                Local Baselines
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Grid */}
+        {simBanks.length > 0 ? (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <ROCCurve banks={simBanks} modelType={rocModelType} />
+              <LossChart rounds={simRounds} totalRounds={TOTAL_ROUNDS} />
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {activeBank && (
+                <ConfusionMatrix
+                  bank={activeBank}
+                  modelType={rocModelType}
+                />
+              )}
+              {activeBank && (
+                <FeatureImportance
+                  bank={activeBank}
+                  modelType={rocModelType}
+                />
+              )}
+            </div>
+
+            <MetricsComparisonBarChart banks={simBanks} />
+          </div>
+        ) : (
+          <div className="p-8 text-center border border-dashed border-slate-800 rounded-xl">
+            <p className="text-xs text-slate-400">
+              Launch a federated training run or select an existing simulation to view real-time model verification metrics.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Deep Operational Panels */}

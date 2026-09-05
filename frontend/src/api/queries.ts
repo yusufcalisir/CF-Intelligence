@@ -152,6 +152,22 @@ export function useBankDistributions() {
   });
 }
 
+export interface ScoringVolumePoint {
+  time: string;
+  volume: number;
+}
+
+export function useScoringVolume() {
+  return useQuery<ScoringVolumePoint[]>({
+    queryKey: ['scoring-volume'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/banks/scoring-volume');
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 export function useTrainingRounds(simulationId: string | undefined) {
   return useQuery<TrainingRound[]>({
     queryKey: ['training-rounds', simulationId],

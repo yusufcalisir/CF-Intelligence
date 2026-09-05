@@ -155,13 +155,20 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
         </div>
 
         {/* Latency / Performance Comparison Chart */}
-        <div className="lg:col-span-2 flex flex-col gap-3">
-          <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex justify-between items-center">
-            <span>Aggregation Latency Comparison</span>
-            <span className="text-[10px] text-slate-500 font-mono">lower is better (values in ms)</span>
-          </h4>
+        <div className="lg:col-span-2 flex flex-col gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              Illustrative Overhead Model — Aggregation Latency
+            </h4>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/30 whitespace-nowrap w-fit">
+              THEORETICAL BENCHMARK MODEL (ILLUSTRATIVE)
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400">
+            Illustrative analytical model comparing cryptographic aggregation overhead across Plaintext, TEE Enclave, and FHE CKKS, calibrated to theoretical polynomial degree and memory boundaries.
+          </p>
           
-          <div className="h-56 bg-slate-950/30 border border-slate-800 rounded-xl p-3">
+          <div className="h-52 bg-slate-950/30 border border-slate-800 rounded-xl p-3">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>

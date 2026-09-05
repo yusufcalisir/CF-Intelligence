@@ -24,22 +24,17 @@ describe('services/api', () => {
     expect(cf.remediated_score).toBe(310.0);
   });
 
-  it('runFLSimulation generates multi-round results when offline', async () => {
+  it('runFLSimulation throws error when service is offline or unreachable', async () => {
     vi.spyOn(globalThis, 'fetch').mockRejectedValueOnce(new Error('FL service down'));
-    const rounds = await runFLSimulation({
-      num_rounds: 3,
-      local_epochs: 2,
-      learning_rate: 0.01,
-      algorithm: 'FED_AVG',
-      dp_epsilon: 1.0,
-      dp_delta: 1e-5,
-    });
-
-    expect(rounds).toHaveLength(3);
-    const round0 = rounds[0];
-    const round2 = rounds[2];
-    expect(round0?.round_number).toBe(1);
-    expect(round2?.round_number).toBe(3);
-    expect(round0?.global_loss).toBeGreaterThan(0);
+    await expect(
+      runFLSimulation({
+        num_rounds: 3,
+        local_epochs: 2,
+        learning_rate: 0.01,
+        algorithm: 'FED_AVG',
+        dp_epsilon: 1.0,
+        dp_delta: 1e-5,
+      })
+    ).rejects.toThrow(/FL service down/i);
   });
 });

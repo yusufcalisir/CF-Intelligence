@@ -84,36 +84,73 @@ export async function fetchCounterfactual(
 export async function runFLSimulation(
   simReq: FLSimulationRequest
 ): Promise<FLRoundResult[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/fl/simulations`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(simReq),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return data.rounds || [];
-    }
-  } catch {
-    // Fallback simulation for live interactive demo
+  const methodMap: Record<string, string> = {
+    FED_AVG: 'fed_avg',
+    FED_ADAM: 'fed_avg_weighted',
+    KRUM: 'krum',
+    BULYAN: 'bulyan',
+    SCAFFOLD: 'fed_avg',
+    FED_ASYNC: 'fed_avg',
+  };
+  const aggregation_method = methodMap[simReq.algorithm] || simReq.algorithm || 'fed_avg_weighted';
+
+  const res = await fetch(`${BASE_URL}/simulations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      num_rounds: simReq.num_rounds,
+      local_epochs: simReq.local_epochs || 2,
+      learning_rate: simReq.learning_rate || 0.01,
+      privacy_mechanism: simReq.dp_epsilon ? 'differential_privacy' : 'none',
+      dp_epsilon: simReq.dp_epsilon || 1.0,
+      dp_delta: simReq.dp_delta || 1e-5,
+      aggregation_method,
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Federated learning simulation request failed: ${res.status} ${res.statusText}`);
   }
 
-  const mockRounds: FLRoundResult[] = [];
-  let currentLoss = 0.65;
-  for (let r = 1; r <= simReq.num_rounds; r++) {
-    currentLoss = Math.max(0.04, currentLoss * 0.72 + (Math.random() * 0.02 - 0.01));
-    mockRounds.push({
-      round_number: r,
-      global_loss: parseFloat(currentLoss.toFixed(4)),
-      per_bank_loss: {
-        bank_a: parseFloat((currentLoss * 0.98).toFixed(4)),
-        bank_b: parseFloat((currentLoss * 1.05).toFixed(4)),
-        bank_c: parseFloat((currentLoss * 0.96).toFixed(4)),
-      },
-      participating_bank_ids: ['bank_a', 'bank_b', 'bank_c'],
-      dropped_bank_ids: [],
-      aggregation_time_ms: Math.round(15 + Math.random() * 25),
-    });
+  const data = await res.json();
+  if (Array.isArray(data.rounds)) {
+    return data.rounds;
   }
-  return mockRounds;
+
+  const simulationId = data.id;
+  if (!simulationId) {
+    return [];
+  }
+
+  // Poll simulation until rounds are populated or completed
+  const maxAttempts = 30;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const statusRes = await fetch(`${BASE_URL}/simulations/${simulationId}`);
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      if (Array.isArray(statusData.rounds) && statusData.rounds.length > 0) {
+        if (statusData.status === 'completed' || statusData.rounds.length >= simReq.num_rounds) {
+          return statusData.rounds.map((r: any) => ({
+            round_number: r.round_number,
+            global_loss: r.global_loss,
+            per_bank_loss: r.per_bank_loss || {
+              bank_a: r.global_loss,
+              bank_b: r.global_loss,
+              bank_c: r.global_loss,
+            },
+            participating_bank_ids: r.participating_banks || ['bank_a', 'bank_b', 'bank_c'],
+            dropped_bank_ids: r.dropped_banks || [],
+            aggregation_time_ms: r.duration_ms || 25,
+          }));
+        }
+      }
+      if (statusData.status === 'failed') {
+        throw new Error(statusData.error_message || 'Federated learning simulation execution failed');
+      }
+    }
+  }
+
+  throw new Error('Simulation timed out waiting for round completion');
 }
+

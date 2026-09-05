@@ -147,9 +147,17 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
 
         {/* Right Side: GAT Attention Weights */}
         <div className="space-y-3">
-          <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-            Graph Attention Network (GAT) Edge Coefficients
-          </h4>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+            <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+              Representative Attention Pattern (Illustrative)
+            </h4>
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap w-fit">
+              REPRESENTATIVE TOPOLOGY (ILLUSTRATIVE)
+            </span>
+          </div>
+          <p className="text-[11px] text-[var(--color-text-muted)]">
+            Structural reference attention weights across heterogeneous graph relation types (Customer, Device, IP, Merchant) showing representative layer gating.
+          </p>
           <div
             tabIndex={0}
             role="region"

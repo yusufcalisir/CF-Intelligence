@@ -208,7 +208,7 @@ describe('API Service Comprehensive Branch Coverage Suite', () => {
       expect(rounds).toEqual([]);
     });
 
-    it('generates synthetic fallback rounds on API failure or offline mode', async () => {
+    it('throws error on API failure or offline mode', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Backend offline'));
 
       const req: FLSimulationRequest = {
@@ -220,12 +220,7 @@ describe('API Service Comprehensive Branch Coverage Suite', () => {
         dp_delta: 1e-5,
       };
 
-      const rounds = await runFLSimulation(req);
-      expect(rounds.length).toBe(3);
-      expect(rounds[0]?.round_number).toBe(1);
-      expect(rounds[2]?.round_number).toBe(3);
-      expect(rounds[0]?.participating_bank_ids).toContain('bank_a');
-      expect(rounds[0]?.global_loss).toBeGreaterThanOrEqual(0.04);
+      await expect(runFLSimulation(req)).rejects.toThrow(/Backend offline/i);
     });
   });
 });

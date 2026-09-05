@@ -397,7 +397,22 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
                 _simulation_results.set(simulation_id, sim)
 
             # Store every event so the training router can serve them
-            _simulation_events.push_list(simulation_id, {"event_type": event_type, "data": data})
+            event_envelope = {"event_type": event_type, "data": data}
+            _simulation_events.push_list(simulation_id, event_envelope)
+
+            # Publish to Redis pub/sub and list for WebSocket streaming consumers
+            c = _simulation_events.client
+            if c:
+                try:
+                    payload_str = json.dumps(event_envelope)
+                    c.publish(f"training:{simulation_id}", payload_str)
+                    c.publish("training:live_prod_v2", payload_str)
+                    c.rpush(f"simulation:{simulation_id}:events", payload_str)
+                    c.rpush("simulation:live_prod_v2:events", payload_str)
+                    c.expire(f"simulation:{simulation_id}:events", 3600)
+                    c.expire("simulation:live_prod_v2:events", 3600)
+                except Exception as exc:
+                    logger.debug("Failed to publish in-process sim event to Redis: %s", exc)
 
         simulation = simulation_service.run_simulation(
             config=config,

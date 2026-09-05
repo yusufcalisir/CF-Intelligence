@@ -454,6 +454,27 @@ async def get_bank_distributions() -> dict[str, Any]:
     return result
 
 
+@router.get("/scoring-volume")
+async def get_scoring_volume() -> list[dict[str, Any]]:
+    """Return 24-hour aggregated transaction scoring volume across consortium banks.
+
+    Aggregates real empirical hourly transaction volume from bank datasets.
+    """
+    dist = await get_bank_distributions()
+    banks_data = dist.get("banks", {})
+    hourly_totals = np.zeros(24, dtype=int)
+    for b_data in banks_data.values():
+        h_data = b_data.get("hourly_fraud_rate", {})
+        totals = h_data.get("total", [])
+        for i, t in enumerate(totals[:24]):
+            hourly_totals[i] += int(t)
+
+    return [
+        {"time": f"{h:02d}:00", "volume": int(hourly_totals[h])}
+        for h in range(24)
+    ]
+
+
 @router.get("/{bank_id}")
 async def get_bank(bank_id: str) -> dict:
     """Get details for a specific bank."""

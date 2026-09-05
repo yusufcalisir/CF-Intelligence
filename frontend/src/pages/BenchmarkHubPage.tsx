@@ -16,6 +16,7 @@ import {
   usePilotReadinessChecklist,
   useValidateDataIngestion,
 } from '../api/queries';
+import ConfusionMatrix from '../components/charts/ConfusionMatrix';
 
 export const BenchmarkHubPage: React.FC = () => {
   const [selectedDataset, setSelectedDataset] = useState<'paysim' | 'ieee_cis' | 'elliptic' | 'creditcard'>('paysim');
@@ -67,16 +68,16 @@ export const BenchmarkHubPage: React.FC = () => {
 
   const datasetDescriptions: Record<string, { title: string; subtitle: string; badge: string; sourceLink: string }> = {
     paysim: {
-      title: 'PaySim Mobile Money (Kenya M-Pesa)',
-      subtitle: 'Derived from real M-Pesa mobile transaction logs (6.36M transactions). Canonical academic standard for mobile fraud & balance draining.',
-      badge: 'Academic Standard (Kaggle: ealaxi/paysim1)',
+      title: 'PaySim Mobile Money Financial Fraud',
+      subtitle: 'Derived from real M-Pesa mobile transaction logs with 6.3M records, capturing synthetic money laundering & fraud smurfing.',
+      badge: 'Empirical Mobile Money Standard',
       sourceLink: 'https://www.kaggle.com/datasets/ealaxi/paysim1',
     },
     ieee_cis: {
-      title: 'IEEE-CIS Fraud Detection (Vesta Corp)',
-      subtitle: 'Real-world e-commerce & payment card fraud transactions (590k samples, 394 features). End-user card fraud benchmark.',
-      badge: 'Real Production Vesta Data',
-      sourceLink: 'https://www.kaggle.com/competitions/ieee-fraud-detection',
+      title: 'IEEE-CIS Fraud Detection Benchmark',
+      subtitle: 'Real-world e-commerce & payment card fraud transactions provided by Vesta Corporation with 400+ anonymized features.',
+      badge: 'Tier-1 Benchmark Dataset',
+      sourceLink: 'https://www.kaggle.com/c/ieee-fraud-detection',
     },
     elliptic: {
       title: 'Elliptic Bitcoin AML Transaction Graph',
@@ -92,18 +93,7 @@ export const BenchmarkHubPage: React.FC = () => {
     },
   };
 
-  const currentCm = benchmarkData?.multi_threshold_confusion_matrices?.[selectedThresholdIndex] || {
-    threshold: 0.5,
-    true_positives: 85,
-    false_positives: 12,
-    true_negatives: 9850,
-    false_negatives: 15,
-    precision: 0.8763,
-    recall: 0.85,
-    fpr: 0.001218,
-    fnr: 0.15,
-    f1_score: 0.8629,
-  };
+  const currentCm = benchmarkData?.multi_threshold_confusion_matrices?.[selectedThresholdIndex] ?? null;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 space-y-6">
@@ -544,60 +534,23 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
             </div>
 
-            {/* 2x2 Confusion Matrix Display */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="border border-slate-800 rounded-xl p-5 bg-slate-950/60">
-                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 mb-1">True Positives (TP)</div>
-                <div className="text-3xl font-extrabold text-white">{currentCm.true_positives.toLocaleString()}</div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Correctly flagged high-risk fraudulent transactions sent to SAR filing and blocked.
+            {/* 2x2 Confusion Matrix Display via Consolidated Component */}
+            {currentCm ? (
+              <ConfusionMatrix
+                matrix={currentCm}
+                title="Multi-Threshold Operational Decision Matrix"
+              />
+            ) : (
+              <div className="border border-slate-800 rounded-xl p-8 text-center bg-slate-950/60">
+                <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2 opacity-80" />
+                <p className="text-sm font-semibold text-slate-200">
+                  {isLoading ? 'Loading Empirical Threshold Confusion Matrix...' : 'No Multi-Threshold Decision Data Available'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Multi-threshold decision metrics are computed during real-world benchmark evaluations across decision thresholds.
                 </p>
               </div>
-
-              <div className="border border-rose-900/40 rounded-xl p-5 bg-rose-950/10">
-                <div className="text-xs font-bold uppercase tracking-wider text-rose-400 mb-1">False Positives (FP) — Alert Fatigue</div>
-                <div className="text-3xl font-extrabold text-rose-400">{currentCm.false_positives.toLocaleString()}</div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Innocent legitimate transactions mistakenly alerted. Represents operational triage burden & customer friction.
-                </p>
-              </div>
-
-              <div className="border border-amber-900/40 rounded-xl p-5 bg-amber-950/10">
-                <div className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-1">False Negatives (FN) — Uncaptured Fraud</div>
-                <div className="text-3xl font-extrabold text-amber-400">{currentCm.false_negatives.toLocaleString()}</div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Missed frauds slipping past detection. Directly causes direct chargeback and balance loss.
-                </p>
-              </div>
-
-              <div className="border border-slate-800 rounded-xl p-5 bg-slate-950/60">
-                <div className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">True Negatives (TN)</div>
-                <div className="text-3xl font-extrabold text-white">{currentCm.true_negatives.toLocaleString()}</div>
-                <p className="text-xs text-slate-400 mt-2">
-                  Seamless frictionless processing for legitimate bank customers.
-                </p>
-              </div>
-            </div>
-
-            {/* Derived Operational Metrics */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-6 border-t border-slate-800">
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <div className="text-[11px] text-slate-400">Precision (PPV)</div>
-                <div className="text-lg font-bold text-white font-mono mt-0.5">{(currentCm.precision * 100).toFixed(2)}%</div>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <div className="text-[11px] text-slate-400">Recall (Sensitivity)</div>
-                <div className="text-lg font-bold text-white font-mono mt-0.5">{(currentCm.recall * 100).toFixed(2)}%</div>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <div className="text-[11px] text-slate-400">False Positive Rate (FPR)</div>
-                <div className="text-lg font-bold text-rose-400 font-mono mt-0.5">{(currentCm.fpr * 100).toFixed(4)}%</div>
-              </div>
-              <div className="bg-slate-950 p-3 rounded-lg border border-slate-800">
-                <div className="text-[11px] text-slate-400">F1-Score</div>
-                <div className="text-lg font-bold text-indigo-400 font-mono mt-0.5">{currentCm.f1_score.toFixed(4)}</div>
-              </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -617,79 +570,105 @@ export const BenchmarkHubPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400">Fidelity Verdict:</span>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  {benchmarkData?.distribution_fidelity?.summary_verdict ?? 'HIGH_FIDELITY'}
-                </span>
-              </div>
+              {benchmarkData?.distribution_fidelity && (
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">Fidelity Verdict:</span>
+                  <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                    {benchmarkData.distribution_fidelity.summary_verdict}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-400">Overall Fidelity Score</div>
-                <div className="text-2xl font-bold text-white font-mono mt-1">
-                  {benchmarkData?.distribution_fidelity?.overall_fidelity_score ?? '0.8420'}
-                </div>
-                <span className="text-[10px] text-slate-500">Scale 0.0 - 1.0 (1.0 = identical)</span>
-              </div>
+            {benchmarkData?.distribution_fidelity ? (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs text-slate-400">Overall Fidelity Score</div>
+                    <div className="text-2xl font-bold text-white font-mono mt-1">
+                      {typeof benchmarkData.distribution_fidelity.overall_fidelity_score === 'number'
+                        ? benchmarkData.distribution_fidelity.overall_fidelity_score.toFixed(4)
+                        : benchmarkData.distribution_fidelity.overall_fidelity_score}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Scale 0.0 - 1.0 (1.0 = identical)</span>
+                  </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-400">Avg Wasserstein Distance</div>
-                <div className="text-2xl font-bold text-white font-mono mt-1">
-                  {benchmarkData?.distribution_fidelity?.avg_wasserstein_distance ?? '12.45'}
-                </div>
-                <span className="text-[10px] text-slate-500">Earth Mover's Distance</span>
-              </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs text-slate-400">Avg Wasserstein Distance</div>
+                    <div className="text-2xl font-bold text-white font-mono mt-1">
+                      {typeof benchmarkData.distribution_fidelity.avg_wasserstein_distance === 'number'
+                        ? benchmarkData.distribution_fidelity.avg_wasserstein_distance.toFixed(2)
+                        : benchmarkData.distribution_fidelity.avg_wasserstein_distance}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Earth Mover's Distance</span>
+                  </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-400">Avg JS Divergence</div>
-                <div className="text-2xl font-bold text-white font-mono mt-1">
-                  {benchmarkData?.distribution_fidelity?.avg_js_divergence ?? '0.1840'}
-                </div>
-                <span className="text-[10px] text-slate-500">Symmetric KL divergence</span>
-              </div>
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs text-slate-400">Avg JS Divergence</div>
+                    <div className="text-2xl font-bold text-white font-mono mt-1">
+                      {typeof benchmarkData.distribution_fidelity.avg_js_divergence === 'number'
+                        ? benchmarkData.distribution_fidelity.avg_js_divergence.toFixed(4)
+                        : benchmarkData.distribution_fidelity.avg_js_divergence}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Symmetric KL divergence</span>
+                  </div>
 
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                <div className="text-xs text-slate-400">Covariance Matrix Drift</div>
-                <div className="text-2xl font-bold text-white font-mono mt-1">
-                  {benchmarkData?.distribution_fidelity?.covariance_matrix_drift_frobenius ?? '0.3420'}
+                  <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
+                    <div className="text-xs text-slate-400">Covariance Matrix Drift</div>
+                    <div className="text-2xl font-bold text-white font-mono mt-1">
+                      {typeof benchmarkData.distribution_fidelity.covariance_matrix_drift_frobenius === 'number'
+                        ? benchmarkData.distribution_fidelity.covariance_matrix_drift_frobenius.toFixed(4)
+                        : benchmarkData.distribution_fidelity.covariance_matrix_drift_frobenius}
+                    </div>
+                    <span className="text-[10px] text-slate-500">Frobenius Norm Difference</span>
+                  </div>
                 </div>
-                <span className="text-[10px] text-slate-500">Frobenius Norm Difference</span>
-              </div>
-            </div>
 
-            {/* Feature Table */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
-                    <th className="py-2.5 px-3">Feature Name</th>
-                    <th className="py-2.5 px-3">Wasserstein Dist</th>
-                    <th className="py-2.5 px-3">JS Divergence</th>
-                    <th className="py-2.5 px-3">KS-Test (stat / p-val)</th>
-                    <th className="py-2.5 px-3">Real Mean (std)</th>
-                    <th className="py-2.5 px-3">Synth Mean (std)</th>
-                    <th className="py-2.5 px-3">Fidelity Score</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
-                  {benchmarkData?.distribution_fidelity?.feature_metrics?.slice(0, 8).map((feat) => (
-                    <tr key={feat.feature_name} className="hover:bg-slate-800/40">
-                      <td className="py-2.5 px-3 font-sans font-medium text-slate-200">{feat.feature_name}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{feat.wasserstein_distance}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{feat.js_divergence}</td>
-                      <td className="py-2.5 px-3 text-slate-300">{feat.ks_statistic} / {feat.ks_p_value.toFixed(4)}</td>
-                      <td className="py-2.5 px-3 text-slate-400">{feat.real_mean} ({feat.real_std})</td>
-                      <td className="py-2.5 px-3 text-slate-400">{feat.synth_mean} ({feat.synth_std})</td>
-                      <td className="py-2.5 px-3">
-                        <span className="font-bold text-emerald-400">{(feat.fidelity_score * 100).toFixed(1)}%</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                {/* Feature Table */}
+                {benchmarkData.distribution_fidelity.feature_metrics && benchmarkData.distribution_fidelity.feature_metrics.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr className="border-b border-slate-800 text-slate-400 uppercase tracking-wider">
+                          <th className="py-2.5 px-3">Feature Name</th>
+                          <th className="py-2.5 px-3">Wasserstein Dist</th>
+                          <th className="py-2.5 px-3">JS Divergence</th>
+                          <th className="py-2.5 px-3">KS-Test (stat / p-val)</th>
+                          <th className="py-2.5 px-3">Real Mean (std)</th>
+                          <th className="py-2.5 px-3">Synth Mean (std)</th>
+                          <th className="py-2.5 px-3">Fidelity Score</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                        {benchmarkData.distribution_fidelity.feature_metrics.slice(0, 8).map((feat) => (
+                          <tr key={feat.feature_name} className="hover:bg-slate-800/40">
+                            <td className="py-2.5 px-3 font-sans font-medium text-slate-200">{feat.feature_name}</td>
+                            <td className="py-2.5 px-3 text-slate-300">{feat.wasserstein_distance}</td>
+                            <td className="py-2.5 px-3 text-slate-300">{feat.js_divergence}</td>
+                            <td className="py-2.5 px-3 text-slate-300">{feat.ks_statistic} / {typeof feat.ks_p_value === 'number' ? feat.ks_p_value.toFixed(4) : feat.ks_p_value}</td>
+                            <td className="py-2.5 px-3 text-slate-400">{feat.real_mean} ({feat.real_std})</td>
+                            <td className="py-2.5 px-3 text-slate-400">{feat.synth_mean} ({feat.synth_std})</td>
+                            <td className="py-2.5 px-3">
+                              <span className="font-bold text-emerald-400">{(feat.fidelity_score * 100).toFixed(1)}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="border border-slate-800 rounded-xl p-8 text-center bg-slate-950/60">
+                <AlertTriangle className="w-8 h-8 text-amber-400 mx-auto mb-2 opacity-80" />
+                <p className="text-sm font-semibold text-slate-200">
+                  {isLoading ? 'Auditing Statistical Fidelity & Distribution Drift...' : 'No Distribution Fidelity Audit Available'}
+                </p>
+                <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
+                  Wasserstein distance and JS divergence metrics are computed when benchmarking empirical datasets against generator distributions.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -1,20 +1,65 @@
 import type { BankResult } from '../../api/types';
 import { BANK_COLORS } from '../../api/types';
 
-interface ConfusionMatrixProps {
-  bank: BankResult;
-  modelType: 'local' | 'federated';
+export interface ConfusionMatrixAtThresholdData {
+  threshold?: number;
+  true_positives: number;
+  false_positives: number;
+  true_negatives: number;
+  false_negatives: number;
+  precision?: number;
+  recall?: number;
+  fpr?: number;
+  fnr?: number;
+  f1_score?: number;
 }
 
-export default function ConfusionMatrix({ bank, modelType }: ConfusionMatrixProps) {
-  const metrics = modelType === 'local' ? bank.local_metrics : bank.federated_metrics;
-  if (!metrics) return null;
+export interface ConfusionMatrixProps {
+  bank?: BankResult;
+  modelType?: 'local' | 'federated';
+  matrix?: ConfusionMatrixAtThresholdData;
+  title?: string;
+  subtitle?: string;
+}
 
-  const cm = metrics.confusion_matrix;
-  const tn = cm[0]?.[0] ?? 0;
-  const fp = cm[0]?.[1] ?? 0;
-  const fn = cm[1]?.[0] ?? 0;
-  const tp = cm[1]?.[1] ?? 0;
+export default function ConfusionMatrix({
+  bank,
+  modelType = 'federated',
+  matrix,
+  title,
+  subtitle,
+}: ConfusionMatrixProps) {
+  let tn = 0;
+  let fp = 0;
+  let fn = 0;
+  let tp = 0;
+  let heading = title || 'Confusion Matrix';
+  let subheading = subtitle;
+  let color = '#6366f1';
+
+  if (matrix) {
+    tn = matrix.true_negatives ?? 0;
+    fp = matrix.false_positives ?? 0;
+    fn = matrix.false_negatives ?? 0;
+    tp = matrix.true_positives ?? 0;
+    if (!subheading && matrix.threshold !== undefined) {
+      subheading = `Decision Threshold τ = ${matrix.threshold.toFixed(2)}`;
+    }
+  } else if (bank) {
+    const metrics = modelType === 'local' ? bank.local_metrics : bank.federated_metrics;
+    if (!metrics) return null;
+
+    const cm = metrics.confusion_matrix;
+    tn = cm[0]?.[0] ?? 0;
+    fp = cm[0]?.[1] ?? 0;
+    fn = cm[1]?.[0] ?? 0;
+    tp = cm[1]?.[1] ?? 0;
+    subheading = subheading || `${bank.name} - ${modelType === 'local' ? 'Local' : 'Federated'}`;
+    color = BANK_COLORS[bank.id] ?? '#6366f1';
+  } else {
+    return null;
+  }
+
   const total = tn + fp + fn + tp || 1;
 
   const cells = [
@@ -24,48 +69,55 @@ export default function ConfusionMatrix({ bank, modelType }: ConfusionMatrixProp
     { label: 'TP', value: tp, row: 1, col: 1, intensity: tp / total },
   ];
 
-  const color = BANK_COLORS[bank.id] ?? '#6366f1';
-
   return (
     <div className="glass-card p-5">
-      <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-1">
-        Confusion Matrix
-      </h3>
-      <p className="text-[10px] text-[var(--color-text-muted)] mb-3">
-        {bank.name} - {modelType === 'local' ? 'Local' : 'Federated'}
-      </p>
+      <div className="flex items-center justify-between mb-1">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
+          {heading}
+        </h3>
+        {matrix?.threshold !== undefined && (
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-400 border border-indigo-500/30">
+            τ = {matrix.threshold.toFixed(2)}
+          </span>
+        )}
+      </div>
+      {subheading && (
+        <p className="text-[10px] text-[var(--color-text-muted)] mb-3">
+          {subheading}
+        </p>
+      )}
 
-      <div className="flex justify-center">
+      <div className="flex justify-center my-2">
         <div>
           {/* Column labels */}
           <div className="flex ml-16">
-            <div className="w-20 text-center text-[10px] text-[var(--color-text-muted)]">Pred: Legit</div>
-            <div className="w-20 text-center text-[10px] text-[var(--color-text-muted)]">Pred: Fraud</div>
+            <div className="w-24 text-center text-[10px] text-[var(--color-text-muted)] font-medium">Pred: Legit</div>
+            <div className="w-24 text-center text-[10px] text-[var(--color-text-muted)] font-medium">Pred: Fraud</div>
           </div>
 
           {/* Rows */}
           {[0, 1].map((row) => (
             <div key={row} className="flex items-center">
-              <div className="w-16 text-right pr-2 text-[10px] text-[var(--color-text-muted)]">
+              <div className="w-16 text-right pr-2 text-[10px] text-[var(--color-text-muted)] font-medium">
                 {row === 0 ? 'Actual: Legit' : 'Actual: Fraud'}
               </div>
               {[0, 1].map((col) => {
                 const cell = cells.find((c) => c.row === row && c.col === col)!;
-                const bgOpacity = Math.min(0.6, cell.intensity * 3);
+                const bgOpacity = Math.min(0.65, Math.max(0.12, cell.intensity * 2.5));
                 const bgColor = cell.isError
                   ? `rgba(244, 63, 94, ${bgOpacity})`
-                  : `rgba(${parseInt(color.slice(1, 3), 16)}, ${parseInt(color.slice(3, 5), 16)}, ${parseInt(color.slice(5, 7), 16)}, ${bgOpacity})`;
+                  : `rgba(${parseInt(color.slice(1, 3), 16) || 99}, ${parseInt(color.slice(3, 5), 16) || 102}, ${parseInt(color.slice(5, 7), 16) || 241}, ${bgOpacity})`;
 
                 return (
                   <div
                     key={col}
-                    className="w-20 h-16 flex flex-col items-center justify-center rounded-md m-0.5 border border-[var(--color-border-subtle)]"
+                    className="w-24 h-16 flex flex-col items-center justify-center rounded-md m-0.5 border border-[var(--color-border-subtle)] transition-colors"
                     style={{ background: bgColor }}
                   >
-                    <span className="text-lg font-bold font-mono text-[var(--color-text-primary)]">
+                    <span className="text-base font-bold font-mono text-[var(--color-text-primary)]">
                       {cell.value.toLocaleString()}
                     </span>
-                    <span className="text-[9px] text-[var(--color-text-muted)]">{cell.label}</span>
+                    <span className="text-[9px] text-[var(--color-text-muted)] font-mono">{cell.label}</span>
                   </div>
                 );
               })}
@@ -73,6 +125,28 @@ export default function ConfusionMatrix({ bank, modelType }: ConfusionMatrixProp
           ))}
         </div>
       </div>
+
+      {/* Operational metrics summary if provided */}
+      {matrix && matrix.precision !== undefined && (
+        <div className="grid grid-cols-4 gap-2 mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-center text-[10px]">
+          <div>
+            <div className="text-[var(--color-text-muted)]">Precision</div>
+            <div className="font-mono font-bold text-[var(--color-text-primary)]">{(matrix.precision * 100).toFixed(1)}%</div>
+          </div>
+          <div>
+            <div className="text-[var(--color-text-muted)]">Recall</div>
+            <div className="font-mono font-bold text-[var(--color-text-primary)]">{((matrix.recall ?? 0) * 100).toFixed(1)}%</div>
+          </div>
+          <div>
+            <div className="text-[var(--color-text-muted)]">FPR</div>
+            <div className="font-mono font-bold text-rose-400">{((matrix.fpr ?? 0) * 100).toFixed(3)}%</div>
+          </div>
+          <div>
+            <div className="text-[var(--color-text-muted)]">F1 Score</div>
+            <div className="font-mono font-bold text-indigo-400">{(matrix.f1_score ?? 0).toFixed(4)}</div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
