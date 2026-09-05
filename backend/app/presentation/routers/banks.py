@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import numpy as np
 import pandas as pd  # noqa: TC002
 from fastapi import APIRouter, HTTPException
 from scipy import stats
-
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
 
 from app.application.services.data_generator import DataGenerator
 
@@ -78,7 +75,7 @@ async def list_banks() -> list[dict]:
     return BANK_CONFIGS
 
 
-def _compute_js_divergence(p: np.ndarray, q: np.ndarray) -> float:
+def _compute_js_divergence(p: Any, q: Any) -> float:
     """Compute the Jensen-Shannon Divergence between two binned frequency distributions."""
     p_arr = np.array(p, dtype=float)
     q_arr = np.array(q, dtype=float)
@@ -119,7 +116,7 @@ def _compute_js_divergence(p: np.ndarray, q: np.ndarray) -> float:
     return float(np.clip(js, 0.0, 1.0))
 
 
-def _compute_psi(expected: np.ndarray, actual: np.ndarray, num_bins: int = 10) -> float:
+def _compute_psi(expected: Any, actual: Any, num_bins: int = 10) -> float:
     """Compute the Population Stability Index (PSI) between two continuous arrays."""
     exp_arr = np.array(expected, dtype=float)
     act_arr = np.array(actual, dtype=float)
@@ -153,26 +150,30 @@ def _compute_psi(expected: np.ndarray, actual: np.ndarray, num_bins: int = 10) -
     return float(psi)
 
 
-def _compute_categorical_js(expected: np.ndarray, actual: np.ndarray) -> float:
+def _compute_categorical_js(expected: Any, actual: Any) -> float:
     """Compute JS Divergence for categorical arrays."""
-    if len(expected) == 0 or len(actual) == 0:
+    exp_arr = np.asarray(expected)
+    act_arr = np.asarray(actual)
+    if len(exp_arr) == 0 or len(act_arr) == 0:
         return 0.0
-    all_cats = np.unique(np.concatenate([expected, actual]))
-    exp_counts = np.array([np.sum(expected == cat) for cat in all_cats], dtype=float)
-    act_counts = np.array([np.sum(actual == cat) for cat in all_cats], dtype=float)
+    all_cats = np.unique(np.concatenate([exp_arr, act_arr]))
+    exp_counts = np.array([np.sum(exp_arr == cat) for cat in all_cats], dtype=float)
+    act_counts = np.array([np.sum(act_arr == cat) for cat in all_cats], dtype=float)
     return _compute_js_divergence(exp_counts, act_counts)
 
 
-def _compute_categorical_psi(expected: np.ndarray, actual: np.ndarray) -> float:
+def _compute_categorical_psi(expected: Any, actual: Any) -> float:
     """Compute PSI for categorical arrays."""
-    if len(expected) == 0 or len(actual) == 0:
+    exp_arr = np.asarray(expected)
+    act_arr = np.asarray(actual)
+    if len(exp_arr) == 0 or len(act_arr) == 0:
         return 0.0
-    all_cats = np.unique(np.concatenate([expected, actual]))
-    exp_counts = np.array([np.sum(expected == cat) for cat in all_cats], dtype=float)
-    act_counts = np.array([np.sum(actual == cat) for cat in all_cats], dtype=float)
+    all_cats = np.unique(np.concatenate([exp_arr, act_arr]))
+    exp_counts = np.array([np.sum(exp_arr == cat) for cat in all_cats], dtype=float)
+    act_counts = np.array([np.sum(act_arr == cat) for cat in all_cats], dtype=float)
 
-    expected_pct = exp_counts / len(expected)
-    actual_pct = act_counts / len(actual)
+    expected_pct = exp_counts / len(exp_arr)
+    actual_pct = act_counts / len(act_arr)
 
     eps = 1e-4
     expected_pct = np.where(expected_pct == 0, eps, expected_pct)
@@ -255,18 +256,18 @@ def _compute_concept_drift(
     from sklearn.linear_model import LogisticRegression
 
     # 1) Model prediction probability shift
-    X_exp = DataGenerator.encode_features(df_exp)
-    X_act = DataGenerator.encode_features(df_act)
+    X_exp: Any = DataGenerator.encode_features(df_exp)
+    X_act: Any = DataGenerator.encode_features(df_act)
 
-    if len(np.unique(y_exp)) < 2:
+    if y_exp.nunique() < 2:
         pred_psi = 0.0
         pred_js = 0.0
     else:
         clf = LogisticRegression(solver="lbfgs", max_iter=100, random_state=42)
         clf.fit(X_exp, y_exp.to_numpy())
 
-        p_exp = clf.predict_proba(X_exp)[:, 1]
-        p_act = clf.predict_proba(X_act)[:, 1]
+        p_exp: Any = clf.predict_proba(X_exp)[:, 1]
+        p_act: Any = clf.predict_proba(X_act)[:, 1]
 
         pred_psi = _compute_psi(p_exp, p_act, num_bins=10)
 
@@ -354,14 +355,14 @@ async def get_bank_distributions() -> dict[str, Any]:
     )
 
     banks_data: dict[str, Any] = {}
-    amount_arrays: dict[str, NDArray[Any]] = {}
+    amount_arrays: dict[str, Any] = {}
 
     for bank_id, (df, labels) in datasets.items():
-        amounts: NDArray[Any] = df["transaction_amount"].to_numpy()
+        amounts = df["transaction_amount"].to_numpy()
         amount_arrays[bank_id] = amounts
-        hours: NDArray[Any] = df["hour_of_day"].to_numpy()
-        merchants: NDArray[Any] = df["merchant_category"].to_numpy()
-        is_fraud: NDArray[Any] = labels.to_numpy().astype(bool)
+        hours = df["hour_of_day"].to_numpy()
+        merchants = df["merchant_category"].to_numpy()
+        is_fraud = labels.to_numpy().astype(bool)
 
         # 1) Transaction amount histogram (log-scale bins)
         log_bins = np.logspace(

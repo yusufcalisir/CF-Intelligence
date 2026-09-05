@@ -6,6 +6,7 @@ Simulation execution runs in background threads within the web process.
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException, Request, status
