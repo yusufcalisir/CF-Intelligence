@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1417%2F1417_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1429%2F1429_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
@@ -472,7 +472,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,160 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (1,172 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (100% kill rate)
@@ -750,7 +750,13 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 - **Byzantine Poisoned Gradient Attack ($\Delta w \times -10.0$):**
   - Simulates a compromised bank node (Bank Gamma) injecting inverted, malicious parameter weights to degrade the global model.
   - The **Krum / Bulyan Defense Shield** evaluates neighbor Euclidean distance sums ($\Delta = 48.2$, exceeding the distance threshold of $14.1$).
-  - The malicious gradient is rejected, Bank Gamma is isolated with an immediate visual quarantine badge (`QUARANTINED BY KRUM`), and global model accuracy is preserved with $+0.42$ ROC-AUC protection over undefended FedAvg.
+  - The malicious gradient is rejected, Bank Gamma is isolated with an immediate visual quarantine badge (`QUARANTINED BY KRUM`), and global model resilience is maintained.
+
+> **Simulation Notice & Metric Classification:** In alignment with platform-wide transparency principles (as applied to illustrative unlearning and dropout simulators), the model accuracy telemetry (`auc_protected`, `auc_compromised_baseline`) displayed in the Chaos Attack Injector HUD is a **continuous live demo indicator / simulation proxy** derived from gradient cosine alignment and boundary strain:
+> 
+> $$\text{AUC}_{\text{protected}} = \text{clamp}\Big(0.9100, 0.9600, 0.9418 - 1.5(1 - \cos\theta) - \frac{\|\Delta w\|_2}{1200 \cdot \tau}\Big)$$
+> 
+> This responsive continuous function provides operators with immediate visual feedback on gradient deviation and defense recovery under active adversarial stress. It is explicitly labeled in the UI as **`SIMULATED DEMO`** and **`Simulated Proxy`**, clearly distinguishing it from offline holdout dataset evaluations measured on static open benchmarks in the [Empirical Benchmarks](#15-empirical-performance--benchmark-suite).
 
 ---
 
@@ -995,7 +1001,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Memory/DB Isolation**| **4/4 Tenant Isolation Tests Passing** | Strict Isolation (403 BOLA rejection) | `test_multi_tenant_security_audit.py` | `Self-Verified (Input sanitization, ContextVar session isolation, Redis namespace enclosure, cross-tenant 403 enforcement)` |
-| **Full Test Suite Pass Rate** | **1,417 / 1,417 passing** | 100% | 1,160 Backend Pytest + 247 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,429 / 1,429 passing** | 100% | 1,172 Backend Pytest + 247 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1320,27 +1326,31 @@ The reports below document the internal scientific verification suites validatin
 ```json
 {
   "attack_type": "byzantine_poisoning",
-  "target_bank": "bank_gamma",
-  "intensity": 0.85
+  "adversary_bank": "bank_gamma",
+  "target_bank": "bank_alpha",
+  "intensity_rate": 500,
+  "defense_strategy": "krum"
 }
 ```
 
 **Attack Execution Response (HTTP 200 OK):**
 ```json
 {
-  "success": true,
+  "attack_id": "ATK-BYZ-9941",
   "attack_type": "byzantine_poisoning",
-  "target_bank": "bank_gamma",
-  "intensity": 0.85,
-  "defense_applied": "Krum Robust Byzantine Aggregation",
-  "node_quarantined": true,
-  "quarantine_reason": "Gradient distance anomaly delta=48.2 exceeded threshold 14.1",
-  "affected_transactions": 0,
-  "interception_rate": 1.0,
-  "system_status": "THREAT_NEUTRALIZED",
-  "timestamp": "2026-09-03T01:15:00Z"
+  "status": "quarantined",
+  "defense_activated": "Krum Robust Byzantine Aggregation",
+  "adversary_quarantined": "bank_gamma",
+  "euclidean_distance": 48.24,
+  "distance_threshold": 14.10,
+  "packets_blocked": 500,
+  "mitigation_latency_ms": 3.8,
+  "auc_protected": 0.9412,
+  "auc_compromised_baseline": 0.5218,
+  "log_entry": "Byzantine poisoned gradient from bank_gamma rejected by Krum Robust Byzantine Aggregation (dist 48.2 > threshold 14.1). Model AUC preserved at 0.9412."
 }
 ```
+*Note: `auc_protected` and `auc_compromised_baseline` in this endpoint represent continuous simulated demo proxy metrics for live operator HUD feedback and are explicitly tagged as simulated in the schema and console UI.*
 
 ### 19.7 Real Dataset Ingestion & Great Expectations Contract Gating
 
@@ -1515,10 +1525,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,417 Tests)
+### Step 5: Master Test Suites Execution (1,429 Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (1,160 tests)
+# 1. Run full backend pytest suite (1,172 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (247 tests across 77 test files)
