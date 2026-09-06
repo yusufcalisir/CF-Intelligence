@@ -10,7 +10,7 @@ export default defineConfig({
   testDir: './',
   testMatch: ['e2e-responsive/**/*.spec.ts', 'e2e-visual/**/*.spec.ts', 'e2e-a11y/**/*.spec.ts', 'e2e-workflows/**/*.spec.ts'],
   snapshotDir: './e2e-visual/snapshots',
-  snapshotPathTemplate: '{snapshotDir}/{testFileDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
+  snapshotPathTemplate: '{snapshotDir}/{testFileName}-snapshots/{arg}-{projectName}{ext}',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
@@ -84,6 +84,14 @@ export default defineConfig({
       testMatch: /.*\.spec\.ts/,
       use: {
         browserName: 'firefox',
+        viewport: { width: 1280, height: 800 },
+      },
+    },
+    {
+      name: 'desktop-standard',
+      testMatch: /.*\.spec\.ts/,
+      use: {
+        browserName: 'chromium',
         viewport: { width: 1280, height: 800 },
       },
     },

@@ -17,6 +17,11 @@ provider "aws" {
   region = var.aws_region
 }
 
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
 # ---------------------------------------------------------------------------
 # Locals
 # ---------------------------------------------------------------------------
@@ -51,8 +56,8 @@ resource "aws_subnet" "private" {
   availability_zone = var.availability_zones[count.index]
 
   tags = merge(local.common_tags, {
-    Name                              = "${var.cluster_name}-private-${count.index}"
-    "kubernetes.io/role/internal-elb" = "1"
+    Name                                        = "${var.cluster_name}-private-${count.index}"
+    "kubernetes.io/role/internal-elb"           = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }
@@ -65,8 +70,8 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = false
 
   tags = merge(local.common_tags, {
-    Name                         = "${var.cluster_name}-public-${count.index}"
-    "kubernetes.io/role/elb"     = "1"
+    Name                                        = "${var.cluster_name}-public-${count.index}"
+    "kubernetes.io/role/elb"                    = "1"
     "kubernetes.io/cluster/${var.cluster_name}" = "owned"
   })
 }
@@ -267,10 +272,10 @@ resource "aws_eks_node_group" "cfi" {
 # AWS KMS — Envelope Encryption Key
 # ---------------------------------------------------------------------------
 resource "aws_kms_key" "cfi" {
-  description              = "CFI Platform — EKS secrets envelope encryption key"
-  deletion_window_in_days  = 30
-  enable_key_rotation      = true
-  multi_region             = false
+  description             = "CFI Platform — EKS secrets envelope encryption key"
+  deletion_window_in_days = 30
+  enable_key_rotation     = true
+  multi_region            = false
 
   tags = merge(local.common_tags, { Name = "${var.cluster_name}-kms" })
 }
@@ -295,10 +300,10 @@ resource "aws_security_group" "rds" {
   vpc_id      = aws_vpc.cfi.id
 
   ingress {
-    description = "PostgreSQL access from EKS nodes"
-    from_port   = 5432
-    to_port     = 5432
-    protocol    = "tcp"
+    description     = "PostgreSQL access from EKS nodes"
+    from_port       = 5432
+    to_port         = 5432
+    protocol        = "tcp"
     security_groups = [aws_security_group.eks_nodes.id]
   }
 
@@ -306,22 +311,22 @@ resource "aws_security_group" "rds" {
 }
 
 resource "aws_db_instance" "cfi_postgresql" {
-  identifier                  = "${var.cluster_name}-postgres"
-  engine                      = "postgres"
-  engine_version              = "16.2"
-  instance_class              = "db.m6i.xlarge"
-  allocated_storage           = 100
-  max_allocated_storage       = 1000
-  storage_type                = "gp3"
-  storage_encrypted           = true
-  kms_key_id                  = aws_kms_key.cfi.arn
-  multi_az                    = true
-  publicly_accessible         = false
-  deletion_protection         = true
-  backup_retention_period     = 7
-  backup_window               = "03:00-04:00"
-  db_subnet_group_name        = aws_db_subnet_group.cfi.name
-  vpc_security_group_ids      = [aws_security_group.rds.id]
+  identifier              = "${var.cluster_name}-postgres"
+  engine                  = "postgres"
+  engine_version          = "16.2"
+  instance_class          = "db.m6i.xlarge"
+  allocated_storage       = 100
+  max_allocated_storage   = 1000
+  storage_type            = "gp3"
+  storage_encrypted       = true
+  kms_key_id              = aws_kms_key.cfi.arn
+  multi_az                = true
+  publicly_accessible     = false
+  deletion_protection     = true
+  backup_retention_period = 7
+  backup_window           = "03:00-04:00"
+  db_subnet_group_name    = aws_db_subnet_group.cfi.name
+  vpc_security_group_ids  = [aws_security_group.rds.id]
 
   db_name  = "cfi_platform"
   username = "cfi_admin"
@@ -375,12 +380,13 @@ resource "aws_elasticache_replication_group" "cfi_redis" {
 }
 
 # ---------------------------------------------------------------------------
-# AWS WAFv2 Web ACL
+# AWS WAFv2 Web ACL (CloudFront Edge Defense)
 # ---------------------------------------------------------------------------
 resource "aws_wafv2_web_acl" "cfi" {
+  provider    = aws.us_east_1
   name        = "${var.cluster_name}-waf-acl"
-  description = "WAF Web ACL for CFI Platform API"
-  scope       = "REGIONAL"
+  description = "WAF Web ACL for CFI Platform CDN & API"
+  scope       = "CLOUDFRONT"
 
   default_action {
     allow {}
@@ -440,6 +446,21 @@ resource "aws_wafv2_web_acl" "cfi" {
 }
 
 # ---------------------------------------------------------------------------
+# ACM Certificate for CloudFront Custom CNAME Domain
+# ---------------------------------------------------------------------------
+resource "aws_acm_certificate" "cfi_cdn" {
+  provider          = aws.us_east_1
+  domain_name       = "api.cfi-platform.org"
+  validation_method = "DNS"
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-cdn-cert" })
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+# ---------------------------------------------------------------------------
 # CloudFront CDN Distribution
 # ---------------------------------------------------------------------------
 resource "aws_cloudfront_distribution" "cfi_cdn" {
@@ -447,6 +468,8 @@ resource "aws_cloudfront_distribution" "cfi_cdn" {
   is_ipv6_enabled     = true
   comment             = "CFI Platform CDN distribution"
   default_root_object = "index.html"
+  aliases             = ["api.cfi-platform.org"]
+  web_acl_id          = aws_wafv2_web_acl.cfi.arn
 
   origin {
     domain_name = "api.cfi-platform.org"
@@ -485,7 +508,9 @@ resource "aws_cloudfront_distribution" "cfi_cdn" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = aws_acm_certificate.cfi_cdn.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 
   tags = merge(local.common_tags, { Name = "${var.cluster_name}-cdn" })

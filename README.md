@@ -475,12 +475,13 @@ CF-Intelligence/
 │   └── tests/                                       # Comprehensive Backend Test Suite (1,172 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
-│       ├── mutation/                                # AST boundary & fault injection mutant suites (100% kill rate)
+│       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
 │       └── property/                                # Hypothesis property-based mathematical invariance tests
 │
 ├── frontend/                                        # React 18 / Vite TypeScript Web Console
 │   ├── middleware.ts                                # Vercel Edge Middleware (@upstash/ratelimit & security guards)
 │   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (10 Tests)
+│   ├── e2e-visual/                                  # Playwright Visual Regression Suite (Strict baseline comparison)
 │   │   ├── auth_session_flow.spec.ts                # Session token lifecycle, navigation & security header validation
 │   │   ├── federated_training_lifecycle.spec.ts     # FL coordinator rounds, weight sync & live telemetry convergence
 │   │   ├── investigation_four_eyes_sar.spec.ts      # Four-Eyes dual supervisor approval & FinCEN SAR XML export
@@ -620,8 +621,10 @@ CF-Intelligence/
     ├── run_elliptic_benchmark.py                    # Real Elliptic Bitcoin transaction graph benchmark runner
     ├── run_enterprise_stress_test.py                # High-throughput ISO 20022 payment stream stress test
     ├── run_benchmark.py                             # 9-Configuration matrix empirical benchmark runner
-    ├── run_mutation_tests.py                        # AST boundary mutant injector (100% mutant kill verification)
-    ├── run_coverage_audit.py                        # 4-tier statement, branch & line coverage auditor
+    ├── ast_mutation_engine.py                       # Dynamic Python AST mutant generator & fault injection transformer
+    ├── run_mutation_tests.py                        # Dynamic AST mutation test runner (86.2% backend AST kill rate / 90.2% composite score)
+    ├── run_coverage_audit.py                        # Multi-dimensional coverage auditor with 75% regression gate (--cov-fail-under)
+    ├── validate_k8s_manifests.py                    # Rendered Helm manifest dry-run validator (kubectl apply --dry-run=client)
     ├── run_all_tests.py                             # Unified cross-stack test runner (Backend pytest + Frontend vitest)
     ├── run_all_verifications.py                     # Master scientific verification runner (18 modules)
     ├── audit_api_contracts.py                       # REST endpoint, schema & TypeScript contract auditor
@@ -1041,8 +1044,9 @@ All benchmark measurements and verification suites can be directly reproduced vi
 | **Enterprise ISO 20022 Stress Test** | `python scripts/run_enterprise_stress_test.py --banks 5 --target-tps 10000 --duration 10` | High-throughput concurrent stream simulation of `pacs.008` messages measuring peak TPS, p50/p99 latency, and error rates. Generates `reports/`. |
 | **End-to-End API Contract Audit** | `python scripts/audit_api_contracts.py` | Audits 100% of REST endpoints, Pydantic schemas, WebSocket streams, and status codes with zero orphaned routes. |
 | **EU AI Act & Governance Export** | `python scripts/export_compliance_report.py` | Generates standardized multi-page markdown compliance audit reports covering bias, explainability, and model governance. |
-| **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 28 AST boundary mutants (relational, Byzantine scale, Four-Eyes bypass) across frontend & backend with 100% mutant kill rate. |
-| **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch`. |
+| **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 29 dynamic Python AST mutants & 12 TypeScript invariants across frontend & backend with 86.2% backend AST kill rate (90.2% composite score). |
+| **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch` with strict 75% regression gate (`--cov-fail-under=75`). |
+| **Kubernetes Manifest Dry-Run Audit** | `python scripts/validate_k8s_manifests.py --all` | Renders Helm charts and executes authentic `kubectl apply --dry-run=client` against all 38 production resources with zero template errors. |
 | **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
 
 ---
@@ -1599,20 +1603,26 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,429 Tests)
+### Step 5: Master Test Suites Execution (1,431 Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
 # 1. Run full backend pytest suite (1,172 tests)
 pytest backend/tests/ -v
 
-# 2. Run full frontend vitest suite (247 tests across 77 test files)
+# 2. Run full frontend vitest suite (249 tests across 78 test files)
 npm --prefix frontend test
 
 # 3. Run Playwright real-browser multi-device E2E suite (10 browser tests)
 npm --prefix frontend run test:e2e:workflows
 # or from frontend directory: npx playwright test e2e-workflows --project=desktop-1440-chromium
 
-# 4. Run master scientific invariant verification suite (18 modules, 307 tests)
+# 4. Run Playwright strict visual regression testing suite (3 baseline comparisons)
+npm --prefix frontend run test:visual
+
+# 5. Run Kubernetes manifest dry-run validation suite (38 rendered resources)
+python scripts/validate_k8s_manifests.py --all
+
+# 6. Run master scientific invariant verification suite (18 modules, 307 tests)
 python scripts/run_all_verifications.py
 ```
 

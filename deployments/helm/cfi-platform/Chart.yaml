@@ -13,12 +13,4 @@ home: https://github.com/yusufcalisir/CF-Intelligence
 maintainers:
   - name: CFI Platform Team
     email: cfi-platform@enterprise.local
-dependencies:
-  - name: postgresql
-    version: ">=12.1.0"
-    repository: https://charts.bitnami.com/bitnami
-    condition: postgresql.enabled
-  - name: redis
-    version: ">=17.0.0"
-    repository: https://charts.bitnami.com/bitnami
-    condition: redis.enabled
+icon: https://raw.githubusercontent.com/yusufcalisir/CF-Intelligence/main/docs/assets/icon.png

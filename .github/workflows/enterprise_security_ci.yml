@@ -58,8 +58,7 @@ jobs:
           pip-audit -r requirements.txt \
             --format sarif \
             --output pip-audit-results.sarif \
-            --ignore-vuln GHSA-c5qf-59p4-3g47 \
-            || echo "⚠️ pip-audit completed with advisory warnings – see SARIF report."
+            --ignore-vuln GHSA-c5qf-59p4-3g47
 
       - name: Upload pip-audit SARIF to GitHub Security tab
         if: always()

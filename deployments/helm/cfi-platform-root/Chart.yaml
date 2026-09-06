@@ -4,3 +4,4 @@ description: A Helm chart for deploying the Collaborative Fraud Intelligence pla
 type: application
 version: 0.1.0
 appVersion: "0.2.0"
+icon: https://raw.githubusercontent.com/yusufcalisir/CF-Intelligence/main/docs/assets/icon.png

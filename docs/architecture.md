@@ -679,16 +679,18 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
  GitHub Actions Event (Push / PR / Nightly Cron)
      │
      ├── 1. sast-static-analysis (Ruff, Mypy, Bandit SAST)
-     ├── 2. dependency-security-audit (pip-audit against PyPA vulnerability DB)
-     ├── 3. trivy-container-security (Trivy scanner for OS/library CVEs)
-     ├── 4. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 5. pytest-security-and-compliance-suites (Full unit, security & EU AI Act test suite)
+     ├── 2. dependency-security-audit (pip-audit against PyPA DB + npm audit)
+     ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
+     ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
+     ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
+     └── 6. pytest-security-and-compliance-suites (Full unit, security & EU AI Act test suite)
 ```
 
 | Security Job | Technology / Tool | Security Scope |
 |---|---|---|
 | **SAST Analysis** | `Ruff`, `Mypy`, `Bandit` | Code formatting, type safety, SQL injection, hardcoded secrets, insecure crypto |
-| **Dependency Audit** | `pip-audit` | PyPI third-party package CVE vulnerability checks |
+| **Dependency Audit** | `pip-audit`, `npm audit` | PyPI and npm third-party package CVE vulnerability checks |
+| **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
 | **Compliance Suites** | `Pytest` | EU AI Act, Differential Privacy, Spectral Defense, HSM Signing unit/integration suites |

@@ -24,7 +24,6 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        continue-on-error: true
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
@@ -48,7 +47,7 @@ jobs:
 
       - name: Run Python Dependency Audit (pip-audit)
         run: |
-          pip-audit -r backend/requirements.txt --ignore-vuln GHSA-c5qf-59p4-3g47 || echo "⚠️ pip-audit completed with advisory notice."
+          pip-audit -r backend/requirements.txt --ignore-vuln GHSA-c5qf-59p4-3g47
 
   # --------------------------------------------------------------------------
   # 2. Backend Unit, Integration & Chaos Test Suite
@@ -101,7 +100,7 @@ jobs:
       - name: Run npm audit
         run: |
           cd frontend
-          npm audit --audit-level=high || echo "⚠️ npm audit advisory notice"
+          npm audit --audit-level=high
 
       - name: Run Vitest Frontend Test Suite
         run: cd frontend && npm test
@@ -203,7 +202,7 @@ jobs:
         env:
           PYTHONPATH: backend
         run: |
-          python scripts/run_coverage_audit.py
+          python scripts/run_coverage_audit.py --fail-under=75
 
   # --------------------------------------------------------------------------
   # 7. Frontend Accessibility & WCAG 2.1 AA Compliance
@@ -290,7 +289,7 @@ jobs:
       - name: Run Visual Regression Snapshot Suite
         run: |
           cd frontend
-          npm run test:visual:update
+          npm run test:visual
 
   # --------------------------------------------------------------------------
   # 10. Subsystem Scientific Verification & Reference Audits

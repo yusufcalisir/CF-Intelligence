@@ -106,6 +106,7 @@ frontend/coverage/
 .coverage
 .coverage.*
 coverage.xml
+coverage*.json
 *.cover
 .pytest_cache/
 .mypy_cache/
@@ -149,4 +150,18 @@ docs/production_roadmap.md
 run_local.*
 deploy_hf.*
 deploy_*.sh
+
+# --- Terraform ---
+**/.terraform/
+*.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
