@@ -41,8 +41,8 @@ def test_sbom_generation_cyclonedx(tmp_path: Path):
 def test_license_compliance_no_copyleft():
     """Scan backend requirements and frontend package.json for copyleft (GPL/AGPL) conflicts."""
     import importlib.metadata
+    import re
 
-    copyleft_indicators = ["gpl", "agpl", "gnu general public license", "gnu affero"]
     flagged = []
 
     # Check direct requirements from requirements.txt
@@ -56,19 +56,41 @@ def test_license_compliance_no_copyleft():
         pkg_name = line.split("==")[0].split(">=")[0].split("<=")[0].split("~=")[0].split("[")[0].strip().lower()
         direct_pkgs.append(pkg_name)
 
+    permissive_exceptions = (
+        "gpl-compatible",
+        "gpl compatible",
+        "psf",
+        "python software foundation",
+        "beopen",
+    )
+
     for pkg in direct_pkgs:
         try:
             dist = importlib.metadata.distribution(pkg)
             lic = (dist.metadata.get("License") or "").lower()
             classifiers = dist.metadata.get_all("Classifier") or []
+
+            # Permissive and Python Software Foundation licenses are not copyleft
+            if any(exc in lic for exc in permissive_exceptions):
+                continue
+
             is_copyleft = False
-            for ind in copyleft_indicators:
-                if ind in lic:
+            for c in classifiers:
+                c_lower = c.lower()
+                if (
+                    "general public license" in c_lower
+                    or "affero" in c_lower
+                    or "gpl" in c_lower
+                ) and "lgpl" not in c_lower and "lesser" not in c_lower:
                     is_copyleft = True
-                for c in classifiers:
-                    if ind in c.lower() and "lgpl" not in c.lower():
-                        is_copyleft = True
-            if is_copyleft and "lesser" not in lic and "lgpl" not in lic:
+
+            if "lesser" not in lic and "lgpl" not in lic and (
+                any(ind in lic for ind in ("gnu general public license", "gnu affero", "agpl", "gplv2", "gplv3"))
+                or (re.search(r"\bgpl\b", lic) and not re.search(r"\bgpl[- ]compatible\b", lic))
+            ):
+                is_copyleft = True
+
+            if is_copyleft:
                 flagged.append((pkg, lic))
         except Exception:
             pass

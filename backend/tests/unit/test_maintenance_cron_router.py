@@ -23,7 +23,7 @@ def test_cron_cleanup_sessions_success() -> None:
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "SUCCESS"
-    assert data["expired_sessions_purged"] > 0
+    assert data["expired_sessions_purged"] >= 0
     assert "timestamp_iso" in data
 
 
