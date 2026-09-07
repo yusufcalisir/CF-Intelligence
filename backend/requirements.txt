@@ -40,7 +40,7 @@ flwr[simulation]>=1.12.0,<2.0.0
 ray>=2.56.0,<3.0.0              # security: PYSEC-2026-2273 (fixed in 2.56.0)
 
 # WebSocket
-websockets>=13.0,<18.0
+websockets>=17.1,<18.0
 
 # Utilities
 structlog>=24.4.0,<27.0.0
