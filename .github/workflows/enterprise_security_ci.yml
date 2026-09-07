@@ -52,21 +52,10 @@ jobs:
       - name: Install pip-audit
         run: pip install pip-audit
 
-      - name: Run pip-audit (SARIF output)
+      - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
         run: |
-          pip-audit -r requirements.txt \
-            --format sarif \
-            --output pip-audit-results.sarif \
-            --ignore-vuln GHSA-c5qf-59p4-3g47
-
-      - name: Upload pip-audit SARIF to GitHub Security tab
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: backend/pip-audit-results.sarif
-          category: pip-audit
-        continue-on-error: true
+          pip-audit -r requirements.txt --ignore-vuln GHSA-c5qf-59p4-3g47
 
       # ── Frontend: npm audit ─────────────────────────────────────────────
       - uses: actions/setup-node@v4
