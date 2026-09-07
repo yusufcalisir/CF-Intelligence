@@ -11,6 +11,7 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel, Field
 
 from app.application.schemas.phase2 import (
     CaseCreateRequest,
@@ -122,30 +123,40 @@ async def create_case(
     the original response is returned without creating a duplicate case.
     """
     idem = IdempotencyService.get()
-    cached = idem.get_cached(idempotency_key)
-    if cached is not None:
+    status_or_hit, cached = idem.acquire(idempotency_key)
+    if status_or_hit == "HIT":
         return JSONResponse(
             content=cached,
             status_code=200,
             headers={"Idempotency-Replayed": "true"},
         )
+    if status_or_hit == "IN_PROGRESS":
+        return JSONResponse(
+            content={"detail": "A request with this Idempotency-Key is currently being processed."},
+            status_code=409,
+            headers={"Retry-After": "2"},
+        )
 
     try:
-        priority = CasePriority(req.priority)
-    except ValueError:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid priority value: {req.priority!r}. "
-            f"Valid values: {[e.value for e in CasePriority]}",
+        try:
+            priority = CasePriority(req.priority)
+        except ValueError:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Invalid priority value: {req.priority!r}. "
+                f"Valid values: {[e.value for e in CasePriority]}",
+            )
+        case = _case_service.create_case(
+            title=req.title,
+            priority=priority,
+            alert_ids=req.alert_ids,
         )
-    case = _case_service.create_case(
-        title=req.title,
-        priority=priority,
-        alert_ids=req.alert_ids,
-    )
-    result = _serialize_case(case)
-    idem.store(idempotency_key, result.model_dump())
-    return result
+        result = _serialize_case(case)
+        idem.complete(idempotency_key, result.model_dump())
+        return result
+    except Exception:
+        idem.release(idempotency_key)
+        raise
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
@@ -361,6 +372,23 @@ async def file_sar_report(case_id: str) -> dict[str, Any]:
         }
     except SARValidationError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+class ExportFinCENXmlRequest(BaseModel):
+    case_id: str = Field(..., description="ID of confirmed fraud case to compile SAR XML for")
+
+
+class ExportFinCENXmlResponse(BaseModel):
+    submission_id: str
+    status: str
+    xml: str
+    pdf_download_url: str
+
+
+@router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
+async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[str, Any]:
+    """Compile and validate FinCEN BSA SAR XML payload (alias contract for Developer Portal & SIEM)."""
+    return await file_sar_report(payload.case_id)
 
 
 # ── Agentic AML Copilot Endpoints ─────────────────────────────────────

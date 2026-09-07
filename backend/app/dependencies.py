@@ -270,7 +270,7 @@ async def enforce_tenant_quota(
         or "bank_alpha"
     )
 
-    allowed, reason = metering.check_quota(target_tenant, "INFERENCE")
+    allowed, reason = metering.acquire_quota(target_tenant, "INFERENCE", count=1)
     if not allowed:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

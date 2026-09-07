@@ -139,6 +139,9 @@ logs/
 .roo/
 .cline/
 scratch/
+phases/
+audit_phases/
+FULL_PERSISTENT_AUDIT_REPORT.md
 implementation_plan.md
 task.md
 walkthrough.md

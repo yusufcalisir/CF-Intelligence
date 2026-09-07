@@ -120,24 +120,27 @@ class TestDecorators:
 # 4. Grafana Dashboards Schema Validation
 # ---------------------------------------------------------------------------
 
-DASHBOARD_FILES = [
-    "fl_consortium_overview.json",
-    "privacy_security_audit.json",
+MONITORING_GRAFANA_DIR = Path(__file__).parents[3] / "monitoring" / "grafana" / "dashboards"
+
+DASHBOARDS_TO_TEST = [
+    (GRAFANA_DIR / "fl_consortium_overview.json"),
+    (GRAFANA_DIR / "privacy_security_audit.json"),
+    (MONITORING_GRAFANA_DIR / "cfi_operational_dashboard.json"),
+    (MONITORING_GRAFANA_DIR / "cfi_privacy_budget_dashboard.json"),
 ]
 
 
-@pytest.mark.parametrize("filename", DASHBOARD_FILES)
-def test_grafana_dashboard_json_validity(filename: str):
-    path = GRAFANA_DIR / filename
+@pytest.mark.parametrize("path", DASHBOARDS_TO_TEST)
+def test_grafana_dashboard_json_validity(path: Path):
     assert path.exists(), f"Dashboard file not found: {path}"
 
     content = path.read_text(encoding="utf-8")
     data = json.loads(content)
 
-    assert "title" in data, f"Missing 'title' in {filename}"
-    assert "panels" in data, f"Missing 'panels' in {filename}"
-    assert len(data["panels"]) >= 3, f"Expected >= 3 panels in {filename}"
-    assert "schemaVersion" in data, f"Missing 'schemaVersion' in {filename}"
+    assert "title" in data, f"Missing 'title' in {path.name}"
+    assert "panels" in data, f"Missing 'panels' in {path.name}"
+    assert len(data["panels"]) >= 3, f"Expected >= 3 panels in {path.name}"
+    assert "schemaVersion" in data, f"Missing 'schemaVersion' in {path.name}"
 
 
 # ---------------------------------------------------------------------------

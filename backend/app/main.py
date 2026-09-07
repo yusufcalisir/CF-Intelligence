@@ -912,6 +912,7 @@ else:
     app.include_router(training.router)
     app.include_router(model_registry.router)
     app.include_router(training_ws.router)
+    app.include_router(streaming_ws.router)
     app.include_router(alerts.router)
     app.include_router(cases.router)
     app.include_router(predict.router)

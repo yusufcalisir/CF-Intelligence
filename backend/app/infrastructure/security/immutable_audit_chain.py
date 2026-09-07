@@ -70,9 +70,15 @@ class ImmutableAuditChain:
 
     def get_chain_proof_hash(self) -> str:
         """Get the current cryptographic proof hash of the audit chain tail."""
-        if self.chain:
-            return self.chain[-1].curr_hash
-        return GENESIS_HASH
+        with self._lock:
+            if self.chain:
+                return self.chain[-1].curr_hash
+            return GENESIS_HASH
+
+    def get_snapshot(self) -> list[AuditLogEntry]:
+        """Return an immutable snapshot copy of current audit entries."""
+        with self._lock:
+            return list(self.chain)
 
     def _seed_default_chain(self) -> None:
         """Seed genesis and initial system audit events."""
@@ -194,7 +200,10 @@ class ImmutableAuditChain:
 
     def verify_chain_integrity(self) -> ChainVerificationReport:
         """Verify full SHA-256 chain integrity from Genesis Block to tail."""
-        if not self.chain:
+        with self._lock:
+            snapshot = list(self.chain)
+
+        if not snapshot:
             return ChainVerificationReport(
                 is_valid=True,
                 total_records=0,
@@ -203,12 +212,12 @@ class ImmutableAuditChain:
 
         expected_prev = GENESIS_HASH
 
-        for i, entry in enumerate(self.chain):
+        for i, entry in enumerate(snapshot):
             # 1. Index sequence check
             if entry.index != i:
                 return ChainVerificationReport(
                     is_valid=False,
-                    total_records=len(self.chain),
+                    total_records=len(snapshot),
                     broken_index=i,
                     tamper_reason=f"Index mismatch at position {i}: expected {i}, got {entry.index}.",
                     last_hash=entry.curr_hash,
@@ -218,7 +227,7 @@ class ImmutableAuditChain:
             if entry.prev_hash != expected_prev:
                 return ChainVerificationReport(
                     is_valid=False,
-                    total_records=len(self.chain),
+                    total_records=len(snapshot),
                     broken_index=i,
                     tamper_reason=f"Chain broken at entry #{i}: prev_hash '{entry.prev_hash[:8]}' does not match expected '{expected_prev[:8]}'.",
                     last_hash=entry.curr_hash,
@@ -237,7 +246,7 @@ class ImmutableAuditChain:
             if recomputed != entry.curr_hash:
                 return ChainVerificationReport(
                     is_valid=False,
-                    total_records=len(self.chain),
+                    total_records=len(snapshot),
                     broken_index=i,
                     tamper_reason=f"Tampering detected at entry #{i} ({entry.event_type}): recomputed hash '{recomputed[:8]}' != stored '{entry.curr_hash[:8]}'.",
                     last_hash=entry.curr_hash,
@@ -247,6 +256,6 @@ class ImmutableAuditChain:
 
         return ChainVerificationReport(
             is_valid=True,
-            total_records=len(self.chain),
-            last_hash=self.chain[-1].curr_hash,
+            total_records=len(snapshot),
+            last_hash=snapshot[-1].curr_hash,
         )

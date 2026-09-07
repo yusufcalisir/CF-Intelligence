@@ -25,20 +25,57 @@ if config and config.config_file_name:
 target_metadata = Base.metadata
 
 
+def _resolve_target_database_url() -> str:
+    """Resolve database URL dynamically from x-arguments, environment, or settings."""
+    import os
+
+    # 1. Custom URL passed via CLI '-x url=...'
+    if context and hasattr(context, "get_x_argument"):
+        with contextlib.suppress(Exception):
+            x_args = context.get_x_argument(as_dictionary=True)
+            if x_args and "url" in x_args:
+                return x_args["url"]
+
+    # 2. Environment variable overrides
+    env_url = os.getenv("ALEMBIC_DATABASE_URL") or os.getenv("DATABASE_URL")
+    if env_url:
+        return env_url
+
+    # 3. Config option if explicitly configured (e.g. from alembic.ini or cfg.set_main_option)
+    if config:
+        cfg_url = config.get_main_option("sqlalchemy.url")
+        if cfg_url and cfg_url.strip() and "change_me_in_production" not in cfg_url:
+            return cfg_url.strip()
+
+    # 4. Project settings fallback
+    settings = get_settings()
+    if settings.database_type == "sqlite":
+        from app.infrastructure.database import _STORAGE_ROOT
+
+        db_path = os.path.abspath(os.path.join(_STORAGE_ROOT, "cfi_central.db")).replace("\\", "/")
+        return f"sqlite+aiosqlite:///{db_path}"
+
+    # 5. Default PostgreSQL credentials from settings
+    return (
+        f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
+        f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
+    )
+
+
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode."""
-    url = config.get_main_option("sqlalchemy.url") if config else None
-    if not url:
-        settings = get_settings()
-        url = (
-            f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
-            f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
-        )
+    url = _resolve_target_database_url()
+    if "+aiosqlite" in url:
+        url = url.replace("+aiosqlite", "")
+    if "+asyncpg" in url:
+        url = url.replace("+asyncpg", "")
+
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=url.startswith("sqlite"),
     )
 
     with context.begin_transaction():
@@ -47,23 +84,20 @@ def run_migrations_offline() -> None:
 
 async def run_migrations_online() -> None:
     """Run migrations in 'online' mode with AsyncEngine."""
-    db_url = config.get_main_option("sqlalchemy.url") if config else None
-    if not db_url:
-        settings = get_settings()
-        db_url = (
-            f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
-            f"@{settings.postgres_host}:{settings.postgres_port}/{settings.postgres_db}"
-        )
-
-    # Use aiosqlite for sqlite test URLs if needed
+    db_url = _resolve_target_database_url()
     if db_url.startswith("sqlite:///") and "+aiosqlite" not in db_url:
         db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
 
+    is_sqlite = db_url.startswith("sqlite")
     connectable = create_async_engine(db_url)
 
     async with connectable.connect() as connection:
         await connection.run_sync(
-            lambda conn: context.configure(connection=conn, target_metadata=target_metadata)
+            lambda conn: context.configure(
+                connection=conn,
+                target_metadata=target_metadata,
+                render_as_batch=is_sqlite,
+            )
         )
 
         async with connection.begin():

@@ -232,15 +232,53 @@ class VaultClient:
     def get_secret(
         self, path: str, key: str | None = None, fallback_env_var: str | None = None
     ) -> Any:
-        """Retrieve secret value by path and key from Vault or fallback env var."""
-        if path in self.secret_cache:
-            data = self.secret_cache[path]
+        """Retrieve secret value by path and key from Vault KV v2 or fallback env var.
+
+        When enabled and circuit breaker is healthy, queries:
+            GET /v1/{mount_point}/data/{path}
+        Falls back honestly to configured environment variables or local development defaults
+        if HashiCorp Vault is unconfigured or unreachable.
+        """
+        clean_path = path.strip("/")
+        if clean_path in self.secret_cache:
+            data = self.secret_cache[clean_path]
             return data.get(key) if key else data
 
+        # 1. Attempt live HashiCorp Vault KV v2 GET if enabled
+        if self.enabled:
+            try:
+                self._check_circuit_breaker()
+                url = f"{self.vault_url}/v1/{self.mount_point}/data/{clean_path}"
+                req = urllib.request.Request(
+                    url,
+                    headers={
+                        "X-Vault-Token": self.vault_token,
+                        "Content-Type": "application/json",
+                    },
+                    method="GET",
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:  # nosec B310
+                    if resp.status == 200:
+                        result = json.loads(resp.read().decode("utf-8"))
+                        secret_payload = result.get("data", {}).get("data", {})
+                        if secret_payload:
+                            self.secret_cache[clean_path] = secret_payload
+                            self._record_success()
+                            return secret_payload.get(key) if key else secret_payload
+            except Exception as exc:
+                self._record_failure(exc)
+                logger.warning(
+                    "Vault KV v2 fetch for '%s' failed (%s); using local development fallback.",
+                    clean_path,
+                    exc,
+                )
+
+        # 2. Check fallback environment variable
         if fallback_env_var and fallback_env_var in os.environ:
             val = os.environ[fallback_env_var]
             return val if key else {key or "value": val}
 
+        # 3. Local development defaults
         defaults = {
             "database/credentials": {
                 "password": "change_me_in_production",
@@ -254,18 +292,31 @@ class VaultClient:
             "tls/certs": {"ca_key": "ca_private_key_pem", "server_key": "server_private_key_pem"},
         }
 
-        secret_data = defaults.get(path, {"value": "secret_default_val"})
-        self.secret_cache[path] = secret_data
+        secret_data = defaults.get(clean_path, {"value": "secret_default_val"})
+        self.secret_cache[clean_path] = secret_data
         return secret_data.get(key) if key else secret_data
 
     def get_secret_metadata(self, path: str) -> VaultSecretMetadata:
-        """Retrieve metadata descriptor for a secret path."""
+        """Retrieve metadata descriptor for a secret path.
+
+        Honestly reflects whether the secret originates from a live Vault KV v2 cluster
+        or local simulated development fallback.
+        """
+        clean_path = path.strip("/")
+        from datetime import UTC, datetime
+
+        is_live_vault = self.enabled and self._vault_available and self._failure_count == 0
+        source_label = (
+            "Vault KV v2 Engine (Live REST API)"
+            if is_live_vault
+            else "Local Development Fallback (Vault Cluster Offline/Simulated)"
+        )
         return VaultSecretMetadata(
-            path=f"{self.mount_point}/data/{path}",
+            path=f"{self.mount_point}/data/{clean_path}",
             version=1,
-            created_time="2026-07-20T12:00:00Z",
+            created_time=datetime.now(UTC).isoformat(),
             destroyed=False,
-            source="Vault KV v2 Engine (KV-v2)" if self.enabled else "Local Secrets Cache",
+            source=source_label,
         )
 
     def bind_pki_to_hsm(

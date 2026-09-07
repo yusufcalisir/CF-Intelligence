@@ -18,6 +18,7 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.config import get_settings
+from app.presentation.websockets.manager import training_ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -26,7 +27,9 @@ router = APIRouter()
 
 async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_prod_v2") -> None:
     """Stream training progress events to a WebSocket client."""
-    await websocket.accept()
+    connected = await training_ws_manager.connect(websocket)
+    if not connected:
+        return
     logger.info("WebSocket connected for simulation %s", simulation_id)
 
     settings = get_settings()
@@ -97,6 +100,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
         except Exception:
             pass
     finally:
+        await training_ws_manager.disconnect(websocket)
         if redis_client is not None:
             with contextlib.suppress(Exception):
                 await redis_client.aclose()

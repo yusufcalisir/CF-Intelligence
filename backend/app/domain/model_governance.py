@@ -22,6 +22,9 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+import threading
+
+
 # ---------------------------------------------------------------------------
 # Enums & Exceptions
 # ---------------------------------------------------------------------------
@@ -285,6 +288,7 @@ class ModelRegistryVault:
     def __init__(self) -> None:
         self._checkpoints: dict[str, ModelCheckpoint] = {}
         self._signoff_gate = DualSignoffGate()
+        self._lock = threading.RLock()
 
     def register_checkpoint(
         self,
@@ -298,63 +302,66 @@ class ModelRegistryVault:
         initial_status: ModelStatus = ModelStatus.CANDIDATE,
     ) -> ModelCheckpoint:
         """Registers a new model checkpoint in the registry vault with computed SHA-256 digests."""
-        model_id = str(uuid.uuid4())
-        version = SemanticVersion.parse(version_str)
+        with self._lock:
+            model_id = str(uuid.uuid4())
+            version = SemanticVersion.parse(version_str)
 
-        weights_sha256 = hashlib.sha256(weights_bytes).hexdigest()
-        hp_json = json.dumps(hyperparameters, sort_keys=True)
-        hyperparams_sha256 = hashlib.sha256(hp_json.encode("utf-8")).hexdigest()
+            weights_sha256 = hashlib.sha256(weights_bytes).hexdigest()
+            hp_json = json.dumps(hyperparameters, sort_keys=True)
+            hyperparams_sha256 = hashlib.sha256(hp_json.encode("utf-8")).hexdigest()
 
-        lineage = CryptographicAuditLineage(
-            model_version=version.to_tag(),
-            git_commit_hash=git_commit_hash,
-            dataset_hash=dataset_hash,
-            dp_epsilon=dp_epsilon,
-            dp_delta=dp_delta,
-        )
+            lineage = CryptographicAuditLineage(
+                model_version=version.to_tag(),
+                git_commit_hash=git_commit_hash,
+                dataset_hash=dataset_hash,
+                dp_epsilon=dp_epsilon,
+                dp_delta=dp_delta,
+            )
 
-        checkpoint = ModelCheckpoint(
-            model_id=model_id,
-            version=version,
-            status=initial_status,
-            weights_sha256=weights_sha256,
-            hyperparams_sha256=hyperparams_sha256,
-            dataset_hash=dataset_hash,
-            dp_epsilon=dp_epsilon,
-            dp_delta=dp_delta,
-            lineage=lineage,
-        )
+            checkpoint = ModelCheckpoint(
+                model_id=model_id,
+                version=version,
+                status=initial_status,
+                weights_sha256=weights_sha256,
+                hyperparams_sha256=hyperparams_sha256,
+                dataset_hash=dataset_hash,
+                dp_epsilon=dp_epsilon,
+                dp_delta=dp_delta,
+                lineage=lineage,
+            )
 
-        self._checkpoints[model_id] = checkpoint
-        logger.info(
-            "Registered model checkpoint %s (%s) with status %s (weights_sha256=%s)",
-            model_id,
-            version.to_tag(),
-            initial_status.value,
-            weights_sha256[:16] + "...",
-        )
-        return checkpoint
+            self._checkpoints[model_id] = checkpoint
+            logger.info(
+                "Registered model checkpoint %s (%s) with status %s (weights_sha256=%s)",
+                model_id,
+                version.to_tag(),
+                initial_status.value,
+                weights_sha256[:16] + "...",
+            )
+            return checkpoint
 
     def sign_checkpoint(self, model_id: str, signing_key: bytes) -> str:
         """Generates an HMAC-SHA256 digital signature envelope for a checkpoint using trusted key."""
-        checkpoint = self._get_checkpoint_or_raise(model_id)
-        payload = checkpoint.compute_signature_payload().encode("utf-8")
-        signature = hmac.new(signing_key, payload, hashlib.sha256).hexdigest()
-        checkpoint.hsm_signature = signature
-        logger.info(
-            "Signed checkpoint %s with HSM signature envelope (%s...)", model_id, signature[:16]
-        )
-        return signature
+        with self._lock:
+            checkpoint = self._get_checkpoint_or_raise(model_id)
+            payload = checkpoint.compute_signature_payload().encode("utf-8")
+            signature = hmac.new(signing_key, payload, hashlib.sha256).hexdigest()
+            checkpoint.hsm_signature = signature
+            logger.info(
+                "Signed checkpoint %s with HSM signature envelope (%s...)", model_id, signature[:16]
+            )
+            return signature
 
     def verify_checkpoint_signature(self, model_id: str, signing_key: bytes) -> bool:
         """Cryptographically verifies the digital signature envelope of a checkpoint."""
-        checkpoint = self._get_checkpoint_or_raise(model_id)
-        if not checkpoint.hsm_signature:
-            return False
+        with self._lock:
+            checkpoint = self._get_checkpoint_or_raise(model_id)
+            if not checkpoint.hsm_signature:
+                return False
 
-        payload = checkpoint.compute_signature_payload().encode("utf-8")
-        expected_sig = hmac.new(signing_key, payload, hashlib.sha256).hexdigest()
-        return hmac.compare_digest(expected_sig, checkpoint.hsm_signature)
+            payload = checkpoint.compute_signature_payload().encode("utf-8")
+            expected_sig = hmac.new(signing_key, payload, hashlib.sha256).hexdigest()
+            return hmac.compare_digest(expected_sig, checkpoint.hsm_signature)
 
     def promote_to_production(
         self,
@@ -371,49 +378,50 @@ class ModelRegistryVault:
             ModelGovernanceError: If dual sign-off fails or model is invalid.
             InvalidSignatureError: If HSM digital signature verification fails.
         """
-        checkpoint = self._get_checkpoint_or_raise(model_id)
+        with self._lock:
+            checkpoint = self._get_checkpoint_or_raise(model_id)
 
-        # 1. Dual Sign-off Gate
-        can_promote, reason = self._signoff_gate.can_promote(sign_offs)
-        if not can_promote:
-            logger.error("Promotion blocked for model %s: %s", model_id, reason)
-            raise ModelGovernanceError(f"Promotion Gate Failed: {reason}")
+            # 1. Dual Sign-off Gate
+            can_promote, reason = self._signoff_gate.can_promote(sign_offs)
+            if not can_promote:
+                logger.error("Promotion blocked for model %s: %s", model_id, reason)
+                raise ModelGovernanceError(f"Promotion Gate Failed: {reason}")
 
-        # 2. Cryptographic Signature Gate
-        if not checkpoint.hsm_signature or not self.verify_checkpoint_signature(
-            model_id, signing_key
-        ):
-            logger.error(
-                "Promotion blocked for model %s: HSM signature verification failed", model_id
-            )
-            raise InvalidSignatureError(
-                f"Invalid Signature Gate Failed: Model checkpoint {model_id} does not have "
-                "a valid cryptographic signature envelope."
-            )
+            # 2. Cryptographic Signature Gate
+            if not checkpoint.hsm_signature or not self.verify_checkpoint_signature(
+                model_id, signing_key
+            ):
+                logger.error(
+                    "Promotion blocked for model %s: HSM signature verification failed", model_id
+                )
+                raise InvalidSignatureError(
+                    f"Invalid Signature Gate Failed: Model checkpoint {model_id} does not have "
+                    "a valid cryptographic signature envelope."
+                )
 
-        # 3. Archive current production model
-        current_prod = self.get_production_model()
-        if current_prod and current_prod.model_id != model_id:
-            current_prod.status = ModelStatus.ARCHIVED
+            # 3. Archive current production model
+            current_prod = self.get_production_model()
+            if current_prod and current_prod.model_id != model_id:
+                current_prod.status = ModelStatus.ARCHIVED
+                logger.info(
+                    "Archived previous production model %s (%s)",
+                    current_prod.model_id,
+                    current_prod.version.to_tag(),
+                )
+
+            # 4. Promote target model
+            checkpoint.status = ModelStatus.PRODUCTION
+            checkpoint.promoted_at = datetime.now(UTC).isoformat()
+            checkpoint.promoted_by = sign_offs
+            if checkpoint.lineage:
+                checkpoint.lineage.sign_offs = sign_offs
+
             logger.info(
-                "Archived previous production model %s (%s)",
-                current_prod.model_id,
-                current_prod.version.to_tag(),
+                "Promoted model checkpoint %s (%s) to PRODUCTION",
+                model_id,
+                checkpoint.version.to_tag(),
             )
-
-        # 4. Promote target model
-        checkpoint.status = ModelStatus.PRODUCTION
-        checkpoint.promoted_at = datetime.now(UTC).isoformat()
-        checkpoint.promoted_by = sign_offs
-        if checkpoint.lineage:
-            checkpoint.lineage.sign_offs = sign_offs
-
-        logger.info(
-            "Promoted model checkpoint %s (%s) to PRODUCTION",
-            model_id,
-            checkpoint.version.to_tag(),
-        )
-        return checkpoint
+            return checkpoint
 
     def rollback_production(self, reason: str) -> tuple[ModelCheckpoint, ModelCheckpoint]:
         """Executes zero-downtime rollback of active PRODUCTION model.
@@ -427,14 +435,15 @@ class ModelRegistryVault:
         Raises:
             ModelGovernanceError: If no active production model or no archived model is found.
         """
-        current_prod = self.get_production_model()
-        if not current_prod:
-            raise ModelGovernanceError("Rollback Failed: No active PRODUCTION model found.")
+        with self._lock:
+            current_prod = self.get_production_model()
+            if not current_prod:
+                raise ModelGovernanceError("Rollback Failed: No active PRODUCTION model found.")
 
-        # Find most recent ARCHIVED model (sorted by promoted_at or created_at)
-        archived_candidates = [
-            c for c in self._checkpoints.values() if c.status == ModelStatus.ARCHIVED
-        ]
+            # Find most recent ARCHIVED model (sorted by promoted_at or created_at)
+            archived_candidates = [
+                c for c in self._checkpoints.values() if c.status == ModelStatus.ARCHIVED
+            ]
         if not archived_candidates:
             raise ModelGovernanceError(
                 "Rollback Failed: No ARCHIVED checkpoint available for restoration."

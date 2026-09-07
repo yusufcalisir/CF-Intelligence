@@ -33,36 +33,63 @@ def test_sr11_7_concept_drift_retraining_trigger() -> None:
 
 
 def test_sr11_7_model_checkpoint_rollback() -> None:
-    """Verifies zero-downtime atomic model rollback (<5s SLA) to previous cryptographically signed checkpoint."""
+    """Verifies zero-downtime atomic model rollback (<5s SLA) using real ModelRegistryVault and AutomaticRollbackTrigger."""
+    from app.domain.model_governance import (
+        ModelRegistryVault,
+        AutomaticRollbackTrigger,
+        ModelStatus,
+    )
+
+    vault = ModelRegistryVault()
+    signing_key = b"hsm_audit_test_signing_key_32bytes"
+    dual_signoffs = [
+        {"role": "ml_engineer", "user": "alice_mle", "signature": "sig_alice"},
+        {"role": "compliance_officer", "user": "bob_comp", "signature": "sig_bob"},
+    ]
+
+    # 1. Register and promote stable checkpoint v2.4.0
+    c_stable = vault.register_checkpoint(
+        version_str="v2.4.0",
+        weights_bytes=b"stable_model_weights_tensor_bytes",
+        hyperparameters={"lr": 0.001, "batch_size": 64},
+        dataset_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        dp_epsilon=1.0,
+    )
+    vault.sign_checkpoint(c_stable.model_id, signing_key)
+    vault.promote_to_production(c_stable.model_id, dual_signoffs, signing_key)
+    assert vault.get_production_model().version.to_tag() == "v2.4.0"
+
+    # 2. Register and promote anomalous candidate v2.5.0
+    c_degraded = vault.register_checkpoint(
+        version_str="v2.5.0",
+        weights_bytes=b"degraded_model_weights_tensor_bytes",
+        hyperparameters={"lr": 0.005, "batch_size": 64},
+        dataset_hash="ca978112ca1bbdcaf064378e477f344553b457022d95a9e364415b30e330f5a2",
+        dp_epsilon=1.0,
+    )
+    vault.sign_checkpoint(c_degraded.model_id, signing_key)
+    vault.promote_to_production(c_degraded.model_id, dual_signoffs, signing_key)
+    assert vault.get_production_model().version.to_tag() == "v2.5.0"
+    assert c_stable.status == ModelStatus.ARCHIVED
+
+    # 3. Trigger evaluates live production degradation (AUC drops below 0.65)
+    trigger = AutomaticRollbackTrigger(min_auc_roc=0.65, max_p99_latency_ms=200.0)
+    should_rollback, reason = trigger.should_rollback(live_auc_roc=0.5210, p99_latency_ms=85.0)
+    assert should_rollback
+    assert "Live ROC-AUC (0.5210) fell below minimum safety threshold" in reason
+
+    # 4. Measure atomic rollback duration and verify state
     t_start = time.perf_counter()
+    rolled_back, restored = vault.rollback_production(reason)
+    rollback_duration = time.perf_counter() - t_start
 
-    # Simulated model checkpoint registry
-    stable_checkpoint = {
-        "version": "v2.4.0",
-        "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "pr_auc": 0.8420,
-        "is_active": False,
-    }
-    degraded_checkpoint = {
-        "version": "v2.5.0-anomalous",
-        "sha256_hash": "ca978112ca1bbdcaf064378e477f344553b457022d95a9e364415b30e330f5a2",
-        "pr_auc": 0.5210,
-        "is_active": True,
-    }
-
-    # Execute rollback logic
-    assert degraded_checkpoint["pr_auc"] < 0.70  # Anomaly detected
-    degraded_checkpoint["is_active"] = False
-    stable_checkpoint["is_active"] = True
-
-    t_end = time.perf_counter()
-    rollback_duration = t_end - t_start
-
-    # Must complete well within the 5.0s SLA (typically <0.01s)
+    # Must complete well within the 5.0s SLA
     assert rollback_duration < 5.0
-    assert stable_checkpoint["is_active"]
-    assert not degraded_checkpoint["is_active"]
-    assert stable_checkpoint["version"] == "v2.4.0"
+    assert rolled_back.status == ModelStatus.ROLLED_BACK
+    assert rolled_back.version.to_tag() == "v2.5.0"
+    assert restored.status == ModelStatus.PRODUCTION
+    assert restored.version.to_tag() == "v2.4.0"
+    assert vault.get_production_model().version.to_tag() == "v2.4.0"
 
 
 def test_sr11_7_disparate_impact_fairness_audit() -> None:

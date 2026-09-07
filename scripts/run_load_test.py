@@ -238,6 +238,9 @@ def format_report_markdown(metrics: LoadTestMetrics) -> str:
     """Formats load test metrics into a professional GitHub markdown report."""
     sla_badge = "✅ **VERIFIED (PASSED)**" if metrics.sla_verified else "❌ **BREACHED (FAILED)**"
 
+    def _badge(val: float) -> str:
+        return "✅ PASS" if val <= metrics.sla_threshold_ms else "❌ BREACHED"
+
     lines = [
         "# Real-Time Scoring Gateway — Load & Latency SLA Verification Report",
         "",
@@ -264,15 +267,15 @@ def format_report_markdown(metrics: LoadTestMetrics) -> str:
         "",
         "The table below details the empirical end-to-end response time distribution measured during the load test run:",
         "",
-        "| Percentile Level | Latency (ms) | SLA Status (<100ms) | Description |",
+        f"| Percentile Level | Latency (ms) | SLA Status (<{int(metrics.sla_threshold_ms)}ms) | Description |",
         "| :--- | :---: | :---: | :--- |",
-        f"| **Min Latency** | `{metrics.min_latency_ms:.2f} ms` | ✅ PASS | Optimal execution path |",
-        f"| **p50 (Median)** | **`{metrics.median_p50_ms:.2f} ms`** | ✅ PASS | Normal transaction scoring latency |",
-        f"| **Mean** | `{metrics.mean_latency_ms:.2f} ms` | ✅ PASS | Average scoring duration across sample |",
-        f"| **p90** | `{metrics.p90_ms:.2f} ms` | ✅ PASS | 90th percentile under concurrent load |",
-        f"| **p95** | `{metrics.p95_ms:.2f} ms` | ✅ PASS | 95th percentile under concurrent load |",
-        f"| **p99 (SLA Invariant)** | **`{metrics.p99_ms:.2f} ms`** | **{sla_badge}** | **Core SLA Guarantee (<100ms)** |",
-        f"| **Max Latency** | `{metrics.max_latency_ms:.2f} ms` | ✅ PASS | Worst-case tail under peak concurrency |",
+        f"| **Min Latency** | `{metrics.min_latency_ms:.2f} ms` | {_badge(metrics.min_latency_ms)} | Optimal execution path |",
+        f"| **p50 (Median)** | **`{metrics.median_p50_ms:.2f} ms`** | {_badge(metrics.median_p50_ms)} | Normal transaction scoring latency |",
+        f"| **Mean** | `{metrics.mean_latency_ms:.2f} ms` | {_badge(metrics.mean_latency_ms)} | Average scoring duration across sample |",
+        f"| **p90** | `{metrics.p90_ms:.2f} ms` | {_badge(metrics.p90_ms)} | 90th percentile under concurrent load |",
+        f"| **p95** | `{metrics.p95_ms:.2f} ms` | {_badge(metrics.p95_ms)} | 95th percentile under concurrent load |",
+        f"| **p99 (SLA Invariant)** | **`{metrics.p99_ms:.2f} ms`** | **{sla_badge}** | **Core SLA Guarantee (<{int(metrics.sla_threshold_ms)}ms)** |",
+        f"| **Max Latency** | `{metrics.max_latency_ms:.2f} ms` | {_badge(metrics.max_latency_ms)} | Worst-case tail under peak concurrency |",
         "",
         "---",
         "",

@@ -289,9 +289,6 @@ async def predict_transaction(
     if caller_tenant and payload.bank_id:
         enforce_tenant_isolation(caller_tenant, payload.bank_id)
 
-    # 0. Record metered inference for tenant quota tracking
-    get_tenant_metering_service().record_inference(metered_tenant, 1)
-
     # 1. Resolve cached active model instance
     try:
         model = _get_cached_serving_model(payload.simulation_id)
@@ -640,9 +637,6 @@ async def score_transaction(
 ) -> ScoreTransactionResponse:
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()
-
-    # Record metered inference for tenant quota tracking
-    get_tenant_metering_service().record_inference(metered_tenant, 1)
 
     # Derive canonical merchant category from merchant_id for risk engine lookup
     _merchant_id_lower = payload.merchant_id.lower()

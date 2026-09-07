@@ -7,11 +7,7 @@ from sqlalchemy import create_engine, pool
 from alembic import context
 from app.config import get_settings
 from app.infrastructure.database import Base
-from app.infrastructure.models import (  # noqa: F401
-    BankConfigModel,
-    SimulationRunModel,
-    TrainingRoundModel,
-)
+import app.infrastructure.models  # noqa: F401
 
 config = context.config
 settings = get_settings()
@@ -30,6 +26,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=url.startswith("sqlite"),
     )
 
     with context.begin_transaction():
@@ -38,10 +35,15 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
-    connectable = create_engine(settings.sync_database_url, poolclass=pool.NullPool)
+    url = settings.sync_database_url
+    connectable = create_engine(url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=url.startswith("sqlite"),
+        )
 
         with context.begin_transaction():
             context.run_migrations()

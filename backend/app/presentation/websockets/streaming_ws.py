@@ -13,6 +13,11 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.presentation.websockets.manager import (
+    global_telemetry_ws_manager,
+    streaming_ws_manager,
+)
+
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["streaming"])
 
@@ -25,7 +30,9 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
     events to the connected client. Also replays any events that
     occurred before the client connected.
     """
-    await websocket.accept()
+    connected = await streaming_ws_manager.connect(websocket)
+    if not connected:
+        return
     logger.info("Streaming WebSocket connected: scenario=%s", scenario_id[:8])
 
     try:
@@ -124,6 +131,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
     except Exception:
         logger.exception("Streaming WebSocket error")
     finally:
+        await streaming_ws_manager.disconnect(websocket)
         with contextlib.suppress(Exception):
             await websocket.close()
 
@@ -131,7 +139,9 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
 @router.websocket("/ws/telemetry")
 async def live_telemetry_websocket(websocket: WebSocket) -> None:
     """Stream platform-wide live telemetry, transactions, and fraud alerts."""
-    await websocket.accept()
+    connected = await global_telemetry_ws_manager.connect(websocket)
+    if not connected:
+        return
     logger.info("Global telemetry WebSocket connected")
 
     try:
@@ -192,6 +202,7 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
     except Exception:
         logger.exception("Global telemetry WebSocket error")
     finally:
+        await global_telemetry_ws_manager.disconnect(websocket)
         with contextlib.suppress(Exception):
             await websocket.close()
 
