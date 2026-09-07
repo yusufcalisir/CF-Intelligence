@@ -57,7 +57,7 @@ class WebSocketConnectionManager:
         Degrades gracefully: slow or non-responsive clients timing out after
         `send_timeout` are evicted without blocking or dropping active responsive clients.
         """
-        msg_str = json.dumps(message) if isinstance(message, dict) else str(message)
+        msg_str = json.dumps(message) if isinstance(message, dict) else message
         async with self._lock:
             clients = list(self._active_connections)
 
