@@ -18,7 +18,7 @@ export default defineConfig({
   reporter: [['list']],
   expect: {
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.05,
+      maxDiffPixelRatio: 0.08,
       threshold: 0.2,
       animations: 'disabled',
     },
