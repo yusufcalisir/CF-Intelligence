@@ -1,12 +1,11 @@
 """Unit tests for Phase 12: Cryptographic Key Lifecycle, Multi-Version Re-Encryption, and Vault Integration."""
 
-import os
 import pytest
 from cryptography.fernet import InvalidToken
 from fastapi.testclient import TestClient
 
-from app.infrastructure.security.tenant_kms import TenantKMSManager
 from app.application.services.kms_service import KMSService
+from app.infrastructure.security.tenant_kms import TenantKMSManager
 from app.infrastructure.security.vault_client import VaultClient
 from app.main import app
 

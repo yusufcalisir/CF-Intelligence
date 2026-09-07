@@ -1,12 +1,11 @@
 """Automated tests for Phase 13: Real Load, Concurrency Performance & WebSocket Verification."""
 
 import asyncio
-import os
 import time
-import numpy as np
-import pytest
-from fastapi.testclient import TestClient
+
 import httpx
+import numpy as np
+from fastapi.testclient import TestClient
 
 from app.main import app
 from app.presentation.websockets.manager import WebSocketConnectionManager

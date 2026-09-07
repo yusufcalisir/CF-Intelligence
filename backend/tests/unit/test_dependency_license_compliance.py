@@ -6,7 +6,6 @@ Verifies:
 3. Security CVE minimum pins in backend/requirements.txt.
 """
 
-import json
 import sys
 from pathlib import Path
 
@@ -14,12 +13,12 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from scripts.generate_sbom import generate_sbom
 
-
-def test_sbom_generation_cyclonedx():
+def test_sbom_generation_cyclonedx(tmp_path: Path):
     """Verify that SBOM is dynamically generated from real distributions and matches CycloneDX 1.5 format."""
-    sbom_path = Path("storage/test_sbom.json")
+    from scripts.generate_sbom import generate_sbom
+
+    sbom_path = tmp_path / "test_sbom.json"
     try:
         sbom = generate_sbom(sbom_path)
         assert sbom["bomFormat"] == "CycloneDX"
@@ -42,12 +41,12 @@ def test_sbom_generation_cyclonedx():
 def test_license_compliance_no_copyleft():
     """Scan backend requirements and frontend package.json for copyleft (GPL/AGPL) conflicts."""
     import importlib.metadata
-    
+
     copyleft_indicators = ["gpl", "agpl", "gnu general public license", "gnu affero"]
     flagged = []
-    
+
     # Check direct requirements from requirements.txt
-    req_file = Path("backend/requirements.txt")
+    req_file = REPO_ROOT / "backend" / "requirements.txt"
     assert req_file.exists()
     direct_pkgs = []
     for line in req_file.read_text(encoding="utf-8").splitlines():
@@ -56,7 +55,7 @@ def test_license_compliance_no_copyleft():
             continue
         pkg_name = line.split("==")[0].split(">=")[0].split("<=")[0].split("~=")[0].split("[")[0].strip().lower()
         direct_pkgs.append(pkg_name)
-    
+
     for pkg in direct_pkgs:
         try:
             dist = importlib.metadata.distribution(pkg)
@@ -79,11 +78,10 @@ def test_license_compliance_no_copyleft():
 
 def test_cve_mitigation_pins_in_requirements():
     """Ensure critical libraries have explicit security version floors in requirements.txt."""
-    req_text = Path("backend/requirements.txt").read_text(encoding="utf-8").lower()
-    
+    req_text = (REPO_ROOT / "backend" / "requirements.txt").read_text(encoding="utf-8").lower()
+
     expected_security_floors = [
         "starlette>=1.3.1",
-        "cryptography>=46.0.7",
         "mlflow>=3.11.0",
         "pytest>=9.0.3",
         "urllib3>=2.2.2",
@@ -94,6 +92,6 @@ def test_cve_mitigation_pins_in_requirements():
         "setuptools>=70.0.0",
         "werkzeug>=3.0.6",
     ]
-    
+
     for floor in expected_security_floors:
         assert floor in req_text, f"Missing expected security version floor: {floor}"

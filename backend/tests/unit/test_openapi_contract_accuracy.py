@@ -6,11 +6,12 @@ Verifies:
 3. POST /api/v1/cases/export/fincen-xml operates correctly.
 """
 
-from fastapi.testclient import TestClient
 import pytest
-from app.main import app
+from fastapi.testclient import TestClient
+
 from app.domain.entities_phase2 import Case
 from app.domain.enums import CasePriority, CaseStatus
+from app.main import app
 from app.presentation.routers.cases import _case_service
 
 

@@ -11,23 +11,17 @@ Tests:
 from __future__ import annotations
 
 import concurrent.futures
-import os
-import tempfile
 import time
 from typing import Any
 
-import pytest
 import torch
 
 from app.application.services.idempotency import IdempotencyService
 from app.application.services.model_registry import ModelRegistry
 from app.application.services.tenant_metering import TenantMeteringService, TenantQuotaLimits
 from app.domain.model_governance import (
-    DualSignoffGate,
-    ModelCheckpoint,
     ModelRegistryVault,
     ModelStatus,
-    SemanticVersion,
 )
 from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
 
@@ -70,7 +64,7 @@ def test_model_promotion_concurrency_single_champion() -> None:
     assert vault.get_production_model() is not None
 
 
-def test_model_registry_concurrent_dual_signoff(tmp_path: os.PathLike) -> None:
+def test_model_registry_concurrent_dual_signoff(tmp_path: Any) -> None:
     """Assert concurrent dual sign-offs do not drop approvals or corrupt registry.json."""
     registry = ModelRegistry(storage_dir=str(tmp_path))
     sim_id = "test_concurrent_signoff_sim"

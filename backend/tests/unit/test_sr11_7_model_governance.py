@@ -35,8 +35,8 @@ def test_sr11_7_concept_drift_retraining_trigger() -> None:
 def test_sr11_7_model_checkpoint_rollback() -> None:
     """Verifies zero-downtime atomic model rollback (<5s SLA) using real ModelRegistryVault and AutomaticRollbackTrigger."""
     from app.domain.model_governance import (
-        ModelRegistryVault,
         AutomaticRollbackTrigger,
+        ModelRegistryVault,
         ModelStatus,
     )
 

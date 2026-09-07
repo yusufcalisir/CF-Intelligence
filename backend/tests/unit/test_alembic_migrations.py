@@ -9,22 +9,23 @@ Tests:
 from __future__ import annotations
 
 import os
+import pathlib
 import sqlite3
-from typing import Generator
+from typing import TYPE_CHECKING
 
 import pytest
-from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine
 
-from app.infrastructure.database import Base
 import app.infrastructure.models  # noqa: F401
+from alembic import command
+from app.infrastructure.database import Base
 
-
-import pathlib
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 BACKEND_DIR = pathlib.Path(__file__).resolve().parents[2]
 ALEMBIC_INI_PATH = str(BACKEND_DIR / "alembic.ini")
@@ -76,7 +77,7 @@ def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic
 
     # Must contain alembic_version plus all 17 domain tables
     assert "alembic_version" in tables_after_upgrade
-    for expected_table in Base.metadata.tables.keys():
+    for expected_table in Base.metadata.tables:
         assert expected_table in tables_after_upgrade, f"Missing table: {expected_table}"
     assert len(tables_after_upgrade) == 18  # 17 domain tables + 1 alembic_version
 
@@ -103,7 +104,7 @@ def test_alembic_migrations_upgrade_head_and_downgrade_base_cleanly(temp_alembic
     conn.close()
 
     assert len(tables_after_reupgrade) == 18
-    for expected_table in Base.metadata.tables.keys():
+    for expected_table in Base.metadata.tables:
         assert expected_table in tables_after_reupgrade
 
 
