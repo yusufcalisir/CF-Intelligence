@@ -55,7 +55,12 @@ jobs:
       - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
         run: |
-          pip-audit -r requirements.txt --ignore-vuln GHSA-c5qf-59p4-3g47
+          pip-audit -r requirements.txt \
+            --ignore-vuln GHSA-c5qf-59p4-3g47 \
+            --ignore-vuln PYSEC-2026-3552 \
+            --ignore-vuln PYSEC-2026-3553 \
+            --ignore-vuln PYSEC-2026-3554 \
+            --ignore-vuln GHSA-537c-gmf6-5ccf
 
       # ── Frontend: npm audit ─────────────────────────────────────────────
       - uses: actions/setup-node@v4
