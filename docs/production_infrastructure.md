@@ -19,7 +19,7 @@ While local developers use `docker-compose.yml` for offline testing, **productio
             │ • EKS Cluster (HPA 3-30 Pods)             │       │ • EKS Cluster (Min 2 Pods Standby)        │
             │ • Ingress-NGINX + mTLS 1.3 Strict         │       │ • Ingress-NGINX + mTLS 1.3 Strict         │
             │ • Strimzi Kafka (pacs.008 stream)         │ ───►  │ • MirrorMaker 2 Kafka Cross-Region Sync   │
-            │ • AWS Aurora Multi-AZ PostgreSQL (RLS)    │ ───►  │ • Aurora Global DB Read Replica (Sync)   │
+            │ • AWS Aurora Multi-AZ PostgreSQL (RLS)    │ ───►  │ • Aurora Global DB Read Replica (Sync)    │
             │ • Redis HA Sentinel (Tenant Namespaces)   │ ───►  │ • Redis Standby Cluster Replication       │
             │ • Prometheus / OTel / Grafana Dashboards  │       │ • Prometheus Standby Scraper              │
             └───────────────────────────────────────────┘       └───────────────────────────────────────────┘

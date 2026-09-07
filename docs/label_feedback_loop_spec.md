@@ -40,7 +40,7 @@ The Human-in-the-Loop Label Feedback Loop connects investigator case determinati
 │   └─────────────────────────────────────────────────────────────────────────────────┘  │
 │                                           │                                            │
 │                                           ▼                                            │
-│   [ Next FL Training Round: Global Model Updated with Human-Verified Intelligence ]   │
+│   [ Next FL Training Round: Global Model Updated with Human-Verified Intelligence ]    │
 │   (Achieves -64.7% False Alarm Triage Load across Banking Consortium)                  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```

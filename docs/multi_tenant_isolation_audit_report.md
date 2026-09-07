@@ -20,11 +20,11 @@ To guarantee compliance with **SOC 2 Type II (Trust Services Criteria CC6.1 - CC
 │ Cross-Tenant ContextVar Injection │ Thread-Local `ContextVar.reset()`   │ BLOCKED (✓)  │
 │ Path Traversal via Tenant ID      │ `sanitize_bank_id` Stripping (`..`) │ BLOCKED (✓)  │
 │ SQL Injection in Tenant Identity  │ Regex Alphanumeric + Double-Quoting │ BLOCKED (✓)  │
-│ Redis Cache Key Collusion         │ Namespaced Keys (`cfi:tenant:<id>:*`)│ ISOLATED (✓) │
+│ Redis Cache Key Collusion         │ Namespaced Keys: cfi:tenant:<id>:*  │ ISOLATED (✓) │
 │ Database Session Pool Bleed       │ Dynamic AsyncEngine Factory / Bank  │ ISOLATED (✓) │
 │ Cross-Tenant BOLA / IDOR Tamper   │ Global TenantAccessControlMiddleware│ REJECTED (✓) │
 │ Unencrypted PII Ingestion         │ Type-Salted HMAC-SHA256 Tokenizer   │ SANITIZED (✓)│
-│ Alembic Migration Schema Drift    │ Dynamic Discovery from tenant_configs│ ZERO DRIFT (✓)│
+│ Alembic Migration Schema Drift    │ Auto-Discovery from tenant_configs  │ NO DRIFT (✓)  │
 │ Stale Key Decryption After Revoke │ Fail-Closed Versioned KMS Envelope  │ BLOCKED (✓)  │
 └───────────────────────────────────┴─────────────────────────────────────┴──────────────┘
 ```

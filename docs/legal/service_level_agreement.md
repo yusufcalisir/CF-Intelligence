@@ -45,7 +45,7 @@ If the Vendor fails to meet the monthly availability SLA, the Customer is contra
 ├──────────────┼──────────────────────────────────────────┼──────────────┼───────────────┤
 │ P1: CRITICAL │ Core Scoring API down; 100% txns blocked │ ≤ 15 minutes │ ≤ 2 hours     │
 │ P2: HIGH     │ FL round failure or latency >50ms        │ ≤ 1 hour     │ ≤ 6 hours     │
-│ P3: MEDIUM   │ Non-critical portal issue, minor telemetry│ ≤ 4 hours    │ ≤ 24 hours    │
+│ P3: MEDIUM   │ Non-critical portal or telemetry issue   │ ≤ 4 hours    │ ≤ 24 hours    │
 │ P4: LOW      │ Feature request, general inquiry         │ ≤ 1 bus. day │ Next Release  │
 └──────────────┴──────────────────────────────────────────┴──────────────┴───────────────┘
 ```

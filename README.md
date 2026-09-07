@@ -121,10 +121,10 @@ The core production path focuses on seven defensible engineering components:
                                            ▼
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                       Real-Time Scoring & Operational Serving                        │
-│  - Real-Time Scoring Gateway (<14.2ms Fast-Path / ~308ms Ensemble SLA)              │
+│  - Real-Time Scoring Gateway (<14.2ms Fast-Path / ~308ms Ensemble SLA)               │
 │  - Multi-Layer Perimeter Defense: Cloudflare WAF + Vercel Edge + slowapi Rate Limit  │
 │  - Broken Access Control (BOLA/IDOR) Multi-Tenant Isolation Middleware               │
-│  - Fast SHAP Explanations (KernelExplainer) & Counterfactual Feature Sensitivity      │
+│  - Fast SHAP Explanations (KernelExplainer) & Counterfactual Feature Sensitivity     │
 │  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML      │
 └──────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -713,12 +713,16 @@ $$
 ### 6.1 Opacus Differential Privacy Guard (`privacy_service.py`)
 Applies formal $(\epsilon, \delta)$-Differential Privacy to local model training rounds:
 - **$L_2$ Gradient Norm Clipping ($C$):**
-  
-  $$\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}$$
+
+$$
+\bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}
+$$
 
 - **Gaussian Noise Addition ($\sigma$):**
-  
-  $$\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)$$
+
+$$
+\sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)
+$$
 
 - **Rényi DP (RDP) Accounting:** Tracks cumulative privacy budget spend across training rounds to guarantee $\epsilon_{\text{total}} \le \epsilon_{\text{target}}$.
 
@@ -726,20 +730,26 @@ Applies formal $(\epsilon, \delta)$-Differential Privacy to local model training
 Implements zero-sum pairwise vector perturbation based on the Bonawitz et al. protocol:
 - Client pairs derive shared secrets using Curve25519 ECDH key exchange: $s_{uv} = \text{HKDF}(\text{ECDH}(sk_u, pk_v))$.
 - Masked updates satisfy the zero-sum invariant across all non-dropped clients:
-  
-  $$y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \implies \sum_k y_k = \sum_k w_k$$
+
+$$
+y_k = w_k + \sum_{j > k} s_{kj} - \sum_{j < k} s_{jk} \implies \sum_k y_k = \sum_k w_k
+$$
 
 - **Shamir (t, n) Threshold Secret Sharing (`shamir_engine.py`):** Shares secret keys across Galois prime field $\mathbb{Z}_p$ to reconstruct dropout masks if a node disconnects during aggregation.
 
 ### 6.3 Confidential Federated Unlearning (GDPR Art. 17) (`federated_unlearning_engine.py`)
 Provides mathematically sound parameter erasure when a participating bank withdraws from the consortium or when an entity exercises GDPR Article 17 ("Right to Erasure / Right to be Forgotten"):
 - **Exact Re-Aggregation:** Recomputes the global model parameters by evaluating FedAvg strictly over the stored model parameter contributions of all retained consortium members, excluding the targeted departing bank:
-  
-  $$\mathbf{w}_{\text{unlearned}} = \frac{1}{K - 1} \sum_{k \neq \text{target}} \mathbf{w}_k$$
+
+$$
+\mathbf{w}_{\text{unlearned}} = \frac{1}{K - 1} \sum_{k \neq \text{target}} \mathbf{w}_k
+$$
 
 - **Lineage Subtraction:** When global consensus weights and the target bank's contribution are known from the immediate prior round, algebraically subtracts the target bank's influence without requiring full retraining from scratch:
-  
-  $$\mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}$$
+
+$$
+\mathbf{w}_{\text{unlearned}} = \frac{K \cdot \mathbf{w}_{\text{global}} - \mathbf{w}_{\text{target}}}{K - 1}
+$$
 
 - **Illustrative Simulator Fallback:** In confidential production federations with zero-knowledge secure aggregation where individual client parameter vectors are never persisted to disk (enforcing zero-raw-PII storage invariants), unlearning requests executed without stored gradient history run via an **illustrative simulator** (`UnlearningMethod.SIMULATED_UNLEARNING`). This honestly benchmarks parameter divergence and issues an unlearning audit receipt without claiming non-existent Hessian matrix inversion ($\mathbf{H}^{-1} \nabla \mathcal{L}$) or conjugate gradient solvers.
 - **Structural Exclusion & Empirical MIA Guarantee:** In zero-raw-PII cross-bank settings, membership-inference attack risk after unlearning is not empirically measured without target client evaluation sets — instead, structural exclusion is mathematically guaranteed (the target bank's parameter contributions are verifiably excluded or algebraically subtracted from the global consensus checkpoint). When client evaluation samples (`y_true, y_pred_prob, member_mask`) are optionally provided, empirical loss-threshold shadow attack accuracy is measured via `MIAEvaluator` (`security_evaluator.py`).
@@ -793,7 +803,9 @@ Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer enti
 ### 9.1 Composite Risk Scoring Engine (`risk_engine.py` & `value_objects_phase2.py`)
 Combines 9 independent risk signals into a unified risk score ($0 - 1000$):
 
-$$\text{Risk Score} = \text{round}\left(\min\left(1.0, \frac{\sum_{i=1}^{9} w_i S_i}{\sum_{i=1}^{9} w_i}\right) \times 1000, 1\right) \quad \text{where } \sum_{i=1}^{9} w_i = 1.00$$
+$$
+\text{Risk Score} = \text{round}\left(\min\left(1.0, \frac{\sum_{i=1}^{9} w_i S_i}{\sum_{i=1}^{9} w_i}\right) \times 1000, 1\right) \quad \text{where } \sum_{i=1}^{9} w_i = 1.00
+$$
 
 | Signal Name | Identifier | What It Evaluates in `risk_engine.py` | Weight |
 |:---|:---|:---|:---:|
@@ -817,7 +829,10 @@ The platform implements rigorous model explainability and actionable remediation
 1. **Real-Time SHAP Explanations (`shap.KernelExplainer`):**
    - Feature importance is computed dynamically using a real `shap.KernelExplainer` running against the serving PyTorch neural network model (`FraudDetectionModel`) with a calibrated baseline reference distribution ($N=30$ normal transactions).
    - **Mathematical Additivity Axiom Guarantee:** For any input transaction vector $\mathbf{x}$, the local accuracy property holds strictly within floating point precision:
-     $$\sum_{i=1}^{M} \phi_i(\mathbf{x}) + \mathbb{E}[f(X)] = f(\mathbf{x}) \quad (\text{Observed residual: } |\sum \phi_i + \text{base value} - f(\mathbf{x})| < 10^{-8})$$
+
+$$
+\sum_{i=1}^{M} \phi_i(\mathbf{x}) + \mathbb{E}[f(X)] = f(\mathbf{x}) \quad (\text{Observed residual: } |\sum \phi_i + \text{base value} - f(\mathbf{x})| < 10^{-8})
+$$
    - Each returned explanation includes the exact attribution $\phi_i$, the normalized feature value, the model output, expected base value, and an explicit `explanation_method: "shap_kernel_explainer"` provenance tag. Analytical heuristics are retained strictly as an emergency secondary fallback and are always explicitly labeled with `explanation_method: "fallback_heuristic"`.
 
 2. **Real Counterfactual Remediation Simulator (`generate_counterfactuals`):**

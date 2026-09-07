@@ -40,7 +40,7 @@ To preserve the mathematical and operational integrity of the collaborative frau
 ├───────────────────────────────────┬────────────────────────────────────┤
 │ INSTITUTIONAL OWNERSHIP (BANK)    │ CONSORTIUM & VENDOR OWNERSHIP (CFI)│
 ├───────────────────────────────────┼────────────────────────────────────┤
-│ • Raw transaction ledgers         │ • Base FL Orchestration Engine    │
+│ • Raw transaction ledgers         │ • Base FL Orchestration Engine     │
 │ • Customer account databases      │ • Proprietary GNN Architectures    │
 │ • Local feature engineering tables│ • Aggregated Global Model Weights  │
 │ • Generated SAR narrative filings │ • Central Telemetry & SIEM Adapters│

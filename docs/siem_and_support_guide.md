@@ -21,13 +21,13 @@ The Collaborative Fraud Intelligence (CFI) platform delivers enterprise security
 │  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                              SIEMLogExporter Engine                              │  │
 │  │                                                                                  │  │
-│  │   ├── Format 1: ArcSight / QRadar Common Event Format (CEF Syslog)                │  │
+│  │   ├── Format 1: ArcSight / QRadar Common Event Format (CEF Syslog)               │  │
 │  │   ├── Format 2: IETF RFC 5424 Structured Syslog (UDP / TLS)                      │  │
 │  │   ├── Format 3: Splunk HTTP Event Collector (HEC)                                │  │
 │  │   └── Format 4: Datadog / Elastic Common Schema (ECS) JSON                       │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 │               │                                                                        │
-│               ├───► Splunk Enterprise / Splunk Cloud (:8088/services/collector/event) │
+│               ├───► Splunk Enterprise / Splunk Cloud (:8088/services/collector/event)  │
 │               ├───► IBM QRadar / Micro Focus ArcSight (Syslog UDP/TCP)                 │
 │               └───► Datadog Logs API (v2 /api/v2/logs)                                 │
 └────────────────────────────────────────────────────────────────────────────────────────┘
