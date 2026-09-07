@@ -47,16 +47,22 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 *   `services/explainability_service.py`: Computes SHAP attributions using `shap.KernelExplainer` with analytical fallbacks.
 *   `services/aml_agentic_copilot.py`: Autonomous BSA/AML RAG narrative generator synthesizing 5-paragraph FinCEN SAR narratives and 4-Eyes supervisor briefings.
 *   `services/federated_unlearning_engine.py`: Confidential federated unlearning engine performing Exact Re-Aggregation across retained participants and Lineage Subtraction parameter erasure for revoked or departing banks without retraining from scratch.
-*   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, and Canary Gates.
+*   `services/model_registry.py`: Manifest-backed model repository managing versioning, active symlinks, Canary Gates, and atomic disk writes (`tempfile.NamedTemporaryFile` + `os.replace`) to prevent partial read corruption.
 *   `services/connector_diagnostics_service.py`: Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
 
+### 2.3 Infrastructure Layer (`backend/app/infrastructure/`)
+Contains concrete implementations of adapters, persistence engines, cryptographic drivers, and external systems.
+
+*   `database/migration_manager.py` & `migrations/env.py`: Alembic linear dual-revision migration engine (`001_production_domain_tables` $\to$ `002_core_and_aml_tables`) with dynamic tenant discovery from `tenant_configs`, PostgreSQL `search_path` injection protection (`_pg_quote_identifier`), SQLite file-based tenant isolation, offline airgap `--sql` generation, and automatic schema adoption (`_ensure_migrated_or_stamped`).
+*   `database/models.py` & `session.py`: SQLAlchemy 2.0 async engine and relational models partitioned dynamically per active tenant.
+*   `security/kms_service.py`: Multi-tenant Key Management Service enforcing AES-256-GCM versioned envelope encryption (`v2:{iv_b64}:{tag_b64}:{ciphertext_b64}`), live HashiCorp Vault connectivity detection with simulated fallback telemetry, and automated background database re-encryption pipelines.
+*   `services/tenant_metering.py` & `idempotency.py`: Concurrency-safe tenant usage quota manager with atomic test-and-increment locking in `acquire_quota` eliminating race conditions, and Redis `SETNX` 3-state idempotency reservation (`ACQUIRED` $\to$ `IN_PROGRESS` $\to$ `HIT`).
 *   `security/auth_service.py`: Enterprise authentication service issuing 15-minute short-lived JWT access tokens, single-use refresh token rotation, and 5-fail brute force lockout protection.
 *   `security/password_hasher.py`: Bcrypt password hashing engine (`cost=12`, 4,096 rounds) with per-password cryptographic salts.
 *   `security/error_handler.py`: Global production error sanitization middleware (RFC 7807 problem details, zero stack trace leakage, unique incident ID correlation, and Sentry telemetry hook).
 *   `security/security_headers.py`: Comprehensive HTTP security headers (CSP, HSTS, X-Frame-Options: DENY, X-Content-Type-Options: nosniff) and strict CORS whitelist enforcement.
 *   `feature_store/`: Low-latency online feature store (`redis_store.py`, `feast_store.py`) and rolling velocity/amount aggregators (<5ms retrieval).
 *   `disaster_recovery/`: Multi-region active-passive failover manager (`region_failover.py`, RTO < 30s, RPO = 0) and automated cryptographic backup verifier.
-*   `database/` & `models.py`: SQLAlchemy 2.0 async engine and relational database tables with PostgreSQL schema and SQLite tenant isolation.
 *   `redis_store.py`: A fault-tolerant state manager. It synchronizes simulation configurations and round metrics to Redis. If Redis is unreachable, it falls back to a thread-safe, in-memory cache to maintain liveness.
 *   `security/p2p_secagg_driver.py` & `shamir_engine.py`: Client-side Curve25519 X25519 ECDH pairwise vector masking and Shamir $(t, n)$ threshold Galois field secret sharing.
 *   `security/pqc_secagg_driver.py`: NIST FIPS 203 (CRYSTALS-Kyber-768 KEM) and FIPS 204 (CRYSTALS-Dilithium-3 signatures) hybrid quantum-safe P2P SecAgg driver.
@@ -345,13 +351,6 @@ Bank A Subnet (bank-a-net)                  Bank B Subnet (bank-b-net)
 - **Outbound-Only mTLS**: Bank client daemons initiate outbound-only mTLS 1.3 connections to the coordinator on `consortium-net:50051`.
 - **Mode Dispatch**: The application dispatches service roles dynamically via the `MODE` environment variable (`MODE=coordinator` vs `MODE=bank_client`).
 
-### 8.3 Enterprise Multi-Tenant Database Persistence Engine (`database.py`)
-
-The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant) where each bank node operates against its own isolated database instance or schema:
-- **AsyncEngine Connection Pooling**: Production PostgreSQL / CockroachDB AsyncEngine configured via `_make_engine_kwargs(tenant)` with `pool_size=20`, `max_overflow=10`, `pool_recycle=3600`, and `pool_pre_ping=True`.
-- **Serializable Isolation & Retry Loop**: `run_cockroach_transaction()` handles SQLSTATE `40001` transaction conflicts with exponential retry loops.
-- **Alembic Schema Migrations**: Managed via [`alembic.ini`](file:///backend/alembic.ini), [`env.py`](file:///backend/app/infrastructure/database/migrations/env.py), and [`migration_manager.py`](file:///backend/app/infrastructure/database/migration_manager.py) for programmatic `upgrade_head()` / `downgrade_revision()` auto-migrations and tracking versioned revision scripts (`001_production_domain_tables`) across multi-tenant bank schemas.
-
 ### 8.2 gRPC Transport Protocol (`fl_service.proto`)
 
 The inter-container parameter exchange, heartbeat liveness, and global model distribution operate over streaming gRPC RPC handlers:
@@ -364,6 +363,13 @@ The inter-container parameter exchange, heartbeat liveness, and global model dis
 | `DownloadGlobalModel` | Server Streaming | Streams aggregated global model binary chunks with per-chunk SHA-256 checksum integrity verification. |
 
 > **Security Guarantee**: Unregistered or certificate-revoked bank nodes are rejected at the `RegisterClient` handler before any parameter stream is accepted.
+
+### 8.3 Enterprise Multi-Tenant Database Persistence Engine (`database.py`)
+
+The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant) where each bank node operates against its own isolated database instance or schema:
+- **AsyncEngine Connection Pooling**: Production PostgreSQL / CockroachDB AsyncEngine configured via `_make_engine_kwargs(tenant)` with `pool_size=20`, `max_overflow=10`, `pool_recycle=3600`, and `pool_pre_ping=True`.
+- **Serializable Isolation & Retry Loop**: `run_cockroach_transaction()` handles SQLSTATE `40001` transaction conflicts with exponential retry loops.
+- **Alembic Schema Migrations**: Managed via [`alembic.ini`](file:///backend/alembic.ini), [`env.py`](file:///backend/app/infrastructure/database/migrations/env.py), and [`migration_manager.py`](file:///backend/app/infrastructure/database/migration_manager.py) for programmatic `upgrade_head()` / `downgrade_revision()` auto-migrations, tracking linear versioned revision scripts (`001_production_domain_tables` $\to$ `002_core_and_aml_tables`) across multi-tenant bank schemas (PostgreSQL `search_path` and isolated SQLite databases) with dynamic tenant discovery (`_get_active_tenants()`) and automated startup schema adoption (`_ensure_migrated_or_stamped()`).
 
 
 ---

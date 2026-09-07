@@ -12,6 +12,7 @@ import hmac
 import json
 import logging
 import re
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -20,9 +21,6 @@ from enum import Enum
 from typing import Any
 
 logger = logging.getLogger(__name__)
-
-
-import threading
 
 
 # ---------------------------------------------------------------------------

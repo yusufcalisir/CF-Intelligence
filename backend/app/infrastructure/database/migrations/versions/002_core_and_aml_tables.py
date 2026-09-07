@@ -23,6 +23,7 @@ Create Date: 2026-09-06
 from __future__ import annotations
 
 import sqlalchemy as sa
+
 from alembic import op
 
 # Alembic revision identifiers
@@ -210,90 +211,10 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
 
-    # 12. Align tenant_configs.cert_fingerprint to String(96) and schema_provisioned nullable=False
-    with op.batch_alter_table("tenant_configs") as batch_op:
-        batch_op.alter_column(
-            "cert_fingerprint",
-            type_=sa.String(96),
-            existing_type=sa.String(64),
-            existing_nullable=True,
-        )
-        batch_op.alter_column(
-            "schema_provisioned",
-            nullable=False,
-            existing_type=sa.Integer(),
-            existing_server_default="0",
-        )
-
-    # 13. Align non-null constraints with SQLAlchemy 2.0 Mapped[str] models
-    with op.batch_alter_table("consortium_members") as batch_op:
-        batch_op.alter_column(
-            "role",
-            nullable=False,
-            existing_type=sa.String(20),
-            existing_server_default="member",
-        )
-
-    with op.batch_alter_table("federated_rounds") as batch_op:
-        batch_op.alter_column(
-            "aggregation_strategy",
-            nullable=False,
-            existing_type=sa.String(30),
-            existing_server_default="fedavg",
-        )
-
-    with op.batch_alter_table("gradient_submissions") as batch_op:
-        batch_op.alter_column(
-            "validation_status",
-            nullable=False,
-            existing_type=sa.String(30),
-            existing_server_default="accepted",
-        )
-
-
 def downgrade() -> None:
-    """Drop all 11 core AML/simulation tables and revert column modifications."""
+    """Drop all 11 core AML/simulation tables."""
 
-    # 1. Revert column modifications
-    with op.batch_alter_table("gradient_submissions") as batch_op:
-        batch_op.alter_column(
-            "validation_status",
-            nullable=True,
-            existing_type=sa.String(30),
-            existing_server_default="accepted",
-        )
-
-    with op.batch_alter_table("federated_rounds") as batch_op:
-        batch_op.alter_column(
-            "aggregation_strategy",
-            nullable=True,
-            existing_type=sa.String(30),
-            existing_server_default="fedavg",
-        )
-
-    with op.batch_alter_table("consortium_members") as batch_op:
-        batch_op.alter_column(
-            "role",
-            nullable=True,
-            existing_type=sa.String(20),
-            existing_server_default="member",
-        )
-
-    with op.batch_alter_table("tenant_configs") as batch_op:
-        batch_op.alter_column(
-            "schema_provisioned",
-            nullable=True,
-            existing_type=sa.Integer(),
-            existing_server_default="0",
-        )
-        batch_op.alter_column(
-            "cert_fingerprint",
-            type_=sa.String(64),
-            existing_type=sa.String(96),
-            existing_nullable=True,
-        )
-
-    # 2. Drop the 11 tables in reverse order of creation
+    # Drop the 11 tables in reverse order of creation
     op.drop_table("business_rules")
     op.drop_table("investigator_audit_logs")
     op.drop_table("evidence")

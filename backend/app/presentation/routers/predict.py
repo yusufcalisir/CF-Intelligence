@@ -30,7 +30,6 @@ from app.dependencies import (
     TenantDep,
     enforce_tenant_isolation,
     enforce_tenant_quota,
-    get_tenant_metering_service,
 )
 from app.infrastructure.security.rate_limiter import limiter
 

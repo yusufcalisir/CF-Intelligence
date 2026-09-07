@@ -7,11 +7,13 @@ fanout with per-client timeouts, and graceful dead-connection eviction.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from fastapi import WebSocket
+if TYPE_CHECKING:
+    from fastapi import WebSocket
 
 logger = logging.getLogger(__name__)
 
@@ -85,10 +87,8 @@ class WebSocketConnectionManager:
                 for dead_ws in dropped_clients:
                     self._active_connections.discard(dead_ws)
                     self._dropped_client_count += 1
-                    try:
+                    with contextlib.suppress(Exception):
                         await dead_ws.close()
-                    except Exception:
-                        pass
             logger.warning(
                 "Broadcast evicted %d stale/slow WebSocket clients. Remaining active: %d",
                 len(dropped_clients),

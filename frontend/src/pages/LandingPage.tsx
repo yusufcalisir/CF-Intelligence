@@ -33,8 +33,9 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
   { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time Multi-Krum defense shield quarantine (Δ=48.2 > 14.1) and +0.42 AUC resilience (monitored via live simulated demo proxy).', algorithm: 'Multi-Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
-  { id: 'dataset-ingestor', name: 'Real Dataset Ingestion Studio', category: 'Core Production Engine', purpose: 'Drag-and-drop CSV/Parquet file ingestor with client-side Zero-PII sanitization (Luhn PAN check, IBAN/TCKN regex, HMAC hashing) and 12-rule Great Expectations data contract gating.', algorithm: 'Luhn PAN Checksum, Type-Salted HMAC-SHA256, Great Expectations 1.x', inputs: 'Bank transactions CSV / Parquet dumps', outputs: 'Validated consortium partition, Dirichlet alpha estimate', tech: 'Great Expectations 1.x, WebAssembly, HMAC-SHA256' },
-  { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 18 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
+  { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 19 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
+  { id: 'db-migrations', name: 'Multi-Tenant Database & Alembic Engine', category: 'Core Production Engine', purpose: 'Executes linear dual-revision migrations (001 -> 002) with dynamic tenant discovery from tenant_configs across PostgreSQL schemas and isolated SQLite databases.', algorithm: 'Alembic Linear Revision, Dynamic Discovery, Auto-Stamping', inputs: 'SQLAlchemy AsyncEngine, active_tenant context', outputs: 'Zero-drift isolated schemas, batch SQLite migration', tech: 'Alembic, SQLAlchemy 2.0 Async, PostgreSQL 16, SQLite' },
+  { id: 'tenant-kms', name: 'Multi-Tenant KMS & Key Lifecycle Engine', category: 'Core Production Engine', purpose: 'Enforces versioned envelope encryption (v1/v2) with AES-256-GCM, automated re-encryption, fail-closed revocation, and scheduled rotation cron triggers.', algorithm: 'Envelope AES-256-GCM, Key Rotation Pipeline, HashiCorp Vault', inputs: 'Tenant secret keys, master Vault secret', outputs: 'Versioned ciphertext envelopes, re-encrypted payloads', tech: 'Cryptography (AES-GCM), HashiCorp Vault, Python 3.12' },
 
   // ── FRONTIER LAB (ADVANCED R&D TRACK) ─────────────────────────────────────
   { id: 'pqc-secagg', name: 'Post-Quantum Cryptography PQC', category: 'Frontier R&D Lab', purpose: 'Researches lattice-based key exchanges for inter-bank P2P SecAgg against future quantum decryption threats (NIST FIPS 203/204).', algorithm: 'CRYSTALS-Kyber-768 KEM + Dilithium-3 Signatures', inputs: 'Lattice public key vectors & encrypted pairwise shares', outputs: 'Quantum-safe decrypted global model gradient', tech: 'NIST FIPS 203/204, liboqs, HKDF-SHA256' },
@@ -160,6 +161,24 @@ const MODULE_SPECS_EXTRA: Record<string, {
     tensorSample: 'Compose Mesh: [Gateway :80] → [Frontend :80] ⊕ [FastAPI :8000] ⊕ [Postgres :5432] ⊕ [Redis :6379]',
     statusBadge: 'ACTIVE PRODUCTION',
   },
+  'db-migrations': {
+    sla: '< 100 ms automated schema check',
+    security: 'PostgreSQL Schema & SQLite Isolation',
+    compliance: 'SOC 2 Type II / PCI-DSS Hard Multi-Tenancy',
+    actionRoute: '/operations',
+    actionLabel: 'Inspect Active Schemas',
+    tensorSample: 'Migration: 001_domain_tables → 002_core_and_aml_tables (Head: Up to date, Drift: 0)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
+  'tenant-kms': {
+    sla: '< 2.5 ms envelope crypto latency',
+    security: 'Versioned AES-256-GCM Envelopes',
+    compliance: 'NIST SP 800-57 Key Management Guidelines',
+    actionRoute: '/security',
+    actionLabel: 'Inspect KMS Keyrings',
+    tensorSample: 'Envelope: v2:{iv_b64}:{tag_b64}:{ciphertext_b64} (Re-encryption: ACTIVE)',
+    statusBadge: 'ACTIVE PRODUCTION',
+  },
   'pqc-secagg': {
     sla: '< 35 ms lattice key encapsulation',
     security: 'NIST FIPS 203 (Kyber-768 KEM)',
@@ -200,7 +219,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
 
 
 const ARCH_NODES: ArchNode[] = [
-  { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 18', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
+  { id: 'frontend', label: 'React Dashboard', description: 'Real-time monitoring dashboard and fraud investigation interface.', tech: ['React 19', 'Vite', 'Framer Motion', 'Recharts'], responsibilities: ['FL round monitoring', 'Graph visualisation', 'Risk investigation', 'Node inspection'], protocols: ['WebSocket', 'REST'] },
   { id: 'api-gw', label: 'API Gateway', description: 'Authenticated entrypoint for all dashboard, bank connector, and external tool traffic.', tech: ['FastAPI', 'JWT', 'TLS 1.3'], responsibilities: ['Auth enforcement', 'Rate limiting', 'Routing', 'Request logging'], protocols: ['HTTPS', 'WebSocket'] },
   { id: 'coordinator', label: 'FL Coordinator', description: 'Central orchestrator managing training rounds, node selection, and aggregation scheduling.', tech: ['Python 3.12', 'gRPC', 'Celery', 'Redis'], responsibilities: ['Round scheduling', 'Node selection', 'Timeout handling', 'Model versioning'], protocols: ['gRPC', 'Protocol Buffers'] },
   { id: 'fl-engine', label: 'FL Engine', description: 'Implements federated optimisation algorithms (FedAvg, FedProx) and gradient aggregation.', tech: ['PyTorch 2.2', 'NumPy', 'SciPy'], responsibilities: ['FedAvg', 'FedProx', 'Straggler tolerance', 'Model validation'], protocols: ['Shared Memory', 'gRPC'] },
@@ -1606,9 +1625,9 @@ export default function LandingPage() {
               {/* Category Filter Pills */}
               <div className="flex items-center gap-1.5 p-1 rounded-xl bg-white/4 border border-white/8 shrink-0 self-start md:self-end">
                 {[
-                  { id: 'ALL', label: 'All (13)' },
-                  { id: 'CORE', label: 'Core Engine (9)' },
-                  { id: 'FRONTIER', label: 'Frontier Lab (4)' },
+                  { id: 'ALL', label: `All (${PLATFORM_MODULES.length})` },
+                  { id: 'CORE', label: `Core Engine (${PLATFORM_MODULES.filter(m => m.category.includes('Core')).length})` },
+                  { id: 'FRONTIER', label: `Frontier Lab (${PLATFORM_MODULES.filter(m => m.category.includes('Frontier')).length})` },
                 ].map(tab => (
                   <button
                     key={tab.id}
@@ -2183,7 +2202,7 @@ export default function LandingPage() {
                       { cap: 'Cross-Bank Federated Learning', cfi: 'YES (Zero Raw PII)', fz: 'NO (Isolated Silo)', ca: 'NO (Cloud Silo)', na: 'NO (Legacy Silo)', ha: 'NO (Isolated)' },
                       { cap: 'Multi-Bank Mule & Smurfing GNN', cfi: 'YES (FedGNN Graph)', fz: 'Partial (Single Bank)', ca: 'NO (Watchlists Only)', na: 'Partial (On-Prem)', ha: 'NO (Single Bank)' },
                       { cap: 'Perimeter Isolation (Zero PII Out)', cfi: 'YES (Edge Cont. + DP)', fz: 'Partial (On-Prem)', ca: 'NO (Vendor Cloud SaaS)', na: 'YES (Heavy Monolith)', ha: 'NO (Cloud SaaS)' },
-                      { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (p99)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
+                      { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
                       { cap: 'False Positive Alert Reduction', cfi: '-64.7% (Measured)', fz: '-40% (Reported)', ca: '-30% (Reported)', na: 'Baseline Legacy', ha: '-35% (Reported)' },
                       { cap: 'Automated FinCEN SAR Generation', cfi: 'YES (Native XML Schema)', fz: 'Partial (Case Tool)', ca: 'Partial (Case Tool)', na: 'Manual Workflow', ha: 'AI Copilot Only' },
                       { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
@@ -2207,7 +2226,7 @@ export default function LandingPage() {
                   { cap: 'Cross-Bank Federated Learning', cfi: 'YES (Zero Raw PII)', fz: 'NO (Isolated Silo)', ca: 'NO (Cloud Silo)', na: 'NO (Legacy Silo)', ha: 'NO (Isolated)' },
                   { cap: 'Multi-Bank Mule & Smurfing GNN', cfi: 'YES (FedGNN Graph)', fz: 'Partial (Single Bank)', ca: 'NO (Watchlists Only)', na: 'Partial (On-Prem)', ha: 'NO (Single Bank)' },
                   { cap: 'Perimeter Isolation (Zero PII Out)', cfi: 'YES (Edge Cont. + DP)', fz: 'Partial (On-Prem)', ca: 'NO (Vendor Cloud SaaS)', na: 'YES (Heavy Monolith)', ha: 'NO (Cloud SaaS)' },
-                  { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (p99)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
+                  { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
                   { cap: 'False Positive Alert Reduction', cfi: '-64.7% (Measured)', fz: '-40% (Reported)', ca: '-30% (Reported)', na: 'Baseline Legacy', ha: '-35% (Reported)' },
                   { cap: 'Automated FinCEN SAR Generation', cfi: 'YES (Native XML Schema)', fz: 'Partial (Case Tool)', ca: 'Partial (Case Tool)', na: 'Manual Workflow', ha: 'AI Copilot Only' },
                   { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
@@ -2465,6 +2484,8 @@ telemetry.on('round.stage', (evt) => {
                     { method: 'POST', path: '/api/v1/security/rdp/calibrate', desc: 'Adaptive DP Auto-Scaler: dynamically calibrate per-round noise multiplier σ_t via Rényi DP', req: 'round_id, current_loss, batch_size', res: 'calibrated_sigma, optimal_alpha' },
                     { method: 'GET',  path: '/api/v1/audit/records',     desc: 'Query immutable SHA-256 cryptographic audit chain records', req: 'tenant_id (optional), limit', res: 'array of AuditRecord objects + block_hash' },
                     { method: 'GET',  path: '/api/v1/diagnostics/connectors', desc: 'Enterprise Connector Diagnostics: probe health for Kafka, Vault, KMS, Splunk, Redis & PostgreSQL', req: 'none (HTTP GET)', res: 'connectors array, latency_ms, status: HEALTHY' },
+                    { method: 'POST', path: '/api/v1/cases/export/fincen-xml', desc: 'Regulatory Export: generate validated FinCEN SAR XML package with SHA-256 digital signature', req: 'case_id, filer_id, narrative_override', res: 'xml_payload, sha256_hash, filing_status' },
+                    { method: 'POST', path: '/v1/cron/rotate-keys',      desc: 'Tenant KMS Lifecycle: trigger scheduled rotation of AES-256-GCM data keys and re-encryption pipeline', req: 'tenant_id (optional), force_rotation: boolean', res: 'rotated_keys_count, reencrypted_records, status' },
                     { method: 'WS',   path: '/ws/telemetry',             desc: 'Bi-directional WebSocket streaming live training rounds & risk alerts', req: 'jwt_token', res: 'JSON event telemetry stream' },
                   ].map(row => (
                     <div key={row.path} className="p-4 sm:p-5 hover:bg-white/3 transition-colors space-y-2 w-full min-w-0">

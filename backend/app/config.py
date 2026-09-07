@@ -4,6 +4,7 @@ Uses pydantic-settings to validate and type-check all configuration at startup.
 Fails fast if required variables are missing.
 """
 
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -152,7 +153,12 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
-        """Async PostgreSQL connection URL."""
+        """Async connection URL."""
+        if self.database_type == "sqlite":
+            from app.infrastructure.storage.storage_utils import get_storage_dir
+
+            db_path = os.path.abspath(os.path.join(get_storage_dir(), "cfi_central.db")).replace("\\", "/")
+            return f"sqlite+aiosqlite:///{db_path}"
         return (
             f"postgresql+asyncpg://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
@@ -160,7 +166,12 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
-        """Sync PostgreSQL connection URL for Alembic migrations."""
+        """Sync connection URL for Alembic migrations and synchronous scripts."""
+        if self.database_type == "sqlite":
+            from app.infrastructure.storage.storage_utils import get_storage_dir
+
+            db_path = os.path.abspath(os.path.join(get_storage_dir(), "cfi_central.db")).replace("\\", "/")
+            return f"sqlite:///{db_path}"
         return (
             f"postgresql://{self.postgres_user}:{self.postgres_password}"
             f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"

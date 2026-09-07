@@ -33,7 +33,7 @@ def upgrade() -> None:
         sa.Column("submitted_bank_ids", sa.JSON, nullable=False, server_default="[]"),
         sa.Column("quorum_required", sa.Integer, nullable=False, server_default="2"),
         sa.Column("global_model_id", sa.String(36), nullable=True),
-        sa.Column("aggregation_strategy", sa.String(30), server_default="fedavg"),
+        sa.Column("aggregation_strategy", sa.String(30), nullable=False, server_default="fedavg"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),
@@ -77,7 +77,7 @@ def upgrade() -> None:
         sa.Column("gradient_hash", sa.String(64), nullable=False),
         sa.Column("dp_epsilon_used", sa.Float, nullable=False),
         sa.Column("participant_count", sa.Integer, nullable=False),
-        sa.Column("validation_status", sa.String(30), server_default="accepted"),
+        sa.Column("validation_status", sa.String(30), nullable=False, server_default="accepted"),
         sa.Column("rejection_reason", sa.Text, nullable=True),
         sa.Column(
             "submitted_at",
@@ -96,7 +96,7 @@ def upgrade() -> None:
         sa.Column("consortium_id", sa.String(36), nullable=False),
         sa.Column("bank_id", sa.String(36), nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="pending"),
-        sa.Column("role", sa.String(20), server_default="member"),
+        sa.Column("role", sa.String(20), nullable=False, server_default="member"),
         sa.Column(
             "joined_at",
             sa.DateTime(timezone=True),
@@ -117,10 +117,10 @@ def upgrade() -> None:
         sa.Column("contact_email", sa.String(255), nullable=False),
         sa.Column("data_residency_region", sa.String(30), nullable=False),
         sa.Column("status", sa.String(25), nullable=False, server_default="pending_verification"),
-        sa.Column("cert_fingerprint", sa.String(64), nullable=True),
+        sa.Column("cert_fingerprint", sa.String(96), nullable=True),
         sa.Column("cert_expires_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("vault_key_path", sa.String(255), nullable=True),
-        sa.Column("schema_provisioned", sa.Integer, server_default="0"),
+        sa.Column("schema_provisioned", sa.Integer, nullable=False, server_default="0"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

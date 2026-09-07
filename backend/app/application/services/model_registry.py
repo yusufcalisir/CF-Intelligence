@@ -6,17 +6,17 @@ Global models are saved per simulation run with metrics metadata.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import os
 import shutil
 import tempfile
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
 import torch
-
-import threading
 
 logger = logging.getLogger(__name__)
 
@@ -96,10 +96,8 @@ class ModelRegistry:
             except Exception as e:
                 logger.error("Failed to save registry manifest for %s: %s", simulation_id, e)
                 if os.path.exists(tmp_manifest_path):
-                    try:
+                    with contextlib.suppress(OSError):
                         os.remove(tmp_manifest_path)
-                    except OSError:
-                        pass
 
     def save_version(
         self,

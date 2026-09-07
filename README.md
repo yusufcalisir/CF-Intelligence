@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1431%2F1431_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1455%2F1455_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
@@ -29,9 +29,9 @@
 | [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [19. API Blueprints](#19-api-endpoint-blueprints--json-schemas) | [26. Author & Maintenance](#26-author-and-maintenance) |
 | [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | | |
 | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | | |
-| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway--rate-limiting) | | |
+| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | | |
 | [11. Case Management & SAR](#11-human-in-the-loop-workbench--regulatory-reporting) | | |
-| [12. Disaster Recovery & SRE](#12-disaster-recovery-high-availability--sre-operations) | | |
+| [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
 
 </div>
 
@@ -66,7 +66,7 @@ The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** addresses th
 │   └──────────────────────────┬─────────────────────────────┘                     │
 │                              ▼                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
-│   │ Real-Time Scoring (<100ms) + SHAP + 6-Stage Case WB    │ (Serving & SAR)     │
+│   │ Real-Time Scoring (<14.2ms / ~308ms) + SHAP + Case WB  │ (Serving & SAR)     │
 │   └────────────────────────────────────────────────────────┘                     │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -77,7 +77,7 @@ The core production path focuses on seven defensible engineering components:
 - **Secure Aggregation (SecAgg):** Peer-to-peer Curve25519 Diffie-Hellman pairwise zero-sum masking for masked parameter aggregation.
 - **Byzantine Consensus:** `Krum` (single representative selection), `Trimmed Mean`, and `Bulyan` (Krum candidate selection + coordinate trimmed mean) aggregators paired with Spectral SVD backdoor filtering.
 - **Graph Intelligence:** PyTorch `GraphSAGE` relational embeddings and MinHash LSH Private Set Intersection (Fuzzy PSI) for entity resolution.
-- **Real-Time Composite Scoring:** Sub-100ms inference gateway combining 9 statistical, behavioral, and topological signals.
+- **Real-Time Composite Scoring:** Low-latency inference gateway combining 9 statistical, behavioral, and topological signals (< 14.2 ms Fast-Path raw, ~308 ms Concurrent Ensemble).
 - **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Edge Middleware $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
 - **Explainability & Governance:** Real-time SHAP feature attributions and a 6-stage case management workbench with automated FinCEN BSA SAR XML compilation.
 
@@ -121,7 +121,7 @@ The core production path focuses on seven defensible engineering components:
                                            ▼
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                       Real-Time Scoring & Operational Serving                        │
-│  - Real-Time Scoring Gateway (<100ms SLA, P99 Latency Monitor)                       │
+│  - Real-Time Scoring Gateway (<14.2ms Fast-Path / ~308ms Ensemble SLA)              │
 │  - Multi-Layer Perimeter Defense: Cloudflare WAF + Vercel Edge + slowapi Rate Limit  │
 │  - Broken Access Control (BOLA/IDOR) Multi-Tenant Isolation Middleware               │
 │  - Fast SHAP Explanations (KernelExplainer) & Counterfactual Feature Sensitivity      │
@@ -233,6 +233,7 @@ CF-Intelligence/
 │
 ├── backend/                                         # Clean Architecture Python 3.12 Backend
 │   ├── alembic.ini                                  # Alembic DB migration configuration
+│   ├── pip_audit_results.json                       # Comprehensive dependency security & vulnerability audit record
 │   ├── pyproject.toml                               # Backend dependency & pytest/coverage config
 │   ├── requirements.txt                             # Pinned production dependencies (FastAPI, PyTorch, Opacus, TenSEAL, Bcrypt, Locust)
 │   ├── app/
@@ -376,8 +377,12 @@ CF-Intelligence/
 │   │   │   ├── database/                            # SQLAlchemy Async ORM, engine, search_path isolation & DDL quoting
 │   │   │   │   ├── __init__.py                      # Engine pool, multi-tenant session factory & metadata migration
 │   │   │   │   ├── tenant_provisioner.py            # PostgreSQL schema & SQLite dynamic tenant database provisioner
-│   │   │   │   ├── migration_manager.py             # Programmatic Alembic database migration runner
+│   │   │   │   ├── migration_manager.py             # Programmatic Alembic database migration runner & auto-stamping
 │   │   │   │   └── migrations/                      # Alembic versioned schema migrations
+│   │   │   │       ├── env.py                       # Dynamic DB URL, multi-tenant schema runner & SQLite batch mode
+│   │   │   │       └── versions/                    # Linear migration revision scripts
+│   │   │   │           ├── 001_production_domain_tables.py # Core production domain tables DDL
+│   │   │   │           └── 002_core_and_aml_tables.py      # Core AML, simulation & evidence tables DDL
 │   │   │   │
 │   │   │   ├── connectors/                          # ISO 20022, SWIFT, Streaming & Message Queue Ingestion
 │   │   │   │   ├── factory.py                       # Dynamic connector factory & protocol registry
@@ -469,16 +474,17 @@ CF-Intelligence/
 │   │       │   ├── admin_console.py                 # Administrative cluster operations & operator tools
 │   │       │   └── gateway.py                       # Multi-tenant API routing & header normalization gateway
 │   │       └── websockets/                          # Real-Time Streaming Channels
+│   │           ├── manager.py                       # WebSocket ConnectionManager, broadcast channels & ping heartbeats
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,172 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (1,196 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
 │       └── property/                                # Hypothesis property-based mathematical invariance tests
 │
-├── frontend/                                        # React 18 / Vite TypeScript Web Console
+├── frontend/                                        # React 19 / Vite TypeScript Web Console
 │   ├── middleware.ts                                # Vercel Edge Middleware (@upstash/ratelimit & security guards)
 │   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (10 Tests)
 │   ├── e2e-visual/                                  # Playwright Visual Regression Suite (Strict baseline comparison)
@@ -614,6 +620,7 @@ CF-Intelligence/
 │   └── test/                                        # Hardhat Mocha/Chai contract unit tests & gas audits
 │
 └── scripts/                                         # Developer Automation, Benchmarks, Load Testing & CLI Tooling
+    ├── generate_sbom.py                             # Automated SPDX / CycloneDX SBOM generator & pip-audit runner
     ├── generate_secrets.py                          # One-click cryptographic 256-bit secret generator for .env
     ├── verify_docker_deployment.py                  # Automated Docker Compose pre-flight and runtime smoke test
     ├── run_load_test.py                             # High-throughput asynchronous load tester & SLA report generator
@@ -892,8 +899,8 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 
 ### 10.6 Real-Time Scoring Gateway, Tenant Quotas & SLA Monitoring
 
-- **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-100ms latency.
-- **Tenant Quota Enforcement (`TenantMeteringService` & `dependencies.py`):** The `enforce_tenant_quota` dependency actively intercepts requests to `/api/v1/predict` and `/api/v1/score-transaction`, tracking monthly quota consumption per tenant tier (e.g., 100,000 monthly calls) and recording usage metrics (`record_inference`). When an institution breaches its quota ceiling, the gateway rejects the request with `HTTP 429 Too Many Requests` (`detail: "Tenant API quota limit exceeded"`). *Scope Note:* Metering is actively wired and enforced at the high-throughput inference gateway endpoints, rather than universally wrapping every internal admin or diagnostic probe.
+- **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-15ms fast-path raw neural latency (<14.2ms) and ~258.9ms p50 / ~308.2ms p99 latency under concurrent 9-signal feature store enrichment (well within the 350ms multi-model SLA budget).
+- **Tenant Quota Enforcement (`TenantMeteringService` & `dependencies.py`):** The `enforce_tenant_quota` dependency actively intercepts requests to `/api/v1/predict` and `/api/v1/score-transaction`, tracking monthly quota consumption per tenant tier (e.g., 100,000 monthly calls) via atomic `acquire_quota()` and recording usage metrics (`record_inference`). When an institution breaches its quota ceiling, the gateway rejects the request with `HTTP 429 Too Many Requests` (`detail: "Tenant API quota limit exceeded"`). *Scope Note:* Metering is actively wired and enforced at the high-throughput inference gateway endpoints, rather than universally wrapping every internal admin or diagnostic probe.
 - **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
 
 ### 10.7 STRIDE Threat Model & Attack Surface Summary
@@ -944,8 +951,32 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 
 ---
 
-## 12. Disaster Recovery, High Availability & SRE Operations
+## 12. Database Architecture, HA & Disaster Recovery Operations
 
+### 12.1 Multi-Tenant Relational Persistence & Alembic Migration Engine
+The persistence tier utilizes SQLAlchemy 2.0 Async ORM backed by a linear, dual-revision Alembic migration lifecycle (`001_production_domain_tables` $\to$ `002_core_and_aml_tables`) across 17 domain, AML, and evidence models:
+- **Dual-Engine Multi-Tenancy:**
+  - *PostgreSQL / CockroachDB:* Dedicated tenant schema spaces (`tenant_{bank_id}`) isolated with `CREATE SCHEMA IF NOT EXISTS` and dynamic `SET search_path TO tenant_{bank_id}, public` scoping, guarded by double-quoted SQL injection sanitization (`_pg_quote_identifier`).
+  - *SQLite:* Dynamic isolated database files (`cfi_{bank_id}.db`) stored in guaranteed writable runtime directories (`_STORAGE_ROOT`) with full batch migration support (`render_as_batch=True`).
+- **Dynamic Active Tenant Discovery:** The migration environment (`migrations/env.py`) dynamically queries registered institutions from the `tenant_configs` table (`_get_active_tenants()`), seamlessly migrating newly onboarded banks with resilient fallback to configured `VALID_TENANTS`.
+- **Zero-Drift Parity & Reversibility:** Validated via automated `compare_metadata()` tests guaranteeing 100% schema parity with zero drift operations, complete linear revision resolution, and reversible rollback (`downgrade base`).
+- **Automatic Schema Adoption & Stamping:** Programmatic startup migration manager (`migration_manager.py`) inspects target databases; if domain tables exist without version records (e.g. from developer ORM bootstrapping), it automatically stamps `head` via `_ensure_migrated_or_stamped()`, preventing collision crashes during container boot.
+- **Offline Migration Mode:** Generates standalone SQL DDL statements (`--sql`) for strict air-gapped change-control environments.
+
+### 12.2 Concurrency Safety & Race Condition Defenses
+- **Thread-Safe Champion Promotion:** `ModelRegistry` and `ModelRegistryVault` enforce reentrant mutual exclusion locks (`threading.RLock()`) and atomic disk file swaps (`tempfile` + `os.replace`) to guarantee zero dual-champion states under concurrent load.
+- **Atomic Tenant Metering:** `TenantMeteringService` utilizes an atomic `acquire_quota(tenant_id, tier, units)` routine to eliminate check-then-act race conditions during high-volume inference bursts.
+- **Three-State Idempotency Key Pipeline:** `IdempotencyService` manages request states (`"ACQUIRED"`, `"IN_PROGRESS"`, `"HIT"`) preventing duplicate concurrent execution of financial workflows and replay attacks.
+- **Tamper-Evident Audit Chain:** `ImmutableAuditChain` guarantees thread-safe, append-only block addition with HMAC-SHA256 integrity verification.
+
+### 12.3 Cryptographic Key Lifecycle & Multi-Tenant KMS
+- **Multi-Tenant Key Isolation:** Per-tenant envelope encryption using AES-256-GCM via `TenantKMSService` with automated key rotation and derivation from master Vault secrets.
+- **Multi-Version Keyring & Envelope Headers:** Supports versioned keyrings (`v1`, `v2`, ...) with explicit envelope format `v{version}:{iv_b64}:{tag_b64}:{ciphertext_b64}`.
+- **Data Re-Encryption & Revocation:** `re_encrypt_tenant_data()` migrates historical records from retired versions to active keys, while `invalidate_retired_keys()` guarantees un-migrated ciphertexts under revoked keys fail closed with `DecryptionError`.
+- **Scheduled Maintenance Cron Endpoint:** `POST /v1/cron/rotate-keys` provides secure token-authorized trigger (`CRON_SECRET_KEY`) for automated key rotation schedulers (Kubernetes CronJobs / CloudWatch Events).
+- **Honest Telemetry Reporting:** Explicit reporting of Vault PKI engine availability (Live HashiCorp Vault vs transparent in-memory cryptographic simulation).
+
+### 12.4 Disaster Recovery & SRE Operations
 - **Active-Passive Multi-Region Failover (`region_failover.py`):** Automates standby region promotion upon primary heartbeat timeout (>15s), with target $\text{RTO} < 30\text{s}$.
 - **Operator CLI (`cfi_cli.py`):** Command-line tool for monitoring platform health, inspecting cluster status, and triggering administrative tasks.
 - **Production-Hardened Systemic Resilience:**
@@ -1001,8 +1032,9 @@ All benchmark measurements are derived from the integrated test suite executed a
 
 | Benchmark Dimension | Measured Value | Design Target | Verification Reference | Verification Status |
 | :--- | :---: | :---: | :--- | :---: |
-| **Inference Latency (p99)** | < 14.2 ms | < 100 ms | `realtime_inference.py` | `Self-Verified (Internal Test Suite)` |
-| **Real-Time Load Test SLA (p99)** | **87.26 ms (51.3 req/s)** | < 100 ms (p99 SLA) | [`reports/load_test_report.md`](reports/load_test_report.md) | `Empirical Load Test (1,000 reqs, 3 banks)` |
+| **Inference Latency (Fast-Path Raw)** | < 14.2 ms | < 50 ms | `realtime_inference.py` | `Self-Verified (Internal Test Suite)` |
+| **Concurrent Ensemble Latency (p50 / p99)** | **258.9 ms (p50) / 308.2 ms (p99)** | < 350 ms (Ensemble SLA) | `test_load_concurrency_verification.py` | `Empirical Load Benchmark (15 workers, 9-signal feature store)` |
+| **Real-Time Load Test Stream SLA (p99)** | **87.26 ms (51.3 req/s)** | < 100 ms (Stream SLA) | [`reports/load_test_report.md`](reports/load_test_report.md) | `Empirical Load Test (1,000 reqs, 3 banks)` |
 | **ABAC Authorization Throughput** | **132,942 req/s (mean)** | > 5,000 req/s | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `Empirical In-Memory Benchmark (50k evals x 3 rounds)` |
 | **ABAC Decision Latency** | < 0.015 ms (p99) | < 1 ms | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `Empirical In-Memory Benchmark` |
 | **SecAgg Throughput (Curve25519 P2P Driver)** | **~513,000 param/s** | > 250k param/s | `p2p_secagg_driver.py` | `Empirical Single-Thread Modular Masking Benchmark` |
@@ -1011,8 +1043,8 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **FL Synthetic ROC-AUC (FedAvg)** | **0.835 mean (range 0.563–0.952)** | > 0.80 measured / 0.950 lab design goal | `simulation_service.py` (5-seed empirical benchmark, 3-bank consortium, 5 rounds) | `Empirical Simulation Benchmark (5 seeds: [42, 123, 456, 789, 2026])` |
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
-| **Multi-Tenant Memory/DB Isolation**| **4/4 Tenant Isolation Tests Passing** | Strict Isolation (403 BOLA rejection) | `test_multi_tenant_security_audit.py` | `Self-Verified (Input sanitization, ContextVar session isolation, Redis namespace enclosure, cross-tenant 403 enforcement)` |
-| **Full Test Suite Pass Rate** | **1,431 / 1,431 passing** | 100% | 1,172 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
+| **Full Test Suite Pass Rate** | **1,455 / 1,455 passing** | 100% | 1,196 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1024,7 +1056,7 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Mobile Money (6.36M txns) | **0.8420** | 0.6940 (`+0.1480`) | **62.4%** (`+19.2%`) | **-64.7% False Alarms** |
 | **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | E-Commerce / Cards (590k txns) | **0.8120** | 0.6510 (`+0.1610`) | **58.9%** (`+21.4%`) | **-58.3% False Alarms** |
-| **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (46k nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** |
+| **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (203k total / 46.5k labeled nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** |
 | **[Credit Card Fraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)** | European Cards PCA (284k txns, LEAF $\alpha=0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** |
 
 ---
@@ -1048,6 +1080,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 | **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch` with strict 75% regression gate (`--cov-fail-under=75`). |
 | **Kubernetes Manifest Dry-Run Audit** | `python scripts/validate_k8s_manifests.py --all` | Renders Helm charts and executes authentic `kubectl apply --dry-run=client` against all 38 production resources with zero template errors. |
 | **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
+| **Dynamic CycloneDX 1.5 SBOM** | `python scripts/generate_sbom.py --format cyclonedx` | Generates automated, dependency-verified CycloneDX 1.5 JSON SBOM capturing 330 components across Python and npm runtimes with license and hash tracking. Outputs to `storage/sbom_cyclonedx.json`. |
 
 ---
 
@@ -1060,7 +1093,7 @@ The table below contrasts the architectural paradigms implemented in CF-Intellig
 | **Data Sharing Paradigm** | **Federated Learning (Zero Raw PII)** | Centralized Cloud Pooling | Isolated Bank Silos | Generic Distributed Primitives |
 | **Multi-Institution Graph Analysis** | **GraphSAGE + Fuzzy PSI** | Single-Tenant Graph / Watchlists | Isolated Rule Engines | Manual Graph Scaffolding |
 | **Privacy Guarantees** | **Opacus DP + Curve25519 SecAgg** | Vendor Trust Agreement | Network Firewalls Only | Custom PET Integrations |
-| **Inference Latency (p99)** | **< 14.2 ms (REST Gateway)** | ~30 - 50 ms | > 100 ms | Framework Dependent |
+| **Inference Latency (p99)** | **< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)** | ~30 - 50 ms | > 100 ms | Framework Dependent |
 | **Non-IID Heterogeneity Handling** | **Dirichlet ($\alpha=0.5$) + FedProx** | N/A (Centralized Data) | N/A (Single Institution) | Basic Weight Averaging |
 | **Explainability & Compliance** | **SHAP + SAR XML + Four-Eyes WB** | Vendor Black Box / Basic UI | Manual Case Review | Bare Model Outputs |
 | **Deployment Model** | **Docker / Kubernetes / gRPC Edge** | Multi-Tenant Cloud SaaS | Heavy On-Premises Monolith | Python Library / CLI |
@@ -1503,6 +1536,57 @@ Publishes real-time training iteration progress broadcast via internal Redis Pub
 }
 ```
 
+### 19.10 Regulatory SAR Export & Key Rotation Cron Endpoints
+
+**1. Case SAR FinCEN XML Export (`POST /api/v1/cases/export/fincen-xml`):**
+Exports confirmed fraud cases directly into official FinCEN BSA XML Schema 2.0 electronic filings:
+
+*Request (`POST /api/v1/cases/export/fincen-xml`):*
+```json
+{
+  "case_id": "CASE-2026-9941"
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "status": "FILED",
+  "submission_id": "SAR-XML-2026-9941-A8F2",
+  "case_id": "CASE-2026-9941",
+  "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<EFilingSubmission ...>\n  <ReportingInstitution>Bank Alpha</ReportingInstitution>\n  <SuspiciousActivityInformation>Cross-Bank Velocity Surge</SuspiciousActivityInformation>\n</EFilingSubmission>",
+  "timestamp": "2026-09-06T12:00:00Z"
+}
+```
+
+**2. Scheduled Key Rotation Trigger (`POST /v1/cron/rotate-keys`):**
+Triggered by Kubernetes CronJobs or cloud event schedulers to rotate per-tenant KMS envelope keys:
+
+*Request (`POST /v1/cron/rotate-keys`):*
+```http
+POST /v1/cron/rotate-keys HTTP/1.1
+Host: api.cfi-platform.org
+Authorization: Bearer <CFI_CRON_SECRET>
+Content-Type: application/json
+
+{
+  "tenant_id": "bank_a",
+  "keep_last_n": 2
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "status": "SUCCESS",
+  "tenant_id": "bank_a",
+  "active_version": 2,
+  "retired_versions": [1],
+  "reencrypted_records_count": 450,
+  "timestamp_iso": "2026-09-06T00:00:00Z"
+}
+```
+
 ---
 
 ## 20. Research & Exploratory Modules
@@ -1583,6 +1667,11 @@ Open `http://localhost` in your corporate browser to access the unified platform
 ```bash
 cd backend
 pip install -r requirements.txt
+
+# Run Alembic schema migrations (upgrade to latest head: 002_core_and_aml_tables)
+alembic upgrade head
+
+# Run backend test suite
 pytest tests/ -v
 ```
 
@@ -1603,10 +1692,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,431 Tests)
+### Step 5: Master Test Suites Execution (1,455 Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (1,172 tests)
+# 1. Run full backend pytest suite (1,196 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (249 tests across 78 test files)

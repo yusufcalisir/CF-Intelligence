@@ -29,12 +29,21 @@ The SLA Contract Engine monitors enterprise Service Level Agreements ($99.9\%$ u
 
 ## 📊 Empirical Load Testing & Latency Verification
 
-To prove sub-100ms $p99$ latency compliance under real production conditions, the scoring gateway is continuously benchmarked using concurrent multi-bank load testing suites:
+The platform evaluates inference latency across two distinct operational profiles:
 
-- **1,000-Request Concurrent Benchmark (`scripts/run_load_test.py`)**:
-  - Measured Throughput: **51.3 req/s**
-  - Success Rate: **1,000 / 1,000 (100.0%)**
-  - Median Latency ($p50$): **52.47 ms**
-  - 95th Percentile ($p95$): **65.23 ms**
-  - **99th Percentile ($p99$): 87.26 ms (< 100.0 ms SLA)**
-  - Full Report: [`reports/load_test_report.md`](../reports/load_test_report.md)
+1. **Lightweight Payment Stream Benchmark (`scripts/run_load_test.py --concurrency 3`)**:
+   - Evaluates fast-path transaction scoring across 3 concurrent bank streams:
+   - Measured Throughput: **51.3 req/s**
+   - Success Rate: **1,000 / 1,000 (100.0%)**
+   - Median Latency ($p50$): **52.47 ms**
+   - 95th Percentile ($p95$): **65.23 ms**
+   - **99th Percentile ($p99$): 87.26 ms (< 100.0 ms SLA)**
+
+2. **High-Concurrency Multi-Model Ensemble Stress Benchmark (`test_load_concurrency_verification.py`)**:
+   - Evaluates full 9-signal feature store enrichment and multi-model ensemble scoring under 15 concurrent worker threads:
+   - Median Latency ($p50$): **258.9 ms**
+   - 95th Percentile ($p95$): **293.3 ms**
+   - **99th Percentile ($p99$): 308.2 ms (< 350.0 ms Ensemble SLA Budget)**
+   - Isolated Single-Model Neural Scoring: **< 14.2 ms**
+   - Full Report: [`reports/load_test_report.md`](../reports/load_test_report.md)
+

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import logging
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
-
-import threading
 
 logger = logging.getLogger(__name__)
 
