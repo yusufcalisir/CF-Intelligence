@@ -32,7 +32,7 @@ mlflow>=3.11.0,<4.0.0           # security: 45 CVEs in <3.11.0 (RCE, auth bypass
 
 # Data Validation & Contracts
 pandera>=0.21.0,<1.0.0
-great_expectations>=1.21.0,<2.0.0
+great_expectations>=1.22.0,<2.0.0
 lxml>=5.0.0
 
 # FL Framework
