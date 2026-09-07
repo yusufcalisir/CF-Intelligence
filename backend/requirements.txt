@@ -43,7 +43,7 @@ ray>=2.56.0,<3.0.0              # security: PYSEC-2026-2273 (fixed in 2.56.0)
 websockets>=13.0,<18.0
 
 # Utilities
-structlog>=24.4.0,<27.0.0
+structlog>=26.1.0,<27.0.0
 python-json-logger>=2.0.7,<4.0.0
 python-dotenv>=1.2.3,<2.0.0
 pika>=1.3.0,<2.0.0
