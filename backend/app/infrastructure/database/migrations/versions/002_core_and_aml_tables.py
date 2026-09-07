@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import sqlalchemy as sa
 
-from alembic import op
+from alembic import op  # type: ignore[attr-defined]
 
 # Alembic revision identifiers
 revision: str = "002_core_and_aml_tables"
