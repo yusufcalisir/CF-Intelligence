@@ -15,9 +15,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"]
+      "@/*": ["./src/*"]
     },
     "types": ["@testing-library/jest-dom/vitest", "node"]
   },

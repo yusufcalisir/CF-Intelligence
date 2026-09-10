@@ -33,7 +33,7 @@ export default function ConfusionMatrix({
   let fp = 0;
   let fn = 0;
   let tp = 0;
-  let heading = title || 'Confusion Matrix';
+  const heading = title || 'Confusion Matrix';
   let subheading = subtitle;
   let color = '#6366f1';
 

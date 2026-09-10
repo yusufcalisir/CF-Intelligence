@@ -104,6 +104,9 @@ updates:
           - "@tailwindcss/*"
           - "postcss"
           - "autoprefixer"
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
 
   # ──────────────────────────────────────────────────────────────────────────
   # GitHub Actions – keep CI action versions up-to-date

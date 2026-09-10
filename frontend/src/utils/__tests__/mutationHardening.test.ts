@@ -40,7 +40,8 @@ describe('Mutation Testing & Fault Injection Hardening Suite', () => {
 
     it('kills boolean filter mutator in classNames', () => {
       // Mutant: removing Boolean filter or returning empty string
-      const result = classNames('btn', false && 'hidden', 'btn-primary', null, undefined, '', 'active');
+      const isHidden = false;
+      const result = classNames('btn', isHidden && 'hidden', 'btn-primary', null, undefined, '', 'active');
       expect(result).toBe('btn btn-primary active');
       expect(classNames()).toBe('');
     });
