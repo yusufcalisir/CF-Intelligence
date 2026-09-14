@@ -7,6 +7,7 @@ computes risk scores, generates explainability reports, and triggers alerts.
 from __future__ import annotations
 
 import asyncio
+import functools
 import logging
 import os
 import random
@@ -56,6 +57,35 @@ _feature_store = FeatureStoreService()
 
 _cached_serving_model: torch.nn.Module | None = None
 _cached_serving_model_mtime: float = 0.0
+
+
+@functools.lru_cache(maxsize=8)
+def _load_challenger_model(simulation_id: str, version: int, dp_compatible: bool) -> torch.nn.Module:
+    """Load and cache challenger model by simulation_id + version (LRU, max 8 entries).
+
+    Avoids per-request disk I/O for challenger shadow evaluation.
+    Cache is invalidated automatically when a new version key is seen.
+    """
+    state_dict = _registry.load_version(simulation_id, version)
+    chall_dp = dp_compatible
+    for key in state_dict:
+        if "running_mean" in key or "running_var" in key:
+            chall_dp = False
+            break
+    chall_input_dim = NUM_FEATURES
+    for weight_key in ("network.0.weight", "module.network.0.weight"):
+        if (
+            weight_key in state_dict
+            and hasattr(state_dict[weight_key], "shape")
+            and len(state_dict[weight_key].shape) >= 2
+        ):
+            chall_input_dim = int(state_dict[weight_key].shape[1])
+            break
+    model = _model_service.create_model(input_dim=chall_input_dim, dp_compatible=chall_dp)
+    model.load_state_dict(state_dict)
+    model.eval()
+    logger.debug("Challenger model v%d loaded and cached (sim=%s).", version, simulation_id[:8])
+    return model
 
 
 def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Module:
@@ -382,28 +412,15 @@ async def predict_transaction(
             if challenger_entry:
                 challenger_ver = challenger_entry["version"]
                 try:
-                    chall_state_dict = _registry.load_version(payload.simulation_id, challenger_ver)
-                    chall_dp = True
-                    for key in chall_state_dict:
-                        if "running_mean" in key or "running_var" in key:
-                            chall_dp = False
-                            break
-
-                    chall_input_dim = NUM_FEATURES
-                    for weight_key in ("network.0.weight", "module.network.0.weight"):
-                        if (
-                            weight_key in chall_state_dict
-                            and hasattr(chall_state_dict[weight_key], "shape")
-                            and len(chall_state_dict[weight_key].shape) >= 2
-                        ):
-                            chall_input_dim = int(chall_state_dict[weight_key].shape[1])
-                            break
-
-                    chall_model = _model_service.create_model(
-                        input_dim=chall_input_dim, dp_compatible=chall_dp
+                    # Use LRU-cached loader — avoids per-request disk I/O
+                    chall_model = _load_challenger_model(
+                        payload.simulation_id, challenger_ver, dp_compatible=True
                     )
-                    chall_model.load_state_dict(chall_state_dict)
-                    chall_model.eval()
+                    chall_input_dim = int(
+                        chall_model.network[0].in_features
+                        if hasattr(chall_model, "network")
+                        else NUM_FEATURES
+                    )
 
                     chall_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
                     if chall_tensor.shape[1] < chall_input_dim:
@@ -422,6 +439,7 @@ async def predict_transaction(
                         challenger_ver,
                         exc,
                     )
+
 
         # Traffic Routing: Route a portion of the traffic to the Challenger
         routed_to = "champion"
