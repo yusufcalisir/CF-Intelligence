@@ -690,7 +690,15 @@ async def score_transaction(
 
     # FATF high-risk jurisdiction supplement: countries not in engine's lookup table
     _HIGH_RISK_COUNTRIES = {"KP", "IR", "MM", "SY", "YE", "LY", "SS", "SO", "CF", "ER"}
-    country_risk_override = 0.95 if payload.country.upper() in _HIGH_RISK_COUNTRIES else None
+    _ELEVATED_RISK_COUNTRIES = {"PK", "TZ", "VU", "NG", "HT", "PH", "AO", "RU", "BY"}
+    country_upper = payload.country.upper()
+    is_fatf_blacklist = country_upper in _HIGH_RISK_COUNTRIES
+    is_fatf_greylist = country_upper in _ELEVATED_RISK_COUNTRIES
+    country_risk_override = (
+        0.95 if is_fatf_blacklist
+        else 0.72 if is_fatf_greylist
+        else None
+    )
 
     txn_dict = {
         "transaction_amount": payload.amount,
@@ -713,6 +721,20 @@ async def score_transaction(
     # Normalize integer risk score [0, 1000]
     risk_score = max(0, min(1000, round(raw_score)))
 
+    # Hard escalations that override the ML composite score:
+    # 1. FATF NCCT blacklisted jurisdiction -> mandatory BLOCK
+    if is_fatf_blacklist:
+        risk_score = max(risk_score, 950)
+    # 2. FATF greylisted jurisdiction -> minimum REVIEW
+    elif is_fatf_greylist:
+        risk_score = max(risk_score, 350)
+    # 3. High-value transactions on high-risk merchants -> REVIEW
+    if payload.amount >= 10000.0 and merchant_risk >= 0.35:
+        risk_score = max(risk_score, 350)
+    # 4. Very large amounts -> always at least REVIEW
+    if payload.amount >= 50000.0:
+        risk_score = max(risk_score, 320)
+
     # Determine risk_level
     if risk_score < 300:
         risk_level = "LOW"
@@ -721,7 +743,7 @@ async def score_transaction(
     else:
         risk_level = "HIGH"
 
-    # Determine decision recommendation
+    # Determine decision
     if risk_score > 900:
         decision = "BLOCK"
     elif risk_score >= 300:
@@ -741,11 +763,23 @@ async def score_transaction(
     except Exception:
         pass
 
-    # Top SHAP feature attributions
+    # Build dynamic explanations from actual risk signals
     explanations = [
-        FeatureContributionItem(feature="merchant_velocity_1h", contribution=0.34),
-        FeatureContributionItem(feature="cross_entity_device_link", contribution=0.27),
+        FeatureContributionItem(
+            feature=s.signal_name,
+            contribution=round(s.weight * s.normalized_score, 3),
+        )
+        for s in sorted(risk_score_obj.signals, key=lambda x: abs(x.weight * x.normalized_score), reverse=True)[:5]
+    ] if risk_score_obj.signals else [
+        FeatureContributionItem(feature="composite_risk_score", contribution=round(raw_score / 1000.0, 3)),
+        FeatureContributionItem(feature="country_risk", contribution=round(country_risk_override or 0.0, 3)),
     ]
+
+    # Add FATF flag explanation if applicable
+    if is_fatf_blacklist:
+        explanations.insert(0, FeatureContributionItem(feature="fatf_ncct_blacklist", contribution=0.95))
+    elif is_fatf_greylist:
+        explanations.insert(0, FeatureContributionItem(feature="fatf_greylist", contribution=0.72))
 
     # Connected entity risk levels
     device_risk = "HIGH" if risk_score > 700 else ("MEDIUM" if risk_score > 300 else "LOW")
@@ -754,8 +788,6 @@ async def score_transaction(
     ]
 
     latency_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
-    if latency_ms < 0.1:
-        latency_ms = 8.0
 
     return ScoreTransactionResponse(
         risk_score=risk_score,
