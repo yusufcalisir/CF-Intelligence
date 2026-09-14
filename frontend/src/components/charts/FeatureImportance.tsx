@@ -52,7 +52,7 @@ export default function FeatureImportance({ bank, modelType }: FeatureImportance
                 fontSize: '12px',
                 color: 'var(--color-text-primary)',
               }}
-              formatter={(value: number) => [value.toFixed(3), 'Importance']}
+              formatter={(value: any) => [Number(value ?? 0).toFixed(3), 'Importance']}
             />
             <Bar
               dataKey="importance"

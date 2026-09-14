@@ -614,7 +614,7 @@ function HourlyChart({ data }: { data: Record<string, unknown>[] }) {
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           }}
           labelStyle={{ color: 'var(--color-text-primary)', fontWeight: 600, marginBottom: 4 }}
-          formatter={(value: number) => [`${value}%`, '']}
+          formatter={(value: any) => [`${value ?? 0}%`, '']}
         />
         {(['bank_a', 'bank_b', 'bank_c'] as const).map((bankId) => (
           <Bar
@@ -667,7 +667,7 @@ function MerchantChart({ data }: { data: Record<string, unknown>[] }) {
             boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
           }}
           labelStyle={{ color: 'var(--color-text-primary)', fontWeight: 600, marginBottom: 4, textTransform: 'capitalize' }}
-          formatter={(value: number) => [`${value}%`, '']}
+          formatter={(value: any) => [`${value ?? 0}%`, '']}
         />
         <Legend content={() => null} />
         {(['bank_a', 'bank_b', 'bank_c'] as const).map((bankId) => (

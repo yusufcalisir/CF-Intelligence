@@ -61,7 +61,7 @@ export default function MetricsComparisonBarChart({ banks }: MetricsComparisonBa
                 fontSize: '11px',
                 color: 'var(--color-text-primary)',
               }}
-              formatter={(value: number) => [(value * 100).toFixed(1) + '%']}
+              formatter={(value: any) => [(Number(value ?? 0) * 100).toFixed(1) + '%']}
             />
             <Legend wrapperStyle={{ fontSize: '10px' }} />
             {banks.map((bank) => (

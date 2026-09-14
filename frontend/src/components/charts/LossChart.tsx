@@ -68,7 +68,7 @@ export default function LossChart({ rounds, totalRounds }: LossChartProps) {
                 fontSize: '12px',
                 color: 'var(--color-text-primary)',
               }}
-              formatter={(value: number) => [value.toFixed(4), 'Loss']}
+              formatter={(value: any) => [Number(value ?? 0).toFixed(4), 'Loss']}
               labelFormatter={(label) => `Round ${label}`}
             />
             <Line

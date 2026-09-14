@@ -186,7 +186,7 @@ export default function PrivacyMonitor({ simulation, rounds }: PrivacyMonitorPro
                     fontSize: '11px',
                     color: 'var(--color-text-primary)',
                   }}
-                  formatter={(value: number) => [value.toFixed(4), 'Spent Epsilon (ε)']}
+                  formatter={(value: any) => [Number(value ?? 0).toFixed(4), 'Spent Epsilon (ε)']}
                   labelFormatter={(label) => `Round ${label}`}
                 />
                 <Area

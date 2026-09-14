@@ -627,7 +627,7 @@ export default function LiveOperationsView() {
                     fontSize={11}
                     tickFormatter={(v: number) => v.toFixed(2)}
                   />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => v.toFixed(4)} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => Number(v ?? 0).toFixed(4)} />
                   <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
                   <Line type="monotone" dataKey="auc" name="Global Federated" stroke={selectedProfile.color} strokeWidth={2.5} dot={false} isAnimationActive={true} />
                   <Line type="monotone" dataKey="bankA" name="Bank Alpha" stroke="#34d399" strokeWidth={1.5} dot={false} strokeDasharray="4 2" isAnimationActive={true} />
@@ -670,7 +670,7 @@ export default function LiveOperationsView() {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="round" stroke="var(--color-text-muted)" fontSize={11} />
                   <YAxis stroke="var(--color-text-muted)" fontSize={11} tickFormatter={(v: number) => v.toFixed(2)} />
-                  <Tooltip contentStyle={tooltipStyle} formatter={(v: number) => v.toFixed(4)} />
+                  <Tooltip contentStyle={tooltipStyle} formatter={(v: any) => Number(v ?? 0).toFixed(4)} />
                   <Area type="monotone" dataKey="loss" name="Loss" stroke="var(--color-accent-rose)" fill="url(#lossGrad)" strokeWidth={2} dot={false} isAnimationActive={true} />
                 </AreaChart>
               </ResponsiveContainer>
