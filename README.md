@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1455%2F1455_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1460%2F1460_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
 
@@ -222,6 +222,7 @@ CF-Intelligence/
 ├── benchmark.py                                     # Master multi-model & multi-dataset benchmark suite
 ├── vercel.json                                      # Vercel deployment configuration & serverless rewrites
 ├── pytest.ini                                       # Global pytest test runner configuration
+├── SECURITY.md                                      # Enterprise vulnerability disclosure, PGP keys & security SLAs
 │
 ├── docker/                                          # Production Enterprise Container Manifests
 │   ├── Dockerfile.frontend                          # Multi-stage Node 20 builder & Alpine Nginx SPA container
@@ -281,6 +282,8 @@ CF-Intelligence/
 │   │   │   ├── dr_coordinator.py                    # Disaster recovery domain state & leader election bounds
 │   │   │   ├── deployment_state.py                  # Zero-downtime canary deployment state descriptors
 │   │   │   ├── backup_record.py                     # Immutable cryptographic database backup metadata
+│   │   │   ├── data_validator.py                    # Ingested payment data contract validation & schema conformance
+│   │   │   ├── metrics_service.py                   # Scientific validation metrics (PR-AUC, Recall@0.1% FPR, latency)
 │   │   │   └── web_console.py                       # Web console telemetry & audit logging contracts
 │   │   │
 │   │   ├── application/
@@ -341,6 +344,9 @@ CF-Intelligence/
 │   │   │       ├── label_feedback_pipeline.py       # Human-in-the-loop analyst feedback ingestion
 │   │   │       ├── streaming_engine.py              # Low-latency Kafka / Redis streaming processor
 │   │   │       ├── connector_diagnostics_service.py # Enterprise connector health, transport ping & probe engine
+│   │   │       ├── design_partner_service.py        # Enterprise design partner pilot onboarding & trial sandbox provisioning
+│   │   │       ├── metrics_service.py               # Empirical validation metrics aggregator & cross-bank benchmark service
+│   │   │       ├── psi_service.py                   # Private Set Intersection (DH-PSI / Fuzzy MinHash) application service
 │   │   │       └── support_diagnostics.py           # Automated health diagnostics & support bundle generator
 
 │   │   │
@@ -479,7 +485,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,196 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (1,201 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -495,7 +501,7 @@ CF-Intelligence/
 │   │   ├── chaos_attack_simulation.spec.ts          # Interactive Byzantine gradient injection & Krum quarantine
 │   │   └── dataset_custom_ingest_flow.spec.ts       # CSV/Parquet drag-and-drop & GE data contract gating
 │   ├── src/
-│   │   ├── pages/                                   # 18 Enterprise Web Console Views
+│   │   ├── pages/                                   # 19 Enterprise Web Console Views
 │   │   │   ├── LandingPage.tsx                      # High-converting SaaS landing page, interactive demo & feature matrices
 │   │   │   ├── Dashboard.tsx                        # Executive KPI dashboard, risk distributions & fraud metrics
 │   │   │   ├── LiveOperationsView.tsx               # Real-time transaction streaming terminal & manual transaction scoring
@@ -513,16 +519,29 @@ CF-Intelligence/
 │   │   │   ├── ApiDocsPage.tsx                      # Interactive API documentation portal & live OpenAPI request runner (/developer)
 │   │   │   ├── PoliciesPage.tsx                     # Dynamic AML risk policy rule manager & threshold tuning
 │   │   │   ├── PsiPage.tsx                          # Private Set Intersection (Fuzzy PSI) cross-bank entity lookup
+│   │   │   ├── SimulationView.tsx                   # Multi-bank round orchestrator, parameter distribution & live simulation launcher
 │   │   │   └── ScenariosPage.tsx                    # Pre-packaged fraud typology attack scenario simulator
 │   │   │
 │   │   ├── components/                              # Modular UI Design System
-│   │   │   ├── Header.tsx                           # Global navigation bar, environment badges & system status
-│   │   │   ├── Navigation.tsx                       # Responsive sidebar navigation & view routing
-│   │   │   ├── ErrorBoundary.tsx                    # React error boundary isolating component render failures
+│   │   │   ├── Navbar.tsx                           # Global navigation bar, environment badges & system status
 │   │   │   ├── Predictor.tsx                        # Live transaction simulation & risk scoring widget
-│   │   │   ├── ModelPerformanceModal.tsx            # Champion/Challenger model performance inspection modal
+│   │   │   ├── BenchmarkLaunchModal.tsx             # 4-Dataset empirical benchmark launcher & scenario configuration modal
 │   │   │   ├── PlatformLaunchModal.tsx              # Guided platform launch & tenant configuration modal
+│   │   │   ├── CounterfactualWorkbench.tsx          # Actionable recourse & counterfactual explanation generator
+│   │   │   ├── DatasetTrainingConfigPanel.tsx       # Non-IID Dirichlet distribution & client partition allocation panel
+│   │   │   ├── DriftAnalytics.tsx                   # Feature drift detector & population stability index (PSI) charts
 │   │   │   ├── FLRoundRunner.tsx                    # Multi-bank round orchestrator & real simulation launcher
+│   │   │   ├── layout/                              # Responsive Application Layout & Navigation
+│   │   │   │   ├── Header.tsx                       # Top utility bar, real-time connection status & theme toggle
+│   │   │   │   ├── Sidebar.tsx                      # Multi-role navigation sidebar, active route indicators & badges
+│   │   │   │   └── Layout.tsx                       # Unified responsive application container & content router
+│   │   │   ├── common/                              # Shared Resilience & Core Utilities
+│   │   │   │   └── ErrorBoundary.tsx                # React error boundary isolating component render failures
+│   │   │   ├── dashboard/                           # Real-Time Operational & Governance Panels
+│   │   │   │   ├── AdversarialDefensePanel.tsx      # Byzantine gradient defense & quarantine monitor
+│   │   │   │   ├── ModelRegistryPanel.tsx           # Champion / Challenger model lifecycle & promotion
+│   │   │   │   ├── PrivacyMonitor.tsx               # Differential Privacy epsilon budget consumption gauge
+│   │   │   │   └── StreamingGNNPanel.tsx            # Dynamic Graph Neural Network streaming anomaly telemetry
 │   │   │   ├── chaos/                               # Live Adversarial Attack Simulator & Interactive Chaos
 │   │   │   │   └── ChaosAttackInjectorPanel.tsx     # 500 tx/s smurfing burst & Byzantine gradient poisoning panel
 │   │   │   ├── charts/                              # High-Performance Consortium Verification Charts
@@ -1068,7 +1087,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **1,455 / 1,455 passing** | 100% | 1,196 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,460 / 1,460 passing** | 100% | 1,201 Backend Pytest + 249 Frontend Vitest + 10 Playwright Real-Browser E2E Tests | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1717,10 +1736,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (1,455 Tests)
+### Step 5: Master Test Suites Execution (1,460 Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (1,196 tests)
+# 1. Run full backend pytest suite (1,201 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (249 tests across 78 test files)
