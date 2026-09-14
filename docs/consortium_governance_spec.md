@@ -47,10 +47,12 @@ The Federated Consortium Governance engine ([`ConsortiumGovernanceService`](../b
 
 A governance proposal evaluates member votes dynamically across the consortium's active voting membership:
 
-$$\text{ratio}_{\text{for}} = \frac{|\text{votes\_for}|}{N_{\text{members}}}, \quad \text{ratio}_{\text{against}} = \frac{|\text{votes\_against}|}{N_{\text{members}}}$$
+$$\mathrm{ratio}_{\mathrm{for}} = \frac{|\mathcal{V}_{\mathrm{for}}|}{N_{\mathrm{members}}}, \quad \mathrm{ratio}_{\mathrm{against}} = \frac{|\mathcal{V}_{\mathrm{against}}|}{N_{\mathrm{members}}}$$
 
-- **Approval Condition:** If $\text{ratio}_{\text{for}} \ge \text{required\_quorum\_ratio}$ (e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
-- **Rejection Condition:** If $\text{ratio}_{\text{against}} > (1.0 - \text{required\_quorum\_ratio})$, the proposal transitions to `REJECTED`.
+where $|\mathcal{V}_{\mathrm{for}}|$ is the tally of affirmative votes (`votes_for`), $|\mathcal{V}_{\mathrm{against}}|$ is the tally of dissenting votes (`votes_against`), and $N_{\mathrm{members}}$ is the active voting member count.
+
+- **Approval Condition:** If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$ (where $\theta_{\mathrm{quorum}}$ is the required quorum ratio, e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
+- **Rejection Condition:** If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, the proposal transitions to `REJECTED`.
 
 ---
 
