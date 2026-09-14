@@ -145,8 +145,6 @@ FULL_PERSISTENT_AUDIT_REPORT.md
 implementation_plan.md
 task.md
 walkthrough.md
-production_roadmap.md
-docs/production_roadmap.md
 
 # --- Local Automation & Deployment Scripts ---
 *.bat
