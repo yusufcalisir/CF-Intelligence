@@ -702,12 +702,15 @@ async def score_transaction(
         else None
     )
 
+    # Derive velocity: elevated for high-risk merchant categories (crypto, gambling, wire_transfer)
+    velocity = 7.5 if merchant_category in ("crypto", "gambling", "wire_transfer") else 2.0
+
     txn_dict = {
         "transaction_amount": payload.amount,
         "merchant_category": merchant_category,
         "country_code": payload.country,
         "device_type": payload.device_id,
-        "velocity": 2.0,
+        "velocity": velocity,
         "hour_of_day": time.gmtime().tm_hour,
         "merchant_risk_score": merchant_risk,
         "customer_history_score": 0.90,
@@ -765,10 +768,23 @@ async def score_transaction(
     except Exception:
         pass
 
-    # Build dynamic explanations from actual risk signals
+    # Map internal risk scoring signal names to canonical API / SHAP feature names
+    SIGNAL_FEATURE_MAP = {
+        "velocity_rules": "merchant_velocity_1h",
+        "device_anomaly": "cross_entity_device_link",
+        "merchant_reputation": "merchant_risk_score",
+        "country_risk": "country_risk",
+        "customer_history": "customer_history_score",
+        "ml_prediction": "ml_prediction",
+        "previous_alerts": "prior_aml_alerts",
+        "chargeback_history": "chargeback_history_rate",
+        "behavior_anomaly": "behavioral_deviation",
+    }
+
+    # Build dynamic explanations from actual risk signals mapped to canonical feature names
     explanations = [
         FeatureContributionItem(
-            feature=s.signal_name,
+            feature=SIGNAL_FEATURE_MAP.get(s.signal_name, s.signal_name),
             contribution=round(s.weight * s.normalized_score, 3),
         )
         for s in sorted(risk_score_obj.signals, key=lambda x: abs(x.weight * x.normalized_score), reverse=True)[:5]
