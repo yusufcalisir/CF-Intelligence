@@ -69,6 +69,8 @@ export default function LiveOperationsView() {
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
   const [currentRound, setCurrentRound] = useState(0);
   const [championAuc, setChampionAuc] = useState(0.72);
+  const championAucRef = useRef(championAuc);
+  championAucRef.current = championAuc;
   const [gradientSubmissions, setGradientSubmissions] = useState(0);
   const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'RECONNECTING'>('CONNECTED');
   const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>('pending');
@@ -171,7 +173,8 @@ export default function LiveOperationsView() {
             setGradientSubmissions((prev) => prev + 1);
           } else if (eventType === 'round_complete' || eventType === 'round_completed') {
             const roundNum = data.round ?? data.round_number ?? 0;
-            const globalAuc = typeof data.auc === 'number' ? data.auc : (data.auc ? parseFloat(data.auc) : championAuc);
+            const fallbackAuc = championAucRef.current;
+            const globalAuc = typeof data.auc === 'number' ? data.auc : (data.auc ? parseFloat(data.auc) : fallbackAuc);
             const roundLoss = typeof data.loss === 'number' ? data.loss : (data.loss ? parseFloat(data.loss) : (data.global_loss ?? data.round_loss ?? 0));
             const perBank = data.per_bank_auc || {};
 
@@ -364,7 +367,6 @@ export default function LiveOperationsView() {
   };
 
   // Auto-start simulation when navigated from Dashboard or via simulation route
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const isAutoStart = id || location.pathname.startsWith('/simulation') || location.search.includes('autostart=true');
     if (isAutoStart && !isTraining && trainingPhase === 'pending') {
@@ -374,6 +376,7 @@ export default function LiveOperationsView() {
     if (location.search.includes('openIngest=true')) {
       setIsIngestModalOpen(true);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, location.pathname, location.search]);
 
   // Tooltip style shared across charts

@@ -24,7 +24,7 @@ interface DatasetDropzoneProps {
   isLoading?: boolean;
 }
 
-export const SAMPLE_TEMPLATES = {
+const SAMPLE_TEMPLATES = {
   bank_alpha_csv: {
     name: 'bank_alpha_production.csv',
     format: 'csv' as const,

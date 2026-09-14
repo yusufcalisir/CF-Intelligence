@@ -39,7 +39,6 @@ test.describe('Responsive Quality: Zero Horizontal Overflow Across Breakpoints',
           if (rect.width > 0 && rect.height > 0) {
             if (rect.right > clientWidth + 2) {
               // Ignore intentional horizontal scroll containers
-              const style = window.getComputedStyle(el);
               const parentOverflow = window.getComputedStyle(el.parentElement || el).overflowX;
               if (parentOverflow !== 'auto' && parentOverflow !== 'scroll') {
                 if (rect.right > maxRight) {
