@@ -111,6 +111,15 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # TypeScript 6+ & Vite 8+ major bumps break typescript-eslint peer dependencies (<6.1.0)
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
 
   # ──────────────────────────────────────────────────────────────────────────
   # GitHub Actions – keep CI action versions up-to-date
