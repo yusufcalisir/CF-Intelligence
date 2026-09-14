@@ -416,11 +416,13 @@ async def predict_transaction(
                     chall_model = _load_challenger_model(
                         payload.simulation_id, challenger_ver, dp_compatible=True
                     )
-                    chall_input_dim = int(
-                        chall_model.network[0].in_features
-                        if hasattr(chall_model, "network")
-                        else NUM_FEATURES
+                    chall_net = getattr(chall_model, "network", None)
+                    chall_first = (
+                        chall_net[0]
+                        if isinstance(chall_net, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(chall_net) > 0
+                        else None
                     )
+                    chall_input_dim = int(getattr(chall_first, "in_features", NUM_FEATURES))
 
                     chall_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
                     if chall_tensor.shape[1] < chall_input_dim:
