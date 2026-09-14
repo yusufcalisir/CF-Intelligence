@@ -71,14 +71,14 @@ The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** addresses th
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The core production path focuses on seven defensible engineering components:
+The core production path focuses on eight defensible engineering components:
 - **Federated Learning Engines:** `FedAvg`, `FedProx`, and `SCAFFOLD` optimization handling extreme Non-IID Dirichlet label skew ($\alpha \le 0.50$).
 - **Differential Privacy Guard:** Local gradient perturbation via Opacus with Gaussian noise and Rényi DP accounting ($\epsilon = 1.0, \delta = 10^{-5}$).
 - **Secure Aggregation (SecAgg):** Peer-to-peer Curve25519 Diffie-Hellman pairwise zero-sum masking for masked parameter aggregation.
 - **Byzantine Consensus:** `Krum` (single representative selection), `Trimmed Mean`, and `Bulyan` (Krum candidate selection + coordinate trimmed mean) aggregators paired with Spectral SVD backdoor filtering.
 - **Graph Intelligence:** PyTorch `GraphSAGE` relational embeddings and MinHash LSH Private Set Intersection (Fuzzy PSI) for entity resolution.
 - **Real-Time Composite Scoring:** Low-latency inference gateway combining 9 statistical, behavioral, and topological signals (< 14.2 ms Fast-Path raw, ~308 ms Concurrent Ensemble).
-- **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Edge Middleware $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
+- **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Security Middleware (Node.js) $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
 - **Explainability & Governance:** Real-time SHAP feature attributions and a 6-stage case management workbench with automated FinCEN BSA SAR XML compilation.
 
 *Note: Exploratory cryptographic research modules (zk-SNARK attestation, TenSEAL CKKS FHE, Post-Quantum Kyber-768, Hardware TEE drivers, EVM incentive contracts, and Cross-Chain bridges) are isolated in the [Research & Exploratory Modules](#20-research--exploratory-modules) section.*
@@ -122,7 +122,7 @@ The core production path focuses on seven defensible engineering components:
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                       Real-Time Scoring & Operational Serving                        │
 │  - Real-Time Scoring Gateway (<14.2ms Fast-Path / ~308ms Ensemble SLA)               │
-│  - Multi-Layer Perimeter Defense: Cloudflare WAF + Vercel Edge + slowapi Rate Limit  │
+│  - Multi-Layer Defense: Cloudflare WAF + Vercel Middleware (Node.js) + slowapi Limit │
 │  - Broken Access Control (BOLA/IDOR) Multi-Tenant Isolation Middleware               │
 │  - Fast SHAP Explanations (KernelExplainer) & Counterfactual Feature Sensitivity     │
 │  - 6-Stage Case Workbench (Four-Eyes Supervisor Signature) & FinCEN BSA SAR XML      │
@@ -211,7 +211,7 @@ sequenceDiagram
 
 ```
 CF-Intelligence/
-├── pyproject.toml                                   # Root packaging and cfi-cli entrypoint
+├── ruff.toml                                        # Project-wide Ruff linter, formatter & rule configuration
 ├── Dockerfile                                       # Multi-stage production container specification (Hugging Face Spaces)
 ├── docker-compose.yml                               # Enterprise multi-container orchestration (Gateway, SPA, API, Postgres, Redis)
 ├── docker-compose.multinode.yml                     # 3-Node distributed bank consortium cluster
@@ -485,7 +485,7 @@ CF-Intelligence/
 │       └── property/                                # Hypothesis property-based mathematical invariance tests
 │
 ├── frontend/                                        # React 19 / Vite TypeScript Web Console
-│   ├── middleware.ts                                # Vercel Edge Middleware (@upstash/ratelimit & security guards)
+│   ├── middleware.ts                                # Vercel Security Middleware (Node.js runtime & security guards)
 │   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (10 Tests)
 │   ├── e2e-visual/                                  # Playwright Visual Regression Suite (Strict baseline comparison)
 │   │   ├── auth_session_flow.spec.ts                # Session token lifecycle, navigation & security header validation
@@ -617,6 +617,7 @@ CF-Intelligence/
 │
 ├── contracts/                                       # Hardhat EVM Smart Contracts [Research]
 │   ├── contracts/                                   # ConsortiumIncentiveSettlement.sol, GnosisSafeMultiSigCoordinator.sol
+│   ├── stubs/                                       # Zero-dependency signing-key stub (vulnerability mitigation)
 │   └── test/                                        # Hardhat Mocha/Chai contract unit tests & gas audits
 │
 └── scripts/                                         # Developer Automation, Benchmarks, Load Testing & CLI Tooling
@@ -625,8 +626,12 @@ CF-Intelligence/
     ├── verify_docker_deployment.py                  # Automated Docker Compose pre-flight and runtime smoke test
     ├── run_load_test.py                             # High-throughput asynchronous load tester & SLA report generator
     ├── locustfile.py                                # Locust multi-user payment streaming load testing suite
+    ├── realtime_benchmark.py                        # Sub-100ms in-process ASGI inference benchmark runner
+    ├── transaction_stream.py                        # Event-driven real-time transaction streaming pipeline
     ├── run_elliptic_benchmark.py                    # Real Elliptic Bitcoin transaction graph benchmark runner
     ├── run_enterprise_stress_test.py                # High-throughput ISO 20022 payment stream stress test
+    ├── run_abac_benchmark.py                        # ABAC authorization policy engine throughput benchmark
+    ├── run_fl_synthetic_benchmark.py                # Synthetic multi-bank FL convergence benchmark runner
     ├── run_benchmark.py                             # 9-Configuration matrix empirical benchmark runner
     ├── ast_mutation_engine.py                       # Dynamic Python AST mutant generator & fault injection transformer
     ├── run_mutation_tests.py                        # Dynamic AST mutation test runner (86.2% backend AST kill rate / 90.2% composite score)
@@ -655,7 +660,7 @@ CF-Intelligence/
 ### 4.1 Synthetic Multi-Bank Data Generator (`data_generator.py`)
 Generates reproducible cross-bank transaction datasets across 3 distinct financial institutions (Bank Alpha, Bank Beta, Bank Gamma) modeling heterogeneous local fraud distributions (credit card velocity, structured wire transfers, cross-border layering) with customizable random seeds and noise profiles.
 
-### 4.2 Multi-Standard Financial Payload Parser (`financial_message_parser.py`)
+### 4.2 Multi-Standard Financial Payload Parser & Connectors (`financial_message_parser.py`, `iso20022_connector.py`, `open_banking_connector.py`)
 Parses industry financial payload formats into a unified `NormalizedTransaction` schema:
 - **ISO 20022 Messages:** `pacs.008` (Financial Interbank Credit Transfer) and `camt.053` (Bank-to-Customer Statement XML).
 - **SWIFT MT Messages:** Legacy `MT103` Single Customer Credit Transfer.
@@ -692,9 +697,10 @@ Orchestrates multi-client federated training rounds supporting 7 optimization st
 1. **FedAvg:** Standard weighted parameter averaging based on client dataset size.
 2. **FedProx:** Adds a client-side proximal regularization penalty ($\frac{\mu}{2} \|w - w^t\|^2$ in `model_service.py:train_local`) during local training to restrict update drift under Non-IID statistical skew; server-side aggregation in `fl_engine.py` performs standard weighted averaging.
 3. **SCAFFOLD:** Corrects client-side gradient trajectories against drift ($g_i \leftarrow g_i - c_i + c$ in `model_service.py`) using control variates; server-side aggregation in `fl_engine.py` evaluates weighted parameter averaging while tracking global variate states.
-4. **FedAdam & FedYogi:** Server-side adaptive optimization with momentum.
-5. **FedAdagrad:** Adaptive gradient server-side learning rate scaling.
-6. **MOON (Model-Contrastive FL):** Contrastive representation learning between local and global representations.
+4. **FedAdam:** Server-side adaptive optimization with first and second moment tracking.
+5. **FedYogi:** Adaptive server-side optimization controlling directional update variance.
+6. **FedAdagrad:** Adaptive gradient server-side learning rate scaling.
+7. **MOON (Model-Contrastive FL):** Contrastive representation learning between local and global representations.
 
 ### 5.2 Dirichlet Non-IID Partitioning & Optuna Hyperparameter Tuning
 - **Dirichlet Partitioner (`fl_dirichlet_partitioner.py`):** Models realistic bank label heterogeneity across institutions using the Dirichlet distribution:
@@ -868,7 +874,7 @@ The platform enforces a zero-trust multi-layer perimeter and application defense
 flowchart LR
     Client["Client / Scraper / Attacker"] --> L1["1. Cloudflare Anycast Edge\n• L3/L4 DDoS Mitigation\n• Bot Fight Mode & Managed Challenge\n• Custom WAF Rules & TLS 1.3 Strict\n• Rate Limit: 60 req/10s on /api/*"]
     
-    L1 --> L2["2. Vercel Edge Middleware\n• V8 Isolate Distributed Execution (<5ms)\n• @upstash/ratelimit Sliding Window\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
+    L1 --> L2["2. Vercel Security Middleware (Node.js)\n• Serverless Node.js Execution\n• @upstash/ratelimit Sliding Window\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
     
     L2 --> L3["3. FastAPI Application Layer\n• slowapi Granular Route Quotas\n• TenantAccessControlMiddleware (BOLA/IDOR)\n• ML Predict: 60/min | FL Sim: 10/min\n• DDoSProtectionMiddleware (100 req/10s)"]
 ```
@@ -878,7 +884,7 @@ flowchart LR
 | Layer | Component | Engine / Implementation | Enforced Protection & Limits | Response Code |
 | :--- | :--- | :--- | :--- | :---: |
 | **Layer 1** | **Cloudflare Perimeter** | Anycast WAF & Bot Management (`deployments/terraform/cloudflare/`) | L3/L4 DDoS absorption, Bot Fight Mode, TLS 1.3 Strict, 60 reqs / 10s on `/api/*`. | `403 Challenge` / `429` |
-| **Layer 2** | **Vercel Edge Network** | Distributed Edge Middleware (`frontend/middleware.ts`) | `@upstash/ratelimit` global sliding window: 20 reqs/min for ML inference, 60 reqs/min for general API. | `429 Too Many Requests` |
+| **Layer 2** | **Vercel Security Middleware** | Node.js Runtime Middleware (`frontend/middleware.ts`) | `@upstash/ratelimit` global sliding window: 20 reqs/min for ML inference, 60 reqs/min for general API. | `429 Too Many Requests` |
 | **Layer 3** | **FastAPI Application** | `slowapi` & `DDoSProtectionMiddleware` (`backend/app/main.py`) | In-process granular quotas (`/predict`: 60/min, `/simulations`: 10/min) and sliding-window burst protection (100 req/10s) with 5,000 IP hard ceiling eviction. | `429 Too Many Requests` |
 
 ### 10.2 Broken Object Level Authorization (BOLA/IDOR) & gRPC Cross-Tenant Isolation
@@ -928,7 +934,7 @@ The platform enforces concrete, test-verified defenses across all 6 STRIDE attac
 | **Tampering** | Byzantine Bank / Attacker | Model Weights & DB | Sign-flip / backdoor / SQLi | Bulyan/Krum aggregation (`fl_engine.py`) + Spectral SVD (`spectral_defense.py`) + ORM DDL quoting | `test_byzantine_defense_validation.py` |
 | **Repudiation** | Rogue Analyst / Bank | Case Workflow | Denying case closure/signature | Four-Eyes dual supervisor signatures (`case_workbench.py`) + Tamper-evident SHA-256 audit ledger | `test_case_management_workbench.py` |
 | **Info Disclosure** | Honest-but-Curious Server | Raw PII & Gradients | Gradient Inversion (DLG) / MIA | Opacus DP ($\epsilon=1.0, \delta=10^{-5}$) + Curve25519 SecAgg + BOLA 403 + Production error sanitization | `test_error_sanitization.py` |
-| **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Edge + `slowapi`) + Finite tensor validation | `test_ddos_middleware.py` |
+| **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Middleware + `slowapi`) + Finite tensor validation | `test_ddos_middleware.py` |
 | **Privilege Escalation** | Rogue Internal User | Model Promotion / SAR | Unauthorized model promotion | ABAC policy engine (`abac_engine.py`) + SR 11-7 holdout PR-AUC $\ge$ champion gate | `test_enterprise_security_suite.py` |
 
 ### 10.8 Automated Security Floor Hardening & Zero-Vulnerability Dependency Perimeter
