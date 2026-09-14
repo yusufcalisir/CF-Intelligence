@@ -63,7 +63,7 @@ graph TD
 │                        AUTOMATED BACKUP INTEGRITY & PROBE PIPELINE                     │
 │                                                                                        │
 │  [ Primary Data Source ]                                                               │
-│   - PostgreSQL 16 Multi-Tenant Schema Dumps (`tenant_{bank_id}`)                      │
+│   - PostgreSQL 16 Multi-Tenant Schema Dumps (`tenant_{bank_id}`)                       │
 │   - SQLite Isolated Bank Transaction DBs                                               │
 │   - PyTorch Global/Local Weight Tensors (`.pt`)                                        │
 │   - Versioned Vault Transit KMS Keyrings                                               │
