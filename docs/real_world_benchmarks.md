@@ -141,12 +141,12 @@ Rather than a static threshold ($\tau = 0.5$), the system computes confusion mat
 
 ```
                                ACTUAL TRUTH
-                         Fraud (1)      Legitimate (0)
-                      ┌──────────────┬──────────────────┐
-          Flagged (1) │  TP (Alert)  │  FP (Friction)   │
-PREDICTED             ├──────────────┼──────────────────┤
-          Pass (0)    │  FN (Loss)   │  TN (Frictionless│
-                      └──────────────┴──────────────────┘
+                         Fraud (1)       Legitimate (0)
+                      ┌──────────────┬────────────────────┐
+          Flagged (1) │  TP (Alert)  │  FP (Friction)     │
+PREDICTED             ├──────────────┼────────────────────┤
+          Pass (0)    │  FN (Loss)   │  TN (Frictionless) │
+                      └──────────────┴────────────────────┘
 ```
 
 ### Financial Cost-Utility Function:
