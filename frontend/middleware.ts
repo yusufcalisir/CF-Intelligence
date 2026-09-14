@@ -84,8 +84,12 @@ export async function evaluateEdgeRateLimit(
   }
 }
 
+export const config = {
+  runtime: 'nodejs',
+};
+
 /**
- * Standard Vercel Edge Middleware handler.
+ * Standard Vercel Middleware handler.
  */
 export default async function middleware(request: Request): Promise<Response | undefined> {
   const url = new URL(request.url);
