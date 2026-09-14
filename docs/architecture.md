@@ -326,14 +326,14 @@ Bank A Subnet (bank-a-net)                  Bank B Subnet (bank-b-net)
 │  - Isolated Storage Vault    │            │  - Isolated Storage Vault    │
 │  - Dedicated mTLS X.509 Cert │            │  - Dedicated mTLS X.509 Cert │
 └────────────┬─────────────────┘            └──────────────┬───────────────┘
-             │ consortium-net only                          │ consortium-net only
+             │ consortium-net only                         │ consortium-net only
              └─────────────────────┐  ┌────────────────────┘
                                    ▼  ▼
                     ┌──────────────────────────────┐
                     │  cfi-fl-coordinator          │
-                    │  - Central PKI / CA Engine    │
-                    │  - Secure Aggregator          │
-                    │  - gRPC Server (:50051)       │
+                    │  - Central PKI / CA Engine   │
+                    │  - Secure Aggregator         │
+                    │  - gRPC Server (:50051)      │
                     └──────────────────────────────┘
 ```
 
