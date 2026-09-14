@@ -32,15 +32,15 @@ Financial institutions currently evaluate five primary architectural paradigms:
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                        ENTERPRISE FRAUD PARADIGM SPECTRUM                              │
-├───────────────────────┬─────────────────────────┬──────────────────────────────────────┤
-│ PARADIGM              │ REPRESENTATIVE SYSTEMS  │ PRIMARY ARCHITECTURAL VULNERABILITY  │
-├───────────────────────┼─────────────────────────┼──────────────────────────────────────┤
-│ 1. Legacy Monoliths   │ FICO Falcon, SAS AML    │ 95%+ False Positive Rates; Siloed    │
-│ 2. Centralized SaaS   │ Feedzai, Featurespace   │ Sovereign Privacy & GDPR Violation   │
-│ 3. Data Clean Rooms   │ Snowflake DCR, InfoSum  │ No Edge ML Training; Query-Only Joins│
-│ 4. Academic FL Kits   │ Flower, PySyft, NVFlare │ Generic Primitives; No Banking Domain│
-│ 5. CF-Intelligence   │ CFI Enterprise Platform │ Domain-Native Zero-Raw-PII FedGNN    │
-└───────────────────────┴─────────────────────────┴──────────────────────────────────────┘
+├──────────────────────┬─────────────────────────┬───────────────────────────────────────┤
+│ PARADIGM             │ REPRESENTATIVE SYSTEMS  │ PRIMARY ARCHITECTURAL VULNERABILITY   │
+├──────────────────────┼─────────────────────────┼───────────────────────────────────────┤
+│ 1. Legacy Monoliths  │ FICO Falcon, SAS AML    │ 95%+ False Positive Rates; Siloed     │
+│ 2. Centralized SaaS  │ Feedzai, Featurespace   │ Sovereign Privacy & GDPR Violation    │
+│ 3. Data Clean Rooms  │ Snowflake DCR, InfoSum  │ No Edge ML Training; Query-Only Joins │
+│ 4. Academic FL Kits  │ Flower, PySyft, NVFlare │ Generic Primitives; No Banking Domain │
+│ 5. CF-Intelligence   │ CFI Enterprise Platform │ Domain-Native Zero-Raw-PII FedGNN     │
+└──────────────────────┴─────────────────────────┴───────────────────────────────────────┘
 ```
 
 ### 2.1. Paradigm 1: Legacy On-Premises Monoliths & Relational Rule Engines
@@ -116,7 +116,7 @@ The matrix below contrasts the 5 paradigms across 12 rigorous technical and oper
 │                     │                                                  │
 │                     ▼                                                  │
 │  [2. Type-Salted HMAC-SHA256 Tokenizer]                                │
-│     - Token = HMAC-SHA256(Salt ∥ EntityType ∥ RawIdentifier)           │
+│     - Token = HMAC-SHA256(Salt || EntityType || RawIdentifier)         │
 │                     │                                                  │
 │                     ▼                                                  │
 │  [3. PyTorch Local Edge GNN Trainer (GraphSAGE / GAT)]                 │
