@@ -1,13 +1,13 @@
 # Comprehensive STRIDE Threat Model & Attack Surface Analysis
 
 > **Zero-Trust Security, Cryptographic Invariants & Privacy-Preserving Threat Modeling**  
-> Technical specification of threat actors (*Kim?*), target assets (*Neye?*), attack vectors (*Nasıl?*), concrete architectural mitigations (*Nasıl Engellenir?*), and empirical automated test verification.
+> Technical specification of threat actors (*Who*), target assets (*What*), attack vectors (*How*), concrete architectural mitigations (*Mitigations*), and empirical automated test verification.
 
 ---
 
 ## 1. Formal Trust Model, Threat Personas & Master STRIDE Matrix
 
-### 1.1 Threat Actor Personas (*Kim Saldırabilir?*)
+### 1.1 Threat Actor Personas (*Who Can Attack*)
 
 | Persona Identifier | Threat Actor Profile | Access Level | Primary Motivation | Capabilities & Vectors |
 | :--- | :--- | :---: | :--- | :--- |
@@ -19,7 +19,7 @@
 
 ---
 
-### 1.2 Target Asset Taxonomy (*Neye Saldırabilir?*)
+### 1.2 Target Asset Taxonomy (*Target Assets*)
 
 ```mermaid
 mindmap
@@ -48,9 +48,9 @@ mindmap
 
 ---
 
-### 1.3 Master STRIDE Threat & Mitigation Matrix (*Kim, Neye, Nasıl ve Nasıl Engellenir?*)
+### 1.3 Master STRIDE Threat & Mitigation Matrix (*Actors, Assets, Vectors & Mitigations*)
 
-| STRIDE Pillar | Threat Actor | Target Asset | Attack Vector (*Nasıl?*) | Concrete Codebase Mitigation (*Nasıl Engellenir?*) | Automated Verification Test & Metric |
+| STRIDE Pillar | Threat Actor | Target Asset | Attack Vector (*How*) | Concrete Codebase Mitigation (*Mitigation*) | Automated Verification Test & Metric |
 | :--- | :---: | :---: | :--- | :--- | :--- |
 | **Spoofing** | T1, T4 | A5 | **Node Impersonation:** Attacker masquerades as Bank Alpha using stolen/forged client certificate. | **X.509 mTLS Certificate Issuance (`bank_onboarding_service.py`, `cert_generator.py`) & gRPC Anti-Spoofing Registration (`servicer.py`):** Genuine 2048-bit RSA X.509 client certificates with SHA-256 fingerprint binding, rejecting mismatched or cross-tenant presented credentials. | `tests/unit/test_bank_onboarding.py`<br/>`tests/unit/test_grpc_transport.py`<br/>*(100% invalid/cross-tenant certs rejected)* |
 | **Spoofing** | T3, T5 | A4 | **Credential Stuffing & Header Forgery:** Brute-forcing analyst passwords or injecting `X-Tenant-ID: bank_beta` headers. | **Bcrypt Cost=12 (`password_hasher.py`) + 15m JWT & Refresh Rotation + 5-Fail Lockout (`auth_service.py`):** Salted bcrypt hashes, 900s JWT access tokens, 1-time refresh token rotation, and 15-minute IP/account lockout after 5 failures. | `tests/unit/test_auth_security.py`<br/>`tests/unit/test_security_controls_audit.py`<br/>*(9/9 auth security tests passed)* |
