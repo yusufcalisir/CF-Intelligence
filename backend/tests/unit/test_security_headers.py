@@ -170,11 +170,12 @@ def test_perimeter_waf_concurrency_thread_safety():
 
 def test_cloudflare_waf_setup_script_api_calls(monkeypatch):
     """Verify Cloudflare WAF setup script configures settings, rules, and rate limits."""
-    from scripts.setup_cloudflare_waf import (
-        configure_rate_limiting_rules,
-        configure_security_settings,
-        configure_waf_rules,
-    )
+    import importlib
+
+    cf_module = importlib.import_module("scripts.setup_cloudflare_waf")
+    configure_security_settings = cf_module.configure_security_settings
+    configure_waf_rules = cf_module.configure_waf_rules
+    configure_rate_limiting_rules = cf_module.configure_rate_limiting_rules
 
     recorded_calls: list[dict] = []
 
@@ -182,7 +183,7 @@ def test_cloudflare_waf_setup_script_api_calls(monkeypatch):
         recorded_calls.append({"endpoint": endpoint, "method": method, "data": data})
         return {"success": True, "result": {}}
 
-    monkeypatch.setattr("scripts.setup_cloudflare_waf.cf_request", mock_cf_request)
+    monkeypatch.setattr(cf_module, "cf_request", mock_cf_request)
 
     configure_security_settings("zone_123", "token_abc")
     configure_waf_rules("zone_123", "token_abc")
