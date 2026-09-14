@@ -15,25 +15,25 @@ The Automated Retention & Erasure Policy Engine ([`AutomatedRetentionEngine`](..
 │                                                                                        │
 │   [ Continuous Ingestion & Scoring Telemetry ]                                         │
 │                       │                                                                │
-│                       ├───► TRANSACTION_LOGS (Default: 90 Days) ──► Cryptographic Zero │
-│                       ├───► INFERENCE_AUDITS (Default: 180 Days) ──► Anonymization     │
-│                       ├───► GRAPH_EDGES      (Default: 30 Days) ──► Hard SQL Delete    │
-│                       └───► EXPLAINABILITY_REPORTS (Default: 60d)──► Cryptographic Zero │
+│                       ├───► TRANSACTION_LOGS        (90 Days)  ──► Cryptographic Zero  │
+│                       ├───► INFERENCE_AUDITS        (180 Days) ──► Anonymization       │
+│                       ├───► GRAPH_EDGES             (30 Days)  ──► Hard SQL Delete     │
+│                       └───► EXPLAINABILITY_REPORTS  (60 Days)  ──► Cryptographic Zero  │
 │                                                                                        │
 │   [ Scheduled Maintenance CronJob / Event Trigger ]                                    │
 │                       │ (POST /v1/cron/cleanup-sessions)                               │
 │                       ▼                                                                │
-│   [ purge_expired_records(tenant_id, db) ] ──► Execute SQL DELETE on Expired Rows     │
+│   [ purge_expired_records(tenant_id, db) ] ──► Execute SQL DELETE on Expired Rows      │
 │                       │                                                                │
 │                       ▼                                                                │
-│   [ Generate Immutable ErasureAuditRecord ] ──► Compute SHA-256 Digest                │
+│   [ Generate Immutable ErasureAuditRecord ] ──► Compute SHA-256 Digest                 │
 │                                                                                        │
 │   ──────────────────────────────────────────────────────────────────────────────────   │
 │   [ GDPR Article 17 Right-to-be-Forgotten Request ]                                    │
 │                       │                                                                │
 │                       ▼ execute_gdpr_right_to_be_forgotten(tenant_id, entity_id_hash)  │
 │   ┌─────────────────────────────────────────────────────────────────────────────────┐  │
-│   │ 1. Hard-delete EntityModel rows matching privacy_id / HMAC hash (bank_id isolated)│
+│   │ 1. Hard-delete EntityModel rows matching privacy_id / HMAC (bank_id isolated)   │  │
 │   │ 2. Hard-delete RelationshipModel edges (source_entity_id / target_entity_id)    │  │
 │   │ 3. Hard-delete AlertModel records referencing transaction_id / entity           │  │
 │   │ 4. Append signed ErasureAuditRecord to immutable compliance ledger              │  │
