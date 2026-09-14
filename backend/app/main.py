@@ -59,6 +59,7 @@ from app.presentation.routers import (
     settlement,
     simulation,
     training,
+    webhook_gateway,
 )
 from app.presentation.websockets import streaming_ws, training_ws
 
@@ -933,6 +934,7 @@ else:
     app.include_router(realtime_inference.router)
     app.include_router(compliance.router)
     app.include_router(optimization.router)
+    app.include_router(webhook_gateway.router)
 
 
 @app.get("/", tags=["root"])
