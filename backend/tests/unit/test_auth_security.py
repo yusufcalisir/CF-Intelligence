@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.infrastructure.security.auth_service import AuthenticationService
+from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.infrastructure.security.password_hasher import (
     hash_password,
     is_bcrypt_hash,
@@ -262,3 +263,40 @@ def test_auth_lockout_endpoint_triggers_429(client: TestClient):
     assert res_5.status_code == 429
     assert "Retry-After" in res_5.headers
     assert "locked out" in res_5.json()["detail"].lower()
+
+
+# ── OIDC Cryptographic Signature Verification Tests ───────────────────────────
+
+
+def test_oidc_authenticator_rejects_forged_signature():
+    """Verify that OIDC tokens with forged or tampered signatures are rejected."""
+    auth = OIDCAuthenticator(signing_secret="test_secret_key_correct_2026_32_bytes_long_rfc7518")
+    attacker_auth = OIDCAuthenticator(signing_secret="test_secret_key_attacker_2026_32_bytes_long_rfc7518")
+
+    # Attacker crafts a token claiming super_admin using wrong signing key
+    forged_token = attacker_auth.create_token(
+        username="attacker",
+        bank_id="bank_a",
+        roles=["super_admin"],
+    )
+
+    valid, claims, err = auth.decode_and_validate_token(forged_token)
+    assert valid is False
+    assert claims is None
+    assert "signature" in err.lower()
+
+
+def test_oidc_authenticator_rejects_expired_token():
+    """Verify that expired OIDC tokens are rejected."""
+    auth = OIDCAuthenticator(signing_secret="test_secret_key_correct_2026_32_bytes_long_rfc7518")
+
+    # Token with negative expiry (expired)
+    expired_token = auth.create_token(
+        username="expired_user",
+        expires_in_seconds=-60,
+    )
+
+    valid, claims, err = auth.decode_and_validate_token(expired_token)
+    assert valid is False
+    assert claims is None
+    assert "expired" in err.lower()

@@ -7,11 +7,11 @@ and verifies issuer/audience alignment for central Keycloak/Okta integrations.
 
 from __future__ import annotations
 
-import base64
-import json
 import logging
 import time
 from dataclasses import dataclass, field
+
+import jwt
 
 logger = logging.getLogger(__name__)
 
@@ -39,13 +39,20 @@ class OIDCAuthenticator:
         self,
         issuer: str = "https://auth.cfi-platform.internal/realms/cfi",
         audience: str = "cfi-api",
-        signing_secret: str = "cfi_oidc_jwt_secret_key_2026",
+        signing_secret: str | None = None,
     ) -> None:
+        from app.config import get_settings
+
+        settings = get_settings()
         self.issuer = issuer
         self.audience = audience
-        self.signing_secret = signing_secret
+        self.signing_secret = (
+            signing_secret
+            or getattr(settings, "oidc_jwt_signing_secret", None)
+            or "cfi_oidc_jwt_secret_key_2026_enterprise_hs256"
+        )
 
-    def create_mock_token(
+    def create_token(
         self,
         username: str = "analyst_a1",
         bank_id: str = "bank_a",
@@ -54,10 +61,10 @@ class OIDCAuthenticator:
         shift_hours: str = "08:00-18:00",
         approval_tier: float = 50000.0,
         allowed_ip_subnets: list[str] | None = None,
+        expires_in_seconds: int = 3600,
     ) -> str:
-        """Create a mock JWT token string for offline development and unit tests."""
-        header = {"alg": "HS256", "typ": "JWT"}
-        now = time.time()
+        """Create a cryptographically signed JWT token string (HS256)."""
+        now = int(time.time())
         payload = {
             "sub": f"usr_{username}",
             "preferred_username": username,
@@ -69,32 +76,52 @@ class OIDCAuthenticator:
             "allowed_ip_subnets": allowed_ip_subnets or ["0.0.0.0/0"],
             "iss": self.issuer,
             "aud": self.audience,
-            "iat": int(now),
-            "exp": int(now + 3600),
+            "iat": now,
+            "exp": now + expires_in_seconds,
         }
+        return jwt.encode(payload, self.signing_secret, algorithm="HS256")
 
-        h_b64 = base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
-        p_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode().rstrip("=")
-        sig_b64 = base64.urlsafe_b64encode(f"{h_b64}.{p_b64}.secret".encode()).decode().rstrip("=")
-        return f"{h_b64}.{p_b64}.{sig_b64}"
+    def create_mock_token(
+        self,
+        username: str = "analyst_a1",
+        bank_id: str = "bank_a",
+        roles: list[str] | None = None,
+        clearance_level: int = 2,
+        shift_hours: str = "08:00-18:00",
+        approval_tier: float = 50000.0,
+        allowed_ip_subnets: list[str] | None = None,
+    ) -> str:
+        """Backward compatibility alias for create_token."""
+        return self.create_token(
+            username=username,
+            bank_id=bank_id,
+            roles=roles,
+            clearance_level=clearance_level,
+            shift_hours=shift_hours,
+            approval_tier=approval_tier,
+            allowed_ip_subnets=allowed_ip_subnets,
+        )
 
     def decode_and_validate_token(self, token: str) -> tuple[bool, UserClaims | None, str]:
-        """Decode JWT bearer token and validate claims."""
+        """Decode and cryptographically verify JWT bearer token signature, expiration, and claims."""
         try:
-            parts = token.strip().split(".")
+            if not token or not isinstance(token, str):
+                return False, None, "Missing or invalid token string."
+
+            cleaned_token = token.strip()
+            parts = cleaned_token.split(".")
             if len(parts) != 3:
                 return False, None, "Invalid JWT structure (expected 3 dot-separated parts)."
 
-            # Decode payload segment
-            padded_payload = parts[1] + "=" * (-len(parts[1]) % 4)
-            payload_bytes = base64.urlsafe_b64decode(padded_payload)
-            claims_dict = json.loads(payload_bytes.decode())
+            # Cryptographic signature and expiration verification via PyJWT
+            claims_dict = jwt.decode(
+                cleaned_token,
+                self.signing_secret,
+                algorithms=["HS256"],
+                options={"verify_signature": True, "verify_exp": True, "verify_aud": False},
+            )
 
-            # Expiration check
             exp = float(claims_dict.get("exp", 0))
-            if exp > 0 and time.time() > exp:
-                return False, None, "JWT token has expired."
-
             user_claims = UserClaims(
                 sub=claims_dict.get("sub", "anonymous"),
                 username=claims_dict.get("preferred_username", claims_dict.get("username", "user")),
@@ -109,6 +136,12 @@ class OIDCAuthenticator:
             )
             return True, user_claims, "Token valid."
 
+        except jwt.ExpiredSignatureError:
+            return False, None, "JWT token has expired."
+        except jwt.InvalidSignatureError:
+            return False, None, "Invalid JWT cryptographic signature."
+        except jwt.InvalidTokenError as err:
+            return False, None, f"Invalid JWT token: {err}"
         except Exception as err:
             logger.error("OIDC JWT token decoding failed: %s", err)
             return False, None, f"Token decode error: {err}"
