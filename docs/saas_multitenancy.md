@@ -99,7 +99,7 @@ High-volume inference bursts require race-condition-free quota tracking:
 Each institution maintains isolated cryptographic keys managed through `TenantKMSService`:
 
 - **Versioned Envelope Format:** Stored ciphertexts maintain explicit versioning headers:
-  $$\text{Payload} = \text{v}\{\text{version}\} : \text{iv\_b64} : \text{tag\_b64} : \text{ciphertext\_b64}$$
+  $$\mathrm{Payload} = \mathtt{v}\{\mathrm{version}\} : \mathrm{iv}_{\mathrm{b64}} : \mathrm{tag}_{\mathrm{b64}} : \mathrm{ciphertext}_{\mathrm{b64}}$$
 - **Data Re-Encryption (`re_encrypt_tenant_data`):** Migrates historical encrypted records from retired keys to active version keys during scheduled maintenance.
 - **Revocation Fail-Closed (`invalidate_retired_keys`):** Un-migrated ciphertexts under revoked keys immediately fail closed with `DecryptionError`.
 - **Scheduled Maintenance Cron (`POST /v1/cron/rotate-keys`):** Protected endpoint authorized with `CRON_SECRET_KEY` for scheduled Kubernetes CronJob or CloudWatch Event execution.

@@ -443,7 +443,7 @@ Naive linear composition over $T$ federated rounds yields cumulative privacy los
 
 ### Context
 
-Traditional tabular models (e.g. standalone XGBoost or LightGBM) evaluate payment transactions in total isolation ($T_x = [\text{amount}, \text{velocity}, \text{merchant\_mcc}, \dots]$). They are fundamentally blind to multi-hop financial smurfing rings, cyclic round-tripping, and synthetic identity networks spanning across multiple banking institutions.
+Traditional tabular models (e.g. standalone XGBoost or LightGBM) evaluate payment transactions in total isolation ($T_x = [\mathrm{amount}, \mathrm{velocity}, \mathrm{merchant}_{\mathrm{mcc}}, \dots]$). They are fundamentally blind to multi-hop financial smurfing rings, cyclic round-tripping, and synthetic identity networks spanning across multiple banking institutions.
 
 ### Decision
 

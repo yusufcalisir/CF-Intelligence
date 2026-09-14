@@ -188,7 +188,7 @@ To guarantee compliance with **SOC 2 Type II (CC6.1–CC6.3)**, **ISO 27001 (A.9
 ### 1. Cryptographic Timeline Hash-Chaining
 All investigation lifecycle events recorded in [`CaseManagementService._add_event()`](../backend/app/application/services/case_service.py#L152) are cryptographically linked using SHA-256 block hashing:
 
-$$\text{hash}_t = \text{SHA-256}\Big(\text{timestamp}_t \,\|\, \text{event\_type}_t \,\|\, \text{description}_t \,\|\, \text{actor}_t \,\|\, \text{hash}_{t-1}\Big)$$
+$$\mathrm{hash}_t = \mathrm{SHA\text{-}256}\Big(\mathrm{timestamp}_t \,\|\, \mathrm{event}_{\mathrm{type},\,t} \,\|\, \mathrm{description}_t \,\|\, \mathrm{actor}_t \,\|\, \mathrm{hash}_{t-1}\Big)$$
 
 - **Genesis Block**: The first event (`created`) binds to `parent_hash = "0" * 64`.
 - **Tamper Evidence**: Any alteration to historical audit events, notes, or timestamps invalidates all downstream hash chains, guaranteeing evidentiary admissibility in regulatory and judicial proceedings.

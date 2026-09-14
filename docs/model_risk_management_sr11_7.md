@@ -71,7 +71,7 @@ $$DI = \frac{P(\text{Risk Score} \ge \tau \mid \text{Protected Group})}{P(\text{
 ### 3.2. Multi-Stage Production Model State Machine
 Model progression follows a strict 5-stage promotion pipeline managed by `ModelLifecycleManager` (`backend/app/domain/model_lifecycle.py`):
 
-$$\text{STAGING} \;\longrightarrow\; \text{SHADOW} \;\longrightarrow\; \text{CANARY} \;\longrightarrow\; \text{PRODUCTION} \;\longrightarrow\; \text{ARCHIVED} \;/\; \text{ROLLED\_BACK}$$
+$$\mathrm{STAGING} \;\longrightarrow\; \mathrm{SHADOW} \;\longrightarrow\; \mathrm{CANARY} \;\longrightarrow\; \mathrm{PRODUCTION} \;\longrightarrow\; \mathrm{ARCHIVED} \;/\; \mathrm{ROLLED}_{\mathrm{BACK}}$$
 
 1. **`STAGING`**: Initial registration and parameter validation in an isolated sandbox.
 2. **`SHADOW`**: Replays live transaction traffic in parallel with the active champion model without affecting transaction authorization decisions.
@@ -109,7 +109,7 @@ When critical concept drift is confirmed ($PSI \ge 0.25$ over consecutive batche
 If an anomalous loss spike or elevated false positive rate ($FPR > 0.5\%$) occurs post-rollout, or if live ROC-AUC drops below safety thresholds ($AUC < 0.65$):
 1. `AutomaticRollbackTrigger` evaluates degradation triggers in real time.
 2. `ModelRegistryVault.rollback_production(reason)` performs an atomic state transition:
-   * Demotes active candidate: $\text{Status} \to \text{ROLLED\_BACK}$.
+   * Demotes active candidate: $\mathrm{Status} \to \mathrm{ROLLED}_{\mathrm{BACK}}$.
    * Restores previous signed checkpoint: $\text{Status} \to \text{PRODUCTION}$.
 3. **SLA Execution Guarantee**: Atomic state switch completes in **$< 5.0\text{ seconds}$** with zero downtime or service interruption.
 

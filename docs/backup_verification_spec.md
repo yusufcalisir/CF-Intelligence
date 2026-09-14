@@ -163,7 +163,7 @@ artifact = verifier.create_backup_artifact(
 ### 2. Continuous Checksum Attestation (`verify_checksum`)
 Scheduled health monitors recalculate the SHA-256 digest across stored snapshots:
 
-$$\text{digest} = \text{SHA-256}(\text{data\_bytes})$$
+$$\mathrm{digest} = \mathrm{SHA\text{-}256}(\mathrm{data}_{\mathrm{bytes}})$$
 
 - **Matching Hash**: Promotes status to `BackupStatus.VERIFIED`.
 - **Mismatch**: Immediately flags artifact as `BackupStatus.CORRUPTED` and triggers automated incident alerting (`SEV2_MAJOR`).
