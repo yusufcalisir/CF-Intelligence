@@ -69,6 +69,68 @@ def configure_security_settings(zone_id: str, token: str) -> None:
             logger.warning("  ✗ Failed to set '%s': %s", setting_name, res.get("errors"))
 
 
+def configure_waf_rules(zone_id: str, token: str) -> None:
+    """Configure Cloudflare WAF Custom Rules (OWASP Top 10, sensitive paths, null byte blocking)."""
+    logger.info("Configuring Cloudflare WAF Custom Rules...")
+    ruleset_payload = {
+        "rules": [
+            {
+                "action": "block",
+                "expression": '(http.request.uri.path contains "/.env" or http.request.uri.path contains "/.git" or http.request.uri.path contains "/admin")',
+                "description": "Block access to sensitive paths and admin files",
+                "enabled": True,
+            },
+            {
+                "action": "block",
+                "expression": '(http.request.uri.path contains "%00" or http.request.body.raw contains "\x00")',
+                "description": "Block null-byte injection attempts",
+                "enabled": True,
+            },
+        ]
+    }
+    res = cf_request(
+        f"zones/{zone_id}/rulesets/phases/http_request_firewall_custom/entrypoint",
+        method="PUT",
+        token=token,
+        data=ruleset_payload,
+    )
+    if res.get("success"):
+        logger.info("  ✓ WAF Custom Rules configured successfully.")
+    else:
+        logger.warning("  ✗ WAF Custom Rules notification: %s", res.get("errors"))
+
+
+def configure_rate_limiting_rules(zone_id: str, token: str) -> None:
+    """Configure Cloudflare L7 Rate Limiting Rules (Volumetric flood protection)."""
+    logger.info("Configuring Cloudflare L7 Rate Limiting Rules...")
+    rate_limit_payload = {
+        "threshold": 100,
+        "period": 10,
+        "action": {
+            "mode": "challenge",
+            "timeout": 60,
+        },
+        "match": {
+            "request": {
+                "methods": ["POST", "PUT", "DELETE"],
+                "schemes": ["HTTPS"],
+                "url": "*.cfi-platform.org/api/*",
+            }
+        },
+        "description": "Mitigate L7 API volumetric flooding (100 reqs/10s)",
+    }
+    res = cf_request(
+        f"zones/{zone_id}/rate_limits",
+        method="POST",
+        token=token,
+        data=rate_limit_payload,
+    )
+    if res.get("success"):
+        logger.info("  ✓ L7 Rate Limiting rule configured successfully.")
+    else:
+        logger.warning("  ✗ Rate Limiting notification: %s", res.get("errors"))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Configure Cloudflare Layer 1 Security for CF-Intelligence")
     parser.add_argument("--zone-id", required=True, help="Cloudflare Zone ID")
@@ -77,6 +139,8 @@ def main() -> None:
 
     logger.info("Initiating Cloudflare Layer 1 Perimeter Hardening for Zone %s", args.zone_id)
     configure_security_settings(args.zone_id, args.token)
+    configure_waf_rules(args.zone_id, args.token)
+    configure_rate_limiting_rules(args.zone_id, args.token)
     logger.info("Cloudflare Layer 1 Security Hardening Complete! ✅")
 
 
