@@ -55,5 +55,5 @@ $$\text{Service Credit Amount} = \text{Monthly Base Subscription Fee} \times \te
 | **$< 95.00\%$** | $> 36.5\text{ hours}$ | **$100\%$** | **$\$12,000$ credit (Full Refund)** |
 
 ### 3.2. Claim Submission & Automated Application Procedure
-* **No Bureaucratic Delay**: Credits are calculated automatically at the end of each billing cycle by `sla_audit_reporter.py` and deducted directly from the subsequent monthly invoice.
+* **No Bureaucratic Delay**: Credits are calculated automatically at the end of each billing cycle by `SLAContractEngine.generate_monthly_penalty_report()` (`sla_contract_engine.py`) and deducted directly from the subsequent monthly invoice.
 * **Manual Claim Window**: If a customer disputes availability calculations, a claim may be filed via `support@cf-intelligence.bank` within thirty (30) days of month-end.

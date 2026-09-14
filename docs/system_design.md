@@ -17,9 +17,14 @@
 
 ---
 
-## 2. High-Level Architecture
+## 2. High-Level Architecture & Deployment Topologies
 
-CFI Simulator utilizes 4 decoupled microservices coordinated via Docker Compose:
+The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployment topologies:
+1. **Production Unified Stack (`docker-compose.yml`):** Enterprise production deployment coupling Nginx Gateway (ports 80/443), React 19 SPA, FastAPI Clean Architecture application server (port 8000), PostgreSQL 16 (port 5432), and Redis 7.2 (port 6379).
+2. **Decoupled Microservices / Dev Grid (`docker-compose.dev.yml` & Helm):** Decomposes functional planes across dedicated containers orchestrated via `gateway.py` path prefix routing.
+3. **Distributed Multi-Node Consortium (`docker-compose.multinode.yml`):** Multi-bank cluster deploying the central coordinator (port 50051 / 8000) alongside isolated bank client daemons (`bank-a`, `bank-b`, `bank-c`) communicating strictly over outbound-only gRPC mTLS.
+
+### 2.1 Microservices Topology & Service Matrix
 
 ```
                           [ Client Browser / UI ]
@@ -39,8 +44,7 @@ CFI Simulator utilizes 4 decoupled microservices coordinated via Docker Compose:
                       [ PostgreSQL Relational DB ]
 ```
 
-### 2.1 Microservice Descriptions
-1.  **`gateway` (Port 8000):** Acts as the reverse proxy. It implements token rate-limiting, request logs, and path prefix routing to downstream services.
+1.  **`gateway` (Port 8000):** Acts as the reverse proxy (`backend/app/presentation/routers/gateway.py`). It implements token rate-limiting, request logs, and path prefix routing to downstream services.
 2.  **`fl-coordinator` (Port 8001):** Houses PyTorch training loops, secure aggregation, client dropouts, and the Flower/Ray adapters.
 3.  **`identity-graph` (Port 8002):** Manages HMAC hash resolution and parses resolved entities into dynamic React Flow elements.
 4.  **`fraud-alert` (Port 8003):** Houses the 9-Signal Risk Scoring Engine, explainability (SHAP), and case resolution.
@@ -130,7 +134,7 @@ For automated economic governance and fair contribution reward distribution acro
 
 ### 3.7 Standalone Bank Client Daemon & Zero-Inbound Egress Topology
 For zero-trust deployment within financial network perimeters:
-*   **Standalone Daemon (`cfi-bank-client`)**: Dedicated Python client binary/daemon (`cli.py`, `bank_daemon.py`) that operates inside each bank's internal network perimeter without opening incoming network ports.
+*   **Standalone Daemon (`cfi-bank-client`)**: Dedicated Python client daemon (`backend/app/infrastructure/client_daemon/daemon.py` / `BankClientDaemon`) and CLI tooling (`scripts/cfi_cli.py`) that operates inside each bank's internal network perimeter without opening incoming network ports.
 *   **Zero-Inbound Port Architecture**: Firewalls strictly prohibit inbound connections to bank networks. The daemon initiates an outbound-only mTLS channel (port 50051) to the `fl-coordinator`, receiving streaming job instructions and streaming local updates back.
 *   **Encrypted Local Vault Storage (`local_vault.py`)**: Protects local PyTorch model checkpoints, training datasets, and session tokens on disk using AES-256-GCM with PBKDF2 key derivation (100,000 iterations).
 *   **Exponential Backoff Reconnector (`ExponentialBackoffReconnector`)**: Handles network drops gracefully using randomized exponential backoff with full jitter to preserve session context and prevent server connection storms.
@@ -184,7 +188,7 @@ The platform enforces a 3-layer perimeter defense architecture to withstand volu
 flowchart LR
     Client["Client / Bot / Attacker"] --> L1["1. Cloudflare Anycast Edge\n• L3/L4 DDoS Mitigation\n• Bot Fight Mode & Managed Challenge\n• WAF Rules & TLS 1.3 Strict\n• Rate Limit: 60 req/10s on /api/*"]
     
-    L1 --> L2["2. Vercel Edge Middleware\n• V8 Isolate Execution (<5ms)\n• @upstash/ratelimit Distributed Limiter\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
+    L1 --> L2["2. Vercel Security Middleware (Node.js)\n• Serverless Node.js Execution\n• @upstash/ratelimit Distributed Limiter\n• Static Asset Bypass (.js/.css/fonts)\n• Fail-Open Graceful Degradation"]
     
     L2 --> L3["3. FastAPI Application Layer\n• slowapi Granular Route Quotas\n• ML Predict: 60 req/min\n• FL Simulation: 10 req/min\n• DDoSProtectionMiddleware (Memory Pruned)"]
 ```
@@ -193,9 +197,9 @@ flowchart LR
    - Automated L3/L4 volumetric attack absorption on Cloudflare's global Anycast network.
    - Bot Fight Mode, Browser Integrity Checks, and Custom WAF Rules challenging high-threat score traffic.
    - Terraform IaC templates available in `deployments/terraform/cloudflare/`.
-2. **Layer 2 (Vercel Edge Network)**:
-   - Distributed Edge Middleware (`frontend/middleware.ts`) powered by `@upstash/ratelimit` and `@upstash/redis`.
-   - Halts flooding traffic before it ever leaves the edge or incurs downstream compute costs.
+2. **Layer 2 (Vercel Security Middleware)**:
+   - Node.js runtime middleware (`frontend/middleware.ts`) powered by `@upstash/ratelimit` and `@upstash/redis`.
+   - Halts flooding traffic before it ever incurs downstream backend compute costs.
 3. **Layer 3 (FastAPI Application Layer)**:
    - In-process `slowapi` limiter singleton (`backend/app/infrastructure/security/rate_limiter.py`) reading `CF-Connecting-IP` / `X-Real-IP`.
    - Endpoint-specific quotas: `/api/v1/predict` (60 req/min), `/api/v1/simulations` (10 req/min), `/api/v1/alerts` (120 req/min).
