@@ -2,7 +2,7 @@
 
 This operational guide details the end-to-end architecture, cryptographic credentialing, and configuration workflows for onboarding a new financial institution node to the **Collaborative Fraud Intelligence (CF-Intelligence)** platform.
 
-The onboarding subsystem ([`BankOnboardingService`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py) and [`onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py)) automates institution registration, mutual TLS (mTLS) X.509 certificate issuance, PostgreSQL engine-level tenant schema isolation, HashiCorp Vault transit KMS key provisioning, and connector YAML generation.
+The onboarding subsystem ([`BankOnboardingService`](../backend/app/application/services/bank_onboarding_service.py) and [`onboarding.py`](../backend/app/presentation/routers/onboarding.py)) automates institution registration, mutual TLS (mTLS) X.509 certificate issuance, PostgreSQL engine-level tenant schema isolation, HashiCorp Vault transit KMS key provisioning, and connector YAML generation.
 
 ---
 
@@ -44,12 +44,12 @@ sequenceDiagram
 
 ### Core Implementation Files
 
-- **Application Service**: [`backend/app/application/services/bank_onboarding_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py)
-- **REST Presentation Router**: [`backend/app/presentation/routers/onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py)
-- **gRPC Coordination Servicer**: [`backend/app/infrastructure/grpc/servicer.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py)
-- **Domain Entities & Enums**: [`backend/app/domain/entities.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/entities.py#L128), [`backend/app/domain/enums.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/enums.py#L215)
-- **Web UI Onboarding Studio**: [`frontend/src/pages/BankOnboardingPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/BankOnboardingPage.tsx)
-- **Automated Unit Tests**: [`backend/tests/unit/test_bank_onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_bank_onboarding.py)
+- **Application Service**: [`backend/app/application/services/bank_onboarding_service.py`](../backend/app/application/services/bank_onboarding_service.py)
+- **REST Presentation Router**: [`backend/app/presentation/routers/onboarding.py`](../backend/app/presentation/routers/onboarding.py)
+- **gRPC Coordination Servicer**: [`backend/app/infrastructure/grpc/servicer.py`](../backend/app/infrastructure/grpc/servicer.py)
+- **Domain Entities & Enums**: [`backend/app/domain/entities.py`](../backend/app/domain/entities.py#L128), [`backend/app/domain/enums.py`](../backend/app/domain/enums.py#L215)
+- **Web UI Onboarding Studio**: [`frontend/src/pages/BankOnboardingPage.tsx`](../frontend/src/pages/BankOnboardingPage.tsx)
+- **Automated Unit Tests**: [`backend/tests/unit/test_bank_onboarding.py`](../backend/tests/unit/test_bank_onboarding.py)
 
 ---
 
@@ -90,7 +90,7 @@ iptables -A OUTPUT -p tcp --dport 50051 -j DROP
 
 ## 2. The 6-Stage Automated Onboarding Pipeline
 
-When a registration request is submitted, [`BankOnboardingService`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py) automatically coordinates six discrete provisioning tasks:
+When a registration request is submitted, [`BankOnboardingService`](../backend/app/application/services/bank_onboarding_service.py) automatically coordinates six discrete provisioning tasks:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -112,23 +112,23 @@ When a registration request is submitted, [`BankOnboardingService`](file:///c:/U
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-1. **Step 1: Database Registration ([`register_bank`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L42))**:
+1. **Step 1: Database Registration ([`register_bank`](../backend/app/application/services/bank_onboarding_service.py#L42))**:
    - Validates `bank_id` format (`^[a-zA-Z0-9_-]{3,36}$`) and ISO 3166-1 alpha-2 jurisdiction.
    - Inserts record into `TenantConfigModel` with status `BankStatus.PENDING_VERIFICATION`.
    - Prevents duplicate registration; raises `BankAlreadyExistsError` (HTTP 409 Conflict).
-2. **Step 2: mTLS X.509 Certificate Issuance ([`issue_mtls_certificate`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L84))**:
+2. **Step 2: mTLS X.509 Certificate Issuance ([`issue_mtls_certificate`](../backend/app/application/services/bank_onboarding_service.py#L84))**:
    - Generates a 2048-bit RSA keypair and X.509 client certificate (`CN={bank_id}.client.cf-intelligence.io`).
    - Computes SHA-256 fingerprint (`SHA256:<hex>`) and 365-day validity window.
    - Updates `cert_fingerprint` and `cert_expires_at` in the database.
-3. **Step 3: Anti-TOFU gRPC Fingerprint Binding ([`register_bank_fingerprint`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L81))**:
-   - Authoritatively registers the certificate fingerprint in [`FederatedLearningServicer`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L89) memory and database fallback.
+3. **Step 3: Anti-TOFU gRPC Fingerprint Binding ([`register_bank_fingerprint`](../backend/app/infrastructure/grpc/servicer.py#L81))**:
+   - Authoritatively registers the certificate fingerprint in [`FederatedLearningServicer`](../backend/app/infrastructure/grpc/servicer.py#L89) memory and database fallback.
    - Strictly blocks Trust-On-First-Use (TOFU) race conditions and cross-tenant impersonation.
-4. **Step 4: PostgreSQL Engine-Level Schema Provisioning ([`provision_tenant_schema`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L122))**:
+4. **Step 4: PostgreSQL Engine-Level Schema Provisioning ([`provision_tenant_schema`](../backend/app/application/services/bank_onboarding_service.py#L122))**:
    - Executes DDL to create isolated schema space: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}`.
    - Initializes tenant tables (`alerts`, `cases`, `features`, `audit_logs`) within that schema.
-5. **Step 5: Vault Transit KMS Key Path Mapping ([`provision_kms_key`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L133))**:
+5. **Step 5: Vault Transit KMS Key Path Mapping ([`provision_kms_key`](../backend/app/application/services/bank_onboarding_service.py#L133))**:
    - Assigns dedicated encryption key path: `transit/keys/tenant_{bank_id}` for envelope encryption.
-6. **Step 6: Connector Config Generation & Activation ([`activate_bank`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L163))**:
+6. **Step 6: Connector Config Generation & Activation ([`activate_bank`](../backend/app/application/services/bank_onboarding_service.py#L163))**:
    - Renders customized `connector_config_yaml`.
    - Transitions status to `BankStatus.ACTIVE` with `activated_at = datetime.now(UTC)`.
 
@@ -152,7 +152,7 @@ curl -X POST https://api.cf-intelligence.io/api/v1/onboarding/register \
 
 #### Onboarding Bundle Response Breakdown
 
-The API returns HTTP 201 Created with [`BankOnboardingBundleResponse`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py#L69):
+The API returns HTTP 201 Created with [`BankOnboardingBundleResponse`](../backend/app/presentation/routers/onboarding.py#L69):
 
 ```json
 {
@@ -238,7 +238,7 @@ Expected output:
 
 ## 🖥️ Web UI Onboarding & Ingestion Studio (`/onboarding`)
 
-Financial institutions can also onboard directly via the browser-based **Bank Node Onboarding Wizard** ([`frontend/src/pages/BankOnboardingPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/BankOnboardingPage.tsx)):
+Financial institutions can also onboard directly via the browser-based **Bank Node Onboarding Wizard** ([`frontend/src/pages/BankOnboardingPage.tsx`](../frontend/src/pages/BankOnboardingPage.tsx)):
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
@@ -274,15 +274,15 @@ Financial institutions can also onboard directly via the browser-based **Bank No
 
 ### 1. Anti-TOFU (Trust On First Use) Prevention
 In unhardened federated systems, coordinators accept any certificate presented during the initial connection (TOFU). In CF-Intelligence, TOFU is **strictly prohibited**:
-- At onboarding time, [`BankOnboardingService.issue_mtls_certificate()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L84) binds the issued fingerprint directly in [`FederatedLearningServicer`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L89).
+- At onboarding time, [`BankOnboardingService.issue_mtls_certificate()`](../backend/app/application/services/bank_onboarding_service.py#L84) binds the issued fingerprint directly in [`FederatedLearningServicer`](../backend/app/infrastructure/grpc/servicer.py#L89).
 - When a node connects via `RegisterClient`, the coordinator verifies that the bank node was pre-onboarded. Un-onboarded nodes are immediately rejected (`is_accepted = False`).
 
 ### 2. Cross-Tenant Certificate Anti-Spoofing
-- If a rogue node (`bank_adversary`) attempts to present a valid certificate fingerprint belonging to another bank (`bank_legit`), [`FederatedLearningServicer.RegisterClient()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L153) detects the identity mismatch:
+- If a rogue node (`bank_adversary`) attempts to present a valid certificate fingerprint belonging to another bank (`bank_legit`), [`FederatedLearningServicer.RegisterClient()`](../backend/app/infrastructure/grpc/servicer.py#L153) detects the identity mismatch:
   `"Cross-tenant certificate spoofing rejected: bank 'bank_adversary' presented fingerprint registered to 'bank_legit'"`.
 
 ### 3. Database Fallback Verification
-- If a coordinator instance restarts, [`_lookup_authoritative_fingerprint()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L121) queries the persistent `TenantConfigModel.cert_fingerprint` column in PostgreSQL, restoring the anti-spoofing cache without requiring re-onboarding.
+- If a coordinator instance restarts, [`_lookup_authoritative_fingerprint()`](../backend/app/infrastructure/grpc/servicer.py#L121) queries the persistent `TenantConfigModel.cert_fingerprint` column in PostgreSQL, restoring the anti-spoofing cache without requiring re-onboarding.
 
 ---
 
@@ -304,7 +304,7 @@ $$\text{Masked Gradient: } m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,
 
 ### 3. 90-Day Certificate Rotation Lifecycle
 - **Automated Warning Threshold**: Automated background workers trigger alerts when `< 30 days` remain before certificate expiration (`check_cert_expiry`).
-- **Zero-Downtime Hot Swapping**: [`POST /api/v1/onboarding/banks/{bank_id}/rotate-cert`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py#L347) issues a fresh keypair and updates the coordinator registry in-memory.
+- **Zero-Downtime Hot Swapping**: [`POST /api/v1/onboarding/banks/{bank_id}/rotate-cert`](../backend/app/presentation/routers/onboarding.py#L347) issues a fresh keypair and updates the coordinator registry in-memory.
 - **Manual CLI Trigger**:
   ```bash
   cfi-cli rotate-certs --bank-id bank_alpha
@@ -314,7 +314,7 @@ $$\text{Masked Gradient: } m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,
 
 ## 🌐 Onboarding REST API Reference
 
-All onboarding endpoints are served under prefix `/api/v1/onboarding` in [`backend/app/presentation/routers/onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py):
+All onboarding endpoints are served under prefix `/api/v1/onboarding` in [`backend/app/presentation/routers/onboarding.py`](../backend/app/presentation/routers/onboarding.py):
 
 | Method | Endpoint | Request Body | Response Schema | Description |
 |:---|:---|:---|:---|:---|
@@ -327,7 +327,7 @@ All onboarding endpoints are served under prefix `/api/v1/onboarding` in [`backe
 
 ## 🧪 Automated Unit Test Suite Matrix
 
-The bank onboarding pipeline and security invariants are verified by the automated unit test suite in [`backend/tests/unit/test_bank_onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_bank_onboarding.py).
+The bank onboarding pipeline and security invariants are verified by the automated unit test suite in [`backend/tests/unit/test_bank_onboarding.py`](../backend/tests/unit/test_bank_onboarding.py).
 
 ### Test Execution Command
 

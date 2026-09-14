@@ -86,7 +86,7 @@ mindmap
 | **Secure Aggregation** | Server sees only the sum, not individual updates | Prevents server from isolating any single bank's contribution |
 | **Batch Training** | Updates are averaged over mini-batches (default 64) | Individual samples are diluted |
 
-*   **Empirical Reconstruction Proxy Audit (`DLGEvaluator`)**: As an illustrative privacy proxy, [`security_evaluator.py`](file:///backend/app/domain/security_evaluator.py) evaluates Pearson correlation ($r$) and MSE between original features and reconstruction baselines across protection modes. *Implementation Note:* The current evaluator computes correlation against noise baselines and does not perform full L-BFGS gradient-inversion optimization (per Zhu et al., 2019); metrics reflect random-baseline correlation floors:
+*   **Empirical Reconstruction Proxy Audit (`DLGEvaluator`)**: As an illustrative privacy proxy, [`security_evaluator.py`](../backend/app/domain/security_evaluator.py) evaluates Pearson correlation ($r$) and MSE between original features and reconstruction baselines across protection modes. *Implementation Note:* The current evaluator computes correlation against noise baselines and does not perform full L-BFGS gradient-inversion optimization (per Zhu et al., 2019); metrics reflect random-baseline correlation floors:
 
 | Protection Mode | Pearson Correlation ($r$) | Reconstruction MSE | Security Assessment |
 | :--- | :--- | :--- | :--- |
@@ -103,7 +103,7 @@ mindmap
 **Threat**: Determine whether a specific transaction was in a bank's training set.
 
 **Mitigation**: Differential privacy with ($\epsilon, \delta$)-guarantees provides formal bounds on membership inference advantage. With $\epsilon=1.0$, the adversary's advantage is bounded by $e^\epsilon \approx 2.72\times$ over random guessing.
-*   **Empirical Security Validation (`MIAEvaluator`)**: The platform evaluates prediction loss distributions via [`security_evaluator.py`](file:///backend/app/domain/security_evaluator.py) to measure empirical privacy leakage (heuristic loss-threshold proxy, not a trained shadow-model MIA):
+*   **Empirical Security Validation (`MIAEvaluator`)**: The platform evaluates prediction loss distributions via [`security_evaluator.py`](../backend/app/domain/security_evaluator.py) to measure empirical privacy leakage (heuristic loss-threshold proxy, not a trained shadow-model MIA):
     - **Unprotected Model**: Loss thresholding attack accuracy reaches **$72.4\%$** (Empirical Attack Advantage $= 0.448$).
     - **DP Protected Model ($\epsilon=1.0, \delta=10^{-5}$)**: Attack accuracy collapses to **$50.4\%$** (heuristic loss-threshold proxy, not a trained shadow-model MIA), driving empirical Attack Advantage down to **$< 0.05$** ($\text{Advantage} = 0.008$).
 
@@ -158,7 +158,7 @@ The platform evaluates global model convergence stability ($F_1$ score) across 6
 
 **Threat**: A compromised bank node embeds a low-rank targeted backdoor trigger (e.g., forcing fraud label $1 \rightarrow 0$ for specific money laundering merchant codes) while maintaining normal loss on standard transactions.
 
-**Mitigation**: The platform applies SVD power iteration decomposition across stacked gradient updates via [`spectral_defense.py`](file:///backend/app/domain/spectral_defense.py) to compute spectral projection scores $s_i = |\langle \Delta w_i, v_1 \rangle|^2$. Updates exceeding the adaptive threshold $\theta = \mu_s + 1.5\sigma_s$ are quarantined.
+**Mitigation**: The platform applies SVD power iteration decomposition across stacked gradient updates via [`spectral_defense.py`](../backend/app/domain/spectral_defense.py) to compute spectral projection scores $s_i = |\langle \Delta w_i, v_1 \rangle|^2$. Updates exceeding the adaptive threshold $\theta = \mu_s + 1.5\sigma_s$ are quarantined.
 
 **Empirical Backdoor Defense Performance (`BackdoorDefenseEvaluator`)**:
 
@@ -566,7 +566,7 @@ The Hardware Security Module Key Vault Engine (`hsm_signer.py`) anchors node pri
 
 ## 18. Operational Resilience & Network Fault Tolerance
 
-The platform validates operational continuity, throughput, and zero-deadlock recovery under network degradation via [`security_evaluator.py`](file:///backend/app/domain/security_evaluator.py) (`NetworkResilienceEvaluator`):
+The platform validates operational continuity, throughput, and zero-deadlock recovery under network degradation via [`security_evaluator.py`](../backend/app/domain/security_evaluator.py) (`NetworkResilienceEvaluator`):
 
 ### 18.1 Empirical Network Fault Benchmark (`NetworkResilienceEvaluator`)
 

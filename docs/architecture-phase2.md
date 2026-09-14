@@ -91,11 +91,11 @@ graph TD
 
 | Layer | Primary Components | Key Files | Responsibility |
 |:---|:---|:---|:---|
-| **Presentation** | Web UI, React Flow, WebSockets, CLI | [InvestigationDashboard.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/InvestigationDashboard.tsx), [CaseDetailPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/CaseDetailPage.tsx), [PsiPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/PsiPage.tsx), [CoordinatorPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/CoordinatorPage.tsx) | Live interactive dashboards, graph visualizer, case detail workbench, PSI sandbox, operator CLI. |
-| **API & Routers** | FastAPI REST endpoints & WebSockets | [cases.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/cases.py), [coordinator.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/coordinator.py), [privacy_defense.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/privacy_defense.py), [compliance.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/compliance.py) | Inbound payload validation, JWT / mTLS authentication, ABAC policy enforcement, HTTP/WebSocket serialization. |
-| **Application Services** | Domain services & business logic | [case_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/case_workbench.py), [regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/regulatory_reporter.py), [psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/psi_service.py), [graph_analytics_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/graph_analytics_service.py) | Risk scoring (9 signals), entity resolution (LSH MinHash), PSI execution, GraphSAGE embeddings, case lifecycle state machines, SAR e-filing. |
-| **Domain Layer** | Dataclasses & pure value objects | [case_management.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/case_management.py), [entities_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/entities_phase2.py), [value_objects_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/value_objects_phase2.py) | Framework-independent domain models, immutable value objects, type-safe status enums, deterministic hashing formulas. |
-| **Infrastructure & Storage** | Persistence & cryptography | [otel_tracer.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/telemetry/otel_tracer.py), [kms_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/kms_service.py), [FinCEN_SAR_2.0.xsd](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/schemas/FinCEN_SAR_2.0.xsd) | PostgreSQL schemas, Redis pub/sub broker, Neo4j Bolt driver, HashiCorp Vault PKI engine, OpenTelemetry / Prometheus telemetry. |
+| **Presentation** | Web UI, React Flow, WebSockets, CLI | [InvestigationDashboard.tsx](../frontend/src/pages/InvestigationDashboard.tsx), [CaseDetailPage.tsx](../frontend/src/pages/CaseDetailPage.tsx), [PsiPage.tsx](../frontend/src/pages/PsiPage.tsx), [CoordinatorPage.tsx](../frontend/src/pages/CoordinatorPage.tsx) | Live interactive dashboards, graph visualizer, case detail workbench, PSI sandbox, operator CLI. |
+| **API & Routers** | FastAPI REST endpoints & WebSockets | [cases.py](../backend/app/presentation/routers/cases.py), [coordinator.py](../backend/app/presentation/routers/coordinator.py), [privacy_defense.py](../backend/app/presentation/routers/privacy_defense.py), [compliance.py](../backend/app/presentation/routers/compliance.py) | Inbound payload validation, JWT / mTLS authentication, ABAC policy enforcement, HTTP/WebSocket serialization. |
+| **Application Services** | Domain services & business logic | [case_workbench.py](../backend/app/application/services/case_workbench.py), [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py), [psi_service.py](../backend/app/application/services/psi_service.py), [graph_analytics_service.py](../backend/app/application/services/graph_analytics_service.py) | Risk scoring (9 signals), entity resolution (LSH MinHash), PSI execution, GraphSAGE embeddings, case lifecycle state machines, SAR e-filing. |
+| **Domain Layer** | Dataclasses & pure value objects | [case_management.py](../backend/app/domain/case_management.py), [entities_phase2.py](../backend/app/domain/entities_phase2.py), [value_objects_phase2.py](../backend/app/domain/value_objects_phase2.py) | Framework-independent domain models, immutable value objects, type-safe status enums, deterministic hashing formulas. |
+| **Infrastructure & Storage** | Persistence & cryptography | [otel_tracer.py](../backend/app/infrastructure/telemetry/otel_tracer.py), [kms_service.py](../backend/app/application/services/kms_service.py), [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd) | PostgreSQL schemas, Redis pub/sub broker, Neo4j Bolt driver, HashiCorp Vault PKI engine, OpenTelemetry / Prometheus telemetry. |
 
 ---
 
@@ -188,12 +188,12 @@ To satisfy strict data protection regulations (GDPR Art. 9/22, CCPA, Bank Secrec
 
 ## Design Patterns & Architectural Choices
 
-* **Signal-Combiner Pattern**: The [RiskScoringEngine](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/risk_engine.py) decouples 9 independent risk scoring strategies (federated ML inference, transaction velocity, high-risk destination geolocation, time-of-day anomaly, transaction amount deviation, device sharing risk, graph risk score, and historical fraud incidence). This enables dynamic weight rebalancing without altering the core pipeline.
+* **Signal-Combiner Pattern**: The [RiskScoringEngine](../backend/app/application/services/risk_engine.py) decouples 9 independent risk scoring strategies (federated ML inference, transaction velocity, high-risk destination geolocation, time-of-day anomaly, transaction amount deviation, device sharing risk, graph risk score, and historical fraud incidence). This enables dynamic weight rebalancing without altering the core pipeline.
 * **Separation of Concerns (Clean Architecture)**:
-  * **Domain Layer** ([case_management.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/case_management.py), [entities_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/entities_phase2.py), [value_objects_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/value_objects_phase2.py)) maintains framework-independent business entities, status enums, and mathematical algorithms.
-  * **Application Layer** ([case_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/case_workbench.py), [regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/regulatory_reporter.py), [psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/psi_service.py), [coordinator_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/coordinator_service.py)) orchestrates business operations and AML algorithms.
-  * **Presentation Layer** ([cases.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/cases.py), [coordinator.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/coordinator.py), [privacy_defense.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/privacy_defense.py)) handles network endpoints, OpenAPI contracts, and serializations.
-* **Finite State Machine (FSM) Pattern**: The [CaseLifecycleStateMachine](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/case_management.py) governs case progression across immutable transition paths, enforcing actor identity logging and four-eyes dual authorization.
+  * **Domain Layer** ([case_management.py](../backend/app/domain/case_management.py), [entities_phase2.py](../backend/app/domain/entities_phase2.py), [value_objects_phase2.py](../backend/app/domain/value_objects_phase2.py)) maintains framework-independent business entities, status enums, and mathematical algorithms.
+  * **Application Layer** ([case_workbench.py](../backend/app/application/services/case_workbench.py), [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py), [psi_service.py](../backend/app/application/services/psi_service.py), [coordinator_service.py](../backend/app/application/services/coordinator_service.py)) orchestrates business operations and AML algorithms.
+  * **Presentation Layer** ([cases.py](../backend/app/presentation/routers/cases.py), [coordinator.py](../backend/app/presentation/routers/coordinator.py), [privacy_defense.py](../backend/app/presentation/routers/privacy_defense.py)) handles network endpoints, OpenAPI contracts, and serializations.
+* **Finite State Machine (FSM) Pattern**: The [CaseLifecycleStateMachine](../backend/app/domain/case_management.py) governs case progression across immutable transition paths, enforcing actor identity logging and four-eyes dual authorization.
 * **Pub/Sub Scenario Replay**: Redis Pub/Sub decouples high-throughput simulation engines from FastAPI WebSocket connections, eliminating latency jitter on browser dashboards during real-time load tests.
 
 ---
@@ -338,7 +338,7 @@ Deterministic exact-string matching fails when bank records differ slightly in s
 
 #### Stage 1 — Standardization Pipeline (`standardize_input()`)
 
-[value_objects_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/value_objects_phase2.py) :: `standardize_input(raw_value, entity_type)` applies a pre-hashing normalization pipeline to all entity identifiers before any matching is attempted:
+[value_objects_phase2.py](../backend/app/domain/value_objects_phase2.py) :: `standardize_input(raw_value, entity_type)` applies a pre-hashing normalization pipeline to all entity identifiers before any matching is attempted:
 
 | Entity Type | Transformation Applied |
 | :--- | :--- |
@@ -351,7 +351,7 @@ This ensures that `"Yusuf Çalışır"` and `"Yusuf Calisir"` both standardize t
 
 #### Stage 2 — Locality-Sensitive Hashing (LSH) on Character n-grams (`compute_minhash_signature()`)
 
-[value_objects_phase2.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/value_objects_phase2.py) :: `compute_minhash_signature(text, num_hashes=16)` generates a compact probabilistic fingerprint:
+[value_objects_phase2.py](../backend/app/domain/value_objects_phase2.py) :: `compute_minhash_signature(text, num_hashes=16)` generates a compact probabilistic fingerprint:
 
 1. **3-gram Extraction**: The standardized name is decomposed into a set of overlapping character 3-grams:
    $$S = \{ \text{text}[i:i+3] \mid 0 \le i \le \text{len(text)} - 3 \}$$
@@ -367,7 +367,7 @@ The 16-dimensional MinHash vector is stored directly in the entity's `attributes
 
 #### Stage 3 — Multi-Attribute Fuzzy PSI (`PSIService.run_psi(enable_fuzzy=True)`)
 
-[psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/psi_service.py) :: `run_psi(bank_a_id, bank_b_id, entity_type, enable_fuzzy=True, fuzzy_threshold=3)` executes a threshold-based multi-attribute matching protocol:
+[psi_service.py](../backend/app/application/services/psi_service.py) :: `run_psi(bank_a_id, bank_b_id, entity_type, enable_fuzzy=True, fuzzy_threshold=3)` executes a threshold-based multi-attribute matching protocol:
 
 1. **Attribute Set**: 5 key PII attributes are evaluated per entity pair: `phone`, `email`, `device_id`, `birthdate`, `surname`.
 2. **Independent DH-PSI per Attribute**: Standard Diffie-Hellman commutative exponentiation is executed independently over each attribute's `PrivacyPreservingIdentifier` hash:
@@ -378,7 +378,7 @@ The 16-dimensional MinHash vector is stored directly in the entity's `attributes
 
 #### Stage 4 — Central LSH Registry (`EntityResolutionService.resolve_fuzzy_entities()`)
 
-[entity_resolution.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/entity_resolution.py) :: `resolve_fuzzy_entities(query_name, entity_type, threshold=0.70)` provides a direct name-to-entity fuzzy lookup:
+[entity_resolution.py](../backend/app/application/services/entity_resolution.py) :: `resolve_fuzzy_entities(query_name, entity_type, threshold=0.70)` provides a direct name-to-entity fuzzy lookup:
 - Standardizes and computes the MinHash signature of the query string.
 - Iterates all stored entities, reads their `minhash_signature` attribute, and computes Jaccard similarity.
 - Returns all entities above the configurable similarity threshold, sorted by descending similarity.
@@ -386,7 +386,7 @@ The 16-dimensional MinHash vector is stored directly in the entity's `attributes
 
 #### Frontend Integration (`PsiPage.tsx`)
 
-The [PsiPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/PsiPage.tsx) React component provides an interactive three-panel UI:
+The [PsiPage.tsx](../frontend/src/pages/PsiPage.tsx) React component provides an interactive three-panel UI:
 - **PSI Protocol Control Center**: Configures bank pair, entity type, Intel SGX TEE toggle, fuzzy enable/disable, and threshold slider ($k = 1–5$).
 - **MinHash Spelling Playground**: Local JavaScript implementation of `standardize_input()` and `compute_minhash_signature()` that shows real-time 16-dimensional signature comparison and Jaccard score for any two name inputs without making API calls.
 - **Central LSH Registry Query Panel**: Calls `/api/v1/entities/fuzzy-resolve` and displays matched entities with similarity scores, bank, risk level, standardized form, and privacy hash.
@@ -575,7 +575,7 @@ graph TD
 * **OAuth2 Authentication**: For systems requiring token-based access, the adapter dynamically requests OAuth2 Client Credentials tokens from the configured authorization server (`oauth_token_url`), caches them locally, and attaches them as Bearer tokens to outbound requests.
 
 ### 2. Financial Message Parsers
-The [financial_message_parser.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/financial_message_parser.py) normalizes real-time and bulk financial messages into transaction entities:
+The [financial_message_parser.py](../backend/app/application/services/financial_message_parser.py) normalizes real-time and bulk financial messages into transaction entities:
 * **ISO 20022 (pacs.008)**: Parses structured XML schemas to extract end-to-end IDs, settlement amounts, currencies, debtor (sender) and creditor (receiver) names, IBANs, and BICs.
 * **SWIFT MT103**: Parses flat legacy SWIFT messages by scanning block 4 tags (e.g., `:20:` for reference, `:32A:` for value date/amount, `:50K:`/`:59:` for customer info).
 * **SEPA credit transfers**: Standardizes incoming instant and credit transfer pain.001 or pacs.008 messages into the platform's schema.
@@ -595,7 +595,7 @@ The platform exposes standardized endpoints compliant with the PSD2 XS2A (Access
 
 ## Enterprise Case Management Workbench & Regulatory SAR Architecture
 
-The [case_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/case_workbench.py) and [case_management.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/case_management.py) services implement full-lifecycle case handling with strict Four-Eyes governance and automated FinCEN Suspicious Activity Report (SAR) XML generation.
+The [case_workbench.py](../backend/app/application/services/case_workbench.py) and [case_management.py](../backend/app/domain/case_management.py) services implement full-lifecycle case handling with strict Four-Eyes governance and automated FinCEN Suspicious Activity Report (SAR) XML generation.
 
 ```mermaid
 stateDiagram-v2
@@ -625,21 +625,21 @@ stateDiagram-v2
   - Every transition records the `actor_id`, timestamp, and reason notes into an append-only audit trail.
 
 ### 2. FinCEN BSA SAR 2.0 XML Generation & Validation
-* The [regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/regulatory_reporter.py) service generates e-filing compliant XML documents for confirmed money laundering cases.
-* Documents are validated against the official XML Schema Definition at [FinCEN_SAR_2.0.xsd](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/schemas/FinCEN_SAR_2.0.xsd), asserting:
+* The [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py) service generates e-filing compliant XML documents for confirmed money laundering cases.
+* Documents are validated against the official XML Schema Definition at [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd), asserting:
   - `<EFilingSubmission>` root element.
   - Standard `<SubmissionHeader>` with `ActivityType`, `SubmissionType`, and timestamps.
   - `<Activity>` body containing institution identifiers, suspect subjects, detailed narratives, and financial transaction amounts.
 
 ### 3. Verified Retraining Label Feedback Loop
-* Confirmed case outcomes are ingested by the [label_feedback_pipeline.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/label_feedback_pipeline.py).
+* Confirmed case outcomes are ingested by the [label_feedback_pipeline.py](../backend/app/application/services/label_feedback_pipeline.py).
 * Validated labels (`label = 1` for `RESOLVED_TRUE_POSITIVE`, `label = 0` for `RESOLVED_FALSE_POSITIVE`) are merged into local bank training partitions using Dirichlet non-IID class weighting, continuously improving model detection accuracy in successive FL rounds.
 
 ---
 
 ## Enterprise Federated Coordinator Suite
 
-The [coordinator_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/coordinator_service.py) transforms static node topologies into a production-grade, self-healing FL network where bank nodes register dynamically, send heartbeats, and negotiate hardware-aware training parameters.
+The [coordinator_service.py](../backend/app/application/services/coordinator_service.py) transforms static node topologies into a production-grade, self-healing FL network where bank nodes register dynamically, send heartbeats, and negotiate hardware-aware training parameters.
 
 ### Architecture
 
@@ -685,10 +685,10 @@ sequenceDiagram
 
 | Component | File | Responsibility |
 |:---|:---|:---|
-| `CoordinatorService` | [coordinator_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/coordinator_service.py) | Client registry, heartbeat tracking, runtime version validator, hardware-aware parameter negotiation. |
-| `coordinator` Router | [coordinator.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/coordinator.py) | REST endpoints: `/handshake`, `/heartbeat`, `/clients`, `/negotiate`. |
-| `cfi_active_clients_count` | [otel_tracer.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/telemetry/otel_tracer.py) | Prometheus gauge tracking live online client count. |
-| `CoordinatorPage` | [CoordinatorPage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/CoordinatorPage.tsx) | Live registry UI, heartbeat health indicators, and API reference. |
+| `CoordinatorService` | [coordinator_service.py](../backend/app/application/services/coordinator_service.py) | Client registry, heartbeat tracking, runtime version validator, hardware-aware parameter negotiation. |
+| `coordinator` Router | [coordinator.py](../backend/app/presentation/routers/coordinator.py) | REST endpoints: `/handshake`, `/heartbeat`, `/clients`, `/negotiate`. |
+| `cfi_active_clients_count` | [otel_tracer.py](../backend/app/infrastructure/telemetry/otel_tracer.py) | Prometheus gauge tracking live online client count. |
+| `CoordinatorPage` | [CoordinatorPage.tsx](../frontend/src/pages/CoordinatorPage.tsx) | Live registry UI, heartbeat health indicators, and API reference. |
 
 ### Heartbeat Timeout Logic
 The coordinator uses a passive sweep model: `get_active_clients()` iterates the registry on each call and marks clients `OFFLINE` when `last_heartbeat` age exceeds `heartbeat_timeout_seconds` (default: 15s). This avoids background thread contention and works transparently with FastAPI async request handlers.
@@ -716,7 +716,7 @@ The coordinator uses a passive sweep model: `get_active_clients()` iterates the 
 
 ## Advanced Privacy Defense & Adversarial Attack Benchmarking
 
-To audit and protect aggregated model weights against adversarial attacks, the system integrates Byzantine-robust optimizers and the [privacy_audit_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/privacy_audit_service.py).
+To audit and protect aggregated model weights against adversarial attacks, the system integrates Byzantine-robust optimizers and the [privacy_audit_service.py](../backend/app/application/services/privacy_audit_service.py).
 
 ```
                   ┌──────────────────────────────┐
@@ -737,11 +737,11 @@ To audit and protect aggregated model weights against adversarial attacks, the s
 
 | Component | File | Responsibility |
 |:---|:---|:---|
-| `Bulyan` & `Trimmed Mean` | [fl_engine.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/fl_engine.py) | Byzantine-robust aggregation algorithms defending against colluding malicious banks. |
-| `PrivacyAuditService` | [privacy_audit_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/privacy_audit_service.py) | Evaluates Membership Inference Attacks (MIA), Model Inversion (gradient variance), and DLG (Pearson correlation). |
-| `PrivacyService` | [privacy_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/privacy_service.py) | Multi-simulation $\epsilon$ privacy budget consumption tracking with exhaustion flags. |
-| `privacy_defense` Router | [privacy_defense.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/privacy_defense.py) | REST API routes: `/aggregation-methods`, `/audit/mia`, `/audit/model-inversion`, `/audit/dlg`, and `/budget-log`. |
-| `PrivacyDefensePage` | [PrivacyDefensePage.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/PrivacyDefensePage.tsx) | Dashboard displaying Byzantine defense methods, active attack simulations, and budget gauges. |
+| `Bulyan` & `Trimmed Mean` | [fl_engine.py](../backend/app/application/services/fl_engine.py) | Byzantine-robust aggregation algorithms defending against colluding malicious banks. |
+| `PrivacyAuditService` | [privacy_audit_service.py](../backend/app/application/services/privacy_audit_service.py) | Evaluates Membership Inference Attacks (MIA), Model Inversion (gradient variance), and DLG (Pearson correlation). |
+| `PrivacyService` | [privacy_service.py](../backend/app/application/services/privacy_service.py) | Multi-simulation $\epsilon$ privacy budget consumption tracking with exhaustion flags. |
+| `privacy_defense` Router | [privacy_defense.py](../backend/app/presentation/routers/privacy_defense.py) | REST API routes: `/aggregation-methods`, `/audit/mia`, `/audit/model-inversion`, `/audit/dlg`, and `/budget-log`. |
+| `PrivacyDefensePage` | [PrivacyDefensePage.tsx](../frontend/src/pages/PrivacyDefensePage.tsx) | Dashboard displaying Byzantine defense methods, active attack simulations, and budget gauges. |
 
 ### Robust Aggregation Algorithms
 
@@ -771,7 +771,7 @@ Defends against colluding attackers that Krum or Median alone cannot mitigate:
 
 ### Public Dataset Loaders (`dataloader.py`)
 
-[dataloader.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py) loads standard benchmarks with automatic synthetic mock fallback for offline CI/CD testing:
+[dataloader.py](../backend/app/application/services/dataloader.py) loads standard benchmarks with automatic synthetic mock fallback for offline CI/CD testing:
 
 | Dataset | Source | Feature Dim | Fraud Ratio | Graph Structure? |
 |:---|:---|---:|---:|:---:|
@@ -831,22 +831,22 @@ Results are saved to `storage/benchmark_results.md` with ROC-AUC, PR-AUC, and F1
 
 ## Automated Verification & Test Coverage Matrix
 
-All Phase 2 components are continuously verified through unit and integration suites under [backend/tests/unit/](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/):
+All Phase 2 components are continuously verified through unit and integration suites under [backend/tests/unit/](../backend/tests/unit):
 
 | Test Suite | Targeted Module / Service | Verified Features | Test Count | Status |
 |:---|:---|:---|:---:|:---:|
-| [test_fuzzy_psi.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_fuzzy_psi.py) | `value_objects_phase2`, `psi_service` | Turkish transliteration, MinHash LSH, 3-of-5 attribute threshold gate | 3 | ✅ 100% Pass |
-| [test_psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_psi_service.py) | `psi_service` | Commutative DH-PSI exponentiation, match identification, cross-encryption | 3 | ✅ 100% Pass |
-| [test_psi_fuzzy_domain.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_psi_fuzzy_domain.py) | `value_objects_phase2` | Normalization edge cases, punctuation stripping, phone E.164 standardization | 4 | ✅ 100% Pass |
-| [test_coordinator_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_coordinator_service.py) | `coordinator_service` | Dynamic handshake, heartbeat sweep, CUDA/RAM parameter negotiation | 19 | ✅ 100% Pass |
-| [test_privacy_defense_router.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_privacy_defense_router.py) | `privacy_defense.py` | Aggregation method listing, MIA / Inversion / DLG audit endpoints | 7 | ✅ 100% Pass |
-| [test_privacy_audit.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_privacy_audit.py) | `privacy_audit_service` | Loss distribution MIA, reconstruction score, Pearson leakage metric | 15 | ✅ 100% Pass |
-| [test_privacy_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_privacy_service.py) | `privacy_service` | Multi-simulation $\epsilon$ log tracking, threshold exhaustion alerts | 15 | ✅ 100% Pass |
-| [test_graph_analytics.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service` | PageRank risk propagation with decay ($\gamma = 0.85$), community density, velocity | 3 | ✅ 100% Pass |
-| [test_graph_embedding.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service` | 12-dim node feature extraction, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
-| [test_neo4j_graph.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_neo4j_graph.py) | `graph_engine` | Neo4j Bolt driver init, Cypher entity/relationship merges, Redis fallback | 8 | ✅ 100% Pass |
-| [test_flink_graph_streaming.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_flink_graph_streaming.py) | `flink_graph_streaming` | High-velocity streaming edge sliding windows, anomaly triggers | 3 | ✅ 100% Pass |
-| [test_advanced_explainability.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
-| [test_case_management_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
-| [test_regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
+| [test_fuzzy_psi.py](../backend/tests/unit/test_fuzzy_psi.py) | `value_objects_phase2`, `psi_service` | Turkish transliteration, MinHash LSH, 3-of-5 attribute threshold gate | 3 | ✅ 100% Pass |
+| [test_psi_service.py](../backend/tests/unit/test_psi_service.py) | `psi_service` | Commutative DH-PSI exponentiation, match identification, cross-encryption | 3 | ✅ 100% Pass |
+| [test_psi_fuzzy_domain.py](../backend/tests/unit/test_psi_fuzzy_domain.py) | `value_objects_phase2` | Normalization edge cases, punctuation stripping, phone E.164 standardization | 4 | ✅ 100% Pass |
+| [test_coordinator_service.py](../backend/tests/unit/test_coordinator_service.py) | `coordinator_service` | Dynamic handshake, heartbeat sweep, CUDA/RAM parameter negotiation | 19 | ✅ 100% Pass |
+| [test_privacy_defense_router.py](../backend/tests/unit/test_privacy_defense_router.py) | `privacy_defense.py` | Aggregation method listing, MIA / Inversion / DLG audit endpoints | 7 | ✅ 100% Pass |
+| [test_privacy_audit.py](../backend/tests/unit/test_privacy_audit.py) | `privacy_audit_service` | Loss distribution MIA, reconstruction score, Pearson leakage metric | 15 | ✅ 100% Pass |
+| [test_privacy_service.py](../backend/tests/unit/test_privacy_service.py) | `privacy_service` | Multi-simulation $\epsilon$ log tracking, threshold exhaustion alerts | 15 | ✅ 100% Pass |
+| [test_graph_analytics.py](../backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service` | PageRank risk propagation with decay ($\gamma = 0.85$), community density, velocity | 3 | ✅ 100% Pass |
+| [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service` | 12-dim node feature extraction, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
+| [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine` | Neo4j Bolt driver init, Cypher entity/relationship merges, Redis fallback | 8 | ✅ 100% Pass |
+| [test_flink_graph_streaming.py](../backend/tests/unit/test_flink_graph_streaming.py) | `flink_graph_streaming` | High-velocity streaming edge sliding windows, anomaly triggers | 3 | ✅ 100% Pass |
+| [test_advanced_explainability.py](../backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
+| [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
+| [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
 | **Total Verified** | **14 Dedicated Suites** | **Collaborative AML Platform Architecture** | **116 Tests** | **100% Pass** |

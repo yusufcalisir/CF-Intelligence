@@ -109,7 +109,7 @@ The application shell provides access to 16 distinct production views organized 
 ## 5. In-Depth View Specifications & User Workflows
 
 ### 5.1. SaaS Landing Page & Launch Sequence (`/`)
-* **Component**: [`LandingPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/LandingPage.tsx)
+* **Component**: [`LandingPage.tsx`](../frontend/src/pages/LandingPage.tsx)
 * **Interactive Hero Preview (`InteractiveDashboardPreview`)**:
   * Features 7 interactive tabs: `Telemetry` (home), `GNN Topology` (gnn), `Differential Privacy` (privacy), `BFT Defense` (bft), `FinCEN SAR` (sar), `Chaos Attack` (chaos), and `Dataset Ingest` (ingest).
   * Direct deep linking routes users directly to `/scenarios` or `/operations?openIngest=true`.
@@ -124,14 +124,14 @@ The application shell provides access to 16 distinct production views organized 
   * Navigates immediately to the target dashboard without screen flicker or intermediate loading screens.
 
 ### 5.2. Consortium Operations Dashboard (`/dashboard`)
-* **Component**: [`Dashboard.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/Dashboard.tsx)
+* **Component**: [`Dashboard.tsx`](../frontend/src/pages/Dashboard.tsx)
 * **Key Widgets**:
   * **Consortium Node Grid**: Live heartbeats for Bank Alpha (JPM), Bank Beta (HSBC), and Bank Gamma (DBK).
   * **Telemetry Summary**: Global ROC-AUC ($0.9120$), active participants, differential privacy spent ($\varepsilon$), and cumulative fraud savings.
   * **Quick Actions Bar**: Fast jump cards to Chaos Simulator, Ingestion Studio, and Benchmark Hub.
 
 ### 5.3. Live Verification & HUD Grid (`/operations`)
-* **Component**: [`LiveOperationsView.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/LiveOperationsView.tsx)
+* **Component**: [`LiveOperationsView.tsx`](../frontend/src/pages/LiveOperationsView.tsx)
 * **Visual Verification Metrics**:
   * **ROC Performance Overlay (`ROCCurve.tsx`)**: Real-time comparison between Collaborative FedGNN ($0.912$) and Single-Bank Baselines ($0.835$).
   * **Loss Convergence Line (`LossChart.tsx`)**: Multi-round training and validation loss decay.
@@ -140,7 +140,7 @@ The application shell provides access to 16 distinct production views organized 
 * **Deep Linking**: Supports URL parameter `?openIngest=true` to automatically launch the dataset ingestion modal.
 
 ### 5.4. AML Case Workbench & SAR Generator (`/cases/:caseId`)
-* **Component**: [`CaseDetailPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/CaseDetailPage.tsx)
+* **Component**: [`CaseDetailPage.tsx`](../frontend/src/pages/CaseDetailPage.tsx)
 * **6-Stage Investigation Lifecycle**:
   `NEW` ──► `ASSIGNED` ──► `UNDER_INVESTIGATION` ──► `ESCALATED` ──► `SAR_GENERATED` ──► `CLOSED`
 * **Four-Eyes Dual Control**:
@@ -151,20 +151,20 @@ The application shell provides access to 16 distinct production views organized 
   * Embedded XML schema validator against official XSD definitions with copy-to-clipboard and `.xml` download triggers.
 
 ### 5.5. Entity Graph Explorer (`/graph`)
-* **Component**: [`GraphPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/GraphPage.tsx)
+* **Component**: [`GraphPage.tsx`](../frontend/src/pages/GraphPage.tsx)
 * **Capabilities**:
   * Interactive 2D/3D WebGL graph rendering multi-hop circular smurfing syndicates across Bank A, Bank B, and Bank C.
   * Node inspection panel displaying anonymized 512-dim GraphSAGE embedding vectors and edge transaction attributes.
 
 ### 5.6. Dataset Ingestion Studio Modal
-* **Component**: [`DatasetIngestionStudioModal.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/DatasetIngestionStudioModal.tsx)
+* **Component**: [`DatasetIngestionStudioModal.tsx`](../frontend/src/components/ingestion/DatasetIngestionStudioModal.tsx)
 * **Key Features**:
   * Drag-and-drop CSV / Parquet file upload.
   * **Zero-Raw-PII Regex Scanner**: Pre-flight inspection flagging and quarantining unhashed national IDs (`TCKN`, `SSN`), credit card numbers (Luhn check), and raw IBANs.
   * **Great Expectations 1.x Data Contract**: Automatic schema inference, null-value checks, and range bounds verification.
 
 ### 5.7. Interactive Chaos & Byzantine Attack Injector
-* **Component**: [`ChaosAttackInjectorPanel.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/components/ChaosAttackInjectorPanel.tsx)
+* **Component**: [`ChaosAttackInjectorPanel.tsx`](../frontend/src/components/chaos/ChaosAttackInjectorPanel.tsx)
 * **Attack Scenarios**:
   * *Label Flipping Attack* (Inverting fraud labels in malicious client batch).
   * *Sign Flipping Attack* (Reversing gradient descent direction vectors).
@@ -175,7 +175,7 @@ The application shell provides access to 16 distinct production views organized 
 
 ## 6. Real-Time Streaming & WebSocket Engine
 
-The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/hooks/useRealTimeFraudStream.ts) displayed globally in the application header:
+The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](../frontend/src/hooks/useRealTimeFraudStream.ts) displayed globally in the application header:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -214,13 +214,13 @@ All console components, navigation routes, deep-linking rules, and error states 
 
 | Test Suite Category | Representative Test File | Verified Capabilities | Status |
 | :--- | :--- | :--- | :---: |
-| **Routing & Deep Linking** | [`RoutingAndDeepLinking.test.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/__tests__/RoutingAndDeepLinking.test.tsx) | 16 route resolutions, URL query params (`?openIngest=true`), dynamic `:caseId` parsing | `14/14 PASSED` |
+| **Routing & Deep Linking** | [`RoutingAndDeepLinking.test.tsx`](../frontend/src/pages/__tests__/RoutingAndDeepLinking.test.tsx) | 16 route resolutions, URL query params (`?openIngest=true`), dynamic `:caseId` parsing | `14/14 PASSED` |
 | **Comprehensive Error States** | `ComprehensiveErrorStates.integration.test.tsx` | Pristine states, form validation, 401/403 ABAC errors, Four-Eyes enforcement | `15/15 PASSED` |
-| **Viewport Overflow & Fit** | [`DesktopComponentFit.test.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/__tests__/DesktopComponentFit.test.tsx) | 1920x1080, 1440x900, and 1280x800 desktop overflow prevention | `3/3 PASSED` |
+| **Viewport Overflow & Fit** | [`DesktopComponentFit.test.tsx`](../frontend/src/pages/__tests__/DesktopComponentFit.test.tsx) | 1920x1080, 1440x900, and 1280x800 desktop overflow prevention | `3/3 PASSED` |
 | **Modal Accessibility** | `ModalAccessibility.test.tsx` | Keyboard trap, Esc key listener, aria semantics on Platform Launch and Ingest | `4/4 PASSED` |
 | **Real-Time Stream Hook** | `useRealTimeFraudStream.test.ts` | WebSocket state machine, latency calculation, offline fallback transition | `3/3 PASSED` |
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
-| **Security & Compliance UI** | [`SecurityPage.test.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
+| **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
 | **Complete Test Suite** | **78 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **249/249 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
@@ -228,10 +228,10 @@ All console components, navigation routes, deep-linking rules, and error states 
 
 ## 9. Related Architectural & System Specifications
 
-* **Consortium Governance & Voting Spec:** [`docs/consortium_governance_spec.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/consortium_governance_spec.md)
-* **Bank Node Onboarding Architecture:** [`docs/bank_onboarding_guide.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/bank_onboarding_guide.md)
-* **Real-Time Inference API Blueprints:** [`docs/realtime_inference_api.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/realtime_inference_api.md)
-* **AML Platform Architecture & Threat Model:** [`docs/aml-platform.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/aml-platform.md)
-* **Observability & SIEM Integration Guide:** [`docs/siem_and_support_guide.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/siem_and_support_guide.md)
+* **Consortium Governance & Voting Spec:** [`docs/consortium_governance_spec.md`](consortium_governance_spec.md)
+* **Bank Node Onboarding Architecture:** [`docs/bank_onboarding_guide.md`](bank_onboarding_guide.md)
+* **Real-Time Inference API Blueprints:** [`docs/realtime_inference_api.md`](realtime_inference_api.md)
+* **AML Platform Architecture & Threat Model:** [`docs/aml-platform.md`](aml-platform.md)
+* **Observability & SIEM Integration Guide:** [`docs/siem_and_support_guide.md`](siem_and_support_guide.md)
 
 

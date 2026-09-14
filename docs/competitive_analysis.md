@@ -139,7 +139,7 @@ The matrix below contrasts the 5 paradigms across 12 rigorous technical and oper
 
 * **Centralized SaaS Vulnerability:** Vendor clouds require ingestion of cleartext customer names, tax IDs, IP addresses, and account balances. In contrast, CF-Intelligence executes a **Zero-Raw-PII Gate** at the edge: any unhashed identifier is rejected and quarantined before processing.
 * **Cryptographic Guarantees:** 
-  1. **Differential Privacy:** Implemented via [`adaptive_dp_autoscaler.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/adaptive_dp_autoscaler.py) with calibrated Gaussian noise ($\varepsilon=1.0, \delta=10^{-5}$) bounding maximum information leakage under arbitrary side-channel knowledge.
+  1. **Differential Privacy:** Implemented via [`adaptive_dp_autoscaler.py`](../backend/app/infrastructure/security/adaptive_dp_autoscaler.py) with calibrated Gaussian noise ($\varepsilon=1.0, \delta=10^{-5}$) bounding maximum information leakage under arbitrary side-channel knowledge.
   2. **Zero-Sum Pairwise Masking SecAgg:** Participating banks negotiate pairwise Diffie-Hellman shared secrets on Curve25519. The masked update satisfies $\sum_{u} y_u = \sum_{u} x_u$, ensuring the coordinator reconstructs only the exact aggregate update while individual bank gradients remain mathematically inaccessible.
 
 ### 4.2. Multi-Bank Money Mule & Smurfing Network Resolution
@@ -155,8 +155,8 @@ A criminal syndicate orchestrating cross-bank smurfing operates across instituti
 
 * **Why Legacy Monoliths & Siloed Models Fail:** Bank 1, Bank 2, and Bank 3 each observe transactions below reporting thresholds ($<\$10,000$). Standalone models lack visibility into the directed acyclic graph (DAG) connecting Mule A to Sink C.
 * **CF-Intelligence Solution:**
-  1. **MinHash LSH Fuzzy PSI:** [`fuzzy_psi.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/fuzzy_psi.py) computes character 3-gram MinHash signatures and LSH band bucket partitions. Peer banks match fuzzy entity references across perimeters without revealing non-matching account records.
-  2. **FedGNN 512-dim Node Embeddings:** [`graph_embedding_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/graph_embedding_service.py) trains localized Graph Attention Networks (GAT). Aggregated graph representations capture multi-hop structural topologies across the consortium, boosting illicit node detection on Elliptic from $0.2543$ to $0.8746$ PR-AUC (+62.0% absolute advantage).
+  1. **MinHash LSH Fuzzy PSI:** [`fuzzy_psi.py`](../backend/app/domain/fuzzy_psi.py) computes character 3-gram MinHash signatures and LSH band bucket partitions. Peer banks match fuzzy entity references across perimeters without revealing non-matching account records.
+  2. **FedGNN 512-dim Node Embeddings:** [`graph_embedding_service.py`](../backend/app/application/services/graph_embedding_service.py) trains localized Graph Attention Networks (GAT). Aggregated graph representations capture multi-hop structural topologies across the consortium, boosting illicit node detection on Elliptic from $0.2543$ to $0.8746$ PR-AUC (+62.0% absolute advantage).
 
 ### 4.3. Latency Budget & Real-Time Payment Rails Integration
 
@@ -179,7 +179,7 @@ Modern payment rails (ISO 20022 `pacs.008`, FedNow, SEPA Instant) mandate end-to
 └──────────────────────────────────────┴─────────────────┴───────────────┘
 ```
 
-* **Empirical Benchmarks:** Verified in [`test_enterprise_stress_test.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_enterprise_stress_test.py) and [`test_scientific_benchmark.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_scientific_benchmark.py):
+* **Empirical Benchmarks:** Verified in [`test_enterprise_stress_test.py`](../backend/tests/unit/test_enterprise_stress_test.py) and [`test_scientific_benchmark.py`](../backend/tests/unit/test_scientific_benchmark.py):
   * Fast-path scoring latency: **$1.82\text{ ms}$**.
   * Complete GNN ensemble latency: $p50 = 3.96\text{ ms}$, $p95 = 9.84\text{ ms}$, $p99 = 13.92\text{ ms}$.
   * Single-node streaming ingestion throughput: **$>38,000\text{ tx/s}$**.
@@ -191,14 +191,14 @@ In production banking, different institutions hold starkly divergent transaction
 * **Academic FL Flaw:** Standard FedAvg suffers from severe client drift and weight divergence under non-IID conditions ($\alpha \le 0.50$).
 * **CF-Intelligence Architecture:**
   1. **FedProx Proximal Regularization:** Adds a proximal penalty $\frac{\mu}{2} \|w - w^t\|^2$ ($\mu = 0.01$) to local objective functions, bounding local updates to the consensus model.
-  2. **Distribution Fidelity Auditor:** [`distribution_fidelity_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/distribution_fidelity_service.py) continuously measures mathematical drift between synthetic generators and empirical banking distributions using **1-Wasserstein Distance**, **Jensen-Shannon Divergence**, and **Frobenius Covariance Drift**.
+  2. **Distribution Fidelity Auditor:** [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fidelity_service.py) continuously measures mathematical drift between synthetic generators and empirical banking distributions using **1-Wasserstein Distance**, **Jensen-Shannon Divergence**, and **Frobenius Covariance Drift**.
 
 ### 4.5. Operational Governance, Explainability & GDPR Unlearning
 
-* **Model Explainability:** Generates local TreeSHAP / KernelSHAP feature attributions integrated into [`InvestigationDashboard`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/InvestigationDashboard.tsx), eliminating the "black-box" resistance common to centralized vendor SaaS.
-* **Automated SAR XML E-Filing:** [`regulatory_reporter.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/regulatory_reporter.py) automatically generates FinCEN BSA-compliant Suspicious Activity Report (SAR) XML packages validated against official XSD schemas.
+* **Model Explainability:** Generates local TreeSHAP / KernelSHAP feature attributions integrated into [`InvestigationDashboard`](../frontend/src/pages/InvestigationDashboard.tsx), eliminating the "black-box" resistance common to centralized vendor SaaS.
+* **Automated SAR XML E-Filing:** [`regulatory_reporter.py`](../backend/app/application/services/regulatory_reporter.py) automatically generates FinCEN BSA-compliant Suspicious Activity Report (SAR) XML packages validated against official XSD schemas.
 * **Four-Eyes Governance Workflow:** High-risk alert resolution requires dual cryptographic signoff (`compliance_officer` + `risk_analyst`) to satisfy regulatory oversight standards.
-* **GDPR Article 17 "Right to Erasure" (Federated Unlearning):** Implemented in [`federated_unlearning_engine.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/federated_unlearning_engine.py). If an institution withdraws from the consortium or exercises revocation, the engine mathematically erases its historical contributions from active checkpoints via **Lineage Subtraction** and **Exact Re-Aggregation** without requiring full model retraining.
+* **GDPR Article 17 "Right to Erasure" (Federated Unlearning):** Implemented in [`federated_unlearning_engine.py`](../backend/app/application/services/federated_unlearning_engine.py). If an institution withdraws from the consortium or exercises revocation, the engine mathematically erases its historical contributions from active checkpoints via **Lineage Subtraction** and **Exact Re-Aggregation** without requiring full model retraining.
 
 ---
 
@@ -260,25 +260,25 @@ All comparative architectural claims, cryptographic invariants, low-latency perf
 
 | Test Suite | File Path | Verified Technical Capabilities | Status |
 | :--- | :--- | :--- | :---: |
-| **Scientific Benchmark Suite** | [`test_scientific_benchmark.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_scientific_benchmark.py) | PR-AUC, Recall@0.1% FPR, Precision@K, 6 model configurations | `3/3 PASSED` |
-| **Benchmark Runner CLI** | [`test_benchmark_runner.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_benchmark_runner.py) | Centralized vs FedAvg vs Local, DP noise accuracy bound | `4/4 PASSED` |
-| **Distribution Fidelity** | [`test_distribution_fidelity.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_distribution_fidelity.py) | 1-Wasserstein, Jensen-Shannon divergence, KS-test, covariance drift | `5/5 PASSED` |
-| **Enterprise Stress Test** | [`test_enterprise_stress_test.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_enterprise_stress_test.py) | ISO 20022 parsing, >38k tx/s throughput, multi-bank generation | `14/14 PASSED` |
-| **Federated Unlearning Engine** | [`test_federated_unlearning_engine.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_federated_unlearning_engine.py) | GDPR Art. 17 Lineage Subtraction, Exact Re-Aggregation, MIA audit | `6/6 PASSED` |
-| **Fuzzy PSI & DH-PSI** | [`test_psi_fuzzy_domain.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_psi_fuzzy_domain.py) | Diffie-Hellman commutativity, MinHash LSH, zero-raw-PII HMAC | `4/4 PASSED` |
-| **MinHash Standardization** | [`test_fuzzy_psi.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_fuzzy_psi.py) | Shingle hashing, Jaccard similarity, LSH bucket matching | `3/3 PASSED` |
-| **Regulatory SAR Reporter** | [`test_regulatory_reporter.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regulatory_reporter.py) | FinCEN BSA SAR XML XSD validation, Four-Eyes human oversight | `5/5 PASSED` |
-| **Regional Governance & AI Act** | [`test_regional_governance_ai_act.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regional_governance_ai_act.py) | Cross-border data sovereignty filter, EU AI Act certificate | `4/4 PASSED` |
-| **Compliance Export Suite** | [`test_compliance_export.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_compliance_export.py) | EU AI Act Articles 10/11/14/15, HMAC-SHA256 digital signature | `21/21 PASSED` |
+| **Scientific Benchmark Suite** | [`test_scientific_benchmark.py`](../backend/tests/unit/test_scientific_benchmark.py) | PR-AUC, Recall@0.1% FPR, Precision@K, 6 model configurations | `3/3 PASSED` |
+| **Benchmark Runner CLI** | [`test_benchmark_runner.py`](../backend/tests/unit/test_benchmark_runner.py) | Centralized vs FedAvg vs Local, DP noise accuracy bound | `4/4 PASSED` |
+| **Distribution Fidelity** | [`test_distribution_fidelity.py`](../backend/tests/unit/test_distribution_fidelity.py) | 1-Wasserstein, Jensen-Shannon divergence, KS-test, covariance drift | `5/5 PASSED` |
+| **Enterprise Stress Test** | [`test_enterprise_stress_test.py`](../backend/tests/unit/test_enterprise_stress_test.py) | ISO 20022 parsing, >38k tx/s throughput, multi-bank generation | `14/14 PASSED` |
+| **Federated Unlearning Engine** | [`test_federated_unlearning_engine.py`](../backend/tests/unit/test_federated_unlearning_engine.py) | GDPR Art. 17 Lineage Subtraction, Exact Re-Aggregation, MIA audit | `6/6 PASSED` |
+| **Fuzzy PSI & DH-PSI** | [`test_psi_fuzzy_domain.py`](../backend/tests/unit/test_psi_fuzzy_domain.py) | Diffie-Hellman commutativity, MinHash LSH, zero-raw-PII HMAC | `4/4 PASSED` |
+| **MinHash Standardization** | [`test_fuzzy_psi.py`](../backend/tests/unit/test_fuzzy_psi.py) | Shingle hashing, Jaccard similarity, LSH bucket matching | `3/3 PASSED` |
+| **Regulatory SAR Reporter** | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | FinCEN BSA SAR XML XSD validation, Four-Eyes human oversight | `5/5 PASSED` |
+| **Regional Governance & AI Act** | [`test_regional_governance_ai_act.py`](../backend/tests/unit/test_regional_governance_ai_act.py) | Cross-border data sovereignty filter, EU AI Act certificate | `4/4 PASSED` |
+| **Compliance Export Suite** | [`test_compliance_export.py`](../backend/tests/unit/test_compliance_export.py) | EU AI Act Articles 10/11/14/15, HMAC-SHA256 digital signature | `21/21 PASSED` |
 | **Total Test Coverage** | **10 Core Suites** | **Comprehensive Functional & Cryptographic Verification** | **69/69 PASSED** |
 
 ---
 
 ## 8. Related Architectural & Operational References
 
-* **Real-World Empirical Datasets & Pilot Architecture:** [`docs/real_world_benchmarks.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/real_world_benchmarks.md)
-* **Enterprise High-Throughput Stress Test Report:** [`docs/enterprise_benchmark_report.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/enterprise_benchmark_report.md)
-* **Target Customer Segments & Purchasing Personas:** [`docs/target_customer_segments.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/target_customer_segments.md)
-* **Model Risk Management & SR 11-7 Governance:** [`docs/model_risk_management_sr11_7.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/model_risk_management_sr11_7.md)
-* **Production Infrastructure & High-Availability:** [`docs/production_infrastructure.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/production_infrastructure.md)
+* **Real-World Empirical Datasets & Pilot Architecture:** [`docs/real_world_benchmarks.md`](real_world_benchmarks.md)
+* **Enterprise High-Throughput Stress Test Report:** [`docs/enterprise_benchmark_report.md`](enterprise_benchmark_report.md)
+* **Target Customer Segments & Purchasing Personas:** [`docs/target_customer_segments.md`](target_customer_segments.md)
+* **Model Risk Management & SR 11-7 Governance:** [`docs/model_risk_management_sr11_7.md`](model_risk_management_sr11_7.md)
+* **Production Infrastructure & High-Availability:** [`docs/production_infrastructure.md`](production_infrastructure.md)
 

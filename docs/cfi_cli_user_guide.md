@@ -18,8 +18,8 @@ The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** provides a u
 └───────────────────────────────────────────┴────────────────────────────────────────────┘
 ```
 
-1. **Production Operator CLI (`cfi-cli`)**: Installed globally as `cfi-cli` via [`backend/pyproject.toml`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/pyproject.toml) (entrypoint [`backend/app/presentation/cli/cfi_cli.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/cli/cfi_cli.py)). Interacts with coordinator REST endpoints for consortium enrollment, live status queries, zero-downtime certificate rotation, signed diagnostic bundles, and rolling deployments.
-2. **Bank Onboarding & Self-Service Sandbox CLI (`scripts/cfi_cli.py`)**: A standalone self-service tool located in [`scripts/cfi_cli.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/scripts/cfi_cli.py). Enables bank IT infrastructure engineers to perform Day-0 integration, scaffold local directories, generate X.509 Certificate Signing Requests (CSR), verify outbound gRPC network reachability, and benchmark local hardware inference throughput.
+1. **Production Operator CLI (`cfi-cli`)**: Installed globally as `cfi-cli` via [`backend/pyproject.toml`](../backend/pyproject.toml) (entrypoint [`backend/app/presentation/cli/cfi_cli.py`](../backend/app/presentation/cli/cfi_cli.py)). Interacts with coordinator REST endpoints for consortium enrollment, live status queries, zero-downtime certificate rotation, signed diagnostic bundles, and rolling deployments.
+2. **Bank Onboarding & Self-Service Sandbox CLI (`scripts/cfi_cli.py`)**: A standalone self-service tool located in [`scripts/cfi_cli.py`](../scripts/cfi_cli.py). Enables bank IT infrastructure engineers to perform Day-0 integration, scaffold local directories, generate X.509 Certificate Signing Requests (CSR), verify outbound gRPC network reachability, and benchmark local hardware inference throughput.
 
 ---
 
@@ -64,7 +64,7 @@ python scripts/cfi_cli.py --help
 
 ## 3. Production Operator CLI Reference (`cfi-cli`)
 
-The production operator CLI is backed by [`backend/app/presentation/cli/cfi_cli.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/cli/cfi_cli.py).
+The production operator CLI is backed by [`backend/app/presentation/cli/cfi_cli.py`](../backend/app/presentation/cli/cfi_cli.py).
 
 ### 3.1. `cfi-cli join`
 Enrolls a new banking institution with the coordinator consortium and provisions the mTLS keypair and connector configuration.
@@ -217,7 +217,7 @@ cfi-cli deploy --target-version v2.2.0
 
 ## 4. Bank Onboarding & Integration Sandbox CLI (`scripts/cfi_cli.py`)
 
-The self-service onboarding tool in [`scripts/cfi_cli.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/scripts/cfi_cli.py) provides pre-flight checks for bank IT infrastructure teams.
+The self-service onboarding tool in [`scripts/cfi_cli.py`](../scripts/cfi_cli.py) provides pre-flight checks for bank IT infrastructure teams.
 
 ### 4.1. `python scripts/cfi_cli.py init`
 Scaffolds local directories and generates a production `bank_config.yaml` template:
@@ -362,17 +362,17 @@ All CLI subcommands, argument parsers, diagnostic SHA-256 signing routines, and 
 
 | Test Suite | File Path | Verified Technical Capabilities | Status |
 | :--- | :--- | :--- | :---: |
-| **CLI Core Unit Tests** | [`test_cfi_cli.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_cfi_cli.py) | Subcommand execution (`status`, `health`, `deploy`, `export-diagnostics`), CLI entrypoint argument parsing | `2/2 PASSED` |
-| **CLI Command Mock Tests** | [`test_cfi_cli_commands.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_cfi_cli_commands.py) | `join` cert disk persistence, `status` table render, `rotate-certs` atomic overwrite, SHA-256 signature verification | `4/4 PASSED` |
-| **gRPC mTLS Network Integration** | [`test_grpc_mtls.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/integration/test_grpc_mtls.py) | Valid cert connection, CN pattern validation, expired cert rejection, unauthorized bank rejection | `13/13 PASSED` |
+| **CLI Core Unit Tests** | [`test_cfi_cli.py`](../backend/tests/unit/test_cfi_cli.py) | Subcommand execution (`status`, `health`, `deploy`, `export-diagnostics`), CLI entrypoint argument parsing | `2/2 PASSED` |
+| **CLI Command Mock Tests** | [`test_cfi_cli_commands.py`](../backend/tests/unit/test_cfi_cli_commands.py) | `join` cert disk persistence, `status` table render, `rotate-certs` atomic overwrite, SHA-256 signature verification | `4/4 PASSED` |
+| **gRPC mTLS Network Integration** | [`test_grpc_mtls.py`](../backend/tests/integration/test_grpc_mtls.py) | Valid cert connection, CN pattern validation, expired cert rejection, unauthorized bank rejection | `13/13 PASSED` |
 | **Total Test Coverage** | **3 Test Suites** | **Comprehensive Packaging, Execution & Cryptographic Verification** | **19/19 PASSED** |
 
 ---
 
 ## 8. Related Architectural & Operational References
 
-* **Bank Onboarding & Integration Architecture:** [`docs/bank_onboarding_guide.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/bank_onboarding_guide.md)
-* **Production Infrastructure & Vault HSM:** [`docs/production_infrastructure.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/production_infrastructure.md)
-* **Developer & OpenAPI Integration Portal:** [`docs/developer_and_api_portal.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/developer_and_api_portal.md)
-* **Production Engineering Decisions & ADRs:** [`docs/engineering_decisions.md`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/engineering_decisions.md)
+* **Bank Onboarding & Integration Architecture:** [`docs/bank_onboarding_guide.md`](bank_onboarding_guide.md)
+* **Production Infrastructure & Vault HSM:** [`docs/production_infrastructure.md`](production_infrastructure.md)
+* **Developer & OpenAPI Integration Portal:** [`docs/developer_and_api_portal.md`](developer_and_api_portal.md)
+* **Production Engineering Decisions & ADRs:** [`docs/engineering_decisions.md`](engineering_decisions.md)
 

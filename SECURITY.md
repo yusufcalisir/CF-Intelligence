@@ -27,7 +27,7 @@ The platform enforces non-negotiable security and privacy guarantees across all 
    - Identifiers must be type-salted HMAC-SHA256 hashed prior to inter-node communication or graph edge formation.
 2. **Differential Privacy Budget Bounding**:
    - Federated gradient updates must satisfy $(\epsilon, \delta)$-Differential Privacy under Rényi DP accounting ($\epsilon \le 1.0, \delta = 10^{-5}$) with $L_2$ gradient clipping bound $C = 1.0$ and calibrated Gaussian noise multiplier ($\sigma \ge 1.1$).
-   - Enforced by [`label_privacy_guard.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/label_privacy_guard.py) and [`privacy_defense.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/privacy_defense.py).
+   - Enforced by [`label_privacy_guard.py`](backend/app/domain/label_privacy_guard.py) and [`privacy_defense.py`](backend/app/presentation/routers/privacy_defense.py).
 3. **Hardware-Isolated Homomorphic Aggregation**:
    - Inter-bank weight aggregation executes inside Intel SGX Enclave v2 or AWS Nitro Enclaves with IAS/DCAP remote attestation.
    - TenSEAL CKKS homomorphic encryption ensures intermediate gradient parameters remain confidential even from the central coordinator.
@@ -43,7 +43,7 @@ The platform enforces non-negotiable security and privacy guarantees across all 
    - Production federated models embed dynamic cryptographic watermarks and trigger backdoors.
    - Backdoor signatures and Kolmogorov-Smirnov statistical tests continuously detect model extraction and IP theft attempts.
 8. **Perimeter WAF & Defense-in-Depth Gateway**:
-   - Edge traffic passes through [`PerimeterWAFGuard`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/perimeter_waf.py) enforcing SQL injection rejection, XSS blocking, sensitive path filtering (`/.env`, `/admin`, `/.git`), brute-force IP lockout (5 failures / 300s window), and strict CORS domain whitelisting.
+   - Edge traffic passes through [`PerimeterWAFGuard`](backend/app/infrastructure/security/perimeter_waf.py) enforcing SQL injection rejection, XSS blocking, sensitive path filtering (`/.env`, `/admin`, `/.git`), brute-force IP lockout (5 failures / 300s window), and strict CORS domain whitelisting.
 
 ---
 
@@ -79,7 +79,7 @@ To expedite assessment and triage, please include:
 
 ## ⏱️ 4. Response Timelines & Severity Classification Matrix
 
-Our triage SLAs and resolution targets strictly mirror the [Enterprise Incident Response Playbook](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/incident_response_playbook.md) and SOC 2 Type II operational commitments:
+Our triage SLAs and resolution targets strictly mirror the [Enterprise Incident Response Playbook](docs/incident_response_playbook.md) and SOC 2 Type II operational commitments:
 
 | Severity Tier | CVSS v3.1 Range | Example Vulnerability Scenarios | Initial Acknowledgment | On-Call Triage SLA | Target Remediation Window |
 | :--- | :---: | :--- | :---: | :---: | :---: |
@@ -137,9 +137,9 @@ To demonstrate our appreciation for responsible researchers who help protect the
 
 For technical specifications, testing boundaries, and automated audit proofs, refer to:
 
-- [Penetration Testing Scope & Rules of Engagement](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/security/pentest_scope.md) — Authorized endpoints, in-scope interfaces, and testing constraints.
-- [SOC 2 Type II Controls Matrix](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/security/soc2_type2_controls_matrix.md) — Trust Services Criteria implementations and automated verification proofs.
-- [Enterprise Incident Response Playbook](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/incident_response_playbook.md) — 24/7 on-call escalation, P0–P4 runbooks, and recovery protocols.
-- [Master Threat Model & Attack Surface](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/docs/threat_model.md) — Formal STRIDE/DREAD threat evaluations.
-- [Perimeter WAF Guard Implementation](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/perimeter_waf.py) — WAF rule definitions and payload filters.
-- [Immutable Cryptographic Audit Chain](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/immutable_audit_chain.py) — Append-only SHA-256 block hash chaining.
+- [Penetration Testing Scope & Rules of Engagement](docs/security/pentest_scope.md) — Authorized endpoints, in-scope interfaces, and testing constraints.
+- [SOC 2 Type II Controls Matrix](docs/security/soc2_type2_controls_matrix.md) — Trust Services Criteria implementations and automated verification proofs.
+- [Enterprise Incident Response Playbook](docs/incident_response_playbook.md) — 24/7 on-call escalation, P0–P4 runbooks, and recovery protocols.
+- [Master Threat Model & Attack Surface](docs/threat_model.md) — Formal STRIDE/DREAD threat evaluations.
+- [Perimeter WAF Guard Implementation](backend/app/infrastructure/security/perimeter_waf.py) — WAF rule definitions and payload filters.
+- [Immutable Cryptographic Audit Chain](backend/app/infrastructure/security/immutable_audit_chain.py) — Append-only SHA-256 block hash chaining.

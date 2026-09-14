@@ -8,7 +8,7 @@ This document defines the semantic versioning scheme, gRPC header handshake prot
 
 Protocol releases strictly adhere to **Semantic Versioning (SemVer 2.0.0)** (`MAJOR.MINOR.PATCH`):
 
-- **MAJOR (`X.0.0`)**: Breaking changes to protobuf wire formats ([`fl_service.proto`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/proto/fl_service.proto)), required parameter serialization schemas, or cryptographic primitives (e.g. `v1.x` to `v2.x`). Requires client SDK upgrades.
+- **MAJOR (`X.0.0`)**: Breaking changes to protobuf wire formats ([`fl_service.proto`](../backend/app/infrastructure/grpc/proto/fl_service.proto)), required parameter serialization schemas, or cryptographic primitives (e.g. `v1.x` to `v2.x`). Requires client SDK upgrades.
 - **MINOR (`x.Y.0`)**: Backward-compatible feature additions (e.g., new optional telemetry fields, updated drift metrics, additive database columns).
 - **PATCH (`x.y.Z`)**: Backward-compatible bug fixes, internal algorithmic optimizations, and performance enhancements.
 
@@ -16,7 +16,7 @@ Protocol releases strictly adhere to **Semantic Versioning (SemVer 2.0.0)** (`MA
 
 ## 📑 2. Platform Compatibility Matrix
 
-The domain compatibility bounds are enforced by [`VersionCompatibilityMatrix`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/protocol_versioning.py):
+The domain compatibility bounds are enforced by [`VersionCompatibilityMatrix`](../backend/app/domain/protocol_versioning.py):
 
 | Platform Version | gRPC Wire Protocol | Supported Client SDK Range | Schema Digest (SHA-256) | Lifecycle Status | Deprecation Date |
 | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -30,7 +30,7 @@ The domain compatibility bounds are enforced by [`VersionCompatibilityMatrix`](f
 
 ## 🤝 3. gRPC Header Handshake & Context Metadata
 
-Every gRPC streaming request (`RegisterClient`, `Heartbeat`, `StreamModelParameters`) is intercepted by [`ProtocolVersionInterceptor`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/version_interceptor.py) to validate client protocol metadata:
+Every gRPC streaming request (`RegisterClient`, `Heartbeat`, `StreamModelParameters`) is intercepted by [`ProtocolVersionInterceptor`](../backend/app/infrastructure/grpc/version_interceptor.py) to validate client protocol metadata:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐

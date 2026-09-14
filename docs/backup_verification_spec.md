@@ -1,6 +1,6 @@
 # 🛡️ Automated Backup Verification & Sandbox Restore Probes Specification
 
-The Backup Verification Engine ([`BackupVerifier`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/disaster_recovery/backup_verifier.py)) delivers continuous cryptographic validation, SHA-256 checksum attestation, and ephemeral sandbox restore probes across database snapshots, PyTorch model checkpoints, and HashiCorp Vault KMS keyrings.
+The Backup Verification Engine ([`BackupVerifier`](../backend/app/infrastructure/disaster_recovery/backup_verifier.py)) delivers continuous cryptographic validation, SHA-256 checksum attestation, and ephemeral sandbox restore probes across database snapshots, PyTorch model checkpoints, and HashiCorp Vault KMS keyrings.
 
 By continuously validating recovery viability in memory sandboxes, the engine guarantees complete immunity against silent bit rot, partial writes, storage volume degradation, and ransomware tampering in accordance with **SOC 2 Type II (CC9.1)**, **ISO 27001 (A.12.3.1)**, **DORA Article 11**, and **EU AI Act Article 12**.
 
@@ -93,7 +93,7 @@ graph TD
 
 ---
 
-## 🔐 Core Domain Models ([`backend/app/domain/backup_record.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/backup_record.py))
+## 🔐 Core Domain Models ([`backend/app/domain/backup_record.py`](../backend/app/domain/backup_record.py))
 
 ### 1. `BackupStatus` Enumeration
 Governs the strict lifecycle state progression of a backup snapshot:
@@ -143,9 +143,9 @@ class RestoreProbeResult:
 
 ---
 
-## ⚙️ Verification Engine Methods ([`backend/app/infrastructure/disaster_recovery/backup_verifier.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/disaster_recovery/backup_verifier.py))
+## ⚙️ Verification Engine Methods ([`backend/app/infrastructure/disaster_recovery/backup_verifier.py`](../backend/app/infrastructure/disaster_recovery/backup_verifier.py))
 
-The [`BackupVerifier`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/disaster_recovery/backup_verifier.py#L19) class exposes four core operational methods:
+The [`BackupVerifier`](../backend/app/infrastructure/disaster_recovery/backup_verifier.py#L19) class exposes four core operational methods:
 
 ### 1. Artifact Registration (`create_backup_artifact`)
 When a database snapshot or model checkpoint is generated, `create_backup_artifact` registers file metadata, computes the initial SHA-256 hash over raw byte content, stores the bytes, and assigns `BackupStatus.CREATED`.
@@ -180,7 +180,7 @@ Unlike naive file integrity tools that only check hashes, `BackupVerifier` execu
 - Verifies checksum validity.
 - Tests mounting and parsing viability.
 - Computes execution duration using high-precision timers (`time.perf_counter()`).
-- If successful, promotes artifact to `BackupStatus.RESTORED` and returns a [`RestoreProbeResult`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/backup_record.py#L37).
+- If successful, promotes artifact to `BackupStatus.RESTORED` and returns a [`RestoreProbeResult`](../backend/app/domain/backup_record.py#L37).
 
 ```python
 probe_result = verifier.run_sandbox_restore_probe(artifact.backup_id)
@@ -213,7 +213,7 @@ assert artifact.status == BackupStatus.CORRUPTED
 
 ## 🧪 Automated Unit Test Suite Matrix
 
-The backup verification engine and sandbox restore probes are verified by the automated test suite in [`backend/tests/unit/test_backup_verifier.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_backup_verifier.py).
+The backup verification engine and sandbox restore probes are verified by the automated test suite in [`backend/tests/unit/test_backup_verifier.py`](../backend/tests/unit/test_backup_verifier.py).
 
 ### Test Execution Command
 

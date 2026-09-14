@@ -45,7 +45,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Engineered Discrepancy Features**:
   $$\text{ErrorBal}_{\text{orig}} = \text{NewBal}_{\text{orig}} + \text{Amount} - \text{OldBal}_{\text{orig}}$$
   $$\text{ErrorBal}_{\text{dest}} = \text{OldBal}_{\text{dest}} + \text{Amount} - \text{NewBal}_{\text{dest}}$$
-* **Implementation**: [`dataloader.py: load_paysim()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L221)
+* **Implementation**: [`dataloader.py: load_paysim()`](../backend/app/application/services/dataloader.py#L221)
 
 ---
 
@@ -62,7 +62,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   * `V1` – `V339`: Vesta engineered risk features (identity matches, velocity signals, device fingerprints).
 * **Consortium Partitioning**:
   Simulates Card-Issuing Banks vs. Merchant Acquiring Banks with distinct fraud exposure slices.
-* **Implementation**: [`dataloader.py: load_ieee_cis()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L382)
+* **Implementation**: [`dataloader.py: load_ieee_cis()`](../backend/app/application/services/dataloader.py#L382)
 
 ---
 
@@ -79,7 +79,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   * Unknown / Unlabeled: $157,205$ nodes ($77.3\%$).
 * **GNN Evaluation Role**:
   Validates multi-party **Graph Attention Networks (FedGNN / GraphSAGE)** for multi-hop money laundering detection without centralizing raw graph adjacency matrices.
-* **Implementation**: [`dataloader.py: load_elliptic()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L57)
+* **Implementation**: [`dataloader.py: load_elliptic()`](../backend/app/application/services/dataloader.py#L57)
 
 ---
 
@@ -90,7 +90,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   where $K$ is the number of bank nodes ($K=3$ default) and $\alpha \in (0, \infty)$ governs heterogeneity:
   * $\alpha \to \infty$: Uniform IID distribution (unrealistic laboratory scenario).
   * $\alpha = 0.50$: Extreme Non-IID skew mirroring retail vs. commercial vs. wealth management institutions.
-* **Implementation**: [`dataloader.py: partition_dataset_non_iid()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L480)
+* **Implementation**: [`dataloader.py: partition_dataset_non_iid()`](../backend/app/application/services/dataloader.py#L480)
 
 ---
 
@@ -111,7 +111,7 @@ Under real-world distributions and calibrated noise injection ($\varepsilon = 1.
 
 ## 4. Synthetic-to-Real Distribution Fidelity Auditor
 
-The [`distribution_fidelity_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/distribution_fidelity_service.py) module continuously quantifies the mathematical drift between synthetic generator distributions and empirical datasets:
+The [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fidelity_service.py) module continuously quantifies the mathematical drift between synthetic generator distributions and empirical datasets:
 
 ```
                   ┌─────────────────────────────────────────┐
@@ -192,7 +192,7 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-The institutional design partner sandbox and validator logic are implemented in [`design_partner_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/design_partner_service.py).
+The institutional design partner sandbox and validator logic are implemented in [`design_partner_service.py`](../backend/app/application/services/design_partner_service.py).
 
 ### Regulatory Compliance Mappings for Institutional IT Committees:
 * **GDPR Article 6 & KVKK Article 5**: Lawful basis preserved; zero raw PII exits the bank data plane.

@@ -18,7 +18,7 @@ The Collaborative AML Intelligence Platform enables participating institutions t
 ## Core AML Features
 
 ### 1. Low-Latency Real-Time Risk Decision API (`POST /v1/transactions/score`)
-A dedicated serving gateway providing sub-10ms transaction risk evaluation against the active globally aggregated model, backed by JIT compilation and Redis caching in [realtime_inference.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/realtime_inference.py) and [predict.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/predict.py).
+A dedicated serving gateway providing sub-10ms transaction risk evaluation against the active globally aggregated model, backed by JIT compilation and Redis caching in [realtime_inference.py](../backend/app/presentation/routers/realtime_inference.py) and [predict.py](../backend/app/presentation/routers/predict.py).
 
 * **Endpoints**: `POST /v1/transactions/score`, `POST /api/v1/transactions/score`, `POST /api/v1/predict/score`, and `POST /v1/inference/score`.
 * **Sub-10ms SLA**: Evaluates incoming payments against the 9-signal composite risk engine and global PyTorch model weights within a strict 10ms response latency bound (`latency_ms`).
@@ -60,13 +60,13 @@ A dedicated serving gateway providing sub-10ms transaction risk evaluation again
 * **Circuit Breaker Resilience**: If consecutive model inference timeouts or failures occur ($\ge 3$), the engine trips a circuit breaker (60s cooldown) and automatically falls back to deterministic rule-based heuristic scoring (`HEURISTIC_FALLBACK`), guaranteeing 100% gateway availability.
 
 ### 2. Collaborative Alert Intelligence
-When a bank's local model flags a transaction, it generates a local alert via [alert_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/alert_service.py). The bank can broadcast a stripped-down, privacy-preserving indicator of this alert to the consortium layer:
+When a bank's local model flags a transaction, it generates a local alert via [alert_service.py](../backend/app/application/services/alert_service.py). The bank can broadcast a stripped-down, privacy-preserving indicator of this alert to the consortium layer:
 * **Hashed Identifiers**: The shared indicator contains only deterministic HMAC-SHA256 privacy hashes of the transaction or customer, with zero raw PII.
 * **Risk Indicator**: A continuous normalized value representing the bank's assessment confidence.
 * **Standard Reason Codes**: Standardized anomaly descriptors (e.g., `VEL-001` for velocity spikes, `GEO-RISK` for high-risk jurisdictions, `STRUCT-002` for potential smurfing) that enable peer institutions to evaluate relevance.
 
 ### 3. Privacy-Preserving Entity Resolution (DH-PSI & Fuzzy MinHash LSH)
-To correlate entities across institutions without disclosing non-overlapping identities, the platform implements two complementary cryptographic protocols in [psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/psi_service.py) and [entity_resolution.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/entity_resolution.py):
+To correlate entities across institutions without disclosing non-overlapping identities, the platform implements two complementary cryptographic protocols in [psi_service.py](../backend/app/application/services/psi_service.py) and [entity_resolution.py](../backend/app/application/services/entity_resolution.py):
 * **Diffie-Hellman Commutative Private Set Intersection (DH-PSI)**:
   - Banks encrypt hash sets with local private keys ($a$ and $b$) over a shared 512-bit prime $p$.
   - After cross-encryption, elements matching $x^{ab} \equiv x^{ba} \pmod p$ confirm identical cross-bank entities in zero knowledge.
@@ -75,15 +75,15 @@ To correlate entities across institutions without disclosing non-overlapping ide
   - Extracts character 3-grams and computes 16-seed MinHash signatures, matching records when multi-attribute overlap satisfies a configurable threshold gate ($k = 3 \text{ of } 5$ attributes).
 
 ### 4. Entity Relationship Graph & Distributed Graph Database Engine
-Resolved entities and their relationships are indexed in [graph_engine.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/graph_engine.py) and [graph_analytics_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/graph_analytics_service.py):
+Resolved entities and their relationships are indexed in [graph_engine.py](../backend/app/application/services/graph_engine.py) and [graph_analytics_service.py](../backend/app/application/services/graph_analytics_service.py):
 * **Dual Backend Support**: Native Neo4j / Memgraph graph database via Bolt protocol, with automatic failover to Redis in-memory adjacency structures for local development.
 * **PageRank Risk Propagation**: Known high-risk and flagged nodes propagate risk scores to adjacent 1-hop and 2-hop neighbors with exponential decay ($\gamma = 0.85$).
 * **Community Analytics**: Isolates connected components, calculating graph cluster size, fraud density, and syndicate cohesion scores.
 * **Temporal Velocity Anomalies**: Detects bursts of edge creation within sliding time windows (e.g., 5 minutes), exposing rapid structuring or automated account networks.
-* **Interactive Visualizer**: Serializes graph topology to React Flow for real-time investigation on [InvestigationDashboard.tsx](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/InvestigationDashboard.tsx).
+* **Interactive Visualizer**: Serializes graph topology to React Flow for real-time investigation on [InvestigationDashboard.tsx](../frontend/src/pages/InvestigationDashboard.tsx).
 
 ### 5. 9-Signal Risk Scoring Engine
-The [risk_engine.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/risk_engine.py) pipeline combines nine independent risk signals into a unified composite score ($0 - 1000$):
+The [risk_engine.py](../backend/app/application/services/risk_engine.py) pipeline combines nine independent risk signals into a unified composite score ($0 - 1000$):
 1. **ML Model Prediction**: Federated PyTorch neural network classification probability.
 2. **Velocity Rules**: Hourly and daily transaction velocity deviations against historical baselines.
 3. **Merchant Reputation**: Historical chargeback and fraud incidence rates of the target counterparty.
@@ -98,7 +98,7 @@ The [risk_engine.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%
 
 ## Fraud Scenarios Simulator
 
-The platform provides a real-time scenario simulator in [scenario_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/scenario_service.py) demonstrating the superiority of collaborative intelligence over isolated bank monitoring:
+The platform provides a real-time scenario simulator in [scenario_service.py](../backend/app/application/services/scenario_service.py) demonstrating the superiority of collaborative intelligence over isolated bank monitoring:
 
 1. **Cross-Institution Fraud Ring (`fraud_ring`)**:
    * *Behavior*: 4 criminal actors share hardware devices and IP proxies to coordinate transactions across Bank Alpha, Bank Beta, and Bank Gamma.
@@ -123,7 +123,7 @@ The platform provides a real-time scenario simulator in [scenario_service.py](fi
 
 ## Feature Store Integration (Feast / Hopsworks Architecture)
 
-To serve low-latency features and prevent data leakage, the platform implements a dual online/offline Feature Store in [feature_store_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/feature_store_service.py):
+To serve low-latency features and prevent data leakage, the platform implements a dual online/offline Feature Store in [feature_store_service.py](../backend/app/application/services/feature_store_service.py):
 
 ### 1. Online Feature Store (Redis-backed)
 - Serves pre-computed customer and merchant feature vectors directly to the `RiskScoringEngine` under strict latency bounds (<5ms execution).
@@ -151,7 +151,7 @@ All incoming feeds are converted into a unified `NormalizedTransaction` Pydantic
 
 ### 2. Concrete Adapter Implementations
 * **Streaming Payment Connector (`StreamingPaymentConnector`)**: Ingests continuous high-throughput payment streams from Kafka, RabbitMQ, or Redis streams, dynamically updating graph buffers.
-* **ISO 20022 & SWIFT Message Parser (`ISO20022MessagingConnector`)**: Full financial XML parser in [financial_message_parser.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/financial_message_parser.py) supporting ISO 20022 MX (`pacs.008.001.08` & `pacs.009` XML) and legacy SWIFT MT103/MT202 messages.
+* **ISO 20022 & SWIFT Message Parser (`ISO20022MessagingConnector`)**: Full financial XML parser in [financial_message_parser.py](../backend/app/application/services/financial_message_parser.py) supporting ISO 20022 MX (`pacs.008.001.08` & `pacs.009` XML) and legacy SWIFT MT103/MT202 messages.
 * **Batch EOD File Connector (`BatchEODFileConnector`)**: End-Of-Day batch file parser handling multi-million record CSV and Apache Parquet datasets.
 * **Core Banking System REST Adapter (`RESTBankConnector`)**: Handles OAuth2 Client Credentials token renewal, mutual TLS (mTLS 1.3) client certificates, HMAC payload signing, and real-time webhook routing.
 * **Enterprise Message Queue Connector (`RabbitMQBankConnector`)**: Asynchronous AMQP consumer utilizing `pika`, with resilient fallback to local queue buffers if the broker experiences connection interruptions.
@@ -164,12 +164,12 @@ All incoming feeds are converted into a unified `NormalizedTransaction` Pydantic
 To satisfy national Financial Intelligence Unit (FIU) mandates (FinCEN, MASAK, FCA) and maintain judicial admissibility:
 
 ### 1. SAR Filed Lifecycle Status
-* The [case_management.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/case_management.py) domain model incorporates the `SAR_FILED` terminal state.
+* The [case_management.py](../backend/app/domain/case_management.py) domain model incorporates the `SAR_FILED` terminal state.
 * Allowed state transitions: `ESCALATED` ➔ `SAR_FILED` and `SAR_FILED` ➔ `CLOSED_CONFIRMED`.
 
 ### 2. Automated FinCEN SAR 2.0 XML Generation
-* Transitions into `SAR_FILED` trigger [regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/regulatory_reporter.py) to compile case metadata, timeline events, investigator notes, and suspect hashes into a schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file (`EFilingSubmission`).
-* All outputs are strictly validated against the official XML schema at [FinCEN_SAR_2.0.xsd](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/schemas/FinCEN_SAR_2.0.xsd), validating mandatory root tags, `<SubmissionHeader>`, and `<Activity>` structures.
+* Transitions into `SAR_FILED` trigger [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py) to compile case metadata, timeline events, investigator notes, and suspect hashes into a schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file (`EFilingSubmission`).
+* All outputs are strictly validated against the official XML schema at [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd), validating mandatory root tags, `<SubmissionHeader>`, and `<Activity>` structures.
 * Generated filings are saved under `storage/regulatory_filings/` and made available via secure FastAPI download endpoints (`/api/v1/cases/{case_id}/sar-report`).
 
 ### 3. Cryptographic Timeline Audit Chain
@@ -181,7 +181,7 @@ To satisfy national Financial Intelligence Unit (FIU) mandates (FinCEN, MASAK, F
 
 ## Full-Fledged AML Investigation Lifecycle & Four-Eyes Governance
 
-To support full-lineage auditing and enforce supervisory checks in [case_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/case_workbench.py):
+To support full-lineage auditing and enforce supervisory checks in [case_workbench.py](../backend/app/application/services/case_workbench.py):
 
 ### 1. Case Evidence Registry
 * **Immutable Evidence Store**: Exposes an isolated storage layer for KYC documents, account statements, and graph evidence proofs linked to open investigation cases.
@@ -196,7 +196,7 @@ To support full-lineage auditing and enforce supervisory checks in [case_workben
 * **Session Duration Tracking**: Monitors analyst session durations and query frequencies to detect anomalous internal activity.
 
 ### 4. Closed-Loop Retraining Feedback Pipeline
-* Implemented in [label_feedback_pipeline.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/label_feedback_pipeline.py).
+* Implemented in [label_feedback_pipeline.py](../backend/app/application/services/label_feedback_pipeline.py).
 * When an investigator confirms a case as `RESOLVED_TRUE_POSITIVE` (confirmed fraud, label = 1) or `RESOLVED_FALSE_POSITIVE` (legitimate transaction, label = 0), verified labels are written to local bank training datasets.
 * Successive local training epochs consume these verified ground-truth labels, continually refining global federated model accuracy across subsequent aggregation rounds.
 
@@ -204,7 +204,7 @@ To support full-lineage auditing and enforce supervisory checks in [case_workben
 
 ## Agentic AML Copilot & Investigation Workbench
 
-To accelerate investigation workflows and eliminate manual compliance paperwork, the platform integrates an autonomous AML AI copilot in [aml_agentic_copilot.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/aml_agentic_copilot.py):
+To accelerate investigation workflows and eliminate manual compliance paperwork, the platform integrates an autonomous AML AI copilot in [aml_agentic_copilot.py](../backend/app/application/services/aml_agentic_copilot.py):
 
 ### 1. Autonomous Narrative Synthesis
 * Synthesizes formal FinCEN 5-paragraph SAR narratives in natural language:
@@ -235,10 +235,10 @@ To align institutional incentives and enforce accountability across commercial f
 * **Quarantine Enforcement**: Flagged nodes are automatically placed in `QUARANTINED` status and excluded from future aggregation rounds.
 
 ### 3. Web3 & CBDC Smart Contract Settlement
-* Programmatic on-chain clearing via [ConsortiumIncentiveSettlement.sol](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/contracts/contracts/ConsortiumIncentiveSettlement.sol) and [smart_contract_driver.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/smart_contract_driver.py).
+* Programmatic on-chain clearing via [ConsortiumIncentiveSettlement.sol](../contracts/contracts/ConsortiumIncentiveSettlement.sol) and [smart_contract_driver.py](../backend/app/infrastructure/security/smart_contract_driver.py).
 * Disburses Wholesale CBDC (`wCBDC`), Fiat Stablecoins (`USDC`), or Digital Lira (`e-TRY`) in 18-decimal token precision based on LOO Shapley basis points (`bps`).
 * Quarantine status locks recipient wallets on-chain, zeroing out disbursements (`BLOCKED_QUARANTINE`).
-* Every transaction hash (`settlement_tx_hash`) and block number is chained to the tamper-proof audit ledger in [immutable_audit_chain.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/immutable_audit_chain.py).
+* Every transaction hash (`settlement_tx_hash`) and block number is chained to the tamper-proof audit ledger in [immutable_audit_chain.py](../backend/app/infrastructure/security/immutable_audit_chain.py).
 
 ---
 
@@ -278,7 +278,7 @@ To satisfy Federal Reserve SR 11-7 Model Risk Management guidelines:
 
 ## Empirical Benchmarks & Experimental Validation
 
-Under extreme financial class imbalance ($< 0.1\%$ fraud incidence), automated benchmarks evaluated in [metrics_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/metrics_service.py) demonstrate:
+Under extreme financial class imbalance ($< 0.1\%$ fraud incidence), automated benchmarks evaluated in [metrics_service.py](../backend/app/application/services/metrics_service.py) demonstrate:
 
 | Model Configuration | PR-AUC | ROC-AUC | Recall@0.1%FPR | P@100 | Latency (ms) | Payload (MB) | DP ($\epsilon$) | OOD Delta |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
@@ -298,8 +298,8 @@ Under extreme financial class imbalance ($< 0.1\%$ fraud incidence), automated b
 
 ## Cross-Border Data Sovereignty & EU AI Act Compliance
 
-* **Regional Aggregation Rings ([regional_governance.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/regional_governance.py))**: Groups bank nodes into regional jurisdictions (`EU-Central`, `US-East`, `APAC-Singapore`). Intra-region updates aggregate locally; cross-border transfers enforce Differential Privacy noise scrubbing ($\epsilon_{\text{inter}}$) to satisfy GDPR Art. 22 and Schrems II requirements.
-* **EU AI Act High-Risk AI Compliance Engine ([ai_act_compliance.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/ai_act_compliance.py))**: Generates JSON compliance certificates covering Articles 10–15:
+* **Regional Aggregation Rings ([regional_governance.py](../backend/app/domain/regional_governance.py))**: Groups bank nodes into regional jurisdictions (`EU-Central`, `US-East`, `APAC-Singapore`). Intra-region updates aggregate locally; cross-border transfers enforce Differential Privacy noise scrubbing ($\epsilon_{\text{inter}}$) to satisfy GDPR Art. 22 and Schrems II requirements.
+* **EU AI Act High-Risk AI Compliance Engine ([ai_act_compliance.py](../backend/app/infrastructure/security/ai_act_compliance.py))**: Generates JSON compliance certificates covering Articles 10–15:
   - **Art. 10 (Data Governance)**: Zero Raw PII enforcement and demographic bias controls.
   - **Art. 11 (Technical Documentation)**: Model training lineage and commit hashes.
   - **Art. 12 (Record-Keeping)**: Automated OpenTelemetry trace logging.
@@ -315,15 +315,15 @@ All collaborative AML intelligence components are validated through targeted uni
 
 | Test Suite | Targeted AML Component | Verified Features | Test Count | Status |
 |:---|:---|:---|:---:|:---:|
-| [test_aml_agentic_copilot.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_aml_agentic_copilot.py) | `aml_agentic_copilot.py` | FinCEN 5-paragraph SAR narrative drafting, 4-Eyes briefings | 3 | ✅ 100% Pass |
-| [test_case_management_workbench.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_case_management_workbench.py) | `case_workbench.py` | FSM lifecycle, 4-Eyes dual supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
-| [test_case_management_feedback_loop.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_case_management_feedback_loop.py) | `label_feedback_pipeline.py` | Ground truth label writeback, Dirichlet non-IID partition updates | 4 | ✅ 100% Pass |
-| [test_regulatory_reporter.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter.py` | FinCEN SAR 2.0 XML schema serialization & XSD validation | 5 | ✅ 100% Pass |
-| [test_regulatory_compliance.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regulatory_compliance.py) | `security_compliance.py` | Compliance router endpoints, regulatory filing export | 3 | ✅ 100% Pass |
-| [test_fuzzy_psi.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_fuzzy_psi.py) | `psi_service.py` | Turkish character transliteration, MinHash LSH, 3-of-5 matching | 3 | ✅ 100% Pass |
-| [test_psi_service.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_psi_service.py) | `psi_service.py` | Commutative DH-PSI modular exponentiation ($x^{ab} \equiv x^{ba}$) | 3 | ✅ 100% Pass |
-| [test_graph_analytics.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service.py` | PageRank decay ($\gamma = 0.85$), community density, velocity anomalies | 3 | ✅ 100% Pass |
-| [test_graph_embedding.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service.py` | 12-dim node features, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
-| [test_neo4j_graph.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_neo4j_graph.py) | `graph_engine.py` | Neo4j Bolt driver initialization, Cypher merges, Redis fallback | 8 | ✅ 100% Pass |
-| [test_regional_governance_ai_act.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_regional_governance_ai_act.py) | `regional_governance.py`, `ai_act_compliance.py` | Regional rings, cross-border DP filters, Articles 10–15 certificate | 4 | ✅ 100% Pass |
+| [test_aml_agentic_copilot.py](../backend/tests/unit/test_aml_agentic_copilot.py) | `aml_agentic_copilot.py` | FinCEN 5-paragraph SAR narrative drafting, 4-Eyes briefings | 3 | ✅ 100% Pass |
+| [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench.py` | FSM lifecycle, 4-Eyes dual supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
+| [test_case_management_feedback_loop.py](../backend/tests/unit/test_case_management_feedback_loop.py) | `label_feedback_pipeline.py` | Ground truth label writeback, Dirichlet non-IID partition updates | 4 | ✅ 100% Pass |
+| [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter.py` | FinCEN SAR 2.0 XML schema serialization & XSD validation | 5 | ✅ 100% Pass |
+| [test_regulatory_compliance.py](../backend/tests/unit/test_regulatory_compliance.py) | `security_compliance.py` | Compliance router endpoints, regulatory filing export | 3 | ✅ 100% Pass |
+| [test_fuzzy_psi.py](../backend/tests/unit/test_fuzzy_psi.py) | `psi_service.py` | Turkish character transliteration, MinHash LSH, 3-of-5 matching | 3 | ✅ 100% Pass |
+| [test_psi_service.py](../backend/tests/unit/test_psi_service.py) | `psi_service.py` | Commutative DH-PSI modular exponentiation ($x^{ab} \equiv x^{ba}$) | 3 | ✅ 100% Pass |
+| [test_graph_analytics.py](../backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service.py` | PageRank decay ($\gamma = 0.85$), community density, velocity anomalies | 3 | ✅ 100% Pass |
+| [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service.py` | 12-dim node features, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
+| [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine.py` | Neo4j Bolt driver initialization, Cypher merges, Redis fallback | 8 | ✅ 100% Pass |
+| [test_regional_governance_ai_act.py](../backend/tests/unit/test_regional_governance_ai_act.py) | `regional_governance.py`, `ai_act_compliance.py` | Regional rings, cross-border DP filters, Articles 10–15 certificate | 4 | ✅ 100% Pass |
 | **Total Verified** | **11 Dedicated Suites** | **Collaborative AML Intelligence Platform** | **61 Tests** | **100% Pass** |

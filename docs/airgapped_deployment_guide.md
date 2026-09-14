@@ -31,14 +31,14 @@ The Collaborative Fraud Intelligence (CFI) platform supports fully air-gapped, z
 
 1. **Zero External Internet Access**: No external telemetry calls, package registry pulls (PyPI, npm), container registry pulls (Docker Hub, Quay), or external OCSP/CRL queries are executed at runtime.
 2. **Cryptographic Bundle Attestation**: Every offline asset (container images, Python wheels, model weights, config templates) is validated against an immutable SHA-256 signed manifest before installation.
-3. **Strict Perimeter Filtering**: Ingress traffic from the internal banking LAN is inspected by [PerimeterWAFGuard](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/perimeter_waf.py) with strict IP whitelisting, authentication lockout thresholds, and OWASP Top 10 attack pattern rejection.
+3. **Strict Perimeter Filtering**: Ingress traffic from the internal banking LAN is inspected by [PerimeterWAFGuard](../backend/app/infrastructure/security/perimeter_waf.py) with strict IP whitelisting, authentication lockout thresholds, and OWASP Top 10 attack pattern rejection.
 4. **Offline Database Migrations**: Schema alterations are generated as static SQL scripts via Alembic `--sql` mode, enabling pre-deployment review and execution by bank Database Administrators (DBAs).
 
 ---
 
 ## Air-Gapped Bundle Structure & Manifest
 
-The [AirGapBundleBuilder](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/deployment/airgap_installer.py) generates deterministic, versioned deployment bundles with an immutable cryptographic manifest.
+The [AirGapBundleBuilder](../backend/app/infrastructure/deployment/airgap_installer.py) generates deterministic, versioned deployment bundles with an immutable cryptographic manifest.
 
 ### Manifest Schema (`airgap_manifest.json`)
 ```json
@@ -85,7 +85,7 @@ print(f'Bundle generated: {manifest.bundle_id}, SHA-256: {manifest.sha256_checks
 ```
 
 ### Stage 2: Offline Migration Generation (`--sql` Mode)
-Generate the complete offline SQL schema migration without connecting to a live database, referencing [001_production_domain_tables.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/database/migrations/versions/001_production_domain_tables.py) and [002_core_and_aml_tables.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/database/migrations/versions/002_core_and_aml_tables.py):
+Generate the complete offline SQL schema migration without connecting to a live database, referencing [001_production_domain_tables.py](../backend/app/infrastructure/database/migrations/versions/001_production_domain_tables.py) and [002_core_and_aml_tables.py](../backend/app/infrastructure/database/migrations/versions/002_core_and_aml_tables.py):
 ```bash
 # Output raw SQL for DBA change approval
 cd backend
@@ -131,7 +131,7 @@ docker compose -f docker-compose.yml up -d
 
 ## Perimeter WAF Guard (`PerimeterWAFGuard`)
 
-The air-gapped gateway enforces edge inspection through [perimeter_waf.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/security/perimeter_waf.py), protecting internal APIs from lateral compromise and insider threats:
+The air-gapped gateway enforces edge inspection through [perimeter_waf.py](../backend/app/infrastructure/security/perimeter_waf.py), protecting internal APIs from lateral compromise and insider threats:
 
 | Inspection Layer | Rule Trigger | Action | Description |
 | :--- | :--- | :---: | :--- |
@@ -176,10 +176,10 @@ assert result.allowed is True
 
 ## Automated Verification Test Suite
 
-All air-gapped packaging, checksum attestation, database schema migrations, and perimeter defense behaviors are verified through targeted test suites under [backend/tests/unit/](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/):
+All air-gapped packaging, checksum attestation, database schema migrations, and perimeter defense behaviors are verified through targeted test suites under [backend/tests/unit/](../backend/tests/unit):
 
 | Test Suite | Targeted Component | Verified Features | Test Count | Status |
 | :--- | :--- | :--- | :---: | :---: |
-| [test_perimeter_airgap.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_perimeter_airgap.py) | `perimeter_waf.py`, `airgap_installer.py` | IP whitelisting, SQLi/XSS rejection, manifest SHA-256 byte verification | 2 | ✅ 100% Pass |
-| [test_alembic_migrations.py](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_alembic_migrations.py) | Alembic migrations | Single linear branch, clean upgrade/downgrade, zero schema drift | 3 | ✅ 100% Pass |
+| [test_perimeter_airgap.py](../backend/tests/unit/test_perimeter_airgap.py) | `perimeter_waf.py`, `airgap_installer.py` | IP whitelisting, SQLi/XSS rejection, manifest SHA-256 byte verification | 2 | ✅ 100% Pass |
+| [test_alembic_migrations.py](../backend/tests/unit/test_alembic_migrations.py) | Alembic migrations | Single linear branch, clean upgrade/downgrade, zero schema drift | 3 | ✅ 100% Pass |
 | **Total Verified** | **2 Dedicated Suites** | **Air-Gapped Banking Security & Deployment** | **5 Tests** | **100% Pass** |

@@ -220,7 +220,7 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 - **Observed output:** `brier_score = nan`
 - **Expected behavior:** Raise `ValueError` with message "y_prob contains non-finite values" OR filter NaN entries and log a data quality warning
 - **Impact:** Silent NaN in calibration report propagates to downstream monitoring comparisons; `is_well_calibrated = False` cannot be reliably determined when brier_score is NaN
-- **Fix location:** [drift_service.py L174–L178](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving cross-bank fraud detection using Federated Learning/backend/app/application/services/drift_service.py#L174-L178)
+- **Fix location:** [drift_service.py L174–L178](../../../backend/app/application/services/drift_service.py#L174-L178)
 
 ### BUG-DR-02: Wasserstein Distance Returns +Inf for Inf-Containing Arrays (MEDIUM)
 
@@ -229,12 +229,12 @@ if len(curr_arr) == 0 or len(ref_arr) == 0:
 - **Observed output:** `wasserstein_distance = inf` (stored as `FeatureDriftMetrics.wasserstein_distance`)
 - **Expected behavior:** Filter non-finite values before computing Wasserstein distance, or raise `ValueError`
 - **Impact:** `inf` propagates to any downstream comparisons involving Wasserstein; dashboard display shows `inf`; JSON serialisation may fail or produce `null`
-- **Fix location:** [drift_service.py L120–L132](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving cross-bank fraud detection using Federated Learning/backend/app/application/services/drift_service.py#L120-L132)
+- **Fix location:** [drift_service.py L120–L132](../../../backend/app/application/services/drift_service.py#L120-L132)
 
 ### Advisory — NaN PSI Silently Evaluates to False in RetrainingTriggerEngine
 
 - **Severity:** LOW (no crash, but semantically misleading)
-- **Location:** [retraining_trigger_engine.py L48](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving cross-bank fraud detection using Federated Learning/backend/app/application/services/retraining_trigger_engine.py#L48)
+- **Location:** [retraining_trigger_engine.py L48](../../../backend/app/application/services/retraining_trigger_engine.py#L48)
 - **Recommendation:** Add `if not math.isfinite(psi_score): raise ValueError(f"PSI score must be finite, got {psi_score}")`
 
 ---
