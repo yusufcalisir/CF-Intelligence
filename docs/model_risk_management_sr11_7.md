@@ -17,17 +17,17 @@ Model risk arises from two primary sources:
 CF-Intelligence implements an institutional Model Risk Management (MRM) framework satisfying all three pillars of SR 11-7: **Model Development & Conceptual Soundness**, **Independent Model Validation & 3 Lines of Defense**, and **Continuous Monitoring, Drift Triggers & Instant Rollback**.
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                        SR 11-7 / OCC 2011-12 MODEL RISK MANAGEMENT (MRM) STACK                         │
-├───────────────────────────────────┬───────────────────────────────────┬────────────────────────────────┤
-│ 1. CONCEPTUAL SOUNDNESS           │ 2. INDEPENDENT MODEL VALIDATION   │ 3. ONGOING MONITORING & DRIFT  │
-├───────────────────────────────────┼───────────────────────────────────┼────────────────────────────────┤
-│ • GNN (GraphSAGE/GAT) + ML Net    │ • 1st Line: Model Developers      │ • Kolmogorov-Smirnov (p<0.01)  │
-│ • Dirichlet Heterogeneity α=0.50  │ • 2nd Line: Independent MRM Team  │ • Population Stability (PSI)   │
-│ • Calibrated DP Noise σ           │ • 3rd Line: Internal Audit        │ • Auto-Retraining Trigger      │
-│ • Zero Raw PII Invariant          │ • Disparate Impact (0.80<=DI<=1.25│ • Instant Rollback SLA <5s     │
-│ • Platt / Isotonic Calibration    │ • Dual Cryptographic Signoff      │ • ModelRegistryVault HSM Guard │
-└───────────────────────────────────┴───────────────────────────────────┴────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                         SR 11-7 / OCC 2011-12 MODEL RISK MANAGEMENT (MRM) STACK                          │
+├───────────────────────────────────┬─────────────────────────────────────┬────────────────────────────────┤
+│ 1. CONCEPTUAL SOUNDNESS           │ 2. INDEPENDENT MODEL VALIDATION     │ 3. ONGOING MONITORING & DRIFT  │
+├───────────────────────────────────┼─────────────────────────────────────┼────────────────────────────────┤
+│ • GNN (GraphSAGE/GAT) + ML Net    │ • 1st Line: Model Developers        │ • Kolmogorov-Smirnov (p<0.01)  │
+│ • Dirichlet Heterogeneity α=0.50  │ • 2nd Line: Independent MRM Team    │ • Population Stability (PSI)   │
+│ • Calibrated DP Noise σ           │ • 3rd Line: Internal Audit          │ • Auto-Retraining Trigger      │
+│ • Zero Raw PII Invariant          │ • Disparate Impact (0.80<=DI<=1.25) │ • Instant Rollback SLA <5s     │
+│ • Platt / Isotonic Calibration    │ • Dual Cryptographic Signoff        │ • ModelRegistryVault HSM Guard │
+└───────────────────────────────────┴─────────────────────────────────────┴────────────────────────────────┘
 ```
 
 ---
