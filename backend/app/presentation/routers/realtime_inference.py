@@ -144,7 +144,7 @@ def get_scripted_model() -> tuple[Any, bool]:
 
     # Compile fresh TorchScript model — always use dp_compatible=True (GroupNorm)
     # so the forward graph is fully deterministic and passes jit.trace sanity checks.
-    from app.application.services.model_service import ModelService, NUM_FEATURES
+    from app.application.services.model_service import NUM_FEATURES, ModelService
 
     settings = get_settings()
     svc = ModelService(settings)
@@ -152,8 +152,9 @@ def get_scripted_model() -> tuple[Any, bool]:
     # Build a fresh GroupNorm model and attempt to load existing champion weights.
     # If weights are incompatible (e.g. BatchNorm keys), fall back to a randomly
     # initialised GroupNorm model which is still safe for serving.
-    from app.application.services.model_registry import ModelRegistry
     import os
+
+    from app.application.services.model_registry import ModelRegistry
 
     registry = ModelRegistry()
     fresh_model = svc.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
