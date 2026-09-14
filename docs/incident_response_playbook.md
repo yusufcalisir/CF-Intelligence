@@ -12,7 +12,7 @@ The platform classifies operational and privacy incidents across both traditiona
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                   24/7 ON-CALL INCIDENT SEVERITY & ESCALATION MATRIX                                            │
+│                                   24/7 ON-CALL INCIDENT SEVERITY & ESCALATION MATRIX                                             │
 ├──────────────┬──────────────────┬──────────────────────────────────────────┬──────────────┬───────────────┬──────────────────────┤
 │ SEVERITY     │ DOMAIN SEVERITY  │ DEFINITION & TRIGGER CONDITION           │ ON-CALL SLA  │ WAR ROOM      │ RESOLUTION SLA (MTTR)│
 ├──────────────┼──────────────────┼──────────────────────────────────────────┼──────────────┼───────────────┼──────────────────────┤
