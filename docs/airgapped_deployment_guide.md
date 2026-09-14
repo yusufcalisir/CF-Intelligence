@@ -10,21 +10,21 @@ The Collaborative Fraud Intelligence (CFI) platform supports fully air-gapped, z
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                          SECURE AIR-GAPPED BANKING PERIMETER                           │
 │                                                                                        │
-│  [ Secure Media / Optical Ingest ] ──► [ AirGapBundleBuilder Verifier ]               │
+│  [ Secure Media / Optical Ingest ] ──► [ AirGapBundleBuilder Verifier ]                │
 │                                                   │ (SHA-256 Validated)                │
 │                                                   ▼                                    │
 │  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                            LOCAL ISOLATED RUNTIME                                │  │
 │  │                                                                                  │  │
-│  │  [ Local Container Registry ]  ──►  Docker Daemon / Offline Kubernetes Cluster  │  │
-│  │  [ Offline Wheelhouse Mirror ] ──►  CPython 3.12 Runtime                          │  │
-│  │  [ Offline Model Registry ]    ──►  PyTorch Champion Enclave                      │  │
-│  │  [ Alembic Offline SQL Migrator ] ──► PostgreSQL 16 Schema / SQLite DB          │  │
+│  │  [ Local Container Registry ]     ──► Docker Daemon / Offline Kubernetes Cluster │  │
+│  │  [ Offline Wheelhouse Mirror ]    ──► CPython 3.12 Runtime                       │  │
+│  │  [ Offline Model Registry ]       ──► PyTorch Champion Enclave                   │  │
+│  │  [ Alembic Offline SQL Migrator ] ──► PostgreSQL 16 Schema / SQLite DB           │  │
 │  │                                                                                  │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 │                                                   ▲                                    │
 │                                                   │ Inbound LAN Only                   │
-│  [ Core Banking Network ] ──► [ PerimeterWAFGuard ] ── (mTLS + Strict IP Whitelist)   │
+│  [ Core Banking Network ] ──► [ PerimeterWAFGuard ] ── (mTLS + Strict IP Whitelist)    │
 │                                (SQLi / XSS / Path Traversal Blocked)                   │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
