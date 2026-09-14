@@ -1263,7 +1263,7 @@ export default function LandingPage() {
                     Integration & Contracts
                   </div>
                   {[
-                    { label: 'REST & WebSocket API', desc: 'OpenAPI 3.0 Reference',      target: 'api' },
+                    { label: 'REST & WebSocket API', desc: 'OpenAPI 3.1 Reference',      target: 'api' },
                     { label: 'Python & TS SDKs',     desc: 'Official Package Libraries', target: 'docs' },
                     { label: 'Legal Agreement Suite', desc: 'DPA, ToS, SLA & Liability', target: 'legal' },
                   ].map(sub => (
@@ -2122,7 +2122,7 @@ export default function LandingPage() {
                   badge: 'PSPs & Electronic Money (EMI)',
                   pain: 'High False Positive Rates (>1%) trigger cart abandonment, customer churn, and call center load.',
                   compliance: 'GDPR Art 6/17 · KVKK · PSD2 SCA',
-                  solution: 'Sub-15ms REST API scoring with SHAP feature attributions, cutting false alarms by 65%.',
+                  solution: 'Sub-15ms fast-path scoring (<65ms stream) with on-demand SHAP explanations, cutting false alarms by 65%.',
                   roi: 'Recovers 60%+ checkout conversions',
                   borderColor: 'border-purple-500/30',
                   badgeColor: 'text-purple-400 bg-purple-500/10 border-purple-500/20',
@@ -2470,7 +2470,7 @@ telemetry.on('round.stage', (evt) => {
               <div className="rounded-2xl sm:rounded-3xl border border-white/8 overflow-hidden backdrop-blur-xl w-full min-w-0">
                 <div className="px-4 sm:px-6 py-3.5 sm:py-4 bg-white/3 border-b border-white/6 flex flex-wrap items-center justify-between gap-2">
                   <span className="text-xs font-mono text-slate-300 font-bold uppercase tracking-wider">REST & WebSocket API Endpoints Reference</span>
-                  <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.0 Spec</span>
+                  <span className="text-[9.5px] font-mono text-indigo-400">OpenAPI 3.1 Spec</span>
                 </div>
                 <div className="divide-y divide-white/5 font-mono text-xs min-w-0">
                   {[
