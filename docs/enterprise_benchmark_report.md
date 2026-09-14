@@ -50,10 +50,10 @@ Inference latency varies based on the operational screening mode. The platform d
 ├───────────────────────────────────┬──────────────────────┬─────────────┬───────────────┤
 │ INFERENCE OPERATIONAL PROFILE     │ EMPIRICAL p50 MEDIAN │ p99 LATENCY │ SLA TARGET    │
 ├───────────────────────────────────┼──────────────────────┼─────────────┼───────────────┤
-│ 1. Fast-Path Single-Model Scoring │ **`14.2 ms`**        │ **`87.3 ms`**│ < 100.0 ms    │
+│ 1. Fast-Path Single-Model Scoring │ 14.2 ms              │ 87.3 ms     │ < 100.0 ms    │
 │    (TorchScript JIT + Redis Cache)│                      │             │ (PASSED ✓)    │
 ├───────────────────────────────────┼──────────────────────┼─────────────┼───────────────┤
-│ 2. Full 9-Signal Ensemble Store   │ **`258.9 ms`**       │ **`308.2 ms`│ < 350.0 ms    │
+│ 2. Full 9-Signal Ensemble Store   │ 258.9 ms             │ 308.2 ms    │ < 350.0 ms    │
 │    (15 Workers + Graph Extract)   │                      │             │ (PASSED ✓)    │
 └───────────────────────────────────┴──────────────────────┴─────────────┴───────────────┘
 ```
