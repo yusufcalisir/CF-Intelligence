@@ -27,13 +27,12 @@ from __future__ import annotations
 
 import argparse
 import ast
+import contextlib
 import json
-import os
 import re
 import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 
@@ -120,7 +119,7 @@ class IntegrityScanner:
                                         if isinstance(key, ast.Constant) and str(key.value).lower() in ("mock", "fake", "dummy"):
                                             self.log(
                                                 "mock", "ERROR", py_file, stmt.lineno,
-                                                f"Function '{node.name}' returns explicit mock dict key '{key.value}'",
+                                                f"Function '{node.name}' returns explicit mock dict key '{key.value!r}'",
                                             )
                 except Exception:
                     pass
@@ -150,17 +149,13 @@ class IntegrityScanner:
         for src_file in frontend_src.rglob("*.tsx"):
             if "__tests__" in src_file.parts:
                 continue
-            try:
+            with contextlib.suppress(Exception):
                 all_frontend_code.append(src_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
         for src_file in frontend_src.rglob("*.ts"):
             if "__tests__" in src_file.parts:
                 continue
-            try:
+            with contextlib.suppress(Exception):
                 all_frontend_code.append(src_file.read_text(encoding="utf-8"))
-            except Exception:
-                pass
 
         combined_code = "\n".join(all_frontend_code)
 
@@ -284,7 +279,7 @@ class IntegrityScanner:
                             if param_names:
                                 self.log(
                                     "constant-funcs", "WARNING", py_file, node.lineno,
-                                    f"Function '{node.name}' takes {param_names} but unconditionally returns constant: {ret.value.value}",
+                                    f"Function '{node.name}' takes {param_names} but unconditionally returns constant: {ret.value.value!r}",
                                 )
 
     # =========================================================================
@@ -324,13 +319,15 @@ class IntegrityScanner:
                     continue
 
                 for node in ast.walk(tree):
-                    if isinstance(node, ast.ExceptHandler):
-                        # Empty except body or body with just 'pass' without comments
-                        if len(node.body) == 1 and isinstance(node.body[0], ast.Pass):
-                            self.log(
-                                "silenced", "WARNING", py_file, node.lineno,
-                                "Swallowed exception handler with bare 'pass' body",
-                            )
+                    if (
+                        isinstance(node, ast.ExceptHandler)
+                        and len(node.body) == 1
+                        and isinstance(node.body[0], ast.Pass)
+                    ):
+                        self.log(
+                            "silenced", "WARNING", py_file, node.lineno,
+                            "Swallowed exception handler with bare 'pass' body",
+                        )
 
     # =========================================================================
     # 6. TODOS & DOCUMENTATION CONSISTENCY
@@ -459,11 +456,12 @@ class IntegrityScanner:
 # =============================================================================
 def print_report(findings: list[Finding]) -> int:
     if sys.platform == "win32":
-        try:
-            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-        except Exception:
-            pass
+        reconfig_stdout = getattr(sys.stdout, "reconfigure", None)
+        if callable(reconfig_stdout):
+            reconfig_stdout(encoding="utf-8", errors="replace")
+        reconfig_stderr = getattr(sys.stderr, "reconfigure", None)
+        if callable(reconfig_stderr):
+            reconfig_stderr(encoding="utf-8", errors="replace")
 
     errors = [f for f in findings if f.severity == "ERROR"]
     warnings = [f for f in findings if f.severity == "WARNING"]
