@@ -1,0 +1,6 @@
+{
+  "name": "@ethersproject/signing-key",
+  "version": "5.8.0",
+  "main": "index.js",
+  "description": "Safe stub for @ethersproject/signing-key replacing vulnerable elliptic with zero-dependency stub"
+}

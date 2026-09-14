@@ -20,10 +20,14 @@
   "author": "Yusuf Çalışır",
   "license": "MIT",
   "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.8",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
+    "chai": "^4.5.0",
+    "ethers": "^6.13.5",
     "hardhat": "^2.22.18"
   },
   "overrides": {
+    "@ethersproject/signing-key": "file:./stubs/signing-key",
     "undici": "^6.21.1",
     "ws": "^8.18.0",
     "fast-uri": "^3.1.6",
@@ -36,11 +40,7 @@
     "cookie": "^0.7.2",
     "bn.js": "^4.12.3",
     "diff": "^5.2.0",
-    "elliptic": "^6.6.1",
-    "js-yaml": "^4.3.2",
-    "sc-istanbul": {
-      "js-yaml": "^3.15.2"
-    }
+    "js-yaml": "^4.3.2"
   }
 }
 
