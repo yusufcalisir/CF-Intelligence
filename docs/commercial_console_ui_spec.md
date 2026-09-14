@@ -17,14 +17,14 @@ Built with **React 19, TypeScript 5.8, Vite, and TailwindCSS**, the console feat
 │                                                       ▼                                │
 │  ┌──────────────────────────────────────────────────────────────────────────────────┐  │
 │  │                    ENTERPRISE APPLICATION SHELL (`Layout.tsx`)                   │  │
-│  ├───────────────────────────────┬──────────────────────────────────────────────────┤  │
+│  ├────────────────────────────────┬─────────────────────────────────────────────────┤  │
 │  │ SIDEBAR NAVIGATION (`Sidebar`) │ HEADER TELEMETRY (`Header.tsx`)                 │  │
 │  │  - Live Consortium Ops (2)     │  - Live WebSocket Connection Indicator          │  │
-│  │  - AML Intelligence Hub (8)    │  - Real-Time Latency Meter (<15ms SLA)           │  │
-│  │  - Enterprise Platform (5)     │  - Streamed Transactions Running Counter         │  │
-│  │  - Observability & Tracing (4) │  - Interactive API Documentation Deep Link       │  │
-│  ├───────────────────────────────┴──────────────────────────────────────────────────┤  │
-│  │ MULTI-ROLE VIEW ADAPTER (`EXECUTIVE`, `COMPLIANCE`, `ML_ENGINEER`, `INVESTIGATOR`)│  │
+│  │  - AML Intelligence Hub (8)    │  - Real-Time Latency Meter (<15ms SLA)          │  │
+│  │  - Enterprise Platform (5)     │  - Streamed Transactions Running Counter        │  │
+│  │  - Observability & Tracing (4) │  - Interactive API Documentation Deep Link      │  │
+│  ├────────────────────────────────┴─────────────────────────────────────────────────┤  │
+│  │ MULTI-ROLE ADAPTER (`EXECUTIVE`, `COMPLIANCE`, `ML_ENGINEER`, `INVESTIGATOR`)    │  │
 │  │  - 16 Modular Pages with React Suspense & Granular Error Boundaries              │  │
 │  └──────────────────────────────────────────────────────────────────────────────────┘  │
 └────────────────────────────────────────────────────────────────────────────────────────┘
@@ -182,7 +182,7 @@ The console integrates continuous telemetry via [`useRealTimeFraudStream.ts`](..
 │                        GLOBAL APPLICATION HEADER                       │
 ├──────────────────────────┬──────────────────────┬──────────────────────┤
 │ Brand Title              │ Live WebSocket State │ Documentation Link   │
-│ "Collaborative Fraud     │ [● Live WS (4ms)]    │ "API Docs ↗"         │
+│ "Collaborative Fraud     │ [• Live WS (4ms)]    │ "API Docs"           │
 │  Intelligence Platform"  │ [38,421 txns]        │ "v2.4.1"             │
 └──────────────────────────┴──────────────────────┴──────────────────────┘
 ```
