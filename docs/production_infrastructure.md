@@ -172,7 +172,7 @@ deployments/helm/
 ├──────────────────────────────┬────────────────────────────────────────────────────┤
 │ HashiCorp Vault PKI Engine   │ Dynamic X.509 mTLS 1.3 cert issuance & rotation    │
 ├──────────────────────────────┼────────────────────────────────────────────────────┤
-│ Hardware Security Module     │ PKCS#11 hardware-backed signing for model weights   │
+│ Hardware Security Module     │ PKCS#11 hardware-backed signing for model weights  │
 ├──────────────────────────────┼────────────────────────────────────────────────────┤
 │ Multi-Tenant Transit KMS     │ Per-tenant cryptographic keys (tenant_<id>)        │
 ├──────────────────────────────┼────────────────────────────────────────────────────┤
