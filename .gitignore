@@ -132,6 +132,9 @@ logs/
 
 # --- Agent Workspaces, Scratchpads & Personal Roadmaps ---
 .agents/
+AGENTS.md
+agents.md
+*.agent.md
 .gemini/
 .claude/
 .cursor/
