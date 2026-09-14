@@ -45,7 +45,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Engineered Discrepancy Features**:
   $$\text{ErrorBal}_{\text{orig}} = \text{NewBal}_{\text{orig}} + \text{Amount} - \text{OldBal}_{\text{orig}}$$
   $$\text{ErrorBal}_{\text{dest}} = \text{OldBal}_{\text{dest}} + \text{Amount} - \text{NewBal}_{\text{dest}}$$
-* **Implementation**: [`dataloader.py: load_paysim()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L183)
+* **Implementation**: [`dataloader.py: load_paysim()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L221)
 
 ---
 
@@ -62,7 +62,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   * `V1` – `V339`: Vesta engineered risk features (identity matches, velocity signals, device fingerprints).
 * **Consortium Partitioning**:
   Simulates Card-Issuing Banks vs. Merchant Acquiring Banks with distinct fraud exposure slices.
-* **Implementation**: [`dataloader.py: load_ieee_cis()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L320)
+* **Implementation**: [`dataloader.py: load_ieee_cis()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L382)
 
 ---
 
@@ -79,7 +79,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   * Unknown / Unlabeled: $157,205$ nodes ($77.3\%$).
 * **GNN Evaluation Role**:
   Validates multi-party **Graph Attention Networks (FedGNN / GraphSAGE)** for multi-hop money laundering detection without centralizing raw graph adjacency matrices.
-* **Implementation**: [`dataloader.py: load_elliptic()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L46)
+* **Implementation**: [`dataloader.py: load_elliptic()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/dataloader.py#L57)
 
 ---
 
@@ -111,7 +111,7 @@ Under real-world distributions and calibrated noise injection ($\varepsilon = 1.
 
 ## 4. Synthetic-to-Real Distribution Fidelity Auditor
 
-The `distribution_fidelity_service.py` module continuously quantifies the mathematical drift between synthetic generator distributions and empirical datasets:
+The [`distribution_fidelity_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/distribution_fidelity_service.py) module continuously quantifies the mathematical drift between synthetic generator distributions and empirical datasets:
 
 ```
                   ┌─────────────────────────────────────────┐
@@ -172,7 +172,7 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 │                         │                                              │
 │                         ▼                                              │
 │  [2. Type-Salted HMAC-SHA256 Tokenization]                             │
-│     - Salt = b"cf-intelligence-pilot-salt" ∥ EntityType                │
+│     - Salt = b"cf-intelligence-pilot-salt-2026" ∥ EntityType           │
 │                         │                                              │
 │                         ▼                                              │
 │  [3. PyTorch Local Edge GNN Trainer]                                   │
@@ -192,7 +192,23 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+The institutional design partner sandbox and validator logic are implemented in [`design_partner_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/design_partner_service.py).
+
 ### Regulatory Compliance Mappings for Institutional IT Committees:
 * **GDPR Article 6 & KVKK Article 5**: Lawful basis preserved; zero raw PII exits the bank data plane.
 * **GDPR Article 17 (Right to Erasure)**: Exact Re-Aggregation and Lineage Subtraction federated unlearning erases historical parameter contributions if an institution departs or exercises revocation.
 * **EU AI Act Article 10 & 15**: Certified bias auditing, disparate impact evaluation ($DI \ge 0.80$), and robust accuracy standards.
+
+---
+
+## 7. Automated Test Verification Matrix
+
+Continuous integration suites validate all benchmark data ingestion, distribution drift auditing, and pilot sandbox services:
+
+| Test Suite | File Path | Verified Capabilities | Status |
+| :--- | :--- | :--- | :---: |
+| **Distribution Fidelity** | `backend/tests/unit/test_distribution_fidelity.py` | Wasserstein distance, Jensen-Shannon divergence, KS-test, covariance drift, multi-feature audit report | `5/5 PASSED` |
+| **Dataset Ingestion** | `backend/tests/unit/test_dataset_ingestor.py` | Preview signal inference, contract validation, quarantine malformed data, consortium enrollment | `4/4 PASSED` |
+| **Elliptic Benchmark** | `backend/tests/unit/test_elliptic_benchmark.py` | Elliptic transaction graph loading, node classification, topology extraction | `1/1 PASSED` |
+| **Benchmark Runner** | `backend/tests/unit/test_benchmark_runner.py` | FedAvg vs Centralized vs Local, DP noise accuracy reduction, JSON report generation | `4/4 PASSED` |
+| **Design Partner Sandbox** | `backend/tests/unit/test_design_partner_sandbox.py` | Type-salted HMAC-SHA256 tokenization, zero-raw-PII regex scan, pilot checklist, PaySim & IEEE evaluation | `4/4 PASSED` |
