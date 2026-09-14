@@ -172,7 +172,7 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 │                         │                                              │
 │                         ▼                                              │
 │  [2. Type-Salted HMAC-SHA256 Tokenization]                             │
-│     - Salt = b"cf-intelligence-pilot-salt-2026" ∥ EntityType           │
+│     - Salt = b"cf-intelligence-pilot-salt-2026" || EntityType          │
 │                         │                                              │
 │                         ▼                                              │
 │  [3. PyTorch Local Edge GNN Trainer]                                   │
