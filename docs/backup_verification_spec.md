@@ -10,26 +10,26 @@ By continuously validating recovery viability in memory sandboxes, the engine gu
 
 ```mermaid
 graph TD
-    subgraph Primary Storage Assets
+    subgraph PrimaryStorage ["Primary Storage Assets"]
         PG["PostgreSQL 16 Multi-Tenant Dumps"]
         SQL["SQLite Isolated Bank Databases"]
         Torch["PyTorch Model Weights (.pt)"]
         Vault["HashiCorp Vault KMS Envelopes"]
     end
 
-    subgraph Backup Generation Engine
+    subgraph BackupEngine ["Backup Generation Engine"]
         CreateBackup["create_backup_artifact()"]
         HashCalc["Compute SHA-256 Digest"]
     end
 
-    subgraph Backup Lifecycle States
+    subgraph BackupStates ["Backup Lifecycle States"]
         StatusCreated["BackupStatus.CREATED"]
         StatusVerified["BackupStatus.VERIFIED"]
         StatusCorrupted["BackupStatus.CORRUPTED"]
         StatusRestored["BackupStatus.RESTORED"]
     end
 
-    subgraph Verification & Sandbox Probes
+    subgraph VerificationProbes ["Verification & Sandbox Probes"]
         VerifyCheck["verify_checksum()"]
         HashMatch{"Computed == Recorded?"}
         ProbeEngine["run_sandbox_restore_probe()"]

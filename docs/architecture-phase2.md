@@ -10,13 +10,13 @@ Phase 2 builds upon the foundational Federated Learning architecture, adding rea
 
 ```mermaid
 graph TD
-    subgraph Presentation Layer
+    subgraph PresentationLayer ["Presentation Layer"]
         UI["React Web Console / React Flow<br/>[InvestigationDashboard, CaseDetailPage, PsiPage]"]
         WS["WebSocket Gateway (/ws/alerts, /ws/scenarios)"]
         CLI["CFI Operator CLI (cfi)"]
     end
 
-    subgraph API & Orchestration Layer (Presentation Routers)
+    subgraph ApiLayer ["API & Orchestration Layer (Presentation Routers)"]
         FastAPI["FastAPI Control Plane (Gateway)"]
         AlertsR["Alerts Router (/api/v1/alerts)"]
         CasesR["Cases Router (/api/v1/cases)"]
@@ -34,7 +34,7 @@ graph TD
         Psd2R["PSD2 Router (/api/v1/psd2)"]
     end
 
-    subgraph Application & Business Logic Services
+    subgraph AppLayer ["Application & Business Logic Services"]
         RiskEng["Risk Scoring Engine (9 Composite Signals)"]
         AlertSvc["Alert Intelligence Service"]
         CaseWorkbench["Investigator Case Workbench Service"]
@@ -50,7 +50,7 @@ graph TD
         FeedbackLoop["Label Feedback Loop Pipeline"]
     end
 
-    subgraph Data & Persistence Layer
+    subgraph DataLayer ["Data & Persistence Layer"]
         DB[("PostgreSQL Multi-Tenant Database")]
         Cache[("Redis Event Broker & Pub/Sub Cache")]
         GraphDB[("Neo4j / Memgraph Distributed Graph DB")]
