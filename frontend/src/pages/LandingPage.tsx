@@ -1505,7 +1505,7 @@ export default function LandingPage() {
                   tag: 'Consortium Benchmark',
                 },
                 {
-                  stat: '$0.00',
+                  stat: '0 Bytes',
                   label: 'Raw PII Transferred',
                   desc: 'Our zero-knowledge federated learning architecture trains global fraud models without exchanging any customer PII or raw transaction records.',
                   tag: 'Cryptographic Guarantee',
