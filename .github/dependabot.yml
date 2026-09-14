@@ -97,6 +97,7 @@ updates:
           - "typescript-eslint"
           - "eslint"
           - "eslint-*"
+          - "@eslint/*"
       # Group TailwindCSS
       tailwind:
         patterns:
@@ -104,6 +105,12 @@ updates:
           - "@tailwindcss/*"
           - "postcss"
           - "autoprefixer"
+    ignore:
+      # ESLint 10 major version upgrade requires ecosystem-wide peer dependency migration
+      - dependency-name: "@eslint/js"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   # ──────────────────────────────────────────────────────────────────────────
   # GitHub Actions – keep CI action versions up-to-date
