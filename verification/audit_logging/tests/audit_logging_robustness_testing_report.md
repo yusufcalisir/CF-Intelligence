@@ -15,14 +15,14 @@ An adversarial security and robustness verification suite was executed against t
 
 | Category # | Security Attack Scenario | Result | Security Behavior & Findings |
 |---|---|---|---|
-| 1 | 1. Historical Log Record Corruption & Tamper Detection | 🟢 PASS | Report: Tampering detected at entry #1 (SECURITY_SUITE_ACTIVATED): recomputed hash 'c9683c5c' != stored '896710c7'. |
+| 1 | 1. Historical Log Record Corruption & Tamper Detection | 🟢 PASS | Report: Tampering detected at entry #1 (SECURITY_SUITE_ACTIVATED): recomputed hash '89d5f4a4' != stored '7ce09126'. |
 | 2 | 2. Index Sequence Corruption & Swap Attacks | 🟢 PASS | Report: Index mismatch at position 1: expected 1, got 2. |
-| 3 | 3. Previous Hash Link Breaking & Insertion Attacks | 🟢 PASS | Report: Chain broken at entry #2: prev_hash '00000000' does not match expected '896710c7'. |
+| 3 | 3. Previous Hash Link Breaking & Insertion Attacks | 🟢 PASS | Report: Chain broken at entry #2: prev_hash '00000000' does not match expected '7ce09126'. |
 | 4 | 4. Network Socket Failure & Syslog Fallback | 🟢 PASS | Caught expected SIEMExportError |
 | 5 | 5. SIEM Disk Storage Resilience & Auto-Queue | 🟢 PASS | Queued to retry queue file |
 | 6 | 6. Concurrent Multi-Threaded Audit Appends | 🟢 PASS | Chain length: 22, Valid: True |
 | 7 | 7. Corrupted JSON Lines in SIEM Retry Buffer | 🟢 PASS | Flushed valid entries, handled malformed gracefully |
-| 8 | 8. Oversized Detail Payloads & Boundary Stress | 🟢 PASS | Hashed 100KB payload successfully: e0e72bf635e2 |
+| 8 | 8. Oversized Detail Payloads & Boundary Stress | 🟢 PASS | Hashed 100KB payload successfully: 763bdb49ae4a |
 | 9 | 9. Invalid & Malformed Timestamp Format Safety | 🟢 PASS | Chain valid despite non-ISO timestamps: True |
 | 10 | 10. Replay Attack & Duplicate Identifier Handling | 🟢 PASS | 5 replayed events produced 5 distinct SHA-256 hashes |
 

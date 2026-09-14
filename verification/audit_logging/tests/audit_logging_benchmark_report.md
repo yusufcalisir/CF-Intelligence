@@ -10,8 +10,8 @@ This report documents empirical performance, latency percentiles, memory allocat
 
 | Operation | p50 (Median) | p95 Latency | p99 Latency | Mean Latency |
 |---|---|---|---|---|
-| `append_event` (In-Memory SHA-256 Chain) | 1.7634 ms | 4.5092 ms | 7.14 ms | 2.1346 ms |
-| `_queue_retry_event` (SIEM JSONL File Write) | 1.2774 ms | 2.4278 ms | 2.7542 ms | 1.4374 ms |
+| `append_event` (In-Memory SHA-256 Chain) | 1.4038 ms | 1.7876 ms | 2.8897 ms | 1.4072 ms |
+| `_queue_retry_event` (SIEM JSONL File Write) | 1.1288 ms | 1.5329 ms | 4.3655 ms | 1.2583 ms |
 
 ---
 
@@ -19,9 +19,9 @@ This report documents empirical performance, latency percentiles, memory allocat
 
 | Ledger Size (Entries) | Measured Verification Time | Chain Integrity Status | Empirical Complexity |
 |---|---|---|---|
-| 100 records | 22.67 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
-| 1000 records | 100.38 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
-| 5000 records | 564.58 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
+| 100 records | 7.56 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
+| 1000 records | 64.15 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
+| 5000 records | 354.88 ms | 🟢 VALID (`is_valid=True`) | $\mathcal{O}(N)$ Linear |
 
 ---
 
@@ -29,17 +29,17 @@ This report documents empirical performance, latency percentiles, memory allocat
 
 | Worker Threads | Measured Throughput (RPS) | Thread Safety Mechanism |
 |---|---|---|
-| 1 Threads | 630.73 RPS | `threading.Lock` synchronized atomic append |
-| 5 Threads | 610.89 RPS | `threading.Lock` synchronized atomic append |
-| 10 Threads | 638.86 RPS | `threading.Lock` synchronized atomic append |
-| 20 Threads | 672.04 RPS | `threading.Lock` synchronized atomic append |
+| 1 Threads | 776.13 RPS | `threading.Lock` synchronized atomic append |
+| 5 Threads | 807.32 RPS | `threading.Lock` synchronized atomic append |
+| 10 Threads | 852.51 RPS | `threading.Lock` synchronized atomic append |
+| 20 Threads | 821.26 RPS | `threading.Lock` synchronized atomic append |
 
 ---
 
 ## 4. Serialization & Peak Memory Allocations
 
-- **Per-Entry SHA-256 Hash Computation Time:** `0.0179 ms`
-- **Peak Memory Allocation (`tracemalloc`):** `2.23 MB`
+- **Per-Entry SHA-256 Hash Computation Time:** `0.0119 ms`
+- **Peak Memory Allocation (`tracemalloc`):** `2.25 MB`
 
 ---
 

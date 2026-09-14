@@ -97,6 +97,11 @@ class ABACEngine:
                     )
             except Exception as err:
                 logger.warning("IP subnet evaluation exception: %s", err)
+                return ABACEvaluationResult(
+                    allowed=False,
+                    policy_name="RULE-IP-RANGE-RESTRICTION",
+                    reason=f"IP Range Restriction: Malformed or unparseable client IP '{client_ip}' ({err}).",
+                )
 
         # 3. Shift Hours Window Constraint Rule
         if user.shift_hours and "-" in user.shift_hours and user.shift_hours != "00:00-24:00":
@@ -115,6 +120,11 @@ class ABACEngine:
                     )
             except Exception as err:
                 logger.warning("Shift hours parse exception: %s", err)
+                return ABACEvaluationResult(
+                    allowed=False,
+                    policy_name="RULE-SHIFT-HOURS-RESTRICTION",
+                    reason=f"Shift Hours Restriction: Unable to evaluate shift window '{user.shift_hours}' ({err}).",
+                )
 
         # 4. Approval Tier Limit for Write/Approve/Export actions
         if (

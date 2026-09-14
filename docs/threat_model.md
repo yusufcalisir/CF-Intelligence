@@ -525,6 +525,7 @@ The Zero-Trust Identity suite introduces PKI certificate management, dynamic mut
 * **Mitigations**:
   * **OIDC JWT Authenticator (`oidc_authenticator.py`)**: Validates bearer tokens (RS256/HS256) and extracts claims (`sub`, `bank_id`, `roles`, `clearance_level`, `shift_hours`, `approval_tier`, `allowed_ip_subnets`).
   * **Dynamic ABAC Engine (`abac_engine.py`)**: Enforces Multi-Tenant Bank Isolation (`RULE-TENANT-ISOLATION`), IP Subnet Range Restriction (`RULE-IP-RANGE-RESTRICTION`), Shift Hours Window (`RULE-SHIFT-HOURS-RESTRICTION`), Approval Tier Limit (`RULE-APPROVAL-TIER-EXCEEDED`), and Security Clearance Level (`RULE-CLEARANCE-LEVEL-INSUFFICIENT`).
+  * **Fail-Closed Zero-Trust Enforcement**: Malformed IP addresses or unparseable shift hour strings immediately fail closed (`allowed=False`) rather than falling through to access approval, preventing parser evasion attacks.
 
 | STRIDE Category | Threat Vector | Platform Mitigation |
 |:---|:---|:---|

@@ -106,6 +106,69 @@ class TestABACEngine:
         assert result.allowed is False
         assert result.policy_name == "RULE-APPROVAL-TIER-EXCEEDED"
 
+    def test_malformed_ip_fails_closed(self):
+        engine = ABACEngine()
+        user = UserClaims(
+            sub="u4",
+            username="analyst_strict_ip",
+            bank_id="bank_a",
+            allowed_ip_subnets=["10.0.0.0/16"],
+        )
+        resource = ABACResource(resource_type="alert", resource_id="alt_12", bank_id="bank_a")
+
+        result = engine.evaluate_access(user, resource, action="read", client_ip="invalid.ip.format.here")
+        assert result.allowed is False
+        assert result.policy_name == "RULE-IP-RANGE-RESTRICTION"
+        assert "Malformed or unparseable client IP" in result.reason
+
+    def test_malformed_shift_hours_fails_closed(self):
+        engine = ABACEngine()
+        user = UserClaims(
+            sub="u5",
+            username="analyst_bad_shift",
+            bank_id="bank_a",
+            shift_hours="bad-range-format",
+        )
+        resource = ABACResource(resource_type="alert", resource_id="alt_13", bank_id="bank_a")
+
+        result = engine.evaluate_access(user, resource, action="read")
+        assert result.allowed is False
+        assert result.policy_name == "RULE-SHIFT-HOURS-RESTRICTION"
+        assert "Unable to evaluate shift window" in result.reason
+
+    def test_clearance_level_exceeded(self):
+        engine = ABACEngine()
+        user = UserClaims(
+            sub="u6",
+            username="low_clearance",
+            bank_id="bank_a",
+            clearance_level=1,
+        )
+        resource = ABACResource(
+            resource_type="model",
+            resource_id="mod_top_secret",
+            bank_id="bank_a",
+            classification_level=3,
+        )
+
+        result = engine.evaluate_access(user, resource, action="read")
+        assert result.allowed is False
+        assert result.policy_name == "RULE-CLEARANCE-LEVEL-INSUFFICIENT"
+
+    def test_superadmin_override(self):
+        engine = ABACEngine()
+        user = UserClaims(
+            sub="u_admin",
+            username="super_user",
+            bank_id="bank_a",
+            roles=["super_admin"],
+        )
+        resource = ABACResource(resource_type="alert", resource_id="alt_99", bank_id="bank_b")
+
+        result = engine.evaluate_access(user, resource, action="read")
+        assert result.allowed is True
+        assert result.policy_name == "RULE-SUPERADMIN-OVERRIDE"
+
 
 class TestVaultClient:
     """Verify HashiCorp Vault secrets manager adapter."""
