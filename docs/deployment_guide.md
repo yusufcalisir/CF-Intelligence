@@ -23,7 +23,7 @@ This comprehensive guide details the production deployment models for the **Coll
   │ 1. Enterprise Nginx Gateway (`cfi-gateway`)                 │
   │    • Same-Origin Routing: eliminates browser CORS           │
   │    • WebSocket Keepalive: 86400s timeout on /ws/*           │
-  │    • Hardened Headers: HSTS, CSP, X-Frame-Options: SAMEORIGIN│
+  │    • Hardened Headers: HSTS, CSP, X-Frame-Options           │
   └──────────────────────┬──────────────────────────────────────┘
                          │
         ┌────────────────┴────────────────┐
