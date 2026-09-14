@@ -71,7 +71,7 @@ Database migrations are managed programmatically via Alembic (`alembic.ini` and 
           return list(VALID_TENANTS)
   ```
 - **Automatic Schema Adoption (`_ensure_migrated_or_stamped`):**
-  When booting against pre-existing database tables created during bootstrap, `MigrationManager` automatically inspects domain table presence and stamps the active `head` revision, preventing revision collision crashes.
+  When booting against pre-existing database tables created during bootstrap, `migration_manager` utilities automatically inspect domain table presence and stamp the active `head` revision, preventing revision collision crashes.
 - **Offline Migration Mode:**
   Supports standalone SQL DDL generation via `alembic upgrade head --sql` for air-gapped banking deployments.
 
@@ -136,12 +136,15 @@ Each institution maintains isolated cryptographic keys managed through `TenantKM
 ```python
 from app.infrastructure.database import active_tenant
 from app.infrastructure.database.tenant_provisioner import TenantProvisioner
-from app.infrastructure.database.migration_manager import MigrationManager
+from app.infrastructure.database.migration_manager import upgrade_head
 
 # 1. Onboard a new bank node with automated Alembic migration
 provisioner = TenantProvisioner()
 tenant_record = await provisioner.provision_tenant("bank_delta", "Delta Regional Bank")
 print("Provisioned:", tenant_record.name, tenant_record.status)
+
+# Optional: Run Alembic migrations to latest head across schemas
+upgrade_head()
 
 # 2. Execute tenant-isolated operation
 token = active_tenant.set("bank_delta")
@@ -160,8 +163,8 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 
 | Test Suite | File Path | Verified Capabilities | Status |
 | :--- | :--- | :--- | :---: |
-| **Tenant Lifecycle** | `tests/unit/test_saas_multi_tenancy.py` | State transitions (PROVISIONING $\to$ ACTIVE $\to$ SUSPENDED $\to$ DELETED) | `3/3 PASSED` |
-| **BOLA / IDOR Security** | `tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |
-| **Alembic Migrations** | `tests/integration/test_alembic_migrations.py` | Dual revision linear head (`002_core_and_aml_tables`), offline SQL, dynamic discovery | `4/4 PASSED` |
-| **KMS Key Lifecycle** | `tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |
-| **Concurrency Safety** | `tests/unit/test_concurrency_safety.py` | Atomic quota acquire under 50 threads, single champion promotion, idempotency locks | `5/5 PASSED` |
+| **Tenant Lifecycle** | `backend/tests/unit/test_saas_multi_tenancy.py` | State transitions (PROVISIONING $\to$ ACTIVE $\to$ SUSPENDED $\to$ DELETED) | `3/3 PASSED` |
+| **BOLA / IDOR Security** | `backend/tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |
+| **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Dual revision linear head (`002_core_and_aml_tables`), offline SQL, dynamic discovery | `4/4 PASSED` |
+| **KMS Key Lifecycle** | `backend/tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |
+| **Concurrency Safety** | `backend/tests/unit/test_concurrency_safety.py` | Atomic quota acquire under 50 threads, single champion promotion, idempotency locks | `5/5 PASSED` |
