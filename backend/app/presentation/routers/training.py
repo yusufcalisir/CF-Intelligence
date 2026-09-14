@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api/v1/training", tags=["training"])
 
 
 @router.get("/{simulation_id}/rounds")
+@router.get("/rounds/{simulation_id}")
 async def get_training_rounds(simulation_id: str) -> list[dict]:
     """Get all training rounds for a simulation.
 

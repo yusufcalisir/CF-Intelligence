@@ -119,5 +119,6 @@ async def training_websocket_default(websocket: WebSocket) -> None:
 
 
 @router.websocket("/ws/training/{simulation_id}")
+@router.websocket("/api/v1/training/ws/{simulation_id}")
 async def training_websocket(websocket: WebSocket, simulation_id: str) -> None:
     await _handle_training_ws(websocket, simulation_id)

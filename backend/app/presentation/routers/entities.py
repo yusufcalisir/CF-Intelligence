@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from fastapi import APIRouter, HTTPException, Query
+from pydantic import BaseModel, Field
 
 from app.application.schemas.phase2 import (
     EntityFuzzyResolveMatch,
@@ -228,6 +229,41 @@ async def run_dh_psi_match(bank_a_id: str, bank_b_id: str, enable_fuzzy: bool = 
     )
     return {
         "protocol": "Commutative Diffie-Hellman (DH-PSI)",
+        "matches": result.get("matches", []),
+        "stats": result.get("stats", {}),
+        "zero_raw_pii_enforced": True,
+    }
+
+
+psi_router = APIRouter(prefix="/api/v1/psi", tags=["psi"])
+
+
+class PSIMatchDirectRequest(BaseModel):
+    source_bank_id: str = "bank_alpha"
+    target_bank_id: str = "bank_beta"
+    client_ecdh_blinded_hashes: list[str] = []
+    enable_fuzzy: bool = True
+
+
+@psi_router.post("/match")
+async def run_dh_psi_match_direct(
+    payload: PSIMatchDirectRequest | None = None,
+    bank_a_id: str | None = None,
+    bank_b_id: str | None = None,
+    enable_fuzzy: bool = True,
+) -> dict:
+    """Execute Privacy-Preserving DH-PSI match directly targeting /api/v1/psi/match."""
+    src = (payload.source_bank_id if payload else None) or bank_a_id or "bank_alpha"
+    tgt = (payload.target_bank_id if payload else None) or bank_b_id or "bank_beta"
+    fuzzy = payload.enable_fuzzy if payload else enable_fuzzy
+    result = _psi_service.run_psi(
+        bank_a_id=src,
+        bank_b_id=tgt,
+        enable_fuzzy=fuzzy,
+    )
+    return {
+        "protocol": "Commutative Diffie-Hellman (DH-PSI)",
+        "matched_cardinality": len(result.get("matches", [])),
         "matches": result.get("matches", []),
         "stats": result.get("stats", {}),
         "zero_raw_pii_enforced": True,

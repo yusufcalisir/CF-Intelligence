@@ -166,6 +166,16 @@ async def list_registered_clients() -> list[ClientCapabilityResponse]:
     return results
 
 
+class NegotiateRequest(BaseModel):
+    bank_id: str = Field(..., min_length=3, max_length=64)
+    base_batch_size: int = Field(default=32, ge=1, le=4096)
+    base_epochs: int = Field(default=5, ge=1, le=100)
+    hardware_type: str | None = None
+    available_vram_gb: float | None = None
+    bandwidth_mbps: float | None = None
+    local_sample_count: int | None = None
+
+
 @router.get("/negotiate", response_model=NegotiatedResponse)
 async def negotiate_training_params(
     bank_id: str,
@@ -176,6 +186,24 @@ async def negotiate_training_params(
     neg = coordinator_service.negotiate_parameters(bank_id, base_batch_size, base_epochs)
     return NegotiatedResponse(
         bank_id=bank_id,
+        batch_size=neg.batch_size,
+        local_epochs=neg.local_epochs,
+        gradient_accumulation_steps=neg.gradient_accumulation_steps,
+        use_cuda=neg.use_cuda,
+        status=neg.status,
+    )
+
+
+@router.post("/negotiate", response_model=NegotiatedResponse)
+async def negotiate_training_params_post(
+    req: NegotiateRequest,
+) -> NegotiatedResponse:
+    """Negotiate training hyper-parameters customized for a bank client via JSON payload."""
+    neg = coordinator_service.negotiate_parameters(
+        req.bank_id, req.base_batch_size, req.base_epochs
+    )
+    return NegotiatedResponse(
+        bank_id=req.bank_id,
         batch_size=neg.batch_size,
         local_epochs=neg.local_epochs,
         gradient_accumulation_steps=neg.gradient_accumulation_steps,

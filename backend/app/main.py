@@ -920,6 +920,7 @@ else:
     app.include_router(rules.router)
     app.include_router(bank_client.router)
     app.include_router(entities.router)
+    app.include_router(entities.psi_router)
     app.include_router(graph.router)
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
