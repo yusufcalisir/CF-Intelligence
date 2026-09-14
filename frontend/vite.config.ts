@@ -11,33 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    chunkSizeWarningLimit: 600,
-    rollupOptions: {
-      output: {
-        manualChunks(id: string) {
-          if (id.includes('node_modules')) {
-            if (id.includes('react-dom') || id.includes('react-router-dom') || id.includes('/react/')) {
-              return 'vendor-react';
-            }
-            if (id.includes('@tanstack/react-query') || id.includes('axios') || id.includes('zustand')) {
-              return 'vendor-query';
-            }
-            if (id.includes('recharts')) {
-              return 'vendor-charts';
-            }
-            if (id.includes('cytoscape') || id.includes('@xyflow')) {
-              return 'vendor-graph';
-            }
-            if (id.includes('framer-motion')) {
-              return 'vendor-motion';
-            }
-            if (id.includes('lucide-react')) {
-              return 'vendor-icons';
-            }
-          }
-        },
-      },
-    },
+    chunkSizeWarningLimit: 1200,
   },
   server: {
     port: 3000,
