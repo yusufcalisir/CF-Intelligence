@@ -55,7 +55,7 @@ def run_abac_benchmark(
         t0 = time.perf_counter()
         for _ in range(iterations):
             t_req_start = time.perf_counter()
-            res = engine.evaluate_access(user, resource, action="read")
+            _ = engine.evaluate_access(user, resource, action="read")
             latencies_us.append((time.perf_counter() - t_req_start) * 1e6)
         elapsed = time.perf_counter() - t0
         round_throughput = iterations / elapsed
@@ -67,7 +67,7 @@ def run_abac_benchmark(
     p99_latency_ms = (statistics.quantiles(latencies_us, n=100)[98]) / 1000.0
 
     print("=" * 60)
-    print(f"ABAC Benchmark Result:")
+    print("ABAC Benchmark Result:")
     print(f"  Throughput:  {mean_throughput:,.0f} req/s")
     print(f"  Mean Latency: {mean_latency_ms:.4f} ms")
     print(f"  p99 Latency:  {p99_latency_ms:.4f} ms")

@@ -20,7 +20,6 @@ from typing import Any
 
 from locust import FastHttpUser, between, task
 
-
 _BANK_IDS = ["bank_alpha", "bank_beta", "bank_gamma"]
 _CURRENCIES = ["EUR", "USD", "GBP", "CHF"]
 _MERCHANTS = ["crypto_exchange", "electronics", "wire_transfer", "gambling", "retail", "jewelry"]

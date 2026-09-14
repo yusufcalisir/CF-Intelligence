@@ -6,7 +6,7 @@ import logging
 import socket
 import ssl
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ class ConnectorHealthStatus:
     broker_connected: bool = True
     cert_days_remaining: int = 365
     last_ping_timestamp: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     details: dict[str, Any] = field(default_factory=dict)
 
@@ -45,7 +45,7 @@ class ConnectorHealthMonitor:
                 (self.broker_host, self.broker_port), timeout=timeout
             ):
                 return True
-        except (OSError, socket.timeout, ConnectionRefusedError) as exc:
+        except (TimeoutError, OSError, ConnectionRefusedError) as exc:
             logger.warning(
                 "Broker ping failed for %s:%d - %s",
                 self.broker_host,
@@ -66,8 +66,8 @@ class ConnectorHealthMonitor:
                 # Format: 'MMM DD HH:MM:SS YYYY GMT'
                 expire_dt = datetime.strptime(
                     not_after_str, "%b %d %H:%M:%S %Y %Z"
-                ).replace(tzinfo=timezone.utc)
-                now = datetime.now(timezone.utc)
+                ).replace(tzinfo=UTC)
+                now = datetime.now(UTC)
                 days_left = (expire_dt - now).days
                 return max(days_left, 0)
         except Exception as exc:

@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import asyncio
-import io
 import json
 import random
 import statistics
@@ -170,7 +169,7 @@ async def run_realtime_benchmark(
         s = sorted(lats)
         n = len(s)
         pct = lambda p: round(s[min(int(p * n), n - 1)], 2)  # noqa: E731
-        within_sla = sum(1 for l in lats if l <= sla_ms)
+        within_sla = sum(1 for lat in lats if lat <= sla_ms)
         return {
             "n_successful": n,
             "throughput_rps": round(n_requests / dur, 1),
@@ -208,8 +207,6 @@ def print_report(report: dict) -> None:
     # Force UTF-8 output on Windows terminals
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-
-    out = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace") if hasattr(sys.stdout, "buffer") else sys.stdout
 
     def _pr(line: str) -> None:
         try:

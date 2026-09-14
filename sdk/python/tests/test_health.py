@@ -1,7 +1,7 @@
 """Unit tests for ConnectorHealthMonitor and ConnectorHealthStatus."""
 
 from unittest.mock import patch
-import pytest
+
 from cfi_connector_sdk.health import ConnectorHealthMonitor, ConnectorHealthStatus
 
 

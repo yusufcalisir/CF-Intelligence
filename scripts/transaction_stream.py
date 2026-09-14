@@ -13,19 +13,21 @@ Usage:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import random
 import statistics
 import sys
 import time
 import uuid
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass, field
 from pathlib import Path
 
 _BACKEND = Path(__file__).resolve().parent.parent / "backend"
 sys.path.insert(0, str(_BACKEND))
 
 import httpx
+
 from app.main import app
 
 BANK_IDS = ["bank_alpha", "bank_beta", "bank_gamma", "bank_delta", "bank_epsilon"]
@@ -190,7 +192,7 @@ async def run_stream_pipeline(
     ) as client:
         print("  [WARM-UP] Priming inference path...", flush=True)
         for bk in BANK_IDS[:3]:
-            try:
+            with contextlib.suppress(Exception):
                 await client.post(
                     "/api/v1/transactions/score",
                     json={
@@ -201,8 +203,6 @@ async def run_stream_pipeline(
                     },
                     headers={"X-Tenant-ID": bk, "X-Bank-ID": bk},
                 )
-            except Exception:
-                pass
         print("  [WARM-UP] Done.\n", flush=True)
 
         prod_task = asyncio.create_task(producer(queue, tps, duration_s, stats))

@@ -11,13 +11,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 import logging
 import random
 import time
-from typing import Any
-
 import urllib.request
-import json
+from typing import Any
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("chaos_harness")
@@ -81,7 +80,7 @@ async def load_generator_worker(worker_id: int, base_url: str, duration_sec: int
 
 async def run_chaos_harness(base_url: str, duration_sec: int, rate_per_sec: int, num_workers: int):
     logger.info("Starting Chaos Load Harness -> target: %s, duration: %ds, rate: %d req/s across %d workers", base_url, duration_sec, rate_per_sec, num_workers)
-    
+
     per_worker_rate = max(1, rate_per_sec // num_workers)
     tasks = [
         asyncio.create_task(load_generator_worker(i, base_url, duration_sec, per_worker_rate))

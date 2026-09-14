@@ -13,12 +13,12 @@ from __future__ import annotations
 
 import ast
 import copy
-import hashlib
 import logging
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "backend"))
@@ -268,12 +268,9 @@ class ASTMutator:
 
     def _test_byzantine_defense_mutants(self) -> None:
         """Injects boundary scale and logic mutants into SpectralByzantineDefense."""
-        from app.domain.byzantine_defense import SpectralByzantineDefense
-
         # Mutant B1: Outlier detection threshold relaxed by 100x
         def test_relaxed_threshold() -> bool:
             # Baseline catches 50x outlier
-            defense = SpectralByzantineDefense()
             updates = {
                 "bank_a": np.ones((5, 5)) * 0.1,
                 "bank_b": np.ones((5, 5)) * 0.1,

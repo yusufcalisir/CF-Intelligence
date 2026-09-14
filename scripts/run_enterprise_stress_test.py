@@ -27,7 +27,7 @@ import sys
 import time
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 logging.basicConfig(
@@ -76,7 +76,7 @@ class PaymentTransactionGenerator:
             # pacs.008 FIToFICstmrCdtTrf header
             "GrpHdr": {
                 "MsgId": f"MSG-{tx_id[:8].upper()}",
-                "CreDtTm": datetime.now(timezone.utc).isoformat(),
+                "CreDtTm": datetime.now(UTC).isoformat(),
                 "NbOfTxs": "1",
                 "SttlmInf": {"SttlmMtd": "CLRG"},
                 "InstgAgt": {"FinInstnId": {"BIC": random.choice(_BANK_BICS)}},
@@ -163,7 +163,7 @@ class StressTestResult:
     duration_actual_seconds: float = 0.0
     per_bank_throughput: dict[str, float] = field(default_factory=dict)
     started_at: str = field(
-        default_factory=lambda: datetime.now(timezone.utc).isoformat()
+        default_factory=lambda: datetime.now(UTC).isoformat()
     )
     completed_at: str = ""
 
@@ -299,7 +299,7 @@ class EnterpriseStressTestRunner:
             error_rate_pct=error_rate,
             duration_actual_seconds=elapsed,
             per_bank_throughput=per_bank,
-            completed_at=datetime.now(timezone.utc).isoformat(),
+            completed_at=datetime.now(UTC).isoformat(),
         )
         return result
 
@@ -400,7 +400,7 @@ def main() -> None:
     json_result = result.to_dict()
 
     os.makedirs(args.output_dir, exist_ok=True)
-    timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+    timestamp = datetime.now(UTC).strftime("%Y%m%d_%H%M%S")
     json_path = os.path.join(args.output_dir, f"benchmark_{timestamp}.json")
     md_path = os.path.join(args.output_dir, f"benchmark_{timestamp}.md")
 

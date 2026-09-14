@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -20,7 +20,7 @@ class NormalizedTransaction(BaseModel):
     amount: float = Field(..., gt=0, description="Transaction monetary amount")
     currency: str = Field(default="USD", description="ISO 4217 currency code")
     timestamp: datetime = Field(
-        default_factory=lambda: datetime.now(timezone.utc),
+        default_factory=lambda: datetime.now(UTC),
         description="UTC transaction timestamp",
     )
     merchant_category_code: str = Field(
@@ -56,6 +56,4 @@ class BaseTransactionAdapter(ABC):
         """Validate transaction schema against basic compliance rules."""
         if tx.amount <= 0:
             return False
-        if len(tx.currency) != 3:
-            return False
-        return True
+        return len(tx.currency) == 3

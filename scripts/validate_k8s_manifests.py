@@ -18,13 +18,13 @@ import argparse
 import http.server
 import json
 import os
-from pathlib import Path
 import shutil
 import socketserver
 import subprocess
 import sys
 import threading
 import time
+from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -125,7 +125,7 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format, *args):
+    def log_message(self, format_str, *args):
         pass
 
 
@@ -257,7 +257,7 @@ def main() -> int:
                 print(f"    [OK] {r}")
         else:
             all_passed = False
-            print(f"  Status: FAILED")
+            print("  Status: FAILED")
             if stdout:
                 print(f"  STDOUT:\n{stdout}")
             if stderr:

@@ -52,26 +52,26 @@ def download_via_kaggle_api(dataset_key: str) -> bool:
     try:
         import kaggle  # type: ignore
         logger.info("Downloading %s via Kaggle API to %s...", dataset_key, target_dir)
-        
+
         if dataset_key == "ieee_cis":
             kaggle.api.competition_download_files("ieee-fraud-detection", path=str(target_dir), quiet=False)
         else:
             kaggle.api.dataset_download_files(cfg["kaggle_slug"], path=str(target_dir), unzip=True, quiet=False)
-        
+
         # Unzip any zip files in the directory
         for z in target_dir.glob("*.zip"):
             logger.info("Extracting %s...", z.name)
             with zipfile.ZipFile(z, "r") as zip_ref:
                 zip_ref.extractall(target_dir)
             z.unlink()
-        
+
         logger.info("Successfully downloaded and extracted %s!", dataset_key)
         return True
     except ImportError:
         logger.warning("Kaggle Python SDK not installed. Run: pip install kaggle")
     except Exception as exc:
         logger.error("Kaggle API download failed for %s: %s", dataset_key, exc)
-    
+
     return False
 
 
@@ -88,7 +88,7 @@ def verify_dataset(dataset_key: str) -> bool:
     if has_parquet or has_csv:
         logger.info("[VERIFIED] %s is available at %s", dataset_key.upper(), target_dir)
         return True
-    
+
     logger.warning("[MISSING] %s not found in %s", dataset_key.upper(), target_dir)
     return False
 
@@ -138,7 +138,7 @@ def main() -> None:
         print(f"\n--- Processing: {key.upper()} ---")
         if verify_dataset(key):
             continue
-        
+
         if args.verify_only:
             print_manual_instructions(key)
             continue

@@ -1,7 +1,7 @@
 """Unit tests for CFI Connector SDK Adapters."""
 
-from datetime import datetime, timezone
-import pytest
+from datetime import UTC, datetime
+
 from cfi_connector_sdk.adapters.entity_adapter import BaseEntityAdapter
 from cfi_connector_sdk.adapters.feature_adapter import BaseFeatureAdapter
 from cfi_connector_sdk.adapters.transaction_adapter import (
@@ -53,7 +53,7 @@ def test_normalized_transaction_invalid_schema():
 
 def test_feature_adapter_velocity_extraction():
     feature_adapter = BaseFeatureAdapter()
-    now_dt = datetime.now(timezone.utc)
+    now_dt = datetime.now(UTC)
 
     history = [
         NormalizedTransaction(

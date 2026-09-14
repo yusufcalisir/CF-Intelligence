@@ -20,11 +20,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
 import shutil
 import subprocess
 import sys
 import time
+from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -55,7 +55,7 @@ def parse_backend_coverage(cov_file: Path) -> dict[str, Any] | None:
     if not cov_file.exists():
         return None
     try:
-        with open(cov_file, "r", encoding="utf-8") as f:
+        with open(cov_file, encoding="utf-8") as f:
             data = json.load(f)
         totals = data.get("totals", {})
         stmts = totals.get("num_statements", 0)
@@ -115,7 +115,7 @@ def parse_frontend_coverage(cov_file: Path) -> dict[str, Any] | None:
     if not cov_file.exists():
         return None
     try:
-        with open(cov_file, "r", encoding="utf-8") as f:
+        with open(cov_file, encoding="utf-8") as f:
             data = json.load(f)
         total = data.get("total", {})
         stmts = total.get("statements", {})

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -19,7 +20,6 @@ import random
 import statistics
 import sys
 import time
-import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -167,14 +167,12 @@ async def execute_load_test(
         for b in ["bank_alpha", "bank_beta", "bank_gamma"]:
             payload = _generate_scoring_payload()
             payload["bank_id"] = b
-            try:
+            with contextlib.suppress(Exception):
                 await client.post(
                     "http://testserver/api/v1/predict",
                     json=payload,
                     headers={"X-Tenant-ID": b, "Content-Type": "application/json"},
                 )
-            except Exception:
-                pass
 
         t_start_total = time.perf_counter()
         workers = [

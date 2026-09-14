@@ -1,7 +1,5 @@
 """Unit tests for CFI LocalFLClient."""
 
-import zlib
-import pytest
 from cfi_connector_sdk.client.local_fl_client import LocalFLClient
 
 

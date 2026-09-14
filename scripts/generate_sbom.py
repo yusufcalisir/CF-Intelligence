@@ -10,9 +10,9 @@ Outputs:
 import datetime
 import importlib.metadata
 import json
-from pathlib import Path
 import sys
 import uuid
+from pathlib import Path
 
 
 def generate_sbom(output_path: Path = Path("storage/sbom_cyclonedx.json")) -> dict:
@@ -49,7 +49,7 @@ def generate_sbom(output_path: Path = Path("storage/sbom_cyclonedx.json")) -> di
     frontend_pkg_path = Path("frontend/package.json")
     if frontend_pkg_path.exists():
         try:
-            with open(frontend_pkg_path, "r", encoding="utf-8") as f:
+            with open(frontend_pkg_path, encoding="utf-8") as f:
                 pkg_data = json.load(f)
             deps = pkg_data.get("dependencies", {})
             dev_deps = pkg_data.get("devDependencies", {})
@@ -77,7 +77,7 @@ def generate_sbom(output_path: Path = Path("storage/sbom_cyclonedx.json")) -> di
         "serialNumber": f"urn:uuid:{uuid.uuid4()}",
         "version": 1,
         "metadata": {
-            "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
             "tools": [
                 {
                     "vendor": "CF-Intelligence",

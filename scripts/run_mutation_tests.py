@@ -85,7 +85,6 @@ def run_backend_mutation_suite() -> tuple[bool, int, int, list]:
 
     total_mutants = len(records)
     killed_mutants = sum(1 for r in records if r.status == "KILLED")
-    survived_mutants = total_mutants - killed_mutants
     success = total_mutants > 0 and (killed_mutants / total_mutants) >= 0.75
 
     print(f"\nDynamic AST Mutants Evaluated ({total_mutants} total):")
