@@ -903,9 +903,9 @@ flowchart LR
 
 | Layer | Component | Engine / Implementation | Enforced Protection & Limits | Response Code |
 | :--- | :--- | :--- | :--- | :---: |
-| **Layer 1** | **Cloudflare Perimeter** | Anycast WAF & Bot Management (`deployments/terraform/cloudflare/`) | L3/L4 DDoS absorption, Bot Fight Mode, TLS 1.3 Strict, 60 reqs / 10s on `/api/*`. | `403 Challenge` / `429` |
+| **Layer 1** | **Cloudflare Perimeter** | Anycast WAF & L7 Rate Limiter (`scripts/setup_cloudflare_waf.py`) | L3/L4 DDoS absorption, TLS 1.3 Strict, custom firewall rules (sensitive path & null-byte blocking), 100 reqs / 10s challenge on mutating routes. | `403 Challenge` / `429` |
 | **Layer 2** | **Vercel Security Middleware** | Node.js Runtime Middleware (`frontend/middleware.ts`) | `@upstash/ratelimit` global sliding window: 20 reqs/min for ML inference, 60 reqs/min for general API. | `429 Too Many Requests` |
-| **Layer 3** | **FastAPI Application** | `slowapi` & `DDoSProtectionMiddleware` (`backend/app/main.py`) | In-process granular quotas (`/predict`: 60/min, `/simulations`: 10/min) and sliding-window burst protection (100 req/10s) with 5,000 IP hard ceiling eviction. | `429 Too Many Requests` |
+| **Layer 3** | **Application WAF & Rate Limiting** | `PerimeterWAFGuard`, `slowapi` & `DDoSProtectionMiddleware` (`backend/app/main.py`) | OWASP Top 10 payload rejection (SQLi, XSS, null-bytes across URL, body, and HTTP headers), thread-safe brute-force lockout with bounded memory pruning (1,000 IPs), in-process route quotas (`/predict`: 60/min, `/simulations`: 10/min), and sliding-window burst protection (100 req/10s). | `400 Bad Request` / `403 Forbidden` / `429 Too Many Requests` |
 
 ### 10.2 Broken Object Level Authorization (BOLA/IDOR) & gRPC Cross-Tenant Isolation
 
@@ -917,12 +917,13 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 - **Fail-Closed Zero-Trust Enforcement:** In strict accordance with Zero-Trust principles, any malformed client IP string or unparseable shift hour range fails closed immediately (`allowed=False`) rather than falling open, preventing parser evasion exploits. The stateless engine achieves **>122,000 evaluations/s** with **7.8 µs** mean latency.
 - **gRPC mTLS Cross-Tenant Registration:** In the gRPC transport servicer (`servicer.py`), certificate fingerprints are bound authoritatively at onboarding time (`issue_mtls_certificate`), not on first gRPC contact — this closes the trust-on-first-use race condition where an unregistered attacker could claim a bank identity before the legitimate bank onboards. Note: this still relies on a self-signed certificate model rather than a full CA chain of trust (Vault PKI root CA signature verification is not yet implemented); that remains a known scope limitation.
 
-### 10.3 Enterprise Authentication & Brute-Force Lockout Defense (`auth_service.py` & `password_hasher.py`)
+### 10.3 Enterprise Authentication, OIDC SSO & Brute-Force Lockout Defense (`auth_service.py`, `oidc_authenticator.py`, `password_hasher.py`)
 
 - **Bcrypt Password Hashing:** Passwords are hashed using bcrypt with adaptive work factor (cost=12, 4096 iterations) and cryptographically secure per-password salt. Plaintext, MD5, and SHA-1 storage are strictly prohibited.
 - **Short-Lived JWT Access Tokens:** Access tokens have an enforced 15-minute (900s) lifetime signed with 256-bit HMAC-SHA256 (RFC 7518 compliant).
+- **Cryptographic OIDC Token Verification (`OIDCAuthenticator`):** Enterprise federated SSO bearer tokens are validated via PyJWT HMAC-SHA256 signature verification (`verify_signature: True`, `verify_exp: True`). Forged signatures and expired tokens are rejected with explicit error codes, extracting authoritative claims (`sub`, `bank_id`, `roles`, `clearance_level`, `shift_hours`, `approval_tier`, `allowed_ip_subnets`).
 - **Refresh Token Rotation:** Refresh tokens (7-day validity) are single-use. Exchanging a refresh token via `POST /api/v1/auth/refresh` immediately revokes the previous token and issues a new access/refresh token pair, preventing replay of stolen credentials.
-- **Brute-Force Account & IP Lockout:** Consecutive failed authentication attempts are tracked per user and client IP. After **5 failed attempts**, the account and IP are temporarily locked out for **15 minutes (900 seconds)**, returning HTTP `429 Too Many Requests` with `Retry-After: 900`.
+- **Brute-Force Account & IP Lockout:** Consecutive failed authentication attempts are tracked per user and client IP. After **5 failed attempts**, the account and IP are temporarily locked out for **15 minutes (900 seconds)**, returning HTTP `429 Too Many Requests` with `Retry-After: 900`. Lockouts can be reset via `reset_client_lockout` upon valid authentication.
 
 ### 10.4 Production Error Sanitization & Sentry Correlation (`error_handler.py`)
 
@@ -930,15 +931,23 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 - **RFC 7807 Problem Details:** Clients receive a clean, uniform generic message (`"Something went wrong. An unexpected internal error occurred."`) alongside a unique incident tracking reference (`incident_id = "inc_..."` and `X-Incident-ID` response header).
 - **Server-Side Diagnostics & Sentry:** Complete Python tracebacks and request diagnostics are logged server-side with structured metadata and dispatched to Sentry with attached incident tags.
 
-### 10.5 Strict CORS Whitelist & HTTP Security Headers (`security_headers.py`)
+### 10.5 Strict CORS Whitelist, Perimeter WAF & HTTP Security Headers (`security_headers.py`, `perimeter_waf.py`)
 
 - **Wildcard Prohibition:** Wildcard CORS (`allow_origins=["*"]`) is strictly banned. CORS is constrained to explicit platform domains (`https://cf-intelligence.vercel.app`, `https://cfi-platform.vercel.app`), local development ports, and authenticated Vercel preview regexes (`^https:\/\/(cf-intelligence|cf-intelligence-git-[a-z0-9-]+-yusufcalisirs-projects)\.vercel\.app$`).
-- **Security Headers Injection:** Outbound responses automatically wrap the following headers:
-  - `Content-Security-Policy`: Restricts unauthorized script and style execution.
-  - `Strict-Transport-Security`: Enforces HTTPS (`max-age=31536000; includeSubDomains`).
+- **Perimeter WAF Guard (`PerimeterWAFGuard`):** Inspects incoming HTTP requests for OWASP Top 10 injection patterns:
+  - **SQL Injection (SQLi):** Scans URL path, JSON body, and all HTTP request headers (e.g. `X-Filter`, `User-Agent`) for SQLi patterns (`UNION SELECT`, `DROP TABLE`, `OR 1=1`, comment queries).
+  - **Cross-Site Scripting (XSS):** Blocks `<script>` tags, `javascript:` pseudo-protocols, and DOM event handlers (`onload=`) in bodies and headers.
+  - **Null-Byte Injection:** Blocks `\x00` null bytes across paths, bodies, and header keys/values.
+  - **Sensitive Path Scanning:** Rejects access to `/.env`, `/.git`, `/admin`, `/actuator`, `/wp-admin`, and `/config.json`.
+  - **Thread Safety & Memory Pruning:** All lockout tracking dictionary mutations are synchronized via `threading.Lock` and bounded by automatic LRU pruning (`_max_tracked_ips = 1000`) to eliminate unbounded memory growth.
+- **Defensive Security Headers Injection:** Outbound responses automatically wrap the following defensive headers:
+  - `Content-Security-Policy`: API-strict directive (`default-src 'none'; script-src 'none'; connect-src 'self'`), with tailored CDN allowances on `/docs` and `/scalar`.
+  - `Strict-Transport-Security`: Enforces HTTPS (`max-age=31536000; includeSubDomains; preload`).
   - `X-Content-Type-Options: nosniff`: Prevents MIME-sniffing attacks.
-  - `X-Frame-Options: DENY`: Blocks clickjacking.
-  - `Referrer-Policy: strict-origin-when-cross-origin`: Minimizes referrer leakage.
+  - `X-Frame-Options: DENY`: Blocks iframe clickjacking.
+  - `Referrer-Policy: no-referrer`: Eliminates cross-origin URL leakage.
+  - `Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=()`: Disables unused browser hardware interfaces.
+  - `X-XSS-Protection: 1; mode=block`: Legacy browser filter hardening.
 
 ### 10.6 Real-Time Scoring Gateway, Tenant Quotas & SLA Monitoring
 

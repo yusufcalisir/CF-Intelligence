@@ -559,6 +559,23 @@ In strict accordance with Zero-Trust architectural invariants, `ABACEngine` enfo
 - **Shift Window Exception Handling**: If employee shift string formats are unparseable or corrupted, the engine immediately denies access with `allowed=False` (`RULE-SHIFT-HOURS-RESTRICTION`).
 - **High-Throughput In-Memory Performance**: Evaluated via `scripts/run_abac_benchmark.py`, the stateless policy engine sustains **122,874 evaluations/second** with mean latency of **0.0078 ms (7.8 µs)** and p99 latency of **0.0184 ms (18.4 µs)**, introducing negligible overhead in the request pipeline.
 
+### 15.2 Cryptographic OIDC JWT Token Verification & Claim Extraction (`oidc_authenticator.py`)
+Enterprise federated SSO and consortium bearer tokens are validated through [`OIDCAuthenticator`](../backend/app/infrastructure/security/oidc_authenticator.py):
+- **HMAC-SHA256 Cryptographic Signature Enforcement**: Uses PyJWT `jwt.decode()` with mandatory signature verification (`verify_signature: True`, `verify_exp: True`), rejecting forged tokens claiming elevated roles (`super_admin`) or invalid signing secrets.
+- **Authoritative Claim Parsing**: Extracts subject (`sub`), tenant bank identity (`bank_id`), RBAC roles (`roles`), security clearance level (`clearance_level`), shift hours window (`shift_hours`), approval tier ceiling (`approval_tier`), and allowed IP subnet CIDRs (`allowed_ip_subnets`).
+- **Dynamic Key Management**: Automatically resolves symmetric signing secret from application configuration (`settings.oidc_jwt_signing_secret`), ensuring synchronization with the security gateway and auth routers.
+
+### 15.3 Application Perimeter Defense, WAF Guard & Defensive Security Headers
+Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGuard`](../backend/app/infrastructure/security/perimeter_waf.py) and [`SecurityHeadersMiddleware`](../backend/app/infrastructure/security/security_headers.py):
+- **Deep OWASP Top 10 Header & Body Inspection**: Every request URL path, body payload, and all HTTP request headers (including `User-Agent`, `Referer`, and custom `X-*` headers) are systematically inspected for:
+  - **SQL Injection (SQLi)**: Regex patterns (`UNION SELECT`, `DROP TABLE`, `OR 1=1`, inline comment sequences).
+  - **Cross-Site Scripting (XSS)**: `<script>` tags, `javascript:` pseudoprotocols, and DOM event handlers (`onload=`).
+  - **Null-Byte Injection**: `\x00` byte sequences to prevent path traversal and byte-poisoning attacks.
+  - **Sensitive Path Scans**: Blocks probes targeting `/.env`, `/.git`, `/admin`, `/actuator`, `/wp-admin`, and `/config.json`.
+- **Thread-Safe Brute-Force Lockout & Memory Pruning**: Consecutively failed authentication attempts are tracked per client IP using `threading.Lock()` to prevent race conditions in multi-worker runtimes. When tracked IP entries exceed `_max_tracked_ips = 1000`, automatic LRU pruning (`_prune_stale_failures`) evicts expired entries, eliminating unbounded memory leaks. Legitimate access can be unlocked via `reset_client_lockout()`.
+- **Defensive HTTP Response Headers**: Injects 7 mandatory security headers on every response (`Content-Security-Policy`, `Strict-Transport-Security` with preload, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, and `X-XSS-Protection`).
+- **Cloudflare Layer 1 Automation**: Provisioned via [`scripts/setup_cloudflare_waf.py`](../scripts/setup_cloudflare_waf.py), configuring zone TLS 1.3 strict encryption, custom firewall rules for sensitive file scanning, and L7 rate limiting (100 reqs/10s) on mutating endpoints.
+
 ---
 
 ## 16. Live High-Throughput Payment Stream Benchmark

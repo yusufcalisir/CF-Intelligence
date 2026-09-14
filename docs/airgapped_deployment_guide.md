@@ -138,9 +138,9 @@ The air-gapped gateway enforces edge inspection through [perimeter_waf.py](../ba
 | **IP Whitelisting** | `WAFRuleCategory.IP_WHITELIST` | **REJECT (403)** | Rejects requests originating from non-whitelisted internal network addresses. |
 | **Authentication Lockout** | `WAFRuleCategory.AUTH_LOCKOUT_EXCEEDED` | **REJECT (403)** | Locks out client IPs exceeding 5 consecutive authentication failures for 300 seconds. |
 | **Sensitive Path Blocking** | `WAFRuleCategory.SENSITIVE_PATH_BLOCKED` | **REJECT (403)** | Blocks access to administrative and sensitive paths (`/.env`, `/admin`, `/actuator`, `/.git`, `/wp-admin`, `/config.json`). |
-| **Null Byte Detection** | `WAFRuleCategory.NULL_BYTE_DETECTED` | **REJECT (400)** | Blocks null-byte injection attempts (`\x00`) in request paths and body payloads. |
-| **SQL Injection (SQLi)** | `WAFRuleCategory.SQLI_INJECTION` | **REJECT (400)** | Blocks `UNION SELECT`, `DROP TABLE`, `OR 1=1`, and stacked comment queries. |
-| **Cross-Site Scripting (XSS)** | `WAFRuleCategory.XSS_ATTACK` | **REJECT (400)** | Blocks `<script>` tags, `javascript:` pseudoprotocols, and DOM event injections (`onload=`). |
+| **Null Byte Detection** | `WAFRuleCategory.NULL_BYTE_DETECTED` | **REJECT (400)** | Blocks null-byte injection attempts (`\x00`) across request paths, body payloads, and HTTP headers. |
+| **SQL Injection (SQLi)** | `WAFRuleCategory.SQLI_INJECTION` | **REJECT (400)** | Blocks `UNION SELECT`, `DROP TABLE`, `OR 1=1`, and stacked queries in paths, bodies, and headers. |
+| **Cross-Site Scripting (XSS)** | `WAFRuleCategory.XSS_ATTACK` | **REJECT (400)** | Blocks `<script>` tags, `javascript:` pseudoprotocols, and DOM injections in bodies and headers. |
 
 ### Multi-Tenant Isolation & Secure Headers
 * **Tenant Claim Validation (`validate_tenant_access`)**: Enforces OWASP A01 (Broken Access Control) mitigation by validating that incoming `X-Bank-ID` headers match the authenticated JWT token claim.
@@ -162,14 +162,19 @@ waf = PerimeterWAFGuard(
     enforce_whitelist=True,
     max_auth_failures=5,
     lockout_duration_seconds=300,
+    max_tracked_ips=1000,
 )
 
 result = waf.inspect_request(
     client_ip="10.10.20.1",
     path="/api/v1/predict/score",
+    headers={"X-Bank-ID": "bank_alpha"},
     body='{"transaction_id": "tx_99"}',
 )
 assert result.allowed is True
+
+# Reset client lockout on successful authentication
+waf.reset_client_lockout(client_ip="10.10.20.1")
 ```
 
 ---
