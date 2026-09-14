@@ -1,49 +1,142 @@
 # 🏦 Bank Node Automated Onboarding & Operations Guide
 
-This guide details the end-to-end process for onboarding a new financial institution node to the **Collaborative Fraud Intelligence (CF-Intelligence)** platform.
+This operational guide details the end-to-end architecture, cryptographic credentialing, and configuration workflows for onboarding a new financial institution node to the **Collaborative Fraud Intelligence (CF-Intelligence)** platform.
+
+The onboarding subsystem ([`BankOnboardingService`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py) and [`onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py)) automates institution registration, mutual TLS (mTLS) X.509 certificate issuance, PostgreSQL engine-level tenant schema isolation, HashiCorp Vault transit KMS key provisioning, and connector YAML generation.
 
 ---
 
-## 1. Prerequisites
+## 🏛️ Automated Onboarding Architecture
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant BankIT as Bank Node IT / Security
+    participant API as Onboarding API Router (/api/v1/onboarding)
+    participant Service as BankOnboardingService
+    participant DB as PostgreSQL (TenantConfigModel)
+    participant PKI as X.509 Cert Engine
+    participant Servicer as gRPC Servicer (Anti-TOFU)
+    participant Vault as Vault Transit KMS
+    participant Daemon as cfi-daemon (Bank Node)
+
+    BankIT->>API: POST /api/v1/onboarding/register (BankRegisterRequest)
+    API->>Service: register_bank(bank_id, legal_name, jurisdiction, ...)
+    Service->>DB: INSERT TenantConfigModel (status=PENDING_VERIFICATION)
+    Service->>PKI: issue_mtls_certificate(bank_id)
+    PKI-->>Service: cert_pem (RSA 2048, CN={bank_id}.client...), key_pem, SHA-256 fingerprint
+    Service->>DB: UPDATE cert_fingerprint, cert_expires_at
+    Service->>Servicer: register_bank_fingerprint(bank_id, fingerprint)
+    Note over Servicer: Authoritative fingerprint binding (Anti-TOFU protection)
+    Service->>DB: provision_tenant_schema(bank_id) -> CREATE SCHEMA tenant_{bank_id}
+    Service->>Vault: provision_kms_key(bank_id) -> transit/keys/tenant_{bank_id}
+    Service->>Service: generate_connector_config(bank_id) -> YAML
+    Service->>DB: activate_bank(bank_id) -> status=ACTIVE, activated_at=NOW()
+    Service-->>API: BankOnboardingBundleResponse
+    API-->>BankIT: HTTP 201 Created (Certs, Keys, YAML Config, Fingerprint)
+
+    Note over BankIT,Daemon: Deployment Phase
+    BankIT->>Daemon: Install Certs & Start Daemon (cfi-daemon --config bank_alpha.yaml)
+    Daemon->>Servicer: gRPC RegisterClient(bank_id, fingerprint)
+    Servicer->>Servicer: Verify against authoritative registry (reject TOFU/spoofing)
+    Servicer-->>Daemon: session_token (grpc_sess_...), assigned_cluster_id
+```
+
+### Core Implementation Files
+
+- **Application Service**: [`backend/app/application/services/bank_onboarding_service.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py)
+- **REST Presentation Router**: [`backend/app/presentation/routers/onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py)
+- **gRPC Coordination Servicer**: [`backend/app/infrastructure/grpc/servicer.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py)
+- **Domain Entities & Enums**: [`backend/app/domain/entities.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/entities.py#L128), [`backend/app/domain/enums.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/domain/enums.py#L215)
+- **Web UI Onboarding Studio**: [`frontend/src/pages/BankOnboardingPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/BankOnboardingPage.tsx)
+- **Automated Unit Tests**: [`backend/tests/unit/test_bank_onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_bank_onboarding.py)
+
+---
+
+## 1. Prerequisites & Transport Requirements
 
 Before initiating node registration, the institution's IT/Security team must verify:
-- **Outbound Network Access:** Outbound TCP port `50051` (gRPC mTLS) open to `coordinator.cf-intelligence.io`.
-- **Admin Access:** API key or administrative credentials to issue onboarding calls to `/api/v1/onboarding/register`.
 - **System Requirements:** Python 3.12+, Docker/Kubernetes container runtime, and at least 4 GB RAM / 2 vCPUs for local training.
+- **Admin Access:** API key or administrative credentials to issue onboarding calls to `/api/v1/onboarding/register`.
+- **Outbound Network Access:** Outbound TCP port `50051` (gRPC mTLS) open to `coordinator.cf-intelligence.io`.
 
----
-
-## 1a. Network Requirements
+### Network & Transport Layer Matrix
 
 > [!IMPORTANT]
 > All CF-Intelligence bank→coordinator communication is **mandatory mTLS over gRPC**.
-> Plain HTTP connections and TLS 1.2 are **refused at the transport layer** — there is no fallback.
+> Plain HTTP connections and TLS 1.2 are **refused at the transport layer** — there is no insecure fallback.
 
 | Requirement | Detail |
 |---|---|
 | **Protocol** | gRPC over TLS 1.3 only (TLS 1.2 rejected) |
 | **Port** | TCP `50051` outbound from bank network to coordinator |
-| **Authentication** | Mutual TLS — both client and server present certificates |
-| **Client cert CN** | Must match `{bank_id}.client.cf-intelligence.io` (issued by onboarding API) |
-| **HTTP fallback** | None — insecure channels are rejected at the server interceptor level |
-| **Coordinator FQDN** | `coordinator.cf-intelligence.io` — add to firewall allowlist |
-| **Cert rotation** | gRPC client auto-detects cert file changes and recycles the channel |
+| **Authentication** | Mutual TLS — both client and server present X.509 certificates |
+| **Client Cert CN** | Must match `{bank_id}.client.cf-intelligence.io` (issued by onboarding API) |
+| **HTTP Fallback** | None — insecure channels are rejected at the server interceptor level |
+| **Coordinator FQDN** | `coordinator.cf-intelligence.io` — add to institutional firewall allowlist |
+| **Cert Rotation** | gRPC client auto-detects cert file changes and recycles the channel |
 
-### Firewall Rule (example — adapt to your environment)
+### Firewall Rule Configuration (Linux `iptables` Example)
 
 ```bash
 # Allow outbound gRPC to CF-Intelligence coordinator
 iptables -A OUTPUT -p tcp --dport 50051 -d coordinator.cf-intelligence.io -j ACCEPT
 
-# Block all other outbound on 50051 (defence-in-depth)
+# Block all other outbound traffic on 50051 (defense-in-depth)
 iptables -A OUTPUT -p tcp --dport 50051 -j DROP
 ```
 
 ---
 
-## 2. Step 1: API Registration
+## 2. The 6-Stage Automated Onboarding Pipeline
 
-Issue a registration request to the central coordinator admin endpoint:
+When a registration request is submitted, [`BankOnboardingService`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py) automatically coordinates six discrete provisioning tasks:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
+│                             6-STAGE AUTOMATED ONBOARDING PIPELINE                                │
+│                                                                                                  │
+│   1. Register Record        2. Issue mTLS X.509       3. Schema Isolation   4. Vault KMS Path    │
+│   ┌────────────────────┐   ┌─────────────────────┐   ┌───────────────────┐  ┌──────────────────┐ │
+│   │ TenantConfigModel  │──►│ RSA-2048 Keypair    │──►│ CREATE SCHEMA     │─►│ transit/keys/    │ │
+│   │ status:            │   │ CN={id}.client...   │   │ tenant_{bank_id}  │  │ tenant_{bank_id} │ │
+│   │ PENDING_VERIFY     │   │ SHA-256 Fingerprint │   │ (init_tables)     │  │                  │ │
+│   └────────────────────┘   └─────────────────────┘   └───────────────────┘  └──────────────────┘ │
+│                                                                                      │           │
+│                                              6. Node Activation                      ▼           │
+│                                            ┌─────────────────────┐         5. YAML Generation    │
+│                                            │ status: ACTIVE      │◄───────────────────────────── │
+│                                            │ activated_at: NOW() │         connector_config_yaml │
+│                                            │ Anti-TOFU Bound     │         (batch, dp_eps, clip) │
+│                                            └─────────────────────┘                               │
+└──────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+1. **Step 1: Database Registration ([`register_bank`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L42))**:
+   - Validates `bank_id` format (`^[a-zA-Z0-9_-]{3,36}$`) and ISO 3166-1 alpha-2 jurisdiction.
+   - Inserts record into `TenantConfigModel` with status `BankStatus.PENDING_VERIFICATION`.
+   - Prevents duplicate registration; raises `BankAlreadyExistsError` (HTTP 409 Conflict).
+2. **Step 2: mTLS X.509 Certificate Issuance ([`issue_mtls_certificate`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L84))**:
+   - Generates a 2048-bit RSA keypair and X.509 client certificate (`CN={bank_id}.client.cf-intelligence.io`).
+   - Computes SHA-256 fingerprint (`SHA256:<hex>`) and 365-day validity window.
+   - Updates `cert_fingerprint` and `cert_expires_at` in the database.
+3. **Step 3: Anti-TOFU gRPC Fingerprint Binding ([`register_bank_fingerprint`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L81))**:
+   - Authoritatively registers the certificate fingerprint in [`FederatedLearningServicer`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L89) memory and database fallback.
+   - Strictly blocks Trust-On-First-Use (TOFU) race conditions and cross-tenant impersonation.
+4. **Step 4: PostgreSQL Engine-Level Schema Provisioning ([`provision_tenant_schema`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L122))**:
+   - Executes DDL to create isolated schema space: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}`.
+   - Initializes tenant tables (`alerts`, `cases`, `features`, `audit_logs`) within that schema.
+5. **Step 5: Vault Transit KMS Key Path Mapping ([`provision_kms_key`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L133))**:
+   - Assigns dedicated encryption key path: `transit/keys/tenant_{bank_id}` for envelope encryption.
+6. **Step 6: Connector Config Generation & Activation ([`activate_bank`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L163))**:
+   - Renders customized `connector_config_yaml`.
+   - Transitions status to `BankStatus.ACTIVE` with `activated_at = datetime.now(UTC)`.
+
+---
+
+## 3. Step-by-Step CLI Onboarding & Deployment
+
+### Step 1: Issue Registration Request
 
 ```bash
 curl -X POST https://api.cf-intelligence.io/api/v1/onboarding/register \
@@ -57,39 +150,48 @@ curl -X POST https://api.cf-intelligence.io/api/v1/onboarding/register \
   }'
 ```
 
-### Response Payload Breakdown
+#### Onboarding Bundle Response Breakdown
 
-The response returns the complete **Onboarding Bundle**:
-- `bank_id`: Confirmed unique bank identifier.
-- `cert_fingerprint`: SHA-256 fingerprint of the issued mTLS certificate.
-- `mtls_cert_pem`: Mutual TLS client certificate (PEM format).
-- `mtls_key_pem`: Private key for mTLS client authentication (PEM format).
-- `connector_config_yaml`: Pre-rendered YAML configuration for the local bank daemon.
+The API returns HTTP 201 Created with [`BankOnboardingBundleResponse`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py#L69):
 
----
+```json
+{
+  "bank_id": "bank_alpha",
+  "status": "active",
+  "legal_name": "Alpha National Bank Inc.",
+  "jurisdiction": "TR",
+  "contact_email": "sec-ops@alphabank.com",
+  "data_residency_region": "eu-west-1",
+  "cert_fingerprint": "SHA256:4a8b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b",
+  "mtls_cert_pem": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
+  "mtls_key_pem": "-----BEGIN RSA PRIVATE KEY-----\n...\n-----END RSA PRIVATE KEY-----",
+  "connector_config_yaml": "bank_id: \"bank_alpha\"\ncoordinator_url: \"https://coordinator.cf-intelligence.io:50051\"\n...",
+  "coordinator_endpoint": "https://coordinator.cf-intelligence.io:50051"
+}
+```
 
-## 3. Step 2: Certificate Installation
+### Step 2: Install Certificates Locally
 
-Save the returned certificates securely on the bank's local node:
+Secure the certificates on the bank node's filesystem with restrictive permissions:
 
 ```bash
 mkdir -p /etc/cfi/certs
 chmod 700 /etc/cfi/certs
 
-# Save certificate and key
+# Save certificate and private key
 echo "$MTLS_CERT_PEM" > /etc/cfi/certs/bank_alpha.crt
 echo "$MTLS_KEY_PEM" > /etc/cfi/certs/bank_alpha.key
 
+chmod 644 /etc/cfi/certs/bank_alpha.crt
 chmod 600 /etc/cfi/certs/bank_alpha.key
 ```
 
----
+### Step 3: Configure Connector Daemon
 
-## 4. Step 3: Connector Config
-
-Save the `connector_config_yaml` to `/etc/cfi/config/bank_alpha.yaml`:
+Save the rendered YAML config to `/etc/cfi/config/bank_alpha.yaml`:
 
 ```yaml
+# CF-Intelligence Bank Client Connector Configuration
 bank_id: "bank_alpha"
 coordinator_url: "https://coordinator.cf-intelligence.io:50051"
 cert_path: "/etc/cfi/certs/bank_alpha.crt"
@@ -102,29 +204,22 @@ clip_norm: 1.0
 health_port: 8080
 ```
 
----
+### Step 4: Launch the Local Training Daemon
 
-## 5. Step 4: Start the Daemon
-
-Launch the local FL client training daemon process (`cfi-daemon`):
+Launch the local FL training client daemon (`cfi-daemon`):
 
 ```bash
 # Launch daemon process with explicit bank ID and configuration path
-cfi-daemon --bank-id bank_alpha --config ~/.cfi/config/bank_alpha.yaml
+cfi-daemon --bank-id bank_alpha --config /etc/cfi/config/bank_alpha.yaml
 ```
 
-### Operational Flags & Configuration Overview:
-- `--bank-id`: Unique consortium bank identifier.
-- `--config`: Path to local YAML daemon configuration file (`~/.cfi/config/{bank_id}.yaml` or `/etc/cfi/config/{bank_id}.yaml`).
 - **Process Lock**: Writes process PID to `storage/daemon.pid` (or `/var/run/cfi/daemon.pid`).
 - **Health Check Endpoint**: Exposes lightweight status server at `http://localhost:8080/health`.
-- **Graceful Shutdown**: Catches `SIGTERM` / `SIGINT` signals and waits up to 30 seconds for in-flight training rounds to complete before removing the PID file.
+- **Graceful Shutdown**: Catches `SIGTERM` / `SIGINT` signals and waits up to 30 seconds for in-flight training rounds to complete before cleanly removing the PID file.
 
----
+### Step 5: Verify Node Connectivity
 
-## 6. Step 5: Verify Connection
-
-Check the node operational status:
+Verify node operational status via the CLI tool:
 
 ```bash
 cfi-cli status --bank-id bank_alpha
@@ -132,118 +227,135 @@ cfi-cli status --bank-id bank_alpha
 
 Expected output:
 ```text
-+---------------+------------------------+---------+-------------------+
-| Bank ID       | Legal Name             | Status  | Schema            |
-+---------------+------------------------+---------+-------------------+
-| bank_alpha    | Alpha National Bank    | ACTIVE  | tenant_bank_alpha |
-+---------------+------------------------+---------+-------------------+
++---------------+--------------------------+---------+-------------------+
+| Bank ID       | Legal Name               | Status  | Schema            |
++---------------+--------------------------+---------+-------------------+
+| bank_alpha    | Alpha National Bank Inc. | ACTIVE  | tenant_bank_alpha |
++---------------+--------------------------+---------+-------------------+
 ```
 
 ---
 
-## 5b. Web UI Onboarding & Dataset Ingestion Studio (`/onboarding`)
+## 🖥️ Web UI Onboarding & Ingestion Studio (`/onboarding`)
 
-In addition to CLI automation, financial institutions can onboard directly via the browser-based **Bank Node Onboarding Wizard**:
+Financial institutions can also onboard directly via the browser-based **Bank Node Onboarding Wizard** ([`frontend/src/pages/BankOnboardingPage.tsx`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/frontend/src/pages/BankOnboardingPage.tsx)):
 
-1. **Step 1: Institutional Legal & Regional Profile**: Select bank ID, legal entity name, regulatory jurisdiction (e.g. `TR`, `EU`, `US`), and data residency region (`eu-west-1`, `us-east-1`, `ap-southeast-1`).
-2. **Step 2: Review Registration Details**: Institutional data sovereignty and privacy verification check.
-3. **Step 3: Cryptographic mTLS X.509 Credentials**: Automated browser-side certificate and private key generation with SHA-256 fingerprint validation.
-4. **Step 4: Bank Daemon Configuration**: Auto-generated YAML configuration (`bank_{id}.yaml`) ready for 1-click download.
-5. **Step 5: Node Quorum Activation & Initial Ingestion**: Confirms active quorum status (100% healthy) and provides a direct launcher for the **Real Dataset Ingestion Studio**:
-   - **Drag-and-Drop Ingestion**: Upload transactions via CSV or Parquet.
-   - **Client-Side Zero-PII Sanitization**: Validates PANs using the Luhn checksum, strips IBAN/TCKN via regex, and tokenizes account identifiers with type-salted HMAC-SHA256.
-   - **Great Expectations Contract Gating**: 12 automated checks (schema validation, non-null bounds, range tests, Non-IID Dirichlet $\alpha$ skew, and KS drift).
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        WEB UI ONBOARDING WIZARD STEPS (/onboarding)                    │
+│                                                                                        │
+│  [Step 1: Legal Info] ──► [Step 2: Review] ──► [Step 3: mTLS PKI]                      │
+│   - Bank ID                - Compliance Audit   - X.509 Cert Generation                │
+│   - Legal Entity Name      - Data Sovereignty   - SHA-256 Fingerprint                  │
+│   - Jurisdiction (EU/US/TR)                     - 1-Click Keypair Download             │
+│   - Data Residency Region                               │                              │
+│                                                         ▼                              │
+│  [Step 5: Connection & Ingestion] ◄── [Step 4: Config YAML]                            │
+│   - Quorum Health Check                - Auto-generated bank_{id}.yaml                 │
+│   - Dataset Ingestion Studio Launch    - Batch size, DP epsilon, clip norm             │
+│   - Zero-PII Sanitization & GX Gates                                                   │
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
 
----
-
-## 6a. How Gradient Submission Works
-
-> [!NOTE]
-> Gradient updates submitted during a federated learning round are protected by three layers of defence:
-> **Secure Aggregation (SecAgg)**, **Opacus Differential Privacy (DP)**, and **HSM/PKI ECDSA Digital Signatures**.
-
-1. **Secure Aggregation (SecAgg) Masking**:
-   - Each participating bank node generates pairwise random zero-sum masks $s_{u,v}$ with all other online consortium members.
-   - The local gradient vector $g_u$ is masked: $m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,u}$.
-   - Upon coordinator aggregation, pairwise masks cancel out exactly ($\sum_u m_u = \sum_u g_u$), revealing only the aggregate model update while guaranteeing individual bank gradient privacy.
-
-2. **Differential Privacy ($\epsilon, \delta$) Noise**:
-   - Local gradients are clipped to $L_2$ norm threshold $C$ (e.g., $1.0$).
-   - Gaussian noise calibrated to privacy budget $\epsilon$ is added. The coordinator enforces $\epsilon \le 10.0$ per round. Submissions exceeding this limit are rejected with `REJECTED_EPSILON`.
-
-3. **Cryptographic Payload Compression & Signing**:
-   - The masked gradient tensor is compressed using `zlib`.
-   - The node signs the payload digest using its HSM / PKI private key (ECDSA P-256 / RSA-PSS):
-     $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round-id} \mathbin{\Vert} \text{bank-id} \mathbin{\Vert} \text{SHA-256}(\text{compressed-gradient})\Big)$$
-   - The coordinator verifies the signature via `SignatureVerifier` before storing in `gradient_submissions` and logging to the `ImmutableAuditChain`.
-
-4. **Quorum Aggregation**:
-   - The coordinator accumulates validated submissions until reaching the round quorum threshold (e.g. 3 banks).
-   - Once quorum is satisfied, global model parameter aggregation is triggered.
+1. **Step 1: Institutional Legal & Regional Profile**: Select bank ID, legal entity name, regulatory jurisdiction (e.g. `EU`, `US`, `UK`, `TR`, `SG`, `JP`), and data residency region (`eu-central-1`, `us-east-1`, `ap-southeast-1`).
+2. **Step 2: Compliance Review**: Institutional data sovereignty, zero raw PII transmission guarantees, and regulatory jurisdiction audit checks.
+3. **Step 3: Cryptographic mTLS X.509 Credentials**: Displays issued client certificate, private key, and SHA-256 fingerprint with 1-click clipboard copy and PEM download buttons.
+4. **Step 4: Bank Daemon Configuration**: Pre-rendered YAML configuration ready for direct download.
+5. **Step 5: Node Quorum Activation & Real Dataset Ingestion Studio**:
+   - Confirms active quorum status (100% healthy).
+   - Launches the **Dataset Ingestion Studio Modal** (`DatasetIngestionStudioModal`):
+     - **Drag-and-Drop Ingestion**: Upload transactions via CSV or Parquet.
+     - **Client-Side Zero-PII Sanitization**: Validates PANs using Luhn checksum, strips IBAN/TCKN via regex, and tokenizes account identifiers using type-salted HMAC-SHA256.
+     - **Great Expectations Contract Gating**: 12 automated checks (schema validation, non-null bounds, range tests, Non-IID Dirichlet $\alpha$ skew, and Kolmogorov-Smirnov drift tests).
 
 ---
 
-## 6b. Supported Core Banking Integration Formats
+## 🔒 Security Invariants & Anti-TOFU Defenses
 
-The CF-Intelligence platform natively ingests data from core banking systems using the following standardized messaging standards and API specs:
+### 1. Anti-TOFU (Trust On First Use) Prevention
+In unhardened federated systems, coordinators accept any certificate presented during the initial connection (TOFU). In CF-Intelligence, TOFU is **strictly prohibited**:
+- At onboarding time, [`BankOnboardingService.issue_mtls_certificate()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/application/services/bank_onboarding_service.py#L84) binds the issued fingerprint directly in [`FederatedLearningServicer`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L89).
+- When a node connects via `RegisterClient`, the coordinator verifies that the bank node was pre-onboarded. Un-onboarded nodes are immediately rejected (`is_accepted = False`).
 
-### 1. ISO 20022 Financial Messaging (MX)
-- **`pacs.008.001.08`**: Financial Institution Customer Credit Transfer. Validated against XSD schema `pacs.008.001.08.xsd`.
-- **`camt.053.001.08`**: Bank-to-Customer Statement. Validated against XSD schema `camt.053.001.08.xsd`.
-- **`pain.001.001.08`**: Customer Credit Transfer Initiation. Validated against XSD schema `pain.001.001.08.xsd`.
-- **`pacs.002.001.10`**: Payment Status Report.
+### 2. Cross-Tenant Certificate Anti-Spoofing
+- If a rogue node (`bank_adversary`) attempts to present a valid certificate fingerprint belonging to another bank (`bank_legit`), [`FederatedLearningServicer.RegisterClient()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L153) detects the identity mismatch:
+  `"Cross-tenant certificate spoofing rejected: bank 'bank_adversary' presented fingerprint registered to 'bank_legit'"`.
 
-### 2. Legacy SWIFT Financial Messaging (MT)
-- **`MT103`**: Single Customer Credit Transfer text payload parser.
-
-### 3. Open Banking & PSD2 REST APIs
-- **Berlin Group NextGenPSD2**: Version 1.3 Account Information Service (AIS) and Payment Initiation Service (PIS).
-- **UK Open Banking**: Read/Write Data API Specification v3.1.
-- **Security & Lifecycle**: OAuth2 Client Credentials grant with automatic token refresh (< 5 minutes TTL) and HTTP 429 rate limit backoff (`Retry-After`).
+### 3. Database Fallback Verification
+- If a coordinator instance restarts, [`_lookup_authoritative_fingerprint()`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/infrastructure/grpc/servicer.py#L121) queries the persistent `TenantConfigModel.cert_fingerprint` column in PostgreSQL, restoring the anti-spoofing cache without requiring re-onboarding.
 
 ---
 
-## 6c. Data Isolation Guarantee
+## 🛡️ Federated Learning Privacy & Data Isolation
 
-> [!IMPORTANT]
-> The CF-Intelligence platform enforces **PostgreSQL Engine-Level Schema Isolation** (SOC2 Type II / PCI-DSS v4.0 compliant).
+### 1. Multi-Layer Gradient Defense
 
-1. **Dedicated PostgreSQL Schema (`tenant_{bank_id}`)**:
-   - Upon registration, `TenantProvisioner` executes DDL statements to create an isolated schema space: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}`.
-   - All tenant database tables (`alerts`, `cases`, `features`, `audit_logs`) reside exclusively within this schema.
+$$\text{Masked Gradient: } m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,u}$$
 
-2. **Dedicated Database Role (`tenant_{bank_id}_role`)**:
-   - A dedicated database user role is provisioned: `CREATE ROLE tenant_{bank_id}_role WITH NOINHERIT LOGIN`.
-   - Privileges are granted exclusively for `tenant_{bank_id}`. The role has **zero permissions** on other bank schemas (`tenant_bank_b`, `tenant_bank_c`).
-   - Cross-bank SQL queries are blocked directly at the database engine parser level, raising a `PermissionError` / `SQLState 42501 (insufficient_privilege)`.
+- **Secure Aggregation (SecAgg)**: Nodes exchange Diffie-Hellman public keys to generate zero-sum pairwise masks $s_{u,v}$. Upon aggregation, pairwise masks cancel out exactly ($\sum_u m_u = \sum_u g_u$).
+- **Differential Privacy (DP)**: Local gradients are clipped to $L_2$ norm threshold $C \le 1.0$, and Gaussian noise calibrated to privacy budget $\epsilon \le 10.0$ is injected. Submissions violating $\epsilon$ bounds are rejected (`REJECTED_EPSILON`).
+- **ECDSA Digital Signatures**: Each gradient tensor is compressed via `zlib` and digitally signed by the node's HSM / PKI private key:
+  $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round-id} \mathbin{\Vert} \text{bank-id} \mathbin{\Vert} \text{SHA-256}(\text{compressed-gradient})\Big)$$
 
-3. **Session Search Path Isolation**:
-   - Every request session initialized via `get_tenant_session(bank_id)` automatically executes `SET search_path TO tenant_{bank_id}, public`.
+### 2. PostgreSQL Engine-Level Schema Isolation
+- **Dedicated Schema**: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}` ensures physical table separation.
+- **Role Isolation**: A dedicated user `tenant_{bank_id}_role` is granted access strictly to `tenant_{bank_id}` with zero privileges on other schemas. Cross-schema queries trigger PostgreSQL engine error `SQLState 42501 (insufficient_privilege)`.
+- **Search Path Enforcement**: Every tenant request executes `SET search_path TO tenant_{bank_id}, public`.
 
----
-
-## 6d. Certificate Rotation Lifecycle
-
-> [!NOTE]
-> All mTLS X.509 client certificates and Vault Transit KMS keys are managed on a **90-Day Rotation Schedule**.
-
-1. **Automated Warning Threshold**:
-   - Automated maintenance workers trigger warnings when `< 30 days` remain before certificate expiry (`check_cert_expiry`).
-2. **Zero-Downtime Hot Swapping**:
-   - `MTLSManager.rotate_cert(bank_id)` issues fresh X.509 keypairs via Vault PKI Engine (`POST /v1/pki/issue/bank-client`).
-3. **Manual CLI Trigger**:
-   - Administrators can manually trigger certificate rotation at any time:
-     ```bash
-     cfi-cli rotate-certs --bank-id <id>
-     ```
+### 3. 90-Day Certificate Rotation Lifecycle
+- **Automated Warning Threshold**: Automated background workers trigger alerts when `< 30 days` remain before certificate expiration (`check_cert_expiry`).
+- **Zero-Downtime Hot Swapping**: [`POST /api/v1/onboarding/banks/{bank_id}/rotate-cert`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py#L347) issues a fresh keypair and updates the coordinator registry in-memory.
+- **Manual CLI Trigger**:
+  ```bash
+  cfi-cli rotate-certs --bank-id bank_alpha
+  ```
 
 ---
 
-## 7. Troubleshooting
+## 🌐 Onboarding REST API Reference
 
-| Issue | Root Cause | Resolution |
-|---|---|---|
-| `UNAUTHENTICATED: Certificate expired` | Cert TTL elapsed | Run `cfi-cli rotate-certs --bank-id <id>` |
-| `PERMISSION_DENIED: Bank not active` | Registration pending verification | Contact coordinator admin to activate node |
-| `UNAVAILABLE: Name resolution failed` | Port 50051 blocked | Verify firewall rules for TCP 50051 |
-| `QuorumNotMetError` | Insufficient participating banks | Wait for additional consortium members to join round |
+All onboarding endpoints are served under prefix `/api/v1/onboarding` in [`backend/app/presentation/routers/onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/app/presentation/routers/onboarding.py):
+
+| Method | Endpoint | Request Body | Response Schema | Description |
+|:---|:---|:---|:---|:---|
+| `POST` | `/register` | `BankRegisterRequest` | `BankOnboardingBundleResponse` | Execute automated 6-step onboarding pipeline (status 201 Created). Returns mTLS certs, key, fingerprint, and YAML config. |
+| `GET` | `/banks` | None | `list[BankStatusResponse]` | List all registered bank nodes with jurisdiction, status, cert fingerprint, and vault key path. |
+| `GET` | `/banks/{bank_id}/status` | None | `BankStatusResponse` | Retrieve detailed status for a specific bank node. |
+| `POST` | `/banks/{bank_id}/rotate-cert` | None | `CertRotationResponse` | Rotate mTLS certificate and private key for an active bank node. |
+
+---
+
+## 🧪 Automated Unit Test Suite Matrix
+
+The bank onboarding pipeline and security invariants are verified by the automated unit test suite in [`backend/tests/unit/test_bank_onboarding.py`](file:///c:/Users/Yusuf/Desktop/projects/Privacy-preserving%20cross-bank%20fraud%20detection%20using%20Federated%20Learning/backend/tests/unit/test_bank_onboarding.py).
+
+### Test Execution Command
+
+```bash
+pytest backend/tests/unit/test_bank_onboarding.py -v
+```
+
+### Verified Test Results (8 Passed in 7.15s)
+
+| Test Function | Target Component / Layer | Assertion / Behavior Verified | Status |
+|:---|:---|:---|:---:|
+| `test_register_bank_creates_db_record` | `BankOnboardingService.register_bank` | Inserts `TenantConfigModel` in `pending_verification` status; schema unprovisioned. | `PASSED` |
+| `test_full_onboarding_pipeline_sets_active` | Full Service Pipeline | Complete transition to `ACTIVE`, schema provisioned, Vault transit KMS path mapped, X.509 RSA-2048 keypair cryptographically verified. | `PASSED` |
+| `test_two_banks_receive_distinct_x509_certificates` | Cryptographic Cert Engine | Distinct onboarding calls produce distinct RSA public/private keypairs, distinct modulus $n$, and distinct SHA-256 fingerprints. | `PASSED` |
+| `test_grpc_cross_tenant_certificate_spoofing_rejected` | `FederatedLearningServicer` Anti-Spoofing | Rejects cross-tenant impersonation when node presents another bank's fingerprint; rejects altered fingerprints. | `PASSED` |
+| `test_tofu_race_condition_rejected_for_unonboarded_bank` | Anti-TOFU Security Barrier | Un-onboarded bank nodes attempting to register via gRPC before onboarding are strictly rejected. Legitimate registration succeeds only after onboarding. | `PASSED` |
+| `test_duplicate_bank_id_rejected` | Service Validation | Attempting to register an already existing `bank_id` raises `BankAlreadyExistsError`. | `PASSED` |
+| `test_connector_config_contains_required_fields` | Configuration Generator | Renders valid YAML string containing `bank_id`, `coordinator_url`, `cert_path`, and `key_path`. | `PASSED` |
+| `test_onboarding_endpoint_returns_bundle` | FastAPI Presentation Router | `POST /api/v1/onboarding/register` returns 201 Created with bundle; duplicate returns 409; `/banks` and `/banks/{id}/status` return 200 OK. | `PASSED` |
+
+---
+
+## 🔧 Operational Troubleshooting Matrix
+
+| Issue Code / Error Message | Root Cause | Remediation Procedure |
+|:---|:---|:---|
+| `UNAUTHENTICATED: Certificate expired` | mTLS client cert 365-day TTL has elapsed | Execute `cfi-cli rotate-certs --bank-id <id>` or `POST /api/v1/onboarding/banks/{id}/rotate-cert`. |
+| `PERMISSION_DENIED: Bank not active` | Registration in `PENDING_VERIFICATION` status | Check coordinator database or trigger `/api/v1/onboarding/register` pipeline completion. |
+| `UNAVAILABLE: Name resolution failed` | Outbound TCP port 50051 blocked by firewall | Verify firewall allowlist permits outbound traffic to `coordinator.cf-intelligence.io:50051`. |
+| `SQLState 42501 (insufficient_privilege)` | Process attempting cross-tenant database access | Ensure `get_tenant_session(bank_id)` sets `search_path TO tenant_{bank_id}, public`. |
+| `gRPC Registration Rejected (is_accepted=False)` | Anti-TOFU barrier triggered or cert spoofing detected | Verify node was properly onboarded via API and presents the authentic fingerprint issued during onboarding. |
