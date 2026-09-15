@@ -442,36 +442,37 @@ class ModelRegistryVault:
             archived_candidates = [
                 c for c in self._checkpoints.values() if c.status == ModelStatus.ARCHIVED
             ]
-        if not archived_candidates:
-            raise ModelGovernanceError(
-                "Rollback Failed: No ARCHIVED checkpoint available for restoration."
+            if not archived_candidates:
+                raise ModelGovernanceError(
+                    "Rollback Failed: No ARCHIVED checkpoint available for restoration."
+                )
+
+            # Sort archived models by creation/promotion timestamp descending
+            archived_candidates.sort(key=lambda c: c.promoted_at or c.created_at, reverse=True)
+            restore_target = archived_candidates[0]
+
+            # Execute rollback
+            current_prod.status = ModelStatus.ROLLED_BACK
+            restore_target.status = ModelStatus.PRODUCTION
+            restore_target.promoted_at = datetime.now(UTC).isoformat()
+
+            logger.warning(
+                "Executed production rollback: Model %s demoted to ROLLED_BACK (reason: %s). "
+                "Restored model %s (%s) to PRODUCTION.",
+                current_prod.model_id,
+                reason,
+                restore_target.model_id,
+                restore_target.version.to_tag(),
             )
-
-        # Sort archived models by creation/promotion timestamp descending
-        archived_candidates.sort(key=lambda c: c.promoted_at or c.created_at, reverse=True)
-        restore_target = archived_candidates[0]
-
-        # Execute rollback
-        current_prod.status = ModelStatus.ROLLED_BACK
-        restore_target.status = ModelStatus.PRODUCTION
-        restore_target.promoted_at = datetime.now(UTC).isoformat()
-
-        logger.warning(
-            "Executed production rollback: Model %s demoted to ROLLED_BACK (reason: %s). "
-            "Restored model %s (%s) to PRODUCTION.",
-            current_prod.model_id,
-            reason,
-            restore_target.model_id,
-            restore_target.version.to_tag(),
-        )
-        return current_prod, restore_target
+            return current_prod, restore_target
 
     def get_production_model(self) -> ModelCheckpoint | None:
         """Returns currently active PRODUCTION model checkpoint, or None if none active."""
-        for checkpoint in self._checkpoints.values():
-            if checkpoint.status == ModelStatus.PRODUCTION:
-                return checkpoint
-        return None
+        with self._lock:
+            for checkpoint in self._checkpoints.values():
+                if checkpoint.status == ModelStatus.PRODUCTION:
+                    return checkpoint
+            return None
 
     def list_checkpoints(self, status: ModelStatus | None = None) -> list[ModelCheckpoint]:
         """Lists registered checkpoints, optionally filtered by status."""

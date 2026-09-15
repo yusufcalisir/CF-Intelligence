@@ -19,6 +19,7 @@ class DeploymentStage(str, Enum):
     ROLLING_UPGRADE = "ROLLING_UPGRADE"
     DUAL_VERSION_ACTIVE = "DUAL_VERSION_ACTIVE"
     UPGRADE_COMPLETED = "UPGRADE_COMPLETED"
+    ABORTED = "ABORTED"
 
 
 @dataclass
@@ -32,6 +33,7 @@ class DeploymentSession:
     drained_connections_count: int = 0
     updated_instances: list[str] = field(default_factory=list)
     started_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    abort_reason: str | None = None
 
 
 @dataclass

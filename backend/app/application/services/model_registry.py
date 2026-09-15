@@ -208,6 +208,52 @@ class ModelRegistry:
         manifest = self._load_manifest(simulation_id)
         return next((e for e in manifest if e["is_active"]), None)
 
+    def get_version_metadata(self, simulation_id: str, version: int) -> dict[str, Any] | None:
+        """Get metadata of a specific model version from the registry."""
+        manifest = self._load_manifest(simulation_id)
+        return next((e for e in manifest if e["version"] == version), None)
+
+    def promote_version(
+        self,
+        simulation_id: str,
+        version: int,
+        target_status: str = "champion",
+    ) -> dict[str, Any]:
+        """Promotes a model version to 'champion' or 'challenger' status."""
+        if target_status not in ("champion", "challenger"):
+            raise ValueError(f"Target status must be 'champion' or 'challenger', got '{target_status}'")
+
+        with self._lock:
+            manifest = self._load_manifest(simulation_id)
+            target_entry = next((e for e in manifest if e["version"] == version), None)
+            if not target_entry:
+                raise ValueError(f"Version {version} not found in registry for {simulation_id}")
+
+            sim_dir = self._get_sim_dir(simulation_id)
+            filepath = os.path.join(sim_dir, target_entry["filename"])
+            if not os.path.exists(filepath):
+                raise FileNotFoundError(f"Model file {filepath} not found on disk")
+
+            if target_status == "champion":
+                for entry in manifest:
+                    entry["is_active"] = entry["version"] == version
+                    if entry["version"] == version:
+                        entry["status"] = "champion"
+                    elif entry.get("status") == "champion":
+                        entry["status"] = "inactive"
+                self._update_global_model_link(simulation_id, filepath)
+            else:  # challenger
+                for entry in manifest:
+                    if entry["version"] == version:
+                        entry["status"] = "challenger"
+                        entry["is_active"] = False
+                    elif entry.get("status") == "challenger":
+                        entry["status"] = "inactive"
+
+            self._save_manifest(simulation_id, manifest)
+            logger.info("Promoted model version %d to %s for %s", version, target_status, simulation_id)
+            return target_entry
+
     def rollback(self, simulation_id: str, version: int) -> dict[str, Any]:
         """Rollback/promote a specific historical version as the active model."""
         with self._lock:
@@ -336,53 +382,52 @@ class ModelEvaluationEngine:
         routed_to: str = "champion",
     ) -> None:
         """Log scoring details for a transaction."""
-        key = f"{simulation_id}:prediction:{transaction_id}"
-        record = {
-            "transaction_id": transaction_id,
-            "champion_version": champion_version,
-            "champion_prob": champion_prob,
-            "champion_latency_ms": champion_latency_ms,
-            "challenger_version": challenger_version,
-            "challenger_prob": challenger_prob,
-            "challenger_latency_ms": challenger_latency_ms,
-            "actual_label": None,
-            "routed_to": routed_to,
-            "timestamp": datetime.now(UTC).isoformat(),
-        }
-        self._store.set(key, record)
+        with self._lock:
+            key = f"{simulation_id}:prediction:{transaction_id}"
+            record = {
+                "transaction_id": transaction_id,
+                "champion_version": champion_version,
+                "champion_prob": champion_prob,
+                "champion_latency_ms": champion_latency_ms,
+                "challenger_version": challenger_version,
+                "challenger_prob": challenger_prob,
+                "challenger_latency_ms": challenger_latency_ms,
+                "actual_label": None,
+                "routed_to": routed_to,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+            self._store.set(key, record)
 
-        list_key = f"{simulation_id}:prediction_keys"
-        existing_val = self._store.get(list_key)
-        existing = existing_val if isinstance(existing_val, list) else []
-        existing.append(key)
-        if len(existing) > 1000:
-            oldest = existing.pop(0)
-            self._store.delete(oldest)
-        self._store.set(list_key, existing)
+            list_key = f"{simulation_id}:prediction_keys"
+            existing_val = self._store.get(list_key)
+            existing = existing_val if isinstance(existing_val, list) else []
+            existing.append(key)
+            if len(existing) > 1000:
+                oldest = existing.pop(0)
+                self._store.delete(oldest)
+            self._store.set(list_key, existing)
 
     def log_feedback(
         self, simulation_id: str, transaction_id: str, actual_label: int
     ) -> dict[str, Any]:
-        """Record the ground truth label for a transaction and evaluate performance."""
-        key = f"{simulation_id}:prediction:{transaction_id}"
-        record = self._store.get(key)
-        if not record:
-            record = {
-                "transaction_id": transaction_id,
-                "champion_version": 1,
-                "champion_prob": 0.5,
-                "champion_latency_ms": 10.0,
-                "challenger_version": None,
-                "challenger_prob": None,
-                "challenger_latency_ms": None,
-                "routed_to": "champion",
-                "timestamp": datetime.now(UTC).isoformat(),
-            }
+        """Record the ground truth label for a transaction and evaluate performance.
 
-        record["actual_label"] = actual_label
-        self._store.set(key, record)
+        Raises:
+            KeyError: If transaction prediction was not previously logged (Zero-Mock Invariant).
+        """
+        with self._lock:
+            key = f"{simulation_id}:prediction:{transaction_id}"
+            record = self._store.get(key)
+            if not record:
+                raise KeyError(
+                    f"Prediction for transaction '{transaction_id}' not found in evaluation store. "
+                    "Cannot log feedback for unscored transactions (Zero-Mock Invariant)."
+                )
 
-        return self.evaluate_performance(simulation_id)
+            record["actual_label"] = actual_label
+            self._store.set(key, record)
+
+            return self.evaluate_performance(simulation_id)
 
     def evaluate_performance(self, simulation_id: str) -> dict[str, Any]:
         """Compute metrics over logged predictions with labels and check routing rules."""
