@@ -242,6 +242,34 @@ class CacheService:
             logger.debug("Rate limit check error key=%s: %s", key, exc)
             return True  # fail open
 
+    # ── Tenant Resource Namespace Isolation ────────────────────────────
+
+    @staticmethod
+    def get_tenant_key(tenant_id: str, resource_key: str) -> str:
+        """Constructs an isolated, deterministic Redis key enclosed in the tenant's namespace."""
+        from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+        clean_tenant = sanitize_bank_id(tenant_id)
+        clean_resource = resource_key.strip(":")
+        return f"cfi:tenant:{clean_tenant}:{clean_resource}"
+
+    async def get_tenant_resource(self, tenant_id: str, resource_key: str) -> Any | None:
+        """Retrieves a cached resource scoped to a specific tenant."""
+        key = self.get_tenant_key(tenant_id, resource_key)
+        return await self._get(key)
+
+    async def set_tenant_resource(
+        self, tenant_id: str, resource_key: str, data: Any, ttl: int = 300
+    ) -> None:
+        """Caches a resource strictly scoped to a specific tenant namespace."""
+        key = self.get_tenant_key(tenant_id, resource_key)
+        await self._set(key, data, ttl)
+
+    async def invalidate_tenant_resource(self, tenant_id: str, resource_key: str) -> None:
+        """Invalidates a cached tenant resource."""
+        key = self.get_tenant_key(tenant_id, resource_key)
+        await self._delete(key)
+
     # ── Health ─────────────────────────────────────────────────────────
 
     async def health(self) -> bool:

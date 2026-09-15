@@ -79,18 +79,24 @@ def _resolve_database_url(tenant: str | None) -> str:
     * ``None`` → central/system database
     * ``"bank_a"`` → bank_a's isolated database
     """
+    clean_tenant: str | None = None
+    if tenant:
+        from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+        clean_tenant = sanitize_bank_id(tenant)
+
     if settings.database_type == "sqlite":
         storage_dir = get_storage_dir()
         with contextlib.suppress(OSError):
             os.makedirs(storage_dir, exist_ok=True)
             os.chmod(storage_dir, 0o777)  # nosec B103
-        db_name = f"cfi_{tenant}.db" if tenant else "cfi_central.db"
+        db_name = f"cfi_{clean_tenant}.db" if clean_tenant else "cfi_central.db"
         db_path = os.path.abspath(os.path.join(storage_dir, db_name)).replace("\\", "/")
         return f"sqlite+aiosqlite:///{db_path}"
 
     # PostgreSQL / CockroachDB: append tenant suffix to database name
     base_db = settings.postgres_db
-    db_name = f"{base_db}_{tenant}" if tenant else base_db
+    db_name = f"{base_db}_{clean_tenant}" if clean_tenant else base_db
     return (
         f"postgresql+asyncpg://{settings.postgres_user}:{settings.postgres_password}"
         f"@{settings.postgres_host}:{settings.postgres_port}/{db_name}"
@@ -123,15 +129,23 @@ _tenant_initialized: set[str | None] = set()
 
 def _get_or_create_engine(tenant: str | None) -> AsyncEngine:
     """Return (and cache) the async engine for a tenant, creating it on first access."""
-    if tenant not in _tenant_engines:
-        url = _resolve_database_url(tenant)
-        eng = create_async_engine(url, **_make_engine_kwargs(tenant))
-        _tenant_engines[tenant] = eng
-        _tenant_sessions[tenant] = async_sessionmaker(
+    clean_tenant: str | None = None
+    if tenant:
+        from app.infrastructure.database.tenant_provisioner import sanitize_bank_id
+
+        clean_tenant = sanitize_bank_id(tenant)
+
+    if clean_tenant not in _tenant_engines:
+        url = _resolve_database_url(clean_tenant)
+        eng = create_async_engine(url, **_make_engine_kwargs(clean_tenant))
+        _tenant_engines[clean_tenant] = eng
+        _tenant_sessions[clean_tenant] = async_sessionmaker(
             eng, class_=AsyncSession, expire_on_commit=False
         )
-        logger.info("Created database engine for tenant=%s url=%s", tenant or "central", url)
-    return _tenant_engines[tenant]
+        logger.info(
+            "Created database engine for tenant=%s url=%s", clean_tenant or "central", url
+        )
+    return _tenant_engines[clean_tenant]
 
 
 _init_lock = asyncio.Lock()

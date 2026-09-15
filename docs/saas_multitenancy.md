@@ -86,9 +86,15 @@ Database migrations are managed programmatically via Alembic (`alembic.ini` and 
 
 ## ⚡ 4. Concurrency Safety & Atomic Tenant Quota Metering
 
-High-volume inference bursts require race-condition-free quota tracking:
+High-volume inference bursts and collaborative FL rounds require race-condition-free quota tracking:
 
-- **Atomic Quota Acquisition:** `TenantMeteringService` executes an atomic `acquire_quota(tenant_id, tier, units)` routine under mutex lock, eliminating check-then-act race conditions during concurrent API bursts.
+- **Atomic Quota Acquisition:** `TenantMeteringService` executes an atomic `acquire_quota(tenant_id, feature, count)` routine under reentrant lock (`threading.RLock()`), eliminating check-then-act race conditions during concurrent burst load.
+- **Fail-Closed Feature Validation:** Restricted strictly to supported features (`INFERENCE`, `FL_ROUND`, `STORAGE`). Any unrecognized feature string fails closed and returns `(False, "Unsupported quota feature")`. Non-positive counts (`count <= 0`) are rejected with `ValueError`.
+- **Temporal Rollover Invariant:**
+  - Daily Inferences: Automatically reset to 0 upon day boundary rollover (`last_reset_date != today`).
+  - Monthly FL Rounds: Automatically reset to 0 upon month boundary rollover (`last_reset_month != this_month`), preventing historical rounds from blocking training in new billing cycles.
+- **Storage Telemetry & Quota Bounds:** Real-time storage consumption tracking via `update_storage_usage(tenant_id, storage_mb)`, incorporated into dynamic billing summaries (`daily_inferences`, `monthly_fl_rounds`, `storage_used_mb`, `estimated_cost_usd`).
+- **Redis Namespace Enclosure:** `CacheService.get_tenant_key` deterministically prefixes caching keys (`cfi:tenant:{clean_tenant}:{resource_key}`) to prevent cross-tenant cache pollution.
 - **Three-State Idempotency Engine:** `IdempotencyService` guarantees request deduplication across `"ACQUIRED"`, `"IN_PROGRESS"`, and `"HIT"` states, rejecting concurrent duplicate submissions of financial cases or settlement claims.
 - **Thread-Safe Champion Promotion:** `ModelRegistry` enforces reentrant mutual exclusion (`threading.RLock()`) and atomic file replacement (`tempfile` + `os.replace`), preventing dual-champion states under parallel sign-offs.
 
@@ -135,7 +141,7 @@ Each institution maintains isolated cryptographic keys managed through `TenantKM
 
 ```python
 from app.infrastructure.database import active_tenant
-from app.infrastructure.database.tenant_provisioner import TenantProvisioner
+from app.infrastructure.tenant_provisioner import TenantProvisioner
 from app.infrastructure.database.migration_manager import upgrade_head
 
 # 1. Onboard a new bank node with automated Alembic migration
@@ -164,7 +170,10 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 | Test Suite | File Path | Verified Capabilities | Status |
 | :--- | :--- | :--- | :---: |
 | **Tenant Lifecycle** | `backend/tests/unit/test_saas_multi_tenancy.py` | State transitions (PROVISIONING $\to$ ACTIVE $\to$ SUSPENDED $\to$ DELETED) | `3/3 PASSED` |
+| **Multi-Tenancy Hardening** | `backend/tests/unit/test_saas_multi_tenancy_hardening.py` | Invariants, thread concurrency, monthly rollover, fail-closed quota, storage | `9/9 PASSED` |
+| **KMS & DB Isolation** | `backend/tests/unit/test_multi_tenancy.py` | Engine isolation, KMS key persistence, model vault directories, log filtering | `18/18 PASSED` |
 | **BOLA / IDOR Security** | `backend/tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |
+| **Tenant KMS & Metering** | `backend/tests/unit/test_tenant_kms_metering.py` | Quota boundary enforcement, 429 rate limits, per-tenant envelope encryption | `4/4 PASSED` |
 | **Alembic Migrations** | `backend/tests/integration/test_alembic_migrations.py` | Dual revision linear head (`002_core_and_aml_tables`), offline SQL, dynamic discovery | `4/4 PASSED` |
 | **KMS Key Lifecycle** | `backend/tests/unit/test_key_lifecycle_vault.py` | Versioned envelope encryption, re-encryption, invalidation, rotation cron | `5/5 PASSED` |
 | **Concurrency Safety** | `backend/tests/unit/test_concurrency_safety.py` | Atomic quota acquire under 50 threads, single champion promotion, idempotency locks | `5/5 PASSED` |
