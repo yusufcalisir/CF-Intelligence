@@ -97,21 +97,42 @@ else:
 
 
 class DataValidatorService:
-    """Orchestrates Pandera schema checks and Great Expectations statistical tests."""
+    """Orchestrates Pandera schema checks, Zero-Raw-PII gating, and Great Expectations statistical tests."""
 
     # Allowed categorical values for device_type validation
     ALLOWED_DEVICES = ["mobile_app", "web_browser", "pos_terminal", "atm", "phone_banking"]
+
+    # Forbidden cleartext PII identifiers (Zero Raw PII policy under GDPR Art. 25/32 & KVKK)
+    FORBIDDEN_PII_TERMS = frozenset(
+        {"iban", "ssn", "tckn", "pan", "cardnumber", "creditcard", "nationalid", "cvv"}
+    )
+
+    # Maximum quarantined batches retained per bank to prevent memory exhaustion (DoS defense)
+    MAX_QUARANTINE_PER_BANK = 100
 
     def __init__(self, alert_service: Any = None) -> None:
         self.alert_service = alert_service
         self._quarantine_store: dict[str, list[pd.DataFrame]] = {}
 
     def validate_streaming_batch(self, df: pd.DataFrame, bank_id: str) -> pd.DataFrame:
-        """Validate an incoming streaming transaction batch using Pandera.
+        """Validate an incoming streaming transaction batch using Pandera and Zero-PII gating.
 
-        If validation fails, the batch is quarantined, a system alert is triggered,
-        and an exception is raised to abort ingestion.
+        If validation fails or forbidden cleartext PII is detected, the batch is quarantined,
+        a system alert is triggered, and an exception is raised to abort ingestion.
         """
+        # 1. Pre-flight Zero-Raw-PII Invariant Inspection
+        detected_pii_cols = [
+            c
+            for c in df.columns
+            if any(term in c.lower().replace("_", "").replace("-", "") for term in self.FORBIDDEN_PII_TERMS)
+        ]
+        if detected_pii_cols:
+            error_msg = f"Zero Raw PII violation: forbidden cleartext PII column(s) detected: {', '.join(detected_pii_cols)}"
+            self._quarantine_batch(df, bank_id, error_msg)
+            raise DataContractValidationError(
+                f"Streaming batch validation failed for bank {bank_id}: {error_msg}"
+            )
+
         if not HAS_PANDERA or pa is None:
             logger.warning(
                 "Pandera is not installed. Using Pandas fallback schema validation for bank %s.",
@@ -262,10 +283,22 @@ class DataValidatorService:
         )
 
     def _quarantine_batch(self, df: pd.DataFrame, bank_id: str, reason: str) -> None:
-        """Quarantine a corrupted dataset batch and trigger a security/system alert."""
+        """Quarantine a corrupted dataset batch with bounded memory and sanitized PII."""
         if bank_id not in self._quarantine_store:
             self._quarantine_store[bank_id] = []
-        self._quarantine_store[bank_id].append(df.copy())
+
+        # Enforce bounded FIFO quarantine storage to prevent memory resource exhaustion (Vector 18)
+        if len(self._quarantine_store[bank_id]) >= self.MAX_QUARANTINE_PER_BANK:
+            self._quarantine_store[bank_id].pop(0)
+
+        # Sanitize DataFrame copy before in-memory storage to prevent heap PII retention (Vector 15)
+        safe_df = df.copy()
+        for col in list(safe_df.columns):
+            col_clean = col.lower().replace("_", "").replace("-", "")
+            if any(term in col_clean for term in self.FORBIDDEN_PII_TERMS):
+                safe_df[col] = "[REDACTED_QUARANTINE_PII]"
+
+        self._quarantine_store[bank_id].append(safe_df)
 
         if self.alert_service:
             try:

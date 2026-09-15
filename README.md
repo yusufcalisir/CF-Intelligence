@@ -925,11 +925,13 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 - **Refresh Token Rotation:** Refresh tokens (7-day validity) are single-use. Exchanging a refresh token via `POST /api/v1/auth/refresh` immediately revokes the previous token and issues a new access/refresh token pair, preventing replay of stolen credentials.
 - **Brute-Force Account & IP Lockout:** Consecutive failed authentication attempts are tracked per user and client IP. After **5 failed attempts**, the account and IP are temporarily locked out for **15 minutes (900 seconds)**, returning HTTP `429 Too Many Requests` with `Retry-After: 900`. Lockouts can be reset via `reset_client_lockout` upon valid authentication.
 
-### 10.4 Production Error Sanitization & Sentry Correlation (`error_handler.py`)
+### 10.4 Production Error Sanitization & PII Leakage Protection (`error_handler.py`, `data_validator.py`, `piiSanitizer.ts`)
 
 - **Zero Information Leakage:** In production environments (`app_env="production"` or `app_debug=False`), all unhandled 500 exceptions are stripped of stack traces, internal filesystem paths (`C:\...`, `/var/...`), database table names, and SQL statements.
 - **RFC 7807 Problem Details:** Clients receive a clean, uniform generic message (`"Something went wrong. An unexpected internal error occurred."`) alongside a unique incident tracking reference (`incident_id = "inc_..."` and `X-Incident-ID` response header).
-- **Server-Side Diagnostics & Sentry:** Complete Python tracebacks and request diagnostics are logged server-side with structured metadata and dispatched to Sentry with attached incident tags.
+- **Type-Salted HMAC-SHA256 PII Masking in Logs & Sentry:** Both error messages and Python tracebacks pass through real-time PII regex scrubbers before being written to disk or dispatched to Sentry. Personal and financial identifiers (IBAN, SSN/TCKN, Credit Card PAN, Email, and Phone numbers) are automatically substituted with type-salted HMAC-SHA256 tokens (`[MASKED_PII:<TYPE>:<DIGEST[:12]>]`), ensuring zero raw PII retention in application log sinks.
+- **Streaming Zero-Raw-PII Ingestion Gate (`data_validator.py`):** Incoming streaming batches are scanned for cleartext PII columns (`iban`, `ssn`, `tckn`, `pan`, `card_number`, `national_id`). Corrupted or non-compliant batches are rejected with `DataContractValidationError`, quarantined with bounded FIFO memory limits (`MAX_QUARANTINE_PER_BANK = 100`), and redacted in heap memory to prevent memory leaks and cleartext PII heap retention.
+- **Client-Side Edge Cryptographic Pseudonymization (`piiSanitizer.ts`):** Edge pre-flight dropzones compute standard pure TypeScript HMAC-SHA256 digests (RFC 2104 / FIPS 180-4) with Luhn validation, generating cryptographic audit receipts for Zero-Raw-PII compliance prior to network transfer.
 
 ### 10.5 Strict CORS Whitelist, Perimeter WAF & HTTP Security Headers (`security_headers.py`, `perimeter_waf.py`)
 

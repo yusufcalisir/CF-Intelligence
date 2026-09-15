@@ -73,16 +73,149 @@ export function detectPIIType(val: any, fieldName: string): string | null {
   return null;
 }
 
-// ── Client-side Mock/Edge Cryptographic Salted Hash ──
-export function typeSaltedHash(value: string, piiType: string, salt: string = 'consortium_edge_salt_2026'): string {
-  const input = `${salt}:${piiType}:${value}`;
-  let hash = 0x811c9dc5;
-  for (let i = 0; i < input.length; i++) {
-    hash ^= input.charCodeAt(i);
-    hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+// ── Pure TypeScript Standard SHA-256 & HMAC-SHA256 (RFC 2104 / FIPS 180-4) ──
+function rightRotate(value: number, amount: number): number {
+  return (value >>> amount) | (value << (32 - amount));
+}
+
+export function sha256Bytes(data: Uint8Array): Uint8Array {
+  const K = [
+    0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+    0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+    0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+    0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+    0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+    0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+    0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+    0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+  ];
+
+  let H0 = 0x6a09e667;
+  let H1 = 0xbb67ae85;
+  let H2 = 0x3c6ef372;
+  let H3 = 0xa54ff53a;
+  let H4 = 0x510e527f;
+  let H5 = 0x9b05688c;
+  let H6 = 0x1f83d9ab;
+  let H7 = 0x5be0cd19;
+
+  const dataLen = data.length;
+  const bitLen = dataLen * 8;
+  const padLen = (((dataLen + 9 + 63) >>> 6) << 6);
+  const padded = new Uint8Array(padLen);
+  padded.set(data, 0);
+  padded[dataLen] = 0x80;
+
+  const view = new DataView(padded.buffer);
+  view.setUint32(padLen - 8, Math.floor(bitLen / 0x100000000), false);
+  view.setUint32(padLen - 4, bitLen >>> 0, false);
+
+  const W = new Uint32Array(64);
+
+  for (let offset = 0; offset < padLen; offset += 64) {
+    for (let i = 0; i < 16; i++) {
+      W[i] = view.getUint32(offset + (i * 4), false);
+    }
+    for (let i = 16; i < 64; i++) {
+      const w15 = W[i - 15] ?? 0;
+      const w2 = W[i - 2] ?? 0;
+      const w16 = W[i - 16] ?? 0;
+      const w7 = W[i - 7] ?? 0;
+      const s0 = rightRotate(w15, 7) ^ rightRotate(w15, 18) ^ (w15 >>> 3);
+      const s1 = rightRotate(w2, 17) ^ rightRotate(w2, 19) ^ (w2 >>> 10);
+      W[i] = (w16 + s0 + w7 + s1) >>> 0;
+    }
+
+    let a = H0, b = H1, c = H2, d = H3, e = H4, f = H5, g = H6, h = H7;
+
+    for (let i = 0; i < 64; i++) {
+      const ki = K[i] ?? 0;
+      const wi = W[i] ?? 0;
+      const S1 = rightRotate(e, 6) ^ rightRotate(e, 11) ^ rightRotate(e, 25);
+      const ch = (e & f) ^ (~e & g);
+      const temp1 = (h + S1 + ch + ki + wi) >>> 0;
+      const S0 = rightRotate(a, 2) ^ rightRotate(a, 13) ^ rightRotate(a, 22);
+      const maj = (a & b) ^ (a & c) ^ (b & c);
+      const temp2 = (S0 + maj) >>> 0;
+
+      h = g;
+      g = f;
+      f = e;
+      e = (d + temp1) >>> 0;
+      d = c;
+      c = b;
+      b = a;
+      a = (temp1 + temp2) >>> 0;
+    }
+
+    H0 = (H0 + a) >>> 0;
+    H1 = (H1 + b) >>> 0;
+    H2 = (H2 + c) >>> 0;
+    H3 = (H3 + d) >>> 0;
+    H4 = (H4 + e) >>> 0;
+    H5 = (H5 + f) >>> 0;
+    H6 = (H6 + g) >>> 0;
+    H7 = (H7 + h) >>> 0;
   }
-  const hex = (hash >>> 0).toString(16).padStart(8, '0');
-  return `enc_${hex}_${Math.abs(hash % 100000)}`;
+
+  const result = new Uint8Array(32);
+  const outView = new DataView(result.buffer);
+  outView.setUint32(0, H0, false);
+  outView.setUint32(4, H1, false);
+  outView.setUint32(8, H2, false);
+  outView.setUint32(12, H3, false);
+  outView.setUint32(16, H4, false);
+  outView.setUint32(20, H5, false);
+  outView.setUint32(24, H6, false);
+  outView.setUint32(28, H7, false);
+  return result;
+}
+
+function stringToUtf8(str: string): Uint8Array {
+  return new TextEncoder().encode(str);
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
+export function hmacSha256(keyStr: string, messageStr: string): string {
+  let keyBytes = stringToUtf8(keyStr);
+  const msgBytes = stringToUtf8(messageStr);
+
+  const blockSize = 64;
+  if (keyBytes.length > blockSize) {
+    keyBytes = sha256Bytes(keyBytes);
+  }
+  const paddedKey = new Uint8Array(blockSize);
+  paddedKey.set(keyBytes, 0);
+
+  const oKeyPad = new Uint8Array(blockSize);
+  const iKeyPad = new Uint8Array(blockSize);
+  for (let i = 0; i < blockSize; i++) {
+    const k = paddedKey[i] ?? 0;
+    oKeyPad[i] = k ^ 0x5c;
+    iKeyPad[i] = k ^ 0x36;
+  }
+
+  const inner = new Uint8Array(blockSize + msgBytes.length);
+  inner.set(iKeyPad, 0);
+  inner.set(msgBytes, blockSize);
+  const innerHash = sha256Bytes(inner);
+
+  const outer = new Uint8Array(blockSize + 32);
+  outer.set(oKeyPad, 0);
+  outer.set(innerHash, blockSize);
+  const outerHash = sha256Bytes(outer);
+
+  return bytesToHex(outerHash);
+}
+
+// ── Client-side Edge Cryptographic HMAC-SHA256 Salted Hash ──
+export function typeSaltedHash(value: string, piiType: string, salt: string = 'consortium_edge_salt_2026'): string {
+  const key = `${salt}:${piiType}`;
+  const digest = hmacSha256(key, value.trim());
+  return `enc_${digest}`;
 }
 
 export function scanRecordsForPII(records: Record<string, any>[]): PIIScanResult {
@@ -99,11 +232,17 @@ export function scanRecordsForPII(records: Record<string, any>[]): PIIScanResult
     }
   }
 
+  const fieldList = Array.from(detectedFields).sort();
+  const summaryPayload = `fields:${fieldList.join(',')}|violations:${count}`;
+  const receiptHash = hmacSha256('consortium_audit_salt_2026', summaryPayload);
+
   return {
     hasPII: detectedFields.size > 0,
     piiViolationsCount: count,
-    detectedFields: Array.from(detectedFields),
-    sanitizedReceipt: detectedFields.size > 0 ? `HMAC-SHA256-CLIENT-SALTED-${Date.now().toString(16).toUpperCase()}` : 'ZERO-PII-VERIFIED',
+    detectedFields: fieldList,
+    sanitizedReceipt: detectedFields.size > 0
+      ? `HMAC-SHA256-CLIENT-SALTED-${receiptHash.slice(0, 16).toUpperCase()}`
+      : 'ZERO-PII-VERIFIED',
   };
 }
 

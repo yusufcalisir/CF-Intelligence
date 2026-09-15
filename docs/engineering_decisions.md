@@ -496,6 +496,8 @@ Implement global production error sanitization middleware (`error_handler.py`):
 1. **Zero Information Leakage in Production**: When `app_env="production"` or `app_debug=False`, all unhandled 500 exceptions are stripped of traceback details and replaced with a uniform generic error message (`"Something went wrong. An unexpected internal error occurred."`).
 2. **RFC 7807 Problem Details**: Responses adhere to standard Problem Details for HTTP APIs (`type`, `title`, `status`, `detail`, `instance`, `incident_id`).
 3. **Trace Correlation & Sentry Integration**: Each exception generates a unique incident ID (`inc_<timestamp>_<uuid>`) returned in both response body and `X-Incident-ID` header. Full diagnostics and tracebacks are logged strictly server-side and dispatched to Sentry with attached incident context.
+4. **Type-Salted HMAC-SHA256 Log Sanitization**: Server-side error logs and tracebacks are scrubbed of raw personal and financial identifiers (IBAN, SSN/TCKN, Credit Card PAN, Email, Phone), substituting each with a deterministic type-salted HMAC-SHA256 token (`[MASKED_PII:<TYPE>:<DIGEST>]`).
+5. **Streaming Zero-PII Gating & Bounded Quarantine**: Streaming data ingestion gates pre-flight columns against forbidden cleartext PII terms (`FORBIDDEN_PII_TERMS`), enqueues non-compliant batches into a bounded FIFO quarantine store (`MAX_QUARANTINE_PER_BANK = 100`) to eliminate memory leaks, and redacts PII columns prior to heap retention.
 
 ### Tradeoff
 
