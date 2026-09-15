@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import logging
+import math
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -32,6 +34,7 @@ class RetrainingJobRecord:
     status: str = "TRIGGERED"
     candidate_model_version: str | None = None
     triggered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    details: dict[str, Any] = field(default_factory=dict)
 
 
 class DriftTriggeredRetrainingService:
@@ -41,6 +44,7 @@ class DriftTriggeredRetrainingService:
         self.psi_threshold = psi_threshold
         self.min_auc_threshold = min_auc_threshold
         self._jobs: dict[str, RetrainingJobRecord] = {}
+        self._lock = threading.RLock()
 
     def evaluate_drift_and_trigger(
         self,
@@ -49,6 +53,15 @@ class DriftTriggeredRetrainingService:
         current_auc: float = 0.85,
     ) -> RetrainingJobRecord | None:
         """Evaluates drift metrics and dispatches a retraining job if thresholds are exceeded."""
+        if not math.isfinite(psi_score) or not math.isfinite(concept_drift_score) or not math.isfinite(current_auc):
+            logger.warning(
+                "Non-finite metrics encountered in retraining evaluation: psi=%s, concept=%s, auc=%s",
+                psi_score,
+                concept_drift_score,
+                current_auc,
+            )
+            return None
+
         cause: RetrainingCause | None = None
 
         if psi_score >= self.psi_threshold:
@@ -67,8 +80,14 @@ class DriftTriggeredRetrainingService:
             cause=cause,
             psi_score=psi_score,
             status="TRIGGERED",
+            details={
+                "concept_drift_score": concept_drift_score,
+                "current_auc": current_auc,
+            },
         )
-        self._jobs[job_id] = record
+        with self._lock:
+            self._jobs[job_id] = record
+
         logger.info(
             "Dispatched retraining job %s (Cause: %s, PSI: %.4f)",
             job_id,
@@ -77,15 +96,42 @@ class DriftTriggeredRetrainingService:
         )
         return record
 
+    def create_manual_job(
+        self,
+        reason: str = "Manual trigger from Observability Console",
+        cause: RetrainingCause = RetrainingCause.PSI_DRIFT_EXCEEDED,
+        psi_score: float = 0.25,
+    ) -> RetrainingJobRecord:
+        """Manually dispatches an automated retraining job."""
+        job_id = f"retrain_{uuid.uuid4().hex[:8]}"
+        record = RetrainingJobRecord(
+            job_id=job_id,
+            cause=cause,
+            psi_score=psi_score,
+            status="TRIGGERED",
+            details={"manual_reason": reason},
+        )
+        with self._lock:
+            self._jobs[job_id] = record
+
+        logger.info(
+            "Manually dispatched retraining job %s (Reason: %s, Cause: %s)",
+            job_id,
+            reason,
+            cause.value,
+        )
+        return record
+
     def execute_retraining_pipeline(self, job_id: str) -> dict[str, Any]:
         """Executes automated FL retraining task producing a candidate model checkpoint."""
-        if job_id not in self._jobs:
-            raise KeyError(f"Retraining job '{job_id}' does not exist.")
+        with self._lock:
+            if job_id not in self._jobs:
+                raise KeyError(f"Retraining job '{job_id}' does not exist.")
 
-        record = self._jobs[job_id]
-        candidate_version = f"model_candidate_{uuid.uuid4().hex[:6]}"
-        record.status = "COMPLETED"
-        record.candidate_model_version = candidate_version
+            record = self._jobs[job_id]
+            candidate_version = f"model_candidate_{uuid.uuid4().hex[:6]}"
+            record.status = "COMPLETED"
+            record.candidate_model_version = candidate_version
 
         logger.info(
             "Retraining job %s completed. Candidate model: %s",
@@ -99,6 +145,27 @@ class DriftTriggeredRetrainingService:
             "metrics": {"auc": 0.88, "precision": 0.84, "recall": 0.81},
         }
 
+    def cancel_job(self, job_id: str, reason: str = "Cancelled by operator") -> bool:
+        """Cancels a pending or triggered retraining job."""
+        with self._lock:
+            if job_id not in self._jobs:
+                return False
+            record = self._jobs[job_id]
+            if record.status in ("COMPLETED", "FAILED"):
+                return False
+            record.status = "CANCELLED"
+            record.details["cancellation_reason"] = reason
+            logger.info("Cancelled retraining job %s (Reason: %s)", job_id, reason)
+            return True
+
     def get_job(self, job_id: str) -> RetrainingJobRecord | None:
         """Retrieves retraining job record by ID."""
-        return self._jobs.get(job_id)
+        with self._lock:
+            return self._jobs.get(job_id)
+
+    def list_jobs(self, status: str | None = None) -> list[RetrainingJobRecord]:
+        """Retrieves all tracked retraining jobs, optionally filtered by status."""
+        with self._lock:
+            if status is None:
+                return list(self._jobs.values())
+            return [j for j in self._jobs.values() if j.status == status]

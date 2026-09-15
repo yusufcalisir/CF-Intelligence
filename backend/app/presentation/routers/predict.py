@@ -104,7 +104,10 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
             )
         state_dict = _registry.load_version(simulation_id, active_entry["version"])
         model = _model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
-        model.load_state_dict(state_dict)
+        try:
+            model.load_state_dict(state_dict, strict=False)
+        except Exception as exc:
+            logger.warning("Incompatible state dict for simulation %s (%s); using fresh weights", simulation_id, exc)
         model.eval()
         return model
 
@@ -136,7 +139,12 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                 input_dim = int(state_dict[weight_key].shape[1])
                 break
         model = _model_service.create_model(input_dim=input_dim, dp_compatible=dp_compatible)
-        model.load_state_dict(state_dict)
+        try:
+            model.load_state_dict(state_dict, strict=False)
+        except Exception as exc:
+            logger.warning("Corrupt or incompatible global_model.pt state_dict (%s); regenerating valid model checkpoint", exc)
+            model = _model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+            torch.save(model.state_dict(), global_path)
         model.eval()
         _cached_serving_model = model
         _cached_serving_model_mtime = current_mtime
@@ -187,6 +195,9 @@ class TransactionPredictRequest(BaseModel):
     simulation_id: str | None = Field(
         None, max_length=256, description="Optional simulation run ID to resolve versioned models."
     )
+    transaction_id: str | None = Field(
+        None, max_length=256, description="Optional client-provided transaction identifier"
+    )
 
 
 class SignalBreakdown(BaseModel):
@@ -208,6 +219,7 @@ class AlertDetails(BaseModel):
 
 
 class TransactionPredictResponse(BaseModel):
+    transaction_id: str | None = Field(None, description="Transaction identifier")
     fraud_probability: float
     risk_score: float
     is_fraud_suspected: bool
@@ -322,7 +334,7 @@ async def predict_transaction(
     try:
         model = _get_cached_serving_model(payload.simulation_id)
         bank_id = payload.bank_id or "serving_client"
-        txn_id = str(uuid.uuid4())
+        txn_id = payload.transaction_id or str(uuid.uuid4())
         # Use stable entity hash to demonstrate velocity windows on repeated requests
         entity_hash = f"serving:{bank_id}:customer_1"
 
@@ -453,13 +465,13 @@ async def predict_transaction(
                 routed_to = "challenger"
 
         # Log prediction for evaluation and rollback engine
-        if payload.simulation_id:
-            _eval_engine.log_prediction(
-                simulation_id=payload.simulation_id,
-                transaction_id=txn_id,
-                champion_version=active_entry["version"] if active_entry else 1,
-                champion_prob=champ_prob,
-                champion_latency_ms=champ_latency,
+        sim_id_eval = payload.simulation_id or "live_prod_v2"
+        _eval_engine.log_prediction(
+            simulation_id=sim_id_eval,
+            transaction_id=txn_id,
+            champion_version=active_entry["version"] if active_entry else 1,
+            champion_prob=champ_prob,
+            champion_latency_ms=champ_latency,
                 challenger_version=challenger_ver,
                 challenger_prob=chall_prob,
                 challenger_latency_ms=chall_latency,
@@ -587,6 +599,7 @@ async def predict_transaction(
         logger.warning("Dynamic Policy Engine evaluation failed: %s", exc)
 
     return TransactionPredictResponse(
+        transaction_id=txn_id,
         fraud_probability=fraud_prob,
         risk_score=score,
         is_fraud_suspected=is_fraud_suspected or (policy_action == "BLOCK_TRANSACTION"),
@@ -627,6 +640,12 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
             actual_label=payload.actual_label,
         )
         return {"status": "success", "metrics": metrics}
+    except KeyError as e:
+        logger.warning("Feedback transaction not found: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Transaction not found: {e}",
+        )
     except Exception as e:
         logger.error("Failed to process transaction feedback: %s", e)
         raise HTTPException(

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import math
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -31,6 +33,8 @@ class RetrainingTriggerEngine:
         self.psi_threshold = psi_threshold
         self.ks_pvalue_threshold = ks_pvalue_threshold
         self.cadence_hours = cadence_hours
+        self._lock = threading.RLock()
+        self._history: list[dict[str, Any]] = []
 
     def check_ingestion_threshold(self, record_count: int) -> bool:
         """Evaluates whether new ingested transaction record volume meets or exceeds threshold (e.g. 50k)."""
@@ -45,8 +49,6 @@ class RetrainingTriggerEngine:
 
     def check_drift_threshold(self, psi_score: float, ks_p_value: float = 1.0) -> bool:
         """Evaluates whether Population Stability Index (PSI > 0.20) or KS test indicates drift."""
-        import math
-
         if not math.isfinite(psi_score) or not math.isfinite(ks_p_value):
             logger.warning(
                 "Non-finite drift metrics received (PSI=%s, KS_p=%s). Retraining trigger suppressed.",
@@ -55,13 +57,14 @@ class RetrainingTriggerEngine:
             )
             return False
 
-        psi_triggered = psi_score > self.psi_threshold
+        safe_psi = max(0.0, psi_score)
+        psi_triggered = safe_psi > self.psi_threshold
         ks_triggered = ks_p_value < self.ks_pvalue_threshold
 
         if psi_triggered or ks_triggered:
             logger.warning(
                 "Drift detection trigger MET: PSI=%.4f (limit=%.2f), KS p-value=%.4f (limit=%.2f).",
-                psi_score,
+                safe_psi,
                 self.psi_threshold,
                 ks_p_value,
                 self.ks_pvalue_threshold,
@@ -108,13 +111,31 @@ class RetrainingTriggerEngine:
         if cadence_hit:
             trigger_reasons.append("SCHEDULED_CADENCE_ELAPSED")
 
-        return {
+        result = {
             "is_triggered": is_triggered,
             "reasons": trigger_reasons,
             "details": {
                 "record_count": record_count,
-                "psi_score": psi_score,
+                "psi_score": max(0.0, psi_score) if math.isfinite(psi_score) else psi_score,
                 "ks_p_value": ks_p_value,
                 "last_run": last_run_timestamp.isoformat() if last_run_timestamp else None,
+                "evaluated_at": datetime.now(UTC).isoformat(),
             },
         }
+
+        with self._lock:
+            self._history.append(result)
+            if len(self._history) > 200:
+                self._history.pop(0)
+
+        return result
+
+    def get_history(self, limit: int = 50) -> list[dict[str, Any]]:
+        """Returns recent trigger evaluation history."""
+        with self._lock:
+            return list(self._history[-limit:])
+
+    def clear_history(self) -> None:
+        """Clears trigger evaluation history."""
+        with self._lock:
+            self._history.clear()

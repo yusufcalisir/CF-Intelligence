@@ -80,36 +80,46 @@ class ModelDriftService:
     @staticmethod
     def _calculate_psi(actual: Any, expected: Any, num_bins: int = 10) -> float:
         """Calculate Population Stability Index (PSI) between actual and expected distributions."""
-        if len(actual) == 0 or len(expected) == 0:
+        if actual is None or expected is None:
             return 0.0
 
+        actual_arr = np.asarray(actual, dtype=float)
+        expected_arr = np.asarray(expected, dtype=float)
+        actual_valid = actual_arr[np.isfinite(actual_arr)]
+        expected_valid = expected_arr[np.isfinite(expected_arr)]
+
+        if len(actual_valid) == 0 or len(expected_valid) == 0:
+            return 0.0
+
+        num_bins = max(2, int(num_bins))
+
         # Small-sample guard (N < 30): quantile PSI exhibits unstable behavior at N < 30
-        if len(actual) < 30 or len(expected) < 30:
+        if len(actual_valid) < 30 or len(expected_valid) < 30:
             logger.warning(
                 "Sample size too small for reliable quantile PSI (actual=%d, expected=%d < 30). Returning 0.0.",
-                len(actual),
-                len(expected),
+                len(actual_valid),
+                len(expected_valid),
             )
             return 0.0
 
         # Determine bin edges from reference/expected distribution
         quantiles = np.linspace(0, 100, num_bins + 1)
-        bins = np.percentile(expected, quantiles)
+        bins = np.percentile(expected_valid, quantiles)
         bins = np.unique(bins)
         if len(bins) < 2:
-            bins = np.linspace(
-                min(expected.min(), actual.min()),
-                max(expected.max(), actual.max()) + 1e-5,
-                num_bins + 1,
-            )
+            min_val = float(min(expected_valid.min(), actual_valid.min()))
+            max_val = float(max(expected_valid.max(), actual_valid.max()))
+            if min_val == max_val:
+                max_val += 1e-4
+            bins = np.linspace(min_val, max_val, num_bins + 1)
 
         # Count frequencies
-        expected_counts, _ = np.histogram(expected, bins=bins)
-        actual_counts, _ = np.histogram(actual, bins=bins)
+        expected_counts, _ = np.histogram(expected_valid, bins=bins)
+        actual_counts, _ = np.histogram(actual_valid, bins=bins)
 
         # Convert to percentages with laplace smoothing (+1e-4) to avoid division by zero
-        expected_pct = (expected_counts + 1e-4) / (len(expected) + 1e-4 * len(expected_counts))
-        actual_pct = (actual_counts + 1e-4) / (len(actual) + 1e-4 * len(actual_counts))
+        expected_pct = (expected_counts + 1e-4) / (len(expected_valid) + 1e-4 * len(expected_counts))
+        actual_pct = (actual_counts + 1e-4) / (len(actual_valid) + 1e-4 * len(actual_counts))
 
         # Sum PSI formula: (Actual% - Expected%) * ln(Actual% / Expected%)
         psi_val = float(np.sum((actual_pct - expected_pct) * np.log(actual_pct / expected_pct)))
@@ -178,6 +188,7 @@ class ModelDriftService:
         num_bins: int = 10,
     ) -> CalibrationReport:
         """Compute Brier Score, ECE, and reliability curve bins for model probability predictions."""
+        num_bins = max(2, int(num_bins))
         if len(y_true) == 0 or len(y_prob) == 0 or len(y_true) != len(y_prob):
             return CalibrationReport(
                 brier_score=0.0,

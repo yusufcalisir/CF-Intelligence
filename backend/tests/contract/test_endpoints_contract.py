@@ -500,6 +500,7 @@ def test_registry_and_inference_contract(client: TestClient):
 
     # Predict transaction contract
     predict_payload = {
+        "transaction_id": "TXN-998822",
         "transaction_amount": 12500.0,
         "merchant_category": "crypto_exchange",
         "country_code": "NG",

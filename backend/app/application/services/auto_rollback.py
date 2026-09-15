@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import threading
 import uuid
 from dataclasses import dataclass, field
@@ -46,7 +47,7 @@ class AutoRollbackManager:
         self.max_latency_ms = max_latency_ms
         self.max_fpr = max_fpr
         self._history: list[RollbackExecutionRecord] = []
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def evaluate_model_health_and_rollback(
         self,
@@ -57,6 +58,15 @@ class AutoRollbackManager:
         fallback_model_version: str,
     ) -> tuple[bool, RollbackExecutionRecord | None]:
         """Evaluates live performance SLA and executes rollback if bounds are violated."""
+        if not math.isfinite(current_auc) or not math.isfinite(current_latency_ms) or not math.isfinite(current_fpr):
+            logger.warning(
+                "Non-finite model health metrics received: AUC=%s, Latency=%s, FPR=%s. Suppressing rollback.",
+                current_auc,
+                current_latency_ms,
+                current_fpr,
+            )
+            return False, None
+
         cause: RollbackCause | None = None
 
         if current_auc < self.min_auc:
@@ -92,3 +102,13 @@ class AutoRollbackManager:
         """Retrieves rollback execution history."""
         with self._lock:
             return list(self._history)
+
+    def get_last_rollback(self) -> RollbackExecutionRecord | None:
+        """Retrieves the most recent rollback execution record, if any."""
+        with self._lock:
+            return self._history[-1] if self._history else None
+
+    def clear_history(self) -> None:
+        """Clears rollback execution history."""
+        with self._lock:
+            self._history.clear()
