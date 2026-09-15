@@ -40,6 +40,7 @@ class AggregationMethod(StrEnum):
 
     FED_AVG = "fed_avg"
     FED_AVG_WEIGHTED = "fed_avg_weighted"
+    FED_PROX = "fed_prox"
     KRUM = "krum"
     COORDINATE_WISE_MEDIAN = "coordinate_wise_median"
     FED_ADAM = "fed_adam"

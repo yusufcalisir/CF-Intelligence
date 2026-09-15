@@ -118,6 +118,30 @@ AGGREGATION_METHODS = [
         "colluding_defense": False,
         "paper": "Reddi et al. (2020)",
     },
+    {
+        "id": "fed_prox",
+        "label": "FedProx (Proximal Regularization)",
+        "description": "Federated averaging with proximal constraint term (mu/2)||w - w_t||^2 to stabilize Non-IID drift and client heterogeneity.",
+        "byzantine_robust": False,
+        "colluding_defense": False,
+        "paper": "Li et al. (2020)",
+    },
+    {
+        "id": "fed_yogi",
+        "label": "FedYogi (Adaptive Server)",
+        "description": "Server-side Yogi optimizer using sign-based variance tracking to prevent learning rate collapse on Non-IID data.",
+        "byzantine_robust": False,
+        "colluding_defense": False,
+        "paper": "Reddi et al. (2021)",
+    },
+    {
+        "id": "scaffold",
+        "label": "SCAFFOLD (Control Variates)",
+        "description": "Server FedAvg aggregation with client drift correction using variance reduction and client-server control variates.",
+        "byzantine_robust": False,
+        "colluding_defense": False,
+        "paper": "Karimireddy et al. (2020)",
+    },
 ]
 
 

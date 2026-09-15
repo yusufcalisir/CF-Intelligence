@@ -738,6 +738,10 @@ class SimulationService:
 
                         prev_w = prev_local_weights_by_bank.get(bank.id)
 
+                        effective_fedprox_mu = getattr(config, "fedprox_mu", 0.0)
+                        if getattr(config, "aggregation_method", "") == "fed_prox" and effective_fedprox_mu == 0.0:
+                            effective_fedprox_mu = 0.01
+
                         if bank.id in bank_data:
                             # Direct PyTorch local training on bank's partition
                             loc_model = self.model_service.create_model(
@@ -751,7 +755,7 @@ class SimulationService:
                                 epochs=config.local_epochs,
                                 learning_rate=config.learning_rate,
                                 batch_size=config.batch_size,
-                                fedprox_mu=getattr(config, "fedprox_mu", 0.0),
+                                fedprox_mu=effective_fedprox_mu,
                                 moon_mu=getattr(config, "moon_mu", 0.0),
                                 moon_temperature=getattr(config, "moon_temperature", 0.5),
                                 global_weights=global_weights,
@@ -783,7 +787,7 @@ class SimulationService:
                                 dp_delta=config.dp_delta,
                                 dp_max_grad_norm=config.dp_max_grad_norm,
                                 correlation_id=correlation_id,
-                                fedprox_mu=getattr(config, "fedprox_mu", 0.0),
+                                fedprox_mu=effective_fedprox_mu,
                                 moon_mu=getattr(config, "moon_mu", 0.0),
                                 moon_temperature=getattr(config, "moon_temperature", 0.5),
                                 prev_local_weights=prev_w,
@@ -1711,6 +1715,9 @@ class SimulationService:
                 },
             )
 
+            # Prune in-memory server optimizer states for this completed simulation
+            self.fl_engine.clear_simulation_state(simulation.id)
+
             return simulation
 
         except Exception as e:
@@ -1736,6 +1743,9 @@ class SimulationService:
                     "error": str(e),
                 },
             )
+
+            # Prune in-memory server optimizer states for this failed simulation
+            self.fl_engine.clear_simulation_state(simulation.id)
 
             return simulation
 

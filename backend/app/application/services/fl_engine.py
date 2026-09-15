@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 import time
 from typing import TYPE_CHECKING
 
@@ -33,9 +34,6 @@ if TYPE_CHECKING:
     from app.application.services.model_service import ModelService
     from app.application.services.privacy_service import PrivacyService
     from app.config import Settings
-
-from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
-from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +57,21 @@ class FederatedLearningEngine:
         self.settings = settings
         self.model_service = model_service
         self.privacy_service = privacy_service
-        self.zk_verifier = ZKSNARKProofVerifier()
-        self.unlearning_engine = FederatedUnlearningEngine()
-        # Server optimizer states for FedOpt (FedAdam / FedAdaGrad) keyed by simulation_id
+        self._state_lock = threading.Lock()
+        # Server optimizer states for FedOpt (FedAdam / FedAdaGrad / FedYogi) keyed by simulation_id
         self._server_m_by_sim: dict[str, np.ndarray] = {}
         self._server_v_by_sim: dict[str, np.ndarray] = {}
         self._server_round_by_sim: dict[str, int] = {}
         self._server_c_by_sim: dict[str, np.ndarray] = {}
+
+    def clear_simulation_state(self, simulation_id: str) -> None:
+        """Prune server optimizer and variate states for a completed or terminated simulation."""
+        with self._state_lock:
+            self._server_m_by_sim.pop(simulation_id, None)
+            self._server_v_by_sim.pop(simulation_id, None)
+            self._server_round_by_sim.pop(simulation_id, None)
+            self._server_c_by_sim.pop(simulation_id, None)
+        logger.info("Cleared in-memory simulation optimizer states for %s", simulation_id)
 
     def aggregate_parameters(
         self,
@@ -161,8 +167,8 @@ class FederatedLearningEngine:
                 else []
             )
 
-        elif method == AggregationMethod.FED_AVG_WEIGHTED:
-            # Weighted average by dataset size
+        elif method in (AggregationMethod.FED_AVG_WEIGHTED, AggregationMethod.FED_PROX):
+            # Weighted average by dataset size (FedAvg: McMahan et al. 2017; FedProx: Li et al. 2020)
             total_samples = sum(client_samples)
             n = len(client_weights)
             if total_samples <= 0:
@@ -191,13 +197,15 @@ class FederatedLearningEngine:
                 delta_t = w_avg - w_t  # pseudo-gradient
 
                 sim_id = simulation_id or "default_sim"
-                if sim_id not in self._server_m_by_sim:
-                    self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
-                if sim_id not in self._server_v_by_sim:
-                    self._server_v_by_sim[sim_id] = np.zeros_like(w_avg)
+                with self._state_lock:
+                    if sim_id not in self._server_m_by_sim:
+                        self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
+                    if sim_id not in self._server_v_by_sim:
+                        self._server_v_by_sim[sim_id] = np.zeros_like(w_avg)
 
-                m_t = self._server_m_by_sim[sim_id]
-                v_t = self._server_v_by_sim[sim_id]
+                    m_t = self._server_m_by_sim[sim_id].copy()
+                    v_t = self._server_v_by_sim[sim_id].copy()
+                    t = self._server_round_by_sim.get(sim_id, 1)
 
                 eta = self.settings.fedopt_server_lr
                 beta1 = self.settings.fedopt_beta1
@@ -210,21 +218,22 @@ class FederatedLearningEngine:
                     v_t_next = beta2 * v_t + (1 - beta2) * (delta_t**2)
 
                     # Track round number for bias correction
-                    t = self._server_round_by_sim.get(sim_id, 1)
                     m_hat = m_t_next / (1.0 - (beta1**t))
                     v_hat = v_t_next / (1.0 - (beta2**t))
 
                     # Update global weights using bias-corrected moments
                     w_next = w_t + eta * m_hat / (np.sqrt(v_hat) + tau)
 
-                    self._server_m_by_sim[sim_id] = m_t_next
-                    self._server_v_by_sim[sim_id] = v_t_next
-                    self._server_round_by_sim[sim_id] = t + 1
+                    with self._state_lock:
+                        self._server_m_by_sim[sim_id] = m_t_next
+                        self._server_v_by_sim[sim_id] = v_t_next
+                        self._server_round_by_sim[sim_id] = t + 1
                 else:  # FED_ADAGRAD
                     v_t_next = v_t + (delta_t**2)
                     w_next = w_t + eta * delta_t / (np.sqrt(v_t_next) + tau)
 
-                    self._server_v_by_sim[sim_id] = v_t_next
+                    with self._state_lock:
+                        self._server_v_by_sim[sim_id] = v_t_next
 
                 avg_weights = w_next.tolist()
 
@@ -345,14 +354,15 @@ class FederatedLearningEngine:
                 delta_t = w_avg - w_t  # pseudo-gradient
 
                 sim_id = simulation_id or "default_sim"
-                if sim_id not in self._server_m_by_sim:
-                    self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
-                if sim_id not in self._server_v_by_sim:
-                    # Yogi initialises v as τ² to avoid zero-division
-                    self._server_v_by_sim[sim_id] = np.full_like(w_avg, self.settings.fedopt_tau**2)
+                with self._state_lock:
+                    if sim_id not in self._server_m_by_sim:
+                        self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
+                    if sim_id not in self._server_v_by_sim:
+                        # Yogi initialises v as τ² to avoid zero-division
+                        self._server_v_by_sim[sim_id] = np.full_like(w_avg, self.settings.fedopt_tau**2)
 
-                m_t = self._server_m_by_sim[sim_id]
-                v_t = self._server_v_by_sim[sim_id]
+                    m_t = self._server_m_by_sim[sim_id].copy()
+                    v_t = self._server_v_by_sim[sim_id].copy()
 
                 eta = self.settings.fedopt_server_lr
                 beta1 = self.settings.fedopt_beta1
@@ -365,8 +375,9 @@ class FederatedLearningEngine:
                 m_t_next = beta1 * m_t + (1 - beta1) * delta_t
                 w_next = w_t + eta * m_t_next / (np.sqrt(v_t_next) + tau)
 
-                self._server_m_by_sim[sim_id] = m_t_next
-                self._server_v_by_sim[sim_id] = v_t_next
+                with self._state_lock:
+                    self._server_m_by_sim[sim_id] = m_t_next
+                    self._server_v_by_sim[sim_id] = v_t_next
 
                 avg_weights = w_next.tolist()
 
@@ -391,10 +402,11 @@ class FederatedLearningEngine:
 
             # Global server control variate tracking
             sim_id = simulation_id or "default_sim"
-            if not hasattr(self, "_server_c_by_sim"):
-                self._server_c_by_sim = {}
-            if sim_id not in self._server_c_by_sim:
-                self._server_c_by_sim[sim_id] = np.zeros(len(w_avg))
+            with self._state_lock:
+                if not hasattr(self, "_server_c_by_sim"):
+                    self._server_c_by_sim = {}
+                if sim_id not in self._server_c_by_sim:
+                    self._server_c_by_sim[sim_id] = np.zeros(len(w_avg))
             logger.info(
                 "SCAFFOLD aggregation (server FedAvg & variate tracking step) for sim=%s",
                 simulation_id,

@@ -713,14 +713,16 @@ The platform includes an interactive enterprise ingestion studio allowing bank d
 ## 5. Federated Learning Engines & Non-IID Optimization
 
 ### 5.1 Core Federated Learning Engine (`fl_engine.py` & `model_service.py`)
-Orchestrates multi-client federated training rounds supporting 7 optimization strategies:
-1. **FedAvg:** Standard weighted parameter averaging based on client dataset size.
-2. **FedProx:** Adds a client-side proximal regularization penalty ($\frac{\mu}{2} \|w - w^t\|^2$ in `model_service.py:train_local`) during local training to restrict update drift under Non-IID statistical skew; server-side aggregation in `fl_engine.py` performs standard weighted averaging.
-3. **SCAFFOLD:** Corrects client-side gradient trajectories against drift ($g_i \leftarrow g_i - c_i + c$ in `model_service.py`) using control variates; server-side aggregation in `fl_engine.py` evaluates weighted parameter averaging while tracking global variate states.
-4. **FedAdam:** Server-side adaptive optimization with first and second moment tracking.
-5. **FedYogi:** Adaptive server-side optimization controlling directional update variance.
-6. **FedAdagrad:** Adaptive gradient server-side learning rate scaling.
-7. **MOON (Model-Contrastive FL):** Contrastive representation learning between local and global representations.
+Orchestrates multi-client federated training rounds supporting canonical optimization and drift mitigation strategies:
+1. **FedAvg (`AggregationMethod.FED_AVG` & `FED_AVG_WEIGHTED`):** Weighted/unweighted parameter averaging based on client dataset size $w_{t+1} = \sum_{k=1}^K \frac{n_k}{n} w_t^k$ (McMahan et al., 2017).
+2. **FedProx (`AggregationMethod.FED_PROX`):** Canonical proximal regularization framework (Li et al., 2020) for heterogeneous and Non-IID banking networks. Local clients minimize $h_k(w; w_t) = F_k(w) + \frac{\mu}{2} \|w - w_t\|^2$ (`model_service.py:train_local`), bounding client drift from global consensus model $w_t$. Server-side aggregation performs sample-weighted consensus averaging while supporting runtime dynamic tuning of $\mu \in [0.001, 0.5]$ (benchmark default $\mu = 0.01$).
+3. **SCAFFOLD (`AggregationMethod.SCAFFOLD`):** Corrects client-side gradient trajectories against drift ($g_i \leftarrow g_i - c_i + c$ in `model_service.py`) using control variates; server-side aggregation in `fl_engine.py` evaluates weighted parameter averaging while tracking global variate states $c$.
+4. **FedAdam (`AggregationMethod.FED_ADAM`):** Server-side adaptive optimization with first ($m_t$) and second ($v_t$) moment tracking with bias correction.
+5. **FedYogi (`AggregationMethod.FED_YOGI`):** Adaptive server-side optimization controlling directional update variance via sign-based second-moment updates $v_t \leftarrow v_t - (1 - \beta_2) \text{sign}(v_t - \Delta_t^2) \Delta_t^2$.
+6. **FedAdagrad (`AggregationMethod.FED_ADAGRAD`):** Adaptive gradient server-side learning rate scaling for sparse update coordinates.
+7. **MOON (Model-Contrastive FL):** Contrastive representation learning maximizing cosine similarity between local and global representations while pushing away previous local representations.
+8. **Thread-Safe Simulation State Lifecycle & Concurrency Guard:** Multi-tenant simulation execution is protected by `threading.Lock()`, eliminating state collisions across concurrent simulation runs in `_server_m_by_sim`, `_server_v_by_sim`, `_server_round_by_sim`, and `_server_c_by_sim`.
+9. **Zero-Memory-Leak State Pruning (`clear_simulation_state`):** Automatically clears server optimizer tensors and variate states upon simulation completion or failure, guaranteeing constant resident memory footprint in long-running SaaS deployments.
 
 ### 5.2 Dirichlet Non-IID Partitioning & Optuna Hyperparameter Tuning
 - **Dirichlet Partitioner (`fl_dirichlet_partitioner.py`):** Models realistic bank label heterogeneity across institutions using the Dirichlet distribution:

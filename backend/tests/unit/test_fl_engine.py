@@ -380,3 +380,133 @@ class TestByzantineRobustness:
         )
         assert result.layer_shapes == sample_weights[0].layer_shapes
         assert len(result.flat_weights) == len(sample_weights[0].flat_weights)
+
+    def test_fed_prox_aggregation(
+        self,
+        fl_engine: FederatedLearningEngine,
+        sample_weights: list[ModelWeights],
+    ) -> None:
+        """FedProx aggregation on server must perform sample-weighted averaging."""
+        # sample_weights has 3 clients with flat_weights: [1.0], [3.0], [2.0]
+        result = fl_engine.aggregate_parameters(
+            sample_weights,
+            client_samples=[1000, 100, 100],
+            method=AggregationMethod.FED_PROX,
+        )
+        # 1000/1200 * 1.0 + 100/1200 * 3.0 + 100/1200 * 2.0 = (1000 + 300 + 200) / 1200 = 1500 / 1200 = 1.25
+        expected = 1500.0 / 1200.0
+        assert all(abs(w - expected) < 1e-5 for w in result.flat_weights)
+        assert result.layer_shapes == sample_weights[0].layer_shapes
+
+    def test_fl_engine_clear_simulation_state(
+        self,
+        fl_engine: FederatedLearningEngine,
+        sample_weights: list[ModelWeights],
+    ) -> None:
+        """clear_simulation_state must prune server optimizer and variate tensors from memory."""
+        sim_id = "test_sim_prune_123"
+        global_w = ModelWeights(layer_shapes=sample_weights[0].layer_shapes, flat_weights=[0.0] * 12)
+
+        # Run FedAdam to populate optimizer state
+        fl_engine.aggregate_parameters(
+            sample_weights,
+            client_samples=[100, 100, 100],
+            method=AggregationMethod.FED_ADAM,
+            global_weights=global_w,
+            simulation_id=sim_id,
+        )
+
+        assert sim_id in fl_engine._server_m_by_sim
+        assert sim_id in fl_engine._server_v_by_sim
+        assert sim_id in fl_engine._server_round_by_sim
+
+        # Clear state
+        fl_engine.clear_simulation_state(sim_id)
+
+        assert sim_id not in fl_engine._server_m_by_sim
+        assert sim_id not in fl_engine._server_v_by_sim
+        assert sim_id not in fl_engine._server_round_by_sim
+
+    def test_fl_engine_thread_safety_concurrent_simulations(
+        self,
+        fl_engine: FederatedLearningEngine,
+        sample_weights: list[ModelWeights],
+    ) -> None:
+        """Concurrent aggregation calls across distinct simulations must be thread-safe."""
+        import concurrent.futures
+
+        global_w = ModelWeights(layer_shapes=sample_weights[0].layer_shapes, flat_weights=[0.0] * 12)
+
+        def worker(sim_index: int) -> ModelWeights:
+            sim_id = f"concurrent_sim_{sim_index}"
+            res = fl_engine.aggregate_parameters(
+                sample_weights,
+                client_samples=[100, 200, 300],
+                method=AggregationMethod.FED_ADAM,
+                global_weights=global_w,
+                simulation_id=sim_id,
+            )
+            fl_engine.clear_simulation_state(sim_id)
+            return res
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+            futures = [executor.submit(worker, i) for i in range(20)]
+            results = [f.result() for f in futures]
+
+        assert len(results) == 20
+        assert all(len(r.flat_weights) == 12 for r in results)
+
+    def test_fed_prox_regularization_divergence_penalty(
+        self,
+        fl_engine: FederatedLearningEngine,
+    ) -> None:
+        """Verify train_local with FedProx penalizes divergence from global model parameters."""
+        import torch
+
+        model_svc = fl_engine.model_service
+        feature_dim = 10
+        model_a = model_svc.create_model(input_dim=feature_dim)
+        model_b = model_svc.create_model(input_dim=feature_dim)
+
+        # Common global weights
+        global_w = model_svc.get_parameters(model_a)
+        model_b = model_svc.set_parameters(model_b, global_w)
+
+        # Synthetic training data
+        rng = np.random.default_rng(42)
+        X = rng.normal(size=(50, feature_dim)).astype(np.float32)
+        y = rng.integers(0, 2, size=50).astype(np.float32)
+
+        # Train model_a with plain FedAvg (fedprox_mu = 0.0)
+        trained_a, loss_a, _ = model_svc.train_local(
+            model_a,
+            X,
+            y,
+            epochs=5,
+            learning_rate=0.05,
+            fedprox_mu=0.0,
+            global_weights=global_w,
+        )
+
+        # Train model_b with strong FedProx regularization (fedprox_mu = 10.0)
+        trained_b, loss_b, _ = model_svc.train_local(
+            model_b,
+            X,
+            y,
+            epochs=5,
+            learning_rate=0.05,
+            fedprox_mu=10.0,
+            global_weights=global_w,
+        )
+
+        # Compute Euclidean distance from initial global weights
+        w_init = np.array(global_w.flat_weights)
+        w_a = np.array(model_svc.get_parameters(trained_a).flat_weights)
+        w_b = np.array(model_svc.get_parameters(trained_b).flat_weights)
+
+        dist_a = float(np.linalg.norm(w_a - w_init))
+        dist_b = float(np.linalg.norm(w_b - w_init))
+
+        # Model trained with FedProx proximal penalty must stay closer to global reference
+        assert dist_b < dist_a, f"FedProx dist ({dist_b:.4f}) must be strictly less than unconstrained dist ({dist_a:.4f})"
+

@@ -269,6 +269,7 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                 </optgroup>
                 <optgroup label="Client-Drift Correction ✨">
                   <option value="scaffold" disabled={config.fl_engine_type === 'flower'}>SCAFFOLD (Control variates) ✨</option>
+                  <option value="fed_prox" disabled={config.fl_engine_type === 'flower'}>FedProx (Proximal Regularization) ✨</option>
                 </optgroup>
                 <optgroup label="Byzantine-Robust">
                   <option value="krum" disabled={config.fl_engine_type === 'flower'}>Krum</option>
@@ -278,8 +279,27 @@ export default function SimulationControls({ onSimulationCreated }: SimulationCo
                 </optgroup>
               </select>
               <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
-                {config.fl_engine_type === 'flower' ? 'Flower uses its built-in FedAvg implementation' : 'FedYogi & SCAFFOLD are new in v20 — adaptive convergence & drift correction'}
+                {config.fl_engine_type === 'flower' ? 'Flower uses its built-in FedAvg implementation' : 'FedProx, FedYogi & SCAFFOLD control client drift and adaptive convergence'}
               </p>
+              {config.aggregation_method === 'fed_prox' && (
+                <div className="mt-3 p-2.5 bg-[var(--color-bg-elevated)] border border-[var(--color-border)] rounded-md">
+                  <label className="block text-xs text-[var(--color-text-secondary)] mb-1 font-medium">
+                    FedProx Proximal Weight (&mu;): {config.fedprox_mu ?? 0.01}
+                  </label>
+                  <input
+                    type="range"
+                    min={0.001}
+                    max={0.5}
+                    step={0.005}
+                    value={config.fedprox_mu ?? 0.01}
+                    onChange={(e) => updateConfig('fedprox_mu', parseFloat(e.target.value))}
+                    className="w-full accent-[var(--color-accent-indigo)]"
+                  />
+                  <p className="text-[10px] text-[var(--color-text-muted)] mt-1">
+                    Adds &frac12;&mu;||w - w_t||&sup2; proximal penalty to local loss, curbing client drift across Non-IID bank data.
+                  </p>
+                </div>
+              )}
             </div>
 
 
