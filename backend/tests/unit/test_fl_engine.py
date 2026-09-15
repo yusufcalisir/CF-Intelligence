@@ -461,8 +461,6 @@ class TestByzantineRobustness:
         fl_engine: FederatedLearningEngine,
     ) -> None:
         """Verify train_local with FedProx penalizes divergence from global model parameters."""
-        import torch
-
         model_svc = fl_engine.model_service
         feature_dim = 10
         model_a = model_svc.create_model(input_dim=feature_dim)
