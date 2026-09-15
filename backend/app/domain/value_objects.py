@@ -143,6 +143,8 @@ class SimulationConfig:
 
     # FL engine selection
     fl_engine_type: str = "custom"
+    p2p_mode: bool = False
+    topology: str = "RING"  # "RING" or "MESH"
 
     # Adversarial / poisoning simulation
     enable_poisoning_simulation: bool = False

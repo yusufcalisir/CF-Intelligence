@@ -63,6 +63,14 @@ class SimulationConfigRequest(BaseModel):
         default="custom",
         description="FL engine: custom (built-in simulator) or flower (Flower framework via Ray simulation)",
     )
+    p2p_mode: bool = Field(
+        default=False,
+        description="Enable serverless peer-to-peer federated learning without coordinator",
+    )
+    topology: str = Field(
+        default="RING",
+        description="P2P network topology: RING or MESH",
+    )
 
     # Adversarial / poisoning simulation
     enable_poisoning_simulation: bool = False

@@ -33,6 +33,8 @@ export interface SimulationConfig {
   poisoning_bank_id: string;
   poisoning_scale: number;
   fl_engine_type: 'custom' | 'flower';
+  p2p_mode?: boolean;
+  topology?: 'RING' | 'MESH';
 
   // Regulatory Compliance & Fairness (AI Act)
   enable_bias_mitigation?: boolean;

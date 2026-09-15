@@ -124,3 +124,76 @@ class TestFlowerEngine:
         assert len(result["rounds"]) == 2
         for r in result["rounds"]:
             assert r["global_loss"] > 0
+
+    def test_flower_engine_native_production_fl_fallback(
+        self,
+        model_service: ModelService,
+        dummy_bank_data: dict[str, dict[str, np.ndarray]],
+    ) -> None:
+        """Native production fallback must train PyTorch models with FedAvg and zero mocks."""
+        engine = FlowerFLEngine(model_service)
+        config = SimulationConfig(
+            num_rounds=2,
+            local_epochs=1,
+            learning_rate=0.001,
+            batch_size=32,
+            fl_engine_type="flower",
+        )
+        global_model = model_service.create_model(dp_compatible=False)
+        callback_data: list[dict[str, Any]] = []
+
+        def dummy_callback(sim_id: str, event_type: str, data: dict[str, Any]) -> None:
+            if event_type == "round_complete":
+                callback_data.append(data)
+
+        result = engine._run_native_production_fl(
+            config=config,
+            bank_data=dummy_bank_data,
+            global_model=global_model,
+            progress_callback=dummy_callback,
+            simulation_id="test_sim_fallback",
+            use_opacus_dp=False,
+        )
+
+        assert "rounds" in result
+        assert len(result["rounds"]) == 2
+        assert len(callback_data) == 2
+        for r in result["rounds"]:
+            assert r["round_number"] in [1, 2]
+            assert r["global_loss"] > 0
+            assert "bank_a" in r["per_bank_loss"]
+            assert r["per_bank_samples"]["bank_a"] == 100
+
+    def test_flower_engine_run_p2p_federated_training(
+        self,
+        model_service: ModelService,
+        dummy_bank_data: dict[str, dict[str, np.ndarray]],
+    ) -> None:
+        """FlowerFLEngine.run_p2p_federated_training delegates to FlowerP2PEngine with real metrics."""
+        engine = FlowerFLEngine(model_service)
+        config = SimulationConfig(
+            num_rounds=2,
+            local_epochs=1,
+            learning_rate=0.001,
+            batch_size=32,
+            p2p_mode=True,
+            topology="RING",
+        )
+        callback_data: list[dict[str, Any]] = []
+
+        def dummy_callback(sim_id: str, event_type: str, data: dict[str, Any]) -> None:
+            if event_type == "round_complete":
+                callback_data.append(data)
+
+        result = engine.run_p2p_federated_training(
+            config=config,
+            bank_data=dummy_bank_data,
+            progress_callback=dummy_callback,
+            simulation_id="test_p2p_sim",
+            topology="RING",
+        )
+
+        assert result["status"] == "SUCCESS"
+        assert len(result["rounds"]) == 2
+        assert len(callback_data) == 1
+        assert result["final_loss"] > 0

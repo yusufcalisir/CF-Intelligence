@@ -93,7 +93,8 @@ class FraudFlowerClient(fl.client.NumPyClient):
                 batch_size=self.sim_config.batch_size,
             )
             metrics = {
-                "loss": float(loss_hist[-1]) if loss_hist else 0.05,
+                "bank_id": self.bank_id,
+                "loss": float(loss_hist[-1]) if loss_hist else 0.0,
                 "epsilon": float(epsilon),
             }
         else:
@@ -105,7 +106,10 @@ class FraudFlowerClient(fl.client.NumPyClient):
                 learning_rate=self.sim_config.learning_rate,
                 batch_size=self.sim_config.batch_size,
             )
-            metrics = {"loss": float(loss_hist[-1]) if loss_hist else 0.05}
+            metrics = {
+                "bank_id": self.bank_id,
+                "loss": float(loss_hist[-1]) if loss_hist else 0.0,
+            }
 
         updated_params = _weights_to_ndarrays(self.model_service, self.model)
         return updated_params, n_samples, metrics
@@ -165,21 +169,29 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
         round_duration = (time.perf_counter() - round_start) * 1000
 
         per_bank_loss: dict[str, float] = {}
-        for client_proxy, fit_res in results:
-            try:
-                cid_idx = int(getattr(client_proxy, "cid", -1))
-                if 0 <= cid_idx < len(self.bank_ids):
-                    bid = self.bank_ids[cid_idx]
-                    metrics = getattr(fit_res, "metrics", {}) or {}
-                    per_bank_loss[bid] = float(metrics.get("loss", 0.05))
-            except Exception:
-                pass
+        for idx, (client_proxy, fit_res) in enumerate(results):
+            metrics = getattr(fit_res, "metrics", {}) or {}
+            bid = metrics.get("bank_id")
+            if not bid:
+                try:
+                    cid_idx = int(getattr(client_proxy, "cid", -1))
+                    if 0 <= cid_idx < len(self.bank_ids):
+                        bid = self.bank_ids[cid_idx]
+                    elif 0 <= idx < len(self.bank_ids):
+                        bid = self.bank_ids[idx]
+                except Exception:
+                    if 0 <= idx < len(self.bank_ids):
+                        bid = self.bank_ids[idx]
+            if bid and bid in self.bank_ids:
+                per_bank_loss[bid] = float(metrics.get("loss", 0.0))
 
+        reporting_losses = [v for v in per_bank_loss.values() if v > 0]
+        default_loss = (sum(reporting_losses) / len(reporting_losses)) if reporting_losses else 0.0
         for bid in self.bank_ids:
             if bid not in per_bank_loss:
-                per_bank_loss[bid] = 0.05
+                per_bank_loss[bid] = default_loss
 
-        avg_loss = sum(per_bank_loss.values()) / len(per_bank_loss) if per_bank_loss else 0.05
+        avg_loss = sum(per_bank_loss.values()) / len(per_bank_loss) if per_bank_loss else 0.0
 
         round_info = {
             "round_number": server_round,
@@ -259,6 +271,11 @@ class FlowerFLEngine:
         )
         dp_enabled = getattr(config, "enable_differential_privacy", False)
 
+        byz_id = (
+            getattr(config, "poisoning_bank_id", None)
+            if getattr(config, "enable_poisoning_simulation", False)
+            else None
+        )
         p2p_results = p2p_engine.run_p2p_federated_round(
             peer_data=bank_data,
             num_rounds=config.num_rounds,
@@ -266,6 +283,13 @@ class FlowerFLEngine:
             dp_enabled=dp_enabled,
             dp_epsilon=getattr(config, "dp_epsilon", 2.0),
             dp_delta=getattr(config, "dp_delta", 1e-5),
+            dp_max_grad_norm=getattr(config, "dp_max_grad_norm", 1.0),
+            local_epochs=getattr(config, "local_epochs", 1),
+            learning_rate=getattr(config, "learning_rate", 0.001),
+            batch_size=getattr(config, "batch_size", 64),
+            byzantine_defense=getattr(config, "byzantine_defense", "none"),
+            byzantine_bank_id=byz_id,
+            byzantine_scale=getattr(config, "poisoning_scale", 5.0),
         )
 
         round_results = [
@@ -303,7 +327,7 @@ class FlowerFLEngine:
         return {
             "status": "SUCCESS",
             "rounds": round_results,
-            "final_loss": round_results[-1]["global_loss"] if round_results else 0.05,
+            "final_loss": round_results[-1]["global_loss"] if round_results else 0.0,
             "engine": "FlowerP2PEngine (Serverless)",
         }
 
@@ -434,39 +458,144 @@ class FlowerFLEngine:
                 "[Flower] Simulation runtime initialization failed: %s. Executing zero-downtime native production fallback...",
                 exc,
             )
-            fallback_rounds: list[dict[str, Any]] = []
-            for r in range(1, sim_config.num_rounds + 1):
-                round_duration = 5.0
-                per_bank_loss = {bid: 0.05 for bid in bank_ids}
-                fallback_rounds.append(
-                    {
-                        "round_number": r,
-                        "global_loss": 0.05,
-                        "per_bank_loss": per_bank_loss,
-                        "participating_bank_ids": bank_ids,
-                        "dropped_bank_ids": [],
-                        "aggregation_time_ms": round_duration,
-                        "round_duration_ms": round_duration,
-                        "per_bank_samples": {
-                            bid: len(bank_data[bid]["X_train"]) for bid in bank_ids
-                        },
-                    }
-                )
-                if progress_callback:
-                    progress_callback(
-                        simulation_id,
-                        "round_complete",
-                        {
-                            "round": r,
-                            "total": sim_config.num_rounds,
-                            "loss": 0.05,
-                            "participants": bank_ids,
-                            "dropped": [],
-                            "duration_ms": round_duration,
-                            "privacy_budget": 0.0,
-                        },
+            return self._run_native_production_fl(
+                config=sim_config,
+                bank_data=bank_data,
+                global_model=global_model,
+                progress_callback=progress_callback,
+                simulation_id=simulation_id,
+                use_opacus_dp=use_opacus_dp,
+            )
+        finally:
+            try:
+                import ray
+
+                if ray.is_initialized():
+                    ray.shutdown()
+            except Exception:
+                pass
+
+    def _run_native_production_fl(
+        self,
+        config: SimulationConfig,
+        bank_data: dict[str, dict[str, np.ndarray]],
+        global_model: Any,
+        progress_callback: ProgressCallback,
+        simulation_id: str,
+        use_opacus_dp: bool,
+    ) -> dict[str, Any]:
+        """Zero-mock native production FL execution when external Ray cluster is unavailable.
+
+        Executes genuine PyTorch model training across client partitions and aggregates
+        parameters using exact Federated Averaging.
+        """
+        import numpy as np
+
+        bank_ids = list(bank_data.keys())
+        fallback_rounds: list[dict[str, Any]] = []
+
+        for r in range(1, config.num_rounds + 1):
+            round_start = time.perf_counter()
+            per_bank_loss: dict[str, float] = {}
+            client_weights: list[list[np.ndarray]] = []
+            client_samples: list[int] = []
+
+            for bid in bank_ids:
+                data = bank_data[bid]
+                x_train = data.get("X_train")
+                y_train = data.get("y_train")
+                n_samples = len(x_train) if x_train is not None else 0
+                client_samples.append(n_samples)
+
+                # Initialize local client model with current global parameters
+                client_model = self.model_service.create_model(dp_compatible=use_opacus_dp)
+                client_model.load_state_dict(global_model.state_dict())
+
+                if n_samples > 0 and y_train is not None and len(y_train) > 0:
+                    if use_opacus_dp:
+                        client_model, loss_hist, _ = self.model_service.train_local_with_opacus(
+                            client_model,
+                            x_train,
+                            y_train,
+                            target_epsilon=config.dp_epsilon,
+                            target_delta=config.dp_delta,
+                            max_grad_norm=config.dp_max_grad_norm,
+                            epochs=config.local_epochs,
+                            learning_rate=config.learning_rate,
+                            batch_size=config.batch_size,
+                        )
+                    else:
+                        client_model, loss_hist, _ = self.model_service.train_local(
+                            client_model,
+                            x_train,
+                            y_train,
+                            epochs=config.local_epochs,
+                            learning_rate=config.learning_rate,
+                            batch_size=config.batch_size,
+                        )
+                    b_loss = (
+                        float(loss_hist[-1])
+                        if loss_hist
+                        else float(
+                            self.model_service.evaluate(client_model, x_train, y_train)["loss"]
+                        )
                     )
-            return {
-                "rounds": fallback_rounds,
-                "history": None,
+                else:
+                    b_loss = 0.0
+
+                per_bank_loss[bid] = b_loss
+                client_weights.append(_weights_to_ndarrays(self.model_service, client_model))
+
+            # Aggregate client weights via FedAvg
+            total_samples = sum(client_samples)
+            if total_samples > 0 and client_weights:
+                avg_weights = [
+                    np.zeros_like(layer, dtype=np.float32) for layer in client_weights[0]
+                ]
+                for c_w, c_s in zip(client_weights, client_samples, strict=False):
+                    weight_factor = c_s / total_samples
+                    for l_idx, layer in enumerate(c_w):
+                        avg_weights[l_idx] += layer.astype(np.float32) * weight_factor
+
+                _ndarrays_to_model(self.model_service, global_model, avg_weights)
+
+            round_duration = (time.perf_counter() - round_start) * 1000.0
+            avg_loss = (
+                sum(per_bank_loss.values()) / len(per_bank_loss) if per_bank_loss else 0.0
+            )
+
+            round_info = {
+                "round_number": r,
+                "global_loss": avg_loss,
+                "per_bank_loss": per_bank_loss,
+                "participating_bank_ids": bank_ids,
+                "dropped_bank_ids": [],
+                "aggregation_time_ms": round_duration,
+                "round_duration_ms": round_duration,
+                "per_bank_samples": {
+                    bid: len(bank_data[bid].get("X_train", [])) for bid in bank_ids
+                },
             }
+            fallback_rounds.append(round_info)
+
+            if progress_callback:
+                progress_callback(
+                    simulation_id,
+                    "round_complete",
+                    {
+                        "round": r,
+                        "total": config.num_rounds,
+                        "loss": avg_loss,
+                        "participants": bank_ids,
+                        "dropped": [],
+                        "duration_ms": round_duration,
+                        "privacy_budget": (
+                            getattr(config, "dp_epsilon", 0.0) if use_opacus_dp else 0.0
+                        ),
+                    },
+                )
+
+        return {
+            "rounds": fallback_rounds,
+            "history": None,
+        }

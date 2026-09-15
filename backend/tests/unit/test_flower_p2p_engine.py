@@ -72,7 +72,7 @@ def test_mix_peer_weights_averages_neighbors(peer_ids: list[str]) -> None:
 def test_run_p2p_federated_round(
     mock_peer_data: dict[str, dict[str, np.ndarray]],
 ) -> None:
-    """FlowerP2PEngine must execute 3 P2P rounds without errors and output valid metrics."""
+    """FlowerP2PEngine must execute 3 P2P rounds with real PyTorch training and valid metrics."""
     engine = FlowerP2PEngine()
     results = engine.run_p2p_federated_round(
         peer_data=mock_peer_data,
@@ -86,3 +86,90 @@ def test_run_p2p_federated_round(
     assert results[0].avg_loss > 0
     assert results[0].convergence_mae >= 0
     assert len(results[0].peer_ids) == 4
+
+
+def test_peer_weights_non_finite_rejected(peer_ids: list[str]) -> None:
+    """Non-finite weights (NaN/Inf) from malicious neighbors must be rejected during mixing."""
+    weights = {
+        peer_ids[0]: [np.array([1.0, 2.0], dtype=np.float32)],
+        peer_ids[1]: [np.array([np.nan, 2.0], dtype=np.float32)],
+    }
+    adj = {
+        peer_ids[0]: [peer_ids[0], peer_ids[1]],
+        peer_ids[1]: [peer_ids[0], peer_ids[1]],
+    }
+
+    mixed = P2PGossipStrategy.mix_peer_weights(weights, adj)
+
+    # peer_ids[0] should reject peer_ids[1] because of NaN and preserve its own finite weights
+    np.testing.assert_allclose(mixed[peer_ids[0]][0], np.array([1.0, 2.0], dtype=np.float32))
+
+
+def test_mix_peer_weights_coordinate_wise_median(peer_ids: list[str]) -> None:
+    """Coordinate-wise median must eliminate extreme Byzantine outliers across neighbors."""
+    weights = {
+        peer_ids[0]: [np.array([2.0, 2.0], dtype=np.float32)],
+        peer_ids[1]: [np.array([1.0, 1.0], dtype=np.float32)],
+        peer_ids[2]: [np.array([1000.0, 1000.0], dtype=np.float32)],  # Byzantine poisoned
+    }
+    adj = {
+        peer_ids[0]: [peer_ids[0], peer_ids[1], peer_ids[2]],
+    }
+
+    mixed = P2PGossipStrategy.mix_peer_weights(weights, adj, defense="coordinate_wise_median")
+
+    # Median of [1.0, 2.0, 1000.0] is 2.0
+    np.testing.assert_allclose(mixed[peer_ids[0]][0], np.array([2.0, 2.0], dtype=np.float32))
+
+
+def test_mix_peer_weights_trimmed_mean(peer_ids: list[str]) -> None:
+    """Trimmed mean must trim extreme lowest and highest values before averaging."""
+    weights = {
+        peer_ids[0]: [np.array([5.0], dtype=np.float32)],
+        peer_ids[1]: [np.array([1.0], dtype=np.float32)],  # Trimmed (min)
+        peer_ids[2]: [np.array([100.0], dtype=np.float32)],  # Trimmed (max)
+    }
+    adj = {
+        peer_ids[0]: [peer_ids[0], peer_ids[1], peer_ids[2]],
+    }
+
+    mixed = P2PGossipStrategy.mix_peer_weights(weights, adj, defense="trimmed_mean")
+
+    # Trimmed elements leave only 5.0
+    np.testing.assert_allclose(mixed[peer_ids[0]][0], np.array([5.0], dtype=np.float32))
+
+
+def test_metropolis_hastings_mixing(peer_ids: list[str]) -> None:
+    """Metropolis-Hastings gossip mixing must yield valid convex combination."""
+    weights = {
+        peer_ids[0]: [np.array([1.0], dtype=np.float32)],
+        peer_ids[1]: [np.array([3.0], dtype=np.float32)],
+    }
+    adj = {
+        peer_ids[0]: [peer_ids[0], peer_ids[1]],
+        peer_ids[1]: [peer_ids[0], peer_ids[1]],
+    }
+
+    mixed = P2PGossipStrategy.mix_peer_weights(weights, adj, metropolis_hastings=True)
+    assert np.isfinite(mixed[peer_ids[0]][0][0])
+    assert 1.0 <= mixed[peer_ids[0]][0][0] <= 3.0
+
+
+def test_run_p2p_with_byzantine_and_mesh(
+    mock_peer_data: dict[str, dict[str, np.ndarray]],
+) -> None:
+    """FlowerP2PEngine must execute in MESH topology with Byzantine defense."""
+    engine = FlowerP2PEngine()
+    results = engine.run_p2p_federated_round(
+        peer_data=mock_peer_data,
+        num_rounds=2,
+        topology=P2PTopologyType.MESH,
+        byzantine_defense="coordinate_wise_median",
+        byzantine_bank_id="bank_gamma",
+        byzantine_scale=10.0,
+    )
+
+    assert len(results) == 2
+    assert results[0].topology == P2PTopologyType.MESH
+    assert results[0].avg_loss > 0
+    assert results[0].convergence_mae >= 0

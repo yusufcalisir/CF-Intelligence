@@ -289,8 +289,8 @@ CF-Intelligence/
 │   │   ├── application/
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
 │   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
-│   │   │       ├── flower_engine.py                 # Flower framework FL integration & simulation bridge
-│   │   │       ├── flower_p2p_engine.py             # Peer-to-peer decentralized Flower transport
+│   │   │       ├── flower_engine.py                 # Flower FL simulation bridge (Ray runtime & zero-mock native fallback)
+│   │   │       ├── flower_p2p_engine.py             # Serverless P2P gossip engine (Ring/Mesh topologies, Byzantine defenses)
 │   │   │       ├── fl_dirichlet_partitioner.py      # Non-IID Dirichlet label skew partitioner (alpha <= 0.50)
 │   │   │       ├── fl_hyperparameter_optimizer.py   # Optuna automated federated hyperparameter tuner
 │   │   │       ├── privacy_service.py               # Opacus DP guard (L2 norm clipping C=1.0 & Gaussian noise)

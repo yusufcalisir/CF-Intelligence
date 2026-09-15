@@ -11,12 +11,12 @@ import logging
 import time
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
 if TYPE_CHECKING:
-    from app.application.services.model_service import ModelService
+    from app.application.services.model_service import FraudDetectionModel, ModelService
 
 logger = logging.getLogger(__name__)
 
@@ -39,12 +39,30 @@ class P2PGossipResult:
     per_peer_loss: dict[str, float] = field(default_factory=dict)
 
 
+def _weights_to_ndarrays(model: FraudDetectionModel) -> list[np.ndarray]:
+    """Extract model parameters as a list of NumPy ndarrays."""
+    return [param.data.cpu().numpy().copy() for param in model.parameters()]
+
+
+def _ndarrays_to_model(
+    model: FraudDetectionModel,
+    ndarrays: list[np.ndarray],
+    device: Any,
+) -> FraudDetectionModel:
+    """Load a list of NumPy ndarrays into PyTorch model parameters."""
+    import torch
+
+    for param, arr in zip(model.parameters(), ndarrays, strict=False):
+        param.data = torch.FloatTensor(arr).to(device)
+    return model
+
+
 class P2PGossipStrategy:
-    """Peer gossip weight exchange and consensus mixing engine."""
+    """Peer gossip weight exchange, validation, and consensus mixing engine."""
 
     @staticmethod
     def build_ring_adjacency(peer_ids: list[str]) -> dict[str, list[str]]:
-        """Builds a bidirectional 1D Ring topology adjacency map."""
+        """Builds a bidirectional 1D Ring topology adjacency map with self-loops."""
         n = len(peer_ids)
         if n == 0:
             return {}
@@ -60,40 +78,119 @@ class P2PGossipStrategy:
 
     @staticmethod
     def build_mesh_adjacency(peer_ids: list[str]) -> dict[str, list[str]]:
-        """Builds a fully-connected mesh topology adjacency map."""
+        """Builds a fully-connected mesh topology adjacency map with self-loops."""
         return {peer: list(peer_ids) for peer in peer_ids}
 
     @staticmethod
     def mix_peer_weights(
         peer_weights: dict[str, list[np.ndarray]],
         adjacency: dict[str, list[str]],
+        defense: str = "none",
+        metropolis_hastings: bool = False,
     ) -> dict[str, list[np.ndarray]]:
         """Executes peer gossip weight averaging across adjacent peer nodes.
 
-        w_i^(t+1) = (1 / |N_i|) * sum_{j in N_i} w_j^(t)
+        Supports degree-normalized averaging, Metropolis-Hastings doubly stochastic weights,
+        and Byzantine-resilient coordinate-wise median or trimmed mean.
+        Filters out non-finite (NaN/Inf) weights and layer dimension mismatches.
         """
         updated_weights: dict[str, list[np.ndarray]] = {}
 
         for peer_id, neighbors in adjacency.items():
-            valid_neighbors = [n for n in neighbors if n in peer_weights]
-            if not valid_neighbors:
-                updated_weights[peer_id] = peer_weights[peer_id]
+            if peer_id not in peer_weights:
                 continue
 
+            local_layers = peer_weights[peer_id]
+            expected_shapes = [layer.shape for layer in local_layers]
+
+            # Validate neighbors: finite values, layer counts, and matching shapes
+            valid_neighbors: list[str] = []
+            for n in neighbors:
+                if n not in peer_weights:
+                    continue
+                n_layers = peer_weights[n]
+                if len(n_layers) != len(local_layers):
+                    logger.warning("[P2P Gossip] Peer %s rejected: layer count mismatch", n)
+                    continue
+                if any(
+                    layer.shape != exp_shape
+                    for layer, exp_shape in zip(n_layers, expected_shapes, strict=False)
+                ):
+                    logger.warning("[P2P Gossip] Peer %s rejected: shape mismatch", n)
+                    continue
+                if any(not np.all(np.isfinite(layer)) for layer in n_layers):
+                    logger.warning(
+                        "[P2P Gossip] Peer %s rejected: non-finite weights (NaN/Inf detected)", n
+                    )
+                    continue
+                valid_neighbors.append(n)
+
+            if not valid_neighbors:
+                updated_weights[peer_id] = [layer.copy() for layer in local_layers]
+                continue
+
+            # Byzantine defense: coordinate-wise median
+            if defense == "coordinate_wise_median" and len(valid_neighbors) >= 3:
+                mixed_layers: list[np.ndarray] = []
+                for layer_idx in range(len(local_layers)):
+                    stacked = np.stack(
+                        [peer_weights[n][layer_idx] for n in valid_neighbors],
+                        axis=0,
+                    )
+                    mixed_layers.append(np.median(stacked, axis=0).astype(np.float32))
+                updated_weights[peer_id] = mixed_layers
+                continue
+
+            # Byzantine defense: trimmed mean (trim 1 lowest and 1 highest per coordinate)
+            if defense == "trimmed_mean" and len(valid_neighbors) >= 3:
+                mixed_layers = []
+                for layer_idx in range(len(local_layers)):
+                    stacked = np.stack(
+                        [peer_weights[n][layer_idx] for n in valid_neighbors],
+                        axis=0,
+                    )
+                    sorted_stacked = np.sort(stacked, axis=0)
+                    trimmed = sorted_stacked[1:-1]
+                    mixed_layers.append(np.mean(trimmed, axis=0).astype(np.float32))
+                updated_weights[peer_id] = mixed_layers
+                continue
+
+            # Metropolis-Hastings doubly stochastic mixing
+            if metropolis_hastings and len(valid_neighbors) > 1:
+                deg_i = len(adjacency.get(peer_id, []))
+                weights_dict: dict[str, float] = {}
+                sum_off_diag = 0.0
+                for n in valid_neighbors:
+                    if n != peer_id:
+                        deg_j = len(adjacency.get(n, []))
+                        w_ij = 1.0 / (1.0 + max(deg_i, deg_j))
+                        weights_dict[n] = w_ij
+                        sum_off_diag += w_ij
+                weights_dict[peer_id] = max(0.0, 1.0 - sum_off_diag)
+
+                total_w = sum(weights_dict.values())
+                if total_w > 0:
+                    weights_dict = {k: v / total_w for k, v in weights_dict.items()}
+
+                mixed_layers = [
+                    np.zeros_like(layer, dtype=np.float32) for layer in local_layers
+                ]
+                for n, weight in weights_dict.items():
+                    for layer_idx, layer_arr in enumerate(peer_weights[n]):
+                        mixed_layers[layer_idx] += (layer_arr * weight).astype(np.float32)
+                updated_weights[peer_id] = mixed_layers
+                continue
+
+            # Standard degree-normalized averaging
             num_neighbors = len(valid_neighbors)
-            sample_weight_list = peer_weights[valid_neighbors[0]]
-
-            # Initialize zero tensors matching layer shapes
-            mixed_layers: list[np.ndarray] = [
-                np.zeros_like(layer, dtype=np.float32) for layer in sample_weight_list
+            mixed_layers = [
+                np.zeros_like(layer, dtype=np.float32) for layer in local_layers
             ]
-
             for neighbor in valid_neighbors:
                 for layer_idx, layer_arr in enumerate(peer_weights[neighbor]):
                     mixed_layers[layer_idx] += layer_arr.astype(np.float32)
 
-            # Divide by neighbor degree to compute average
-            mixed_layers = [layer / num_neighbors for layer in mixed_layers]
+            mixed_layers = [(layer / num_neighbors).astype(np.float32) for layer in mixed_layers]
             updated_weights[peer_id] = mixed_layers
 
         return updated_weights
@@ -137,8 +234,16 @@ class FlowerP2PEngine:
         dp_enabled: bool = False,
         dp_epsilon: float = 2.0,
         dp_delta: float = 1e-5,
+        dp_max_grad_norm: float = 1.0,
+        local_epochs: int = 1,
+        learning_rate: float = 0.001,
+        batch_size: int = 64,
+        byzantine_defense: str = "none",
+        byzantine_bank_id: str | None = None,
+        byzantine_scale: float = 5.0,
+        metropolis_hastings: bool = False,
     ) -> list[P2PGossipResult]:
-        """Executes serverless peer-to-peer federated learning rounds.
+        """Executes serverless peer-to-peer federated learning rounds with genuine PyTorch training.
 
         Args:
             peer_data: Dict mapping peer_id to train/test datasets.
@@ -147,6 +252,14 @@ class FlowerP2PEngine:
             dp_enabled: Whether to apply Opacus local Differential Privacy.
             dp_epsilon: Target privacy budget epsilon.
             dp_delta: Target privacy failure probability delta.
+            dp_max_grad_norm: Maximum gradient clipping norm for Opacus DP.
+            local_epochs: Epochs per local training step.
+            learning_rate: SGD learning rate.
+            batch_size: Mini-batch size.
+            byzantine_defense: Defense algorithm ('none', 'coordinate_wise_median', 'trimmed_mean').
+            byzantine_bank_id: Bank ID acting maliciously (poisoning weights).
+            byzantine_scale: Poisoning scaling factor for malicious peer.
+            metropolis_hastings: Whether to use Metropolis-Hastings mixing matrix.
 
         Returns:
             List of P2PGossipResult metrics per round.
@@ -155,55 +268,111 @@ class FlowerP2PEngine:
         if not peer_ids:
             return []
 
+        model_service = self.model_service
+        if model_service is None:
+            from app.application.services.model_service import ModelService
+            from app.config import get_settings
+
+            model_service = ModelService(get_settings())
+
+        first_peer_data = peer_data[peer_ids[0]]
+        x_train_sample = first_peer_data.get("X_train")
+        input_dim = (
+            int(x_train_sample.shape[1])
+            if x_train_sample is not None and len(x_train_sample.shape) > 1
+            else 10
+        )
+
         adjacency = (
             P2PGossipStrategy.build_ring_adjacency(peer_ids)
             if topology == P2PTopologyType.RING
             else P2PGossipStrategy.build_mesh_adjacency(peer_ids)
         )
 
-        # Initialize mock model weights per peer (simulated weights)
-        peer_weights: dict[str, list[np.ndarray]] = {}
-        for peer in peer_ids:
-            peer_weights[peer] = [
-                np.random.default_rng(seed=abs(hash(peer)) % 100000)
-                .normal(0.0, 0.1, (64, 32))
-                .astype(np.float32),
-                np.random.default_rng(seed=abs(hash(peer)) % 100000)
-                .normal(0.0, 0.1, (32, 1))
-                .astype(np.float32),
-            ]
+        # Initialize reference PyTorch model so all peers begin from synchronized architecture
+        ref_model = model_service.create_model(input_dim=input_dim, dp_compatible=dp_enabled)
+        initial_weights = _weights_to_ndarrays(ref_model)
+
+        peer_weights: dict[str, list[np.ndarray]] = {
+            peer: [layer.copy() for layer in initial_weights] for peer in peer_ids
+        }
+        peer_models: dict[str, FraudDetectionModel] = {
+            peer: model_service.create_model(input_dim=input_dim, dp_compatible=dp_enabled)
+            for peer in peer_ids
+        }
 
         results: list[P2PGossipResult] = []
 
         for r in range(1, num_rounds + 1):
             start_time = time.perf_counter()
 
-            # 1. Local training simulation on each peer node
+            # 1. Local real PyTorch training on each peer node
             per_peer_loss: dict[str, float] = {}
             for peer in peer_ids:
-                # Simulate loss reduction over rounds
-                decay = 1.0 / (1.0 + 0.15 * r)
-                base_loss = float(np.random.default_rng().uniform(0.1, 0.25) * decay)
-                per_peer_loss[peer] = base_loss
+                p_model = peer_models[peer]
+                _ndarrays_to_model(p_model, peer_weights[peer], model_service.device)
 
-                # Perturb peer weights to simulate local SGD step
-                grad_step = [
-                    np.random.default_rng()
-                    .normal(0.0, 0.01 * decay, layer.shape)
-                    .astype(np.float32)
-                    for layer in peer_weights[peer]
-                ]
-                peer_weights[peer] = [
-                    w - g for w, g in zip(peer_weights[peer], grad_step, strict=False)
-                ]
+                data = peer_data[peer]
+                x_tr = data.get("X_train")
+                y_tr = data.get("y_train")
+
+                if x_tr is not None and len(x_tr) > 0 and y_tr is not None and len(y_tr) > 0:
+                    if dp_enabled:
+                        p_model, loss_hist, _ = model_service.train_local_with_opacus(
+                            p_model,
+                            x_tr,
+                            y_tr,
+                            target_epsilon=dp_epsilon,
+                            target_delta=dp_delta,
+                            max_grad_norm=dp_max_grad_norm,
+                            epochs=local_epochs,
+                            learning_rate=learning_rate,
+                            batch_size=batch_size,
+                        )
+                    else:
+                        p_model, loss_hist, _ = model_service.train_local(
+                            p_model,
+                            x_tr,
+                            y_tr,
+                            epochs=local_epochs,
+                            learning_rate=learning_rate,
+                            batch_size=batch_size,
+                        )
+                    loss = (
+                        float(loss_hist[-1])
+                        if loss_hist
+                        else float(model_service.evaluate(p_model, x_tr, y_tr)["loss"])
+                    )
+                else:
+                    loss = 0.0
+
+                updated_layers = _weights_to_ndarrays(p_model)
+
+                # Byzantine poisoning injection simulation
+                if byzantine_bank_id == peer:
+                    logger.warning("[Flower P2P] Simulating Byzantine poisoning on peer: %s", peer)
+                    updated_layers = [
+                        (-byzantine_scale * layer).astype(np.float32) for layer in updated_layers
+                    ]
+                    loss = loss * byzantine_scale
+
+                peer_weights[peer] = updated_layers
+                per_peer_loss[peer] = loss
 
             # 2. Peer gossip weight exchange & mixing over adjacency topology
-            peer_weights = P2PGossipStrategy.mix_peer_weights(peer_weights, adjacency)
+            peer_weights = P2PGossipStrategy.mix_peer_weights(
+                peer_weights,
+                adjacency,
+                defense=byzantine_defense,
+                metropolis_hastings=metropolis_hastings,
+            )
 
             # 3. Calculate network convergence MAE
             convergence_mae = P2PGossipStrategy.calculate_convergence_mae(peer_weights)
             duration_ms = (time.perf_counter() - start_time) * 1000.0
-            avg_loss = sum(per_peer_loss.values()) / len(per_peer_loss)
+            avg_loss = (
+                sum(per_peer_loss.values()) / len(per_peer_loss) if per_peer_loss else 0.0
+            )
 
             res = P2PGossipResult(
                 round_id=r,
@@ -227,3 +396,4 @@ class FlowerP2PEngine:
             )
 
         return results
+
