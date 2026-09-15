@@ -11,6 +11,7 @@ from app.application.schemas.phase2 import (
     CommunityAnalyticsResponse,
     CypherQueryRequest,
     CypherQueryResponse,
+    FlinkStreamStatusResponse,
     GNNInferEmbeddingRequest,
     GNNInferEmbeddingResponse,
     GraphResponse,
@@ -21,26 +22,27 @@ from app.application.schemas.phase2 import (
     RiskPropagationResponse,
     SmurfingDetectionResponse,
     SmurfingPatternItem,
+    StreamEdgeEventRequest,
+    StreamEdgeEventResponse,
+    StreamingGNNTrainStepResponse,
     TemporalAnomalyResponse,
 )
+from app.application.services.flink_graph_streaming import StreamingEdgeEvent
 from app.application.services.graph_analytics_service import GraphAnalyticsService
 from app.application.services.graph_embedding_service import GraphEmbeddingService
 from app.application.services.graph_engine import GraphEngine
+from app.application.services.streaming_gnn_model import StreamingGATModel
+from app.application.services.streaming_graph_service import StreamingGraphService
 from app.domain.enums import EntityType
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/graph", tags=["graph"])
 
-
-class StreamGraphEdgeRequest(BaseModel):
-    edge_id: str = Field(..., description="Unique graph edge transaction ID")
-    source_id: str = Field(..., description="Source entity ID")
-    target_id: str = Field(..., description="Target entity ID")
-    rel_type: str = Field("TRANSACTS_WITH", description="Relationship type")
-    amount: float = Field(100.0, description="Transaction amount")
-
-
 _graph_engine = GraphEngine()
+_graph_analytics_service = GraphAnalyticsService(graph_engine=_graph_engine)
+_graph_embedding_service = GraphEmbeddingService(graph_engine=_graph_engine)
+_streaming_graph_service = StreamingGraphService()
+_streaming_gnn_model = StreamingGATModel(in_dim=12)
 
 
 def get_graph_engine() -> GraphEngine:
@@ -328,24 +330,6 @@ async def embedding_fraud_clusters(req: GNNEmbeddingClusterRequest) -> dict:
     }
 
 
-@router.post("/stream/edge")
-async def stream_graph_edge(req: StreamGraphEdgeRequest) -> dict:
-    """Stream a real-time graph edge event into Apache Flink processor."""
-    return _graph_analytics.stream_realtime_edge_event(
-        edge_id=req.edge_id,
-        source_id=req.source_id,
-        target_id=req.target_id,
-        rel_type=req.rel_type,
-        amount=req.amount,
-    )
-
-
-@router.get("/stream/status")
-async def flink_stream_status() -> dict:
-    """Get Apache Flink sub-second real-time graph streaming engine status."""
-    return _graph_analytics.get_flink_streaming_status()
-
-
 @router.get("/embeddings/stats")
 async def get_embedding_stats() -> dict:
     """Get summary statistics about the GNN embedding space.
@@ -427,4 +411,84 @@ async def execute_cypher_query(req: CypherQueryRequest) -> CypherQueryResponse:
     except Exception as e:
         logger.error("Error executing Cypher query: %s", e)
         raise HTTPException(status_code=500, detail=f"Cypher execution failed: {e}")
+
+
+@router.post("/stream/edge", response_model=StreamEdgeEventResponse)
+async def process_streaming_edge(req: StreamEdgeEventRequest) -> StreamEdgeEventResponse:
+    """Stream a real-time graph edge transaction through Apache Flink processor and active GNN window."""
+    try:
+        # Ingest into Flink processor for subsecond anomaly detection
+        event = StreamingEdgeEvent(
+            edge_id=req.edge_id,
+            source_id=req.source_id,
+            target_id=req.target_id,
+            rel_type=req.rel_type,
+            amount=req.amount,
+            bank_id=req.bank_id,
+        )
+        receipt = _graph_analytics_service.flink_processor.process_streaming_edge(event)
+
+        # Ingest into streaming GNN sliding window graph
+        _streaming_graph_service.add_transaction(
+            {
+                "sender_id": req.source_id,
+                "receiver_id": req.target_id,
+                "amount": req.amount,
+                "bank_id": req.bank_id,
+                "is_fraud": len(receipt.velocity_anomalies) > 0,
+            }
+        )
+
+        return StreamEdgeEventResponse(
+            processed_count=receipt.processed_count,
+            latency_ms=receipt.latency_ms,
+            window_size_ms=receipt.window_size_ms,
+            velocity_anomalies=receipt.velocity_anomalies,
+            high_risk_entities=receipt.high_risk_entities,
+            processed_at=receipt.processed_at,
+        )
+    except Exception as e:
+        logger.error("Error processing streaming edge: %s", e)
+        raise HTTPException(status_code=500, detail=f"Streaming edge processing failed: {e}")
+
+
+@router.get("/stream/status", response_model=FlinkStreamStatusResponse)
+async def get_stream_status() -> FlinkStreamStatusResponse:
+    """Retrieve Apache Flink streaming engine and SLA status telemetry."""
+    status = _graph_analytics_service.get_flink_streaming_status()
+    return FlinkStreamStatusResponse(**status)
+
+
+@router.post("/stream/gnn/train", response_model=StreamingGNNTrainStepResponse)
+async def trigger_streaming_gnn_train() -> StreamingGNNTrainStepResponse:
+    """Trigger an online backpropagation step on the active streaming graph with time-decayed edge weights."""
+    import torch
+
+    h, edge_index, labels, edge_weights = _streaming_graph_service.get_active_subgraph_tensors(return_weights=True)
+    status = _streaming_graph_service.get_status_summary()
+
+    if h.size(0) == 0 or edge_index.size(1) == 0 or len(labels) == 0:
+        return StreamingGNNTrainStepResponse(
+            loss=0.0,
+            node_count=status["node_count"],
+            edge_count=status["edge_count"],
+            window_size_minutes=status["window_size_minutes"],
+            training_applied=False,
+        )
+
+    labels_tensor = torch.tensor(labels, dtype=torch.float32)
+    loss = _streaming_gnn_model.online_train_step(
+        h=h,
+        edge_index=edge_index,
+        labels=labels_tensor,
+        edge_weights=edge_weights,
+    )
+
+    return StreamingGNNTrainStepResponse(
+        loss=round(loss, 4),
+        node_count=status["node_count"],
+        edge_count=status["edge_count"],
+        window_size_minutes=status["window_size_minutes"],
+        training_applied=True,
+    )
 

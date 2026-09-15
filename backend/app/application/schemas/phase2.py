@@ -966,3 +966,41 @@ class DatasetConsortiumEnrollResponse(BaseModel):
     partition_assigned: str
     next_action_url: str
 
+
+class StreamEdgeEventRequest(BaseModel):
+    edge_id: str = Field(..., description="Unique graph edge transaction ID")
+    source_id: str = Field(..., description="Source entity ID")
+    target_id: str = Field(..., description="Target entity ID")
+    rel_type: str = Field("TRANSACTS_WITH", description="Relationship type")
+    amount: float = Field(100.0, description="Transaction amount")
+    bank_id: str = Field("", description="Bank ID emitting the edge")
+
+
+class StreamEdgeEventResponse(BaseModel):
+    processed_count: int
+    latency_ms: float
+    window_size_ms: int
+    velocity_anomalies: list[dict[str, Any]]
+    high_risk_entities: list[str]
+    processed_at: str
+
+
+class FlinkStreamStatusResponse(BaseModel):
+    status: str
+    engine: str
+    window_size_ms: int
+    velocity_threshold: float
+    processed_total_edges: int
+    avg_latency_ms: float
+    subsecond_sla_pass: bool
+    tracked_entity_count: int
+
+
+class StreamingGNNTrainStepResponse(BaseModel):
+    loss: float
+    node_count: int
+    edge_count: int
+    window_size_minutes: int
+    training_applied: bool
+
+

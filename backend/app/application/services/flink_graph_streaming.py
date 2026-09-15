@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
@@ -26,6 +27,7 @@ class StreamingEdgeEvent:
     target_id: str
     rel_type: str
     amount: float
+    bank_id: str = ""
     event_time: str = field(default_factory=lambda: datetime.datetime.now(datetime.UTC).isoformat())
 
 
@@ -53,9 +55,11 @@ class FlinkGraphStreamProcessor:
     ) -> None:
         self.window_size_ms = window_size_ms
         self.velocity_threshold = velocity_threshold
+        self._lock = threading.RLock()
 
         # Sliding window state accumulators: pair_key -> deque of timestamps (seconds)
         self._sliding_window_edges: dict[str, deque[float]] = defaultdict(deque)
+        self._sliding_window_amounts: dict[str, deque[tuple[float, float]]] = defaultdict(deque)
         self._entity_degrees: dict[str, int] = defaultdict(int)
         self._processed_total = 0
         self._total_latency_ms = 0.0
@@ -69,46 +73,62 @@ class FlinkGraphStreamProcessor:
         start_time = time.perf_counter()
         now = time.time()
         window_cutoff = now - (self.window_size_ms / 1000.0)
+        window_sec = max(0.001, self.window_size_ms / 1000.0)
 
         velocity_anomalies: list[dict[str, Any]] = []
         high_risk_entities: set[str] = set()
 
-        for ev in events:
-            pair_key = f"{ev.source_id}->{ev.target_id}"
+        with self._lock:
+            for ev in events:
+                pair_key = f"{ev.source_id}->{ev.target_id}"
 
-            # Append timestamp to pair sliding window deque
-            self._sliding_window_edges[pair_key].append(now)
+                # Append timestamp and amount to pair sliding window deques
+                self._sliding_window_edges[pair_key].append(now)
+                self._sliding_window_amounts[pair_key].append((now, float(ev.amount)))
 
-            # Evict timestamps older than sliding window cutoff
-            while (
-                self._sliding_window_edges[pair_key]
-                and self._sliding_window_edges[pair_key][0] < window_cutoff
-            ):
-                self._sliding_window_edges[pair_key].popleft()
+                # Evict timestamps older than sliding window cutoff
+                while (
+                    self._sliding_window_edges[pair_key]
+                    and self._sliding_window_edges[pair_key][0] < window_cutoff
+                ):
+                    self._sliding_window_edges[pair_key].popleft()
 
-            # Increment streaming entity degrees
-            self._entity_degrees[ev.source_id] += 1
-            self._entity_degrees[ev.target_id] += 1
+                while (
+                    self._sliding_window_amounts[pair_key]
+                    and self._sliding_window_amounts[pair_key][0][0] < window_cutoff
+                ):
+                    self._sliding_window_amounts[pair_key].popleft()
 
-            # Compute edge velocity anomaly ratio
-            recent_count = len(self._sliding_window_edges[pair_key])
-            if recent_count >= self.velocity_threshold:
-                velocity_anomalies.append(
-                    {
-                        "pair_key": pair_key,
-                        "source_id": ev.source_id,
-                        "target_id": ev.target_id,
-                        "edge_count_in_window": recent_count,
-                        "window_ms": self.window_size_ms,
-                        "anomaly_score": round(recent_count / self.velocity_threshold, 2),
-                    }
-                )
-                high_risk_entities.add(ev.source_id)
-                high_risk_entities.add(ev.target_id)
+                # Increment streaming entity degrees
+                self._entity_degrees[ev.source_id] += 1
+                self._entity_degrees[ev.target_id] += 1
 
-        duration_ms = (time.perf_counter() - start_time) * 1000.0
-        self._processed_total += len(events)
-        self._total_latency_ms += duration_ms
+                # Compute edge velocity anomaly ratio and window statistics
+                recent_count = len(self._sliding_window_edges[pair_key])
+                if recent_count >= self.velocity_threshold:
+                    burst_rate_eps = round(recent_count / window_sec, 2)
+                    window_vol = round(
+                        sum(amt for _, amt in self._sliding_window_amounts[pair_key]), 2
+                    )
+                    velocity_anomalies.append(
+                        {
+                            "pair_key": pair_key,
+                            "source_id": ev.source_id,
+                            "target_id": ev.target_id,
+                            "edge_count_in_window": recent_count,
+                            "window_ms": self.window_size_ms,
+                            "anomaly_score": round(recent_count / self.velocity_threshold, 2),
+                            "burst_rate_eps": burst_rate_eps,
+                            "window_volume": window_vol,
+                            "bank_id": ev.bank_id,
+                        }
+                    )
+                    high_risk_entities.add(ev.source_id)
+                    high_risk_entities.add(ev.target_id)
+
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            self._processed_total += len(events)
+            self._total_latency_ms += duration_ms
 
         logger.info(
             "[Flink Streaming] Processed %d edges | Latency: %.2fms | Anomalies: %d",
@@ -131,26 +151,38 @@ class FlinkGraphStreamProcessor:
         now = time.time()
         window_cutoff = now - (self.window_size_ms / 1000.0)
 
-        # Clean stale edges
-        while (
-            self._sliding_window_edges[pair_key]
-            and self._sliding_window_edges[pair_key][0] < window_cutoff
-        ):
-            self._sliding_window_edges[pair_key].popleft()
+        with self._lock:
+            # Clean stale edges
+            while (
+                self._sliding_window_edges[pair_key]
+                and self._sliding_window_edges[pair_key][0] < window_cutoff
+            ):
+                self._sliding_window_edges[pair_key].popleft()
 
-        return float(len(self._sliding_window_edges[pair_key]))
+            return float(len(self._sliding_window_edges[pair_key]))
 
     def get_stream_status(self) -> dict[str, Any]:
         """Returns Apache Flink stream processor engine status metrics."""
-        avg_latency = (
-            self._total_latency_ms / self._processed_total if self._processed_total > 0 else 12.4
-        )
-        return {
-            "status": "RUNNING",
-            "engine": "Apache Flink PyFlink DataStream",
-            "window_size_ms": self.window_size_ms,
-            "processed_total_edges": self._processed_total,
-            "avg_latency_ms": round(avg_latency, 2),
-            "subsecond_sla_pass": avg_latency < 50.0,
-            "tracked_entity_count": len(self._entity_degrees),
-        }
+        with self._lock:
+            avg_latency = (
+                self._total_latency_ms / self._processed_total if self._processed_total > 0 else 12.4
+            )
+            return {
+                "status": "RUNNING",
+                "engine": "Apache Flink PyFlink DataStream",
+                "window_size_ms": self.window_size_ms,
+                "velocity_threshold": self.velocity_threshold,
+                "processed_total_edges": self._processed_total,
+                "avg_latency_ms": round(avg_latency, 2),
+                "subsecond_sla_pass": avg_latency < 50.0,
+                "tracked_entity_count": len(self._entity_degrees),
+            }
+
+    def reset(self) -> None:
+        """Reset all in-memory streaming window buffers and metrics."""
+        with self._lock:
+            self._sliding_window_edges.clear()
+            self._sliding_window_amounts.clear()
+            self._entity_degrees.clear()
+            self._processed_total = 0
+            self._total_latency_ms = 0.0

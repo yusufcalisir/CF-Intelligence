@@ -859,8 +859,9 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine` | Neo4j Bolt driver init, Cypher entity/relationship merges, Redis fallback | 8 | ✅ 100% Pass |
 | [test_graph_analytics_hardening.py](../backend/tests/unit/test_graph_analytics_hardening.py) | `graph_engine` | Cyclic mule rings ($L \in [3, 7]$), canonical deduplication, smurfing, safe Cypher, thread locks | 10 | ✅ 100% Pass |
 | [test_flink_graph_streaming.py](../backend/tests/unit/test_flink_graph_streaming.py) | `flink_graph_streaming` | High-velocity streaming edge sliding windows, anomaly triggers | 3 | ✅ 100% Pass |
+| [test_streaming_gnn_hardening.py](../backend/tests/unit/test_streaming_gnn_hardening.py) | `streaming_gnn_model`, `flink_graph_streaming`, `streaming_graph_service` | Multi-neighbor index_add_, exponential time decay w(t), Flink burst rate/volume, thread safety, streaming API | 10 | ✅ 100% Pass |
 | [test_advanced_explainability.py](../backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **16 Dedicated Suites** | **Collaborative AML Platform Architecture** | **136 Tests** | **100% Pass** |
+| **Total Verified** | **17 Dedicated Suites** | **Collaborative AML Platform Architecture** | **146 Tests** | **100% Pass** |
 
