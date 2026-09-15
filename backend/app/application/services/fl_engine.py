@@ -23,7 +23,7 @@ import asyncio
 import logging
 import threading
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
@@ -698,7 +698,7 @@ class FederatedLearningEngine:
                 SpectralDefenseConfig,
             )
 
-            client_dict = {str(i): w for i, w in enumerate(client_weights)}
+            client_dict: dict[str, Any] = {str(i): w for i, w in enumerate(client_weights)}
             detector = SpectralAnomalyDetector(SpectralDefenseConfig(min_clients=2))
             reports = detector.detect_backdoor_anomalies(client_dict)
             honest_indices = [int(r.node_id) for r in reports if not r.is_poisoned]

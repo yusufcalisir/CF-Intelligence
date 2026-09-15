@@ -164,12 +164,12 @@ class SpectralAnomalyDetector:
         self.config = config or SpectralDefenseConfig()
 
     def compute_spectral_scores(
-        self, client_updates: dict[str, dict[str, Any]]
+        self, client_updates: dict[str, Any]
     ) -> dict[str, float]:
         """Compute SVD spectral projection scores s_i = |⟨Δw_i, v₁⟩|² for each client.
 
         Args:
-            client_updates: Mapping of {bank_id: parameter_update_dict}.
+            client_updates: Mapping of {bank_id: parameter_update_dict_or_weights}.
 
         Returns:
             Mapping of {bank_id: spectral_score}.
@@ -220,21 +220,21 @@ class SpectralAnomalyDetector:
         return scores
 
     def detect_backdoor_anomalies(
-        self, client_updates: dict[str, dict[str, Any]]
+        self, client_updates: dict[str, Any]
     ) -> list[SpectralAnomalyReport]:
         """Identify poisoned client updates exceeding the spectral anomaly threshold.
 
         Threshold: θ = μ_s + τ · σ_s  where τ = spectral_threshold_multiplier.
 
         Args:
-            client_updates: Mapping of {bank_id: parameter_update_dict}.
+            client_updates: Mapping of {bank_id: parameter_update_dict_or_weights}.
 
         Returns:
             List of SpectralAnomalyReport per client, flagging poisoned nodes.
         """
         # 1. Pre-filter corrupted updates containing NaN or Inf before SVD matrix decomposition
         reports: list[SpectralAnomalyReport] = []
-        clean_updates: dict[str, dict[str, Any]] = {}
+        clean_updates: dict[str, Any] = {}
 
         for nid, update in client_updates.items():
             vec = _flatten(update)
@@ -332,12 +332,12 @@ class SpectralAnomalyDetector:
         return reports
 
     def aggregate_robust_spectral(
-        self, client_updates: dict[str, dict[str, Any]]
+        self, client_updates: dict[str, Any]
     ) -> dict[str, Any]:
         """Filter poisoned client updates and compute clean parameter average.
 
         Args:
-            client_updates: Mapping of {bank_id: parameter_update_dict}.
+            client_updates: Mapping of {bank_id: parameter_update_dict_or_weights}.
 
         Returns:
             Robustly aggregated global parameter update dict.
