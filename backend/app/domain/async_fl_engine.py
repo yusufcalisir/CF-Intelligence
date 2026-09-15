@@ -52,7 +52,7 @@ def staleness_attenuation(
     if tau <= 0:
         return 1.0
 
-    func_str = func.value if isinstance(func, StalenessFunction) else str(func).lower()
+    func_str = func.value if isinstance(func, StalenessFunction) else func.lower()
 
     if func_str == StalenessFunction.EXPONENTIAL:
         return float(np.exp(-alpha * float(tau)))
@@ -238,7 +238,7 @@ class AsyncFLEngine:
         with self._lock:
             taus = [r.staleness_tau for r in self.update_history if r.applied]
             avg_tau = float(np.mean(taus)) if taus else 0.0
-            max_tau = int(max(taus)) if taus else 0
+            max_tau = max(taus) if taus else 0
 
             return {
                 "current_round": self.current_round,
