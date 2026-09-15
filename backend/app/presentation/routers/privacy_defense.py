@@ -51,6 +51,41 @@ class DLGAuditRequest(BaseModel):
     )
 
 
+class CalibrateNoiseRequest(BaseModel):
+    target_epsilon: float = Field(..., gt=0.0, description="Target DP epsilon")
+    target_delta: float = Field(1e-5, gt=0.0, lt=1.0, description="Target DP delta")
+    sensitivity: float = Field(1.0, gt=0.0, description="L2 sensitivity (clipping bound C)")
+    mechanism: str = Field("gaussian", description="Mechanism type ('gaussian')")
+
+
+class CalibrateNoiseResponse(BaseModel):
+    mechanism: str
+    target_epsilon: float
+    target_delta: float
+    sensitivity: float
+    calibrated_sigma: float
+    formula: str
+
+
+class RDPCompositionRequest(BaseModel):
+    sigmas: list[float] = Field(
+        ..., min_length=1, description="Noise multipliers across training rounds"
+    )
+    target_delta: float = Field(1e-5, gt=0.0, lt=1.0, description="Target delta for (eps, delta)-DP")
+    sample_ratio_q: float = Field(1.0, gt=0.0, le=1.0, description="Batch sampling ratio q")
+    orders: list[float] | None = Field(None, description="Optional list of Rényi orders to evaluate")
+
+
+class RDPCompositionResponse(BaseModel):
+    total_rounds: int
+    cumulative_epsilon: float
+    optimal_order_alpha: float
+    naive_sum_epsilon: float
+    privacy_saving_pct: float
+    target_delta: float
+    rdp_map: dict[str, float]
+
+
 # ── Aggregation Method Catalogue ────────────────────
 
 AGGREGATION_METHODS = [
@@ -208,3 +243,54 @@ async def get_budget_log(epsilon_limit: float = 8.0) -> list[dict]:
     if summaries:
         telemetry.cfi_privacy_epsilon_consumed.set(summaries[0]["total_epsilon"])
     return summaries
+
+
+@router.post("/calibrate-noise", response_model=CalibrateNoiseResponse)
+async def calibrate_noise(request: CalibrateNoiseRequest) -> CalibrateNoiseResponse:
+    """Calibrate Gaussian mechanism noise scale sigma given target (eps, delta) and L2 sensitivity C."""
+    sigma = _privacy_service.calculate_gaussian_noise_scale(
+        epsilon=request.target_epsilon,
+        delta=request.target_delta,
+        sensitivity=request.sensitivity,
+    )
+    return CalibrateNoiseResponse(
+        mechanism="gaussian",
+        target_epsilon=request.target_epsilon,
+        target_delta=request.target_delta,
+        sensitivity=request.sensitivity,
+        calibrated_sigma=round(sigma, 6),
+        formula="sigma = C * sqrt(2 * ln(1.25 / delta)) / epsilon",
+    )
+
+
+@router.post("/rdp-composition", response_model=RDPCompositionResponse)
+async def compose_rdp(request: RDPCompositionRequest) -> RDPCompositionResponse:
+    """Compute exact Rényi Differential Privacy (RDP) composition and convex dual optimal (eps, delta)-DP bound."""
+    import numpy as np
+
+    best_eps, best_alpha, rdp_map = _privacy_service.compose_rdp(
+        sigmas=request.sigmas,
+        delta=request.target_delta,
+        q=request.sample_ratio_q,
+        orders=request.orders,
+    )
+
+    # Compute naive linear sum of analytical epsilons for comparison
+    naive_sum = sum(
+        (request.sample_ratio_q * (2.0 * float(np.log(1.25 / request.target_delta))) ** 0.5) / s
+        for s in request.sigmas
+    )
+    saving_pct = max(0.0, (naive_sum - best_eps) / max(naive_sum, 1e-6) * 100.0)
+
+    # Convert keys to string for JSON serialization
+    str_rdp_map = {str(k): round(v, 6) for k, v in rdp_map.items()}
+
+    return RDPCompositionResponse(
+        total_rounds=len(request.sigmas),
+        cumulative_epsilon=round(best_eps, 6),
+        optimal_order_alpha=round(best_alpha, 4),
+        naive_sum_epsilon=round(naive_sum, 6),
+        privacy_saving_pct=round(saving_pct, 2),
+        target_delta=request.target_delta,
+        rdp_map=str_rdp_map,
+    )

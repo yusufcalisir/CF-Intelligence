@@ -118,3 +118,51 @@ class TestBudgetLogEndpoint:
     def test_budget_log_epsilon_limit_param(self) -> None:
         response = client.get("/api/v1/privacy-defense/budget-log?epsilon_limit=5.0")
         assert response.status_code == 200
+
+
+class TestNoiseCalibrationAndRDPCompositionEndpoints:
+    def test_calibrate_noise_success(self) -> None:
+        payload = {
+            "target_epsilon": 1.0,
+            "target_delta": 1e-5,
+            "sensitivity": 1.0,
+            "mechanism": "gaussian",
+        }
+        response = client.post("/api/v1/privacy-defense/calibrate-noise", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["calibrated_sigma"] > 0
+        assert data["mechanism"] == "gaussian"
+        assert "formula" in data
+
+    def test_calibrate_noise_validation_error(self) -> None:
+        payload = {
+            "target_epsilon": -1.0,
+            "target_delta": 1e-5,
+            "sensitivity": 1.0,
+        }
+        response = client.post("/api/v1/privacy-defense/calibrate-noise", json=payload)
+        assert response.status_code == 422
+
+    def test_rdp_composition_success(self) -> None:
+        payload = {
+            "sigmas": [1.2, 1.2, 1.2, 1.2, 1.2],
+            "target_delta": 1e-5,
+            "sample_ratio_q": 0.05,
+        }
+        response = client.post("/api/v1/privacy-defense/rdp-composition", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["total_rounds"] == 5
+        assert data["cumulative_epsilon"] > 0
+        assert data["optimal_order_alpha"] > 1.0
+        assert data["privacy_saving_pct"] >= 0.0
+        assert "2.0" in data["rdp_map"]
+
+    def test_rdp_composition_invalid_sigmas(self) -> None:
+        payload = {
+            "sigmas": [],
+            "target_delta": 1e-5,
+        }
+        response = client.post("/api/v1/privacy-defense/rdp-composition", json=payload)
+        assert response.status_code == 422

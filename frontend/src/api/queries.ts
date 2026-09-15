@@ -59,6 +59,10 @@ import type {
   TuneResponse,
   UnlearnBankRequest,
   UnlearnBankResponse,
+  CalibrateNoiseRequest,
+  CalibrateNoiseResponse,
+  RDPCompositionRequest,
+  RDPCompositionResponse,
 } from './types';
 
 
@@ -1040,6 +1044,30 @@ export function useTriggerUnlearning() {
   return useMutation<UnlearnBankResponse, Error, UnlearnBankRequest>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<UnlearnBankResponse>('/api/v1/security/unlearn', payload);
+      return data;
+    },
+  });
+}
+
+export function useCalibrateNoise() {
+  return useMutation<CalibrateNoiseResponse, Error, CalibrateNoiseRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CalibrateNoiseResponse>(
+        '/api/v1/privacy-defense/calibrate-noise',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useRDPComposition() {
+  return useMutation<RDPCompositionResponse, Error, RDPCompositionRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<RDPCompositionResponse>(
+        '/api/v1/privacy-defense/rdp-composition',
+        payload
+      );
       return data;
     },
   });

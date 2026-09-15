@@ -1324,4 +1324,37 @@ export interface UnlearnBankResponse {
   retained_banks: string[];
 }
 
+export interface CalibrateNoiseRequest {
+  target_epsilon: number;
+  target_delta?: number;
+  sensitivity?: number;
+  mechanism?: string;
+}
+
+export interface CalibrateNoiseResponse {
+  mechanism: string;
+  target_epsilon: number;
+  target_delta: number;
+  sensitivity: number;
+  calibrated_sigma: number;
+  formula: string;
+}
+
+export interface RDPCompositionRequest {
+  sigmas: number[];
+  target_delta?: number;
+  sample_ratio_q?: number;
+  orders?: number[];
+}
+
+export interface RDPCompositionResponse {
+  total_rounds: number;
+  cumulative_epsilon: number;
+  optimal_order_alpha: number;
+  naive_sum_epsilon: number;
+  privacy_saving_pct: number;
+  target_delta: number;
+  rdp_map: Record<string, number>;
+}
+
 
