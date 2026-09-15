@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 # ── Shared sentinel regex (strips ASCII control chars) ────────────────────────
 _SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -500,7 +500,7 @@ class PSIResponse(BaseModel):
 class EntityFuzzyResolveRequest(BaseModel):
     query_name: str = Field(
         ...,
-        min_length=2,
+        min_length=1,
         max_length=256,
         description="Entity name or alias to fuzzy-match",
     )
@@ -512,13 +512,34 @@ class EntityFuzzyResolveRequest(BaseModel):
         0.70,
         ge=0.0,
         le=1.0,
-        description="Minimum Jaro-Winkler similarity score [0.0, 1.0]",
+        description="Minimum Jaccard similarity score [0.0, 1.0]",
     )
+    bank_id: str | None = Field(
+        None,
+        max_length=64,
+        description="Optional bank tenant ID filter",
+    )
+    limit: int = Field(
+        50,
+        ge=1,
+        le=100,
+        description="Maximum matched candidates to return",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "query_name" not in data and "raw_identifier" in data:
+                data["query_name"] = data["raw_identifier"]
+            if "threshold" not in data and "similarity_threshold" in data:
+                data["threshold"] = data["similarity_threshold"]
+        return data
 
     @field_validator("query_name")
     @classmethod
     def sanitize_query(cls, v: str) -> str:
-        return _strip_control(v)
+        return _strip_control(v).strip()
 
 
 class EntityFuzzyResolveMatch(BaseModel):

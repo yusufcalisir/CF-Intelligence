@@ -13,11 +13,13 @@ a trusted third party or derived from MPC.
 from __future__ import annotations
 
 import logging
+import threading
 from datetime import UTC, datetime
 from typing import Any, cast
 
 from app.domain.entities_phase2 import Entity, Relationship
 from app.domain.enums import EntityType, RelationshipType, RiskLevel
+from app.domain.fuzzy_psi import FuzzyPSIMatcher
 from app.domain.value_objects_phase2 import (
     PrivacyPreservingIdentifier,
     calculate_jaccard_similarity,
@@ -86,10 +88,14 @@ class EntityResolutionService:
     enabling cross-institution correlation without PII exposure.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, num_hashes: int = 16, num_bands: int = 16) -> None:
+        self._lock = threading.RLock()
         self._entities = RedisStore("entity")
         self._relationships = RedisStore("relationship")
         self._hash_index = RedisStore("hash_index")
+        self._fuzzy_matcher = FuzzyPSIMatcher(
+            num_hashes=num_hashes, num_bands=num_bands
+        )
 
     def create_entity(
         self,
@@ -109,48 +115,56 @@ class EntityResolutionService:
 
         # If customer or merchant, calculate MinHash signature for fuzzy entity resolution
         if entity_type in (EntityType.CUSTOMER, EntityType.MERCHANT):
-            attributes_copy["minhash_signature"] = compute_minhash_signature(standardized)
+            attributes_copy["minhash_signature"] = compute_minhash_signature(
+                standardized, num_hashes=self._fuzzy_matcher.num_hashes
+            )
             attributes_copy["raw_standardized"] = standardized
 
         privacy_id = PrivacyPreservingIdentifier.compute(raw_identifier, entity_type.value)
 
-        # Check if we already have this entity for this bank
-        existing = self._find_entity(privacy_id, bank_id)
-        if existing:
-            existing.last_seen = datetime.now(UTC)
-            self._entities.set(existing.id, _entity_to_dict(existing))
-            return existing
+        with self._lock:
+            # Check if we already have this entity for this bank
+            existing = self._find_entity(privacy_id, bank_id)
+            if existing:
+                existing.last_seen = datetime.now(UTC)
+                self._entities.set(existing.id, _entity_to_dict(existing))
+                if entity_type in (EntityType.CUSTOMER, EntityType.MERCHANT):
+                    self._fuzzy_matcher.index_entity(existing.id, bank_id, standardized)
+                return existing
 
-        # Generate a short display label
-        type_prefix = {
-            EntityType.CUSTOMER: "CUST",
-            EntityType.MERCHANT: "MERCH",
-            EntityType.DEVICE: "DEV",
-            EntityType.CARD: "CARD",
-            EntityType.EMAIL: "EMAIL",
-            EntityType.PHONE: "PHONE",
-            EntityType.IP_ADDRESS: "IP",
-        }
-        prefix = type_prefix.get(entity_type, "ENT")
-        display_label = f"{prefix}-{privacy_id[:6]}"
+            # Generate a short display label
+            type_prefix = {
+                EntityType.CUSTOMER: "CUST",
+                EntityType.MERCHANT: "MERCH",
+                EntityType.DEVICE: "DEV",
+                EntityType.CARD: "CARD",
+                EntityType.EMAIL: "EMAIL",
+                EntityType.PHONE: "PHONE",
+                EntityType.IP_ADDRESS: "IP",
+            }
+            prefix = type_prefix.get(entity_type, "ENT")
+            display_label = f"{prefix}-{privacy_id[:6]}"
 
-        entity = Entity(
-            entity_type=entity_type,
-            privacy_id=privacy_id,
-            bank_id=bank_id,
-            display_label=display_label,
-            attributes=attributes_copy,
-        )
+            entity = Entity(
+                entity_type=entity_type,
+                privacy_id=privacy_id,
+                bank_id=bank_id,
+                display_label=display_label,
+                attributes=attributes_copy,
+            )
 
-        self._entities.set(entity.id, _entity_to_dict(entity))
+            self._entities.set(entity.id, _entity_to_dict(entity))
 
-        val = self._hash_index.get(privacy_id)
-        data = cast("dict", val) if val is not None else {"ids": []}
-        entity_ids = data.setdefault("ids", [])
-        entity_ids.append(entity.id)
-        self._hash_index.set(privacy_id, data)
+            val = self._hash_index.get(privacy_id)
+            data = cast("dict", val) if val is not None else {"ids": []}
+            entity_ids = data.setdefault("ids", [])
+            entity_ids.append(entity.id)
+            self._hash_index.set(privacy_id, data)
 
-        return entity
+            if entity_type in (EntityType.CUSTOMER, EntityType.MERCHANT):
+                self._fuzzy_matcher.index_entity(entity.id, bank_id, standardized)
+
+            return entity
 
     def resolve_cross_institution(self, privacy_hash: str) -> list[Entity]:
         """Find matching entities across all banks.
@@ -270,20 +284,62 @@ class EntityResolutionService:
             confidence=confidence,
             evidence=evidence or [],
         )
-        self._relationships.set(rel.id, _relationship_to_dict(rel))
+        with self._lock:
+            self._relationships.set(rel.id, _relationship_to_dict(rel))
         return rel
 
     def update_risk_level(self, entity_id: str, risk_level: RiskLevel) -> None:
-        entity = self.get_entity(entity_id)
-        if entity:
-            entity.risk_level = risk_level
-            self._entities.set(entity.id, _entity_to_dict(entity))
+        with self._lock:
+            entity = self.get_entity(entity_id)
+            if entity:
+                entity.risk_level = risk_level
+                self._entities.set(entity.id, _entity_to_dict(entity))
 
     def increment_alert_count(self, entity_id: str) -> None:
-        entity = self.get_entity(entity_id)
-        if entity:
-            entity.alert_count += 1
-            self._entities.set(entity.id, _entity_to_dict(entity))
+        with self._lock:
+            entity = self.get_entity(entity_id)
+            if entity:
+                entity.alert_count += 1
+                self._entities.set(entity.id, _entity_to_dict(entity))
+
+    def delete_entity(self, entity_id: str) -> bool:
+        """Purges an entity and removes it from LSH indices (GDPR Art. 17 right-to-erasure)."""
+        with self._lock:
+            val = self._entities.get(entity_id)
+            if not val:
+                return False
+            entity = _dict_to_entity(val)
+
+            # 1. Remove from primary store
+            self._entities.delete(entity_id)
+
+            # 2. Remove from hash_index
+            hval = self._hash_index.get(entity.privacy_id)
+            if hval and isinstance(hval, dict):
+                ids = [i for i in hval.get("ids", []) if i != entity_id]
+                if ids:
+                    hval["ids"] = ids
+                    self._hash_index.set(entity.privacy_id, hval)
+                else:
+                    self._hash_index.delete(entity.privacy_id)
+
+            # 3. Remove from LSH fuzzy matcher
+            self._fuzzy_matcher.remove_entity(entity_id)
+
+            # 4. Remove associated relationships
+            for rel in self.get_relationships():
+                if rel.source_entity_id == entity_id or rel.target_entity_id == entity_id:
+                    self._relationships.delete(rel.id)
+
+            return True
+
+    def clear_all(self) -> None:
+        """Clears all entities, relationships, hash indexes, and LSH matcher buckets."""
+        with self._lock:
+            self._entities.clear()
+            self._relationships.clear()
+            self._hash_index.clear()
+            self._fuzzy_matcher.clear()
 
     def get_entity(self, entity_id: str) -> Entity | None:
         val = self._entities.get(entity_id)
@@ -327,29 +383,53 @@ class EntityResolutionService:
         query_name: str,
         entity_type: EntityType = EntityType.CUSTOMER,
         threshold: float = 0.70,
+        bank_id: str | None = None,
+        limit: int = 50,
     ) -> list[dict[str, Any]]:
-        """Find entities matching a raw name fuzzily using MinHash LSH similarities.
+        """Find entities matching a raw name fuzzily using MinHash LSH candidate pruning.
 
-        Computes the MinHash signature of the query_name, Jaccard-compares
-        it against all registered entities of the target entity_type,
-        and returns matching entities with their similarity scores.
+        Computes the MinHash signature of the query_name, uses LSH buckets
+        to retrieve candidate entities (avoiding full table scans),
+        calculates Jaccard similarity, and returns matching entities.
         """
+        if not query_name or not query_name.strip():
+            return []
+
+        threshold = max(0.0, min(1.0, float(threshold)))
+        limit = max(1, min(100, int(limit)))
+
         standardized_query = standardize_input(query_name, entity_type.value)
-        query_sig = compute_minhash_signature(standardized_query)
+        query_sig = compute_minhash_signature(
+            standardized_query, num_hashes=self._fuzzy_matcher.num_hashes
+        )
 
-        raw_entities = [_dict_to_entity(v) for v in self._entities.list_values()]
-        results: list[dict[str, Any]] = []
+        with self._lock:
+            # 1. First attempt candidate retrieval via LSH band index
+            candidate_ids = self._fuzzy_matcher.get_candidate_ids_for_text(standardized_query)
 
-        for e in raw_entities:
-            if e.entity_type != entity_type:
-                continue
-            sig = e.attributes.get("minhash_signature")
-            if not sig:
-                continue
-            sim = calculate_jaccard_similarity(query_sig, sig)
-            if sim >= threshold:
-                results.append({"entity": e, "similarity_score": round(sim, 2)})
+            candidates: list[Entity] = []
+            if candidate_ids:
+                for cid in candidate_ids:
+                    ent = self.get_entity(cid)
+                    if ent:
+                        candidates.append(ent)
+            else:
+                # Fallback for entities populated out-of-band without LSH warming
+                raw_entities = [_dict_to_entity(v) for v in self._entities.list_values()]
+                candidates = raw_entities
 
-        # Sort by similarity score descending
-        results.sort(key=lambda x: float(x["similarity_score"]), reverse=True)
-        return results
+            results: list[dict[str, Any]] = []
+            for e in candidates:
+                if e.entity_type != entity_type:
+                    continue
+                if bank_id and e.bank_id != bank_id:
+                    continue
+                sig = e.attributes.get("minhash_signature")
+                if not sig:
+                    continue
+                sim = calculate_jaccard_similarity(query_sig, sig)
+                if sim >= threshold:
+                    results.append({"entity": e, "similarity_score": round(sim, 2)})
+
+            results.sort(key=lambda x: float(x["similarity_score"]), reverse=True)
+            return results[:limit]

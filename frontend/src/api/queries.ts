@@ -660,7 +660,20 @@ export function useFuzzyResolve() {
   return useMutation<FuzzyMatchResponse[], Error, EntityFuzzyResolveRequest>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post('/api/v1/entities/fuzzy-resolve', payload);
-      return data;
+      if (data && Array.isArray(data.matches)) {
+        return data.matches.map((m: any) => ({
+          entity_id: m.entity?.id || m.entity_id || '',
+          display_label: m.entity?.display_label || m.display_label || '',
+          entity_type: m.entity?.entity_type || m.entity_type || '',
+          bank_id: m.entity?.bank_id || m.bank_id || '',
+          risk_level: m.entity?.risk_level || m.risk_level || '',
+          privacy_id: m.entity?.privacy_id || m.privacy_id || '',
+          similarity: m.similarity_score ?? m.similarity ?? 0,
+          standardized_stored:
+            m.entity?.attributes?.raw_standardized || m.standardized_stored || '',
+        }));
+      }
+      return Array.isArray(data) ? data : [];
     },
   });
 }

@@ -694,10 +694,13 @@ export interface PSIResponse {
 }
 
 export interface EntityFuzzyResolveRequest {
-  raw_identifier: string;
+  raw_identifier?: string;
+  query_name?: string;
   entity_type: string;
   similarity_threshold?: number;
+  threshold?: number;
   limit?: number;
+  bank_id?: string;
 }
 
 export interface FuzzyMatchResponse {

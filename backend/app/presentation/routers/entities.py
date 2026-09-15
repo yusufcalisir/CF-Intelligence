@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
@@ -92,6 +93,30 @@ async def get_entity_profile(
         raise HTTPException(status_code=404, detail="Entity not found")
 
 
+@router.delete("/{entity_id}")
+async def delete_entity_endpoint(
+    entity_id: str, actor: str = Query("analyst"), caller_tenant: TenantDep = None
+) -> dict[str, Any]:
+    """Purges an entity and removes it from LSH indices (GDPR Art. 17 right-to-erasure)."""
+    entity = _entity_service.get_entity(entity_id)
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, entity.bank_id)
+
+    deleted = _entity_service.delete_entity(entity_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    AuditService().log_action(actor, "gdpr_delete_entity", entity_id)
+    return {
+        "deleted": True,
+        "entity_id": entity_id,
+        "policy": "GDPR Art. 17 Right-to-Erasure Enforced",
+    }
+
+
 @router.get("/{entity_id}/relationships")
 async def get_entity_relationships(
     entity_id: str, caller_tenant: TenantDep = None
@@ -178,6 +203,8 @@ async def run_fuzzy_resolve(
         query_name=req.query_name,
         entity_type=et,
         threshold=req.threshold,
+        bank_id=req.bank_id,
+        limit=req.limit,
     )
 
     response_matches = []

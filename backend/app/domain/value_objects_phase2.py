@@ -13,6 +13,13 @@ import unicodedata
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.domain.fuzzy_psi import (
+    calculate_jaccard_similarity as calculate_jaccard_similarity,
+)
+from app.domain.fuzzy_psi import (
+    compute_minhash_signature as compute_minhash_signature,
+)
+
 
 def standardize_input(raw_value: str, entity_type: str) -> str:
     """Standardizes inputs depending on entity type to improve matching accuracy.
@@ -69,40 +76,6 @@ def standardize_input(raw_value: str, entity_type: str) -> str:
         val = val.lower()
 
     return val
-
-
-def compute_minhash_signature(text: str, num_hashes: int = 16) -> list[int]:
-    """Generates a MinHash signature for a text based on character 3-grams.
-
-    Calculates num_hashes minimum values using simple, deterministic hash functions.
-    The Jaccard similarity between two texts can be approximated by comparing
-    their MinHash signatures.
-    """
-    if not text:
-        return [0] * num_hashes
-
-    # Compute character 3-grams
-    shingles = {text} if len(text) < 3 else {text[i : i + 3] for i in range(len(text) - 2)}
-
-    signature = []
-    for i in range(num_hashes):
-        min_val = float("inf")
-        for shingle in shingles:
-            h_str = f"{shingle}:{i}"
-            h_val = int(hashlib.sha256(h_str.encode()).hexdigest(), 16)
-            if h_val < min_val:
-                min_val = h_val
-        signature.append(int(min_val % 1000000))
-
-    return signature
-
-
-def calculate_jaccard_similarity(sig1: list[int], sig2: list[int]) -> float:
-    """Estimates Jaccard similarity between two MinHash signatures."""
-    if not sig1 or not sig2 or len(sig1) != len(sig2):
-        return 0.0
-    matches = sum(1 for x, y in zip(sig1, sig2) if x == y)
-    return matches / len(sig1)
 
 
 @dataclass(frozen=True)
