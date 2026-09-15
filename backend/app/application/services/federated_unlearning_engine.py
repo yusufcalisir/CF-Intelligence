@@ -205,7 +205,7 @@ class FederatedUnlearningEngine:
         if not target_bank_id or not isinstance(target_bank_id, str):
             raise ValueError("target_bank_id must be a non-empty string.")
 
-        method_str = method.value if isinstance(method, UnlearningMethod) else str(method)
+        method_str = method.value if isinstance(method, UnlearningMethod) else method
 
         # 0. Projected Gradient Ascent
         if method_str == UnlearningMethod.PROJECTED_GRADIENT_ASCENT.value:

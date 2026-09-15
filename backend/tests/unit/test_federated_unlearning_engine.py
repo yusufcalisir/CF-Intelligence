@@ -109,6 +109,8 @@ class TestFederatedUnlearningEngine(unittest.TestCase):
         self.assertGreater(res.parameter_drift_delta, 0.0)
         self.assertTrue(res.erasure_verified)
         self.assertIsNone(res.mia_membership_probability)
+        self.assertIsNotNone(res.unlearned_weights)
+        assert res.unlearned_weights is not None
         np.testing.assert_allclose(res.unlearned_weights, initial_w - target_grad, rtol=1e-5)
 
     def test_standalone_illustrative_simulator_honest_audit(self) -> None:
