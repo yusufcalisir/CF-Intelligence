@@ -14,9 +14,9 @@ def test_sr11_7_concept_drift_retraining_trigger() -> None:
     svc = ModelDriftService()
 
     # Synthetic reference vs drifted prediction scores
-    np.random.seed(42)
-    ref_predictions = np.random.beta(0.5, 5.0, 1000).tolist()  # Typical low fraud score distribution
-    drifted_predictions = np.random.beta(2.0, 2.0, 1000).tolist()  # Heavy concept shift
+    rng = np.random.default_rng(42)
+    ref_predictions = rng.beta(0.5, 5.0, 1000).tolist()  # Typical low fraud score distribution
+    drifted_predictions = rng.beta(2.0, 2.0, 1000).tolist()  # Heavy concept shift
 
     drift_report = svc.run_full_drift_analysis(
         current_data={"amount": [100.0] * 100},
@@ -103,9 +103,9 @@ def test_sr11_7_disparate_impact_fairness_audit() -> None:
         return rate_a / rate_b
 
     # Synthetic predictions across demographic groups
-    np.random.seed(123)
-    scores_ref = np.random.uniform(0.0, 0.70, 500).tolist()
-    scores_protected = np.random.uniform(0.0, 0.72, 500).tolist()
+    rng = np.random.default_rng(123)
+    scores_ref = rng.uniform(0.0, 0.70, 500).tolist()
+    scores_protected = rng.uniform(0.0, 0.72, 500).tolist()
 
     di_ratio = compute_disparate_impact(scores_protected, scores_ref, threshold=0.60)
 

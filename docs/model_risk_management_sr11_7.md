@@ -137,6 +137,9 @@ python -m pytest backend/tests/unit/test_model_registry.py -v
 
 # 6. Core model service, FedProx, MOON & feature importance (11 tests)
 python -m pytest backend/tests/unit/test_model_service.py -v
+
+# 7. Model governance hardening, distinct-user four-eyes & canary quality gate (10 tests)
+python -m pytest backend/tests/unit/test_model_governance_hardening.py -v
 ```
 
 ### 📋 Audit Verdict Summary
@@ -149,6 +152,7 @@ python -m pytest backend/tests/unit/test_model_service.py -v
 | **`test_model_lifecycle.py`** | STAGING $\to$ SHADOW $\to$ CANARY $\to$ PRODUCTION state machine, transition blocks | 3 | ✅ PASSED |
 | **`test_model_registry.py`** | Checkpoint hashing, HSM signature verification, rollback restoration | 16 | ✅ PASSED |
 | **`test_model_service.py`** | Fraud model forward pass, FedProx/MOON training, feature importance | 11 | ✅ PASSED |
-| **TOTAL** | **Full SR 11-7 / OCC 2011-12 Model Governance Specification** | **44** | **100% PASSED** |
+| **`test_model_governance_hardening.py`** | Four-eyes self-approval block, conceptual soundness checklist, validation schedule, canary gate | 10 | ✅ PASSED |
+| **TOTAL** | **Full SR 11-7 / OCC 2011-12 Model Governance Specification** | **54** | **100% PASSED** |
 
-*All 44 automated test cases execute cleanly in 11.66s with zero failures, zero warnings, and 100% regulatory invariant enforcement.*
+*All 54 automated test cases execute cleanly with zero failures, zero warnings, and 100% regulatory invariant enforcement.*

@@ -67,7 +67,7 @@ class SemanticVersion:
     def parse(cls, version_str: str) -> SemanticVersion:
         """Parses string version tag into SemanticVersion instance."""
         clean = version_str.strip().lstrip("vV")
-        match = re.match(r"^(\d+)\.(\d+)\.(\d+)$", clean)
+        match = re.match(r"^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$", clean)
         if not match:
             # Fallback for integer or invalid strings
             try:
@@ -76,7 +76,7 @@ class SemanticVersion:
             except ValueError:
                 return cls(major=1, minor=0, patch=0)
 
-        maj, min_, pat = match.groups()
+        maj, min_, pat = match.groups()[:3]
         return cls(major=int(maj), minor=int(min_), patch=int(pat))
 
     def to_tag(self) -> str:
@@ -102,11 +102,11 @@ class DualSignoffGate:
     REQUIRED_ROLES = {"ml_engineer", "compliance_officer"}
 
     def can_promote(self, sign_offs: list[dict[str, Any]]) -> tuple[bool, str]:
-        """Evaluates whether all required sign-offs are present with valid signatures."""
+        """Evaluates whether all required sign-offs are present with valid signatures from distinct actors."""
         if not sign_offs:
             return False, "Dual Signoff Gating Failed: No sign-offs provided."
 
-        signed_roles = set()
+        valid_signoffs: dict[str, str] = {}
         for sign in sign_offs:
             role = str(sign.get("role", "")).lower().strip()
             user = str(sign.get("user", "")).strip()
@@ -119,18 +119,26 @@ class DualSignoffGate:
                 role = "ml_engineer"
 
             if role in self.REQUIRED_ROLES and user and signature:
-                signed_roles.add(role)
+                valid_signoffs[role] = user
 
-        missing_roles = self.REQUIRED_ROLES - signed_roles
+        missing_roles = self.REQUIRED_ROLES - set(valid_signoffs.keys())
         if missing_roles:
             return (
                 False,
                 f"Dual Signoff Gating Failed: Missing required sign-off roles ({', '.join(sorted(missing_roles))}).",
             )
 
+        # Vector 16: Four-Eyes Principle (distinct users)
+        unique_users = set(valid_signoffs.values())
+        if len(unique_users) < len(self.REQUIRED_ROLES):
+            return (
+                False,
+                "Dual Signoff Gating Failed: Four-Eyes Principle violation. ML Engineer and Compliance Officer must be distinct individuals (self-approval prohibited).",
+            )
+
         return (
             True,
-            "Dual Signoff Gate Passed: Both ML Engineer and Compliance Officer sign-offs verified.",
+            "Dual Signoff Gate Passed: Both ML Engineer and Compliance Officer sign-offs verified from distinct authorized actors.",
         )
 
 
@@ -146,12 +154,12 @@ class ShadowDeploymentEngine:
         self.shadow_ratio = max(0.0, min(0.50, shadow_ratio))
 
     def should_route_to_shadow(self, request_id: str) -> bool:
-        """Deterministically routes 10% of prediction traffic based on request_id hash."""
+        """Deterministically routes shadow prediction traffic based on request_id SHA-256 hash."""
         if not request_id:
             return False
 
         hash_val = (
-            int(hashlib.md5(request_id.encode("utf-8"), usedforsecurity=False).hexdigest(), 16)
+            int(hashlib.sha256(request_id.encode("utf-8")).hexdigest(), 16)
             % 100
         )
         threshold = int(self.shadow_ratio * 100)
@@ -300,6 +308,13 @@ class ModelRegistryVault:
         initial_status: ModelStatus = ModelStatus.CANDIDATE,
     ) -> ModelCheckpoint:
         """Registers a new model checkpoint in the registry vault with computed SHA-256 digests."""
+        if not weights_bytes:
+            raise ModelGovernanceError("Checkpoint registration failed: weights_bytes must not be empty.")
+        if dp_epsilon <= 0.0:
+            raise ModelGovernanceError("Checkpoint registration failed: dp_epsilon must be positive.")
+        if dp_delta <= 0.0 or dp_delta >= 1.0:
+            raise ModelGovernanceError("Checkpoint registration failed: dp_delta must be in (0, 1).")
+
         with self._lock:
             model_id = str(uuid.uuid4())
             version = SemanticVersion.parse(version_str)
