@@ -52,6 +52,16 @@ class DynamicQuorumManager:
     )
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
+    def __post_init__(self) -> None:
+        if not (0.0 < self.quorum_threshold_pct <= 1.0):
+            raise ValueError(
+                f"quorum_threshold_pct must be strictly between 0.0 and 1.0, got {self.quorum_threshold_pct}"
+            )
+        if self.target_window_seconds <= 0:
+            raise ValueError(
+                f"target_window_seconds must be positive integer, got {self.target_window_seconds}"
+            )
+
     def register_nodes(self, node_ids: list[str]) -> None:
         """Registers participating bank nodes for the active training round (thread-safe)."""
         with self._lock:

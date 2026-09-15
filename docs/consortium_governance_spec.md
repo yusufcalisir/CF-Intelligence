@@ -68,7 +68,7 @@ Member institutions are assigned explicit privileges via [`MemberRole`](../backe
 
 ---
 
-## 📑 3. Proposal Actions & Lifecycle States
+## 📑 3. Proposal Actions & Lifecycle State Machine
 
 The proposal lifecycle is governed by [`ProposalAction`](../backend/app/domain/consortium_governance.py) and [`ProposalStatus`](../backend/app/domain/consortium_governance.py):
 
@@ -83,16 +83,33 @@ class ProposalStatus(str, Enum):
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
     EXPIRED = "EXPIRED"
+    CANCELLED = "CANCELLED"
 ```
 
+### Proposal Actions
 1. **Member Onboarding (`ADD_MEMBER`)**:
-   - Requires $K/N$ member quorum.
-   - Upon approval, the target institution is added as `FULL_MEMBER` and can participate in federated training.
+   - Requires weighted voting quorum approval ($\ge \theta_{\mathrm{quorum}}$).
+   - Upon approval, the target institution is added as `FULL_MEMBER` (or specified role) with designated voting weight and joins active federation rounds.
 2. **Malicious Node Eviction (`REMOVE_MEMBER`)**:
    - If an institution exhibits repeated Byzantine poisoning, collusion, or SLA breach, members vote to evict.
    - Upon approval, the node is pruned from `consortium.members`, and confidential federated unlearning ([`federated_unlearning_engine.py`](../backend/app/application/services/federated_unlearning_engine.py)) erases historical parameter footprints via Lineage Subtraction.
 3. **Policy Calibration (`UPDATE_POLICY`)**:
-   - Adjusts consortium-wide rules such as Differential Privacy budget caps ($\epsilon_{\max}$) or minimum participating member thresholds.
+   - Dynamically calibrates consortium invariants without hard fork:
+     - `new_quorum_ratio`: adjusts required majority threshold $\theta_{\mathrm{quorum}} \in (0, 1]$.
+     - `new_max_epsilon`: alters global Differential Privacy budget expenditure cap $\epsilon_{\max}$.
+     - `new_min_members_n`: raises or lowers participant floor $N_{\min}$.
+     - `new_status`: transitions consortium status (`ACTIVE`, `SUSPENDED`, `ARCHIVED`).
+
+### Weighted Quorum Evaluation Engine
+Votes are evaluated based on institutions' allocated stake weights ($\mathrm{voting\_power} \ge 0.0$):
+$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
+$$\mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
+
+- **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$, status transitions to `APPROVED` and action is executed.
+- **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.
+- **TTL Expiration**: If $\mathrm{elapsed\_time} \ge \mathrm{ttl\_seconds}$ (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
+- **Sponsor Cancellation**: The proposing bank can voluntarily withdraw a pending proposal before resolution, transitioning state to `CANCELLED`.
+- **Role Hierarchy**: `OBSERVER` institutions have $\mathrm{power} = 0.0$ and cannot sponsor proposals or cast votes.
 
 ---
 
@@ -177,14 +194,15 @@ assert is_valid is True
 
 ## 🧪 6. Automated Unit Test Suite Parity
 
-The consortium governance and policy enforcement modules are verified across **22 automated unit tests**:
+The consortium governance and policy enforcement modules are verified across **34 automated unit tests**:
 
 ```bash
 python -m pytest \
   backend/tests/unit/test_consortium_governance.py \
+  backend/tests/unit/test_consortium_governance_hardening.py \
   backend/tests/unit/test_consortium_policy.py \
   backend/tests/unit/test_consortium_policy_hardening.py -v
-# 22 passed in 1.48s (100% Pass)
+# 34 passed in 2.25s (100% Pass)
 ```
 
 | Test File | Test Function | Verification Scope |
@@ -192,6 +210,18 @@ python -m pytest \
 | `test_consortium_governance.py` | `test_consortium_creation_and_founder` | Consortium initialization, founder role assignment, and active status. |
 | `test_consortium_governance.py` | `test_proposal_voting_quorum_approval` | Automatic creator voting, single-member quorum approval, and member activation. |
 | `test_consortium_governance.py` | `test_multi_member_voting_and_eviction` | Multi-member voting, pending state under $2/3$ threshold, and `REMOVE_MEMBER` eviction. |
+| `test_consortium_governance_hardening.py` | `test_consortium_input_validations` | Input bound validations (empty ID, name, non-finite quorum ratio, non-positive $\epsilon$). |
+| `test_consortium_governance_hardening.py` | `test_consortium_member_voting_rights_and_roles` | Role permissions and voting eligibility (`FOUNDER`, `FULL_MEMBER`, `OBSERVER`). |
+| `test_consortium_governance_hardening.py` | `test_membership_proposal_invariants` | Bounds checking, positive TTL enforcement, and temporal expiration evaluation. |
+| `test_consortium_governance_hardening.py` | `test_weighted_voting_quorum_calculation` | Mathematical weighted stake voting power distribution and majority threshold passage. |
+| `test_consortium_governance_hardening.py` | `test_observer_bank_cannot_sponsor_or_vote` | Enforcement of zero voting power and proposal sponsorship prohibition for observers. |
+| `test_consortium_governance_hardening.py` | `test_proposal_policy_update_action` | `UPDATE_POLICY` proposal lifecycle, dynamic parameter execution, and key whitelisting. |
+| `test_consortium_governance_hardening.py` | `test_cancel_proposal_lifecycle` | Sponsor-initiated proposal cancellation prior to quorum resolution. |
+| `test_consortium_governance_hardening.py` | `test_proposal_rejection_due_to_unreachable_quorum` | Early termination and rejection when against votes make quorum mathematically impossible. |
+| `test_consortium_governance_hardening.py` | `test_duplicate_and_invalid_member_actions` | Guard against adding existing members or evicting non-existent members. |
+| `test_consortium_governance_hardening.py` | `test_dynamic_quorum_manager_validations` | `DynamicQuorumManager` threshold and window bounds checking. |
+| `test_consortium_governance_hardening.py` | `test_consortium_service_thread_safety` | Concurrency lock integrity under multi-threaded vote submission. |
+| `test_consortium_governance_hardening.py` | `test_list_proposals_and_members` | Proposal filtering, status queries, and membership roster directory. |
 | `test_consortium_policy.py` | `test_consortium_policy_validation_success` | Successful validation when all quorum, $\epsilon$ cap, and whitelist rules pass. |
 | `test_consortium_policy.py` | `test_consortium_policy_blocks_insufficient_quorum` | Blocks FL round when participating bank count is below minimum threshold. |
 | `test_consortium_policy.py` | `test_consortium_policy_blocks_exceeded_epsilon` | Rejects round proposal exceeding global DP privacy expenditure cap. |
