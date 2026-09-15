@@ -21,17 +21,23 @@ if TYPE_CHECKING:
 def _disable_opacus_hooks(model: nn.Module):
     modules_to_disable = []
     for m in model.modules():
-        disable_fn = getattr(m, "disable_hooks", None)
-        if callable(disable_fn):
-            disable_fn()
-            modules_to_disable.append(m)
+        try:
+            disable_fn = getattr(m, "disable_hooks", None)
+            if callable(disable_fn):
+                disable_fn()
+                modules_to_disable.append(m)
+        except Exception:
+            pass
     try:
         yield
     finally:
         for m in modules_to_disable:
-            enable_fn = getattr(m, "enable_hooks", None)
-            if callable(enable_fn):
-                enable_fn()
+            try:
+                enable_fn = getattr(m, "enable_hooks", None)
+                if callable(enable_fn):
+                    enable_fn()
+            except Exception:
+                pass
 
 
 class AdversarialDefenseService:
@@ -72,7 +78,7 @@ class AdversarialDefenseService:
 
         x_adv = x + eps * sign(d_L / d_x)
         """
-        if epsilon <= 0.0:
+        if epsilon <= 0.0 or x.numel() == 0:
             return x.clone()
 
         model.eval()
@@ -107,9 +113,10 @@ class AdversarialDefenseService:
 
         x^{t+1} = Proj(x^t + alpha * sign(d_L / d_x^t))
         """
-        if epsilon <= 0.0 or steps <= 0:
+        if epsilon <= 0.0 or steps <= 0 or x.numel() == 0:
             return x.clone()
 
+        alpha = max(0.0, alpha)
         model.eval()
         # Initialize x_adv with uniform random noise inside L_inf ball
         x_adv = x.clone().detach() + torch.FloatTensor(x.shape).uniform_(-epsilon, epsilon)
@@ -141,6 +148,8 @@ class AdversarialDefenseService:
         epsilon: float = 0.05,
     ) -> dict[str, float]:
         """Evaluates model Clean Accuracy vs Robust Accuracy under FGSM and PGD evasion attacks."""
+        if epsilon < 0.0:
+            raise ValueError("Adversarial perturbation epsilon must be non-negative (>= 0.0)")
         model.eval()
         total_samples = 0
         clean_correct = 0

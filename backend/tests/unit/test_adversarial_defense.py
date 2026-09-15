@@ -101,3 +101,32 @@ def test_train_local_with_adversarial_training():
 
     assert len(loss_history) == 2
     assert isinstance(trained_model, FraudDetectionModel)
+
+
+def test_adversarial_defense_edge_cases_and_validations():
+    import pytest
+
+    service = AdversarialDefenseService.get_instance()
+    model = FraudDetectionModel(input_dim=10)
+    x = torch.randn(4, 10)
+    y = torch.tensor([[1.0], [0.0], [1.0], [0.0]])
+    loss_fn = nn.BCELoss()
+
+    # Epsilon <= 0 should return clone
+    x_zero_eps = service.generate_fgsm_perturbation(model, x, y, loss_fn, epsilon=0.0)
+    assert torch.allclose(x, x_zero_eps)
+
+    # Empty tensor should return empty clone
+    empty_x = torch.empty(0, 10)
+    empty_y = torch.empty(0, 1)
+    res_empty = service.generate_fgsm_perturbation(model, empty_x, empty_y, loss_fn, epsilon=0.05)
+    assert res_empty.shape == empty_x.shape
+
+    # PGD steps = 0 should return clone
+    x_pgd_zero = service.generate_pgd_perturbation(model, x, y, loss_fn, epsilon=0.05, steps=0)
+    assert torch.allclose(x, x_pgd_zero)
+
+    # Negative epsilon in evaluate_adversarial_robustness should raise ValueError
+    loader = DataLoader(TensorDataset(x, y), batch_size=2)
+    with pytest.raises(ValueError, match="Adversarial perturbation epsilon must be non-negative"):
+        service.evaluate_adversarial_robustness(model, loader, loss_fn, epsilon=-0.01)

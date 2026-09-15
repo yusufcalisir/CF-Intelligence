@@ -531,7 +531,7 @@ export interface AttackInjectionRequest {
   adversary_bank?: string;
   target_bank?: string;
   intensity_rate?: number;
-  defense_strategy?: 'krum' | 'trimmed_mean' | 'bulyan' | 'psi_graph';
+  defense_strategy?: 'krum' | 'trimmed_mean' | 'bulyan' | 'spectral' | 'spectral_svd' | 'psi_graph';
 }
 
 export interface AttackInjectionResponse {

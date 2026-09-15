@@ -13,6 +13,7 @@ Mathematical Foundation:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import math
 from dataclasses import dataclass, field
@@ -38,6 +39,15 @@ class SpectralDefenseConfig:
 
     singular_value_rank: int = 3
     """Number of top singular vectors to use for multi-rank spectral projection (default: top-3)."""
+
+    def __post_init__(self) -> None:
+        """Validate configuration parameters."""
+        if self.spectral_threshold_multiplier <= 0:
+            raise ValueError("spectral_threshold_multiplier must be positive (> 0)")
+        if self.min_clients < 2:
+            raise ValueError("min_clients must be at least 2 for SVD matrix decomposition")
+        if self.singular_value_rank < 1:
+            raise ValueError("singular_value_rank must be at least 1")
 
 
 @dataclass
@@ -72,15 +82,34 @@ def _normalize(v: list[float]) -> list[float]:
     return [x / n for x in v] if n > 1e-12 else list(v)
 
 
-def _flatten(weights: dict[str, list[float]]) -> list[float]:
-    """Flatten a parameter dict into a single numeric vector."""
-    result: list[float] = []
-    for val in weights.values():
-        if isinstance(val, (int, float)):
-            result.append(float(val))
-        elif isinstance(val, list):
-            result.extend(val)
-    return result
+def _flatten(weights: dict[str, Any] | list[float] | Any) -> list[float]:
+    """Flatten a parameter dict, list, or ModelWeights object into a single numeric vector."""
+    if hasattr(weights, "flat_weights"):
+        return [float(x) for x in weights.flat_weights if isinstance(x, (int, float))]
+    if isinstance(weights, list):
+        result: list[float] = []
+        for x in weights:
+            if isinstance(x, (int, float)):
+                result.append(float(x))
+            elif isinstance(x, list):
+                result.extend(float(item) for item in x if isinstance(item, (int, float)))
+        return result
+    if hasattr(weights, "tolist"):
+        # Support numpy arrays or tensors without hard dependency
+        with contextlib.suppress(Exception):
+            return _flatten(weights.tolist())
+    if isinstance(weights, dict):
+        result = []
+        for val in weights.values():
+            if isinstance(val, (int, float)):
+                result.append(float(val))
+            elif isinstance(val, list):
+                result.extend(float(x) for x in val if isinstance(x, (int, float)))
+            elif hasattr(val, "tolist"):
+                with contextlib.suppress(Exception):
+                    result.extend(_flatten(val.tolist()))
+        return result
+    return []
 
 
 def _power_iteration(
@@ -152,7 +181,10 @@ class SpectralAnomalyDetector:
             return {}
 
         # Ensure all rows have the same length (pad or truncate to min)
-        min_d = min(len(row) for row in flat_updates)
+        min_d = min((len(row) for row in flat_updates), default=0)
+        if min_d == 0:
+            return {nid: 0.0 for nid in node_ids}
+
         matrix = [row[:min_d] for row in flat_updates]
 
         # Compute multi-rank singular vectors via power iteration and matrix deflation
@@ -245,6 +277,21 @@ class SpectralAnomalyDetector:
         mu = sum(score_values) / len(score_values)
         variance = sum((s - mu) ** 2 for s in score_values) / len(score_values)
         sigma = math.sqrt(variance)
+
+        # Guard against zero variance (homogeneous updates across all honest clients)
+        if sigma < 1e-9:
+            logger.info("Spectral defense: homogeneous client spectrum (σ < 1e-9); zero anomalies detected.")
+            for nid in scores:
+                reports.append(
+                    SpectralAnomalyReport(
+                        node_id=nid,
+                        spectral_score=round(scores[nid], 6),
+                        is_poisoned=False,
+                        reason="homogeneous_spectrum_no_variance",
+                    )
+                )
+            return reports
+
         threshold = mu + self.config.spectral_threshold_multiplier * sigma
 
         logger.info(
@@ -286,7 +333,7 @@ class SpectralAnomalyDetector:
 
     def aggregate_robust_spectral(
         self, client_updates: dict[str, dict[str, Any]]
-    ) -> dict[str, float]:
+    ) -> dict[str, Any]:
         """Filter poisoned client updates and compute clean parameter average.
 
         Args:
@@ -308,18 +355,35 @@ class SpectralAnomalyDetector:
         honest_updates: list[dict[str, Any]] = [client_updates[nid] for nid in honest_ids]
 
         # Compute honest-only parameter average
-        aggregated: dict[str, float] = {}
+        aggregated: dict[str, Any] = {}
         all_keys: set[str] = set().union(*(u.keys() for u in honest_updates))
 
         for key in all_keys:
-            values: list[float] = []
-            for update in honest_updates:
-                val = update.get(key, 0.0)
-                if isinstance(val, (int, float)):
-                    values.append(float(val))
-                elif isinstance(val, list) and val:
-                    values.append(float(val[0]))
-            aggregated[key] = sum(values) / len(values) if values else 0.0
+            sample_val = next((u[key] for u in honest_updates if key in u), None)
+            if isinstance(sample_val, list):
+                # Vector average
+                matching_lists = [u[key] for u in honest_updates if key in u and isinstance(u[key], list)]
+                max_len = max((len(lst) for lst in matching_lists), default=0)
+                avg_vec = [0.0] * max_len
+                counts = [0] * max_len
+                for lst in matching_lists:
+                    for idx, item in enumerate(lst):
+                        if isinstance(item, (int, float)):
+                            avg_vec[idx] += float(item)
+                            counts[idx] += 1
+                aggregated[key] = [
+                    (avg_vec[idx] / counts[idx]) if counts[idx] > 0 else 0.0
+                    for idx in range(max_len)
+                ]
+            else:
+                values: list[float] = []
+                for update in honest_updates:
+                    val = update.get(key, 0.0)
+                    if isinstance(val, (int, float)):
+                        values.append(float(val))
+                    elif isinstance(val, list) and val:
+                        values.append(float(val[0]))
+                aggregated[key] = sum(values) / len(values) if values else 0.0
 
         logger.info(
             "Robust spectral aggregation: %d honest / %d total clients, %d params.",

@@ -190,6 +190,27 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             sorted_s = np.sort(s_updates, axis=0)
             robust_agg = np.mean(sorted_s[1:-1], axis=0) if len(s_updates) > 2 else np.mean(s_updates, axis=0)
             defense_name = "Bulyan Robust Byzantine Aggregation"
+        elif req.defense_strategy in ("spectral", "spectral_svd"):
+            from app.domain.spectral_defense import (
+                SpectralAnomalyDetector,
+                SpectralDefenseConfig,
+            )
+
+            client_dict = {
+                f"bank_{i}": {"grad": update.tolist()}
+                for i, update in enumerate(all_updates)
+            }
+            detector = SpectralAnomalyDetector(SpectralDefenseConfig(min_clients=3))
+            reports = detector.detect_backdoor_anomalies(client_dict)
+            honest_indices = [
+                int(r.node_id.replace("bank_", ""))
+                for r in reports
+                if not r.is_poisoned
+            ]
+            if not honest_indices:
+                honest_indices = [0]
+            robust_agg = np.mean(all_updates[honest_indices], axis=0)
+            defense_name = "Spectral SVD Low-Rank Anomaly Defense"
         else:  # default krum
             krum_scores: list[float] = []
             for i in range(len(all_updates)):

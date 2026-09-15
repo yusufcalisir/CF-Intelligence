@@ -691,6 +691,33 @@ class FederatedLearningEngine:
             logger.info("Byzantine defense (bulyan): deferring to aggregation step")
             return client_weights
 
+        if defense_type in ("spectral", "spectral_svd"):
+            # Spectral defense: apply SVD multi-rank projection to filter low-rank backdoor poisoning
+            from app.domain.spectral_defense import (
+                SpectralAnomalyDetector,
+                SpectralDefenseConfig,
+            )
+
+            client_dict = {str(i): w for i, w in enumerate(client_weights)}
+            detector = SpectralAnomalyDetector(SpectralDefenseConfig(min_clients=2))
+            reports = detector.detect_backdoor_anomalies(client_dict)
+            honest_indices = [int(r.node_id) for r in reports if not r.is_poisoned]
+
+            if not honest_indices:
+                logger.warning(
+                    "Byzantine defense (spectral): all %d updates flagged as poisoned; falling back to full set",
+                    len(client_weights),
+                )
+                return client_weights
+
+            logger.info(
+                "Byzantine defense (spectral): retained %d/%d client updates (quarantined %d poisoned)",
+                len(honest_indices),
+                len(client_weights),
+                len(client_weights) - len(honest_indices),
+            )
+            return [client_weights[i] for i in honest_indices]
+
         # coordinate_wise_median and any unknown defense: return all weights
         # unchanged — the aggregation method will apply robustness if configured.
         return client_weights

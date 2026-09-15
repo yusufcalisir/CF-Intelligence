@@ -35,6 +35,31 @@ async def test_inject_byzantine_poisoning_attack() -> None:
 
 
 @pytest.mark.asyncio
+async def test_inject_byzantine_attack_with_spectral_defense() -> None:
+    """Verify Byzantine gradient poisoning attack triggers Spectral SVD quarantine of Bank Gamma."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.post(
+            "/api/v1/scenarios/inject-attack",
+            json={
+                "attack_type": "byzantine_poisoning",
+                "adversary_bank": "bank_gamma",
+                "target_bank": "bank_alpha",
+                "intensity_rate": 500,
+                "defense_strategy": "spectral",
+            },
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["attack_type"] == "byzantine_poisoning"
+        assert data["status"] == "quarantined"
+        assert data["adversary_quarantined"] == "bank_gamma"
+        assert "Spectral SVD" in data["defense_activated"]
+        assert data["auc_protected"] > 0.90
+        assert data["auc_compromised_baseline"] < 0.60
+
+
+@pytest.mark.asyncio
 async def test_inject_smurfing_burst_attack() -> None:
     """Verify 500 tx/s smurfing burst attack triggers GraphSAGE & LSH-PSI interception."""
     transport = ASGITransport(app=app)

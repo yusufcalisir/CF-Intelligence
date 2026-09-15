@@ -23,7 +23,7 @@ export default function ChaosAttackInjectorPanel({
 }: ChaosAttackInjectorProps) {
   const injectAttackMutation = useInjectAttack();
   const [activeAttack, setActiveAttack] = useState<AttackInjectionResponse | null>(null);
-  const [selectedDefense, setSelectedDefense] = useState<'krum' | 'trimmed_mean' | 'bulyan'>('krum');
+  const [selectedDefense, setSelectedDefense] = useState<'krum' | 'trimmed_mean' | 'bulyan' | 'spectral'>('krum');
   const [intensity, setIntensity] = useState(500);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const intensityInputId = useId();
@@ -79,11 +79,15 @@ export default function ChaosAttackInjectorPanel({
     } catch {
       // Offline / fallback mock handling
       setIsOfflineMode(true);
+      const defenseLabel =
+        selectedDefense === 'spectral'
+          ? 'Spectral SVD Low-Rank Anomaly Defense'
+          : `${selectedDefense.toUpperCase()} Robust Byzantine Aggregation`;
       const fallbackRes: AttackInjectionResponse = {
         attack_id: `ATK-BYZ-${Date.now().toString().slice(-4)}`,
         attack_type: 'byzantine_poisoning',
         status: 'quarantined',
-        defense_activated: `${selectedDefense.toUpperCase()} Robust Byzantine Aggregation`,
+        defense_activated: defenseLabel,
         adversary_quarantined: 'bank_gamma',
         euclidean_distance: 48.24,
         distance_threshold: 14.10,
@@ -91,7 +95,7 @@ export default function ChaosAttackInjectorPanel({
         mitigation_latency_ms: 3.8,
         auc_protected: 0.9412,
         auc_compromised_baseline: 0.5218,
-        log_entry: `[Offline Sandbox] Byzantine poisoned gradient from Bank Gamma rejected by ${selectedDefense.toUpperCase()} (dist 48.2 > cutoff 14.1).`,
+        log_entry: `[Offline Sandbox] Byzantine poisoned gradient from Bank Gamma rejected by ${defenseLabel} (dist 48.2 > cutoff 14.1).`,
       };
       setActiveAttack(fallbackRes);
       onAttackTriggered?.(fallbackRes);
@@ -226,9 +230,10 @@ export default function ChaosAttackInjectorPanel({
             {/* Defense Selector */}
             <div className="flex items-center gap-1.5 mt-2">
               <span className="text-[10px] text-[var(--color-text-muted)] font-semibold">Defense:</span>
-              {(['krum', 'trimmed_mean', 'bulyan'] as const).map((def) => (
+              {(['krum', 'trimmed_mean', 'bulyan', 'spectral'] as const).map((def) => (
                 <button
                   key={def}
+                  id={`defense-select-${def}`}
                   onClick={() => setSelectedDefense(def)}
                   className={`text-[10px] font-mono px-2 py-0.5 rounded transition-all ${
                     selectedDefense === def

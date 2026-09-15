@@ -353,7 +353,7 @@ class AttackInjectionRequest(BaseModel):
         le=5000,
         description="Burst transaction or gradient rate per second",
     )
-    defense_strategy: Literal["krum", "trimmed_mean", "bulyan", "psi_graph"] = Field(
+    defense_strategy: Literal["krum", "trimmed_mean", "bulyan", "spectral", "spectral_svd", "psi_graph"] = Field(
         default="krum",
         description="Active algorithmic defense strategy to intercept the threat",
     )
