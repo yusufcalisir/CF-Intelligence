@@ -6,11 +6,16 @@ Manages fraud alerts and shared cross-institution intelligence.
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.application.schemas.phase2 import (
+    AlertDeduplicationStatsResponse,
     AlertResponse,
+    AlertStatusUpdateRequest,
+    AlertTriageEvaluateRequest,
+    AlertTriageEvaluateResponse,
     CounterfactualChangeSchema,
     CounterfactualExplanationResponse,
     DecisionReplayResponse,
@@ -27,6 +32,9 @@ from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import AlertSeverity, AlertStatus
 from app.infrastructure.security.rate_limiter import limiter
 
+if TYPE_CHECKING:
+    from app.domain.entities_phase2 import Alert
+
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["alerts"])
 
@@ -37,6 +45,31 @@ _explainability_service = ExplainabilityService()
 
 def get_alert_service() -> AlertIntelligenceService:
     return _alert_service
+
+
+def _to_alert_response(a: Alert) -> AlertResponse:
+    return AlertResponse(
+        id=a.id,
+        bank_id=a.bank_id,
+        transaction_id=a.transaction_id,
+        risk_score=a.risk_score,
+        severity=a.severity.value,
+        status=a.status.value,
+        reason_codes=a.reason_codes,
+        confidence=a.confidence,
+        involved_entity_ids=a.involved_entity_ids,
+        created_at=a.created_at.isoformat(),
+        top_features=a.top_features,
+        risk_factors=a.risk_factors,
+        model_confidence=a.model_confidence,
+        triage_priority=a.triage_priority.value if hasattr(a.triage_priority, "value") else str(a.triage_priority),
+        triage_action=a.triage_action.value if hasattr(a.triage_action, "value") else str(a.triage_action),
+        sla_minutes=a.sla_minutes,
+        triage_reasons=a.triage_reasons,
+        dedup_count=a.dedup_count,
+        is_duplicate=a.is_duplicate,
+        dedup_key=a.dedup_key,
+    )
 
 
 @router.get("/alerts", response_model=list[AlertResponse])
@@ -77,24 +110,15 @@ async def list_alerts(
         limit=limit,
     )
 
-    return [
-        AlertResponse(
-            id=a.id,
-            bank_id=a.bank_id,
-            transaction_id=a.transaction_id,
-            risk_score=a.risk_score,
-            severity=a.severity.value,
-            status=a.status.value,
-            reason_codes=a.reason_codes,
-            confidence=a.confidence,
-            involved_entity_ids=a.involved_entity_ids,
-            created_at=a.created_at.isoformat(),
-            top_features=a.top_features,
-            risk_factors=a.risk_factors,
-            model_confidence=a.model_confidence,
-        )
-        for a in alerts
-    ]
+    return [_to_alert_response(a) for a in alerts]
+
+
+@router.get("/alerts/dedup/stats", response_model=AlertDeduplicationStatsResponse)
+@limiter.limit("120/minute")
+async def get_deduplication_stats(request: Request) -> AlertDeduplicationStatsResponse:
+    """Get real-time alert deduplication sliding window statistics."""
+    stats = _alert_service.get_dedup_stats()
+    return AlertDeduplicationStatsResponse(**stats)
 
 
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
@@ -112,20 +136,71 @@ async def get_alert(
     if caller_tenant:
         enforce_tenant_isolation(caller_tenant, alert.bank_id)
 
-    return AlertResponse(
-        id=alert.id,
-        bank_id=alert.bank_id,
-        transaction_id=alert.transaction_id,
-        risk_score=alert.risk_score,
-        severity=alert.severity.value,
-        status=alert.status.value,
-        reason_codes=alert.reason_codes,
-        confidence=alert.confidence,
-        involved_entity_ids=alert.involved_entity_ids,
-        created_at=alert.created_at.isoformat(),
-        top_features=alert.top_features,
-        risk_factors=alert.risk_factors,
-        model_confidence=alert.model_confidence,
+    return _to_alert_response(alert)
+
+
+@router.patch("/alerts/{alert_id}/status", response_model=AlertResponse)
+@limiter.limit("60/minute")
+async def update_alert_status(
+    request: Request,
+    alert_id: str,
+    payload: AlertStatusUpdateRequest,
+    caller_tenant: TenantDep = None,
+) -> AlertResponse:
+    """Update an alert's investigation status."""
+    alert = _alert_service.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
+    try:
+        target_status = AlertStatus(payload.status)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid alert status: {payload.status!r}",
+        )
+
+    updated = _alert_service.update_alert_status(
+        alert_id=alert_id,
+        status=target_status,
+        resolution_notes=payload.resolution_notes,
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    return _to_alert_response(updated)
+
+
+@router.post("/alerts/{alert_id}/triage", response_model=AlertTriageEvaluateResponse)
+@limiter.limit("60/minute")
+async def evaluate_alert_triage(
+    request: Request,
+    alert_id: str,
+    payload: AlertTriageEvaluateRequest | None = None,
+    caller_tenant: TenantDep = None,
+) -> AlertTriageEvaluateResponse:
+    """Trigger on-demand multi-factor triage re-evaluation for an alert."""
+    alert = _alert_service.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
+    txn_override = payload.model_dump(exclude_unset=True) if payload else {}
+    updated = _alert_service.triage_alert(alert_id, txn_override=txn_override)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    return AlertTriageEvaluateResponse(
+        alert_id=updated.id,
+        triage_priority=updated.triage_priority.value if hasattr(updated.triage_priority, "value") else str(updated.triage_priority),
+        triage_action=updated.triage_action.value if hasattr(updated.triage_action, "value") else str(updated.triage_action),
+        sla_minutes=updated.sla_minutes,
+        triage_reasons=updated.triage_reasons,
     )
 
 

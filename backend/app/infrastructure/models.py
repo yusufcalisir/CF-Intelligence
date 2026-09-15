@@ -100,6 +100,12 @@ class AlertModel(Base):
     risk_factors: Mapped[list] = mapped_column(JSON, default=list)
     model_confidence: Mapped[float] = mapped_column(Float, default=0.0)
     historical_evidence: Mapped[list] = mapped_column(JSON, default=list)
+    triage_priority: Mapped[str] = mapped_column(String(20), default="p3_medium")
+    triage_action: Mapped[str] = mapped_column(String(32), default="queue_standard")
+    sla_minutes: Mapped[int] = mapped_column(Integer, default=1440)
+    triage_reasons: Mapped[list] = mapped_column(JSON, default=list)
+    dedup_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dedup_count: Mapped[int] = mapped_column(Integer, default=1)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

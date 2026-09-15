@@ -22,6 +22,8 @@ from app.domain.enums import (
     RelationshipType,
     RiskLevel,
     ScenarioType,
+    TriageAction,
+    TriagePriority,
 )
 
 
@@ -52,10 +54,24 @@ class Alert:
     model_confidence: float = 0.0
     historical_evidence: list[str] = field(default_factory=list)
 
+    # Triage & Deduplication
+    triage_priority: TriagePriority = TriagePriority.P3_MEDIUM
+    triage_action: TriageAction = TriageAction.QUEUE_STANDARD
+    sla_minutes: int = 1440
+    triage_reasons: list[str] = field(default_factory=list)
+    dedup_key: str | None = None
+    dedup_count: int = 1
+    is_duplicate: bool = False
+    first_seen_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    last_duplicate_at: datetime | None = None
+
     @property
     def is_actionable(self) -> bool:
         """Whether this alert requires investigation."""
-        return self.severity in (AlertSeverity.CRITICAL, AlertSeverity.HIGH)
+        return self.severity in (AlertSeverity.CRITICAL, AlertSeverity.HIGH) or self.triage_priority in (
+            TriagePriority.P1_CRITICAL,
+            TriagePriority.P2_HIGH,
+        )
 
 
 @dataclass

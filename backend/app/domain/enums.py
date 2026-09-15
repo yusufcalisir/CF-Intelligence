@@ -148,6 +148,24 @@ class CasePriority(StrEnum):
     P4_LOW = "p4_low"
 
 
+class TriagePriority(StrEnum):
+    """Priority classification for automated alert triage."""
+
+    P1_CRITICAL = "p1_critical"
+    P2_HIGH = "p2_high"
+    P3_MEDIUM = "p3_medium"
+    P4_LOW = "p4_low"
+
+
+class TriageAction(StrEnum):
+    """Recommended operational workflow action for triaged alerts."""
+
+    ESCALATE_IMMEDIATE = "escalate_immediate"
+    INVESTIGATE_CASE = "investigate_case"
+    QUEUE_STANDARD = "queue_standard"
+    AUTO_MONITOR = "auto_monitor"
+
+
 class EntityType(StrEnum):
     """Types of entities in the financial crime graph."""
 

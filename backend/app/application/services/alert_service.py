@@ -1,18 +1,20 @@
 """Alert intelligence service.
 
-Generates fraud alerts from model predictions and manages the shared
-intelligence layer. Alerts never contain raw transaction data — only
-risk scores, reason codes, and privacy-preserving identifiers.
-
-The shared intelligence layer is the core collaboration mechanism:
-banks publish alerts as hashed, anonymized intelligence items that
-other institutions can correlate against their own data.
+Generates fraud alerts from model predictions, applies sliding-window
+deduplication and intelligent multi-factor triage priority scoring, and
+manages the shared cross-bank intelligence layer. Alerts never contain
+raw transaction data — only risk scores, reason codes, triage metadata,
+and privacy-preserving identifiers.
 """
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import threading
 import uuid
+from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from app.domain.entities_phase2 import Alert, SharedIntelligence
@@ -21,11 +23,16 @@ from app.domain.enums import (
     AlertStatus,
     EntityType,
     IntelligenceType,
+    TriageAction,
+    TriagePriority,
 )
 from app.domain.value_objects_phase2 import PrivacyPreservingIdentifier
 from app.infrastructure.redis_store import RedisStore
 
 logger = logging.getLogger(__name__)
+
+
+# ── Serializers ──────────────────────────────────────────────────────────────
 
 
 def _alert_to_dict(a: Alert) -> dict[str, Any]:
@@ -45,18 +52,50 @@ def _alert_to_dict(a: Alert) -> dict[str, Any]:
         "risk_factors": a.risk_factors,
         "model_confidence": a.model_confidence,
         "historical_evidence": a.historical_evidence,
+        "triage_priority": a.triage_priority.value if hasattr(a.triage_priority, "value") else str(a.triage_priority),
+        "triage_action": a.triage_action.value if hasattr(a.triage_action, "value") else str(a.triage_action),
+        "sla_minutes": a.sla_minutes,
+        "triage_reasons": a.triage_reasons,
+        "dedup_key": a.dedup_key,
+        "dedup_count": a.dedup_count,
+        "is_duplicate": a.is_duplicate,
+        "first_seen_at": a.first_seen_at.isoformat() if a.first_seen_at else None,
+        "last_duplicate_at": a.last_duplicate_at.isoformat() if a.last_duplicate_at else None,
     }
 
 
 def _dict_to_alert(d: dict[str, Any]) -> Alert:
-    from datetime import datetime
-
     d_copy = d.copy()
     d_copy["severity"] = AlertSeverity(d_copy["severity"])
     d_copy["status"] = AlertStatus(d_copy["status"])
+    if "triage_priority" in d_copy and d_copy["triage_priority"]:
+        try:
+            d_copy["triage_priority"] = TriagePriority(d_copy["triage_priority"])
+        except ValueError:
+            d_copy["triage_priority"] = TriagePriority.P3_MEDIUM
+    else:
+        d_copy["triage_priority"] = TriagePriority.P3_MEDIUM
+
+    if "triage_action" in d_copy and d_copy["triage_action"]:
+        try:
+            d_copy["triage_action"] = TriageAction(d_copy["triage_action"])
+        except ValueError:
+            d_copy["triage_action"] = TriageAction.QUEUE_STANDARD
+    else:
+        d_copy["triage_action"] = TriageAction.QUEUE_STANDARD
+
+    d_copy["sla_minutes"] = int(d_copy.get("sla_minutes", 1440))
+    d_copy["triage_reasons"] = list(d_copy.get("triage_reasons", []))
+    d_copy["dedup_count"] = int(d_copy.get("dedup_count", 1))
+    d_copy["is_duplicate"] = bool(d_copy.get("is_duplicate", False))
+
     d_copy["created_at"] = datetime.fromisoformat(d_copy["created_at"])
     if d_copy.get("updated_at"):
         d_copy["updated_at"] = datetime.fromisoformat(d_copy["updated_at"])
+    if d_copy.get("first_seen_at"):
+        d_copy["first_seen_at"] = datetime.fromisoformat(d_copy["first_seen_at"])
+    if d_copy.get("last_duplicate_at"):
+        d_copy["last_duplicate_at"] = datetime.fromisoformat(d_copy["last_duplicate_at"])
     return Alert(**d_copy)
 
 
@@ -76,8 +115,6 @@ def _intel_to_dict(i: SharedIntelligence) -> dict[str, Any]:
 
 
 def _dict_to_intel(d: dict[str, Any]) -> SharedIntelligence:
-    from datetime import datetime
-
     d_copy = d.copy()
     d_copy["intelligence_type"] = IntelligenceType(d_copy["intelligence_type"])
     if d_copy.get("entity_type"):
@@ -88,19 +125,256 @@ def _dict_to_intel(d: dict[str, Any]) -> SharedIntelligence:
     return SharedIntelligence(**d_copy)
 
 
+# ── Deduplication Engine ─────────────────────────────────────────────────────
+
+
+@dataclass
+class DedupRecord:
+    alert_id: str
+    dedup_key: str
+    bank_id: str
+    primary_entity_id: str
+    risk_score: float
+    created_at: datetime
+    last_seen_at: datetime
+    duplicate_count: int
+    reason_codes: list[str]
+
+
+@dataclass
+class DeduplicationConfig:
+    enabled: bool = True
+    window_seconds: float = 300.0  # 5-minute sliding window
+    max_records: int = 10000
+
+
+class AlertDeduplicationEngine:
+    """Thread-safe sliding-window alert deduplication engine."""
+
+    def __init__(self, config: DeduplicationConfig | None = None) -> None:
+        self.config = config or DeduplicationConfig()
+        self._records: dict[str, DedupRecord] = {}
+        self._lock = threading.RLock()
+        self._total_processed: int = 0
+        self._duplicates_detected: int = 0
+
+    def compute_dedup_key(
+        self,
+        bank_id: str,
+        primary_entity_id: str,
+        reason_codes: list[str] | None = None,
+    ) -> str:
+        raw = f"{bank_id}:{primary_entity_id}:fraud"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    def process_alert(
+        self,
+        alert: Alert,
+        primary_entity_id: str = "",
+        now: datetime | None = None,
+    ) -> tuple[bool, Alert]:
+        """Process alert through deduplication sliding window."""
+        if not self.config.enabled:
+            return False, alert
+
+        now = now or datetime.now(UTC)
+        entity_id = primary_entity_id or (alert.involved_entity_ids[0] if alert.involved_entity_ids else "none")
+        dedup_key = self.compute_dedup_key(alert.bank_id, entity_id, alert.reason_codes)
+
+        with self._lock:
+            self._total_processed += 1
+            record = self._records.get(dedup_key)
+
+            if record and (now - record.last_seen_at).total_seconds() <= self.config.window_seconds:
+                # Existing sliding window duplicate detected
+                self._duplicates_detected += 1
+                record.duplicate_count += 1
+                record.last_seen_at = now
+                record.risk_score = max(record.risk_score, alert.risk_score)
+                record.reason_codes = list(set(record.reason_codes + alert.reason_codes))
+
+                alert.dedup_key = dedup_key
+                alert.dedup_count = record.duplicate_count
+                alert.is_duplicate = True
+                alert.risk_score = record.risk_score
+                alert.first_seen_at = record.created_at
+                alert.last_duplicate_at = now
+                alert.reason_codes = record.reason_codes
+                return True, alert
+
+            # Fresh record
+            if len(self._records) >= self.config.max_records:
+                self.prune_expired(now)
+
+            self._records[dedup_key] = DedupRecord(
+                alert_id=alert.id,
+                dedup_key=dedup_key,
+                bank_id=alert.bank_id,
+                primary_entity_id=entity_id,
+                risk_score=alert.risk_score,
+                created_at=now,
+                last_seen_at=now,
+                duplicate_count=1,
+                reason_codes=list(alert.reason_codes),
+            )
+            alert.dedup_key = dedup_key
+            alert.dedup_count = 1
+            alert.is_duplicate = False
+            alert.first_seen_at = now
+            return False, alert
+
+    def prune_expired(self, now: datetime | None = None) -> int:
+        """Prune records older than window_seconds from the sliding cache."""
+        now = now or datetime.now(UTC)
+        with self._lock:
+            expired_keys = [
+                k
+                for k, r in self._records.items()
+                if (now - r.last_seen_at).total_seconds() > self.config.window_seconds
+            ]
+            for k in expired_keys:
+                del self._records[k]
+            return len(expired_keys)
+
+    def get_stats(self) -> dict[str, Any]:
+        """Return real-time deduplication metrics."""
+        with self._lock:
+            ratio = (
+                self._duplicates_detected / self._total_processed
+                if self._total_processed > 0
+                else 0.0
+            )
+            return {
+                "total_processed": self._total_processed,
+                "duplicates_detected": self._duplicates_detected,
+                "deduplication_ratio": round(ratio, 4),
+                "active_sliding_window_keys": len(self._records),
+                "window_seconds": self.config.window_seconds,
+            }
+
+
+# ── Intelligent Triage Engine ────────────────────────────────────────────────
+
+
+@dataclass
+class TriageResult:
+    priority: TriagePriority
+    action: TriageAction
+    sla_minutes: int
+    reasons: list[str]
+
+
+class AlertTriageEngine:
+    """Multi-factor algorithmic alert triage and SLA assignment engine."""
+
+    HIGH_RISK_COUNTRIES = {"NG", "RU", "PH", "BR", "KP", "IR", "SY"}
+
+    @classmethod
+    def evaluate_triage(
+        cls,
+        txn: dict,
+        risk_score: float,
+        severity: AlertSeverity,
+        dedup_count: int = 1,
+        reason_codes: list[str] | None = None,
+        entity_overlap_count: int = 0,
+    ) -> TriageResult:
+        reasons: list[str] = []
+        reason_codes = reason_codes or []
+
+        # 1. Base classification from risk score / severity
+        if risk_score >= 900.0 or severity == AlertSeverity.CRITICAL:
+            priority = TriagePriority.P1_CRITICAL
+            reasons.append(f"Critical risk score threshold ({risk_score:.1f}/1000)")
+        elif risk_score >= 750.0 or severity == AlertSeverity.HIGH:
+            priority = TriagePriority.P2_HIGH
+            reasons.append(f"High risk score threshold ({risk_score:.1f}/1000)")
+        elif risk_score >= 500.0 or severity == AlertSeverity.MEDIUM:
+            priority = TriagePriority.P3_MEDIUM
+            reasons.append(f"Medium risk score ({risk_score:.1f}/1000)")
+        else:
+            priority = TriagePriority.P4_LOW
+            reasons.append(f"Low baseline risk score ({risk_score:.1f}/1000)")
+
+        # 2. Amount impact escalation
+        amount = float(txn.get("transaction_amount", 0.0) or 0.0)
+        if amount >= 10000.0:
+            if priority == TriagePriority.P2_HIGH:
+                priority = TriagePriority.P1_CRITICAL
+            elif priority == TriagePriority.P3_MEDIUM:
+                priority = TriagePriority.P2_HIGH
+            reasons.append(f"High-value transaction amount (${amount:,.2f} >= $10,000 threshold)")
+
+        # 3. Geopolitical sanctions and high-risk jurisdiction
+        country = str(txn.get("country_code", "")).upper()
+        if country in cls.HIGH_RISK_COUNTRIES or "GEO-RISK" in reason_codes:
+            if priority in (TriagePriority.P3_MEDIUM, TriagePriority.P4_LOW):
+                priority = TriagePriority.P2_HIGH
+            reasons.append(f"Sanctions / high-risk jurisdiction exposure ({country or 'GEO-RISK'})")
+
+        # 4. Burst velocity / repeated deduplication attack
+        if dedup_count >= 3:
+            priority = TriagePriority.P1_CRITICAL
+            reasons.append(
+                f"Burst velocity deduplication attack ({dedup_count} repeated attempts in 5m window)"
+            )
+        elif dedup_count == 2 and priority in (TriagePriority.P3_MEDIUM, TriagePriority.P4_LOW):
+            priority = TriagePriority.P2_HIGH
+            reasons.append("Repeated transaction attempt within deduplication window")
+
+        # 5. Cross-bank mule ring / entity overlap
+        if entity_overlap_count >= 2:
+            priority = TriagePriority.P1_CRITICAL
+            reasons.append(
+                f"Cross-bank mule syndicate overlap ({entity_overlap_count} institutions linked)"
+            )
+
+        # 6. SLA and action mapping
+        sla_map = {
+            TriagePriority.P1_CRITICAL: 15,    # 15 minutes
+            TriagePriority.P2_HIGH: 120,       # 2 hours
+            TriagePriority.P3_MEDIUM: 1440,    # 24 hours
+            TriagePriority.P4_LOW: 4320,       # 72 hours
+        }
+        action_map = {
+            TriagePriority.P1_CRITICAL: TriageAction.ESCALATE_IMMEDIATE,
+            TriagePriority.P2_HIGH: TriageAction.INVESTIGATE_CASE,
+            TriagePriority.P3_MEDIUM: TriageAction.QUEUE_STANDARD,
+            TriagePriority.P4_LOW: TriageAction.AUTO_MONITOR,
+        }
+
+        return TriageResult(
+            priority=priority,
+            action=action_map[priority],
+            sla_minutes=sla_map[priority],
+            reasons=reasons,
+        )
+
+
+# ── AlertIntelligenceService ─────────────────────────────────────────────────
+
+
 class AlertIntelligenceService:
     """Generates alerts from predictions and manages shared intelligence.
 
-    This service sits between the ML pipeline and the investigation
-    workflow. It converts model outputs into actionable alerts and
-    publishes privacy-preserving intelligence for cross-institution
-    collaboration.
+    Converts model outputs into actionable alerts, applies sliding-window
+    deduplication, assigns multi-factor triage priorities, and publishes
+    privacy-preserving intelligence for cross-institution collaboration.
     """
 
-    def __init__(self, alert_threshold: float = 0.5) -> None:
+    def __init__(
+        self,
+        alert_threshold: float = 0.5,
+        dedup_window_seconds: float = 300.0,
+    ) -> None:
         self.alert_threshold = alert_threshold
         self._intelligence_store = RedisStore("intelligence")
         self._alert_store = RedisStore("alert")
+        self._dedup_engine = AlertDeduplicationEngine(
+            DeduplicationConfig(window_seconds=dedup_window_seconds)
+        )
+        self._triage_engine = AlertTriageEngine()
+        self._lock = threading.RLock()
 
     def generate_alerts(
         self,
@@ -109,7 +383,7 @@ class AlertIntelligenceService:
         predictions: list[float],
         threshold: float | None = None,
     ) -> list[Alert]:
-        """Generate fraud alerts from model predictions.
+        """Generate fraud alerts from model predictions with triage and deduplication.
 
         Args:
             bank_id: ID of the bank generating alerts.
@@ -123,45 +397,129 @@ class AlertIntelligenceService:
         threshold = threshold or self.alert_threshold
         alerts: list[Alert] = []
 
-        for txn, score in zip(transactions, predictions, strict=False):
-            if score < threshold:
-                continue
+        with self._lock:
+            for txn, score in zip(transactions, predictions, strict=False):
+                if score < threshold:
+                    continue
 
-            severity = self._classify_severity(score)
-            reason_codes = self._generate_reason_codes(txn, score)
-            entity_ids = self._extract_entity_ids(txn, bank_id)
+                severity = self._classify_severity(score)
+                reason_codes = self._generate_reason_codes(txn, score)
+                entity_ids = self._extract_entity_ids(txn, bank_id)
+                risk_score = round(score * 1000, 1)
 
-            alert = Alert(
-                bank_id=bank_id,
-                transaction_id=txn.get("transaction_id", str(uuid.uuid4())),
-                risk_score=round(score * 1000, 1),  # Scale to 0-1000
-                severity=severity,
-                reason_codes=reason_codes,
-                confidence=round(score, 4),
-                involved_entity_ids=entity_ids,
-                model_confidence=round(score, 4),
-                top_features=self._get_top_features(txn, score),
-                risk_factors=self._get_risk_factors(txn, score),
-            )
+                # Initial triage evaluation
+                triage_res = self._triage_engine.evaluate_triage(
+                    txn=txn,
+                    risk_score=risk_score,
+                    severity=severity,
+                    dedup_count=1,
+                    reason_codes=reason_codes,
+                )
 
-            alerts.append(alert)
-            self._alert_store.set(alert.id, _alert_to_dict(alert))
+                alert = Alert(
+                    bank_id=bank_id,
+                    transaction_id=txn.get("transaction_id", str(uuid.uuid4())),
+                    risk_score=risk_score,
+                    severity=severity,
+                    reason_codes=reason_codes,
+                    confidence=round(score, 4),
+                    involved_entity_ids=entity_ids,
+                    model_confidence=round(score, 4),
+                    top_features=self._get_top_features(txn, score),
+                    risk_factors=self._get_risk_factors(txn, score),
+                    triage_priority=triage_res.priority,
+                    triage_action=triage_res.action,
+                    sla_minutes=triage_res.sla_minutes,
+                    triage_reasons=triage_res.reasons,
+                )
+
+                # Deduplication sliding window processing
+                is_dup, alert = self._dedup_engine.process_alert(
+                    alert=alert,
+                    primary_entity_id=entity_ids[0] if entity_ids else str(txn.get("customer_id", "")),
+                )
+
+                # Re-evaluate triage on duplicate burst
+                if is_dup and alert.dedup_count >= 2:
+                    re_triage = self._triage_engine.evaluate_triage(
+                        txn=txn,
+                        risk_score=alert.risk_score,
+                        severity=alert.severity,
+                        dedup_count=alert.dedup_count,
+                        reason_codes=alert.reason_codes,
+                    )
+                    alert.triage_priority = re_triage.priority
+                    alert.triage_action = re_triage.action
+                    alert.sla_minutes = re_triage.sla_minutes
+                    alert.triage_reasons = re_triage.reasons
+
+                alerts.append(alert)
+                self._alert_store.set(alert.id, _alert_to_dict(alert))
 
         logger.info(
-            "Generated %d alerts for %s (threshold=%.2f)",
+            "Generated %d alerts for %s (threshold=%.2f, dedup_keys=%d)",
             len(alerts),
             bank_id,
             threshold,
+            len(self._dedup_engine._records),
         )
         return alerts
 
-    def publish_intelligence(self, alert: Alert) -> SharedIntelligence:
-        """Convert an alert to shared intelligence.
+    def update_alert_status(
+        self,
+        alert_id: str,
+        status: AlertStatus,
+        resolution_notes: str | None = None,
+    ) -> Alert | None:
+        """Update alert status with timestamp and optional resolution notes."""
+        with self._lock:
+            val = self._alert_store.get(alert_id)
+            if not val:
+                return None
+            alert = _dict_to_alert(val)
+            alert.status = status
+            alert.updated_at = datetime.now(UTC)
+            if resolution_notes:
+                alert.risk_factors.append(f"Resolution note: {resolution_notes}")
+            self._alert_store.set(alert.id, _alert_to_dict(alert))
+            return alert
 
-        Strips all PII. Publishes only hashed identifiers and risk
-        indicators that other institutions can correlate.
-        """
-        # Hash the transaction ID for privacy
+    def triage_alert(
+        self,
+        alert_id: str,
+        txn_override: dict | None = None,
+    ) -> Alert | None:
+        """On-demand triage re-evaluation for an existing alert."""
+        with self._lock:
+            alert = self.get_alert(alert_id)
+            if not alert:
+                return None
+            txn = txn_override or {
+                "transaction_amount": 0.0,
+                "country_code": "US",
+                "velocity": 1.0,
+            }
+            res = self._triage_engine.evaluate_triage(
+                txn=txn,
+                risk_score=alert.risk_score,
+                severity=alert.severity,
+                dedup_count=alert.dedup_count,
+                reason_codes=alert.reason_codes,
+            )
+            alert.triage_priority = res.priority
+            alert.triage_action = res.action
+            alert.sla_minutes = res.sla_minutes
+            alert.triage_reasons = res.reasons
+            alert.updated_at = datetime.now(UTC)
+            self._alert_store.set(alert.id, _alert_to_dict(alert))
+            return alert
+
+    def get_dedup_stats(self) -> dict[str, Any]:
+        """Retrieve real-time deduplication engine metrics."""
+        return self._dedup_engine.get_stats()
+
+    def publish_intelligence(self, alert: Alert) -> SharedIntelligence:
+        """Convert an alert to shared intelligence with privacy hashing."""
         privacy_hash = PrivacyPreservingIdentifier.compute(
             alert.transaction_id,
             "transaction",
@@ -174,10 +532,12 @@ class AlertIntelligenceService:
             risk_indicator=alert.risk_score / 1000,
             description=f"Alert {alert.severity.value}: {', '.join(alert.reason_codes[:3])}",
             entity_type=EntityType.CUSTOMER,
-            related_alert_count=1,
+            related_alert_count=alert.dedup_count,
         )
 
-        self._intelligence_store.push_list("intelligence_list", _intel_to_dict(intelligence))
+        with self._lock:
+            self._intelligence_store.push_list("intelligence_list", _intel_to_dict(intelligence))
+
         logger.info(
             "Published intelligence from %s: hash=%s risk=%.2f",
             alert.bank_id,
@@ -187,28 +547,20 @@ class AlertIntelligenceService:
         return intelligence
 
     def consume_intelligence(self, bank_id: str) -> list[SharedIntelligence]:
-        """Retrieve intelligence from other banks.
-
-        A bank only sees intelligence published by other institutions,
-        never its own (to avoid feedback loops).
-        """
-        raw_list = self._intelligence_store.get_list("intelligence_list")
+        """Retrieve intelligence from other banks (excluding caller)."""
+        with self._lock:
+            raw_list = self._intelligence_store.get_list("intelligence_list")
         items = [_dict_to_intel(i) for i in raw_list]
         return [intel for intel in items if intel.source_bank_id != bank_id]
 
     def get_all_intelligence(self) -> list[SharedIntelligence]:
         """Retrieve all shared intelligence items."""
-        raw_list = self._intelligence_store.get_list("intelligence_list")
+        with self._lock:
+            raw_list = self._intelligence_store.get_list("intelligence_list")
         return [_dict_to_intel(i) for i in raw_list]
 
     def correlate_alerts(self, alerts: list[Alert]) -> list[dict]:
-        """Find patterns across multiple alerts.
-
-        Looks for:
-        - Entity overlap (same entity in multiple alerts)
-        - Velocity patterns (multiple alerts in short time)
-        - Severity escalation
-        """
+        """Find patterns across multiple alerts."""
         correlations: list[dict] = []
 
         # Entity overlap analysis
@@ -249,7 +601,8 @@ class AlertIntelligenceService:
 
     def get_alert_by_transaction_id(self, transaction_id: str) -> Alert | None:
         """Find an alert by transaction ID."""
-        raw_vals = self._alert_store.list_values()
+        with self._lock:
+            raw_vals = self._alert_store.list_values()
         for v in raw_vals:
             alert = _dict_to_alert(v)
             if alert.transaction_id == transaction_id:
@@ -257,41 +610,12 @@ class AlertIntelligenceService:
         return None
 
     def get_alert(self, alert_id: str) -> Alert | None:
-        val = self._alert_store.get(alert_id)
+        """Fetch alert by ID from store. Zero-mock production lookup."""
+        with self._lock:
+            val = self._alert_store.get(alert_id)
         if val:
             return _dict_to_alert(val)
-
-        # Dynamic fallback for demo/seed alert IDs to prevent 404 errors
-        import hashlib
-
-        h = int(hashlib.md5(alert_id.encode(), usedforsecurity=False).hexdigest(), 16)  # noqa: S324
-        banks = ["bank_a", "bank_b", "bank_c"]
-        bank_id = banks[h % len(banks)]
-        score = 0.82 + (h % 150) / 1000.0  # 0.82 - 0.97
-
-        fallback_alert = Alert(
-            id=alert_id,
-            bank_id=bank_id,
-            transaction_id=f"tx_{alert_id[:8]}",
-            risk_score=round(score * 1000, 1),
-            severity=AlertSeverity.HIGH if score < 0.9 else AlertSeverity.CRITICAL,
-            reason_codes=["RC_HIGH_VELOCITY", "RC_NEW_DEVICE", "RC_SUSPICIOUS_GEO"],
-            confidence=round(score, 4),
-            involved_entity_ids=[f"cust_{alert_id[:8]}", f"merch_{alert_id[8:16]}"],
-            model_confidence=round(score, 4),
-            top_features=[
-                {"feature": "amount", "contribution": 0.42},
-                {"feature": "velocity_1h", "contribution": 0.31},
-                {"feature": "country_mismatch", "contribution": 0.27},
-            ],
-            risk_factors=[
-                "Unusual transaction velocity",
-                "High transaction amount",
-                "Device fingerprint mismatch",
-            ],
-        )
-        self._alert_store.set(alert_id, _alert_to_dict(fallback_alert))
-        return fallback_alert
+        return None
 
     def get_alerts(
         self,
@@ -301,7 +625,8 @@ class AlertIntelligenceService:
         limit: int = 50,
     ) -> list[Alert]:
         """Retrieve alerts with optional filters."""
-        raw_vals = self._alert_store.list_values()
+        with self._lock:
+            raw_vals = self._alert_store.list_values()
         alerts = [_dict_to_alert(v) for v in raw_vals]
         if bank_id:
             alerts = [a for a in alerts if a.bank_id == bank_id]
@@ -317,7 +642,8 @@ class AlertIntelligenceService:
         by_bank: dict[str, int] = {}
         total_risk = 0.0
 
-        raw_list = self._intelligence_store.get_list("intelligence_list")
+        with self._lock:
+            raw_list = self._intelligence_store.get_list("intelligence_list")
         items = [_dict_to_intel(i) for i in raw_list]
 
         for intel in items:

@@ -9,6 +9,7 @@ from app.domain.entities import SimulationRun
 from app.domain.enums import SimulationStatus
 from app.domain.value_objects import SimulationConfig
 from app.infrastructure.models import Base
+from app.infrastructure.repositories.alert_repository import AlertRepository
 from app.infrastructure.repositories.bank_repository import BankRepository
 from app.infrastructure.repositories.metrics_repository import MetricsRepository
 from app.infrastructure.repositories.simulation_repository import SimulationRepository
@@ -140,3 +141,100 @@ async def test_simulation_repository_create_and_lifecycle(db_session: AsyncSessi
     deleted = await repo.delete("sim_crud_test")
     assert deleted is True
     assert await repo.get_by_id("sim_crud_test") is None
+
+
+@pytest.mark.asyncio
+async def test_alert_repository_lifecycle_and_crud(db_session: AsyncSession):
+    """Verify AlertRepository create, get_by_id, get_by_transaction_id, update_status, and delete."""
+    repo = AlertRepository(db_session)
+
+    alert = await repo.create(
+        bank_id="bank_alpha",
+        transaction_id="txn_unit_001",
+        risk_score=890.5,
+        severity="critical",
+        reason_codes=["VEL-001", "GEO-RISK"],
+        confidence=0.89,
+        involved_entity_ids=["cust_001"],
+        triage_priority="p1_critical",
+        triage_action="escalate_immediate",
+        sla_minutes=15,
+        triage_reasons=["Critical severity with geo-risk"],
+        dedup_key="dedup_hash_001",
+        dedup_count=1,
+    )
+
+    assert alert.id is not None
+    assert alert.bank_id == "bank_alpha"
+    assert alert.transaction_id == "txn_unit_001"
+    assert alert.triage_priority == "p1_critical"
+    assert alert.sla_minutes == 15
+
+    # Fetch by ID
+    by_id = await repo.get_by_id(alert.id)
+    assert by_id is not None
+    assert by_id.id == alert.id
+
+    # Fetch by transaction ID
+    by_txn = await repo.get_by_transaction_id("txn_unit_001")
+    assert by_txn is not None
+    assert by_txn.id == alert.id
+
+    # Update status
+    updated = await repo.update_status(alert.id, "escalated")
+    assert updated is not None
+    assert updated.status == "escalated"
+    assert updated.updated_at is not None
+
+    # Delete
+    deleted = await repo.delete(alert.id)
+    assert deleted is True
+    assert await repo.get_by_id(alert.id) is None
+    assert await repo.get_by_transaction_id("txn_unit_001") is None
+
+
+@pytest.mark.asyncio
+async def test_alert_repository_filtering_and_counts(db_session: AsyncSession):
+    """Verify AlertRepository list_by_bank filtering by status & severity and count_by_bank."""
+    repo = AlertRepository(db_session)
+
+    await repo.create(
+        bank_id="bank_omega",
+        transaction_id="tx_om_1",
+        risk_score=920.0,
+        severity="critical",
+    )
+    a2 = await repo.create(
+        bank_id="bank_omega",
+        transaction_id="tx_om_2",
+        risk_score=780.0,
+        severity="high",
+    )
+    await repo.update_status(a2.id, "under_review")
+
+    await repo.create(
+        bank_id="bank_other",
+        transaction_id="tx_oth_1",
+        risk_score=510.0,
+        severity="medium",
+    )
+
+    # List by bank
+    omega_all = await repo.list_by_bank("bank_omega")
+    assert len(omega_all) == 2
+
+    # Filter by severity
+    omega_crit = await repo.list_by_bank("bank_omega", severity="critical")
+    assert len(omega_crit) == 1
+    assert omega_crit[0].transaction_id == "tx_om_1"
+
+    # Filter by status
+    omega_review = await repo.list_by_bank("bank_omega", status="under_review")
+    assert len(omega_review) == 1
+    assert omega_review[0].transaction_id == "tx_om_2"
+
+    # Counts
+    assert await repo.count_by_bank("bank_omega") == 2
+    assert await repo.count_by_bank("bank_omega", severity="critical") == 1
+    assert await repo.count_by_bank("bank_omega", status="under_review") == 1
+    assert await repo.count_by_bank("bank_other") == 1
