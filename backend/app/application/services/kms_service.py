@@ -26,14 +26,13 @@ from typing import Any
 
 from cryptography.fernet import Fernet, InvalidToken
 
+from app.domain.psi_service import PSI_PRIME
 from app.infrastructure.storage.storage_utils import get_storage_dir
 
 logger = logging.getLogger(__name__)
 
 _STORAGE_ROOT = get_storage_dir()
-
-# DH-PSI prime — must match psi_service.py
-_PSI_PRIME = 0xDEB00B9C694F4BE84A28B101E6A0F1D8B9646D0BF1A0F53FBAFF74205A405D021C7B38A8DE5F482F6B8470E04E5FCEF5BA88CEB8E5E7A0D0BF7BCAAA83DE4F2D
+_PSI_PRIME = PSI_PRIME
 
 
 class KMSService:

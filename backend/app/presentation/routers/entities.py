@@ -154,6 +154,8 @@ _psi_service = PSIService(_entity_service)
 @router.post("/psi", response_model=PSIResponse)
 async def run_entities_psi(req: PSIRequest, actor: str = Query("analyst")) -> PSIResponse:
     """Run simulated Private Set Intersection (PSI) protocol between two banks."""
+    if not req.bank_a_id or not req.bank_b_id:
+        raise HTTPException(status_code=400, detail="bank_a_id and bank_b_id must be provided")
     et = EntityType(req.entity_type) if req.entity_type else None
     result = _psi_service.run_psi(
         req.bank_a_id,
@@ -222,6 +224,8 @@ async def tokenize_raw_identifier(
 @router.post("/psi-match")
 async def run_dh_psi_match(bank_a_id: str, bank_b_id: str, enable_fuzzy: bool = True) -> dict:
     """Execute Privacy-Preserving DH-PSI match between two bank entities without PII exposure."""
+    if not bank_a_id or not bank_b_id:
+        raise HTTPException(status_code=400, detail="bank_a_id and bank_b_id must be provided")
     result = _psi_service.run_psi(
         bank_a_id=bank_a_id,
         bank_b_id=bank_b_id,
@@ -256,11 +260,25 @@ async def run_dh_psi_match_direct(
     src = (payload.source_bank_id if payload else None) or bank_a_id or "bank_alpha"
     tgt = (payload.target_bank_id if payload else None) or bank_b_id or "bank_beta"
     fuzzy = payload.enable_fuzzy if payload else enable_fuzzy
-    result = _psi_service.run_psi(
-        bank_a_id=src,
-        bank_b_id=tgt,
-        enable_fuzzy=fuzzy,
-    )
+
+    if not src or not tgt:
+        raise HTTPException(status_code=400, detail="source_bank_id and target_bank_id must be provided")
+
+    client_hashes = payload.client_ecdh_blinded_hashes if payload else []
+    if client_hashes:
+        result = _psi_service.run_psi_direct(
+            source_bank_id=src,
+            target_bank_id=tgt,
+            client_ecdh_blinded_hashes=client_hashes,
+            enable_fuzzy=fuzzy,
+        )
+    else:
+        result = _psi_service.run_psi(
+            bank_a_id=src,
+            bank_b_id=tgt,
+            enable_fuzzy=fuzzy,
+        )
+
     return {
         "protocol": "Commutative Diffie-Hellman (DH-PSI)",
         "matched_cardinality": len(result.get("matches", [])),

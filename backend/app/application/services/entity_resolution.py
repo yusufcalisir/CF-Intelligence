@@ -50,8 +50,10 @@ def _dict_to_entity(d: dict[str, Any]) -> Entity:
     d_copy = d.copy()
     d_copy["entity_type"] = EntityType(d_copy["entity_type"])
     d_copy["risk_level"] = RiskLevel(d_copy["risk_level"])
-    d_copy["first_seen"] = datetime.fromisoformat(d_copy["first_seen"])
-    d_copy["last_seen"] = datetime.fromisoformat(d_copy["last_seen"])
+    if isinstance(d_copy.get("first_seen"), str):
+        d_copy["first_seen"] = datetime.fromisoformat(d_copy["first_seen"])
+    if isinstance(d_copy.get("last_seen"), str):
+        d_copy["last_seen"] = datetime.fromisoformat(d_copy["last_seen"])
     return Entity(**d_copy)
 
 
