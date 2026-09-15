@@ -101,6 +101,10 @@ def compute_ks_test(u: np.ndarray, v: np.ndarray) -> tuple[float, float]:
 
 def compute_covariance_drift(X_real: np.ndarray, X_synth: np.ndarray) -> float:
     """Compute Frobenius norm distance between correlation matrices of real and synthetic features."""
+    if X_real.ndim < 2 or X_synth.ndim < 2:
+        return 0.0
+    if X_real.shape[0] < 2 or X_synth.shape[0] < 2:
+        return 0.0
     min_cols = min(X_real.shape[1], X_synth.shape[1])
     if min_cols < 2:
         return 0.0
@@ -124,6 +128,17 @@ def audit_distribution_fidelity(
     degradation_metrics: dict[str, Any] | None = None,
 ) -> DistributionFidelityReport:
     """Audit statistical fidelity between real benchmark data and synthetic generator data."""
+    if len(X_real) == 0 or len(X_synth) == 0:
+        raise ValueError("Dataset feature arrays cannot be empty.")
+    if len(y_real) != len(X_real):
+        raise ValueError(
+            f"X_real length ({len(X_real)}) does not match y_real length ({len(y_real)})."
+        )
+    if len(y_synth) != len(X_synth):
+        raise ValueError(
+            f"X_synth length ({len(X_synth)}) does not match y_synth length ({len(y_synth)})."
+        )
+
     num_features = min(X_real.shape[1], X_synth.shape[1])
     names = feature_names or [f"feature_{i}" for i in range(num_features)]
 
@@ -178,16 +193,12 @@ def audit_distribution_fidelity(
         verdict = "EXTREME_SHIFT"
 
     default_degradation = degradation_metrics or {
-        "synthetic_lab_target_auc": 0.950,
-        "measured_federated_auc": 0.835,  # 5-seed empirical mean across 3-bank consortium
-        "empirical_auc_range": [0.563, 0.952],
-        "synthetic_auc": 0.835,  # Empirical measured baseline
-        "real_world_auc": 0.812,
-        "auc_degradation_delta": -0.023,
-        "synthetic_pr_auc": 0.820,
-        "real_world_pr_auc": 0.765,
-        "pr_auc_degradation_delta": -0.055,
-        "recall_at_01_fpr_drop": -0.082,
+        "class_imbalance_delta": round(float(abs(imb_real - imb_synth)), 6),
+        "mean_wasserstein_distance": round(avg_wd, 4),
+        "mean_js_divergence": round(avg_js, 4),
+        "covariance_drift_frobenius": cov_drift,
+        "feature_count_evaluated": num_features,
+        "distribution_shift_verdict": verdict,
     }
 
     return DistributionFidelityReport(

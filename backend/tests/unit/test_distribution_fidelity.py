@@ -70,3 +70,53 @@ def test_audit_distribution_fidelity_report():
     assert 0.0 <= report.overall_fidelity_score <= 1.0
     assert len(report.feature_metrics) == 5
     assert report.summary_verdict in ("HIGH_FIDELITY", "MODERATE_SHIFT", "EXTREME_SHIFT")
+
+    # Verify dynamic empirical degradation metrics are calculated
+    deg = report.degradation_metrics
+    assert "class_imbalance_delta" in deg
+    assert "mean_wasserstein_distance" in deg
+    assert "mean_js_divergence" in deg
+    assert "covariance_drift_frobenius" in deg
+    assert "distribution_shift_verdict" in deg
+    assert deg["feature_count_evaluated"] == 5
+    assert deg["mean_wasserstein_distance"] >= 0.0
+
+
+def test_covariance_drift_edge_cases():
+    # 1D arrays
+    assert compute_covariance_drift(np.array([1.0, 2.0]), np.array([3.0, 4.0])) == 0.0
+    # Single-row matrices
+    assert compute_covariance_drift(np.zeros((1, 5)), np.zeros((1, 5))) == 0.0
+    # Single-column matrices
+    assert compute_covariance_drift(np.zeros((5, 1)), np.zeros((5, 1))) == 0.0
+
+
+def test_audit_distribution_fidelity_validations():
+    rng = np.random.default_rng(42)
+    X = rng.standard_normal((10, 2))
+    y = np.array([0, 1] * 5)
+
+    with pytest.raises(ValueError, match="Dataset feature arrays cannot be empty"):
+        audit_distribution_fidelity(
+            X_real=np.empty((0, 2)),
+            y_real=np.array([]),
+            X_synth=X,
+            y_synth=y,
+        )
+
+    with pytest.raises(ValueError, match="X_real length .* does not match y_real length"):
+        audit_distribution_fidelity(
+            X_real=X,
+            y_real=np.array([0]),
+            X_synth=X,
+            y_synth=y,
+        )
+
+    with pytest.raises(ValueError, match="X_synth length .* does not match y_synth length"):
+        audit_distribution_fidelity(
+            X_real=X,
+            y_real=y,
+            X_synth=X,
+            y_synth=np.array([0]),
+        )
+

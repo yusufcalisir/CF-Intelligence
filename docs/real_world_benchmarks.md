@@ -90,7 +90,11 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   where $K$ is the number of bank nodes ($K=3$ default) and $\alpha \in (0, \infty)$ governs heterogeneity:
   * $\alpha \to \infty$: Uniform IID distribution (unrealistic laboratory scenario).
   * $\alpha = 0.50$: Extreme Non-IID skew mirroring retail vs. commercial vs. wealth management institutions.
-* **Implementation**: [`dataloader.py: partition_dataset_non_iid()`](../backend/app/application/services/dataloader.py#L480)
+* **Implementation**: [`fl_dirichlet_partitioner.py: DirichletPartitioner`](../backend/app/application/services/fl_dirichlet_partitioner.py) & [`dataloader.py: partition_dataset_non_iid()`](../backend/app/application/services/dataloader.py#L480)
+* **Statistical Verification (`compute_partition_stats`)**:
+  - Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c |P_i(c) - P_{\text{global}}(c)| \in [0, 1]$).
+  - Shannon Label Entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$).
+  - Boundary Donor Rebalancing: Strictly guarantees $|D_i| \ge \text{min\_size}$ without distorting natural Dirichlet concentration.
 
 ---
 
