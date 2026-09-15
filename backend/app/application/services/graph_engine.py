@@ -1071,7 +1071,7 @@ class GraphEngine:
                 return [{"type": k, "count": v} for k, v in counts.items()]
 
             if "MATCH (N:ENTITY)" in upper_q and "RETURN N" in upper_q:
-                return [{"n": _dict_to_entity(v).model_dump()} for v in self._entities.list_values()]
+                return [{"n": _entity_to_dict(_dict_to_entity(v))} for v in self._entities.list_values()]
 
             return []
 

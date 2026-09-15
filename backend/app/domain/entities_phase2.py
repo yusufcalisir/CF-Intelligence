@@ -10,6 +10,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from typing import Any
 
 from app.domain.enums import (
     AlertSeverity,
@@ -149,7 +150,7 @@ class Relationship:
     target_entity_id: str = ""
     relationship_type: RelationshipType = RelationshipType.OWNS
     confidence: float = 1.0
-    evidence: list[str] = field(default_factory=list)  # Alert IDs, transaction hashes
+    evidence: list[str] | dict[str, Any] = field(default_factory=list)  # Alert IDs, transaction hashes, or metadata dict
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 

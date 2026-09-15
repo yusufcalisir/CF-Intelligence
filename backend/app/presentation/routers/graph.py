@@ -410,7 +410,7 @@ async def execute_cypher_query(req: CypherQueryRequest) -> CypherQueryResponse:
     try:
         results = _graph_engine.execute_cypher(
             query=req.query,
-            params=req.parameters,
+            params=req.query_parameters,
             read_only=req.read_only,
         )
         elapsed_ms = (time.perf_counter() - start_t) * 1000.0
@@ -418,6 +418,7 @@ async def execute_cypher_query(req: CypherQueryRequest) -> CypherQueryResponse:
             success=True,
             database_backend=_graph_engine.db_type.capitalize(),
             row_count=len(results),
+            count=len(results),
             execution_time_ms=round(elapsed_ms, 2),
             results=results,
         )

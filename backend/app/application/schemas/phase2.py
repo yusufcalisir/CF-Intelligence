@@ -625,13 +625,21 @@ class SmurfingDetectionResponse(BaseModel):
 class CypherQueryRequest(BaseModel):
     query: str = Field(..., min_length=3, max_length=2048, description="Cypher query string to execute")
     params: dict[str, Any] = Field(default_factory=dict, description="Query parameters dictionary")
+    parameters: dict[str, Any] = Field(default_factory=dict, description="Alias for query parameters")
     read_only: bool = Field(True, description="Strictly forbid mutation clauses (MERGE, CREATE, DELETE, SET, etc.)")
+
+    @property
+    def query_parameters(self) -> dict[str, Any]:
+        return self.parameters or self.params or {}
 
 
 class CypherQueryResponse(BaseModel):
     results: list[dict[str, Any]]
-    count: int
-    database_backend: str
+    count: int = 0
+    database_backend: str = "In-memory"
+    success: bool = True
+    row_count: int = 0
+    execution_time_ms: float = 0.0
 
 
 class GNNInferEmbeddingRequest(BaseModel):
