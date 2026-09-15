@@ -17,6 +17,7 @@ This service integrates with the existing FL pipeline:
 from __future__ import annotations
 
 import logging
+import threading
 from collections import defaultdict
 from typing import TYPE_CHECKING, Any
 
@@ -61,6 +62,8 @@ class GraphEmbeddingService:
         self.hidden_dim = hidden_dim
         self.num_layers = num_layers
         self.neighbor_sample_size = neighbor_sample_size
+
+        self._lock = threading.RLock()
 
         # Model (lazily initialized per training session)
         self._model: GraphSAGEModel | None = None
@@ -280,22 +283,153 @@ class GraphEmbeddingService:
 
     def get_model_weights(self) -> ModelWeights | None:
         """Get current model weights for federated aggregation."""
-        if self._model is None:
-            return None
-        return self._model.to_model_weights()
+        with self._lock:
+            if self._model is None:
+                return None
+            return self._model.to_model_weights()
 
     def load_global_weights(self, weights: ModelWeights) -> None:
         """Load aggregated global weights from the coordinator."""
-        model = self._get_or_create_model()
-        model.load_model_weights(weights)
-        logger.info("Loaded global GNN weights (%d parameters)", weights.num_parameters)
+        with self._lock:
+            model = self._get_or_create_model()
+            model.load_model_weights(weights)
+            logger.info("Loaded global GNN weights (%d parameters)", weights.num_parameters)
 
-    def get_embedding(self, entity_id: str) -> np.ndarray | None:
-        """Get the cached embedding vector for a specific entity.
+    def infer_node_embedding(
+        self,
+        entity_id: str,
+        depth: int = 2,
+        allow_cache: bool = True,
+        dp_noise: bool = False,
+        noise_scale: float = 0.05,
+    ) -> np.ndarray | None:
+        """Inductively infer an embedding for an unseen or dynamic node.
 
-        Returns None if the entity hasn't been embedded yet.
+        Computes the embedding using the trained GraphSAGE model over the entity's
+        local K-hop neighborhood without requiring full graph retraining.
         """
-        return self._embeddings.get(entity_id)
+        with self._lock:
+            # 1. Return cached if allowed and present
+            if allow_cache and entity_id in self._embeddings:
+                emb = self._embeddings[entity_id]
+                if dp_noise and noise_scale > 0.0:
+                    rng = np.random.default_rng()
+                    noise = rng.normal(0.0, noise_scale, size=emb.shape)
+                    noised = emb + noise
+                    norm = np.linalg.norm(noised)
+                    return (noised / norm).astype(np.float32) if norm > 1e-8 else noised.astype(np.float32)
+                return emb
+
+            # 2. Fetch entity from graph engine
+            raw_target = self.graph_engine._entities.get(entity_id)
+            if not raw_target:
+                return None
+
+            # 3. Retrieve local neighbors up to depth (default 2 hops)
+            neighbors = self.graph_engine.find_neighbors(entity_id, depth=depth)
+
+            # Subgraph entities: target entity + neighbors
+            all_subgraph_entities = [raw_target]
+            seen_ids = {entity_id}
+            for n in neighbors:
+                if n.id not in seen_ids:
+                    seen_ids.add(n.id)
+                    n_val = self.graph_engine._entities.get(n.id)
+                    if n_val:
+                        all_subgraph_entities.append(n_val)
+
+            # Node ID to local index mapping
+            sub_id_to_idx = {e["id"]: idx for idx, e in enumerate(all_subgraph_entities)}
+            target_idx = sub_id_to_idx[entity_id]
+
+            # Build local adjacency
+            sub_adj: list[list[int]] = [[] for _ in range(len(all_subgraph_entities))]
+            degree_counts: dict[int, int] = defaultdict(int)
+
+            raw_rels = self.graph_engine._relationships.list_values()
+            for r in raw_rels:
+                u = r.get("source_entity_id", "")
+                v = r.get("target_entity_id", "")
+                if u in sub_id_to_idx and v in sub_id_to_idx:
+                    u_idx = sub_id_to_idx[u]
+                    v_idx = sub_id_to_idx[v]
+                    sub_adj[u_idx].append(v_idx)
+                    sub_adj[v_idx].append(u_idx)
+                    degree_counts[u_idx] += 1
+                    degree_counts[v_idx] += 1
+
+            # Extract features
+            features = np.zeros((len(all_subgraph_entities), NODE_FEATURE_DIM), dtype=np.float32)
+            for idx, e in enumerate(all_subgraph_entities):
+                deg = degree_counts.get(idx, 0)
+                features[idx] = extract_node_features(e, degree=deg)
+
+            features_tensor = torch.tensor(features, dtype=torch.float32)
+
+            # Run GNN model in evaluation mode
+            model = self._get_or_create_model()
+            model.eval()
+            with torch.no_grad():
+                sub_embeddings = model.get_embeddings(
+                    features_tensor, sub_adj, num_sample=self.neighbor_sample_size
+                )
+                node_emb = sub_embeddings[target_idx].cpu().numpy().astype(np.float32)
+
+            # Cache the computed embedding
+            self._embeddings[entity_id] = node_emb
+
+            if dp_noise and noise_scale > 0.0:
+                rng = np.random.default_rng()
+                noise = rng.normal(0.0, noise_scale, size=node_emb.shape)
+                noised = node_emb + noise
+                norm = np.linalg.norm(noised)
+                return (noised / norm).astype(np.float32) if norm > 1e-8 else noised.astype(np.float32)
+
+            return node_emb
+
+    def get_embedding(
+        self,
+        entity_id: str,
+        allow_inductive: bool = False,
+        dp_noise: bool = False,
+        noise_scale: float = 0.05,
+    ) -> np.ndarray | None:
+        """Get the cached or inductively inferred embedding vector for a specific entity.
+
+        Returns None if the entity has not been embedded and allow_inductive=False.
+        """
+        with self._lock:
+            if entity_id in self._embeddings:
+                emb = self._embeddings[entity_id]
+                if dp_noise and noise_scale > 0.0:
+                    rng = np.random.default_rng()
+                    noise = rng.normal(0.0, noise_scale, size=emb.shape)
+                    noised = emb + noise
+                    norm = np.linalg.norm(noised)
+                    return (noised / norm).astype(np.float32) if norm > 1e-8 else noised.astype(np.float32)
+                return emb
+
+            if allow_inductive:
+                return self.infer_node_embedding(
+                    entity_id, dp_noise=dp_noise, noise_scale=noise_scale
+                )
+
+            return None
+
+    def get_query_count(self, entity_id: str) -> int:
+        """Get number of similarity queries issued for an entity."""
+        with self._lock:
+            return self._query_counts.get(entity_id, 0)
+
+    def is_budget_exhausted(self, entity_id: str) -> bool:
+        """Check whether the similarity query budget is exhausted."""
+        with self._lock:
+            return self._query_counts.get(entity_id, 0) >= self.max_query_budget
+
+    def reset_query_budgets(self) -> None:
+        """Reset all query rate limiting counters."""
+        with self._lock:
+            self._query_counts.clear()
 
     def find_similar_entities(
         self,
@@ -316,43 +450,44 @@ class GraphEmbeddingService:
         Returns:
             List of dicts with entity_id, similarity score, and metadata.
         """
-        if self._query_counts[query_entity_id] >= self.max_query_budget:
-            logger.warning("Query budget exhausted for entity_id=%s", query_entity_id)
-            return []
+        with self._lock:
+            if self._query_counts[query_entity_id] >= self.max_query_budget:
+                logger.warning("Query budget exhausted for entity_id=%s", query_entity_id)
+                return []
 
-        self._query_counts[query_entity_id] += 1
+            self._query_counts[query_entity_id] += 1
 
-        query_emb = self._embeddings.get(query_entity_id)
-        if query_emb is None:
-            return []
+            query_emb = self._embeddings.get(query_entity_id)
+            if query_emb is None:
+                return []
 
-        results: list[dict[str, Any]] = []
-        query_norm = np.linalg.norm(query_emb)
-        if query_norm == 0:
-            return []
+            results: list[dict[str, Any]] = []
+            query_norm = np.linalg.norm(query_emb)
+            if query_norm == 0:
+                return []
 
-        for entity_id, emb in self._embeddings.items():
-            if entity_id == query_entity_id:
-                continue
+            for entity_id, emb in self._embeddings.items():
+                if entity_id == query_entity_id:
+                    continue
 
-            emb_norm = np.linalg.norm(emb)
-            if emb_norm == 0:
-                continue
+                emb_norm = np.linalg.norm(emb)
+                if emb_norm == 0:
+                    continue
 
-            similarity = float(np.dot(query_emb, emb) / (query_norm * emb_norm))
+                similarity = float(np.dot(query_emb, emb) / (query_norm * emb_norm))
 
-            if similarity >= threshold:
-                results.append(
-                    {
-                        "entity_id": entity_id,
-                        "similarity": round(similarity, 4),
-                    }
-                )
+                if similarity >= threshold:
+                    results.append(
+                        {
+                            "entity_id": entity_id,
+                            "similarity": round(similarity, 4),
+                        }
+                    )
 
-        # Sort by similarity descending
-        results.sort(key=lambda x: float(x["similarity"]), reverse=True)
+            # Sort by similarity descending
+            results.sort(key=lambda x: float(x["similarity"]), reverse=True)
 
-        return results[:top_k]
+            return results[:top_k]
 
     def get_all_embeddings(
         self, noise_scale: float = 0.05, dp_noise: bool = True
@@ -384,72 +519,75 @@ class GraphEmbeddingService:
                 "enables graph topology reconstruction attacks."
             )
 
-        out: dict[str, list[float]] = {}
-        for entity_id, emb in self._embeddings.items():
-            if dp_noise and noise_scale > 0.0:
-                rng = np.random.default_rng()
-                noise = rng.normal(0.0, noise_scale, size=emb.shape)
-                noised_emb = emb + noise
-                norm = np.linalg.norm(noised_emb)
-                if norm > 1e-8:
-                    noised_emb = noised_emb / norm
-                out[entity_id] = noised_emb.tolist()
-            else:
-                out[entity_id] = emb.tolist()
-        return out
+        with self._lock:
+            out: dict[str, list[float]] = {}
+            for entity_id, emb in self._embeddings.items():
+                if dp_noise and noise_scale > 0.0:
+                    rng = np.random.default_rng()
+                    noise = rng.normal(0.0, noise_scale, size=emb.shape)
+                    noised_emb = emb + noise
+                    norm = np.linalg.norm(noised_emb)
+                    if norm > 1e-8:
+                        noised_emb = noised_emb / norm
+                    out[entity_id] = noised_emb.tolist()
+                else:
+                    out[entity_id] = emb.tolist()
+            return out
 
     def get_embedding_stats(self) -> dict[str, Any]:
         """Get summary statistics about the embedding space."""
-        if not self._embeddings:
+        with self._lock:
+            if not self._embeddings:
+                return {
+                    "num_embedded_nodes": 0,
+                    "embedding_dim": self.embedding_dim,
+                    "model_parameters": 0,
+                }
+
+            all_embs = np.array(list(self._embeddings.values()))
+
+            # Compute pairwise cosine similarities for distribution stats
+            norms = np.linalg.norm(all_embs, axis=1, keepdims=True)
+            norms = np.maximum(norms, 1e-8)  # Avoid division by zero
+            normalized = all_embs / norms
+
+            # Sample pairwise similarities (full matrix too expensive for large graphs)
+            n = len(normalized)
+            if n > 100:
+                # Random sample of 100 pairs
+                rng = np.random.default_rng(42)
+                idx_a = rng.choice(n, size=100, replace=True)
+                idx_b = rng.choice(n, size=100, replace=True)
+                similarities = np.array(
+                    [
+                        float(np.dot(normalized[a], normalized[b]))
+                        for a, b in zip(idx_a, idx_b)
+                        if a != b
+                    ]
+                )
+            else:
+                sim_matrix = normalized @ normalized.T
+                np.fill_diagonal(sim_matrix, 0)
+                similarities = sim_matrix[np.triu_indices(n, k=1)]
+
+            model = self._get_or_create_model()
+            num_params = sum(p.numel() for p in model.parameters())
+
             return {
-                "num_embedded_nodes": 0,
+                "num_embedded_nodes": len(self._embeddings),
                 "embedding_dim": self.embedding_dim,
-                "model_parameters": 0,
+                "model_parameters": num_params,
+                "mean_similarity": round(float(np.mean(similarities)), 4)
+                if len(similarities) > 0
+                else 0.0,
+                "std_similarity": round(float(np.std(similarities)), 4)
+                if len(similarities) > 0
+                else 0.0,
+                "max_similarity": round(float(np.max(similarities)), 4)
+                if len(similarities) > 0
+                else 0.0,
+                "min_similarity": round(float(np.min(similarities)), 4)
+                if len(similarities) > 0
+                else 0.0,
             }
 
-        all_embs = np.array(list(self._embeddings.values()))
-
-        # Compute pairwise cosine similarities for distribution stats
-        norms = np.linalg.norm(all_embs, axis=1, keepdims=True)
-        norms = np.maximum(norms, 1e-8)  # Avoid division by zero
-        normalized = all_embs / norms
-
-        # Sample pairwise similarities (full matrix too expensive for large graphs)
-        n = len(normalized)
-        if n > 100:
-            # Random sample of 100 pairs
-            rng = np.random.default_rng(42)
-            idx_a = rng.choice(n, size=100, replace=True)
-            idx_b = rng.choice(n, size=100, replace=True)
-            similarities = np.array(
-                [
-                    float(np.dot(normalized[a], normalized[b]))
-                    for a, b in zip(idx_a, idx_b)
-                    if a != b
-                ]
-            )
-        else:
-            sim_matrix = normalized @ normalized.T
-            np.fill_diagonal(sim_matrix, 0)
-            similarities = sim_matrix[np.triu_indices(n, k=1)]
-
-        model = self._get_or_create_model()
-        num_params = sum(p.numel() for p in model.parameters())
-
-        return {
-            "num_embedded_nodes": len(self._embeddings),
-            "embedding_dim": self.embedding_dim,
-            "model_parameters": num_params,
-            "mean_similarity": round(float(np.mean(similarities)), 4)
-            if len(similarities) > 0
-            else 0.0,
-            "std_similarity": round(float(np.std(similarities)), 4)
-            if len(similarities) > 0
-            else 0.0,
-            "max_similarity": round(float(np.max(similarities)), 4)
-            if len(similarities) > 0
-            else 0.0,
-            "min_similarity": round(float(np.min(similarities)), 4)
-            if len(similarities) > 0
-            else 0.0,
-        }

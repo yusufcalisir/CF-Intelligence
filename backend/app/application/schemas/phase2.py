@@ -634,6 +634,20 @@ class CypherQueryResponse(BaseModel):
     database_backend: str
 
 
+class GNNInferEmbeddingRequest(BaseModel):
+    entity_id: str = Field(..., description="Target entity ID to inductively embed")
+    allow_unseen: bool = Field(True, description="Whether to infer for unseen nodes")
+    dp_noise: bool = Field(False, description="Whether to inject calibrated DP noise")
+
+
+class GNNInferEmbeddingResponse(BaseModel):
+    entity_id: str
+    embedding: list[float]
+    dimension: int
+    is_inductive: bool
+
+
+
 # ── Evidence & Audit ──────────────────────────
 
 _EVIDENCE_TYPES = Literal[

@@ -323,12 +323,29 @@ class GraphSAGEModel(nn.Module):
 
     def load_model_weights(self, weights: ModelWeights, include_classifier: bool = False) -> None:
         """Load federated model weights back into the model."""
+        params = list(self.parameters() if include_classifier else self.sage_layers.parameters())
+        if len(params) != len(weights.layer_shapes):
+            raise ValueError(
+                f"Model weights layer count mismatch: expected {len(params)} layers, "
+                f"got {len(weights.layer_shapes)}"
+            )
+
         offset = 0
-        params = self.parameters() if include_classifier else self.sage_layers.parameters()
-        for param, shape in zip(params, weights.layer_shapes, strict=False):
+        for param, shape in zip(params, weights.layer_shapes, strict=True):
+            if tuple(param.shape) != tuple(shape):
+                raise ValueError(
+                    f"Model weights layer shape mismatch: expected {tuple(param.shape)}, "
+                    f"got {tuple(shape)}"
+                )
             numel = 1
             for s in shape:
                 numel *= s
+            if offset + numel > len(weights.flat_weights):
+                raise ValueError(
+                    f"Model weights truncated: expected at least {offset + numel} elements, "
+                    f"got {len(weights.flat_weights)}"
+                )
             param_data = weights.flat_weights[offset : offset + numel]
             param.data = torch.tensor(param_data, dtype=torch.float32).reshape(shape)
             offset += numel
+

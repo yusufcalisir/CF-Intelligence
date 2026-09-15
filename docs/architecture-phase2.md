@@ -855,11 +855,12 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_privacy_service.py](../backend/tests/unit/test_privacy_service.py) | `privacy_service` | Multi-simulation $\epsilon$ log tracking, threshold exhaustion alerts | 15 | ✅ 100% Pass |
 | [test_graph_analytics.py](../backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service` | PageRank risk propagation with decay ($\gamma = 0.85$), community density, velocity | 3 | ✅ 100% Pass |
 | [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service` | 12-dim node feature extraction, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
+| [test_graph_embedding_hardening.py](../backend/tests/unit/test_graph_embedding_hardening.py) | `graph_embedding_service` | Inductive inference on unseen nodes, DP noise injection, weight shape validation, similarity query budget & thread safety | 10 | ✅ 100% Pass |
 | [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine` | Neo4j Bolt driver init, Cypher entity/relationship merges, Redis fallback | 8 | ✅ 100% Pass |
 | [test_graph_analytics_hardening.py](../backend/tests/unit/test_graph_analytics_hardening.py) | `graph_engine` | Cyclic mule rings ($L \in [3, 7]$), canonical deduplication, smurfing, safe Cypher, thread locks | 10 | ✅ 100% Pass |
 | [test_flink_graph_streaming.py](../backend/tests/unit/test_flink_graph_streaming.py) | `flink_graph_streaming` | High-velocity streaming edge sliding windows, anomaly triggers | 3 | ✅ 100% Pass |
 | [test_advanced_explainability.py](../backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **15 Dedicated Suites** | **Collaborative AML Platform Architecture** | **126 Tests** | **100% Pass** |
+| **Total Verified** | **16 Dedicated Suites** | **Collaborative AML Platform Architecture** | **136 Tests** | **100% Pass** |
 

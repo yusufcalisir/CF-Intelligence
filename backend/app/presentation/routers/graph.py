@@ -11,6 +11,8 @@ from app.application.schemas.phase2 import (
     CommunityAnalyticsResponse,
     CypherQueryRequest,
     CypherQueryResponse,
+    GNNInferEmbeddingRequest,
+    GNNInferEmbeddingResponse,
     GraphResponse,
     GraphStatsResponse,
     MuleRingDetectionResponse,
@@ -224,6 +226,30 @@ async def get_entity_embedding(entity_id: str) -> dict:
     }
 
 
+@router.post("/embeddings/infer", response_model=GNNInferEmbeddingResponse)
+async def infer_entity_embedding(req: GNNInferEmbeddingRequest) -> GNNInferEmbeddingResponse:
+    """Inductively infer node embedding for seen or unseen entities."""
+    cached = _graph_embedding_service.get_embedding(req.entity_id, allow_inductive=False)
+    is_inductive = cached is None
+
+    embedding = _graph_embedding_service.infer_node_embedding(
+        entity_id=req.entity_id,
+        allow_cache=not is_inductive,
+        dp_noise=req.dp_noise,
+    )
+    if embedding is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Entity '{req.entity_id}' not found in graph engine for inductive embedding.",
+        )
+    return GNNInferEmbeddingResponse(
+        entity_id=req.entity_id,
+        embedding=embedding.tolist(),
+        dimension=len(embedding),
+        is_inductive=is_inductive,
+    )
+
+
 @router.post("/embeddings/similar")
 async def find_similar_entities(req: GNNSimilarityRequest) -> dict:
     """Find structurally similar entities via embedding cosine similarity.
@@ -238,8 +264,7 @@ async def find_similar_entities(req: GNNSimilarityRequest) -> dict:
         threshold=req.threshold,
     )
     # Budget exhaustion: service returns [] when per-entity query limit is reached
-    query_count = _graph_embedding_service._query_counts.get(req.entity_id, 0)
-    if not results and query_count >= _graph_embedding_service.max_query_budget:
+    if not results and _graph_embedding_service.is_budget_exhausted(req.entity_id):
         raise HTTPException(
             status_code=429,
             detail=(
