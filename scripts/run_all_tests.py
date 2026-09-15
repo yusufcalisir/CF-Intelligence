@@ -1,11 +1,11 @@
 """Master Unified Test Runner for CF-Intelligence.
 
 Executes all test suites across the repository:
-1. Frontend Suite (Vitest: 57 test files, 125 integration/view/component/E2E tests)
-2. Frontend Visual Regression Suite (Playwright: 36 visual snapshot tests across 4 viewports)
-3. Backend Suite (Pytest: 1105+ unit, integration, chaos, and property-based tests)
-4. Scientific Verification Suite (Pytest + Reference audits across all 17 modules)
-5. EVM Smart Contracts Suite (Hardhat: Shapley token settlements)
+1. Frontend Suite (Vitest: 79 test files, 257 integration/view/component/E2E tests)
+2. Frontend Visual & A11y Suite (Playwright: 72 tests across viewports, responsive & axe-core)
+3. Backend Suite (Pytest: 1246 unit, integration, chaos, and property-based tests)
+4. Scientific Verification Suite (Pytest: 307 tests across all 17 modules)
+5. EVM Smart Contracts Suite (Hardhat: 13 tests for Shapley token settlements)
 
 Usage:
     python scripts/run_all_tests.py              # Run frontend + backend + verification

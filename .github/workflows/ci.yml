@@ -62,7 +62,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 1201 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 1246 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -89,7 +89,7 @@ jobs:
   # 3. Frontend Unit, View & Component Test Suite
   # --------------------------------------------------------------------------
   frontend-unit-and-integration:
-    name: 3. Frontend Unit & Component Test Suite (Vitest 249 Tests)
+    name: 3. Frontend Unit & Component Test Suite (Vitest 257 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -304,7 +304,7 @@ jobs:
   # 10. Subsystem Scientific Verification & Reference Audits
   # --------------------------------------------------------------------------
   scientific-verification-audit:
-    name: 10. Scientific Verification Audit Suite (17 Math & Privacy Modules)
+    name: 10. Scientific Verification Audit Suite (307 Tests across 17 Math & Privacy Modules)
     runs-on: ubuntu-latest
     needs: backend-unit-and-integration
     steps:
@@ -337,7 +337,7 @@ jobs:
   # 11. EVM Smart Contracts Test Suite
   # --------------------------------------------------------------------------
   smart-contracts-suite:
-    name: 11. EVM Smart Contracts Test Suite (Hardhat Shapley Settlement)
+    name: 11. EVM Smart Contracts Test Suite (Hardhat 13 Tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
