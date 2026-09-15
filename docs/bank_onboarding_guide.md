@@ -319,23 +319,28 @@ All onboarding endpoints are served under prefix `/api/v1/onboarding` in [`backe
 | Method | Endpoint | Request Body | Response Schema | Description |
 |:---|:---|:---|:---|:---|
 | `POST` | `/register` | `BankRegisterRequest` | `BankOnboardingBundleResponse` | Execute automated 6-step onboarding pipeline (status 201 Created). Returns mTLS certs, key, fingerprint, and YAML config. |
+| `GET` | `/bundle/{bank_id}` | None | `BankOnboardingBundleResponse` | Retrieve existing configuration bundle and credentials for a registered bank node. |
 | `GET` | `/banks` | None | `list[BankStatusResponse]` | List all registered bank nodes with jurisdiction, status, cert fingerprint, and vault key path. |
-| `GET` | `/banks/{bank_id}/status` | None | `BankStatusResponse` | Retrieve detailed status for a specific bank node. |
+| `GET` | `/banks/{bank_id}/status` | None | `BankStatusResponse` | Retrieve detailed status for a specific bank node (returns 404 NOT FOUND if not found). |
+| `POST` | `/banks/{bank_id}/sign-csr` | `BankCSRSignRequest` | `BankCSRSignResponse` | Cryptographically verify and sign an institutional X.509 CSR via the PKI wizard without server-side key generation. |
+| `POST` | `/banks/{bank_id}/verify` | None | `BankStatusResponse` | Complete institutional compliance verification. |
+| `POST` | `/banks/{bank_id}/activate` | None | `BankStatusResponse` | Activate an onboarded bank node. |
+| `POST` | `/banks/{bank_id}/suspend` | None | `BankStatusResponse` | Suspend an active bank node. |
 | `POST` | `/banks/{bank_id}/rotate-cert` | None | `CertRotationResponse` | Rotate mTLS certificate and private key for an active bank node. |
 
 ---
 
 ## 🧪 Automated Unit Test Suite Matrix
 
-The bank onboarding pipeline and security invariants are verified by the automated unit test suite in [`backend/tests/unit/test_bank_onboarding.py`](../backend/tests/unit/test_bank_onboarding.py).
+The bank onboarding pipeline, CSR signing PKI wizard, and zero-mock presentation contracts are verified by the automated unit test suites in [`backend/tests/unit/test_bank_onboarding.py`](../backend/tests/unit/test_bank_onboarding.py) and [`backend/tests/unit/test_bank_onboarding_hardening.py`](../backend/tests/unit/test_bank_onboarding_hardening.py).
 
 ### Test Execution Command
 
 ```bash
-pytest backend/tests/unit/test_bank_onboarding.py -v
+pytest backend/tests/unit/test_bank_onboarding.py backend/tests/unit/test_bank_onboarding_hardening.py -v
 ```
 
-### Verified Test Results (8 Passed in 7.15s)
+### Verified Test Results (17 Passed in 26.4s)
 
 | Test Function | Target Component / Layer | Assertion / Behavior Verified | Status |
 |:---|:---|:---|:---:|
@@ -347,6 +352,15 @@ pytest backend/tests/unit/test_bank_onboarding.py -v
 | `test_duplicate_bank_id_rejected` | Service Validation | Attempting to register an already existing `bank_id` raises `BankAlreadyExistsError`. | `PASSED` |
 | `test_connector_config_contains_required_fields` | Configuration Generator | Renders valid YAML string containing `bank_id`, `coordinator_url`, `cert_path`, and `key_path`. | `PASSED` |
 | `test_onboarding_endpoint_returns_bundle` | FastAPI Presentation Router | `POST /api/v1/onboarding/register` returns 201 Created with bundle; duplicate returns 409; `/banks` and `/banks/{id}/status` return 200 OK. | `PASSED` |
+| `test_csr_cryptographic_signing_success` | CSR PKI Wizard | Cryptographically verifies and signs valid institutional X.509 CSR with RSA keypair; binds fingerprint. | `PASSED` |
+| `test_csr_invalid_pem_rejected` | PKI Input Validation | Malformed or invalid CSR PEM strings raise `InvalidCSRError`. | `PASSED` |
+| `test_csr_tampered_signature_rejected` | Cryptographic Invariants | CSRs with tampered/altered signatures fail cryptographic signature verification and raise `InvalidCSRError`. | `PASSED` |
+| `test_operations_on_nonexistent_bank_fail_fast` | Fail-Fast Architecture | Mutations on non-existent bank IDs immediately raise `BankNotFoundError`. | `PASSED` |
+| `test_multi_step_lifecycle_state_machine` | Lifecycle State Machine | Full progression through PENDING $\to$ VERIFIED $\to$ ACTIVE $\to$ SUSPENDED $\to$ OFFBOARDED; blocks activating offboarded nodes. | `PASSED` |
+| `test_bank_id_sanitization_and_validation` | Injection & Path Traversal | Strict regex enforcement blocks path traversal (`../../etc/passwd`) and SQL injection. | `PASSED` |
+| `test_router_zero_mock_empty_list_and_404` | Zero-Mock Enforcement | Empty database returns `[]` (not mock banks); non-existent bank status returns HTTP 404 NOT FOUND. | `PASSED` |
+| `test_router_pki_wizard_csr_signing_endpoint` | PKI Wizard REST Endpoint | `POST /banks/{id}/sign-csr` validates, signs, and registers authentic institutional certificates. | `PASSED` |
+| `test_router_bundle_and_lifecycle_endpoints` | Presentation Lifecycle | `GET /bundle/{id}`, `POST /verify`, `POST /suspend`, `POST /activate` operational without mock fallbacks. | `PASSED` |
 
 ---
 
