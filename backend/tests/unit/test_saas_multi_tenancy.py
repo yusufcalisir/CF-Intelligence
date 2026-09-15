@@ -55,7 +55,9 @@ async def test_tenant_provisioner_automated_schema_creation() -> None:
 
     # Test suspension & deletion
     await provisioner.suspend_tenant("bank_omega")
-    assert registry.get_tenant("bank_omega").status == TenantStatus.SUSPENDED
+    suspended_tenant = registry.get_tenant("bank_omega")
+    assert suspended_tenant is not None
+    assert suspended_tenant.status == TenantStatus.SUSPENDED
 
     deleted = await provisioner.delete_tenant("bank_omega", purge_database=True)
     assert deleted is True

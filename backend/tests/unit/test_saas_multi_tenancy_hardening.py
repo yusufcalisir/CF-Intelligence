@@ -281,9 +281,13 @@ async def test_tenant_provisioner_facade_and_lifecycle() -> None:
 
     # Suspend tenant
     await provisioner.suspend_tenant("bank_theta_01")
-    assert registry.get_tenant("bank_theta_01").status == TenantStatus.SUSPENDED
+    suspended_record = registry.get_tenant("bank_theta_01")
+    assert suspended_record is not None
+    assert suspended_record.status == TenantStatus.SUSPENDED
 
     # Delete tenant
     deleted = await provisioner.delete_tenant("bank_theta_01", purge_database=True)
     assert deleted is True
-    assert registry.get_tenant("bank_theta_01").status == TenantStatus.DELETED
+    deleted_record = registry.get_tenant("bank_theta_01")
+    assert deleted_record is not None
+    assert deleted_record.status == TenantStatus.DELETED
