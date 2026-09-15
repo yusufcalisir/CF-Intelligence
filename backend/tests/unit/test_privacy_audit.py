@@ -156,6 +156,37 @@ class TestPrivacyAuditService:
         assert result["dlg_leakage_score"] >= 0.99
         assert result["risk_tier"] == "high_risk"
 
+    def test_audit_link_reconstruction_single_node(
+        self, audit_service: PrivacyAuditService
+    ) -> None:
+        """Single node graph should return safe tier due to insufficient structure."""
+        result = audit_service.audit_link_reconstruction(
+            embeddings={"node_0": np.array([1.0, 0.0])},
+            adjacency_lists=[[]],
+            node_id_to_index={"node_0": 0},
+        )
+        assert result["link_leakage_auc"] == 0.5
+        assert result["risk_tier"] == "safe"
+
+    def test_audit_model_inversion_negative_norms_raises_error(
+        self, audit_service: PrivacyAuditService
+    ) -> None:
+        """Negative gradient norms should raise ValueError."""
+        with pytest.raises(ValueError, match="Gradient norms must be non-negative"):
+            audit_service.audit_model_inversion(gradient_norms=[1.0, -2.0, 3.0])
+
+    def test_audit_dlg_single_element_gradients(
+        self, audit_service: PrivacyAuditService
+    ) -> None:
+        """Length < 2 gradient vectors should return safe tier with explanatory message."""
+        result = audit_service.audit_gradient_leakage_dlg(
+            original_gradients=[1.0],
+            received_gradients=[1.0],
+        )
+        assert result["dlg_leakage_score"] == 0.0
+        assert result["risk_tier"] == "safe"
+        assert "min 2 elements required" in result["message"]
+
 
 class TestPrivacyServiceBudgetLog:
     """Tests for multi-simulation privacy budget summary (get_all_budgets_summary)."""

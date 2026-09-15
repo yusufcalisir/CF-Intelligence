@@ -10,10 +10,11 @@ import hashlib
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query, status
 from pydantic import BaseModel
 
 from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
+from app.application.services.privacy_service import PrivacyBudgetExceededError
 from app.config import get_settings
 from app.domain.value_objects_pqc import PQCKemAlgorithm, PQCSignatureAlgorithm
 from app.domain.value_objects_unlearning import UnlearningMethod
@@ -511,22 +512,42 @@ class CalibrateRDPRequest(BaseModel):
     total_samples: int = 10_000
     target_epsilon: float = 4.0
     total_rounds: int = 50
+    node_id: str = "global"
+    enforce_budget_limit: bool = False
 
 
 @router.post("/rdp/calibrate")
 async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> dict[str, Any]:
     """Dynamically calibrate per-round noise multiplier sigma_t using Rényi DP and loss velocity."""
-    cal = _rdp_autoscaler.auto_scale_noise_multiplier(
-        round_id=req.round_id,
-        current_loss=req.current_loss,
-        prev_loss=req.prev_loss,
-        batch_size=req.batch_size,
-        total_samples=req.total_samples,
-        total_rounds=req.total_rounds,
+    try:
+        cal = _rdp_autoscaler.auto_scale_noise_multiplier(
+            round_id=req.round_id,
+            current_loss=req.current_loss,
+            prev_loss=req.prev_loss,
+            batch_size=req.batch_size,
+            total_samples=req.total_samples,
+            total_rounds=req.total_rounds,
+            node_id=req.node_id,
+            enforce_budget_limit=req.enforce_budget_limit,
+            target_epsilon=req.target_epsilon,
+        )
+    except PrivacyBudgetExceededError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=str(e),
+        ) from e
+
+    state = _rdp_autoscaler.get_accountant_state(
+        node_id=req.node_id, target_epsilon=req.target_epsilon
     )
-    state = _rdp_autoscaler.get_accountant_state()
     return {
         "round_id": cal.round_id,
+        "node_id": cal.node_id,
         "calibrated_sigma": cal.calibrated_sigma,
         "gradient_clip_c": cal.gradient_clip_c,
         "instantaneous_epsilon": cal.instantaneous_epsilon,
@@ -541,10 +562,11 @@ async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> dict[str, Any]:
 
 
 @router.get("/rdp/status")
-async def get_rdp_status() -> dict[str, Any]:
+async def get_rdp_status(node_id: str = Query("global", description="Bank node identifier")) -> dict[str, Any]:
     """Get real-time telemetry and budget projection for the adaptive DP auto-scaler."""
-    telemetry = _rdp_autoscaler.get_telemetry()
+    telemetry = _rdp_autoscaler.get_telemetry(node_id=node_id)
     return {
+        "node_id": telemetry.node_id,
         "active_sigma": telemetry.active_sigma,
         "active_clip_norm": telemetry.active_clip_norm,
         "cumulative_epsilon": telemetry.cumulative_epsilon,
@@ -554,4 +576,6 @@ async def get_rdp_status() -> dict[str, Any]:
         "snr_signal_to_noise": telemetry.snr_signal_to_noise,
         "risk_tier": telemetry.risk_tier,
         "audit_events": telemetry.audit_events,
+        "audit_chain_valid": telemetry.audit_chain_valid,
+        "nodes_summary": _rdp_autoscaler.get_all_nodes_summary(),
     }

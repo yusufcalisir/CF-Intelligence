@@ -39,6 +39,7 @@ class DynamicNoiseCalibration:
     gradient_clip_c: float
     instantaneous_epsilon: float
     optimal_alpha: float
+    node_id: str = "global"
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,39 @@ class RDPAccountantState:
     optimal_alpha_order: float
     budget_exhaustion_pct: float
     is_budget_exceeded: bool
+    node_id: str = "global"
+
+
+@dataclass(frozen=True)
+class PrivacyAuditEvent:
+    """Cryptographically chained audit trail record for dynamic DP calibration events."""
+
+    step: int
+    timestamp_utc: str
+    round_id: int
+    node_id: str
+    calibrated_sigma: float
+    gradient_clip_c: float
+    cumulative_epsilon: float
+    target_epsilon: float
+    risk_tier: str
+    previous_hash: str
+    block_hash: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "step": self.step,
+            "timestamp_utc": self.timestamp_utc,
+            "round_id": self.round_id,
+            "node_id": self.node_id,
+            "calibrated_sigma": self.calibrated_sigma,
+            "gradient_clip_c": self.gradient_clip_c,
+            "cumulative_epsilon": self.cumulative_epsilon,
+            "target_epsilon": self.target_epsilon,
+            "risk_tier": self.risk_tier,
+            "previous_hash": self.previous_hash,
+            "block_hash": self.block_hash,
+        }
 
 
 @dataclass(frozen=True)
@@ -69,3 +103,5 @@ class AutoScalerTelemetry:
     risk_tier: str  # 'OPTIMAL', 'CALIBRATING', 'BUDGET_WARNING', 'EXHAUSTED'
     history: list[DynamicNoiseCalibration] = field(default_factory=list)
     audit_events: list[dict[str, Any]] = field(default_factory=list)
+    audit_chain_valid: bool = True
+    node_id: str = "global"

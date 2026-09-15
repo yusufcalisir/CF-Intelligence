@@ -22,6 +22,7 @@ class PrivacyAuditService:
         embeddings: dict[str, np.ndarray],
         adjacency_lists: list[list[int]],
         node_id_to_index: dict[str, int],
+        seed: int | None = None,
     ) -> dict[str, Any]:
         """Perform a Link Reconstruction Attack (LRA) audit on node embeddings.
 
@@ -40,6 +41,13 @@ class PrivacyAuditService:
 
         # Convert embeddings to matrix aligned with indices
         n_nodes = len(node_id_to_index)
+        if n_nodes < 2:
+            return {
+                "link_leakage_auc": 0.5,
+                "risk_tier": "safe",
+                "message": "Insufficient nodes to perform LRA audit (minimum 2 nodes required).",
+            }
+
         emb_dim = next(iter(embeddings.values())).shape[0]
         emb_matrix = np.zeros((n_nodes, emb_dim))
         for node_id, idx in node_id_to_index.items():
@@ -61,7 +69,7 @@ class PrivacyAuditService:
 
         # Gather negative edges (random non-links)
         neg_scores: list[float] = []
-        rng = np.random.default_rng(42)
+        rng = np.random.default_rng(seed)
         n_pos = len(pos_scores)
         if n_pos == 0:
             return {
@@ -195,6 +203,9 @@ class PrivacyAuditService:
                 "message": "No gradient norms provided for model inversion audit.",
             }
 
+        if any(norm < 0 for norm in gradient_norms):
+            raise ValueError("Gradient norms must be non-negative")
+
         arr = np.array(gradient_norms)
         # Normalise to [0, 1]: high norm variance → high reconstruction risk
         mean_norm = float(np.mean(arr))
@@ -251,6 +262,12 @@ class PrivacyAuditService:
             }
 
         min_len = min(len(original_gradients), len(received_gradients))
+        if min_len < 2:
+            return {
+                "dlg_leakage_score": 0.0,
+                "risk_tier": "safe",
+                "message": "Insufficient gradient vector length for DLG correlation (min 2 elements required).",
+            }
         orig = np.array(original_gradients[:min_len])
         recv = np.array(received_gradients[:min_len])
 
