@@ -267,7 +267,7 @@ class FlowerFLEngine:
 
         p2p_engine = FlowerP2PEngine(model_service=self.model_service)
         topo_enum = (
-            P2PTopologyType.MESH if str(topology).upper() == "MESH" else P2PTopologyType.RING
+            P2PTopologyType.MESH if topology.upper() == "MESH" else P2PTopologyType.RING
         )
         dp_enabled = getattr(config, "enable_differential_privacy", False)
 
@@ -511,7 +511,12 @@ class FlowerFLEngine:
                 client_model = self.model_service.create_model(dp_compatible=use_opacus_dp)
                 client_model.load_state_dict(global_model.state_dict())
 
-                if n_samples > 0 and y_train is not None and len(y_train) > 0:
+                if (
+                    x_train is not None
+                    and len(x_train) > 0
+                    and y_train is not None
+                    and len(y_train) > 0
+                ):
                     if use_opacus_dp:
                         client_model, loss_hist, _ = self.model_service.train_local_with_opacus(
                             client_model,
