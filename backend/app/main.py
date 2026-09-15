@@ -879,6 +879,7 @@ elif service_name in ("fl-coordinator", "coordinator"):
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)
     app.include_router(settlement.router)
+    app.include_router(optimization.router)
 
 elif service_name == "identity-graph":
     app.include_router(health.router)

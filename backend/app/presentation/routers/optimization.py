@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import threading
+from collections import OrderedDict
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from app.application.services.fl_hyperparameter_optimizer import FLHyperparameterOptimizer
@@ -14,8 +16,40 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/admin/optimization", tags=["Hyperparameter Optimization"])
 
-# In-memory storage for optimization studies
-STORED_STUDIES: dict[str, dict[str, Any]] = {}
+# Thread-safe bounded in-memory storage for optimization studies (Vector 9 & 18)
+MAX_STORED_STUDIES = 100
+_studies_lock = threading.Lock()
+STORED_STUDIES: OrderedDict[str, dict[str, Any]] = OrderedDict()
+
+
+def store_study_result(study_name: str, results: dict[str, Any]) -> None:
+    """Store study result with thread-safety and FIFO eviction at MAX_STORED_STUDIES."""
+    with _studies_lock:
+        if len(STORED_STUDIES) >= MAX_STORED_STUDIES and study_name not in STORED_STUDIES:
+            STORED_STUDIES.popitem(last=False)
+        STORED_STUDIES[study_name] = results
+        STORED_STUDIES.move_to_end(study_name)
+
+
+def get_stored_study(study_name: str) -> dict[str, Any] | None:
+    """Safely retrieve a study result by name."""
+    with _studies_lock:
+        return STORED_STUDIES.get(study_name)
+
+
+def list_stored_study_names() -> list[str]:
+    """Safely list all stored study names."""
+    with _studies_lock:
+        return list(STORED_STUDIES.keys())
+
+
+def remove_stored_study(study_name: str) -> bool:
+    """Safely remove a stored study."""
+    with _studies_lock:
+        if study_name in STORED_STUDIES:
+            del STORED_STUDIES[study_name]
+            return True
+        return False
 
 
 class TuneRequest(BaseModel):
@@ -62,7 +96,7 @@ async def trigger_hyperparameter_tuning(payload: TuneRequest) -> TuneResponse:
             timeout=payload.timeout_seconds,
         )
 
-        STORED_STUDIES[payload.study_name] = results
+        store_study_result(payload.study_name, results)
         return TuneResponse(**results)
     except Exception as e:
         logger.error("Failed to run FL hyperparameter tuning study '%s': %s", payload.study_name, e)
@@ -75,15 +109,29 @@ async def trigger_hyperparameter_tuning(payload: TuneRequest) -> TuneResponse:
 @router.get("/studies", response_model=list[str])
 async def list_optimization_studies() -> list[str]:
     """List all completed or active Optuna hyperparameter study names."""
-    return list(STORED_STUDIES.keys())
+    return list_stored_study_names()
 
 
 @router.get("/studies/{study_name}", response_model=TuneResponse)
 async def get_study_details(study_name: str) -> TuneResponse:
     """Retrieve details and best parameters for a specific Optuna study."""
-    if study_name not in STORED_STUDIES:
+    study = get_stored_study(study_name)
+    if study is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Study '{study_name}' not found.",
         )
-    return TuneResponse(**STORED_STUDIES[study_name])
+    return TuneResponse(**study)
+
+
+@router.delete("/studies/{study_name}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_study(study_name: str) -> Response:
+    """Delete a completed or active Optuna study from memory."""
+    deleted = remove_stored_study(study_name)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Study '{study_name}' not found.",
+        )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+

@@ -55,6 +55,8 @@ import type {
   DatasetContractAuditResponse,
   DatasetConsortiumEnrollRequest,
   DatasetConsortiumEnrollResponse,
+  TuneRequest,
+  TuneResponse,
 } from './types';
 
 
@@ -995,6 +997,43 @@ export function useEnrollDatasetConsortium() {
     },
   });
 }
+
+export function useOptimizationStudies() {
+  return useQuery<string[]>({
+    queryKey: ['optimization-studies'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<string[]>('/v1/admin/optimization/studies');
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useOptimizationStudyDetails(studyName: string | undefined) {
+  return useQuery<TuneResponse>({
+    queryKey: ['optimization-study', studyName],
+    queryFn: async () => {
+      const { data } = await apiClient.get<TuneResponse>(`/v1/admin/optimization/studies/${studyName}`);
+      return data;
+    },
+    enabled: !!studyName,
+    retry: false,
+  });
+}
+
+export function useTriggerHyperparameterTuning() {
+  const queryClient = useQueryClient();
+  return useMutation<TuneResponse, Error, TuneRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<TuneResponse>('/v1/admin/optimization/tune', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['optimization-studies'] });
+    },
+  });
+}
+
 
 
 

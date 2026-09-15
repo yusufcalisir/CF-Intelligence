@@ -1273,4 +1273,26 @@ export interface DatasetConsortiumEnrollResponse {
   next_action_url: string;
 }
 
+export interface TuneRequest {
+  study_name?: string;
+  dirichlet_alpha?: number;
+  num_clients?: number;
+  num_rounds?: number;
+  n_trials?: number;
+  timeout_seconds?: number | null;
+}
+
+export interface TuneResponse {
+  study_name: string;
+  dirichlet_alpha: number;
+  best_trial_number: number;
+  best_value: number;
+  best_params: Record<string, any>;
+  param_importances: Record<string, number>;
+  total_trials: number;
+  completed_trials: number;
+  pruned_trials: number;
+  duration_ms: number;
+}
+
 
