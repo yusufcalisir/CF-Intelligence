@@ -1004,3 +1004,43 @@ class StreamingGNNTrainStepResponse(BaseModel):
     training_applied: bool
 
 
+class EllipticBenchmarkRequest(BaseModel):
+    n_samples: int = Field(2000, ge=50, le=50000, description="Number of node samples to evaluate")
+    random_seed: int = Field(42, ge=0, description="Random seed for reproducibility")
+    epochs: int = Field(5, ge=1, le=50, description="Number of training epochs")
+    learning_rate: float = Field(0.01, gt=0.0, le=1.0, description="Optimizer learning rate")
+    save_report: bool = Field(True, description="Whether to persist markdown and json reports")
+
+
+class EllipticPipelineMetrics(BaseModel):
+    roc_auc: float
+    pr_auc: float
+    recall_at_01_fpr: float
+
+
+class EllipticAdvantageMetrics(BaseModel):
+    pr_auc_gain: float
+    roc_auc_gain: float
+    recall_gain: float
+
+
+class EllipticBenchmarkMetrics(BaseModel):
+    federated_graph_pipeline: EllipticPipelineMetrics
+    isolated_single_bank_baseline: EllipticPipelineMetrics
+    federated_advantage: EllipticAdvantageMetrics
+
+
+class EllipticBenchmarkResponse(BaseModel):
+    dataset: str
+    source_type: str
+    total_nodes: int
+    total_edges: int
+    illicit_node_count: int
+    illicit_rate_percent: float
+    evaluated_test_nodes: int
+    metrics: EllipticBenchmarkMetrics
+    report_saved: bool = False
+    report_path: str | None = None
+
+
+

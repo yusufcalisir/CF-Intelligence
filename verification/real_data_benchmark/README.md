@@ -4,19 +4,19 @@ This report documents the self-verification benchmark evaluating the **Elliptic 
 
 ## Benchmark Summary
 
-- **Dataset:** Elliptic Bitcoin Dataset (REAL source)
-- **Total Nodes:** 46,564
-- **Total Edges:** 234,355
-- **Illicit Transaction Ratio:** 9.76%
-- **Test Set Nodes:** 9,313
+- **Dataset:** Elliptic Bitcoin Dataset (MOCK source)
+- **Total Nodes:** 200
+- **Total Edges:** 600
+- **Illicit Transaction Ratio:** 2.5%
+- **Test Set Nodes:** 40
 
 ## Quantitative Evaluation
 
 | Pipeline Configuration | PR-AUC | ROC-AUC | Recall @ 0.1% FPR |
 |:---|:---:|:---:|:---:|
-| **Federated Graph Pipeline (GraphSAGE + Risk Engine)** | **0.8746** | **0.9758** | **80.6%** |
-| **Isolated Single-Bank Baseline (Local Classifier)** | 0.2543 | 0.7330 | 52.4% |
-| **Federation Advantage ($\Delta$)** | **+0.6203** | **+0.2428** | **+28.2%** |
+| **Federated Graph Pipeline (GraphSAGE + Risk Engine)** | **0.3333** | **0.9487** | **0.0%** |
+| **Isolated Single-Bank Baseline (Local Classifier)** | 0.1250 | 0.8205 | 0.0% |
+| **Federation Advantage ($\\Delta$)** | **+0.2083** | **+0.1282** | **+0.0%** |
 
 ## Methodological Notes
 

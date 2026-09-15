@@ -81,21 +81,35 @@ def load_elliptic(
         logger.info("[Elliptic] Loading real dataset from %s", root)
         feat_df = pd.read_csv(features_csv, header=None)
         # First column is txId, rest are features
-        X = feat_df.iloc[:, 1:].values.astype(np.float32)
+        feat_df.rename(columns={0: "txId"}, inplace=True)
+        feat_df["txId"] = feat_df["txId"].astype(str)
 
         cls_df = pd.read_csv(classes_csv)
+        cls_df["txId"] = cls_df["txId"].astype(str)
         # class 1=illicit → 1, class 2=licit → 0, unknown → dropped
-        cls_df = cls_df[cls_df["class"] != "unknown"].copy()
+        cls_df = cls_df[cls_df["class"].astype(str) != "unknown"].copy()
         cls_df["label"] = (cls_df["class"].astype(str) == "1").astype(int)
-        y = cls_df["label"].values
 
-        # Trim X to match valid rows if needed
-        X = X[: len(y)]
+        # Merge strictly on txId to guarantee row alignment
+        merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
+
+        y = merged_df["label"].values.astype(int)
+        feature_cols = [c for c in merged_df.columns if c not in ("txId", "class", "label")]
+        X = merged_df[feature_cols].values.astype(np.float32)
+
+        # Build index mapping for edges
+        tx_id_to_idx = {tx_id: idx for idx, tx_id in enumerate(merged_df["txId"].tolist())}
 
         edges: list[tuple[int, int]] = []
         if edges_csv.exists():
             edge_df = pd.read_csv(edges_csv)
-            edges = list(zip(edge_df.iloc[:, 0].tolist(), edge_df.iloc[:, 1].tolist()))
+            src_col = edge_df.columns[0]
+            dst_col = edge_df.columns[1]
+            for s, d in zip(edge_df[src_col].astype(str), edge_df[dst_col].astype(str)):
+                s_idx = tx_id_to_idx.get(s)
+                d_idx = tx_id_to_idx.get(d)
+                if s_idx is not None and d_idx is not None:
+                    edges.append((s_idx, d_idx))
 
         logger.info("[Elliptic] Loaded %d nodes, %d edges", len(y), len(edges))
         return {"X": X, "y": y, "edges": edges, "source": "real"}

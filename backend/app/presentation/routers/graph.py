@@ -11,6 +11,8 @@ from app.application.schemas.phase2 import (
     CommunityAnalyticsResponse,
     CypherQueryRequest,
     CypherQueryResponse,
+    EllipticBenchmarkRequest,
+    EllipticBenchmarkResponse,
     FlinkStreamStatusResponse,
     GNNInferEmbeddingRequest,
     GNNInferEmbeddingResponse,
@@ -27,6 +29,7 @@ from app.application.schemas.phase2 import (
     StreamingGNNTrainStepResponse,
     TemporalAnomalyResponse,
 )
+from app.application.services.elliptic_benchmark_service import EllipticBenchmarkService
 from app.application.services.flink_graph_streaming import StreamingEdgeEvent
 from app.application.services.graph_analytics_service import GraphAnalyticsService
 from app.application.services.graph_embedding_service import GraphEmbeddingService
@@ -43,6 +46,7 @@ _graph_analytics_service = GraphAnalyticsService(graph_engine=_graph_engine)
 _graph_embedding_service = GraphEmbeddingService(graph_engine=_graph_engine)
 _streaming_graph_service = StreamingGraphService()
 _streaming_gnn_model = StreamingGATModel(in_dim=12)
+_elliptic_benchmark_service = EllipticBenchmarkService()
 
 
 def get_graph_engine() -> GraphEngine:
@@ -491,4 +495,44 @@ async def trigger_streaming_gnn_train() -> StreamingGNNTrainStepResponse:
         window_size_minutes=status["window_size_minutes"],
         training_applied=True,
     )
+
+
+@router.post("/benchmark/elliptic", response_model=EllipticBenchmarkResponse)
+async def run_elliptic_benchmark(req: EllipticBenchmarkRequest | None = None) -> EllipticBenchmarkResponse:
+    """Execute the Elliptic Bitcoin dataset graph benchmark using genuine PyTorch models."""
+    params = req or EllipticBenchmarkRequest()
+    try:
+        results = _elliptic_benchmark_service.run_benchmark(
+            n_samples=params.n_samples,
+            random_seed=params.random_seed,
+            epochs=params.epochs,
+            learning_rate=params.learning_rate,
+        )
+        report_path = None
+        if params.save_report:
+            report_p = _elliptic_benchmark_service.save_report(results)
+            report_path = str(report_p)
+
+        return EllipticBenchmarkResponse(
+            **results,
+            report_saved=params.save_report,
+            report_path=report_path,
+        )
+    except Exception as exc:
+        logger.error("Elliptic benchmark failed: %s", exc)
+        raise HTTPException(status_code=500, detail=f"Elliptic benchmark execution failed: {exc}") from exc
+
+
+@router.get("/benchmark/elliptic/latest", response_model=EllipticBenchmarkResponse)
+async def get_latest_elliptic_benchmark() -> EllipticBenchmarkResponse:
+    """Retrieve the latest cached Elliptic graph benchmark results."""
+    latest = _elliptic_benchmark_service.get_latest_benchmark_results()
+    if latest is None:
+        latest = _elliptic_benchmark_service.run_benchmark(n_samples=200, random_seed=42, epochs=3)
+    return EllipticBenchmarkResponse(
+        **latest,
+        report_saved=True,
+        report_path="verification/real_data_benchmark/README.md",
+    )
+
 

@@ -1,26 +1,26 @@
 {
   "dataset": "Elliptic Bitcoin Dataset",
-  "source_type": "real",
-  "total_nodes": 46564,
-  "total_edges": 234355,
-  "illicit_node_count": 4545,
-  "illicit_rate_percent": 9.76,
-  "evaluated_test_nodes": 9313,
+  "source_type": "mock",
+  "total_nodes": 200,
+  "total_edges": 600,
+  "illicit_node_count": 5,
+  "illicit_rate_percent": 2.5,
+  "evaluated_test_nodes": 40,
   "metrics": {
     "federated_graph_pipeline": {
-      "roc_auc": 0.9758,
-      "pr_auc": 0.8746,
-      "recall_at_01_fpr": 0.806
+      "roc_auc": 0.9487,
+      "pr_auc": 0.3333,
+      "recall_at_01_fpr": 0.0
     },
     "isolated_single_bank_baseline": {
-      "roc_auc": 0.733,
-      "pr_auc": 0.2543,
-      "recall_at_01_fpr": 0.5239
+      "roc_auc": 0.8205,
+      "pr_auc": 0.125,
+      "recall_at_01_fpr": 0.0
     },
     "federated_advantage": {
-      "pr_auc_gain": 0.6203,
-      "roc_auc_gain": 0.2428,
-      "recall_gain": 0.2821
+      "pr_auc_gain": 0.2083,
+      "roc_auc_gain": 0.1282,
+      "recall_gain": 0.0
     }
   }
 }
