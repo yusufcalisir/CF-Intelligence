@@ -587,3 +587,26 @@ class GraphAnalyticsService:
 
         results.sort(key=lambda c: (c["fraud_density"], c["size"]), reverse=True)
         return results
+
+    def detect_cyclic_mule_rings(
+        self, min_length: int = 3, max_length: int = 7, bank_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Delegates cyclic mule ring detection to the underlying GraphEngine."""
+        return self.graph_engine.detect_cyclic_mule_rings(
+            min_length=min_length, max_length=max_length, bank_id=bank_id
+        )
+
+    def detect_smurfing_patterns(
+        self, window_hours: int = 24, min_fan: int = 3, max_depth: int = 3, bank_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Delegates smurfing pattern detection to the underlying GraphEngine."""
+        return self.graph_engine.detect_smurfing_patterns(
+            window_hours=window_hours, min_fan=min_fan, max_depth=max_depth, bank_id=bank_id
+        )
+
+    def execute_safe_cypher(
+        self, query: str, params: dict[str, Any] | None = None, read_only: bool = True
+    ) -> list[dict[str, Any]]:
+        """Safely executes a Cypher query with read_only mutation safeguards."""
+        return self.graph_engine.execute_cypher(query=query, params=params, read_only=read_only)
+

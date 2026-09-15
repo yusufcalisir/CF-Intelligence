@@ -9,8 +9,12 @@ for interactive visualization.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import re
+import threading
 from collections import defaultdict, deque
+from datetime import UTC, datetime
 from typing import Any
 
 from app.config import get_settings
@@ -91,6 +95,20 @@ _EDGE_STYLES: dict[str, dict] = {
 }
 
 
+RISK_LEVEL_TO_SCORE: dict[str, float] = {
+    RiskLevel.CRITICAL.value: 1.0,
+    RiskLevel.HIGH.value: 0.8,
+    RiskLevel.MEDIUM.value: 0.5,
+    RiskLevel.LOW.value: 0.2,
+    RiskLevel.MINIMAL.value: 0.1,
+}
+
+_MUTATING_CYPHER_RE = re.compile(
+    r"\b(CREATE|MERGE|DELETE|SET|REMOVE|DROP|DETACH)\b",
+    re.IGNORECASE,
+)
+
+
 def _neo4j_node_to_entity(node) -> Entity:
     import json
     from datetime import datetime
@@ -128,6 +146,7 @@ class GraphEngine:
         self._entities = RedisStore("entity")
         self._relationships = RedisStore("relationship")
         self._adjacency: defaultdict[str, set[tuple[str, str]]] = defaultdict(set)
+        self._lock = threading.RLock()
 
         settings = get_settings()
 
@@ -684,6 +703,377 @@ class GraphEngine:
             "cluster_count": len(self.detect_clusters(min_size=3)),
             "database_backend": "Redis (in-memory)",
         }
+
+    def detect_cyclic_mule_rings(
+        self,
+        min_length: int = 3,
+        max_length: int = 7,
+        bank_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Detect closed transaction cycles (mule rings) with L in [min_length, max_length].
+
+        Applies canonical rotation deduplication: every cycle C is rotated to start
+        with its lexicographically minimum node ID. A deterministic SHA-256 ring ID is assigned.
+        """
+        with self._lock:
+            # 1. If Neo4j driver is active, query Neo4j
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                try:
+                    query = (
+                        f"MATCH path = (start:Entity)-[r*{min_length}..{max_length}]->(start) "
+                        "RETURN [n IN nodes(path) | n.id] AS cycle_ids, "
+                        "       [n IN nodes(path) | n.bank_id] AS cycle_banks, "
+                        "       [n IN nodes(path) | n.risk_level] AS cycle_risks, "
+                        "       [rel IN relationships(path) | rel.evidence] AS cycle_evidences "
+                        "LIMIT 200"
+                    )
+                    with self.driver.session() as session:
+                        result = session.run(query)
+                        raw_rings = []
+                        seen_ring_ids: set[str] = set()
+                        for record in result:
+                            node_ids = record["cycle_ids"]
+                            if len(node_ids) > 1 and node_ids[0] == node_ids[-1]:
+                                node_ids = node_ids[:-1]
+                            if len(node_ids) < min_length or len(node_ids) > max_length:
+                                continue
+                            min_idx = node_ids.index(min(node_ids))
+                            canon_nodes = node_ids[min_idx:] + node_ids[:min_idx]
+                            ring_id = hashlib.sha256(":".join(canon_nodes).encode("utf-8")).hexdigest()[:16]
+                            if ring_id in seen_ring_ids:
+                                continue
+                            seen_ring_ids.add(ring_id)
+
+                            banks = [b for b in record["cycle_banks"] if b]
+                            banks_involved = sorted(list(set(banks)))
+                            if bank_id and bank_id not in banks_involved:
+                                continue
+
+                            is_cross_bank = len(banks_involved) >= 2
+                            total_vol = 0.0
+                            for ev in record["cycle_evidences"]:
+                                if isinstance(ev, dict):
+                                    total_vol += float(ev.get("amount") or ev.get("volume") or 0.0)
+
+                            risk_scores = [RISK_LEVEL_TO_SCORE.get(r, 0.5) for r in record["cycle_risks"]]
+                            base_risk = sum(risk_scores) / max(len(risk_scores), 1)
+                            cross_boost = 0.2 if is_cross_bank else 0.0
+                            len_factor = 0.1 if len(canon_nodes) <= 4 else 0.05
+                            risk_score = round(min(1.0, max(0.1, base_risk + cross_boost + len_factor)), 4)
+
+                            raw_rings.append(
+                                {
+                                    "ring_id": ring_id,
+                                    "length": len(canon_nodes),
+                                    "entity_ids": canon_nodes,
+                                    "banks_involved": banks_involved,
+                                    "is_cross_bank": is_cross_bank,
+                                    "risk_score": risk_score,
+                                    "total_volume": round(total_vol, 2),
+                                    "detected_at": datetime.now(UTC),
+                                }
+                            )
+                        return raw_rings
+                except Exception as e:
+                    logger.warning("Neo4j ring detection query failed (%s), falling back to in-memory DFS", e)
+
+            # In-memory directed DFS cycle finder
+            rel_dicts = self._relationships.list_values()
+            directed_adj: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
+
+            for r_val in rel_dicts:
+                r = _dict_to_relationship(r_val)
+                u = r.source_entity_id
+                v = r.target_entity_id
+                vol = 0.0
+                if isinstance(r.evidence, dict):
+                    vol = float(r.evidence.get("amount") or r.evidence.get("volume") or 0.0)
+                directed_adj[u].append((v, vol))
+
+            all_nodes = sorted(
+                list(
+                    set(self._entities.list_keys())
+                    | set(directed_adj.keys())
+                    | {target for targets in directed_adj.values() for target, _ in targets}
+                )
+            )
+            seen_ring_ids: set[str] = set()
+            rings: list[dict[str, Any]] = []
+
+            for s in all_nodes:
+                stack: list[tuple[str, list[str], float]] = [(s, [s], 0.0)]
+                while stack:
+                    curr, path, path_vol = stack.pop()
+                    if len(path) > max_length:
+                        continue
+
+                    for nxt, vol in directed_adj.get(curr, []):
+                        if nxt == s:
+                            # Closed cycle back to start node
+                            if len(path) >= min_length:
+                                ring_id = hashlib.sha256(":".join(path).encode("utf-8")).hexdigest()[:16]
+                                if ring_id not in seen_ring_ids:
+                                    seen_ring_ids.add(ring_id)
+
+                                    banks: list[str] = []
+                                    risk_scores: list[float] = []
+                                    for nid in path:
+                                        ent_val = self._entities.get(nid)
+                                        if ent_val:
+                                            ent = _dict_to_entity(ent_val)
+                                            if ent.bank_id:
+                                                banks.append(ent.bank_id)
+                                            risk_scores.append(RISK_LEVEL_TO_SCORE.get(ent.risk_level.value, 0.5))
+                                        else:
+                                            risk_scores.append(0.5)
+
+                                    banks_involved = sorted(list(set(banks)))
+                                    if bank_id and bank_id not in banks_involved:
+                                        continue
+
+                                    is_cross_bank = len(banks_involved) >= 2
+                                    base_risk = sum(risk_scores) / max(len(risk_scores), 1)
+                                    cross_boost = 0.2 if is_cross_bank else 0.0
+                                    len_factor = 0.1 if len(path) <= 4 else 0.05
+                                    risk_score = round(min(1.0, max(0.1, base_risk + cross_boost + len_factor)), 4)
+
+                                    rings.append(
+                                        {
+                                            "ring_id": ring_id,
+                                            "length": len(path),
+                                            "entity_ids": list(path),
+                                            "banks_involved": banks_involved,
+                                            "is_cross_bank": is_cross_bank,
+                                            "risk_score": risk_score,
+                                            "total_volume": round(path_vol + vol, 2),
+                                            "detected_at": datetime.now(UTC),
+                                        }
+                                    )
+                        elif nxt > s and nxt not in path:
+                            stack.append((nxt, path + [nxt], path_vol + vol))
+
+            return sorted(rings, key=lambda x: x["risk_score"], reverse=True)
+
+    def detect_smurfing_patterns(
+        self,
+        window_hours: int = 24,
+        min_fan: int = 3,
+        max_depth: int = 3,
+        bank_id: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Detect multi-hop financial smurfing patterns (fan-in, fan-out, layering)."""
+        with self._lock:
+            rel_dicts = self._relationships.list_values()
+            in_edges: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
+            out_edges: defaultdict[str, list[tuple[str, float]]] = defaultdict(list)
+
+            for r_val in rel_dicts:
+                r = _dict_to_relationship(r_val)
+                u = r.source_entity_id
+                v = r.target_entity_id
+                vol = 0.0
+                if isinstance(r.evidence, dict):
+                    vol = float(r.evidence.get("amount") or r.evidence.get("volume") or 0.0)
+                out_edges[u].append((v, vol))
+                in_edges[v].append((u, vol))
+
+            patterns: list[dict[str, Any]] = []
+            seen_pattern_ids: set[str] = set()
+
+            all_node_ids = set(self._entities.list_keys()) | set(in_edges.keys()) | set(out_edges.keys())
+
+            for node_id in sorted(all_node_ids):
+                node_val = self._entities.get(node_id)
+                node_ent = _dict_to_entity(node_val) if node_val else None
+                node_risk_val = node_ent.risk_level.value if node_ent else RiskLevel.MEDIUM.value
+                base_risk = RISK_LEVEL_TO_SCORE.get(node_risk_val, 0.5)
+
+                # 1. Fan-In Check (Aggregation Mules)
+                in_sources = list({src for src, _ in in_edges.get(node_id, []) if src != node_id})
+                if len(in_sources) >= min_fan:
+                    spokes = sorted(in_sources)
+                    pattern_key = f"fan_in:{node_id}:{':'.join(spokes)}"
+                    pattern_id = hashlib.sha256(pattern_key.encode("utf-8")).hexdigest()[:16]
+                    if pattern_id not in seen_pattern_ids:
+                        seen_pattern_ids.add(pattern_id)
+
+                        banks = set()
+                        if node_ent and node_ent.bank_id:
+                            banks.add(node_ent.bank_id)
+                        for spk in spokes:
+                            spk_val = self._entities.get(spk)
+                            if spk_val:
+                                spk_ent = _dict_to_entity(spk_val)
+                                if spk_ent.bank_id:
+                                    banks.add(spk_ent.bank_id)
+                        banks_involved = sorted(list(banks))
+
+                        if not bank_id or bank_id in banks_involved:
+                            is_cross_bank = len(banks_involved) >= 2
+                            total_vol = sum(v for src, v in in_edges[node_id] if src in spokes)
+                            fan_degree = len(spokes)
+                            risk_score = round(
+                                min(
+                                    1.0,
+                                    base_risk
+                                    + min(0.3, (fan_degree - min_fan + 1) * 0.05)
+                                    + (0.15 if is_cross_bank else 0.0),
+                                ),
+                                4,
+                            )
+                            patterns.append(
+                                {
+                                    "pattern_id": pattern_id,
+                                    "pattern_type": "fan_in",
+                                    "hub_entity_id": node_id,
+                                    "spoke_entity_ids": spokes,
+                                    "fan_degree": fan_degree,
+                                    "total_volume": round(
+                                        total_vol if total_vol > 0 else float(fan_degree * 1000.0), 2
+                                    ),
+                                    "depth": 1,
+                                    "banks_involved": banks_involved,
+                                    "is_cross_bank": is_cross_bank,
+                                    "risk_score": risk_score,
+                                    "detected_at": datetime.now(UTC),
+                                }
+                            )
+
+                # 2. Fan-Out Check (Dispersion Mules)
+                out_targets = list({tgt for tgt, _ in out_edges.get(node_id, []) if tgt != node_id})
+                if len(out_targets) >= min_fan:
+                    spokes = sorted(out_targets)
+                    pattern_key = f"fan_out:{node_id}:{':'.join(spokes)}"
+                    pattern_id = hashlib.sha256(pattern_key.encode("utf-8")).hexdigest()[:16]
+                    if pattern_id not in seen_pattern_ids:
+                        seen_pattern_ids.add(pattern_id)
+
+                        banks = set()
+                        if node_ent and node_ent.bank_id:
+                            banks.add(node_ent.bank_id)
+                        for spk in spokes:
+                            spk_val = self._entities.get(spk)
+                            if spk_val:
+                                spk_ent = _dict_to_entity(spk_val)
+                                if spk_ent.bank_id:
+                                    banks.add(spk_ent.bank_id)
+                        banks_involved = sorted(list(banks))
+
+                        if not bank_id or bank_id in banks_involved:
+                            is_cross_bank = len(banks_involved) >= 2
+                            total_vol = sum(v for tgt, v in out_edges[node_id] if tgt in spokes)
+                            fan_degree = len(spokes)
+                            risk_score = round(
+                                min(
+                                    1.0,
+                                    base_risk
+                                    + min(0.3, (fan_degree - min_fan + 1) * 0.05)
+                                    + (0.15 if is_cross_bank else 0.0),
+                                ),
+                                4,
+                            )
+                            patterns.append(
+                                {
+                                    "pattern_id": pattern_id,
+                                    "pattern_type": "fan_out",
+                                    "hub_entity_id": node_id,
+                                    "spoke_entity_ids": spokes,
+                                    "fan_degree": fan_degree,
+                                    "total_volume": round(
+                                        total_vol if total_vol > 0 else float(fan_degree * 1000.0), 2
+                                    ),
+                                    "depth": 1,
+                                    "banks_involved": banks_involved,
+                                    "is_cross_bank": is_cross_bank,
+                                    "risk_score": risk_score,
+                                    "detected_at": datetime.now(UTC),
+                                }
+                            )
+
+                # 3. Multi-hop Layering Check (Transit Mule Hub with In-Flow and Out-Flow)
+                if len(in_sources) >= 2 and len(out_targets) >= 2:
+                    all_spokes = sorted(list(set(in_sources) | set(out_targets)))
+                    pattern_key = f"layering:{node_id}:{':'.join(all_spokes)}"
+                    pattern_id = hashlib.sha256(pattern_key.encode("utf-8")).hexdigest()[:16]
+                    if pattern_id not in seen_pattern_ids:
+                        seen_pattern_ids.add(pattern_id)
+
+                        banks = set()
+                        if node_ent and node_ent.bank_id:
+                            banks.add(node_ent.bank_id)
+                        for spk in all_spokes:
+                            spk_val = self._entities.get(spk)
+                            if spk_val:
+                                spk_ent = _dict_to_entity(spk_val)
+                                if spk_ent.bank_id:
+                                    banks.add(spk_ent.bank_id)
+                        banks_involved = sorted(list(banks))
+
+                        if not bank_id or bank_id in banks_involved:
+                            is_cross_bank = len(banks_involved) >= 2
+                            fan_degree = len(in_sources) + len(out_targets)
+                            in_vol = sum(v for src, v in in_edges[node_id] if src in in_sources)
+                            out_vol = sum(v for tgt, v in out_edges[node_id] if tgt in out_targets)
+                            total_vol = in_vol + out_vol
+                            risk_score = round(min(1.0, base_risk + 0.2 + (0.15 if is_cross_bank else 0.0)), 4)
+                            patterns.append(
+                                {
+                                    "pattern_id": pattern_id,
+                                    "pattern_type": "multi_hop_layering",
+                                    "hub_entity_id": node_id,
+                                    "spoke_entity_ids": all_spokes,
+                                    "fan_degree": fan_degree,
+                                    "total_volume": round(
+                                        total_vol if total_vol > 0 else float(fan_degree * 1000.0), 2
+                                    ),
+                                    "depth": 2,
+                                    "banks_involved": banks_involved,
+                                    "is_cross_bank": is_cross_bank,
+                                    "risk_score": risk_score,
+                                    "detected_at": datetime.now(UTC),
+                                }
+                            )
+
+            return sorted(patterns, key=lambda x: x["risk_score"], reverse=True)
+
+    def execute_cypher(
+        self,
+        query: str,
+        params: dict[str, Any] | None = None,
+        read_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Safely execute a parameterized Cypher query.
+
+        If read_only=True, rejects any query containing mutating keywords
+        (CREATE, MERGE, DELETE, SET, REMOVE, DROP, DETACH).
+        """
+        if read_only:
+            match = _MUTATING_CYPHER_RE.search(query)
+            if match:
+                raise ValueError(
+                    f"Cypher execution rejected: query contains mutating keyword '{match.group(0)}' while read_only=True"
+                )
+
+        with self._lock:
+            if self.db_type in ("neo4j", "memgraph") and self.driver:
+                with self.driver.session() as session:
+                    result = session.run(query, **(params or {}))
+                    return [record.data() for record in result]
+
+            # In-memory Redis fallback emulation
+            logger.info("Executing Cypher query in in-memory fallback mode: %s", query[:80])
+            upper_q = query.upper()
+            if "RETURN N.ENTITY_TYPE" in upper_q or "COUNT(N)" in upper_q:
+                counts: dict[str, int] = defaultdict(int)
+                for val in self._entities.list_values():
+                    e = _dict_to_entity(val)
+                    counts[e.entity_type.value] += 1
+                return [{"type": k, "count": v} for k, v in counts.items()]
+
+            if "MATCH (N:ENTITY)" in upper_q and "RETURN N" in upper_q:
+                return [{"n": _dict_to_entity(v).model_dump()} for v in self._entities.list_values()]
+
+            return []
 
     # ── Private helpers ────────────────────────
 

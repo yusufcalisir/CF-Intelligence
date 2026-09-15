@@ -420,6 +420,17 @@ To handle massive scales of customer relationships, transactions, and alert link
     ```
 * **Real-time GNN Serving**: Enables compatibility with real-time Graph Neural Network inference runtimes (e.g. Memgraph GNN modules / DGL) to update node embeddings dynamically as new transaction edges are written.
 * **Dual-Storage & Fallback**: Configured via `graph_db_type` in settings (supporting `"redis"`, `"neo4j"`, `"memgraph"`). If the graph database is not reachable or not installed, the engine gracefully falls back to the Redis / in-memory adjacency list to maintain complete backward compatibility in development.
+* **Topological Ring Analytics & Mule Loop Detection**:
+  - Detects closed transaction cycles of length $L \in [3, 7]$ using directed DFS traversal in memory or native Cypher variable-length path matching `MATCH path = (start:Entity)-[r*3..7]->(start)`.
+  - Implements canonical rotation deduplication: rotates each cycle to begin with its lexicographically minimum entity ID, preventing identical cycle duplicates under cyclic permutations. Assigns deterministic SHA-256 ring digests.
+  - Multi-bank risk scoring: evaluates cross-bank boundaries ($\text{banks\_involved} \ge 2$), entity risk baselines, and cycle compactness.
+* **Multi-Hop Financial Smurfing Detection**:
+  - *Fan-In (Aggregation Mules)*: Identifies hubs receiving convergent micro-deposits from $\ge 3$ distinct sources.
+  - *Fan-Out (Dispersion Mules)*: Identifies hubs dispersing funds to $\ge 3$ target accounts to circumvent reporting thresholds.
+  - *Multi-Hop Layering*: Identifies transit hubs exhibiting concurrent high fan-in and fan-out across multiple hops (depth $\ge 2$).
+* **Safe Parameterized Cypher Execution**:
+  - Rejects mutation keywords (`CREATE`, `MERGE`, `DELETE`, `SET`, `REMOVE`, `DROP`, `DETACH`) when `read_only=True` via strict regex parsing.
+  - Thread safety enforced across all graph state mutations and queries via `threading.RLock()`.
 
 ### 2.6 Advanced AI Explainability Portal (Counterfactuals, Decision Replay, GNNExplainer)
 
@@ -845,8 +856,10 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_graph_analytics.py](../backend/tests/unit/test_graph_analytics.py) | `graph_analytics_service` | PageRank risk propagation with decay ($\gamma = 0.85$), community density, velocity | 3 | ✅ 100% Pass |
 | [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service` | 12-dim node feature extraction, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
 | [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine` | Neo4j Bolt driver init, Cypher entity/relationship merges, Redis fallback | 8 | ✅ 100% Pass |
+| [test_graph_analytics_hardening.py](../backend/tests/unit/test_graph_analytics_hardening.py) | `graph_engine` | Cyclic mule rings ($L \in [3, 7]$), canonical deduplication, smurfing, safe Cypher, thread locks | 10 | ✅ 100% Pass |
 | [test_flink_graph_streaming.py](../backend/tests/unit/test_flink_graph_streaming.py) | `flink_graph_streaming` | High-velocity streaming edge sliding windows, anomaly triggers | 3 | ✅ 100% Pass |
 | [test_advanced_explainability.py](../backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **14 Dedicated Suites** | **Collaborative AML Platform Architecture** | **116 Tests** | **100% Pass** |
+| **Total Verified** | **15 Dedicated Suites** | **Collaborative AML Platform Architecture** | **126 Tests** | **100% Pass** |
+

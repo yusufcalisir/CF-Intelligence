@@ -126,6 +126,17 @@ class RedisStore:
                 logger.error(f"Redis list_values failed: {e}")
         return list(self._fallback_store.values())
 
+    def list_keys(self) -> list[str]:
+        c = self.client
+        if c:
+            try:
+                keys = c.keys(f"{self.prefix}:*")
+                prefix_len = len(self.prefix) + 1
+                return [k[prefix_len:] for k in keys if not k.endswith(":list_data")]
+            except Exception as e:
+                logger.error(f"Redis list_keys failed: {e}")
+        return [k for k in self._fallback_store if not k.endswith(":list_data")]
+
     def push_list(self, key: str, value: dict) -> None:
         c = self.client
         if c:
@@ -147,7 +158,6 @@ class RedisStore:
         return self._fallback_store.get(f"{key}:list_data", [])
 
     def clear(self) -> None:
-        self._fallback_store.clear()
         c = self.client
         if c:
             try:
@@ -156,3 +166,4 @@ class RedisStore:
                     c.delete(*keys)
             except Exception as e:
                 logger.error(f"Redis clear failed: {e}")
+        self._fallback_store.clear()

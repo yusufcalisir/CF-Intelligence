@@ -9,10 +9,16 @@ from pydantic import BaseModel, Field
 
 from app.application.schemas.phase2 import (
     CommunityAnalyticsResponse,
+    CypherQueryRequest,
+    CypherQueryResponse,
     GraphResponse,
     GraphStatsResponse,
+    MuleRingDetectionResponse,
+    MuleRingItem,
     RiskPropagationRequest,
     RiskPropagationResponse,
+    SmurfingDetectionResponse,
+    SmurfingPatternItem,
     TemporalAnomalyResponse,
 )
 from app.application.services.graph_analytics_service import GraphAnalyticsService
@@ -323,3 +329,76 @@ async def get_embedding_stats() -> dict:
     parameter count, and pairwise similarity distribution statistics.
     """
     return _graph_embedding_service.get_embedding_stats()
+
+
+@router.get("/rings/detect", response_model=MuleRingDetectionResponse)
+async def detect_mule_rings(
+    min_length: int = Query(3, ge=3, le=10, description="Minimum cycle length"),
+    max_length: int = Query(7, ge=3, le=10, description="Maximum cycle length"),
+    bank_id: str | None = Query(None, description="Filter rings by participating bank ID"),
+) -> MuleRingDetectionResponse:
+    """Detect cyclic mule rings in the transaction graph."""
+    rings_data = _graph_engine.detect_cyclic_mule_rings(
+        min_length=min_length, max_length=max_length, bank_id=bank_id
+    )
+    rings = [MuleRingItem(**r) for r in rings_data]
+    cross_bank_count = sum(1 for r in rings if r.is_cross_bank)
+    max_score = max((r.risk_score for r in rings), default=0.0)
+    return MuleRingDetectionResponse(
+        total_rings=len(rings),
+        cross_bank_rings=cross_bank_count,
+        max_risk_score=max_score,
+        rings=rings,
+    )
+
+
+@router.get("/smurfing/detect", response_model=SmurfingDetectionResponse)
+async def detect_smurfing(
+    window_hours: int = Query(24, ge=1, le=168, description="Analysis time window in hours"),
+    min_fan: int = Query(3, ge=2, le=50, description="Minimum fan-in or fan-out degree"),
+    max_depth: int = Query(3, ge=1, le=5, description="Maximum layering depth"),
+    bank_id: str | None = Query(None, description="Filter patterns by bank ID"),
+) -> SmurfingDetectionResponse:
+    """Detect multi-hop financial smurfing patterns (fan-in, fan-out, layering)."""
+    patterns_data = _graph_engine.detect_smurfing_patterns(
+        window_hours=window_hours, min_fan=min_fan, max_depth=max_depth, bank_id=bank_id
+    )
+    patterns = [SmurfingPatternItem(**p) for p in patterns_data]
+    fan_in_count = sum(1 for p in patterns if p.pattern_type == "fan_in")
+    fan_out_count = sum(1 for p in patterns if p.pattern_type == "fan_out")
+    layering_count = sum(1 for p in patterns if p.pattern_type == "multi_hop_layering")
+    return SmurfingDetectionResponse(
+        total_patterns=len(patterns),
+        fan_in_count=fan_in_count,
+        fan_out_count=fan_out_count,
+        layering_count=layering_count,
+        patterns=patterns,
+    )
+
+
+@router.post("/cypher/execute", response_model=CypherQueryResponse)
+async def execute_cypher_query(req: CypherQueryRequest) -> CypherQueryResponse:
+    """Safely execute a parameterized Cypher query with read_only mutation rejection."""
+    import time
+
+    start_t = time.perf_counter()
+    try:
+        results = _graph_engine.execute_cypher(
+            query=req.query,
+            params=req.parameters,
+            read_only=req.read_only,
+        )
+        elapsed_ms = (time.perf_counter() - start_t) * 1000.0
+        return CypherQueryResponse(
+            success=True,
+            database_backend=_graph_engine.db_type.capitalize(),
+            row_count=len(results),
+            execution_time_ms=round(elapsed_ms, 2),
+            results=results,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        logger.error("Error executing Cypher query: %s", e)
+        raise HTTPException(status_code=500, detail=f"Cypher execution failed: {e}")
+

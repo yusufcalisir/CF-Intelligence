@@ -585,6 +585,55 @@ class TemporalAnomalyResponse(BaseModel):
     time_window_start: str
 
 
+# ── Graph Ring & Smurfing Analytics ────────────
+
+
+class MuleRingItem(BaseModel):
+    ring_id: str = Field(..., description="Unique deterministic identifier for detected mule ring")
+    length: int = Field(..., ge=3, le=7, description="Number of hops in the cyclic ring (L in [3, 7])")
+    node_ids: list[str] = Field(..., description="Canonical sequence of entity IDs forming the directed transaction loop")
+    bank_ids: list[str] = Field(default_factory=list, description="Unique bank IDs involved in the transaction loop")
+    is_cross_bank: bool = Field(False, description="Flag indicating cross-bank consortium mule ring")
+    risk_score: float = Field(..., ge=0.0, le=1000.0, description="Composite risk score of the cyclic mule ring")
+    detected_at: str = Field(..., description="ISO 8601 timestamp of ring detection")
+
+
+class MuleRingDetectionResponse(BaseModel):
+    rings: list[MuleRingItem]
+    total_rings: int
+    cross_bank_rings: int
+
+
+class SmurfingPatternItem(BaseModel):
+    pattern_id: str = Field(..., description="Unique identifier of detected smurfing pattern")
+    pattern_type: Literal["FAN_IN", "FAN_OUT", "MULTI_HOP_LAYERING"] = Field(
+        ..., description="Smurfing topology pattern type"
+    )
+    central_entity_id: str = Field(..., description="Central mule or aggregator entity ID")
+    counterparty_ids: list[str] = Field(..., description="List of originators or recipient counterparty entity IDs")
+    fan_degree: int = Field(..., ge=1, description="Number of converging or dispersing counterparties")
+    severity: Literal["low", "medium", "high", "critical"] = Field(..., description="Smurfing severity level")
+    risk_score: float = Field(..., ge=0.0, le=1000.0, description="Assessed risk score for the smurfing cluster")
+    detected_at: str = Field(..., description="ISO 8601 timestamp of detection")
+
+
+class SmurfingDetectionResponse(BaseModel):
+    patterns: list[SmurfingPatternItem]
+    total_patterns: int
+
+
+class CypherQueryRequest(BaseModel):
+    query: str = Field(..., min_length=3, max_length=2048, description="Cypher query string to execute")
+    params: dict[str, Any] = Field(default_factory=dict, description="Query parameters dictionary")
+    read_only: bool = Field(True, description="Strictly forbid mutation clauses (MERGE, CREATE, DELETE, SET, etc.)")
+
+
+class CypherQueryResponse(BaseModel):
+    results: list[dict[str, Any]]
+    count: int
+    database_backend: str
+
+
 # ── Evidence & Audit ──────────────────────────
 
 _EVIDENCE_TYPES = Literal[
