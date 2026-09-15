@@ -939,6 +939,50 @@ export interface NegotiatedParamsResponse {
   status: 'COMPATIBLE' | 'DEGRADED';
 }
 
+export interface AsyncUpdateRequest {
+  bank_id: string;
+  submitted_round: number;
+  client_weights: Record<string, number[]>;
+  layer_shapes?: Record<string, number[]> | null;
+  sample_count?: number;
+}
+
+export interface AsyncUpdateResponse {
+  success: boolean;
+  bank_id: string;
+  submitted_round: number;
+  current_round: number;
+  staleness_tau: number;
+  staleness_attenuation: number;
+  effective_alpha: number;
+  layer_keys: string[];
+}
+
+export interface QuorumStatusResponse {
+  round_number: number;
+  registered_nodes_count: number;
+  submitted_nodes_count: number;
+  quorum_threshold_pct: number;
+  current_quorum_pct: number;
+  state: 'WAITING' | 'QUORUM_REACHED' | 'TIMEOUT_EXPIRED';
+  start_time: string;
+  target_window_seconds: number;
+  time_remaining_seconds: number;
+}
+
+export interface AsyncFLEngineStatusResponse {
+  current_round: number;
+  alpha_staleness: number;
+  learning_rate: number;
+  max_staleness: number;
+  staleness_function: string;
+  total_updates: number;
+  dropped_updates: number;
+  applied_updates: number;
+  average_staleness: number;
+  max_observed_staleness: number;
+}
+
 
 
 // ── Privacy Defense Suite (Item 19) ────────────────────────────

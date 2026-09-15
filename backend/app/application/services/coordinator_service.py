@@ -11,6 +11,10 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
+import numpy as np  # noqa: TC002
+
+from app.domain.async_fl_engine import AsyncFLEngine, staleness_attenuation
+from app.domain.quorum_manager import DynamicQuorumManager, RoundQuorumStatus
 from app.infrastructure.logging.siem_exporter import SIEMAuditEvent, SIEMLogExporter
 
 logger = logging.getLogger(__name__)
@@ -55,6 +59,10 @@ class CoordinatorService:
         self.gradient_submissions: dict[int, dict[str, bytes]] = {}
         self.grpc_notifications: deque[dict[str, Any]] = deque(maxlen=1000)
         self._lock = threading.Lock()
+
+        # Domain FL Engines
+        self.async_fl_engine = AsyncFLEngine(current_round=1, alpha_staleness=0.5, learning_rate=0.8)
+        self.quorum_manager = DynamicQuorumManager(quorum_threshold_pct=0.60, target_window_seconds=300)
 
     def register_client(
         self,
@@ -161,6 +169,7 @@ class CoordinatorService:
         }
         self.rounds[round_id] = round_data
         self.gradient_submissions[round_id] = {}
+        self.quorum_manager.register_nodes(active_banks)
 
         # Send StartRoundRequest gRPC notifications to all participating active banks
         for bank_id in active_banks:
@@ -196,6 +205,7 @@ class CoordinatorService:
             self.gradient_submissions[round_id][clean_bank] = gradient_bytes
             submitted_count = len(self.gradient_submissions[round_id])
             min_clients = self.rounds[round_id]["min_clients"]
+            self.quorum_manager.record_node_submission(clean_bank)
 
             logger.info(
                 "Received gradient from '%s' for round %d (%d/%d submissions)",
@@ -374,6 +384,82 @@ class CoordinatorService:
             use_cuda=use_cuda,
             status=status,
         )
+
+    def submit_async_update(
+        self,
+        bank_id: str,
+        submitted_round: int,
+        client_weights: dict[str, np.ndarray],
+        sample_count: int = 100,
+    ) -> dict[str, Any]:
+        """Processes an asynchronous model parameter update with staleness attenuation."""
+        clean_bank = bank_id.lower().strip()
+        if clean_bank not in self.registry:
+            raise ValueError(f"Bank '{clean_bank}' is not registered with the coordinator.")
+
+        self.record_heartbeat(clean_bank)
+
+        prev_round = self.async_fl_engine.current_round
+        updated_weights = self.async_fl_engine.apply_async_update(
+            node_id=clean_bank,
+            submitted_round=submitted_round,
+            client_weights=client_weights,
+            sample_count=sample_count,
+            advance_round=True,
+        )
+
+        tau = max(0, prev_round - submitted_round)
+        s_tau = staleness_attenuation(
+            tau,
+            alpha=self.async_fl_engine.alpha_staleness,
+            func=self.async_fl_engine.staleness_func,
+            max_staleness=self.async_fl_engine.max_staleness,
+        )
+        effective_alpha = float(self.async_fl_engine.learning_rate * s_tau)
+
+        # Log SIEM Audit Event for async update
+        siem = SIEMLogExporter()
+        event = SIEMAuditEvent(
+            event_id=f"async_fl_upd_{clean_bank}_{submitted_round}_{int(time.time())}",
+            event_type="ASYNC_FL_UPDATE_APPLIED",
+            severity="INFO",
+            source_bank=clean_bank,
+            message=(
+                f"Async update from {clean_bank}: submitted_r={submitted_round}, "
+                f"tau={tau}, s(tau)={s_tau:.4f}, eff_alpha={effective_alpha:.4f}, "
+                f"new_round={self.async_fl_engine.current_round}"
+            ),
+        )
+        siem.export_event(event)
+
+        return {
+            "success": True,
+            "bank_id": clean_bank,
+            "submitted_round": submitted_round,
+            "current_round": self.async_fl_engine.current_round,
+            "staleness_tau": tau,
+            "staleness_attenuation": round(s_tau, 6),
+            "effective_alpha": round(effective_alpha, 6),
+            "layer_keys": list(updated_weights.keys()),
+        }
+
+    def get_quorum_status(self, round_id: int | None = None) -> RoundQuorumStatus:
+        """Returns dynamic quorum evaluation status for the active round."""
+        target_round = round_id if round_id is not None else (self.current_round_id or 1)
+        return self.quorum_manager.evaluate_quorum_status(round_number=target_round)
+
+    def prune_completed_rounds(self, keep_last: int = 50) -> int:
+        """Prunes historical completed round data to prevent unbounded memory growth."""
+        with self._lock:
+            if len(self.rounds) <= keep_last:
+                return 0
+            sorted_round_ids = sorted(self.rounds.keys())
+            to_prune = sorted_round_ids[:-keep_last]
+            for r_id in to_prune:
+                self.rounds.pop(r_id, None)
+                self.gradient_submissions.pop(r_id, None)
+            logger.info("Pruned %d historical rounds from coordinator memory", len(to_prune))
+            return len(to_prune)
 
 
 coordinator_service = CoordinatorService()

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import datetime
 import logging
+import threading
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -49,41 +50,47 @@ class DynamicQuorumManager:
     round_start_time: datetime.datetime = field(
         default_factory=lambda: datetime.datetime.now(datetime.UTC)
     )
+    _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def register_nodes(self, node_ids: list[str]) -> None:
-        """Registers participating bank nodes for the active training round."""
-        self.registered_nodes = set(node_ids)
-        self.submitted_nodes.clear()
-        self.round_start_time = datetime.datetime.now(datetime.UTC)
-        logger.info(
-            "Registered %d nodes for dynamic quorum monitoring (threshold=%.0f%%)",
-            len(self.registered_nodes),
-            self.quorum_threshold_pct * 100,
-        )
+        """Registers participating bank nodes for the active training round (thread-safe)."""
+        with self._lock:
+            self.registered_nodes = set(node_ids)
+            self.submitted_nodes.clear()
+            self.round_start_time = datetime.datetime.now(datetime.UTC)
+            logger.info(
+                "Registered %d nodes for dynamic quorum monitoring (threshold=%.0f%%)",
+                len(self.registered_nodes),
+                self.quorum_threshold_pct * 100,
+            )
 
     def record_node_submission(self, node_id: str) -> QuorumState:
-        """Records a gradient/weight submission from a bank node and checks quorum condition."""
-        if node_id in self.registered_nodes:
-            self.submitted_nodes.add(node_id)
+        """Records a gradient/weight submission from a bank node and checks quorum condition (thread-safe)."""
+        with self._lock:
+            if node_id in self.registered_nodes:
+                self.submitted_nodes.add(node_id)
 
         return self.evaluate_quorum_status().state
 
     def evaluate_quorum_status(self, round_number: int = 1) -> RoundQuorumStatus:
         """Evaluates current submission progress against quorum threshold (>= 60%) and timeout window."""
-        total_registered = max(1, len(self.registered_nodes))
-        total_submitted = len(self.submitted_nodes)
-        current_pct = round(total_submitted / total_registered, 4)
+        with self._lock:
+            total_registered = max(1, len(self.registered_nodes))
+            total_submitted = len(self.submitted_nodes)
+            current_pct = round(total_submitted / total_registered, 4)
 
-        now = datetime.datetime.now(datetime.UTC)
-        elapsed = (now - self.round_start_time).total_seconds()
-        time_remaining = max(0.0, self.target_window_seconds - elapsed)
+            now = datetime.datetime.now(datetime.UTC)
+            elapsed = (now - self.round_start_time).total_seconds()
+            time_remaining = max(0.0, self.target_window_seconds - elapsed)
 
-        if current_pct >= self.quorum_threshold_pct:
-            state = QuorumState.QUORUM_REACHED
-        elif elapsed >= self.target_window_seconds:
-            state = QuorumState.TIMEOUT_EXPIRED
-        else:
-            state = QuorumState.WAITING
+            if current_pct >= self.quorum_threshold_pct:
+                state = QuorumState.QUORUM_REACHED
+            elif elapsed >= self.target_window_seconds:
+                state = QuorumState.TIMEOUT_EXPIRED
+            else:
+                state = QuorumState.WAITING
+
+            start_iso = self.round_start_time.isoformat()
 
         logger.debug(
             "Quorum eval: round %d, submitted %d/%d (%.1f%%, threshold=%.1f%%, state=%s)",
@@ -102,7 +109,7 @@ class DynamicQuorumManager:
             quorum_threshold_pct=self.quorum_threshold_pct,
             current_quorum_pct=current_pct,
             state=state,
-            start_time=self.round_start_time.isoformat(),
+            start_time=start_iso,
             target_window_seconds=self.target_window_seconds,
             time_remaining_seconds=round(time_remaining, 2),
         )

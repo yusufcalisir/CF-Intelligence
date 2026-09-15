@@ -734,6 +734,35 @@ $$
   where lower concentration ($\alpha \le 0.50$) synthesizes severe non-IID class imbalance and higher concentration ($\alpha \to 10.0$) approximates uniform IID distributions.
 - **Optuna Bayesian TPE Optimizer (`fl_hyperparameter_optimizer.py`):** Performs automated search over learning rate, local epochs, DP clipping bounds $C_{\text{max}}$, noise scale $\sigma$, and FedProx $\mu$ using `TPESampler` with early `MedianPruner` stopping.
 
+### 5.3 Asynchronous Federated Learning Engine & Dynamic Quorum Coordination (`async_fl_engine.py`, `coordinator_service.py`, `quorum_manager.py`)
+Provides non-blocking, asynchronous parameter updates (FedAsync; Xie et al., 2019) allowing fast participant banks to contribute weights continuously without waiting on high-latency straggler nodes:
+1. **Staleness Attenuation Factor ($S(\tau)$):** Down-weights parameter updates from slower nodes based on staleness delay $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ using polynomial decay with damping coefficient $\alpha$:
+
+$$
+S(\tau) = (1 + \tau)^{-\alpha}, \quad \alpha \in [0.1, 1.0]
+$$
+
+   Supported attenuation formulations also include exponential $S(\tau) = e^{-\alpha \tau}$, constant $S(\tau) = 1.0$, and hinge decay $S(\tau) = \min\left(1, \frac{1}{\alpha(\tau - 2) + 1}\right)$.
+2. **Effective Learning Rate & Global Consensus Update:** Global model parameters $W^{(t+1)}$ are updated as:
+
+$$
+W^{(t+1)} = (1 - \eta \cdot S(\tau)) W^{(t)} + \eta \cdot S(\tau) W_{\mathrm{client}}
+$$
+
+3. **Straggler Bounded Cutoff ($\tau_{\max}$):** Updates with staleness delay exceeding $\tau_{\max} = 50$ are automatically dropped to prevent parameter degradation from ancient checkpoints.
+4. **Byzantine & Non-Finite Defense:** Client parameter updates undergo strict numerical validation (`np.isfinite`); updates containing `NaN` or `Inf` are rejected with `ValueError`, keeping the global consensus model unpoisoned.
+5. **Thread-Safe Mutex Lock:** All read and write operations on global weights and update histories are serialized via internal `threading.Lock()`, guaranteeing race-free multi-tenant concurrency.
+6. **Dynamic Quorum Timeout Manager (`quorum_manager.py`):** Continuously monitors participant check-in progress across bank nodes. A round transitions to `QUORUM_REACHED` as soon as $\ge 60\%$ of active nodes submit, or to `TIMEOUT_EXPIRED` after the 300-second target window.
+7. **Federation Coordinator REST APIs (`coordinator.py`):**
+   - `POST /api/v1/coordinator/handshake`: Dynamic client registration and runtime compatibility validation.
+   - `POST /api/v1/coordinator/heartbeat`: Periodic liveness check-in; drops unresponsive nodes after 15 seconds.
+   - `GET /api/v1/coordinator/clients`: Active participant registry and capability profiles.
+   - `GET /api/v1/coordinator/negotiate` & `POST /negotiate`: Heterogeneous hardware parameter negotiation (CUDA vs. CPU).
+   - `POST /api/v1/coordinator/async-update`: Submit FedAsync staleness-attenuated parameter updates.
+   - `GET /api/v1/coordinator/async-status`: Retrieve runtime staleness metrics and engine parameters.
+   - `GET /api/v1/coordinator/quorum-status`: Inspect dynamic round quorum progress and countdown.
+   - `POST /api/v1/coordinator/rounds/prune`: Free historical in-memory round data to maintain constant memory footprint.
+
 ---
 
 ## 6. Core Privacy-Enhancing Technologies: DP & SecAgg

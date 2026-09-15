@@ -103,6 +103,60 @@ class ClientCapabilityResponse(BaseModel):
     last_heartbeat_ago_seconds: float
 
 
+class AsyncUpdateRequest(BaseModel):
+    bank_id: str = Field(
+        ..., min_length=3, max_length=64, description="Unique bank tenant ID"
+    )
+    submitted_round: int = Field(
+        ..., ge=1, description="Round number client base model was trained on"
+    )
+    client_weights: dict[str, list[float]] = Field(
+        ..., description="Flattened or 1D list of parameter weights per layer"
+    )
+    layer_shapes: dict[str, list[int]] | None = Field(
+        default=None, description="Optional tensor dimensions to reconstruct multi-dimensional weights"
+    )
+    sample_count: int = Field(
+        default=100, ge=1, description="Number of local training samples"
+    )
+
+
+class AsyncUpdateResponse(BaseModel):
+    success: bool
+    bank_id: str
+    submitted_round: int
+    current_round: int
+    staleness_tau: int
+    staleness_attenuation: float
+    effective_alpha: float
+    layer_keys: list[str]
+
+
+class QuorumStatusResponse(BaseModel):
+    round_number: int
+    registered_nodes_count: int
+    submitted_nodes_count: int
+    quorum_threshold_pct: float
+    current_quorum_pct: float
+    state: str
+    start_time: str
+    target_window_seconds: int
+    time_remaining_seconds: float
+
+
+class AsyncFLEngineStatusResponse(BaseModel):
+    current_round: int
+    alpha_staleness: float
+    learning_rate: float
+    max_staleness: int
+    staleness_function: str
+    total_updates: int
+    dropped_updates: int
+    applied_updates: int
+    average_staleness: float
+    max_observed_staleness: int
+
+
 # ── Endpoints ─────────────────────────────────────────────────
 
 
@@ -210,3 +264,68 @@ async def negotiate_training_params_post(
         use_cuda=neg.use_cuda,
         status=neg.status,
     )
+
+
+@router.post("/async-update", response_model=AsyncUpdateResponse)
+async def submit_async_update(req: AsyncUpdateRequest) -> AsyncUpdateResponse:
+    """Submit an asynchronous parameter update attenuated by staleness S(tau)."""
+    import numpy as np
+
+    numpy_weights: dict[str, np.ndarray] = {}
+    for layer, vals in req.client_weights.items():
+        arr = np.array(vals, dtype=np.float32)
+        if req.layer_shapes and layer in req.layer_shapes:
+            try:
+                arr = arr.reshape(req.layer_shapes[layer])
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    detail=f"Shape mismatch reshaping layer '{layer}': {e}",
+                ) from e
+        numpy_weights[layer] = arr
+
+    try:
+        res = coordinator_service.submit_async_update(
+            bank_id=req.bank_id,
+            submitted_round=req.submitted_round,
+            client_weights=numpy_weights,
+            sample_count=req.sample_count,
+        )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        ) from e
+
+    return AsyncUpdateResponse(**res)
+
+
+@router.get("/async-status", response_model=AsyncFLEngineStatusResponse)
+async def get_async_engine_status() -> AsyncFLEngineStatusResponse:
+    """Retrieve runtime staleness damping metrics and hyperparameters of the FedAsync engine."""
+    metrics = coordinator_service.async_fl_engine.get_staleness_metrics()
+    return AsyncFLEngineStatusResponse(**metrics)
+
+
+@router.get("/quorum-status", response_model=QuorumStatusResponse)
+async def get_dynamic_quorum_status(round_id: int | None = None) -> QuorumStatusResponse:
+    """Inspect dynamic quorum threshold progress and countdown for active/specified training round."""
+    q_status = coordinator_service.get_quorum_status(round_id)
+    return QuorumStatusResponse(
+        round_number=q_status.round_number,
+        registered_nodes_count=q_status.registered_nodes_count,
+        submitted_nodes_count=q_status.submitted_nodes_count,
+        quorum_threshold_pct=q_status.quorum_threshold_pct,
+        current_quorum_pct=q_status.current_quorum_pct,
+        state=q_status.state.value if hasattr(q_status.state, "value") else str(q_status.state),
+        start_time=q_status.start_time,
+        target_window_seconds=q_status.target_window_seconds,
+        time_remaining_seconds=q_status.time_remaining_seconds,
+    )
+
+
+@router.post("/rounds/prune")
+async def prune_historical_rounds(keep_last: int = 50) -> dict[str, Any]:
+    """Prune historical in-memory round states to prevent heap memory accumulation."""
+    pruned = coordinator_service.prune_completed_rounds(keep_last=keep_last)
+    return {"pruned_rounds_count": pruned, "keep_last": keep_last}

@@ -247,16 +247,24 @@ The parameter exchange pipeline (`backend/app/infrastructure/security/secure_par
 
 Prevents training round deadlocks caused by bank node network outages, maintenance windows, or latency spikes.
 
-### 6.1 Asynchronous Federated Aggregation (`async_fl_engine.py`)
-The `AsyncFLEngine` implements the **FedAsync** parameter update protocol. Fast bank nodes submit model updates immediately — without blocking on straggler nodes — using a staleness attenuation factor to preserve convergence quality.
+### 6.1 Asynchronous Federated Aggregation (`async_fl_engine.py`, `coordinator_service.py`)
+The `AsyncFLEngine` implements the **FedAsync** parameter update protocol (Xie et al., 2019). Fast bank nodes submit model updates immediately — without blocking on straggler nodes — using a staleness attenuation factor to preserve convergence quality.
 
-**Staleness Attenuation Function:**
+**Staleness Attenuation Functions ($S(\tau)$):**
 $$S(\tau) = (1 + \tau)^{-\alpha}$$
-where $\tau = t_{\text{current}} - t_{\text{submitted}}$ (rounds elapsed since submission) and $\alpha$ is the attenuation exponent (default: $\alpha = 0.5$).
+where $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ (rounds elapsed since submission) and $\alpha$ is the attenuation exponent (default: $\alpha = 0.5$). Additional supported formulations include exponential decay $S(\tau) = e^{-\alpha \tau}$, constant $S(\tau) = 1.0$, and hinge decay $S(\tau) = \min\left(1, \frac{1}{\alpha(\tau - 2) + 1}\right)$.
+
+**Straggler Cutoff Bound ($\tau_{\max}$):**
+Updates with $\tau > \tau_{\max} = 50$ are automatically dropped ($S(\tau) = 0.0$) to prevent model divergence caused by severely outdated gradients.
 
 **Global Weight Update Rule:**
 $$W^{(t+1)} = (1 - \alpha_\tau)\,W^{(t)} + \alpha_\tau\,W_i^{(t-\tau)}$$
 where $\alpha_\tau = \eta \cdot S(\tau)$ is the learning rate weighted by staleness attenuation. Fresh updates ($\tau = 0$) receive full learning rate weight ($S(0) = 1.0$); older stale updates are progressively down-weighted.
+
+**Invariants & Safety Protections:**
+- **Byzantine Non-Finite Guard:** Automatic pre-aggregation inspection (`np.isfinite`); any incoming tensor with `NaN` or `Inf` triggers an immediate `ValueError` without mutating the global state.
+- **Thread-Safe Concurrency:** Serialized via internal `threading.Lock()` across concurrent bank submission threads.
+- **Memory Management:** Bounded update history buffer (`maxlen=500`) and round pruning (`prune_completed_rounds`) prevent heap accumulation.
 
 ### 6.2 Dynamic Quorum Timeout Manager (`quorum_manager.py`)
 The `DynamicQuorumManager` monitors real-time round submission progress across all registered bank nodes. It automatically triggers round aggregation as soon as the minimum quorum threshold is satisfied — without waiting for the target window to expire.
@@ -270,8 +278,8 @@ The `DynamicQuorumManager` monitors real-time round submission progress across a
 
 **Auto-Aggregation Protocol:**
 1. Bank nodes register for the round via `register_nodes(node_ids)`.
-2. Each gradient/weight submission is recorded via `record_node_submission(node_id)`.
-3. After each submission, `evaluate_quorum_status()` checks: $\frac{|\text{submitted}|}{|\text{registered}|} \ge 0.60$.
+2. Each gradient/weight submission is recorded via `record_node_submission(node_id)` under thread-safe synchronization.
+3. After each submission, `evaluate_quorum_status()` checks: $\frac{|\mathrm{submitted}|}{|\mathrm{registered}|} \ge 0.60$.
 4. If `QUORUM_REACHED` $\to$ immediate aggregation trigger (no timeout wait).
 5. If `TIMEOUT_EXPIRED` $\to$ graceful fallback with partial aggregation from submitted nodes.
 

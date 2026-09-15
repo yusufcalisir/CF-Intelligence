@@ -750,6 +750,21 @@ export default function CoordinatorPage() {
                 path: '/api/v1/coordinator/negotiate',
                 desc: 'Retrieve heterogeneous training parameters for a bank node',
               },
+              {
+                method: 'POST',
+                path: '/api/v1/coordinator/async-update',
+                desc: 'Submit FedAsync parameter update with staleness damping S(tau)',
+              },
+              {
+                method: 'GET',
+                path: '/api/v1/coordinator/quorum-status',
+                desc: 'Inspect dynamic quorum threshold progress and round countdown',
+              },
+              {
+                method: 'GET',
+                path: '/api/v1/coordinator/async-status',
+                desc: 'Inspect FedAsync staleness attenuation metrics and parameters',
+              },
             ].map(({ method, path, desc }) => {
               const isCopied = copiedPath === path;
 
