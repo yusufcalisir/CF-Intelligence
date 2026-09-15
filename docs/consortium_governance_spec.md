@@ -96,14 +96,27 @@ class ProposalStatus(str, Enum):
 
 ---
 
-## 🛡️ 4. Pre-Round Policy Enforcement Engine
+## 🛡️ 4. Pre-Round Policy Enforcement Engine & Dynamic Sharing Rules
 
-Prior to launching any federated training round, [`ConsortiumPolicyEngine`](../backend/app/domain/consortium_policy.py) evaluates 4 pre-flight invariants:
+Prior to launching any federated training round, [`ConsortiumPolicyEngine`](../backend/app/domain/consortium_policy.py) evaluates 7 pre-flight invariants:
 
-1. **Quorum Member Count**: Verifies that active participating banks meet or exceed `min_active_members` (default: 2 banks).
-2. **Differential Privacy Expenditure Cap**: Asserts that proposed round noise budget satisfies $\epsilon_{\text{round}} \le \min(\text{consortium}.\epsilon_{\max}, \text{policy}.\epsilon_{\max})$.
-3. **Active Membership Authentication**: Validates that all candidate bank nodes are active members of the consortium.
-4. **Model Architecture Whitelist**: Ensures the neural network architecture is whitelisted (`PyTorch_MLP`, `GraphSAGE`, `GAT`, `LogisticRegression`).
+1. **Quorum Member Count & Sybil Duplicate Prevention**:
+   - Verifies that unique active participating banks meet or exceed `min_active_members` (default: 2 banks).
+   - Enforces Sybil protection by rejecting participation manifests containing duplicate bank identities (`unique_banks != participating_banks`).
+2. **Differential Privacy Expenditure Cap**:
+   - Asserts that proposed round noise budget satisfies $\epsilon_{\text{round}} \le \min(\text{consortium}.\epsilon_{\max}, \text{policy}.\epsilon_{\max})$.
+   - Validates that $\epsilon_{\text{round}}$ is positive and mathematically finite ($\epsilon > 0.0, \epsilon \neq \infty, \epsilon \neq \text{NaN}$).
+3. **Active Membership Authentication**:
+   - Validates that all candidate bank nodes are active members of the consortium (`bank_id in consortium.members` with active status).
+4. **Model Architecture Whitelist**:
+   - Ensures the neural network architecture is whitelisted (`PyTorch_MLP`, `GraphSAGE`, `GAT`, `LogisticRegression`).
+5. **Cross-Border Data Sovereignty & Regional Governance Rings**:
+   - Validates participant jurisdictions against `allowed_regions` (e.g., `["EU", "EEA"]`).
+   - If participant banks span multiple sovereign regions (e.g., `EU` and `US`), cross-border model exchange is prohibited unless `allow_cross_border_sharing=True` is explicitly approved via consortium governance voting (Schrems II and GDPR Article 22 compliance).
+6. **Restricted PII Feature Governance**:
+   - Scans proposed shared feature sets against `restricted_features` (e.g., `["ssn", "national_id", "raw_account_number", "iban"]`) to guarantee zero direct PII transmission.
+7. **Minimum Local Data Sample Contribution**:
+   - Evaluates `member_sample_counts` against `min_data_samples_per_member` (default: $\ge 100$ records) to eliminate free-rider institutions attempting to benefit from federated weights without proportional data contribution.
 
 If any invariant fails, the engine raises `ConsortiumPolicyViolation` and aborts round execution.
 
@@ -140,13 +153,22 @@ proposal = service.propose_membership_change(
 assert proposal.status == ProposalStatus.APPROVED
 assert "bank_b" in consortium.members
 
-# 4. Enforce FL round preconditions
-engine = ConsortiumPolicyEngine(config=ConsortiumPolicyConfig(min_active_members=2))
+# 4. Enforce FL round preconditions with cross-border and sample validation
+engine = ConsortiumPolicyEngine(
+    config=ConsortiumPolicyConfig(
+        min_active_members=2,
+        allow_cross_border_sharing=False,
+        allowed_regions=["EU", "EEA"],
+        min_data_samples_per_member=100,
+    )
+)
 is_valid, reasons = engine.validate_fl_round_preconditions(
     consortium=consortium,
     participating_banks=["bank_a", "bank_b"],
     round_epsilon=2.0,
     architecture="PyTorch_MLP",
+    participant_regions={"bank_a": "EU", "bank_b": "EU"},
+    member_sample_counts={"bank_a": 500, "bank_b": 750},
 )
 assert is_valid is True
 ```
@@ -155,13 +177,14 @@ assert is_valid is True
 
 ## 🧪 6. Automated Unit Test Suite Parity
 
-The consortium governance and policy enforcement modules are verified across **7 automated unit tests**:
+The consortium governance and policy enforcement modules are verified across **22 automated unit tests**:
 
 ```bash
 python -m pytest \
   backend/tests/unit/test_consortium_governance.py \
-  backend/tests/unit/test_consortium_policy.py -v
-# 7 passed in 0.99s (100% Pass)
+  backend/tests/unit/test_consortium_policy.py \
+  backend/tests/unit/test_consortium_policy_hardening.py -v
+# 22 passed in 1.48s (100% Pass)
 ```
 
 | Test File | Test Function | Verification Scope |
@@ -173,3 +196,11 @@ python -m pytest \
 | `test_consortium_policy.py` | `test_consortium_policy_blocks_insufficient_quorum` | Blocks FL round when participating bank count is below minimum threshold. |
 | `test_consortium_policy.py` | `test_consortium_policy_blocks_exceeded_epsilon` | Rejects round proposal exceeding global DP privacy expenditure cap. |
 | `test_consortium_policy.py` | `test_consortium_policy_blocks_unapproved_bank` | Rejects unapproved or evicted bank nodes attempting to participate. |
+| `test_consortium_policy_hardening.py` | `test_policy_config_validation_invalid_bounds` | Invalid configuration parameters rejection (`min_active_members < 1`, $\epsilon \le 0$). |
+| `test_consortium_policy_hardening.py` | `test_duplicate_participating_banks_rejected` | Prevents Sybil attacks from spoofing participant quorum with duplicate bank IDs. |
+| `test_consortium_policy_hardening.py` | `test_cross_border_sharing_blocked_by_default` | Rejects cross-border round execution without explicit consortium waiver. |
+| `test_consortium_policy_hardening.py` | `test_cross_border_sharing_allowed_with_waiver` | Permits compliant cross-border federation when sovereign waiver is activated. |
+| `test_consortium_policy_hardening.py` | `test_disallowed_region_rejected` | Rejects unapproved jurisdiction nodes participating in training rings. |
+| `test_consortium_policy_hardening.py` | `test_restricted_features_blocked` | Rejects round attempts sharing raw PII attributes (SSN, IBAN). |
+| `test_consortium_policy_hardening.py` | `test_member_sample_counts_enforced` | Prevents free-rider participation by requiring minimum local sample volume. |
+| `test_consortium_policy_hardening.py` | `test_direct_cross_border_helper` | Validates `validate_cross_border_sharing` helper and DP enforcement safeguards. |
