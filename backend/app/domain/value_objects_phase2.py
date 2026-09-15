@@ -144,6 +144,7 @@ class RiskWeightConfig:
     previous_alerts: float = 0.08
     chargeback_history: float = 0.07
     behavior_anomaly: float = 0.07
+    gnn_topological_risk: float = 0.0
 
     def to_dict(self) -> dict[str, float]:
         return {
@@ -156,6 +157,7 @@ class RiskWeightConfig:
             "previous_alerts": self.previous_alerts,
             "chargeback_history": self.chargeback_history,
             "behavior_anomaly": self.behavior_anomaly,
+            "gnn_topological_risk": self.gnn_topological_risk,
         }
 
 

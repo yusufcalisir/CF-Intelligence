@@ -13,6 +13,8 @@ are independent, and the combination logic is configurable.
 from __future__ import annotations
 
 import logging
+import math
+import threading
 
 from app.domain.value_objects_phase2 import RiskScore, RiskSignal, RiskWeightConfig
 
@@ -89,6 +91,7 @@ class RiskScoringEngine:
 
     def __init__(self, weights: RiskWeightConfig | None = None) -> None:
         self.weights = weights or RiskWeightConfig()
+        self._lock = threading.RLock()
         # In-memory lookups for historical data (populated by scenario engine)
         self._alert_history: dict[str, int] = {}  # entity_hash → alert count
         self._chargeback_history: dict[str, float] = {}  # entity_hash → chargeback rate
@@ -143,9 +146,8 @@ class RiskScoringEngine:
                 if online_feats:
                     feats = online_feats[0]
                     # Map online features back to txn fields for scoring
-                    txn_eval["velocity"] = feats.get(
-                        "rolling_velocity_1h", txn_eval.get("velocity", 1.0)
-                    )
+                    fs_velocity = feats.get("rolling_velocity_1h", 1.0)
+                    txn_eval["velocity"] = max(txn_eval.get("velocity", 1.0), fs_velocity)
                     txn_eval["customer_history_score"] = feats.get(
                         "customer_history_score", txn_eval.get("customer_history_score", 0.95)
                     )
@@ -179,6 +181,15 @@ class RiskScoringEngine:
             self._eval_behavior_anomaly(txn_eval, entity_hash),
         ]
 
+        # Evaluate GNN topological risk if configured or supplied in transaction
+        if (
+            self.weights.gnn_topological_risk > 0.0
+            or "gnn_topological_risk" in txn_eval
+            or "gnn_score" in txn_eval
+            or "gnn_risk_score" in txn_eval
+        ):
+            signals.append(self._eval_gnn_topological_risk(txn_eval))
+
         composite = self._combine_signals(signals)
 
         return RiskScore(
@@ -187,17 +198,21 @@ class RiskScoringEngine:
         )
 
     def update_weights(self, weights: RiskWeightConfig) -> None:
-        self.weights = weights
+        with self._lock:
+            self.weights = weights
 
     def register_alert(self, entity_hash: str) -> None:
         """Record an alert for historical signal tracking."""
-        self._alert_history[entity_hash] = self._alert_history.get(entity_hash, 0) + 1
+        with self._lock:
+            self._alert_history[entity_hash] = self._alert_history.get(entity_hash, 0) + 1
 
     def register_chargeback(self, entity_hash: str, rate: float) -> None:
-        self._chargeback_history[entity_hash] = rate
+        with self._lock:
+            self._chargeback_history[entity_hash] = rate
 
     def register_baseline(self, entity_hash: str, baseline: dict) -> None:
-        self._behavior_baselines[entity_hash] = baseline
+        with self._lock:
+            self._behavior_baselines[entity_hash] = baseline
 
     # ── Signal evaluators ─────────────────────
 
@@ -284,7 +299,8 @@ class RiskScoringEngine:
         )
 
     def _eval_previous_alerts(self, entity_hash: str) -> RiskSignal:
-        count = self._alert_history.get(entity_hash, 0)
+        with self._lock:
+            count = self._alert_history.get(entity_hash, 0)
         # Normalize: 0 alerts = 0 risk, 5+ alerts = max risk
         normalized = min(1.0, count / 5) if count > 0 else 0.0
         return RiskSignal(
@@ -296,7 +312,8 @@ class RiskScoringEngine:
         )
 
     def _eval_chargeback_history(self, entity_hash: str) -> RiskSignal:
-        rate = self._chargeback_history.get(entity_hash, 0.0)
+        with self._lock:
+            rate = self._chargeback_history.get(entity_hash, 0.0)
         normalized = min(1.0, rate * 10)  # 10% chargeback rate → max risk
         return RiskSignal(
             signal_name="chargeback_history",
@@ -307,7 +324,8 @@ class RiskScoringEngine:
         )
 
     def _eval_behavior_anomaly(self, txn: dict, entity_hash: str) -> RiskSignal:
-        baseline = self._behavior_baselines.get(entity_hash)
+        with self._lock:
+            baseline = self._behavior_baselines.get(entity_hash)
         if not baseline:
             return RiskSignal(
                 signal_name="behavior_anomaly",
@@ -337,6 +355,30 @@ class RiskScoringEngine:
             raw_value=z_score,
             normalized_score=normalized,
             explanation=f"Amount deviation: {z_score:.1f}σ from baseline",
+        )
+
+    def _eval_gnn_topological_risk(self, txn: dict) -> RiskSignal:
+        raw_gnn = txn.get(
+            "gnn_topological_risk", txn.get("gnn_score", txn.get("gnn_risk_score", 0.0))
+        )
+        try:
+            val = float(raw_gnn)
+            if math.isnan(val) or math.isinf(val):
+                val = 0.0
+        except (ValueError, TypeError):
+            val = 0.0
+        normalized = max(0.0, min(1.0, val))
+        weight = (
+            self.weights.gnn_topological_risk
+            if self.weights.gnn_topological_risk > 0.0
+            else 0.10
+        )
+        return RiskSignal(
+            signal_name="gnn_topological_risk",
+            weight=weight,
+            raw_value=val,
+            normalized_score=normalized,
+            explanation=f"GNN topological risk score: {normalized:.1%}",
         )
 
     # ── Combiner ──────────────────────────────

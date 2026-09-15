@@ -662,6 +662,10 @@ async def score_transaction(
     """Low-Latency Real-Time Risk Decision API providing sub-10ms risk evaluation against the globally trained model."""
     start_time = time.perf_counter()
 
+    # Enforce multi-tenant isolation if tenant header is provided
+    if caller_tenant and x_bank_id:
+        enforce_tenant_isolation(caller_tenant, x_bank_id)
+
     # Derive canonical merchant category from merchant_id for risk engine lookup
     _merchant_id_lower = payload.merchant_id.lower()
     if (
@@ -710,6 +714,37 @@ async def score_transaction(
     # Derive velocity: elevated for high-risk merchant categories (crypto, gambling, wire_transfer)
     velocity = 7.5 if merchant_category in ("crypto", "gambling", "wire_transfer") else 2.0
 
+    # Online Feature Store: query real customer and merchant historical features if enabled
+    customer_history_score = 0.90
+    chargeback_count = 0
+    account_age_days = 365
+    if _settings.feature_store_enabled:
+        try:
+            entity_rows = [
+                {
+                    "customer_id": f"serving:{payload.account_id}",
+                    "merchant_id": payload.merchant_id,
+                }
+            ]
+            online_feats = _feature_store.get_online_features(
+                entity_rows,
+                [
+                    "customer_history_score",
+                    "account_age_days",
+                    "chargeback_count",
+                    "rolling_velocity_1h",
+                ],
+            )
+            if online_feats:
+                feats = online_feats[0]
+                customer_history_score = feats.get("customer_history_score", customer_history_score)
+                chargeback_count = feats.get("chargeback_count", chargeback_count)
+                account_age_days = feats.get("account_age_days", account_age_days)
+                if "rolling_velocity_1h" in feats:
+                    velocity = max(velocity, float(feats["rolling_velocity_1h"]))
+        except Exception as exc:
+            logger.debug("Feature Store online query failed in score_transaction: %s", exc)
+
     txn_dict = {
         "transaction_amount": payload.amount,
         "merchant_category": merchant_category,
@@ -718,14 +753,39 @@ async def score_transaction(
         "velocity": velocity,
         "hour_of_day": time.gmtime().tm_hour,
         "merchant_risk_score": merchant_risk,
-        "customer_history_score": 0.90,
-        "chargeback_count": 0,
-        "account_age_days": 365,
+        "customer_history_score": customer_history_score,
+        "chargeback_count": chargeback_count,
+        "account_age_days": account_age_days,
         **({"country_risk_score": country_risk_override} if country_risk_override else {}),
     }
 
-    # Run composite risk scoring engine offloaded to threadpool
-    risk_score_obj = await asyncio.to_thread(_risk_engine.score_transaction, txn_dict, 0.15)
+    # 1. Real ML model inference via cached serving neural network
+    try:
+        serving_model = _get_cached_serving_model()
+        input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
+        network = getattr(serving_model, "network", None)
+        first_layer = (
+            network[0]
+            if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list)) and len(network) > 0
+            else None
+        )
+        input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
+        if input_tensor.shape[1] < input_dim:
+            input_tensor = torch.nn.functional.pad(
+                input_tensor, (0, input_dim - input_tensor.shape[1]), value=0.0
+            )
+        elif input_tensor.shape[1] > input_dim:
+            input_tensor = input_tensor[:, :input_dim]
+        ml_prediction = await asyncio.to_thread(_eval_model, serving_model, input_tensor)
+    except Exception as exc:
+        logger.warning("Serving model inference failed; using baseline risk: %s", exc)
+        ml_prediction = 0.15
+
+    # Run composite risk scoring engine offloaded to threadpool with genuine ML confidence
+    entity_hash = f"scoring:{x_bank_id or 'global'}:{payload.account_id}"
+    risk_score_obj = await asyncio.to_thread(
+        _risk_engine.score_transaction, txn_dict, ml_prediction, entity_hash
+    )
     raw_score = risk_score_obj.score
 
     # Normalize integer risk score [0, 1000]

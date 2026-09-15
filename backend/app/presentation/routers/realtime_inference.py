@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import io
 import logging
 import pickle
+import threading
 import time
 from typing import Any
 
@@ -92,6 +94,7 @@ class RealtimeInferenceResponse(BaseModel):
 fallback_engine = InferenceFallbackEngine()
 
 # Circuit Breaker & Redis Cache State
+_cb_lock = threading.Lock()
 _consecutive_failures: int = 0
 _circuit_open: bool = False
 _circuit_opened_at: float = 0.0
@@ -102,16 +105,18 @@ _cached_from_redis: bool = False
 def reset_circuit_breaker() -> None:
     """Reset circuit breaker state for testing or recovery."""
     global _consecutive_failures, _circuit_open, _circuit_opened_at
-    _consecutive_failures = 0
-    _circuit_open = False
-    _circuit_opened_at = 0.0
+    with _cb_lock:
+        _consecutive_failures = 0
+        _circuit_open = False
+        _circuit_opened_at = 0.0
 
 
 def reset_model_cache() -> None:
     """Clear local and Redis cached scripted model."""
     global _cached_scripted_model, _cached_from_redis
-    _cached_scripted_model = None
-    _cached_from_redis = False
+    with _cb_lock:
+        _cached_scripted_model = None
+        _cached_from_redis = False
 
 
 def get_scripted_model() -> tuple[Any, bool]:
@@ -133,7 +138,11 @@ def get_scripted_model() -> tuple[Any, bool]:
         if redis_client:
             cached_bytes = redis_client.get("cfi:champion_model")
             if cached_bytes:
-                _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301
+                try:
+                    buffer = io.BytesIO(cached_bytes)
+                    _cached_scripted_model = torch.jit.load(buffer)
+                except Exception:
+                    _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301 fallback
                 _cached_from_redis = True
                 logger.info(
                     "Loaded champion TorchScript model from Redis cache (cfi:champion_model)."
@@ -163,14 +172,20 @@ def get_scripted_model() -> tuple[Any, bool]:
         try:
             state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
             # Only load keys that match the GroupNorm architecture
-            compatible = {k: v for k, v in state_dict.items()
-                          if "running_mean" not in k and "running_var" not in k
-                          and "num_batches_tracked" not in k}
+            compatible = {
+                k: v
+                for k, v in state_dict.items()
+                if "running_mean" not in k
+                and "running_var" not in k
+                and "num_batches_tracked" not in k
+            }
             missing, unexpected = fresh_model.load_state_dict(compatible, strict=False)
             if missing:
                 logger.debug("JIT model: %d keys not loaded (expected for GroupNorm)", len(missing))
         except Exception as exc:
-            logger.warning("Champion weights incompatible with GroupNorm model: %s — using random init", exc)
+            logger.warning(
+                "Champion weights incompatible with GroupNorm model: %s — using random init", exc
+            )
 
     fresh_model.eval()
 
@@ -187,15 +202,20 @@ def get_scripted_model() -> tuple[Any, bool]:
     _cached_scripted_model = scripted
     _cached_from_redis = False
 
-    # Store in Redis
+    # Store in Redis safely using io.BytesIO buffer
     try:
         from app.infrastructure.cache import get_redis_client
 
         redis_client = get_redis_client()
         if redis_client:
-            redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301
-    except Exception:
-        pass
+            try:
+                buffer = io.BytesIO()
+                torch.jit.save(scripted, buffer)
+                redis_client.set("cfi:champion_model", buffer.getvalue(), ex=3600)
+            except Exception:
+                redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301 fallback
+    except Exception as exc:
+        logger.debug("Failed to store champion model in Redis: %s", exc)
 
     return _cached_scripted_model, False
 
@@ -210,9 +230,13 @@ def score_transaction_realtime(
     start_time = time.perf_counter()
     now = time.time()
 
-    # 1. Check Circuit Breaker State (60s cooldown)
-    if _circuit_open:
-        if now - _circuit_opened_at > 60.0:
+    # 1. Check Circuit Breaker State (60s cooldown) under thread lock
+    with _cb_lock:
+        is_open = _circuit_open
+        opened_at = _circuit_opened_at
+
+    if is_open:
+        if now - opened_at > 60.0:
             logger.info("Circuit Breaker cooldown elapsed. Attempting model recovery...")
             reset_circuit_breaker()
         else:
@@ -241,21 +265,27 @@ def score_transaction_realtime(
         # 2. Get TorchScript Model (Redis cache or JIT)
         scripted_model, from_redis = get_scripted_model()
 
-        # 3. Construct input feature vector (10 features)
-        merchant_risk = (
-            0.5 if payload.merchant_category.lower() in ("crypto_exchange", "gambling") else 0.1
+        # 3. Construct canonical input feature vector (10 features) aligned with FEATURE_NAMES
+        from app.application.services.data_generator import MERCHANT_CATEGORIES
+
+        cat_str = payload.merchant_category.lower()
+        merchant_risk = 0.50 if cat_str in ("crypto_exchange", "crypto", "gambling") else 0.10
+        cat_idx = float(
+            MERCHANT_CATEGORIES.index(cat_str) if cat_str in MERCHANT_CATEGORIES else 0
         )
+        hour_now = float(time.gmtime().tm_hour)
+
         features = [
-            payload.amount / 1000.0,
-            float(payload.velocity_1h),
+            min(1.0, max(0.0, payload.amount / 5000.0)),
+            min(1.0, max(0.0, cat_idx / 19.0)),
+            0.0,  # country_code index (US default)
+            0.25,  # device_type (mobile_app / web_browser default)
+            min(1.0, max(0.0, float(payload.velocity_1h) / 30.0)),
+            min(1.0, max(0.0, hour_now / 23.0)),
             merchant_risk,
-            0.1,
-            0.2,
-            0.0,
-            0.3,
-            0.05,
-            0.1,
-            0.0,
+            0.90,  # customer_history_score
+            0.0,  # chargeback_count
+            0.365,  # account_age_days (365/1000)
         ]
         input_tensor = torch.FloatTensor([features])
 
@@ -265,7 +295,8 @@ def score_transaction_realtime(
             model_score = float(output.item()) if hasattr(output, "item") else float(output[0])
 
         # Reset consecutive failures on success
-        _consecutive_failures = 0
+        with _cb_lock:
+            _consecutive_failures = 0
 
         # High amount rule overlay
         reasons: list[str] = []
@@ -273,7 +304,7 @@ def score_transaction_realtime(
         if payload.amount > 20000.0:
             final_score += 0.30
             reasons.append("High amount")
-        if payload.merchant_category.lower() in ("crypto_exchange", "gambling", "p2p_cash"):
+        if cat_str in ("crypto_exchange", "crypto", "gambling", "p2p_cash"):
             final_score += 0.25
             reasons.append("High-risk merchant")
 
@@ -307,18 +338,20 @@ def score_transaction_realtime(
         )
 
     except Exception as exc:
-        _consecutive_failures += 1
+        with _cb_lock:
+            _consecutive_failures += 1
+            cur_failures = _consecutive_failures
+            if cur_failures >= 3:
+                _circuit_open = True
+                _circuit_opened_at = time.time()
+                logger.error("Inference Circuit Breaker TRIPPED OPEN after 3 failures!")
+
         logger.warning(
             "Primary ML inference failed for tx %s (strike %d/3: %s).",
             payload.transaction_id,
-            _consecutive_failures,
+            cur_failures,
             exc,
         )
-
-        if _consecutive_failures >= 3:
-            _circuit_open = True
-            _circuit_opened_at = time.time()
-            logger.error("Inference Circuit Breaker TRIPPED OPEN after 3 failures!")
 
         decision, risk_score, explanation = fallback_engine.evaluate_heuristic_fallback(
             amount=payload.amount,
