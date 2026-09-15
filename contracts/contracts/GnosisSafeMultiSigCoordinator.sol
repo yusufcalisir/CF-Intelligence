@@ -133,6 +133,19 @@ contract GnosisSafeMultiSigCoordinator {
     }
 
     /**
+     * @notice Revoke a previous confirmation for a pending proposal that has not yet been executed.
+     */
+    function revokeConfirmation(uint256 _txId) external onlyOwner txExists(_txId) notExecuted(_txId) {
+        require(isConfirmedBy[_txId][msg.sender], "GnosisSafeMultiSig: Transaction not confirmed by caller");
+        Transaction storage txn = transactions[_txId];
+        require(txn.confirmationCount > 0, "GnosisSafeMultiSig: Confirmation count underflow guard");
+        txn.confirmationCount -= 1;
+        isConfirmedBy[_txId][msg.sender] = false;
+
+        emit ConfirmationRevoked(_txId, msg.sender);
+    }
+
+    /**
      * @notice Get confirmation status for all 3 trustee owners.
      */
     function getConfirmations(uint256 _txId) external view txExists(_txId) returns (bool[3] memory confirmations) {

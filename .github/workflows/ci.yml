@@ -62,7 +62,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 1344 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 1351 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -337,7 +337,7 @@ jobs:
   # 11. EVM Smart Contracts Test Suite
   # --------------------------------------------------------------------------
   smart-contracts-suite:
-    name: 11. EVM Smart Contracts Test Suite (Hardhat 13 Tests)
+    name: 11. EVM Smart Contracts Test Suite (Hardhat 31 Tests)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code

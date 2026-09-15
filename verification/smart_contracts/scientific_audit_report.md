@@ -13,12 +13,12 @@
 This report delivers a comprehensive scientific audit and formal verification of the **Consortium Incentive Settlement** smart contract (`ConsortiumIncentiveSettlement.sol`) and **Gnosis Safe 2-of-3 Multi-Sig Coordinator Governance** (`GnosisSafeMultiSigCoordinator.sol`) executing on EVM-compatible blockchains. The contract automates CBDC (Central Bank Digital Currency) or Fiat-Backed Stablecoin (`e-TRY`, `USDC`) incentive distribution based on cryptographic **Leave-One-Out (LOO) Federated Shapley Values**, linking disbursements directly to SHA-256 / Keccak-256 on-chain audit proof hashes (`auditProofHash`).
 
 The verification suite encompasses:
-1. **Hardhat EVM Integration Suite:** 13/13 passing tests on local EVM nodes.
+1. **Hardhat EVM Integration Suite:** 31/31 passing tests on local EVM nodes (`ConsortiumIncentiveSettlement` + `GnosisSafeMultiSigCoordinator`).
 2. **Pure-Python Reference Verification Engine:** 30/30 passing multi-bank scenarios.
 3. **Property-Based Testing (Hypothesis):** 3 core protocol properties verified across 200+ randomized inputs.
 4. **Adversarial Failure Injection:** 5 fault injection attack vectors tested and mitigated.
 5. **Gas Cost & Scalability Benchmarking:** Empirical $\mathcal{O}(N)$ gas scaling analysis ($N \in [2, 100]$ banks).
-6. **Gnosis Safe 2-of-3 Multi-Sig Governance Unit Suite:** 5/5 passing threshold governance scenarios.
+6. **Gnosis Safe 2-of-3 Multi-Sig Governance Unit Suite:** 12/12 Hardhat tests + 16/16 backend tests passed.
 
 ---
 
@@ -57,14 +57,19 @@ Each settlement transaction embeds `auditProofHash = keccak256(EpochAuditData)`,
 
 ## 4. Empirical Verification Evidence & Multi-Phase Test Results
 
-### 4.1 Hardhat EVM Integration Suite (`contracts/test/ConsortiumIncentiveSettlement.test.js`)
-All 13 tests passed cleanly on EVM Paris:
-| Test Category | Contract Verification Target | Assertion Count | Execution Result |
+### 4.1 Hardhat EVM Integration Suite (`ConsortiumIncentiveSettlement.test.js` & `GnosisSafeMultiSigCoordinator.test.js`)
+All 31 tests passed cleanly on EVM Paris:
+| Test Category | Contract Verification Target | Test Count | Execution Result |
 |:---|:---|:---:|:---:|
-| **Contract Deployment** | Coordinator & Stablecoin Address Binding | 1 Assertion | 🟢 **PASSED** |
-| **Pool Funding** | Deposit Mechanics & Zero-Deposit Guards | 3 Assertions | 🟢 **PASSED** |
-| **Incentive Distribution** | Shapley Proportional Allocation & Proof Hash | 4 Assertions | 🟢 **PASSED** |
-| **Payout & Governance** | Multi-Bank Claims, Double-Claim Guard, Quarantine | 5 Assertions | 🟢 **PASSED (1.00s)** |
+| **Contract Deployment** | Coordinator, Currency, Initial Pool & Validation Guards | 4 Tests | 🟢 **PASSED** |
+| **Pool Funding** | Deposit Mechanics, Positive Wei & Non-Coordinator Guards | 3 Tests | 🟢 **PASSED** |
+| **Incentive Distribution** | Shapley Proportional Allocation, Proof Hash, Array Mismatch | 5 Tests | 🟢 **PASSED** |
+| **Payout & Governance** | Multi-Bank Claims, Double-Claim Guard, Quarantine & Clearing | 5 Tests | 🟢 **PASSED** |
+| **Byzantine Slashing** | Stake/Penalty Slashing, Event Emission, Revert on Zero Address | 2 Tests | 🟢 **PASSED** |
+| **Gnosis Multi-Sig Setup** | 3 Unique Owners, Threshold 2, Zero-Address Rejection | 3 Tests | 🟢 **PASSED** |
+| **Proposal Lifecycle** | Propose, Auto-Confirmation, Non-Owner Rejection | 2 Tests | 🟢 **PASSED** |
+| **Threshold Execution** | 2-of-3 Threshold Trigger, Duplicate Confirmation Rejection | 4 Tests | 🟢 **PASSED** |
+| **Signature Revocation** | Pre-Execution Revocation, Confirmation Count Decrement | 3 Tests | 🟢 **PASSED (2.00s)** |
 
 ### 4.2 Phase 1: Pure-Python Reference Verification (`smart_contracts_reference_verification.py`)
 - Evaluated **30 independent multi-bank consortium settlement scenarios** ($N \in [3, 10]$ banks, pool sizes up to $10^{24}$ wei).

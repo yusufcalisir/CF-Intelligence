@@ -11,6 +11,7 @@ import datetime
 import hashlib
 import json
 import logging
+import threading
 from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
@@ -54,6 +55,7 @@ class GnosisSafeMultiSigCoordinatorDriver:
         ]
         self._proposals: dict[int, MultiSigProposal] = {}
         self._tx_counter = 0
+        self._lock = threading.RLock()
 
     def submit_proposal(
         self,
@@ -63,91 +65,145 @@ class GnosisSafeMultiSigCoordinatorDriver:
         payload: dict[str, Any] | None = None,
     ) -> MultiSigProposal:
         """Submits a new governance proposal requiring 2-of-3 trustee signatures."""
-        if proposer_wallet not in self.owner_wallets:
-            raise ValueError(
-                f"Proposer wallet '{proposer_wallet}' is not an authorized trustee owner."
+        with self._lock:
+            if proposer_wallet not in self.owner_wallets:
+                raise ValueError(
+                    f"Proposer wallet '{proposer_wallet}' is not an authorized trustee owner."
+                )
+
+            if isinstance(action_type, str):
+                action_type = GovernanceActionType(action_type)
+
+            tx_id = self._tx_counter
+            self._tx_counter += 1
+
+            payload_str = json.dumps(payload or {}, sort_keys=True)
+            payload_hash = hashlib.sha256(payload_str.encode()).hexdigest()
+            summary = f"{action_type.value} for Epoch #{epoch_id}"
+
+            confirmations = {owner: (owner == proposer_wallet) for owner in self.owner_wallets}
+
+            proposal = MultiSigProposal(
+                tx_id=tx_id,
+                action_type=action_type,
+                epoch_id=epoch_id,
+                payload_hash=payload_hash,
+                payload_summary=summary,
+                confirmation_count=1,
+                executed=False,
+                confirmations=confirmations,
+                proposer=proposer_wallet,
             )
+            self._proposals[tx_id] = proposal
 
-        if isinstance(action_type, str):
-            action_type = GovernanceActionType(action_type)
-
-        tx_id = self._tx_counter
-        self._tx_counter += 1
-
-        payload_str = json.dumps(payload or {}, sort_keys=True)
-        payload_hash = hashlib.sha256(payload_str.encode()).hexdigest()
-        summary = f"{action_type.value} for Epoch #{epoch_id}"
-
-        confirmations = {owner: (owner == proposer_wallet) for owner in self.owner_wallets}
-
-        proposal = MultiSigProposal(
-            tx_id=tx_id,
-            action_type=action_type,
-            epoch_id=epoch_id,
-            payload_hash=payload_hash,
-            payload_summary=summary,
-            confirmation_count=1,
-            executed=False,
-            confirmations=confirmations,
-            proposer=proposer_wallet,
-        )
-        self._proposals[tx_id] = proposal
-
-        logger.info(
-            "Submitted Gnosis Safe Multi-Sig proposal: tx_id=%d, action=%s, proposer=%s",
-            tx_id,
-            action_type.value,
-            proposer_wallet,
-        )
-        return proposal
+            logger.info(
+                "Submitted Gnosis Safe Multi-Sig proposal: tx_id=%d, action=%s, proposer=%s",
+                tx_id,
+                action_type.value,
+                proposer_wallet,
+            )
+            return proposal
 
     def confirm_proposal(self, tx_id: int, owner_wallet: str) -> MultiSigProposal:
         """Confirms a pending proposal with a trustee signature. Executes automatically upon 2/3 signatures."""
-        if tx_id not in self._proposals:
-            raise KeyError(f"Transaction ID #{tx_id} does not exist.")
+        with self._lock:
+            if tx_id not in self._proposals:
+                raise KeyError(f"Transaction ID #{tx_id} does not exist.")
 
-        if owner_wallet not in self.owner_wallets:
-            raise ValueError(f"Signer wallet '{owner_wallet}' is not an authorized trustee owner.")
+            if owner_wallet not in self.owner_wallets:
+                raise ValueError(f"Signer wallet '{owner_wallet}' is not an authorized trustee owner.")
 
-        prop = self._proposals[tx_id]
-        if prop.executed:
-            raise RuntimeError(f"Proposal #{tx_id} has already been executed.")
+            prop = self._proposals[tx_id]
+            if prop.executed:
+                raise RuntimeError(f"Proposal #{tx_id} has already been executed.")
 
-        if prop.confirmations.get(owner_wallet, False):
-            raise ValueError(f"Proposal #{tx_id} has already been confirmed by '{owner_wallet}'.")
+            if prop.confirmations.get(owner_wallet, False):
+                raise ValueError(f"Proposal #{tx_id} has already been confirmed by '{owner_wallet}'.")
 
-        updated_confirmations = dict(prop.confirmations)
-        updated_confirmations[owner_wallet] = True
-        new_count = sum(1 for v in updated_confirmations.values() if v)
-        is_executed = new_count >= self.threshold
+            updated_confirmations = dict(prop.confirmations)
+            updated_confirmations[owner_wallet] = True
+            new_count = sum(1 for v in updated_confirmations.values() if v)
+            is_executed = new_count >= self.threshold
 
-        updated_proposal = MultiSigProposal(
-            tx_id=prop.tx_id,
-            action_type=prop.action_type,
-            epoch_id=prop.epoch_id,
-            payload_hash=prop.payload_hash,
-            payload_summary=prop.payload_summary,
-            confirmation_count=new_count,
-            threshold=prop.threshold,
-            executed=is_executed,
-            confirmations=updated_confirmations,
-            proposer=prop.proposer,
-            created_at=prop.created_at,
-        )
-        self._proposals[tx_id] = updated_proposal
+            updated_proposal = MultiSigProposal(
+                tx_id=prop.tx_id,
+                action_type=prop.action_type,
+                epoch_id=prop.epoch_id,
+                payload_hash=prop.payload_hash,
+                payload_summary=prop.payload_summary,
+                confirmation_count=new_count,
+                threshold=prop.threshold,
+                executed=is_executed,
+                confirmations=updated_confirmations,
+                proposer=prop.proposer,
+                created_at=prop.created_at,
+            )
+            self._proposals[tx_id] = updated_proposal
 
-        logger.info(
-            "Confirmed proposal #%d: count=%d/%d, executed=%s, signer=%s",
-            tx_id,
-            new_count,
-            self.threshold,
-            is_executed,
-            owner_wallet,
-        )
-        return updated_proposal
+            logger.info(
+                "Confirmed proposal #%d: count=%d/%d, executed=%s, signer=%s",
+                tx_id,
+                new_count,
+                self.threshold,
+                is_executed,
+                owner_wallet,
+            )
+            return updated_proposal
+
+    def revoke_confirmation(self, tx_id: int, owner_wallet: str) -> MultiSigProposal:
+        """Revokes a previously given confirmation signature before proposal execution."""
+        with self._lock:
+            if tx_id not in self._proposals:
+                raise KeyError(f"Transaction ID #{tx_id} does not exist.")
+
+            if owner_wallet not in self.owner_wallets:
+                raise ValueError(f"Signer wallet '{owner_wallet}' is not an authorized trustee owner.")
+
+            prop = self._proposals[tx_id]
+            if prop.executed:
+                raise RuntimeError(f"Proposal #{tx_id} has already been executed.")
+
+            if not prop.confirmations.get(owner_wallet, False):
+                raise ValueError(f"Proposal #{tx_id} has not been confirmed by '{owner_wallet}'.")
+
+            updated_confirmations = dict(prop.confirmations)
+            updated_confirmations[owner_wallet] = False
+            new_count = sum(1 for v in updated_confirmations.values() if v)
+
+            updated_proposal = MultiSigProposal(
+                tx_id=prop.tx_id,
+                action_type=prop.action_type,
+                epoch_id=prop.epoch_id,
+                payload_hash=prop.payload_hash,
+                payload_summary=prop.payload_summary,
+                confirmation_count=new_count,
+                threshold=prop.threshold,
+                executed=False,
+                confirmations=updated_confirmations,
+                proposer=prop.proposer,
+                created_at=prop.created_at,
+            )
+            self._proposals[tx_id] = updated_proposal
+
+            logger.info(
+                "Revoked confirmation on proposal #%d: count=%d/%d, signer=%s",
+                tx_id,
+                new_count,
+                self.threshold,
+                owner_wallet,
+            )
+            return updated_proposal
 
     def get_proposal(self, tx_id: int) -> MultiSigProposal | None:
-        return self._proposals.get(tx_id)
+        with self._lock:
+            return self._proposals.get(tx_id)
 
     def get_all_proposals(self) -> list[MultiSigProposal]:
-        return list(self._proposals.values())
+        with self._lock:
+            return list(self._proposals.values())
+
+    def reset(self) -> None:
+        """Resets coordinator driver state for test isolation."""
+        with self._lock:
+            self._proposals.clear()
+            self._tx_counter = 0

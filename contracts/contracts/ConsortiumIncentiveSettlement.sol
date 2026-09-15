@@ -40,6 +40,9 @@ contract ConsortiumIncentiveSettlement {
     // Mapping: bankAddress => isQuarantined
     mapping(address => bool) public blacklistedParticipants;
 
+    // Mapping: bankAddress => totalSlashedPenaltyWei
+    mapping(address => uint256) public totalSlashedWei;
+
     // List of recorded epoch IDs
     uint256[] public recordedEpochs;
 
@@ -54,6 +57,7 @@ contract ConsortiumIncentiveSettlement {
     event PayoutClaimed(uint256 indexed epochId, address indexed participant, uint256 amountWei);
     event ParticipantQuarantined(address indexed participant, string reason);
     event ParticipantCleared(address indexed participant);
+    event ParticipantSlashed(address indexed participant, uint256 penaltyWei, string reason);
 
     // --- Modifiers ---
     modifier onlyCoordinator() {
@@ -63,6 +67,7 @@ contract ConsortiumIncentiveSettlement {
 
     // --- Constructor ---
     constructor(string memory _currency) {
+        require(bytes(_currency).length > 0, "ConsortiumIncentiveSettlement: Settlement currency cannot be empty");
         coordinator = msg.sender;
         settlementCurrency = _currency;
     }
@@ -96,6 +101,8 @@ contract ConsortiumIncentiveSettlement {
         bytes32 auditProofHash
     ) external onlyCoordinator {
         require(!epochSettlements[epochId].isSettled, "ConsortiumIncentiveSettlement: Epoch already settled");
+        require(recipients.length > 0, "ConsortiumIncentiveSettlement: Empty recipients list");
+        require(auditProofHash != bytes32(0), "ConsortiumIncentiveSettlement: Audit proof hash cannot be zero");
         require(
             recipients.length == amountsWei.length &&
             recipients.length == bankNames.length &&
@@ -106,6 +113,7 @@ contract ConsortiumIncentiveSettlement {
         uint256 totalPayout = 0;
         for (uint256 i = 0; i < recipients.length; i++) {
             address recipient = recipients[i];
+            require(recipient != address(0), "ConsortiumIncentiveSettlement: Invalid recipient address");
             bool isBlocked = blacklistedParticipants[recipient];
             uint256 payout = isBlocked ? 0 : amountsWei[i];
 
@@ -158,6 +166,7 @@ contract ConsortiumIncentiveSettlement {
      * @param reason Description of adversarial behavior (e.g. gradient poisoning / LOO Shapley <= -0.05).
      */
     function quarantineParticipant(address participant, string calldata reason) external onlyCoordinator {
+        require(participant != address(0), "ConsortiumIncentiveSettlement: Invalid participant address");
         blacklistedParticipants[participant] = true;
         emit ParticipantQuarantined(participant, reason);
     }
@@ -167,8 +176,30 @@ contract ConsortiumIncentiveSettlement {
      * @param participant Address of the node to clear.
      */
     function clearQuarantine(address participant) external onlyCoordinator {
+        require(participant != address(0), "ConsortiumIncentiveSettlement: Invalid participant address");
+        require(blacklistedParticipants[participant], "ConsortiumIncentiveSettlement: Participant not quarantined");
         blacklistedParticipants[participant] = false;
         emit ParticipantCleared(participant);
+    }
+
+    /**
+     * @notice Slash a Byzantine malicious node's stake/payout allocation and penalize their account.
+     * @param participant Address of the malicious node.
+     * @param penaltyWei Slashed penalty amount in token wei.
+     * @param reason Cryptographic or adversarial reason for the slash (e.g. Byzantine poisoning / Sybil attack).
+     */
+    function slashParticipant(
+        address participant,
+        uint256 penaltyWei,
+        string calldata reason
+    ) external onlyCoordinator {
+        require(participant != address(0), "ConsortiumIncentiveSettlement: Invalid participant address");
+        require(penaltyWei > 0, "ConsortiumIncentiveSettlement: Slash penalty must be greater than zero");
+
+        blacklistedParticipants[participant] = true;
+        totalSlashedWei[participant] += penaltyWei;
+
+        emit ParticipantSlashed(participant, penaltyWei, reason);
     }
 
     // --- View Functions ---

@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.infrastructure.security.smart_contract_driver import (
+    EpochAlreadySettledError,
+    InvalidSettlementParameterError,
     SmartContractSettlementDriver,
 )
 
@@ -74,6 +76,10 @@ async def trigger_settlement(payload: SettlementTriggerRequest) -> dict[str, Any
             currency=payload.currency,
         )
         return receipt
+    except EpochAlreadySettledError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except InvalidSettlementParameterError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Settlement execution failed: {exc}") from exc
 
@@ -107,6 +113,28 @@ class MultiSigConfirmRequest(BaseModel):
     )
 
 
+class MultiSigRevokeRequest(BaseModel):
+    tx_id: int = Field(..., ge=0, le=1_000_000)
+    owner_wallet: str = Field(
+        ...,
+        min_length=10,
+        max_length=64,
+        pattern=r"^0x[a-fA-F0-9]{40}$",
+        description="EIP-55 checksummed Ethereum wallet address",
+    )
+
+
+class QuarantineRequest(BaseModel):
+    bank_name_or_wallet: str = Field(..., min_length=2, max_length=128)
+    reason: str = Field(default="Adversarial behavior detected", max_length=256)
+
+
+class SlashRequest(BaseModel):
+    bank_name_or_wallet: str = Field(..., min_length=2, max_length=128)
+    penalty_usd: float = Field(..., gt=0.0, le=10_000_000.0)
+    reason: str = Field(default="Byzantine gradient poisoning", max_length=256)
+
+
 @router.get("/multisig/proposals")
 async def get_multisig_proposals() -> list[dict[str, Any]]:
     """Returns list of active Gnosis Safe 2-of-3 multi-sig coordinator proposals."""
@@ -130,6 +158,28 @@ async def get_multisig_proposals() -> list[dict[str, Any]]:
     ]
 
 
+@router.get("/multisig/proposals/{tx_id}")
+async def get_multisig_proposal_by_id(tx_id: int) -> dict[str, Any]:
+    """Returns details for a single Gnosis Safe proposal."""
+    driver = SmartContractSettlementDriver.get_instance()
+    prop = driver.multisig_driver.get_proposal(tx_id)
+    if prop is None:
+        raise HTTPException(status_code=404, detail=f"Proposal #{tx_id} does not exist.")
+    return {
+        "tx_id": prop.tx_id,
+        "action_type": prop.action_type,
+        "epoch_id": prop.epoch_id,
+        "payload_hash": prop.payload_hash,
+        "payload_summary": prop.payload_summary,
+        "confirmation_count": prop.confirmation_count,
+        "threshold": prop.threshold,
+        "executed": prop.executed,
+        "confirmations": prop.confirmations,
+        "proposer": prop.proposer,
+        "created_at": prop.created_at,
+    }
+
+
 @router.post("/multisig/propose")
 async def propose_multisig_action(req: MultiSigProposeRequest) -> dict[str, Any]:
     """Submits a new 2-of-3 threshold multi-sig proposal for coordinator governance."""
@@ -142,8 +192,10 @@ async def propose_multisig_action(req: MultiSigProposeRequest) -> dict[str, Any]
             payload=req.payload,
         )
         return {"status": "SUCCESS", "tx_id": prop.tx_id, "executed": prop.executed}
-    except Exception as exc:
+    except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/multisig/confirm")
@@ -160,5 +212,71 @@ async def confirm_multisig_action(req: MultiSigConfirmRequest) -> dict[str, Any]
             "confirmation_count": prop.confirmation_count,
             "executed": prop.executed,
         }
-    except Exception as exc:
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/multisig/revoke")
+async def revoke_multisig_action(req: MultiSigRevokeRequest) -> dict[str, Any]:
+    """Revokes a trustee confirmation for a pending multi-sig proposal."""
+    try:
+        driver = SmartContractSettlementDriver.get_instance()
+        prop = driver.multisig_driver.revoke_confirmation(
+            tx_id=req.tx_id, owner_wallet=req.owner_wallet
+        )
+        return {
+            "status": "SUCCESS",
+            "tx_id": prop.tx_id,
+            "confirmation_count": prop.confirmation_count,
+            "executed": prop.executed,
+        }
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+
+@router.post("/quarantine")
+async def quarantine_bank_node(req: QuarantineRequest) -> dict[str, Any]:
+    """Quarantines a participant node on-chain."""
+    driver = SmartContractSettlementDriver.get_instance()
+    driver.quarantine_bank(req.bank_name_or_wallet, req.reason)
+    return {
+        "status": "SUCCESS",
+        "message": f"Bank node '{req.bank_name_or_wallet}' quarantined on-chain.",
+    }
+
+
+@router.post("/clear-quarantine")
+async def clear_bank_quarantine_node(req: QuarantineRequest) -> dict[str, Any]:
+    """Clears quarantine status for a participant node on-chain."""
+    driver = SmartContractSettlementDriver.get_instance()
+    driver.clear_quarantine(req.bank_name_or_wallet)
+    return {
+        "status": "SUCCESS",
+        "message": f"Quarantine cleared for '{req.bank_name_or_wallet}'.",
+    }
+
+
+@router.post("/slash")
+async def slash_bank_node(req: SlashRequest) -> dict[str, Any]:
+    """Slashes a Byzantine malicious node on-chain."""
+    try:
+        driver = SmartContractSettlementDriver.get_instance()
+        record = driver.slash_bank(req.bank_name_or_wallet, req.penalty_usd, req.reason)
+        return {"status": "SUCCESS", "slashed_record": record}
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/slashed")
+async def get_slashed_nodes() -> dict[str, Any]:
+    """Returns all recorded Byzantine slashing events."""
+    driver = SmartContractSettlementDriver.get_instance()
+    return driver.get_slashed_penalties()

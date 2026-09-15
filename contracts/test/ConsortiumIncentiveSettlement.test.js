@@ -191,5 +191,65 @@ describe("ConsortiumIncentiveSettlement", function () {
         .to.emit(contract, "PayoutClaimed")
         .withArgs(epochId, bankB.address, ethers.parseEther("400"));
     });
+
+    it("Should allow coordinator to slash Byzantine participants", async function () {
+      const penalty = ethers.parseEther("150");
+      await expect(
+        contract.connect(coordinator).slashParticipant(bankC.address, penalty, "Byzantine Sybil Poisoning Detected")
+      )
+        .to.emit(contract, "ParticipantSlashed")
+        .withArgs(bankC.address, penalty, "Byzantine Sybil Poisoning Detected");
+
+      expect(await contract.totalSlashedWei(bankC.address)).to.equal(penalty);
+      expect(await contract.blacklistedParticipants(bankC.address)).to.be.true;
+    });
+
+    it("Should revert slashing if penalty is zero or address is zero", async function () {
+      await expect(
+        contract.connect(coordinator).slashParticipant(bankC.address, 0, "Invalid Penalty")
+      ).to.be.revertedWith("ConsortiumIncentiveSettlement: Slash penalty must be greater than zero");
+
+      await expect(
+        contract.connect(coordinator).slashParticipant(ethers.ZeroAddress, ethers.parseEther("10"), "Zero Address")
+      ).to.be.revertedWith("ConsortiumIncentiveSettlement: Invalid participant address");
+    });
+
+    it("Should revert clearQuarantine if participant is not quarantined", async function () {
+      await expect(
+        contract.connect(coordinator).clearQuarantine(bankA.address)
+      ).to.be.revertedWith("ConsortiumIncentiveSettlement: Participant not quarantined");
+    });
+  });
+
+  describe("Validation Guards", function () {
+    it("Should revert deployment if currency string is empty", async function () {
+      const Factory = await ethers.getContractFactory("ConsortiumIncentiveSettlement");
+      await expect(Factory.deploy("")).to.be.revertedWith(
+        "ConsortiumIncentiveSettlement: Settlement currency cannot be empty"
+      );
+    });
+
+    it("Should revert distributeIncentives if recipients array is empty", async function () {
+      await contract.connect(coordinator).depositPool(500, ethers.parseEther("100"));
+      await expect(
+        contract.connect(coordinator).distributeIncentives(
+          500, [], [], [], [], AUDIT_PROOF_HASH
+        )
+      ).to.be.revertedWith("ConsortiumIncentiveSettlement: Empty recipients list");
+    });
+
+    it("Should revert distributeIncentives if audit proof hash is zero", async function () {
+      await contract.connect(coordinator).depositPool(501, ethers.parseEther("100"));
+      await expect(
+        contract.connect(coordinator).distributeIncentives(
+          501,
+          [bankA.address],
+          ["Bank A"],
+          [10000],
+          [ethers.parseEther("100")],
+          ethers.ZeroHash
+        )
+      ).to.be.revertedWith("ConsortiumIncentiveSettlement: Audit proof hash cannot be zero");
+    });
   });
 });

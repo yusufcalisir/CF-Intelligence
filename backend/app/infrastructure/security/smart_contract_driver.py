@@ -7,10 +7,24 @@ Links on-chain payouts directly to ImmutableAuditChain SHA-256 proof hashes.
 
 import hashlib
 import logging
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+class SmartContractSettlementError(Exception):
+    """Base exception for smart contract settlement errors."""
+
+
+class EpochAlreadySettledError(SmartContractSettlementError):
+    """Raised when attempting to settle an epoch that has already been settled on-chain."""
+
+
+class InvalidSettlementParameterError(SmartContractSettlementError):
+    """Raised when parameters for settlement distribution are invalid."""
+
 
 # Default Contract ABI for ConsortiumIncentiveSettlement
 CONTRACT_ABI = [
@@ -66,6 +80,33 @@ CONTRACT_ABI = [
         "type": "event",
     },
     {
+        "anonymous": False,
+        "inputs": [
+            {"indexed": True, "internalType": "address", "name": "participant", "type": "address"},
+            {"indexed": False, "internalType": "string", "name": "reason", "type": "string"},
+        ],
+        "name": "ParticipantQuarantined",
+        "type": "event",
+    },
+    {
+        "anonymous": False,
+        "inputs": [
+            {"indexed": True, "internalType": "address", "name": "participant", "type": "address"},
+        ],
+        "name": "ParticipantCleared",
+        "type": "event",
+    },
+    {
+        "anonymous": False,
+        "inputs": [
+            {"indexed": True, "internalType": "address", "name": "participant", "type": "address"},
+            {"indexed": False, "internalType": "uint256", "name": "penaltyWei", "type": "uint256"},
+            {"indexed": False, "internalType": "string", "name": "reason", "type": "string"},
+        ],
+        "name": "ParticipantSlashed",
+        "type": "event",
+    },
+    {
         "inputs": [
             {"internalType": "uint256", "name": "epochId", "type": "uint256"},
             {"internalType": "address[]", "name": "recipients", "type": "address[]"},
@@ -75,6 +116,17 @@ CONTRACT_ABI = [
             {"internalType": "bytes32", "name": "auditProofHash", "type": "bytes32"},
         ],
         "name": "distributeIncentives",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function",
+    },
+    {
+        "inputs": [
+            {"internalType": "address", "name": "participant", "type": "address"},
+            {"internalType": "uint256", "name": "penaltyWei", "type": "uint256"},
+            {"internalType": "string", "name": "reason", "type": "string"},
+        ],
+        "name": "slashParticipant",
         "outputs": [],
         "stateMutability": "nonpayable",
         "type": "function",
@@ -96,6 +148,10 @@ class SmartContractSettlementDriver:
         self.chain_id = 11155111
         self.current_block_height = 5421890
         self.settlement_history: list[dict[str, Any]] = []
+        self._settled_epoch_ids: set[str] = set()
+        self._quarantined_nodes: set[str] = set()
+        self._slashed_penalties: dict[str, list[dict[str, Any]]] = {}
+        self._lock = threading.RLock()
 
         # Preset bank wallet mappings for deterministic simulation
         self.bank_wallets = {
@@ -125,12 +181,53 @@ class SmartContractSettlementDriver:
         hasher = hashlib.sha256(bank_name.encode("utf-8")).hexdigest()
         return f"0x{hasher[:40]}"
 
+    def quarantine_bank(self, bank_name_or_wallet: str, reason: str = "") -> None:
+        """Quarantine a malicious or free-riding participant node on-chain."""
+        with self._lock:
+            self._quarantined_nodes.add(bank_name_or_wallet)
+            logger.warning("Bank node quarantined on-chain: %s (Reason: %s)", bank_name_or_wallet, reason)
+
+    def clear_quarantine(self, bank_name_or_wallet: str) -> None:
+        """Removes quarantine status for a participant node."""
+        with self._lock:
+            self._quarantined_nodes.discard(bank_name_or_wallet)
+            logger.info("Quarantine cleared on-chain for bank node: %s", bank_name_or_wallet)
+
+    def is_bank_quarantined(self, bank_name_or_wallet: str) -> bool:
+        """Checks if a participant node is currently quarantined."""
+        with self._lock:
+            wallet = self.bank_wallets.get(bank_name_or_wallet, "")
+            return bank_name_or_wallet in self._quarantined_nodes or (bool(wallet) and wallet in self._quarantined_nodes)
+
+    def slash_bank(self, bank_name_or_wallet: str, penalty_usd: float, reason: str = "") -> dict[str, Any]:
+        """Slashes a Byzantine malicious node's stake/payout allocation."""
+        with self._lock:
+            if penalty_usd <= 0:
+                raise ValueError("Slash penalty amount must be strictly greater than zero.")
+            self.quarantine_bank(bank_name_or_wallet, reason=f"Slashed: {reason}")
+            record = {
+                "bank": bank_name_or_wallet,
+                "penalty_usd": penalty_usd,
+                "reason": reason,
+                "timestamp": datetime.now(UTC).isoformat(),
+            }
+            if bank_name_or_wallet not in self._slashed_penalties:
+                self._slashed_penalties[bank_name_or_wallet] = []
+            self._slashed_penalties[bank_name_or_wallet].append(record)
+            logger.warning("Participant %s slashed: $%.2f (Reason: %s)", bank_name_or_wallet, penalty_usd, reason)
+            return record
+
+    def get_slashed_penalties(self) -> dict[str, list[dict[str, Any]]]:
+        """Returns all recorded Byzantine slashing events."""
+        with self._lock:
+            return dict(self._slashed_penalties)
+
     def settle_incentives(
         self,
         epoch_id: str,
         contributions: dict[str, float],
-        quarantine_statuses: dict[str, bool],
-        audit_proof_hash: str,
+        quarantine_statuses: dict[str, bool] | None = None,
+        audit_proof_hash: str = "",
         total_pool_usd: float = 100000.0,
         currency: str = "wCBDC",
     ) -> dict[str, Any]:
@@ -147,92 +244,132 @@ class SmartContractSettlementDriver:
         Returns:
             Dict containing transaction receipts, block numbers, and on-chain payout records.
         """
-        self.current_block_height += 1
-        now_iso = datetime.now(UTC).isoformat()
+        with self._lock:
+            if epoch_id in self._settled_epoch_ids:
+                raise EpochAlreadySettledError(
+                    f"ConsortiumIncentiveSettlement: Epoch '{epoch_id}' has already been settled."
+                )
 
-        # Compute positive sum for proportional distribution
-        total_positive_score = sum(score for score in contributions.values() if score > 0)
+            if not contributions:
+                raise InvalidSettlementParameterError(
+                    "ConsortiumIncentiveSettlement: Empty recipients or contribution scores."
+                )
 
-        on_chain_payouts: list[dict[str, Any]] = []
-        total_distributed_wei = 0
+            if not audit_proof_hash or len(audit_proof_hash) < 16:
+                raise InvalidSettlementParameterError(
+                    "ConsortiumIncentiveSettlement: Invalid cryptographic audit chain proof hash."
+                )
 
-        for bank_name, score in contributions.items():
-            is_quarantined = quarantine_statuses.get(bank_name, False)
-            wallet = self._get_bank_wallet(bank_name)
+            if total_pool_usd <= 0:
+                raise InvalidSettlementParameterError(
+                    "ConsortiumIncentiveSettlement: Total pool budget must be greater than zero."
+                )
 
-            if total_positive_score > 0 and score > 0 and not is_quarantined:
-                share_fraction = score / total_positive_score
-                payout_usd = share_fraction * total_pool_usd
-            else:
-                share_fraction = 0.0
-                payout_usd = 0.0
+            quarantine_map = quarantine_statuses or {}
+            self.current_block_height += 1
+            now_iso = datetime.now(UTC).isoformat()
 
-            # Convert to token wei (18 decimals: 1 USD = 1e18 Wei)
-            payout_wei = int(payout_usd * 10**18)
-            total_distributed_wei += payout_wei
+            # Compute positive sum for proportional distribution
+            total_positive_score = sum(score for score in contributions.values() if score > 0)
 
-            on_chain_payouts.append(
-                {
-                    "bank_name": bank_name,
-                    "wallet_address": wallet,
-                    "shapley_score": round(score, 6),
-                    "shapley_basis_points": int(score * 10000),
-                    "share_percent": round(share_fraction * 100, 2),
-                    "payout_usd": round(payout_usd, 2),
-                    "payout_wei": str(payout_wei),
-                    "is_quarantined": is_quarantined,
-                    "status": "BLOCKED_QUARANTINE" if is_quarantined else "DISTRIBUTED",
-                }
+            on_chain_payouts: list[dict[str, Any]] = []
+            total_distributed_wei = 0
+
+            for bank_name, score in contributions.items():
+                wallet = self._get_bank_wallet(bank_name)
+                is_quarantined = (
+                    quarantine_map.get(bank_name, False)
+                    or self.is_bank_quarantined(bank_name)
+                    or self.is_bank_quarantined(wallet)
+                )
+
+                if total_positive_score > 0 and score > 0 and not is_quarantined:
+                    share_fraction = score / total_positive_score
+                    payout_usd = share_fraction * total_pool_usd
+                else:
+                    share_fraction = 0.0
+                    payout_usd = 0.0
+
+                # Convert to token wei (18 decimals: 1 USD = 1e18 Wei)
+                payout_wei = int(payout_usd * 10**18)
+                total_distributed_wei += payout_wei
+
+                on_chain_payouts.append(
+                    {
+                        "bank_name": bank_name,
+                        "wallet_address": wallet,
+                        "shapley_score": round(score, 6),
+                        "shapley_basis_points": int(score * 10000),
+                        "share_percent": round(share_fraction * 100, 2),
+                        "payout_usd": round(payout_usd, 2),
+                        "payout_wei": str(payout_wei),
+                        "is_quarantined": is_quarantined,
+                        "status": "BLOCKED_QUARANTINE" if is_quarantined else "DISTRIBUTED",
+                    }
+                )
+
+            # Generate cryptographic transaction hash
+            raw_tx_data = (
+                f"{epoch_id}:{audit_proof_hash}:{total_distributed_wei}:{self.current_block_height}"
+            )
+            tx_hash = f"0x{hashlib.sha256(raw_tx_data.encode('utf-8')).hexdigest()}"
+
+            receipt = {
+                "epoch_id": epoch_id,
+                "status": "SUCCESS",
+                "transaction_hash": tx_hash,
+                "block_number": self.current_block_height,
+                "block_timestamp": now_iso,
+                "contract_address": self.contract_address,
+                "coordinator_address": self.coordinator_address,
+                "currency": currency,
+                "total_pool_usd": total_pool_usd,
+                "total_distributed_usd": round(sum(p["payout_usd"] for p in on_chain_payouts), 2),
+                "total_distributed_wei": str(total_distributed_wei),
+                "gas_used": 142850,
+                "effective_gas_price_gwei": 15.5,
+                "audit_proof_hash": audit_proof_hash,
+                "payouts": on_chain_payouts,
+            }
+
+            self.settlement_history.append(receipt)
+            self._settled_epoch_ids.add(epoch_id)
+            logger.info(
+                "Smart contract settlement executed. Tx: %s | Block: %d | Total: $%.2f %s",
+                tx_hash,
+                self.current_block_height,
+                receipt["total_distributed_usd"],
+                currency,
             )
 
-        # Generate cryptographic transaction hash
-        raw_tx_data = (
-            f"{epoch_id}:{audit_proof_hash}:{total_distributed_wei}:{self.current_block_height}"
-        )
-        tx_hash = f"0x{hashlib.sha256(raw_tx_data.encode('utf-8')).hexdigest()}"
-
-        receipt = {
-            "epoch_id": epoch_id,
-            "status": "SUCCESS",
-            "transaction_hash": tx_hash,
-            "block_number": self.current_block_height,
-            "block_timestamp": now_iso,
-            "contract_address": self.contract_address,
-            "coordinator_address": self.coordinator_address,
-            "currency": currency,
-            "total_pool_usd": total_pool_usd,
-            "total_distributed_usd": round(sum(p["payout_usd"] for p in on_chain_payouts), 2),
-            "total_distributed_wei": str(total_distributed_wei),
-            "gas_used": 142850,
-            "effective_gas_price_gwei": 15.5,
-            "audit_proof_hash": audit_proof_hash,
-            "payouts": on_chain_payouts,
-        }
-
-        self.settlement_history.append(receipt)
-        logger.info(
-            "Smart contract settlement executed. Tx: %s | Block: %d | Total: $%.2f %s",
-            tx_hash,
-            self.current_block_height,
-            receipt["total_distributed_usd"],
-            currency,
-        )
-
-        return receipt
+            return receipt
 
     def get_contract_info(self) -> dict[str, Any]:
         """Returns details about the deployed Consortium Settlement Smart Contract."""
-        return {
-            "contract_address": self.contract_address,
-            "coordinator_address": self.coordinator_address,
-            "network_name": self.network_name,
-            "chain_id": self.chain_id,
-            "current_block_height": self.current_block_height,
-            "supported_currencies": ["wCBDC", "USDC", "e-TRY"],
-            "total_settlements_executed": len(self.settlement_history),
-            "abi": CONTRACT_ABI,
-        }
+        with self._lock:
+            return {
+                "contract_address": self.contract_address,
+                "coordinator_address": self.coordinator_address,
+                "network_name": self.network_name,
+                "chain_id": self.chain_id,
+                "current_block_height": self.current_block_height,
+                "supported_currencies": ["wCBDC", "USDC", "e-TRY"],
+                "total_settlements_executed": len(self.settlement_history),
+                "total_quarantined_nodes": len(self._quarantined_nodes),
+                "total_slashed_nodes": len(self._slashed_penalties),
+                "abi": CONTRACT_ABI,
+            }
 
     def get_settlement_history(self) -> list[dict[str, Any]]:
         """Returns all executed settlement receipts."""
-        return self.settlement_history
+        with self._lock:
+            return list(self.settlement_history)
+
+    def reset(self) -> None:
+        """Resets driver state for clean unit test isolation."""
+        with self._lock:
+            self.settlement_history.clear()
+            self._settled_epoch_ids.clear()
+            self._quarantined_nodes.clear()
+            self._slashed_penalties.clear()
+            self.multisig_driver.reset()
