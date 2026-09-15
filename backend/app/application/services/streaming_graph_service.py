@@ -3,7 +3,7 @@ import math
 import threading
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
-from typing import Any
+from typing import Any, Literal, overload
 
 import numpy as np
 import torch
@@ -175,6 +175,20 @@ class StreamingGraphService:
 
             self.nodes = pruned_nodes
             self._rebuild_indices()
+
+    @overload
+    def get_active_subgraph_tensors(
+        self,
+        return_weights: Literal[True],
+        decay_lambda: float | None = ...,
+    ) -> tuple[torch.Tensor, torch.Tensor, list[float], torch.Tensor]: ...
+
+    @overload
+    def get_active_subgraph_tensors(
+        self,
+        return_weights: Literal[False] = ...,
+        decay_lambda: float | None = ...,
+    ) -> tuple[torch.Tensor, torch.Tensor, list[float]]: ...
 
     def get_active_subgraph_tensors(
         self,
