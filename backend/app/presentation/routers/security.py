@@ -309,6 +309,9 @@ class UnlearnBankRequest(BaseModel):
     unlearning_method: str = UnlearningMethod.EXACT_REAGGREGATION.value
     start_round: int = 1
     end_round: int = 42
+    ascent_lr: float = 0.01
+    ascent_steps: int = 3
+    projection_radius: float = 0.15
 
 
 @router.post("/unlearn")
@@ -322,6 +325,9 @@ async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
     res = _unlearning_engine.unlearn_bank_contributions(
         target_bank_id=req.target_bank_id,
         method=method_enum,
+        ascent_lr=req.ascent_lr,
+        ascent_steps=req.ascent_steps,
+        projection_radius=req.projection_radius,
     )
     return {
         "target_bank_id": res.target_bank_id,
@@ -347,7 +353,7 @@ async def get_unlearning_status() -> dict[str, Any]:
         "supported_methods": [m.value for m in UnlearningMethod],
         "total_unlearning_runs": _unlearning_engine.unlearning_runs_count,
         "target_mia_threshold": 0.52,
-        "unlearning_mechanism": "Exact Re-aggregation / Lineage Subtraction",
+        "unlearning_mechanism": "Exact Re-aggregation / Lineage Subtraction / Projected Gradient Ascent",
     }
 
 

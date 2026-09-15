@@ -15,6 +15,7 @@ class UnlearningMethod(StrEnum):
 
     EXACT_REAGGREGATION = "EXACT_REAGGREGATION"
     EXACT_LINEAGE_SUBTRACTION = "EXACT_LINEAGE_SUBTRACTION"
+    PROJECTED_GRADIENT_ASCENT = "PROJECTED_GRADIENT_ASCENT"
     SIMULATED_UNLEARNING = "SIMULATED_UNLEARNING"
     # Legacy aliases for API backward compatibility
     FIRST_ORDER_HESSIAN_INVERSION = "FIRST_ORDER_HESSIAN_INVERSION"
@@ -30,6 +31,9 @@ class FederatedUnlearningRequest:
     start_round: int = 1
     end_round: int = 42
     verification_threshold_mia: float = 0.52
+    ascent_lr: float = 0.01
+    ascent_steps: int = 3
+    projection_radius: float = 0.15
 
 
 @dataclass(frozen=True)

@@ -1295,4 +1295,33 @@ export interface TuneResponse {
   duration_ms: number;
 }
 
+export interface UnlearnBankRequest {
+  target_bank_id: string;
+  unlearning_method?: string;
+  start_round?: number;
+  end_round?: number;
+  ascent_lr?: number;
+  ascent_steps?: number;
+  projection_radius?: number;
+}
+
+export interface UnlearnBankResponse {
+  target_bank_id: string;
+  unlearning_method: string;
+  initial_model_l2_norm: number;
+  unlearned_model_l2_norm: number;
+  parameter_drift_delta: number;
+  hessian_spectral_radius: number;
+  mia_membership_probability: number | null;
+  execution_time_ms: number;
+  erasure_verified: boolean;
+  lineage_hash: string;
+  audit_log: Array<{
+    step: number;
+    name: string;
+    status: string;
+  }>;
+  retained_banks: string[];
+}
+
 

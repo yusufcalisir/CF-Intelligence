@@ -57,6 +57,8 @@ import type {
   DatasetConsortiumEnrollResponse,
   TuneRequest,
   TuneResponse,
+  UnlearnBankRequest,
+  UnlearnBankResponse,
 } from './types';
 
 
@@ -1030,6 +1032,15 @@ export function useTriggerHyperparameterTuning() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['optimization-studies'] });
+    },
+  });
+}
+
+export function useTriggerUnlearning() {
+  return useMutation<UnlearnBankResponse, Error, UnlearnBankRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<UnlearnBankResponse>('/api/v1/security/unlearn', payload);
+      return data;
     },
   });
 }

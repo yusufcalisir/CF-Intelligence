@@ -1132,6 +1132,7 @@ export default function SecurityPage() {
                       >
                         <option value="EXACT_REAGGREGATION">Exact Re-Aggregation (Retained Clients)</option>
                         <option value="EXACT_LINEAGE_SUBTRACTION">Exact Lineage Subtraction</option>
+                        <option value="PROJECTED_GRADIENT_ASCENT">Projected Gradient Ascent (PGA)</option>
                         <option value="SIMULATED_UNLEARNING">Standalone Illustrative Simulator</option>
                       </select>
                     </div>
