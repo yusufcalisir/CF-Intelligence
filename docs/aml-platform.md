@@ -167,10 +167,13 @@ To satisfy national Financial Intelligence Unit (FIU) mandates (FinCEN, MASAK, F
 * The [case_management.py](../backend/app/domain/case_management.py) domain model incorporates the `SAR_FILED` terminal state.
 * Allowed state transitions: `ESCALATED` ➔ `SAR_FILED` and `SAR_FILED` ➔ `CLOSED_CONFIRMED`.
 
-### 2. Automated FinCEN SAR 2.0 XML Generation
+### 2. Automated FinCEN SAR 2.0 XML Generation & Cryptographic Filing Hash
 * Transitions into `SAR_FILED` trigger [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py) to compile case metadata, timeline events, investigator notes, and suspect hashes into a schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file (`EFilingSubmission`).
-* All outputs are strictly validated against the official XML schema at [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd), validating mandatory root tags, `<SubmissionHeader>`, and `<Activity>` structures.
-* Generated filings are saved under `storage/regulatory_filings/` and made available via secure FastAPI download endpoints (`/api/v1/cases/{case_id}/sar-report`).
+* All outputs are strictly validated against the official XML schema at [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd), validating mandatory root tags, `<SubmissionHeader>`, `<ReportingInstitution>`, `<Subjects>`, `<SuspiciousActivityDetails>`, and `<Narrative>` structures.
+* Subject entities are strictly tokenized using Zero-PII privacy hashes; unlinked cases dynamically derive a deterministic HMAC digest ($\mathrm{SHA\text{-}256}(\text{"case\_subject:"} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) preventing static mock strings.
+* Each filing is fingerprinted with an immutable SHA-256 cryptographic digest: $\mathcal{H}_{\mathrm{filing}} = \mathrm{SHA\text{-}256}(\mathcal{X}_{\mathrm{canonical}})$.
+* Generated filings are saved atomically under `storage/regulatory_filings/sar_{case_id}.xml` using temporary file creation and atomic rename (`os.replace`) protected by a reentrant mutex (`threading.RLock()`).
+* Endpoints are available via `/api/v1/cases/{case_id}/sar-report`, `/api/v1/cases/{case_id}/file-sar`, `/api/v1/cases/export/fincen-xml`, and dedicated compliance management routes `/api/v1/compliance/sar/*` (`/filings`, `/validate`, `/generate`, `/{filing_id}`).
 
 ### 3. Cryptographic Timeline Audit Chain
 * Events are bound using sequential SHA-256 block hashing:

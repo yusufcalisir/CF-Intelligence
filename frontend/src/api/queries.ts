@@ -75,6 +75,11 @@ import type {
   RetrainingBatchResponse,
   DPGradientRequest,
   DPGradientResponse,
+  SARFilingRecord,
+  SARValidationResult,
+  ExportFinCENXmlRequest,
+  ExportFinCENXmlResponse,
+  SARGenerateRequest,
 } from './types';
 
 
@@ -1251,9 +1256,60 @@ export function useComputeDPGradient() {
   });
 }
 
+// ── FinCEN SAR 2.0 e-Filing & Regulatory Queries ────────
 
+export function useSarFilingsQuery(limit: number = 50) {
+  return useQuery<SARFilingRecord[]>({
+    queryKey: ['sar-filings', limit],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SARFilingRecord[]>(
+        `/api/v1/compliance/sar/filings?limit=${limit}`
+      );
+      return data;
+    },
+  });
+}
 
+export function useGenerateSarFilingMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<SARFilingRecord, Error, SARGenerateRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<SARFilingRecord>(
+        '/api/v1/compliance/sar/generate',
+        payload
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sar-filings'] });
+    },
+  });
+}
 
+export function useValidateSarXmlMutation() {
+  return useMutation<SARValidationResult, Error, { xml_content: string }>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<SARValidationResult>(
+        '/api/v1/compliance/sar/validate',
+        payload
+      );
+      return data;
+    },
+  });
+}
 
-
-
+export function useExportFinCENXmlMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ExportFinCENXmlResponse, Error, ExportFinCENXmlRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ExportFinCENXmlResponse>(
+        '/api/v1/cases/export/fincen-xml',
+        payload
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sar-filings'] });
+    },
+  });
+}

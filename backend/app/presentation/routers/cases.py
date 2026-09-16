@@ -457,22 +457,49 @@ def _serialize_case(case: Any) -> CaseResponse:
 
 
 @router.post("/{case_id}/file-sar")
-async def file_sar_report(case_id: str) -> dict[str, Any]:
-    """Generate and validate FinCEN BSA SAR XML payload for a confirmed fraud case."""
-    import uuid
-
+async def file_sar_report(
+    case_id: str,
+    institution_name: str | None = None,
+    narrative_override: str | None = None,
+) -> dict[str, Any]:
+    """Generate and validate FinCEN BSA SAR XML payload with SHA-256 integrity hash for a confirmed fraud case."""
     from app.application.services.regulatory_reporter import (
         RegulatoryReporterService,
         SARValidationError,
     )
 
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+
     try:
-        xml_str = RegulatoryReporterService.generate_sar_xml(case_id)
-        submission_id = f"sar_{uuid.uuid4().hex[:12]}"
+        from app.application.services.alert_service import AlertIntelligenceService
+
+        alert_service = AlertIntelligenceService()
+        alerts = [
+            a
+            for aid in (case.alert_ids or [])
+            if (a := alert_service.get_alert(aid)) is not None
+        ]
+
+        filing_record = RegulatoryReporterService.generate_and_store_sar_filing(
+            case_id=case_id,
+            case_obj=case,
+            alerts=alerts,
+            institution_name=institution_name or "Consortium AML Joint Investigation Unit",
+            narrative_override=narrative_override,
+        )
+
+        with open(filing_record.xml_path, encoding="utf-8") as f:
+            xml_str = f.read()
+
         return {
-            "submission_id": submission_id,
+            "submission_id": filing_record.submission_id,
             "status": "FILED",
             "xml": xml_str,
+            "xml_payload": xml_str,
+            "sha256_hash": filing_record.sha256_hash,
+            "filing_status": "FILED",
             "pdf_download_url": f"/api/v1/cases/{case_id}/sar.pdf",
         }
     except SARValidationError as exc:
@@ -481,19 +508,29 @@ async def file_sar_report(case_id: str) -> dict[str, Any]:
 
 class ExportFinCENXmlRequest(BaseModel):
     case_id: str = Field(..., description="ID of confirmed fraud case to compile SAR XML for")
+    filer_id: str | None = Field(None, description="Optional compliance officer or filer identifier")
+    narrative_override: str | None = Field(None, description="Optional custom SAR narrative override")
+    institution_name: str | None = Field(None, description="Optional reporting financial institution override")
 
 
 class ExportFinCENXmlResponse(BaseModel):
     submission_id: str
     status: str
     xml: str
+    xml_payload: str | None = None
+    sha256_hash: str | None = None
+    filing_status: str | None = None
     pdf_download_url: str
 
 
 @router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
 async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[str, Any]:
-    """Compile and validate FinCEN BSA SAR XML payload (alias contract for Developer Portal & SIEM)."""
-    return await file_sar_report(payload.case_id)
+    """Compile and validate FinCEN BSA SAR XML payload with SHA-256 hash (Developer Portal & SIEM)."""
+    return await file_sar_report(
+        payload.case_id,
+        institution_name=payload.institution_name,
+        narrative_override=payload.narrative_override,
+    )
 
 
 # ── Agentic AML Copilot Endpoints ─────────────────────────────────────

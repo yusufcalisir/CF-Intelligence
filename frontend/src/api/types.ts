@@ -1529,5 +1529,49 @@ export interface DPGradientResponse {
   sigma: number;
 }
 
+// ── FinCEN SAR 2.0 e-Filing & Regulatory Submissions ────────
+export interface SARFilingRecord {
+  filing_id: string;
+  submission_id: string;
+  case_id: string;
+  sha256_hash: string;
+  status: 'FILED' | 'VALIDATED';
+  institution_name: string;
+  created_at: string;
+  xml_path: string;
+  alert_count: number;
+  subject_count: number;
+  total_risk_score: number;
+}
 
+export interface SARValidationResult {
+  valid: boolean;
+  sha256_hash: string;
+  root_element: string;
+  schema_version: string;
+  byte_size: number;
+}
 
+export interface ExportFinCENXmlRequest {
+  case_id: string;
+  filer_id?: string | null;
+  narrative_override?: string | null;
+  institution_name?: string | null;
+}
+
+export interface ExportFinCENXmlResponse {
+  submission_id: string;
+  status: string;
+  xml: string;
+  xml_payload?: string | null;
+  sha256_hash?: string | null;
+  filing_status?: string | null;
+  pdf_download_url: string;
+}
+
+export interface SARGenerateRequest {
+  case_id: string;
+  institution_name?: string | null;
+  tin_type?: string | null;
+  narrative_override?: string | null;
+}

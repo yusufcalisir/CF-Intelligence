@@ -250,11 +250,14 @@ Synthesizes a standardized 5-paragraph FinCEN SAR narrative:
 - Compiles XML adhering strictly to `schemas/FinCEN_SAR_2.0.xsd`:
   - `<SubmissionHeader>`: `ActivityType="SAR"`, `SubmissionType="New"`, `CreatedTimestamp`.
   - `<Activity>`: `ActivityID`, `ActivityStatus`, `ReportingInstitution`.
-  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`).
+  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`). Unlinked alerts dynamically derive a deterministic zero-PII subject privacy hash ($\mathrm{SHA\text{-}256}(\text{"case\_subject:"} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) eliminating static mock constants.
   - `<SuspiciousActivityDetails>`: Composite `TotalRiskScore`, `Priority`, linked `AlertIds`.
   - `<Narrative>`: Summary, investigator notes, and cryptographically signed event timeline.
 - **Validation Mandate**: Validates generated XML against `schemas/FinCEN_SAR_2.0.xsd` using `lxml.etree.XMLSchema`. Malformed XML or missing required elements raises [`SARValidationError`](../backend/app/application/services/regulatory_reporter.py#L24).
-- **State Guard**: Generating SAR XML for an unconfirmed or open case is strictly rejected (`"is not resolved confirmed fraud"`).
+- **Cryptographic Filing Hash**: Computes an immutable SHA-256 filing hash for regulatory e-filing auditability:
+  $$\mathcal{H}_{\mathrm{filing}} = \mathrm{SHA\text{-}256}(\mathcal{X}_{\mathrm{canonical}})$$
+- **Atomic Storage**: Persists filings under `storage/regulatory_filings/sar_{case_id}.xml` via atomic rename (`os.replace`) protected by a reentrant mutex (`threading.RLock()`).
+- **State Guard**: Generating SAR XML for an unconfirmed or open case is strictly rejected (`"is not resolved confirmed fraud"`). Missing cases fail closed with HTTP 404 (zero mock fallbacks).
 
 ---
 
@@ -313,8 +316,8 @@ All endpoints are hosted under prefix `/api/v1/cases` and defined in [`backend/a
 | `GET` | `/{case_id}/sar-report`| None | `FileResponse (application/xml)` | Download serialized FinCEN SAR 2.0 XML report. |
 | `POST` | `/{case_id}/evidence` | `EvidenceRequest` (`evidence_type`, `title`, `file_path`, `content`, `uploaded_by`) | `EvidenceResponse` | Register evidence with SHA-256 content verification. |
 | `GET` | `/{case_id}/evidence` | None | `list[EvidenceResponse]` | Retrieve all registered evidence items for a case. |
-| `POST` | `/{case_id}/file-sar` | None | `{"submission_id", "status", "xml", "pdf_download_url"}` | Generate, validate, and file FinCEN BSA XML payload. |
-| `POST` | `/export/fincen-xml` | `ExportFinCENXmlRequest` (`case_id`) | `ExportFinCENXmlResponse` | Compile FinCEN SAR XML (alias contract for SIEM/APIs). |
+| `POST` | `/{case_id}/file-sar` | Optional `institution_name`, `narrative_override` | `{"submission_id", "status", "xml", "xml_payload", "sha256_hash", "filing_status", "pdf_download_url"}` | Generate, validate, hash, and file FinCEN BSA XML payload. |
+| `POST` | `/export/fincen-xml` | `ExportFinCENXmlRequest` (`case_id`, `filer_id`, `narrative_override`, `institution_name`) | `ExportFinCENXmlResponse` | Compile FinCEN SAR XML with SHA-256 hash (SIEM/APIs). |
 | `POST` | `/{case_id}/copilot/narrative` | `CopilotQueryRequest` (optional notes) | `CopilotQueryResponse` | Synthesize 5-paragraph SAR narrative & 4-Eyes briefing. |
 | `GET` | `/{case_id}/copilot/summary` | None | `dict` (findings, drivers, lineage) | Retrieve structured Copilot findings and risk disposition. |
 | `GET` | `/audit/logs` | `limit` (1–500, default 100) | `list[InvestigatorAuditLogResponse]` | Audit log feed for compliance & supervisory review. |
