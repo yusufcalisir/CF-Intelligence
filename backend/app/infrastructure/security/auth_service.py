@@ -11,6 +11,7 @@ Features:
 from __future__ import annotations
 
 import logging
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -68,6 +69,7 @@ class BruteForceLockoutManager:
 
     Enforces temporary lockout (default: 15 minutes / 900 seconds) after
     a threshold of consecutive failed login attempts (default: 5).
+    Guarded by a reentrant lock to eliminate race conditions under concurrent load.
     """
 
     def __init__(
@@ -77,6 +79,7 @@ class BruteForceLockoutManager:
     ) -> None:
         self.max_failures = max_failures
         self.lockout_duration_seconds = lockout_duration_seconds
+        self._lock = threading.RLock()
         # identifier -> list of failure timestamps
         self._failures: dict[str, list[float]] = {}
         # identifier -> lockout start timestamp
@@ -84,81 +87,84 @@ class BruteForceLockoutManager:
 
     def record_failure(self, identifier: str) -> LockoutStatus:
         """Record a failed login attempt. Returns the updated LockoutStatus."""
-        now = time.time()
-        key = identifier.lower().strip()
+        with self._lock:
+            now = time.time()
+            key = identifier.lower().strip()
 
-        # Clean up failures older than lockout window
-        recent_failures = [
-            t for t in self._failures.get(key, [])
-            if now - t <= self.lockout_duration_seconds
-        ]
-        recent_failures.append(now)
-        self._failures[key] = recent_failures
+            # Clean up failures older than lockout window
+            recent_failures = [
+                t for t in self._failures.get(key, [])
+                if now - t <= self.lockout_duration_seconds
+            ]
+            recent_failures.append(now)
+            self._failures[key] = recent_failures
 
-        # Check if threshold reached
-        if len(recent_failures) >= self.max_failures:
-            self._locked_until[key] = now + self.lockout_duration_seconds
-            logger.warning(
-                "BRUTE-FORCE LOCKOUT TRIGGERED for identifier '%s'. Locked for %d seconds.",
-                key,
-                self.lockout_duration_seconds,
-            )
+            # Check if threshold reached
+            if len(recent_failures) >= self.max_failures:
+                self._locked_until[key] = now + self.lockout_duration_seconds
+                logger.warning(
+                    "BRUTE-FORCE LOCKOUT TRIGGERED for identifier '%s'. Locked for %d seconds.",
+                    key,
+                    self.lockout_duration_seconds,
+                )
+                return LockoutStatus(
+                    is_locked=True,
+                    failed_attempts=len(recent_failures),
+                    max_attempts=self.max_failures,
+                    remaining_seconds=float(self.lockout_duration_seconds),
+                    lockout_duration_seconds=self.lockout_duration_seconds,
+                )
+
             return LockoutStatus(
-                is_locked=True,
+                is_locked=False,
                 failed_attempts=len(recent_failures),
                 max_attempts=self.max_failures,
-                remaining_seconds=float(self.lockout_duration_seconds),
+                remaining_seconds=0.0,
                 lockout_duration_seconds=self.lockout_duration_seconds,
             )
-
-        return LockoutStatus(
-            is_locked=False,
-            failed_attempts=len(recent_failures),
-            max_attempts=self.max_failures,
-            remaining_seconds=0.0,
-            lockout_duration_seconds=self.lockout_duration_seconds,
-        )
 
     def check_lockout(self, identifier: str) -> LockoutStatus:
         """Check if an identifier is currently locked out and return remaining duration."""
-        now = time.time()
-        key = identifier.lower().strip()
+        with self._lock:
+            now = time.time()
+            key = identifier.lower().strip()
 
-        locked_until = self._locked_until.get(key, 0.0)
-        if locked_until > now:
-            remaining = locked_until - now
+            locked_until = self._locked_until.get(key, 0.0)
+            if locked_until > now:
+                remaining = locked_until - now
+                return LockoutStatus(
+                    is_locked=True,
+                    failed_attempts=len(self._failures.get(key, [])),
+                    max_attempts=self.max_failures,
+                    remaining_seconds=round(remaining, 1),
+                    lockout_duration_seconds=self.lockout_duration_seconds,
+                )
+
+            # Lockout expired, clean up
+            if key in self._locked_until:
+                del self._locked_until[key]
+                self._failures.pop(key, None)
+
+            recent = [
+                t for t in self._failures.get(key, [])
+                if now - t <= self.lockout_duration_seconds
+            ]
+            self._failures[key] = recent
+
             return LockoutStatus(
-                is_locked=True,
-                failed_attempts=len(self._failures.get(key, [])),
+                is_locked=False,
+                failed_attempts=len(recent),
                 max_attempts=self.max_failures,
-                remaining_seconds=round(remaining, 1),
+                remaining_seconds=0.0,
                 lockout_duration_seconds=self.lockout_duration_seconds,
             )
 
-        # Lockout expired, clean up
-        if key in self._locked_until:
-            del self._locked_until[key]
-            self._failures.pop(key, None)
-
-        recent = [
-            t for t in self._failures.get(key, [])
-            if now - t <= self.lockout_duration_seconds
-        ]
-        self._failures[key] = recent
-
-        return LockoutStatus(
-            is_locked=False,
-            failed_attempts=len(recent),
-            max_attempts=self.max_failures,
-            remaining_seconds=0.0,
-            lockout_duration_seconds=self.lockout_duration_seconds,
-        )
-
     def reset(self, identifier: str) -> None:
         """Reset failed attempt counters upon successful authentication."""
-        key = identifier.lower().strip()
-        self._failures.pop(key, None)
-        self._locked_until.pop(key, None)
+        with self._lock:
+            key = identifier.lower().strip()
+            self._failures.pop(key, None)
+            self._locked_until.pop(key, None)
 
 
 class AuthenticationService:
@@ -244,6 +250,14 @@ class AuthenticationService:
         )
         self._users[uname] = user
         return user
+
+    def get_user(self, username: str) -> UserRecord | None:
+        """Safely fetch an active user by username."""
+        uname = username.lower().strip()
+        user = self._users.get(uname)
+        if user and user.is_active:
+            return user
+        return None
 
     def authenticate(
         self,

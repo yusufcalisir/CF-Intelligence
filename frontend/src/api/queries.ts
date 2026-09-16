@@ -86,6 +86,12 @@ import type {
   GDPRErasureRequest,
   ErasureAuditRecordResponse,
   ErasureChainVerificationResponse,
+  LoginRequest,
+  LoginResponse,
+  RefreshTokenRequest,
+  UserProfileResponse,
+  LogoutResponse,
+  LockoutStatusResponse,
 } from './types';
 
 
@@ -1409,4 +1415,85 @@ export function useVerifyErasureChainQuery(tenantId: string = 'bank_alpha') {
     enabled: !!tenantId,
   });
 }
+
+// ── Authentication & Session Hooks ────────────────────────────────────────────
+
+export function useCurrentUserQuery(token?: string) {
+  return useQuery<UserProfileResponse>({
+    queryKey: ['current-user', token],
+    queryFn: async () => {
+      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+      const { data } = await apiClient.get<UserProfileResponse>('/api/v1/auth/me', { headers });
+      return data;
+    },
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useLoginMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<LoginResponse, Error, LoginRequest>({
+    mutationFn: async (credentials) => {
+      const { data } = await apiClient.post<LoginResponse>('/api/v1/auth/login', credentials);
+      if (typeof window !== 'undefined' && data.access_token) {
+        localStorage.setItem('cfi_token', data.access_token);
+        if (data.tenant_id) {
+          localStorage.setItem('cfi_tenant_id', data.tenant_id);
+        }
+      }
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(['current-user'], data.user);
+      queryClient.invalidateQueries({ queryKey: ['current-user'] });
+    },
+  });
+}
+
+export function useRefreshTokenMutation() {
+  return useMutation<LoginResponse, Error, RefreshTokenRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<LoginResponse>('/api/v1/auth/refresh', payload);
+      if (typeof window !== 'undefined' && data.access_token) {
+        localStorage.setItem('cfi_token', data.access_token);
+      }
+      return data;
+    },
+  });
+}
+
+export function useLogoutMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<LogoutResponse, Error, { token?: string } | void>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<LogoutResponse>('/api/v1/auth/logout', payload ?? {});
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('cfi_token');
+        sessionStorage.removeItem('cfi_token');
+        localStorage.removeItem('cfi_tenant_id');
+        sessionStorage.removeItem('cfi_tenant_id');
+      }
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.clear();
+    },
+  });
+}
+
+export function useLockoutStatusQuery(identifier: string) {
+  return useQuery<LockoutStatusResponse>({
+    queryKey: ['lockout-status', identifier],
+    queryFn: async () => {
+      const { data } = await apiClient.get<LockoutStatusResponse>(
+        `/api/v1/auth/lockout-status?identifier=${encodeURIComponent(identifier)}`
+      );
+      return data;
+    },
+    enabled: !!identifier,
+    retry: false,
+  });
+}
+
 

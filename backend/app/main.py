@@ -853,8 +853,9 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import copilot, datasets, design_partner, feedback, onboarding
+from app.presentation.routers import auth, copilot, datasets, design_partner, feedback, onboarding
 
+app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(design_partner.router)
 app.include_router(diagnostics.router)
@@ -930,7 +931,6 @@ else:
     app.include_router(dashboard.router)
     app.include_router(psd2.router)
     app.include_router(security.router)
-    app.include_router(auth.router)
     app.include_router(monitoring.router)
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)

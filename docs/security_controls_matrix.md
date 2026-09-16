@@ -10,8 +10,8 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | :--- | :--- | :--- | :--- | :--- | :---: |
 | **`SOC2-CC6.1`** | SOC 2 Type II | Perimeter WAF, IP whitelisting, SQLi/XSS filtering & Bot Management | `PerimeterWAFGuard`, Cloudflare Terraform IaC | `test_security_controls_audit.py` | `PASS` |
 | **`SOC2-CC6.1.1`** | SOC 2 Type II | Bcrypt password hashing (cost=12) with salted cryptographic digests | `PasswordHasher` (`password_hasher.py`) | `test_auth_security.py` | `PASS` |
-| **`SOC2-CC6.1.2`** | SOC 2 Type II | Short-lived JWTs (15 min) with single-use refresh token rotation | `EnterpriseAuthService` (`auth_service.py`) | `test_auth_security.py` | `PASS` |
-| **`SOC2-CC6.1.3`** | SOC 2 Type II | Brute-force account & IP lockout (5 failed attempts -> 15 min lock) | `EnterpriseAuthService` (`auth_service.py`) | `test_auth_security.py` | `PASS` |
+| **`SOC2-CC6.1.2`** | SOC 2 Type II | Short-lived JWTs (15 min) with single-use refresh token rotation | `EnterpriseAuthService` (`auth_service.py`), `auth.py` | `test_auth_security.py`<br/>`test_auth_routes.py` | `PASS` |
+| **`SOC2-CC6.1.3`** | SOC 2 Type II | Brute-force account & IP lockout (5 failed attempts -> 15 min lock) | `EnterpriseAuthService` (`auth_service.py`), `auth.py` | `test_auth_security.py`<br/>`test_auth_routes.py` | `PASS` |
 | **`SOC2-CC6.1.4`** | SOC 2 Type II | Strict CORS whitelist (zero wildcard `*`) & HTTP security headers | `SecurityHeadersMiddleware`, `config.py` | `test_security_headers.py` | `PASS` |
 | **`SOC2-CC6.2`** | SOC 2 Type II | Multi-Tenant BOLA Isolation & OIDC Scoped Tenant Access | `TenantAccessControlMiddleware` (`main.py`) | `test_tenant_isolation.py` | `PASS` |
 | **`SOC2-CC6.3`** | SOC 2 Type II | Attribute-Based Access Control (ABAC) with granular tenant rules | `ABACPolicyEngine` (`abac_engine.py`) | `test_enterprise_security_suite.py` | `PASS` |

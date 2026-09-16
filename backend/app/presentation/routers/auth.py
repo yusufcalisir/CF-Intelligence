@@ -4,19 +4,45 @@ Provides endpoints for:
 - User login with bcrypt verification, brute-force defense, and 15-minute temporary lockout.
 - Short-lived JWT access token issuance (15-30m) + refresh token rotation.
 - Token refresh, session verification, and token revocation.
+- Current user profile queries (/me) with multi-tenant ABAC isolation.
 - Lockout status queries.
 """
 
 from __future__ import annotations
 
+import asyncio
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
-from pydantic import BaseModel, Field
 
+from app.application.schemas.auth import (
+    LockoutStatusResponse,
+    LoginRequest,
+    LoginResponse,
+    LogoutRequest,
+    LogoutResponse,
+    RefreshRequest,
+    RefreshTokenRequest,
+    TokenResponse,
+    TokenVerifyResponse,
+    UserProfileResponse,
+)
 from app.infrastructure.security.auth_service import AuthenticationService
 from app.infrastructure.security.rate_limiter import limiter
+
+__all__ = [
+    "LockoutStatusResponse",
+    "LoginRequest",
+    "LoginResponse",
+    "LogoutRequest",
+    "LogoutResponse",
+    "RefreshRequest",
+    "RefreshTokenRequest",
+    "TokenResponse",
+    "TokenVerifyResponse",
+    "UserProfileResponse",
+    "router",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -25,67 +51,42 @@ router = APIRouter(prefix="/api/v1/auth", tags=["authentication"])
 _auth_service = AuthenticationService.get_instance()
 
 
-# ── Schemas ───────────────────────────────────────────────────────────────────
-
-
-class LoginRequest(BaseModel):
-    """User login payload with username and password."""
-
-    username: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
-        description="Username or user email",
-    )
-    password: str = Field(
-        ...,
-        min_length=6,
-        max_length=128,
-        description="Account password",
-    )
-
-
-class LoginResponse(BaseModel):
-    """Successful authentication response with JWT access and refresh token bundle."""
-
-    access_token: str
-    refresh_token: str
-    token_type: str = "Bearer"
-    expires_in: int = Field(900, description="Access token expiration in seconds (15 minutes)")
-    refresh_expires_in: int = Field(604800, description="Refresh token expiration in seconds (7 days)")
-    user: dict[str, Any]
-
-
-class RefreshRequest(BaseModel):
-    """Token refresh payload containing the long-lived refresh token."""
-
-    refresh_token: str = Field(..., min_length=10, description="Signed JWT refresh token")
-
-
-class TokenVerifyResponse(BaseModel):
-    """Access token verification verdict and extracted claims."""
-
-    valid: bool
-    claims: dict[str, Any] | None = None
-    detail: str
-
-
-class LogoutRequest(BaseModel):
-    """Optional payload specifying refresh or access token to explicitly revoke."""
-
-    token: str | None = Field(None, description="Optional token to revoke")
-
-
-class LockoutStatusResponse(BaseModel):
-    """Brute-force lockout status for an identifier."""
-
-    identifier: str
-    is_locked: bool
-    failed_attempts: int
-    max_attempts: int
-    remaining_seconds: float
-    lockout_duration_seconds: int
+def _derive_permissions(roles: list[str]) -> list[str]:
+    """Derive fine-grained ABAC permissions from assigned user roles."""
+    perms: set[str] = set()
+    for role in roles:
+        r = role.lower().strip()
+        if r in ("admin", "super_admin"):
+            perms.update([
+                "read:all",
+                "write:all",
+                "admin:all",
+                "cases:manage",
+                "alerts:manage",
+                "models:manage",
+                "governance:vote",
+            ])
+        elif r in ("compliance_officer", "compliance_auditor"):
+            perms.update([
+                "read:all",
+                "cases:review",
+                "alerts:review",
+                "compliance:file_sar",
+                "audit:read",
+            ])
+        elif r in ("analyst", "investigator"):
+            perms.update([
+                "read:cases",
+                "write:cases",
+                "read:alerts",
+                "write:alerts",
+                "copilot:query",
+            ])
+        elif r == "auditor":
+            perms.update(["read:all", "audit:read"])
+        else:
+            perms.add(f"read:{r}")
+    return sorted(perms)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -100,12 +101,15 @@ async def login(
 ) -> LoginResponse:
     """Authenticate with username and password.
 
-    Enforces bcrypt verification and 15-minute temporary lockout after
+    Enforces bcrypt verification offloaded to a worker thread to prevent event-loop
+    blocking, multi-tenant isolation, and a 15-minute temporary lockout after
     5 consecutive failed attempts.
     """
     client_ip = request.client.host if request.client else "127.0.0.1"
 
-    success, user, message, lockout = _auth_service.authenticate(
+    # Execute CPU-intensive bcrypt hashing in threadpool (Vector 13: Non-Blocking I/O)
+    success, user, message, lockout = await asyncio.to_thread(
+        _auth_service.authenticate,
         username=payload.username,
         plain_password=payload.password,
         client_ip=client_ip,
@@ -126,7 +130,38 @@ async def login(
         )
 
     assert user is not None
+
+    # Multi-tenant domain isolation check (Vector 7)
+    if payload.tenant_id:
+        target_tenant = payload.tenant_id.lower().replace("-", "_").strip()
+        user_tenant = user.bank_id.lower().replace("-", "_").strip()
+        is_admin = any(r in user.roles for r in ("admin", "super_admin"))
+        if not is_admin and target_tenant != user_tenant:
+            logger.warning(
+                "Multi-Tenant Isolation: User '%s' (bank '%s') attempted login to tenant '%s'",
+                user.username,
+                user.bank_id,
+                payload.tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"User '{user.username}' is assigned to bank '{user.bank_id}' and cannot access tenant '{payload.tenant_id}'.",
+            )
+
     token_bundle = _auth_service.create_token_bundle(user)
+    derived_perms = _derive_permissions(user.roles)
+    primary_role = user.roles[0] if user.roles else "analyst"
+
+    user_profile = UserProfileResponse(
+        user_id=user.user_id,
+        username=user.username,
+        bank_id=user.bank_id,
+        tenant_id=user.bank_id,
+        roles=user.roles,
+        clearance_level=user.clearance_level,
+        permissions=derived_perms,
+        is_active=user.is_active,
+    )
 
     return LoginResponse(
         access_token=token_bundle.access_token,
@@ -134,13 +169,9 @@ async def login(
         token_type=token_bundle.token_type,
         expires_in=token_bundle.expires_in,
         refresh_expires_in=token_bundle.refresh_expires_in,
-        user={
-            "user_id": user.user_id,
-            "username": user.username,
-            "bank_id": user.bank_id,
-            "roles": user.roles,
-            "clearance_level": user.clearance_level,
-        },
+        tenant_id=user.bank_id,
+        role=primary_role,
+        user=user_profile,
     )
 
 
@@ -161,6 +192,24 @@ async def refresh_token(
 
     # Decode claims to return user details
     _, claims, _ = _auth_service.verify_access_token(bundle.access_token)
+    roles = claims.get("roles", ["analyst"]) if claims else ["analyst"]
+    bank_id = claims.get("bank_id", "bank_a") if claims else "bank_a"
+    username = claims.get("username", "") if claims else ""
+    user_id = claims.get("sub", "") if claims else ""
+    clearance = claims.get("clearance_level", 1) if claims else 1
+    primary_role = roles[0] if roles else "analyst"
+    derived_perms = _derive_permissions(roles)
+
+    user_profile = UserProfileResponse(
+        user_id=user_id,
+        username=username,
+        bank_id=bank_id,
+        tenant_id=bank_id,
+        roles=roles,
+        clearance_level=clearance,
+        permissions=derived_perms,
+        is_active=True,
+    )
 
     return LoginResponse(
         access_token=bundle.access_token,
@@ -168,26 +217,102 @@ async def refresh_token(
         token_type=bundle.token_type,
         expires_in=bundle.expires_in,
         refresh_expires_in=bundle.refresh_expires_in,
-        user={
-            "user_id": claims.get("sub", "") if claims else "",
-            "username": claims.get("username", "") if claims else "",
-            "bank_id": claims.get("bank_id", "") if claims else "",
-            "roles": claims.get("roles", []) if claims else [],
-            "clearance_level": claims.get("clearance_level", 1) if claims else 1,
-        },
+        tenant_id=bank_id,
+        role=primary_role,
+        user=user_profile,
     )
 
 
-@router.post("/verify", response_model=TokenVerifyResponse)
-async def verify_token(
-    authorization: str = Header(..., description="Bearer <token>"),
-) -> TokenVerifyResponse:
-    """Verify an access token and return decoded user claims."""
+@router.get("/me", response_model=UserProfileResponse)
+async def get_current_user(
+    authorization: str | None = Header(None, description="Bearer <access_token>"),
+    x_tenant_id: str | None = Header(None, alias="X-Tenant-ID", description="Active tenant header"),
+) -> UserProfileResponse:
+    """Retrieve profile and fine-grained permissions for the active authenticated user."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     token_parts = authorization.strip().split()
     if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid authorization header format. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_str = token_parts[1]
+    is_valid, claims, detail = _auth_service.verify_access_token(token_str)
+
+    if not is_valid or not claims:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=detail or "Authentication token is invalid or has expired.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    username = claims.get("username", "")
+    token_bank_id = claims.get("bank_id", "")
+    roles = claims.get("roles", [])
+
+    # Multi-tenant cross-tenant header validation (Vector 7)
+    if x_tenant_id:
+        norm_header_tenant = x_tenant_id.lower().replace("-", "_").strip()
+        norm_token_tenant = token_bank_id.lower().replace("-", "_").strip()
+        is_cross_bank_authorized = any(
+            r in roles for r in ("admin", "super_admin", "cross_bank_investigator")
+        )
+        if not is_cross_bank_authorized and norm_header_tenant != norm_token_tenant:
+            logger.warning(
+                "ABAC Multi-Tenant Violation: Token bank '%s' mismatched X-Tenant-ID '%s'",
+                token_bank_id,
+                x_tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Cross-tenant access forbidden. Token bank '{token_bank_id}' does not match requested tenant '{x_tenant_id}'.",
+            )
+
+    user = _auth_service.get_user(username)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"User account '{username}' was not found or is inactive.",
+        )
+
+    return UserProfileResponse(
+        user_id=user.user_id,
+        username=user.username,
+        bank_id=user.bank_id,
+        tenant_id=user.bank_id,
+        roles=user.roles,
+        clearance_level=user.clearance_level,
+        permissions=_derive_permissions(user.roles),
+        is_active=user.is_active,
+    )
+
+
+@router.post("/verify", response_model=TokenVerifyResponse)
+async def verify_token(
+    authorization: str | None = Header(None, description="Bearer <token>"),
+) -> TokenVerifyResponse:
+    """Verify an access token and return decoded user claims."""
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing Authorization header. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    token_parts = authorization.strip().split()
+    if len(token_parts) != 2 or token_parts[0].lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format. Expected 'Bearer <token>'.",
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     token_str = token_parts[1]
@@ -197,6 +322,7 @@ async def verify_token(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=detail,
+            headers={"WWW-Authenticate": "Bearer"},
         )
 
     return TokenVerifyResponse(
@@ -206,11 +332,11 @@ async def verify_token(
     )
 
 
-@router.post("/logout")
+@router.post("/logout", response_model=LogoutResponse)
 async def logout(
     payload: LogoutRequest | None = None,
     authorization: str | None = Header(None),
-) -> dict[str, str]:
+) -> LogoutResponse:
     """Revoke tokens and terminate the session."""
     token_to_revoke = None
     if payload and payload.token:
@@ -221,7 +347,10 @@ async def logout(
     if token_to_revoke:
         _auth_service.revoke_token(token_to_revoke)
 
-    return {"status": "logged_out", "detail": "Session terminated and token invalidated."}
+    return LogoutResponse(
+        status="logged_out",
+        detail="Session terminated and token invalidated.",
+    )
 
 
 @router.get("/lockout-status", response_model=LockoutStatusResponse)
@@ -237,4 +366,8 @@ async def get_lockout_status(
         max_attempts=status_obj.max_attempts,
         remaining_seconds=status_obj.remaining_seconds,
         lockout_duration_seconds=status_obj.lockout_duration_seconds,
+        is_locked_out=status_obj.is_locked,
+        remaining_lockout_seconds=status_obj.remaining_seconds,
+        user_failure_count=status_obj.failed_attempts,
+        ip_failure_count=status_obj.failed_attempts,
     )

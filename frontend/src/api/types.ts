@@ -1632,3 +1632,70 @@ export interface ErasureChainVerificationResponse {
   tamper_reason?: string | null;
 }
 
+// ── Authentication & Token Lifecycle Types ────────────────────────────────────
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+  tenant_id?: string | null;
+}
+
+export interface UserProfileResponse {
+  user_id: string;
+  username: string;
+  bank_id: string;
+  tenant_id: string;
+  roles: string[];
+  clearance_level: number;
+  permissions: string[];
+  is_active?: boolean;
+}
+
+export interface LoginResponse {
+  access_token: string;
+  refresh_token: string;
+  token_type: string;
+  expires_in: number;
+  refresh_expires_in: number;
+  tenant_id: string;
+  role: string;
+  user: UserProfileResponse;
+}
+
+export type TokenResponse = LoginResponse;
+
+export interface RefreshTokenRequest {
+  refresh_token: string;
+}
+
+export type RefreshRequest = RefreshTokenRequest;
+
+export interface TokenVerifyResponse {
+  valid: boolean;
+  claims: Record<string, unknown> | null;
+  detail: string;
+}
+
+export interface LogoutRequest {
+  token?: string | null;
+}
+
+export interface LogoutResponse {
+  status: string;
+  detail: string;
+}
+
+export interface LockoutStatusResponse {
+  identifier: string;
+  is_locked: boolean;
+  failed_attempts: number;
+  max_attempts: number;
+  remaining_seconds: number;
+  lockout_duration_seconds: number;
+  is_locked_out?: boolean | null;
+  remaining_lockout_seconds?: number | null;
+  user_failure_count?: number | null;
+  ip_failure_count?: number | null;
+}
+
+
