@@ -1,11 +1,10 @@
 {
   "pythonVersion": "3.12",
   "pythonPlatform": "Windows",
-  "venvPath": "C:/Users/Yusuf/AppData/Local/Programs/Python",
-  "venv": "Python312",
+  "venvPath": "backend",
+  "venv": ".venv",
   "extraPaths": [
-    "sdk/python",
     "backend",
-    "C:/Users/Yusuf/AppData/Local/Programs/Python/Python312/Lib/site-packages"
+    "sdk/python"
   ]
 }

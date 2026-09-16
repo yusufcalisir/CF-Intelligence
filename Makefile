@@ -13,7 +13,7 @@ dev: ## Start all services in development mode
 	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 
 dev-backend: ## Start backend services only
-	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build api worker postgres redis
+	docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build backend postgres redis
 
 dev-frontend: ## Start frontend dev server only
 	cd frontend && npm run dev

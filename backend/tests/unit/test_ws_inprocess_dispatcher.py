@@ -25,7 +25,6 @@ from app.presentation.websockets.manager import (
     WebSocketConnectionManager,
 )
 
-
 # ── Fixtures ────────────────────────────────────────────────────────────────
 
 
