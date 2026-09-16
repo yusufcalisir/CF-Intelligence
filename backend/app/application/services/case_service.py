@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import threading
 from datetime import UTC, datetime
 from typing import Any
 
@@ -37,6 +38,7 @@ def _case_to_dict(c: Case) -> dict[str, Any]:
         "assigned_to": c.assigned_to,
         "alert_ids": c.alert_ids,
         "evidence_ids": getattr(c, "evidence_ids", []),
+        "supervisor_signatures": getattr(c, "supervisor_signatures", []) or [],
         "notes": [
             {
                 "id": n.id,
@@ -72,6 +74,8 @@ def _dict_to_case(d: dict[str, Any]) -> Case:
     d_copy["priority"] = CasePriority(d_copy["priority"])
     if "evidence_ids" not in d_copy:
         d_copy["evidence_ids"] = []
+    if "supervisor_signatures" not in d_copy:
+        d_copy["supervisor_signatures"] = []
     d_copy["created_at"] = datetime.fromisoformat(d_copy["created_at"])
     if d_copy.get("updated_at"):
         d_copy["updated_at"] = datetime.fromisoformat(d_copy["updated_at"])
@@ -105,6 +109,7 @@ def _dict_to_case(d: dict[str, Any]) -> Case:
     d_copy["timeline"] = timeline
 
     return Case(**d_copy)
+
 
 
 # Valid status transitions
@@ -148,6 +153,7 @@ class CaseManagementService:
 
     def __init__(self) -> None:
         self._cases = RedisStore("case")
+        self._lock = threading.RLock()
 
     def _add_event(
         self,
@@ -181,54 +187,57 @@ class CaseManagementService:
         alert_ids: list[str] | None = None,
     ) -> Case:
         """Create a new investigation case."""
-        case = Case(
-            title=title,
-            priority=priority,
-            alert_ids=alert_ids or [],
-        )
+        with self._lock:
+            case = Case(
+                title=title,
+                priority=priority,
+                alert_ids=alert_ids or [],
+            )
 
-        self._add_event(case, "created", f"Case created: {title}", "system")
+            self._add_event(case, "created", f"Case created: {title}", "system")
 
-        self._cases.set(case.id, _case_to_dict(case))
-        logger.info("Created case %s: %s (priority=%s)", case.id[:8], title, priority.value)
-        return case
+            self._cases.set(case.id, _case_to_dict(case))
+            logger.info("Created case %s: %s (priority=%s)", case.id[:8], title, priority.value)
+            return case
 
     def assign_case(self, case_id: str, investigator: str) -> Case:
         """Assign a case to an investigator."""
-        case = self._get_case(case_id)
-        old_assignee = case.assigned_to
-        case.assigned_to = investigator
-        case.status = CaseStatus.ASSIGNED
-        case.updated_at = datetime.now(UTC)
+        with self._lock:
+            case = self._get_case(case_id)
+            old_assignee = case.assigned_to
+            case.assigned_to = investigator
+            case.status = CaseStatus.ASSIGNED
+            case.updated_at = datetime.now(UTC)
 
-        self._add_event(
-            case,
-            "assigned",
-            f"Assigned to {investigator}" + (f" (from {old_assignee})" if old_assignee else ""),
-            "system",
-        )
+            self._add_event(
+                case,
+                "assigned",
+                f"Assigned to {investigator}" + (f" (from {old_assignee})" if old_assignee else ""),
+                "system",
+            )
 
-        logger.info("Assigned case %s to %s", case_id[:8], investigator)
-        self._cases.set(case.id, _case_to_dict(case))
-        return case
+            logger.info("Assigned case %s to %s", case_id[:8], investigator)
+            self._cases.set(case.id, _case_to_dict(case))
+            return case
 
     def add_note(self, case_id: str, author: str, content: str) -> CaseNote:
         """Add an investigation note to a case."""
-        case = self._get_case(case_id)
+        with self._lock:
+            case = self._get_case(case_id)
 
-        note = CaseNote(case_id=case_id, author=author, content=content)
-        case.notes.append(note)
-        case.updated_at = datetime.now(UTC)
+            note = CaseNote(case_id=case_id, author=author, content=content)
+            case.notes.append(note)
+            case.updated_at = datetime.now(UTC)
 
-        self._add_event(
-            case,
-            "note_added",
-            f"Note by {author}: {content[:80]}{'...' if len(content) > 80 else ''}",
-            author,
-        )
+            self._add_event(
+                case,
+                "note_added",
+                f"Note by {author}: {content[:80]}{'...' if len(content) > 80 else ''}",
+                author,
+            )
 
-        self._cases.set(case.id, _case_to_dict(case))
-        return note
+            self._cases.set(case.id, _case_to_dict(case))
+            return note
 
     def change_status(
         self,
@@ -236,118 +245,232 @@ class CaseManagementService:
         new_status: CaseStatus,
         actor: str = "analyst",
         supervisor_signature: str | None = None,
+        second_supervisor_signature: str | None = None,
+        supervisor_signatures: list[str] | None = None,
     ) -> Case:
-        """Change case status with transition validation.
+        """Change case status with transition validation and dual-control signoff.
 
         Raises:
             ValueError: If the transition is not valid or supervisor signature is missing/invalid.
         """
-        case = self._get_case(case_id)
-        old_status = case.status
+        with self._lock:
+            case = self._get_case(case_id)
+            old_status = case.status
 
-        valid = _VALID_TRANSITIONS.get(old_status, set())
-        if new_status not in valid:
-            raise ValueError(
-                f"Invalid transition: {old_status.value} → {new_status.value}. "
-                f"Valid targets: {', '.join(s.value for s in valid)}"
+            valid = _VALID_TRANSITIONS.get(old_status, set())
+            if new_status not in valid:
+                raise ValueError(
+                    f"Invalid transition: {old_status.value} → {new_status.value}. "
+                    f"Valid targets: {', '.join(s.value for s in valid)}"
+                )
+
+            # Consolidate supervisor signatures
+            collected_signatures: list[str] = []
+            if supervisor_signatures:
+                collected_signatures.extend([s.strip() for s in supervisor_signatures if s and s.strip()])
+            if supervisor_signature and supervisor_signature.strip():
+                if supervisor_signature.strip() not in collected_signatures:
+                    collected_signatures.append(supervisor_signature.strip())
+            if second_supervisor_signature and second_supervisor_signature.strip():
+                if second_supervisor_signature.strip() not in collected_signatures:
+                    collected_signatures.append(second_supervisor_signature.strip())
+
+            # Also include any previously attached supervisor signatures on the case
+            existing_sigs = getattr(case, "supervisor_signatures", []) or []
+            for s in existing_sigs:
+                if s and s.strip() and s.strip() not in collected_signatures:
+                    collected_signatures.append(s.strip())
+
+            metadata: dict[str, Any] = {"from": old_status.value, "to": new_status.value}
+            if collected_signatures:
+                metadata["supervisor_signatures"] = collected_signatures
+                metadata["supervisor_signature"] = collected_signatures[0]
+            elif supervisor_signature:
+                metadata["supervisor_signature"] = supervisor_signature
+
+            if new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
+                if not collected_signatures:
+                    raise ValueError(
+                        "Case closure requires secondary supervisor signature (Four-Eyes Principle)."
+                    )
+                # Check separation of duties: supervisor signature must be different from analyst actor
+                for sig in collected_signatures:
+                    sig_clean = sig.replace("supervisor:", "").strip().lower()
+                    actor_clean = actor.replace("analyst:", "").strip().lower()
+                    if sig_clean == actor_clean:
+                        raise ValueError(
+                            "Supervisor signature must be different from the analyst actor (Four-Eyes Principle)."
+                        )
+                # If multiple signatures are provided, validate they are distinct supervisors
+                if len(collected_signatures) > 1:
+                    clean_ids = [s.replace("supervisor:", "").strip().lower() for s in collected_signatures]
+                    if len(set(clean_ids)) < len(clean_ids):
+                        raise ValueError("Duplicate supervisor signatures rejected under Four-Eyes dual control.")
+
+                case.closed_at = datetime.now(UTC)
+                case.supervisor_signatures = collected_signatures
+
+                # Retraining feedback loop: record confirmed analyst verdict label into retraining dataset
+                actual_label = 1 if new_status == CaseStatus.CLOSED_CONFIRMED else 0
+                metadata["retraining_feedback_label"] = actual_label
+
+                feedback_recorded = False
+                try:
+                    from app.application.services.label_feedback import LocalLabelFeedbackPipeline
+
+                    feedback_pipeline = LocalLabelFeedbackPipeline()
+                    for alert_id in case.alert_ids:
+                        feedback_pipeline.ingest_analyst_determination(
+                            alert_id=alert_id,
+                            determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
+                            notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",
+                        )
+                    feedback_recorded = True
+                except Exception as exc:
+                    logger.warning("Feedback pipeline ingestion notice: %s", exc)
+
+                try:
+                    from app.application.services.model_registry import (
+                        ModelEvaluationEngine,
+                        ModelRegistry,
+                    )
+
+                    eval_engine = ModelEvaluationEngine(ModelRegistry())
+
+                    # Record ground truth label for all linked alerts/transactions if transaction exists in eval engine
+                    for alert_id in case.alert_ids:
+                        try:
+                            eval_engine.log_feedback(
+                                simulation_id="default_sim",
+                                transaction_id=f"tx_{alert_id[:8]}",
+                                actual_label=actual_label,
+                            )
+                        except KeyError:
+                            # Transaction not in eval simulation cache, which is normal for arbitrary alert IDs
+                            pass
+                    feedback_recorded = True
+                except Exception as exc:
+                    logger.warning(
+                        "Failed to record retraining label feedback for case %s: %s", case_id[:8], exc
+                    )
+                metadata["retraining_feedback_recorded"] = feedback_recorded
+            elif collected_signatures:
+                case.supervisor_signatures = collected_signatures
+
+            case.status = new_status
+            case.updated_at = datetime.now(UTC)
+
+            if new_status == CaseStatus.SAR_FILED:
+                from app.application.services.alert_service import AlertIntelligenceService
+                from app.application.services.regulatory_reporter import RegulatoryReporterService
+
+                # Fetch alerts linked to the case
+                alert_service = AlertIntelligenceService()
+                alerts = []
+                for alert_id in case.alert_ids:
+                    alert = alert_service.get_alert(alert_id)
+                    if alert:
+                        alerts.append(alert)
+
+                # Generate XML report
+                xml_content = RegulatoryReporterService.generate_fincen_sar_xml(case, alerts)
+
+                # Save report
+                report_dir = "storage/regulatory_filings"
+                os.makedirs(report_dir, exist_ok=True)
+                report_path = os.path.join(report_dir, f"sar_{case.id}.xml").replace("\\", "/")
+                with open(report_path, "w", encoding="utf-8") as f:
+                    f.write(xml_content)
+
+                # Log the path in timeline metadata
+                metadata["sar_report_path"] = report_path
+
+            self._add_event(
+                case,
+                "status_changed",
+                f"Status: {old_status.value} → {new_status.value}",
+                actor,
+                metadata,
             )
 
-        metadata: dict[str, Any] = {"from": old_status.value, "to": new_status.value}
-        if supervisor_signature:
-            metadata["supervisor_signature"] = supervisor_signature
-
-        if new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
-            if not supervisor_signature or not supervisor_signature.strip():
-                raise ValueError(
-                    "Case closure requires secondary supervisor signature (Four-Eyes Principle)."
-                )
-            if supervisor_signature == actor:
-                raise ValueError(
-                    "Supervisor signature must be different from the analyst actor (Four-Eyes Principle)."
-                )
-            case.closed_at = datetime.now(UTC)
-
-            # Retraining feedback loop: record confirmed analyst verdict label into retraining dataset
-            actual_label = 1 if new_status == CaseStatus.CLOSED_CONFIRMED else 0
-            try:
-                from app.application.services.model_registry import (
-                    ModelEvaluationEngine,
-                    ModelRegistry,
-                )
-
-                eval_engine = ModelEvaluationEngine(ModelRegistry())
-
-                # Record ground truth label for all linked alerts/transactions
-                for alert_id in case.alert_ids:
-                    eval_engine.log_feedback(
-                        simulation_id="default_sim",
-                        transaction_id=f"tx_{alert_id[:8]}",
-                        actual_label=actual_label,
-                    )
-                metadata["retraining_feedback_label"] = actual_label
-                metadata["retraining_feedback_recorded"] = True
-            except Exception as exc:
-                logger.warning(
-                    "Failed to record retraining label feedback for case %s: %s", case_id[:8], exc
-                )
-
-        case.status = new_status
-        case.updated_at = datetime.now(UTC)
-
-        if new_status == CaseStatus.SAR_FILED:
-            from app.application.services.alert_service import AlertIntelligenceService
-            from app.application.services.regulatory_reporter import RegulatoryReporterService
-
-            # Fetch alerts linked to the case
-            alert_service = AlertIntelligenceService()
-            alerts = []
-            for alert_id in case.alert_ids:
-                alert = alert_service.get_alert(alert_id)
-                if alert:
-                    alerts.append(alert)
-
-            # Generate XML report
-            xml_content = RegulatoryReporterService.generate_fincen_sar_xml(case, alerts)
-
-            # Save report
-            report_dir = "storage/regulatory_filings"
-            os.makedirs(report_dir, exist_ok=True)
-            report_path = os.path.join(report_dir, f"sar_{case.id}.xml").replace("\\", "/")
-            with open(report_path, "w", encoding="utf-8") as f:
-                f.write(xml_content)
-
-            # Log the path in timeline metadata
-            metadata["sar_report_path"] = report_path
-
-        self._add_event(
-            case,
-            "status_changed",
-            f"Status: {old_status.value} → {new_status.value}",
-            actor,
-            metadata,
-        )
-
-        logger.info("Case %s status: %s → %s", case_id[:8], old_status.value, new_status.value)
-        self._cases.set(case.id, _case_to_dict(case))
-        return case
+            logger.info("Case %s status: %s → %s", case_id[:8], old_status.value, new_status.value)
+            self._cases.set(case.id, _case_to_dict(case))
+            return case
 
     def link_alert(self, case_id: str, alert_id: str) -> Case:
         """Link an additional alert to an existing case."""
-        case = self._get_case(case_id)
+        with self._lock:
+            case = self._get_case(case_id)
 
-        if alert_id not in case.alert_ids:
-            case.alert_ids.append(alert_id)
-            case.updated_at = datetime.now(UTC)
+            if alert_id not in case.alert_ids:
+                case.alert_ids.append(alert_id)
+                case.updated_at = datetime.now(UTC)
 
-            self._add_event(case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system")
+                self._add_event(case, "alert_linked", f"Alert {alert_id[:8]} linked to case", "system")
 
-        self._cases.set(case.id, _case_to_dict(case))
-        return case
+            self._cases.set(case.id, _case_to_dict(case))
+            return case
 
     def get_timeline(self, case_id: str) -> list[CaseEvent]:
         """Get the investigation timeline for a case."""
-        case = self._get_case(case_id)
-        return sorted(case.timeline, key=lambda e: e.timestamp)
+        with self._lock:
+            case = self._get_case(case_id)
+            return sorted(case.timeline, key=lambda e: e.timestamp)
+
+    def verify_timeline_integrity(self, case_id: str) -> dict[str, Any]:
+        """Verify the cryptographic SHA-256 hash chain of the case investigation timeline.
+
+        Returns:
+            dict with 'is_valid' (bool), 'event_count' (int), 'corrupted_index' (int | None),
+            and 'chain_hashes' (list[str]).
+        """
+        with self._lock:
+            case = self._get_case(case_id)
+            if not case.timeline:
+                return {
+                    "is_valid": True,
+                    "event_count": 0,
+                    "corrupted_index": None,
+                    "chain_hashes": [],
+                    "message": "Timeline is empty.",
+                }
+
+            chain_hashes: list[str] = []
+            expected_parent = "0" * 64
+
+            for idx, event in enumerate(case.timeline):
+                parent_hash = event.metadata.get("parent_hash")
+                event_hash = event.metadata.get("hash")
+
+                if parent_hash != expected_parent:
+                    return {
+                        "is_valid": False,
+                        "event_count": len(case.timeline),
+                        "corrupted_index": idx,
+                        "chain_hashes": chain_hashes,
+                        "message": f"Parent hash mismatch at index {idx}: expected {expected_parent[:8]}, got {str(parent_hash)[:8]}",
+                    }
+
+                calculated_hash = _hash_event(event, expected_parent)
+                if event_hash != calculated_hash:
+                    return {
+                        "is_valid": False,
+                        "event_count": len(case.timeline),
+                        "corrupted_index": idx,
+                        "chain_hashes": chain_hashes,
+                        "message": f"Hash recalculation mismatch at index {idx}: expected {calculated_hash[:8]}, got {str(event_hash)[:8]}",
+                    }
+
+                chain_hashes.append(event_hash)
+                expected_parent = event_hash
+
+            return {
+                "is_valid": True,
+                "event_count": len(case.timeline),
+                "corrupted_index": None,
+                "chain_hashes": chain_hashes,
+                "message": "Cryptographic timeline hash chain intact and verified.",
+            }
 
     def export_summary(self, case_id: str) -> str:
         """Export an investigation summary as markdown.
@@ -355,106 +478,108 @@ class CaseManagementService:
         Returns:
             Markdown-formatted summary suitable for reporting.
         """
-        case = self._get_case(case_id)
-        lines = [
-            f"# Investigation Summary: {case.title}",
-            "",
-            f"**Case ID:** {case.id}",
-            f"**Status:** {case.status.value}",
-            f"**Priority:** {case.priority.value}",
-            f"**Assigned to:** {case.assigned_to or 'Unassigned'}",
-            f"**Created:** {case.created_at.isoformat()}",
-        ]
-
-        if case.closed_at:
-            lines.append(f"**Closed:** {case.closed_at.isoformat()}")
-            if case.duration_hours is not None:
-                lines.append(f"**Duration:** {case.duration_hours:.1f} hours")
-
-        lines.extend(
-            [
+        with self._lock:
+            case = self._get_case(case_id)
+            lines = [
+                f"# Investigation Summary: {case.title}",
                 "",
-                f"## Linked Alerts ({len(case.alert_ids)})",
-                "",
+                f"**Case ID:** {case.id}",
+                f"**Status:** {case.status.value}",
+                f"**Priority:** {case.priority.value}",
+                f"**Assigned to:** {case.assigned_to or 'Unassigned'}",
+                f"**Created:** {case.created_at.isoformat()}",
             ]
-        )
-        for alert_id in case.alert_ids:
-            lines.append(f"- `{alert_id}`")
 
-        if case.notes:
-            lines.extend(["", "## Investigation Notes", ""])
-            for note in case.notes:
-                lines.append(f"### {note.author} — {note.created_at.strftime('%Y-%m-%d %H:%M')}")
-                lines.append(f"{note.content}")
-                lines.append("")
+            if case.closed_at:
+                lines.append(f"**Closed:** {case.closed_at.isoformat()}")
+                if case.duration_hours is not None:
+                    lines.append(f"**Duration:** {case.duration_hours:.1f} hours")
 
-        lines.extend(["", "## Timeline", ""])
-        for event in sorted(case.timeline, key=lambda e: e.timestamp):
-            ts = event.timestamp.strftime("%Y-%m-%d %H:%M:%S")
-            lines.append(f"- **{ts}** [{event.event_type}] {event.description}")
+            lines.extend(
+                [
+                    "",
+                    f"## Linked Alerts ({len(case.alert_ids)})",
+                    "",
+                ]
+            )
+            for alert_id in case.alert_ids:
+                lines.append(f"- `{alert_id}`")
 
-        return "\n".join(lines)
+            if case.notes:
+                lines.extend(["", "## Investigation Notes", ""])
+                for note in case.notes:
+                    lines.append(f"### {note.author} — {note.created_at.strftime('%Y-%m-%d %H:%M')}")
+                    lines.append(f"{note.content}")
+                    lines.append("")
+
+            lines.extend(["", "## Timeline", ""])
+            for event in sorted(case.timeline, key=lambda e: e.timestamp):
+                ts = event.timestamp.strftime("%Y-%m-%d %H:%M:%S")
+                lines.append(f"- **{ts}** [{event.event_type}] {event.description}")
+
+            return "\n".join(lines)
 
     def get_case(self, case_id: str) -> Case | None:
-        val = self._cases.get(case_id)
-        if val:
-            return _dict_to_case(val)
+        with self._lock:
+            val = self._cases.get(case_id)
+            if val:
+                return _dict_to_case(val)
 
-        # Only synthesise a fallback for valid UUID-format IDs.
-        # Non-UUID strings (e.g. "nonexistent") return None as before.
-        import re
+            # Only synthesise a fallback for valid UUID-format IDs.
+            # Non-UUID strings (e.g. "nonexistent") return None as before.
+            import re
 
-        if not re.fullmatch(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            case_id,
-            re.IGNORECASE,
-        ):
-            return None
-        h = int(hashlib.sha256(case_id.encode()).hexdigest(), 16)
-        priorities = [
-            CasePriority.P1_CRITICAL,
-            CasePriority.P2_HIGH,
-            CasePriority.P3_MEDIUM,
-            CasePriority.P4_LOW,
-        ]
-        statuses = [
-            CaseStatus.INVESTIGATING,
-            CaseStatus.PENDING_REVIEW,
-            CaseStatus.ESCALATED,
-            CaseStatus.ASSIGNED,
-        ]
-        titles = [
-            "High-Risk Activity: Device Sharing & Crypto Outflow",
-            "Cross-Border Transaction Velocity Anomaly",
-            "Suspected Account Takeover — Multi-Bank Device Match",
-            "Structuring Pattern Detected: Smurfing Indicators",
-        ]
-        analysts = ["senior_analyst_1", "analyst_2", "compliance_officer_1", "analyst_3"]
-        now = datetime.now(UTC)
-        fallback_case = Case(
-            id=case_id,
-            title=titles[h % len(titles)],
-            status=statuses[h % len(statuses)],
-            priority=priorities[h % len(priorities)],
-            assigned_to=analysts[h % len(analysts)],
-            alert_ids=[],
-            notes=[],
-            timeline=[
-                CaseEvent(
-                    event_type="case_opened",
-                    description="Investigation case auto-generated for compliance review.",
-                    actor="system",
-                    timestamp=now,
-                    metadata={},
-                )
-            ],
-            created_at=now,
-            total_risk_score=round(0.65 + (h % 350) / 1000.0, 4),
-        )
-        # Persist the fallback case so _get_case() (used by change_status,
-        # add_note, link_alert, etc.) can find it on subsequent calls.
-        self._cases.set(case_id, _case_to_dict(fallback_case))
-        return fallback_case
+            if not re.fullmatch(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                case_id,
+                re.IGNORECASE,
+            ):
+                return None
+            h = int(hashlib.sha256(case_id.encode()).hexdigest(), 16)
+            priorities = [
+                CasePriority.P1_CRITICAL,
+                CasePriority.P2_HIGH,
+                CasePriority.P3_MEDIUM,
+                CasePriority.P4_LOW,
+            ]
+            statuses = [
+                CaseStatus.INVESTIGATING,
+                CaseStatus.PENDING_REVIEW,
+                CaseStatus.ESCALATED,
+                CaseStatus.ASSIGNED,
+            ]
+            titles = [
+                "High-Risk Activity: Device Sharing & Crypto Outflow",
+                "Cross-Border Transaction Velocity Anomaly",
+                "Suspected Account Takeover — Multi-Bank Device Match",
+                "Structuring Pattern Detected: Smurfing Indicators",
+            ]
+            analysts = ["senior_analyst_1", "analyst_2", "compliance_officer_1", "analyst_3"]
+            now = datetime.now(UTC)
+            fallback_case = Case(
+                id=case_id,
+                title=titles[h % len(titles)],
+                status=statuses[h % len(statuses)],
+                priority=priorities[h % len(priorities)],
+                assigned_to=analysts[h % len(analysts)],
+                alert_ids=[],
+                notes=[],
+                timeline=[
+                    CaseEvent(
+                        event_type="case_opened",
+                        description="Investigation case auto-generated for compliance review.",
+                        actor="system",
+                        timestamp=now,
+                        metadata={},
+                    )
+                ],
+                created_at=now,
+                total_risk_score=round(0.65 + (h % 350) / 1000.0, 4),
+            )
+            # Persist the fallback case so _get_case() (used by change_status,
+            # add_note, link_alert, etc.) can find it on subsequent calls.
+            self._cases.set(case_id, _case_to_dict(fallback_case))
+            return fallback_case
 
     def get_cases(
         self,
@@ -463,13 +588,14 @@ class CaseManagementService:
         limit: int = 50,
     ) -> list[Case]:
         """Retrieve cases with optional filters."""
-        raw_vals = self._cases.list_values()
-        cases = [_dict_to_case(v) for v in raw_vals]
-        if status:
-            cases = [c for c in cases if c.status == status]
-        if priority:
-            cases = [c for c in cases if c.priority == priority]
-        return sorted(cases, key=lambda c: c.created_at, reverse=True)[:limit]
+        with self._lock:
+            raw_vals = self._cases.list_values()
+            cases = [_dict_to_case(v) for v in raw_vals]
+            if status:
+                cases = [c for c in cases if c.status == status]
+            if priority:
+                cases = [c for c in cases if c.priority == priority]
+            return sorted(cases, key=lambda c: c.created_at, reverse=True)[:limit]
 
     # ── Private helpers ────────────────────────
 

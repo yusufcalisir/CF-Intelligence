@@ -59,13 +59,41 @@ class CaseRepository:
     async def update_status(self, case_id: str, status: str) -> CaseModel | None:
         """Update case status. Sets closed_at when status is a terminal state."""
         values: dict = {"status": status, "updated_at": datetime.now(UTC)}
-        terminal_statuses = {"resolved_confirmed_fraud", "resolved_false_positive", "closed"}
+        terminal_statuses = {
+            "resolved_confirmed_fraud",
+            "resolved_false_positive",
+            "closed",
+            "closed_confirmed",
+            "closed_false_positive",
+        }
         if status in terminal_statuses:
             values["closed_at"] = datetime.now(UTC)
+        case = await self.get_by_id(case_id)
+        if case is not None:
+            case.status = status
+            if "closed_at" in values:
+                case.closed_at = values["closed_at"]
         await self.session.execute(
             update(CaseModel).where(CaseModel.id == case_id).values(**values)
         )
         await self.session.commit()
+        return await self.get_by_id(case_id)
+
+    async def link_alert(self, case_id: str, alert_id: str) -> CaseModel | None:
+        """Link an alert ID to the case."""
+        case = await self.get_by_id(case_id)
+        if case is None:
+            return None
+        alert_ids = list(case.alert_ids or [])
+        if alert_id not in alert_ids:
+            alert_ids.append(alert_id)
+            case.alert_ids = alert_ids
+            await self.session.execute(
+                update(CaseModel)
+                .where(CaseModel.id == case_id)
+                .values(alert_ids=alert_ids, updated_at=datetime.now(UTC))
+            )
+            await self.session.commit()
         return await self.get_by_id(case_id)
 
     async def assign_to(self, case_id: str, investigator: str) -> CaseModel | None:

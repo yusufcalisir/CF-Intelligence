@@ -15,23 +15,28 @@ from pydantic import BaseModel, Field
 
 from app.application.schemas.phase2 import (
     CaseCreateRequest,
+    CaseEscalateRequest,
     CaseEventResponse,
     CaseLinkAlertRequest,
     CaseNoteRequest,
     CaseNoteResponse,
+    CaseResolveRequest,
     CaseResponse,
+    CaseSignRequest,
     CaseStatusRequest,
     CaseSummaryResponse,
     EvidenceRequest,
     EvidenceResponse,
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
+    TimelineVerificationResponse,
 )
 from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.case_service import (
     AuditService,
     CaseManagementService,
     EvidenceRegistryService,
+    _case_to_dict,
 )
 from app.application.services.idempotency import IdempotencyService
 from app.dependencies import TenantDep, enforce_tenant_isolation
@@ -184,7 +189,7 @@ async def get_case(
 
 @router.patch("/{case_id}", response_model=CaseResponse)
 async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseResponse:
-    """Update case status."""
+    """Update case status with transition validation and dual-control signoff."""
     try:
         new_status = CaseStatus(req.status)
         case = _case_service.change_status(
@@ -192,10 +197,103 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
             new_status,
             actor=req.actor,
             supervisor_signature=req.supervisor_signature,
+            second_supervisor_signature=req.second_supervisor_signature,
+            supervisor_signatures=req.supervisor_signatures,
         )
         return _serialize_case(case)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{case_id}/escalate", response_model=CaseResponse)
+async def escalate_case(case_id: str, req: CaseEscalateRequest) -> CaseResponse:
+    """Escalate a case to PENDING_REVIEW for Four-Eyes supervisor evaluation."""
+    try:
+        _case_service.add_note(case_id, author=req.actor, content=f"Escalation justification: {req.reason}")
+        case = _case_service.change_status(case_id, CaseStatus.PENDING_REVIEW, actor=req.actor)
+        return _serialize_case(case)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{case_id}/sign", response_model=CaseResponse)
+async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
+    """Record a supervisor dual-control signature on a case under review."""
+    try:
+        case = _case_service.get_case(case_id)
+        if not case:
+            raise HTTPException(status_code=404, detail="Case not found")
+        if req.action == "REJECT":
+            case = _case_service.change_status(
+                case_id,
+                CaseStatus.INVESTIGATING,
+                actor=req.supervisor_id,
+            )
+            _case_service.add_note(
+                case_id,
+                author=req.supervisor_id,
+                content=f"Supervisor rejection: {req.notes or 'No reason specified'}",
+            )
+            return _serialize_case(case)
+
+        sig = f"supervisor:{req.supervisor_id}"
+        existing_sigs = list(getattr(case, "supervisor_signatures", []) or [])
+        clean_existing = [s.replace("supervisor:", "").strip().lower() for s in existing_sigs]
+        if req.supervisor_id.strip().lower() in clean_existing:
+            raise HTTPException(status_code=400, detail="Supervisor has already signed this case.")
+
+        existing_sigs.append(sig)
+        case.supervisor_signatures = existing_sigs
+        _case_service._cases.set(case.id, _case_to_dict(case))
+        _case_service._add_event(
+            case,
+            "supervisor_signed",
+            f"Supervisor signature recorded by {req.supervisor_id}. Total signatures: {len(existing_sigs)}",
+            req.supervisor_id,
+            {"supervisor_id": req.supervisor_id, "notes": req.notes},
+        )
+        _case_service._cases.set(case.id, _case_to_dict(case))
+        return _serialize_case(case)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{case_id}/resolve", response_model=CaseResponse)
+async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
+    """Resolve and close a case under strict Four-Eyes dual control."""
+    try:
+        target_status = (
+            CaseStatus.CLOSED_CONFIRMED
+            if req.resolution == "CONFIRMED_FRAUD"
+            else CaseStatus.CLOSED_FALSE_POSITIVE
+        )
+        case = _case_service.change_status(
+            case_id,
+            target_status,
+            actor=req.actor,
+            supervisor_signature=f"supervisor:{req.primary_supervisor}",
+            second_supervisor_signature=f"supervisor:{req.secondary_supervisor}",
+        )
+        return _serialize_case(case)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)
+async def verify_case_timeline(case_id: str) -> TimelineVerificationResponse:
+    """Verify cryptographic SHA-256 parent hash chain of the case investigation timeline."""
+    try:
+        result = _case_service.verify_timeline_integrity(case_id)
+        return TimelineVerificationResponse(
+            case_id=case_id,
+            is_valid=result["is_valid"],
+            event_count=result["event_count"],
+            corrupted_index=result["corrupted_index"],
+            chain_hashes=result["chain_hashes"],
+            message=result["message"],
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{case_id}/notes", response_model=CaseNoteResponse)
@@ -348,6 +446,8 @@ def _serialize_case(case: Any) -> CaseResponse:
         total_risk_score=case.total_risk_score,
         duration_hours=case.duration_hours,
         is_open=case.is_open,
+        supervisor_signatures=getattr(case, "supervisor_signatures", []) or [],
+        supervisor_signature=getattr(case, "supervisor_signature", None),
     )
 
 

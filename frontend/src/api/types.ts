@@ -387,6 +387,8 @@ export interface Case {
   total_risk_score: number;
   duration_hours: number | null;
   is_open: boolean;
+  supervisor_signatures?: string[];
+  supervisor_signature?: string | null;
 }
 
 export interface CaseSummary {

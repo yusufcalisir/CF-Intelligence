@@ -96,6 +96,18 @@ class Case:
     closed_at: datetime | None = None
     total_risk_score: float = 0.0
     evidence_ids: list[str] = field(default_factory=list)
+    supervisor_signatures: list[str] = field(default_factory=list)
+
+    @property
+    def supervisor_signature(self) -> str | None:
+        """Legacy accessor returning primary supervisor signature if present."""
+        return self.supervisor_signatures[0] if self.supervisor_signatures else None
+
+    @supervisor_signature.setter
+    def supervisor_signature(self, value: str | None) -> None:
+        """Legacy setter appending a signature if not already present."""
+        if value and value not in self.supervisor_signatures:
+            self.supervisor_signatures.append(value)
 
     @property
     def is_open(self) -> bool:
@@ -108,6 +120,7 @@ class Case:
     def duration_hours(self) -> float | None:
         end = self.closed_at or datetime.now(UTC)
         return (end - self.created_at).total_seconds() / 3600
+
 
 
 @dataclass

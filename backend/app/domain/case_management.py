@@ -38,6 +38,42 @@ def extract_supervisor_identity(signature: str) -> str:
     return remainder.upper()
 
 
+def validate_distinct_supervisors(signatures: list[str]) -> list[str]:
+    """Validates that a list of supervisor signatures contains at least 2 distinct valid supervisor identities.
+
+    Raises:
+        InvalidCaseTransitionError: If fewer than 2 signatures are provided or duplicate identities exist.
+    """
+    if not signatures:
+        raise InvalidCaseTransitionError(
+            "Four-Eyes supervisor dual-authorization signature required."
+        )
+    for s in signatures:
+        if not s.startswith("SIG_SUPERVISOR_"):
+            raise InvalidCaseTransitionError(
+                "Four-Eyes supervisor dual-authorization signature required to resolve case."
+            )
+        ident = extract_supervisor_identity(s)
+        if not ident:
+            raise InvalidCaseTransitionError(
+                f"Supervisor signature '{s}' does not contain a valid supervisor identity."
+            )
+    if len(signatures) < 2:
+        raise InvalidCaseTransitionError(
+            f"Four-Eyes dual supervisor authorization requires 2 distinct supervisor signatures (got {len(signatures)}: '{signatures[0]}')."
+        )
+    valid_identities: dict[str, str] = {}
+    for s in signatures:
+        ident = extract_supervisor_identity(s)
+        if ident in valid_identities:
+            raise InvalidCaseTransitionError(
+                f"Four-Eyes dual supervisor authorization requires 2 distinct supervisor identities (duplicate signer identity '{ident}' rejected)."
+            )
+        valid_identities[ident] = s
+    return list(valid_identities.values())
+
+
+
 # Allowed state transition map for case lifecycle
 ALLOWED_CASE_TRANSITIONS: dict[InvestigatorCaseStatus, set[InvestigatorCaseStatus]] = {
     InvestigatorCaseStatus.NEW: {
@@ -156,39 +192,8 @@ class CaseLifecycleStateMachine:
             InvestigatorCaseStatus.RESOLVED_FALSE_POSITIVE,
         )
         if is_resolution:
-            if not candidate_sigs:
-                raise InvalidCaseTransitionError(
-                    f"Four-Eyes supervisor dual-authorization signature required to resolve case '{record.case_id}' to {target_status.value}."
-                )
+            record.supervisor_signatures = validate_distinct_supervisors(candidate_sigs)
 
-            # Validate each signature format first
-            for s in candidate_sigs:
-                if not s.startswith("SIG_SUPERVISOR_"):
-                    raise InvalidCaseTransitionError(
-                        f"Four-Eyes supervisor dual-authorization signature required to resolve case '{record.case_id}' to {target_status.value}."
-                    )
-
-            # Check if only 1 signature was provided
-            if len(candidate_sigs) < 2:
-                raise InvalidCaseTransitionError(
-                    f"Four-Eyes dual supervisor authorization requires 2 distinct supervisor signatures (got {len(candidate_sigs)}: '{candidate_sigs[0]}')."
-                )
-
-            # Extract unique signer IDs and reject duplicate signers
-            valid_identities: dict[str, str] = {}
-            for s in candidate_sigs:
-                ident = extract_supervisor_identity(s)
-                if not ident:
-                    raise InvalidCaseTransitionError(
-                        f"Supervisor signature '{s}' does not contain a valid supervisor identity."
-                    )
-                if ident in valid_identities:
-                    raise InvalidCaseTransitionError(
-                        f"Four-Eyes dual supervisor authorization requires 2 distinct supervisor identities (duplicate signer identity '{ident}' rejected)."
-                    )
-                valid_identities[ident] = s
-
-            record.supervisor_signatures = list(valid_identities.values())
 
         record.status = target_status
         record.history.append(

@@ -175,6 +175,45 @@ class CaseStatusRequest(BaseModel):
         pattern=r"^[a-zA-Z0-9_\-\.@]+$",
     )
     supervisor_signature: str | None = Field(None, max_length=512)
+    second_supervisor_signature: str | None = Field(None, max_length=512)
+    supervisor_signatures: list[str] = Field(default_factory=list)
+
+
+class CaseEscalateRequest(BaseModel):
+    reason: str = Field(..., min_length=3, max_length=512)
+    actor: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+
+
+class CaseSignRequest(BaseModel):
+    supervisor_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
+    action: str = Field("APPROVE", pattern=r"^(APPROVE|REJECT)$")
+    notes: str | None = Field(None, max_length=512)
+
+
+class CaseResolveRequest(BaseModel):
+    resolution: str = Field(..., pattern=r"^(CONFIRMED_FRAUD|FALSE_POSITIVE)$")
+    primary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
+    secondary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
+    actor: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+    )
+
+
+class TimelineVerificationResponse(BaseModel):
+    case_id: str
+    is_valid: bool
+    event_count: int
+    corrupted_index: int | None = None
+    chain_hashes: list[str] = []
+    message: str
 
 
 class CaseLinkAlertRequest(BaseModel):
@@ -218,6 +257,8 @@ class CaseResponse(BaseModel):
     total_risk_score: float = 0.0
     duration_hours: float | None = None
     is_open: bool = True
+    supervisor_signatures: list[str] = []
+    supervisor_signature: str | None = None
 
 
 class CaseSummaryResponse(BaseModel):

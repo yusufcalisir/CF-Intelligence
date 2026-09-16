@@ -297,7 +297,18 @@ export function useCreateCase() {
 
 export function useUpdateCaseStatus() {
   const queryClient = useQueryClient();
-  return useMutation<Case, Error, { caseId: string; status: string; actor?: string; supervisor_signature?: string }>({
+  return useMutation<
+    Case,
+    Error,
+    {
+      caseId: string;
+      status: string;
+      actor?: string;
+      supervisor_signature?: string;
+      second_supervisor_signature?: string;
+      supervisor_signatures?: string[];
+    }
+  >({
     mutationFn: async ({ caseId, ...body }) => {
       const { data } = await apiClient.patch(`/api/v1/cases/${caseId}`, body);
       return data;

@@ -301,7 +301,11 @@ All endpoints are hosted under prefix `/api/v1/cases` and defined in [`backend/a
 | `GET` | `/` | `status`, `priority`, `limit` (1–200) | `list[CaseSummaryResponse]` | Filter and list investigation cases. |
 | `POST` | `/` | `CaseCreateRequest`, Header `Idempotency-Key` | `CaseResponse` | Idempotently create an investigation case from linked alerts. |
 | `GET` | `/{case_id}` | `actor` (default "analyst") | `CaseResponse` | Retrieve full case details with tenant isolation verification. |
-| `PATCH` | `/{case_id}` | `CaseStatusRequest` (`status`, `actor`, `supervisor_signature`) | `CaseResponse` | Transition case status with Four-Eyes dual control enforcement. |
+| `PATCH` | `/{case_id}` | `CaseStatusRequest` (`status`, `actor`, `supervisor_signature`, `second_supervisor_signature`) | `CaseResponse` | Transition case status with Four-Eyes dual control enforcement. |
+| `POST` | `/{case_id}/escalate` | `CaseEscalateRequest` (`reason`, `actor`) | `CaseResponse` | Escalate a case to PENDING_REVIEW for Four-Eyes supervisor evaluation. |
+| `POST` | `/{case_id}/sign` | `CaseSignRequest` (`supervisor_id`, `action`, `notes`) | `CaseResponse` | Record supervisor approval signature under Four-Eyes dual control. |
+| `POST` | `/{case_id}/resolve` | `CaseResolveRequest` (`resolution`, `primary_supervisor`, `secondary_supervisor`) | `CaseResponse` | Resolve and close case under strict dual supervisor signoff. |
+| `GET` | `/{case_id}/timeline/verify` | None | `TimelineVerificationResponse` | Verify cryptographic SHA-256 parent hash chain of case timeline. |
 | `POST` | `/{case_id}/notes` | `CaseNoteRequest` (`author`, `content`) | `CaseNoteResponse` | Append an investigation note to the case timeline. |
 | `POST` | `/{case_id}/alerts` | `CaseLinkAlertRequest` (`alert_id`) | `CaseResponse` | Link an additional fraud alert to the investigation case. |
 | `GET` | `/{case_id}/timeline` | None | `list[CaseEventResponse]` | Retrieve cryptographically signed SHA-256 event timeline. |
@@ -328,10 +332,11 @@ The Case Management subsystem is verified by a multi-suite automated test matrix
 pytest backend/tests/unit/test_case_management_workbench.py \
        backend/tests/unit/test_case_management_feedback_loop.py \
        backend/tests/unit/test_case_service_branches.py \
+       backend/tests/unit/test_case_lifecycle_hardening.py \
        backend/tests/unit/test_regulatory_reporter.py -v
 ```
 
-### Verified Test Results (14 Passed in 10.22s)
+### Verified Test Results (24 Passed in 12.80s)
 
 | Test File | Test Name | Assertion / Behavior Verified | Status |
 |:---|:---|:---|:---:|
@@ -344,6 +349,16 @@ pytest backend/tests/unit/test_case_management_workbench.py \
 | [`test_case_management_feedback_loop.py`](../backend/tests/unit/test_case_management_feedback_loop.py) | `test_analyst_determination_closed_false_positive_feedback_loop` | Recording `label=0` retraining feedback in timeline for false positive triage | `PASSED` |
 | [`test_case_management_feedback_loop.py`](../backend/tests/unit/test_case_management_feedback_loop.py) | `test_fincen_sar_report_generation_and_download` | REST download of valid FinCEN XML payload via `/api/v1/cases/{id}/sar-report` | `PASSED` |
 | [`test_case_service_branches.py`](../backend/tests/unit/test_case_service_branches.py) | `test_case_lifecycle_and_four_eyes_branches` | 10-step branch coverage: genesis hash, parent hash linkage, note addition, invalid transition, analyst=supervisor rejection, distinct supervisor closure, alert linking, markdown export | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_four_eyes_closure_requires_supervisor_signature` | Rejects case closure without supervisor signature | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_four_eyes_rejection_of_self_approval` | Prevents analyst from self-approving as supervisor | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_four_eyes_rejection_of_duplicate_supervisors` | Rejects identical supervisor identity in dual signoff | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_four_eyes_distinct_supervisors_success_and_retraining_label` | Validates dual signoff closure and sets retraining feedback label | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_workbench_stepwise_review_and_dual_signoff` | Tests escalation and resolution with distinct supervisor signers | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_workbench_state_machine_illegal_transition_blocked` | Blocks illegal direct transitions with InvalidCaseTransitionError | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_timeline_cryptographic_hash_integrity_verification` | Verifies intact SHA-256 parent hash chain across investigation timeline | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_timeline_hash_corruption_detection` | Detects timeline event tampering with exact corrupted index | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_case_service_thread_safety_under_concurrent_writes` | Validates concurrent multithreaded mutations with RLock | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_repository_terminal_status_and_linking` | Verifies CaseRepository closed_at setting and alert linking | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_xml_passes_xsd_validation` | SAR XML conforms to FinCEN BSA 2.0 schema elements | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_xml_fails_when_violating_xsd_schema` | Missing mandatory XSD elements raises `SARValidationError` | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_rejected_for_unresolved_case` | Attempting to generate SAR XML for open/investigating case raises `SARValidationError` | `PASSED` |
