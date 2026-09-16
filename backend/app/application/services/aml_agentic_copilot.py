@@ -65,32 +65,36 @@ class AMLAgenticCopilot:
         normalized_timeline: list[dict[str, Any]] = []
         if timeline_events:
             for ev in timeline_events:
+                ev_dict: dict[str, Any]
                 if hasattr(ev, "__dict__"):
+                    ev_desc = str(getattr(ev, "description", "") or "")
                     ev_dict = {
                         "event_type": getattr(ev, "event_type", "event"),
-                        "description": getattr(ev, "description", ""),
+                        "description": ev_desc,
                         "actor": getattr(ev, "actor", "system"),
                         "timestamp": str(getattr(ev, "timestamp", "")),
                         "metadata": getattr(ev, "metadata", {}) or {},
                     }
                 elif isinstance(ev, dict):
+                    ev_desc = str(ev.get("description", "") or "")
                     ev_dict = {
                         "event_type": ev.get("event_type", "event"),
-                        "description": ev.get("description", ""),
+                        "description": ev_desc,
                         "actor": ev.get("actor", "system"),
                         "timestamp": str(ev.get("timestamp", "")),
                         "metadata": ev.get("metadata", {}) or {},
                     }
                 else:
+                    ev_desc = str(ev)
                     ev_dict = {
                         "event_type": "event",
-                        "description": str(ev),
+                        "description": ev_desc,
                         "actor": "system",
                         "timestamp": "",
                         "metadata": {},
                     }
                 # Mask any PII inside description
-                ev_dict["description"] = mask_pii_in_text(ev_dict["description"])
+                ev_dict["description"] = mask_pii_in_text(ev_desc)
                 normalized_timeline.append(ev_dict)
 
         # 2. Normalize registered evidence artifacts
@@ -122,7 +126,7 @@ class AMLAgenticCopilot:
                     elif hasattr(n, "content"):
                         raw_notes_list.append(str(getattr(n, "content", "")))
                     else:
-                        raw_notes_list.append(str(n))
+                        raw_notes_list.append(n)
 
             for note_str in raw_notes_list:
                 if _contains_raw_pii(note_str):

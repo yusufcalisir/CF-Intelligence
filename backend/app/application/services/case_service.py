@@ -9,6 +9,7 @@ complexity.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import logging
 import os
@@ -167,7 +168,8 @@ class CaseManagementService:
         parent_hash = "0" * 64
         if case.timeline:
             last_event = case.timeline[-1]
-            parent_hash = last_event.metadata.get("hash") or "0" * 64
+            last_meta = last_event.metadata if isinstance(last_event.metadata, dict) else {}
+            parent_hash = str(last_meta.get("hash") or "0" * 64)
 
         event = CaseEvent(
             event_type=event_type,
@@ -270,12 +272,10 @@ class CaseManagementService:
             collected_signatures: list[str] = []
             if supervisor_signatures:
                 collected_signatures.extend([s.strip() for s in supervisor_signatures if s and s.strip()])
-            if supervisor_signature and supervisor_signature.strip():
-                if supervisor_signature.strip() not in collected_signatures:
-                    collected_signatures.append(supervisor_signature.strip())
-            if second_supervisor_signature and second_supervisor_signature.strip():
-                if second_supervisor_signature.strip() not in collected_signatures:
-                    collected_signatures.append(second_supervisor_signature.strip())
+            if supervisor_signature and supervisor_signature.strip() and supervisor_signature.strip() not in collected_signatures:
+                collected_signatures.append(supervisor_signature.strip())
+            if second_supervisor_signature and second_supervisor_signature.strip() and second_supervisor_signature.strip() not in collected_signatures:
+                collected_signatures.append(second_supervisor_signature.strip())
 
             # Also include any previously attached supervisor signatures on the case
             existing_sigs = getattr(case, "supervisor_signatures", []) or []
@@ -318,7 +318,9 @@ class CaseManagementService:
 
                 feedback_recorded = False
                 try:
-                    from app.application.services.label_feedback import LocalLabelFeedbackPipeline
+                    from app.application.services.label_feedback_pipeline import (
+                        LocalLabelFeedbackPipeline,
+                    )
 
                     feedback_pipeline = LocalLabelFeedbackPipeline()
                     for alert_id in case.alert_ids:
@@ -341,15 +343,12 @@ class CaseManagementService:
 
                     # Record ground truth label for all linked alerts/transactions if transaction exists in eval engine
                     for alert_id in case.alert_ids:
-                        try:
+                        with contextlib.suppress(KeyError):
                             eval_engine.log_feedback(
                                 simulation_id="default_sim",
                                 transaction_id=f"tx_{alert_id[:8]}",
                                 actual_label=actual_label,
                             )
-                        except KeyError:
-                            # Transaction not in eval simulation cache, which is normal for arbitrary alert IDs
-                            pass
                     feedback_recorded = True
                 except Exception as exc:
                     logger.warning(
@@ -438,11 +437,12 @@ class CaseManagementService:
                 }
 
             chain_hashes: list[str] = []
-            expected_parent = "0" * 64
+            expected_parent: str = "0" * 64
 
             for idx, event in enumerate(case.timeline):
-                parent_hash = event.metadata.get("parent_hash")
-                event_hash = event.metadata.get("hash")
+                meta = event.metadata if isinstance(event.metadata, dict) else {}
+                parent_hash = str(meta.get("parent_hash") or "")
+                event_hash = str(meta.get("hash") or "")
 
                 if parent_hash != expected_parent:
                     return {
@@ -450,7 +450,7 @@ class CaseManagementService:
                         "event_count": len(case.timeline),
                         "corrupted_index": idx,
                         "chain_hashes": chain_hashes,
-                        "message": f"Parent hash mismatch at index {idx}: expected {expected_parent[:8]}, got {str(parent_hash)[:8]}",
+                        "message": f"Parent hash mismatch at index {idx}: expected {expected_parent[:8]}, got {parent_hash[:8]}",
                     }
 
                 calculated_hash = _hash_event(event, expected_parent)
@@ -460,7 +460,7 @@ class CaseManagementService:
                         "event_count": len(case.timeline),
                         "corrupted_index": idx,
                         "chain_hashes": chain_hashes,
-                        "message": f"Hash recalculation mismatch at index {idx}: expected {calculated_hash[:8]}, got {str(event_hash)[:8]}",
+                        "message": f"Hash recalculation mismatch at index {idx}: expected {calculated_hash[:8]}, got {event_hash[:8]}",
                     }
 
                 chain_hashes.append(event_hash)
