@@ -1136,4 +1136,21 @@ class EllipticBenchmarkResponse(BaseModel):
     report_path: str | None = None
 
 
+class AMLEvidencePackageResponse(BaseModel):
+    case_id: str
+    case_title: str
+    case_status: str
+    risk_score: float
+    alert_ids: list[str]
+    evidence_ids: list[str]
+    timeline_events_count: int
+    notes_count: int
+    top_risk_drivers: list[dict[str, Any]]
+    graph_topology: dict[str, Any]
+    zero_pii_verified: bool
+    assembled_at: str
+    evidence_digest: str
+
+
+
 

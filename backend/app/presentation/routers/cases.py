@@ -47,10 +47,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
 
 _case_service = CaseManagementService()
+_evidence_service = EvidenceRegistryService()
 
 
 def get_case_service() -> CaseManagementService:
     return _case_service
+
+
+def get_evidence_service() -> EvidenceRegistryService:
+    return _evidence_service
 
 
 @router.get("", response_model=list[CaseSummaryResponse])
@@ -503,23 +508,44 @@ async def generate_copilot_narrative(
 ) -> CopilotQueryResponse:
     """Synthesize formal FinCEN 5-paragraph SAR narrative and 4-Eyes supervisor briefing using AML Copilot."""
     c_obj = _case_service.get_case(case_id)
-    title = c_obj.title if c_obj else f"Case {case_id}"
-    status = (
+    if not c_obj:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+
+    title = c_obj.title or f"Case {case_id}"
+    status_str = (
         (c_obj.status.value if hasattr(c_obj.status, "value") else str(c_obj.status))
-        if c_obj
+        if c_obj.status
         else "OPEN"
     )
-    alert_ids = c_obj.alert_ids if c_obj else ["alt_101", "alt_102"]
+    alert_ids = c_obj.alert_ids or []
     notes = req.custom_investigator_notes if req else None
 
-    analysis = _aml_copilot.generate_case_narrative(
+    # Retrieve registered evidence artifacts
+    evidence_items = _evidence_service.get_case_evidence(case_id)
+
+    # Normalize timeline events and existing notes
+    timeline_events = [e.__dict__ if hasattr(e, "__dict__") else e for e in c_obj.timeline]
+    case_notes = [n.content if hasattr(n, "content") else str(n) for n in c_obj.notes]
+    if notes:
+        case_notes.append(notes)
+
+    # Dynamically extract risk score
+    risk_score = float(c_obj.total_risk_score) if c_obj.total_risk_score and c_obj.total_risk_score > 0.0 else 750.0
+
+    dossier = _aml_copilot.assemble_case_evidence(
         case_id=case_id,
         case_title=title,
-        case_status=status,
+        case_status=status_str,
+        total_risk_score=risk_score,
         alert_ids=alert_ids,
-        risk_score=785.0,
-        investigator_notes=notes,
+        timeline_events=timeline_events,
+        evidence_artifacts=evidence_items,
+        investigator_notes=case_notes,
+        shap_drivers=req.shap_attributions if req else None,
+        graph_metadata=req.graph_metadata if req else None,
     )
+
+    analysis = _aml_copilot.synthesize_from_evidence(dossier, investigator_notes=notes)
 
     from datetime import UTC, datetime
 
@@ -533,19 +559,43 @@ async def generate_copilot_narrative(
         zero_pii_verified=analysis.zero_pii_verified,
         generated_at=datetime.fromtimestamp(analysis.generated_at_timestamp, tz=UTC).isoformat(),
         lineage_hash=analysis.lineage_hash,
+        evidence_count=analysis.evidence_count,
+        timeline_event_count=analysis.timeline_event_count,
     )
 
 
 @router.get("/{case_id}/copilot/summary")
 async def get_copilot_summary(case_id: str) -> dict[str, Any]:
     """Get structured Copilot findings and 4-Eyes disposition for a case."""
-    analysis = _aml_copilot.generate_case_narrative(
-        case_id=case_id,
-        case_title=f"Case {case_id}",
-        case_status="UNDER_INVESTIGATION",
-        alert_ids=["alt_101", "alt_102"],
-        risk_score=820.0,
+    c_obj = _case_service.get_case(case_id)
+    if not c_obj:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+
+    title = c_obj.title or f"Case {case_id}"
+    status_str = (
+        (c_obj.status.value if hasattr(c_obj.status, "value") else str(c_obj.status))
+        if c_obj.status
+        else "OPEN"
     )
+    alert_ids = c_obj.alert_ids or []
+    risk_score = float(c_obj.total_risk_score) if c_obj.total_risk_score and c_obj.total_risk_score > 0.0 else 750.0
+
+    evidence_items = _evidence_service.get_case_evidence(case_id)
+    timeline_events = [e.__dict__ if hasattr(e, "__dict__") else e for e in c_obj.timeline]
+    case_notes = [n.content if hasattr(n, "content") else str(n) for n in c_obj.notes]
+
+    dossier = _aml_copilot.assemble_case_evidence(
+        case_id=case_id,
+        case_title=title,
+        case_status=status_str,
+        total_risk_score=risk_score,
+        alert_ids=alert_ids,
+        timeline_events=timeline_events,
+        evidence_artifacts=evidence_items,
+        investigator_notes=case_notes,
+    )
+    analysis = _aml_copilot.synthesize_from_evidence(dossier)
+
     return {
         "case_id": analysis.case_id,
         "recommended_action": analysis.recommended_action,
@@ -553,4 +603,55 @@ async def get_copilot_summary(case_id: str) -> dict[str, Any]:
         "graph_topology_summary": analysis.graph_topology_summary,
         "zero_pii_verified": analysis.zero_pii_verified,
         "lineage_hash": analysis.lineage_hash,
+        "evidence_count": analysis.evidence_count,
+        "timeline_event_count": analysis.timeline_event_count,
+        "evidence_hash": dossier.evidence_hash,
+    }
+
+
+@router.get("/{case_id}/copilot/evidence")
+async def get_copilot_case_evidence(case_id: str) -> dict[str, Any]:
+    """Get assembled cryptographic case evidence dossier."""
+    c_obj = _case_service.get_case(case_id)
+    if not c_obj:
+        raise HTTPException(status_code=404, detail=f"Case '{case_id}' not found.")
+
+    title = c_obj.title or f"Case {case_id}"
+    status_str = (
+        (c_obj.status.value if hasattr(c_obj.status, "value") else str(c_obj.status))
+        if c_obj.status
+        else "OPEN"
+    )
+    alert_ids = c_obj.alert_ids or []
+    risk_score = float(c_obj.total_risk_score) if c_obj.total_risk_score and c_obj.total_risk_score > 0.0 else 750.0
+
+    evidence_items = _evidence_service.get_case_evidence(case_id)
+    timeline_events = [e.__dict__ if hasattr(e, "__dict__") else e for e in c_obj.timeline]
+    case_notes = [n.content if hasattr(n, "content") else str(n) for n in c_obj.notes]
+
+    dossier = _aml_copilot.assemble_case_evidence(
+        case_id=case_id,
+        case_title=title,
+        case_status=status_str,
+        total_risk_score=risk_score,
+        alert_ids=alert_ids,
+        timeline_events=timeline_events,
+        evidence_artifacts=evidence_items,
+        investigator_notes=case_notes,
+    )
+
+    return {
+        "case_id": dossier.case_id,
+        "case_title": dossier.case_title,
+        "case_status": dossier.case_status,
+        "total_risk_score": dossier.total_risk_score,
+        "alert_ids": dossier.alert_ids,
+        "timeline_events": dossier.timeline_events,
+        "evidence_artifacts": dossier.evidence_artifacts,
+        "investigator_notes": dossier.investigator_notes,
+        "shap_drivers": dossier.shap_drivers,
+        "graph_topology": dossier.graph_topology,
+        "pii_sanitized_count": dossier.pii_sanitized_count,
+        "evidence_hash": dossier.evidence_hash,
+        "assembled_at": dossier.assembled_at,
     }

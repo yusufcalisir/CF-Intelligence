@@ -185,6 +185,7 @@ class CaseManagementService:
         title: str,
         priority: CasePriority = CasePriority.P3_MEDIUM,
         alert_ids: list[str] | None = None,
+        total_risk_score: float = 0.0,
     ) -> Case:
         """Create a new investigation case."""
         with self._lock:
@@ -192,12 +193,13 @@ class CaseManagementService:
                 title=title,
                 priority=priority,
                 alert_ids=alert_ids or [],
+                total_risk_score=float(total_risk_score),
             )
 
             self._add_event(case, "created", f"Case created: {title}", "system")
 
             self._cases.set(case.id, _case_to_dict(case))
-            logger.info("Created case %s: %s (priority=%s)", case.id[:8], title, priority.value)
+            logger.info("Created case %s: %s (priority=%s, risk=%.1f)", case.id[:8], title, priority.value, total_risk_score)
             return case
 
     def assign_case(self, case_id: str, investigator: str) -> Case:

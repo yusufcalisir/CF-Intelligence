@@ -64,6 +64,10 @@ import type {
   CalibrateNoiseResponse,
   RDPCompositionRequest,
   RDPCompositionResponse,
+  CaseEvidenceDossier,
+  CopilotDirectGenerationRequest,
+  CopilotQueryRequest,
+  CopilotQueryResponse,
 } from './types';
 
 
@@ -1108,6 +1112,71 @@ export function useRDPComposition() {
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<RDPCompositionResponse>(
         '/api/v1/privacy-defense/rdp-composition',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+// ── Autonomous Agentic AML Copilot & Evidence Assembly Hooks ───
+
+export function useGenerateCopilotNarrative() {
+  const queryClient = useQueryClient();
+  return useMutation<CopilotQueryResponse, Error, { caseId: string; request?: CopilotQueryRequest }>({
+    mutationFn: async ({ caseId, request }) => {
+      const { data } = await apiClient.post<CopilotQueryResponse>(
+        `/api/v1/cases/${caseId}/copilot/narrative`,
+        request || { case_id: caseId }
+      );
+      return data;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({ queryKey: ['copilot-summary', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['copilot-evidence', caseId] });
+    },
+  });
+}
+
+export function useCopilotSummary(caseId: string | undefined) {
+  return useQuery<{
+    case_id: string;
+    recommended_action: string;
+    top_risk_drivers: Array<{ feature: string; impact: number; description?: string }>;
+    graph_topology_summary: Record<string, unknown>;
+    zero_pii_verified: boolean;
+    lineage_hash: string;
+    evidence_count?: number;
+    timeline_event_count?: number;
+    evidence_hash?: string;
+  }>({
+    queryKey: ['copilot-summary', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/cases/${caseId}/copilot/summary`);
+      return data;
+    },
+    enabled: !!caseId,
+    retry: false,
+  });
+}
+
+export function useCaseEvidenceDossier(caseId: string | undefined) {
+  return useQuery<CaseEvidenceDossier>({
+    queryKey: ['copilot-evidence', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/cases/${caseId}/copilot/evidence`);
+      return data;
+    },
+    enabled: !!caseId,
+    retry: false,
+  });
+}
+
+export function useDirectGenerateSAR() {
+  return useMutation<CopilotQueryResponse, Error, CopilotDirectGenerationRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CopilotQueryResponse>(
+        '/api/v1/copilot/generate-sar',
         payload
       );
       return data;

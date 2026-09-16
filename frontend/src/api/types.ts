@@ -1380,4 +1380,77 @@ export interface RDPCompositionResponse {
   rdp_map: Record<string, number>;
 }
 
+// ── Autonomous Agentic AML Copilot & Evidence Assembly ─────────
+
+export interface CaseEvidenceDossier {
+  case_id: string;
+  case_title: string;
+  case_status: string;
+  total_risk_score: number;
+  alert_ids: string[];
+  timeline_events: Array<{
+    event_type: string;
+    description: string;
+    actor: string;
+    timestamp: string;
+    metadata?: Record<string, unknown>;
+  }>;
+  evidence_artifacts: Array<{
+    id: string;
+    title: string;
+    evidence_type: string;
+    file_path: string;
+    content_hash: string;
+    uploaded_by: string;
+    uploaded_at: string;
+  }>;
+  investigator_notes: string[];
+  shap_drivers: Array<{
+    feature: string;
+    impact: number;
+    description?: string;
+  }>;
+  graph_topology: Record<string, unknown>;
+  pii_sanitized_count: number;
+  evidence_hash: string;
+  assembled_at: number;
+}
+
+export interface CopilotQueryRequest {
+  case_id: string;
+  include_fincen_narrative?: boolean;
+  include_four_eyes_briefing?: boolean;
+  custom_investigator_notes?: string | null;
+  shap_attributions?: Array<{ feature: string; impact: number; description?: string }>;
+  graph_metadata?: Record<string, unknown>;
+}
+
+export interface CopilotDirectGenerationRequest {
+  case_id: string;
+  shap_attributions?: Array<{ feature: string; impact: number; description?: string }>;
+  graph_nodes?: Array<Record<string, unknown>> | Record<string, unknown>;
+  custom_investigator_notes?: string | null;
+  risk_score?: number | null;
+}
+
+export interface CopilotQueryResponse {
+  case_id: string;
+  fincen_sar_narrative: string;
+  four_eyes_briefing: string;
+  recommended_action: string;
+  top_risk_drivers: Array<{
+    feature: string;
+    impact: number;
+    description?: string;
+  }>;
+  graph_topology_summary: Record<string, unknown>;
+  zero_pii_verified: boolean;
+  generated_at: string;
+  lineage_hash: string;
+  evidence_count?: number;
+  timeline_event_count?: number;
+  sar_narrative?: string;
+  supervisor_briefing?: string;
+}
+
 

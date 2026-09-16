@@ -9,7 +9,7 @@ import {
   useAddEvidence,
 } from '../api/queries';
 
-import { CASE_STATUS_LABELS, PRIORITY_LABELS } from '../api/types';
+import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
 import { useQueryClient } from '@tanstack/react-query';
 import { ExplainabilityPanel } from './AlertsPage';
 import { Bot, Sparkles, Copy, Check, FileText, ShieldAlert } from 'lucide-react';
@@ -44,13 +44,7 @@ export default function CaseDetailPage() {
   const [supervisorSig, setSupervisorSig] = useState('');
 
   // Agentic AML Copilot state
-  const [copilotData, setCopilotData] = useState<{
-    fincen_sar_narrative: string;
-    four_eyes_briefing: string;
-    recommended_action: string;
-    top_risk_drivers: Array<{ feature: string; impact: number; description?: string }>;
-    lineage_hash: string;
-  } | null>(null);
+  const [copilotData, setCopilotData] = useState<CopilotQueryResponse | null>(null);
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
