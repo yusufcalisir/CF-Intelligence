@@ -18,7 +18,7 @@ import sys
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "backend"))
@@ -103,6 +103,14 @@ class ASTMutator:
         # Targeted test assertion suite for evaluate_condition
         def run_policy_tests(eval_fn: Callable[[dict[str, Any], dict[str, Any]], bool]) -> str | None:
             """Runs policy boundary tests against candidate evaluate_condition. Returns failing test name or None."""
+            # Guard 0: Missing field or operator
+            if eval_fn({"operator": "=="}, {"amount": 100}):
+                return "test_missing_field_fails"
+            if eval_fn({"field": "amount"}, {"amount": 100}):
+                return "test_missing_operator_fails"
+            if eval_fn({"operator": "==", "value": 100}, cast("dict[str, Any]", {cast("Any", None): 100})):
+                return "test_missing_field_with_none_key_fails"
+
             # Test 1: GTE boundary
             if not eval_fn({"field": "amount", "operator": ">=", "value": 9000}, {"amount": 9000}):
                 return "test_gte_exact_boundary"
@@ -170,7 +178,7 @@ class ASTMutator:
             if not eval_fn(cond_not, {"amount": 2500}):
                 return "test_not_false_inner"
 
-            # Test 10: In & Not In
+            # Test 10: In & Not In (List)
             cond_in = {"field": "country", "operator": "in", "value": ["US", "GB", "DE"]}
             cond_not_in = {"field": "country", "operator": "not in", "value": ["US", "GB", "DE"]}
             if not eval_fn(cond_in, {"country": "US"}):
@@ -181,6 +189,132 @@ class ASTMutator:
                 return "test_not_in_mismatch"
             if eval_fn(cond_not_in, {"country": "GB"}):
                 return "test_not_in_match"
+
+            # Test 11: In & Not In (Substring in target string)
+            cond_sub_in = {"field": "agent", "operator": "in", "value": "Windows NT 10.0"}
+            cond_sub_not_in = {"field": "agent", "operator": "not in", "value": "Windows NT 10.0"}
+            if not eval_fn(cond_sub_in, {"agent": "Windows"}):
+                return "test_substr_in_match"
+            if eval_fn(cond_sub_in, {"agent": "Linux"}):
+                return "test_substr_in_mismatch"
+            if not eval_fn(cond_sub_not_in, {"agent": "Linux"}):
+                return "test_substr_not_in_match"
+            if eval_fn(cond_sub_not_in, {"agent": "Windows"}):
+                return "test_substr_not_in_mismatch"
+
+            # Test 12: Between range check (min_value / max_value)
+            cond_btw_mm = {"field": "amount", "operator": "between", "min_value": 100, "max_value": 500}
+            if not eval_fn(cond_btw_mm, {"amount": 100}):
+                return "test_between_min_boundary"
+            if not eval_fn(cond_btw_mm, {"amount": 500}):
+                return "test_between_max_boundary"
+            if not eval_fn(cond_btw_mm, {"amount": 250}):
+                return "test_between_mid"
+            if eval_fn(cond_btw_mm, {"amount": 99.99}):
+                return "test_between_under_min"
+            if eval_fn(cond_btw_mm, {"amount": 500.01}):
+                return "test_between_over_max"
+            if eval_fn({"field": "amount", "operator": "between", "min_value": 100}, {"amount": 250}):
+                return "test_between_missing_max"
+            if eval_fn({"field": "amount", "operator": "between", "max_value": 500}, {"amount": 250}):
+                return "test_between_missing_min"
+
+            # Test 13: Between range check (List/Tuple of length 2)
+            cond_btw_list = {"field": "amount", "operator": "between", "value": [100, 500]}
+            if not eval_fn(cond_btw_list, {"amount": 300}):
+                return "test_between_list_mid"
+            if eval_fn(cond_btw_list, {"amount": 50}):
+                return "test_between_list_under"
+            if eval_fn({"field": "amount", "operator": "between", "value": [100]}, {"amount": 100}):
+                return "test_between_list_len1_fails"
+            if eval_fn({"field": "amount", "operator": "between", "value": [100, 200, 300]}, {"amount": 150}):
+                return "test_between_list_len3_fails"
+
+            # Test 14: Between range check (Dict with min / max)
+            cond_btw_dict = {"field": "amount", "operator": "between", "value": {"min": 100, "max": 500}}
+            if not eval_fn(cond_btw_dict, {"amount": 300}):
+                return "test_between_dict_mid"
+            if eval_fn(cond_btw_dict, {"amount": 600}):
+                return "test_between_dict_over"
+            if eval_fn({"field": "amount", "operator": "between", "value": {"min": 100}}, {"amount": 300}):
+                return "test_between_dict_missing_max"
+            if eval_fn({"field": "amount", "operator": "between", "value": {"max": 500}}, {"amount": 300}):
+                return "test_between_dict_missing_min"
+            if not eval_fn({"field": "amount", "operator": "between", "min_value": 100, "value": [50, 500]}, {"amount": 200}):
+                return "test_between_min_only_list_fallback"
+
+            class _RangeObj:
+                def __contains__(self, k: str) -> bool:
+                    return k in ("min", "max")
+                def __getitem__(self, k: str) -> float:
+                    return 100.0 if k == "min" else 500.0
+
+            if eval_fn({"field": "amount", "operator": "between", "value": _RangeObj()}, {"amount": 250}):
+                return "test_between_non_dict_with_min_max"
+
+            # Test 15: Boolean equality & inequality
+            cond_b_eq_t = {"field": "flag", "operator": "==", "value": True}
+            cond_b_eq_f = {"field": "flag", "operator": "==", "value": False}
+            cond_b_neq_t = {"field": "flag", "operator": "!=", "value": True}
+            cond_b_neq_f = {"field": "flag", "operator": "!=", "value": False}
+            if not eval_fn(cond_b_eq_t, {"flag": True}):
+                return "test_bool_eq_true_match"
+            if not eval_fn(cond_b_eq_t, {"flag": "true"}):
+                return "test_bool_eq_str_true_match"
+            if not eval_fn(cond_b_eq_t, {"flag": "yes"}):
+                return "test_bool_eq_str_yes_match"
+            if not eval_fn(cond_b_eq_t, {"flag": "1"}):
+                return "test_bool_eq_str_1_match"
+            if eval_fn(cond_b_eq_t, {"flag": False}):
+                return "test_bool_eq_true_mismatch"
+            if eval_fn(cond_b_eq_t, {"flag": "no"}):
+                return "test_bool_eq_str_no_mismatch"
+            if not eval_fn(cond_b_eq_f, {"flag": False}):
+                return "test_bool_eq_false_match"
+            if eval_fn(cond_b_eq_f, {"flag": True}):
+                return "test_bool_eq_false_mismatch"
+            if not eval_fn(cond_b_neq_t, {"flag": False}):
+                return "test_bool_neq_true_match"
+            if eval_fn(cond_b_neq_t, {"flag": True}):
+                return "test_bool_neq_true_mismatch"
+            if not eval_fn(cond_b_neq_f, {"flag": True}):
+                return "test_bool_neq_false_match"
+            if eval_fn(cond_b_neq_f, {"flag": False}):
+                return "test_bool_neq_false_mismatch"
+
+            # Test 16: 'contains' & 'not contains'
+            cond_cnt_list = {"field": "tags", "operator": "contains", "value": "vip"}
+            cond_cnt_str = {"field": "memo", "operator": "contains", "value": "wire"}
+            cond_ncnt_list = {"field": "tags", "operator": "not contains", "value": "bad"}
+            cond_ncnt_str = {"field": "memo", "operator": "not contains", "value": "fraud"}
+            if not eval_fn(cond_cnt_list, {"tags": ["retail", "vip"]}):
+                return "test_contains_list_match"
+            if eval_fn(cond_cnt_list, {"tags": ["retail", "standard"]}):
+                return "test_contains_list_mismatch"
+            if not eval_fn(cond_cnt_str, {"memo": "urgent wire transfer"}):
+                return "test_contains_str_match"
+            if eval_fn(cond_cnt_str, {"memo": "cash deposit"}):
+                return "test_contains_str_mismatch"
+            if not eval_fn(cond_ncnt_list, {"tags": ["retail", "vip"]}):
+                return "test_not_contains_list_match"
+            if eval_fn(cond_ncnt_list, {"tags": ["retail", "bad"]}):
+                return "test_not_contains_list_mismatch"
+            if not eval_fn(cond_ncnt_str, {"memo": "legitimate payroll"}):
+                return "test_not_contains_str_match"
+            if eval_fn(cond_ncnt_str, {"memo": "suspected fraud transfer"}):
+                return "test_not_contains_str_mismatch"
+
+            # Test 17: Regex / Matches
+            cond_regex = {"field": "code", "operator": "regex", "value": r"^TX_[0-9]+$"}
+            cond_matches = {"field": "code", "operator": "matches", "value": r"^TX_[0-9]+$"}
+            if not eval_fn(cond_regex, {"code": "TX_12345"}):
+                return "test_regex_match"
+            if eval_fn(cond_regex, {"code": "AB_12345"}):
+                return "test_regex_mismatch"
+            if not eval_fn(cond_matches, {"code": "TX_99999"}):
+                return "test_matches_match"
+            if eval_fn(cond_matches, {"code": "INVALID"}):
+                return "test_matches_mismatch"
 
             return None
 
