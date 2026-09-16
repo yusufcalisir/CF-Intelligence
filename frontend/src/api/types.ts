@@ -1698,4 +1698,55 @@ export interface LockoutStatusResponse {
   ip_failure_count?: number | null;
 }
 
+// ── Gateway & Perimeter Ingress Types ─────────────────────────────────────────
+
+export interface GatewayServiceRoute {
+  service_name: string;
+  http_url: string;
+  ws_url: string;
+  healthy: boolean;
+  latency_ms: number;
+}
+
+export interface GatewayRateLimitConfig {
+  enabled: boolean;
+  limit_per_minute: number;
+  tracked_clients: number;
+  storage_backend: string;
+}
+
+export interface GatewayStatusResponse {
+  status: string;
+  service: string;
+  version: string;
+  environment: string;
+  uptime_seconds: number;
+  mode: string;
+  downstream_services: Record<string, GatewayServiceRoute>;
+  path_mappings_count: number;
+  rate_limit: GatewayRateLimitConfig;
+  timestamp: string;
+}
+
+export interface GatewayHealthResponse {
+  status: string;
+  healthy: boolean;
+  service: string;
+  services_ready: Record<string, boolean>;
+  timestamp: string;
+}
+
+export interface GatewayMetricsResponse {
+  service: string;
+  requests_total: number;
+  requests_by_method: Record<string, number>;
+  rate_limited_total: number;
+  auth_failures_total: number;
+  abac_denials_total: number;
+  downstream_errors_total: number;
+  avg_latency_ms: number;
+  uptime_seconds: number;
+}
+
+
 

@@ -92,6 +92,9 @@ import type {
   UserProfileResponse,
   LogoutResponse,
   LockoutStatusResponse,
+  GatewayStatusResponse,
+  GatewayHealthResponse,
+  GatewayMetricsResponse,
 } from './types';
 
 
@@ -1495,5 +1498,43 @@ export function useLockoutStatusQuery(identifier: string) {
     retry: false,
   });
 }
+
+// ── Gateway Ingress Telemetry & Status Hooks ──────────────────────────────────
+
+export function useGatewayStatusQuery() {
+  return useQuery<GatewayStatusResponse>({
+    queryKey: ['gateway-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GatewayStatusResponse>('/api/v1/gateway/status');
+      return data;
+    },
+    retry: false,
+    refetchInterval: 10000,
+  });
+}
+
+export function useGatewayHealthQuery() {
+  return useQuery<GatewayHealthResponse>({
+    queryKey: ['gateway-health'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GatewayHealthResponse>('/api/v1/gateway/health');
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useGatewayMetricsQuery() {
+  return useQuery<GatewayMetricsResponse>({
+    queryKey: ['gateway-metrics'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GatewayMetricsResponse>('/api/v1/gateway/metrics');
+      return data;
+    },
+    retry: false,
+    refetchInterval: 5000,
+  });
+}
+
 
 

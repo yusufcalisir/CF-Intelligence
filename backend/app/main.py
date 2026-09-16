@@ -43,6 +43,7 @@ from app.presentation.routers import (
     dashboard,
     diagnostics,
     entities,
+    gateway,
     graph,
     health,
     maintenance_cron,
@@ -940,6 +941,7 @@ else:
     app.include_router(compliance.api_router)
     app.include_router(optimization.router)
     app.include_router(webhook_gateway.router)
+    app.include_router(gateway.api_router)
 
 
 @app.get("/", tags=["root"])
