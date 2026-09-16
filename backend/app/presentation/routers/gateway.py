@@ -177,6 +177,7 @@ PATH_ROUTING = {
     "/api/v1/scenarios": "fraud-alert",
     "/api/v1/dashboard": "fraud-alert",
     "/api/v1/predict": "fraud-alert",
+    "/api/v1/webhooks": "fl-coordinator",
 }
 
 

@@ -95,6 +95,14 @@ import type {
   GatewayStatusResponse,
   GatewayHealthResponse,
   GatewayMetricsResponse,
+  WebhookSubscriptionRequest,
+  WebhookSubscriptionResponse,
+  WebhookSubscriptionListResponse,
+  WebhookVerifyRequest,
+  WebhookVerifyResponse,
+  WebhookDeliveryLogsResponse,
+  WebhookDeleteResponse,
+  WebhookHealthResponse,
 } from './types';
 
 
@@ -1535,6 +1543,92 @@ export function useGatewayMetricsQuery() {
     refetchInterval: 5000,
   });
 }
+
+// ── Developer Webhook Gateway Hooks ──────────────────────────────────────────
+
+export function useWebhookSubscriptionsQuery(tenantId?: string) {
+  return useQuery<WebhookSubscriptionListResponse>({
+    queryKey: ['webhook-subscriptions', tenantId],
+    queryFn: async () => {
+      const url = tenantId
+        ? `/api/v1/webhooks/subscriptions?tenant_id=${encodeURIComponent(tenantId)}`
+        : '/api/v1/webhooks/subscriptions';
+      const { data } = await apiClient.get<WebhookSubscriptionListResponse>(url);
+      return data;
+    },
+    staleTime: 30000,
+  });
+}
+
+export function useRegisterWebhookMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<WebhookSubscriptionResponse, Error, WebhookSubscriptionRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<WebhookSubscriptionResponse>(
+        '/api/v1/webhooks/subscriptions',
+        payload
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['webhook-health'] });
+    },
+  });
+}
+
+export function useDeleteWebhookMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<WebhookDeleteResponse, Error, string>({
+    mutationFn: async (subscriptionId) => {
+      const { data } = await apiClient.delete<WebhookDeleteResponse>(
+        `/api/v1/webhooks/subscriptions/${encodeURIComponent(subscriptionId)}`
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['webhook-subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['webhook-health'] });
+    },
+  });
+}
+
+export function useWebhookDeliveryLogsQuery(limit: number = 50) {
+  return useQuery<WebhookDeliveryLogsResponse>({
+    queryKey: ['webhook-deliveries', limit],
+    queryFn: async () => {
+      const { data } = await apiClient.get<WebhookDeliveryLogsResponse>(
+        `/api/v1/webhooks/deliveries?limit=${limit}`
+      );
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useWebhookHealthQuery() {
+  return useQuery<WebhookHealthResponse>({
+    queryKey: ['webhook-health'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<WebhookHealthResponse>('/api/v1/webhooks/health');
+      return data;
+    },
+    retry: false,
+  });
+}
+
+export function useWebhookVerifyMutation() {
+  return useMutation<WebhookVerifyResponse, Error, WebhookVerifyRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<WebhookVerifyResponse>(
+        '/api/v1/webhooks/verify',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
 
 
 

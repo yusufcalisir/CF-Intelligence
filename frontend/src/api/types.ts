@@ -1748,5 +1748,92 @@ export interface GatewayMetricsResponse {
   uptime_seconds: number;
 }
 
+// ── Developer Webhook Gateway Types ──────────────────────────────────────────
+
+export type WebhookEventType =
+  | 'ALERT_CREATED'
+  | 'CASE_RESOLVED'
+  | 'MODEL_PROMOTED'
+  | 'DRIFT_DETECTED';
+
+export interface WebhookSubscriptionRequest {
+  tenant_id: string;
+  target_url: string;
+  events: WebhookEventType[];
+}
+
+export interface WebhookSubscriptionResponse {
+  subscription_id: string;
+  tenant_id: string;
+  target_url: string;
+  secret_key: string;
+  events: WebhookEventType[];
+  created_at?: string;
+  is_active: boolean;
+}
+
+export interface WebhookSubscriptionItem {
+  subscription_id: string;
+  tenant_id: string;
+  target_url: string;
+  events: WebhookEventType[];
+  created_at?: string;
+  is_active: boolean;
+}
+
+export interface WebhookSubscriptionListResponse {
+  tenant_id?: string | null;
+  subscriptions: WebhookSubscriptionItem[];
+  total_count: number;
+}
+
+export interface WebhookTestDispatchResponse {
+  dispatched_count: number;
+  event_type: string;
+  sample_signature?: string | null;
+}
+
+export interface WebhookVerifyRequest {
+  payload: Record<string, unknown>;
+  signature: string;
+  secret_key: string;
+}
+
+export interface WebhookVerifyResponse {
+  valid: boolean;
+  algorithm: string;
+}
+
+export interface WebhookDeliveryLogItem {
+  delivery_id: string;
+  target_url: string;
+  event_type: string;
+  status_code?: number | null;
+  success: boolean;
+  attempt_count: number;
+  error_message?: string | null;
+  timestamp: string;
+}
+
+export interface WebhookDeliveryLogsResponse {
+  deliveries: WebhookDeliveryLogItem[];
+  total_count: number;
+}
+
+export interface WebhookDeleteResponse {
+  subscription_id: string;
+  deleted: boolean;
+  message: string;
+}
+
+export interface WebhookHealthResponse {
+  status: string;
+  service: string;
+  active_subscriptions: number;
+  total_deliveries: number;
+  timestamp: string;
+}
+
+
 
 

@@ -13,10 +13,11 @@ from app.application.services.webhook_service import (
     WebhookEventType,
     WebhookService,
 )
-from app.presentation.routers.webhook_gateway import router
+from app.presentation.routers.webhook_gateway import api_router, router
 
 app = FastAPI()
 app.include_router(router)
+app.include_router(api_router)
 client = TestClient(app)
 
 
@@ -242,5 +243,139 @@ def test_webhook_ssrf_dns_rebinding_blocked(monkeypatch: pytest.MonkeyPatch) -> 
 
     monkeypatch.setattr(socket, "getaddrinfo", mock_getaddrinfo_private)
     assert WebhookService.validate_target_url("https://rebind.attacker.com/webhook") is False
+
+
+def test_webhook_subscriptions_listing() -> None:
+    """Test listing subscriptions and verifying secret keys are not exposed."""
+    # Register subscription
+    client.post(
+        "/v1/webhooks/subscriptions",
+        json={
+            "tenant_id": "bank_listing_test",
+            "target_url": "https://api.bank.com/hooks/notify",
+            "events": ["ALERT_CREATED"],
+        },
+    )
+
+    # Query list endpoint
+    resp = client.get("/v1/webhooks/subscriptions?tenant_id=bank_listing_test")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["total_count"] >= 1
+    assert "subscriptions" in data
+
+    first_item = data["subscriptions"][0]
+    assert first_item["tenant_id"] == "bank_listing_test"
+    assert "target_url" in first_item
+    assert "secret_key" not in first_item  # Masked for security
+
+
+def test_webhook_subscription_deletion() -> None:
+    """Test deleting a webhook subscription and confirming 404 on non-existent deletion."""
+    reg_resp = client.post(
+        "/v1/webhooks/subscriptions",
+        json={
+            "tenant_id": "bank_del_test",
+            "target_url": "https://api.bank.com/hooks/delete_me",
+            "events": ["CASE_RESOLVED"],
+        },
+    )
+    sub_id = reg_resp.json()["subscription_id"]
+
+    # Delete subscription
+    del_resp = client.delete(f"/v1/webhooks/subscriptions/{sub_id}")
+    assert del_resp.status_code == 200
+    assert del_resp.json()["deleted"] is True
+
+    # Re-deleting must return RFC 7807 404
+    re_del_resp = client.delete(f"/v1/webhooks/subscriptions/{sub_id}")
+    assert re_del_resp.status_code == 404
+    assert re_del_resp.json()["type"] == "https://cfi-platform.org/errors/NotFound"
+
+
+def test_webhook_tenant_isolation_boundary() -> None:
+    """Test that X-Tenant-ID header prevents unauthorized registration for another tenant."""
+    resp = client.post(
+        "/v1/webhooks/subscriptions",
+        json={
+            "tenant_id": "bank_victim",
+            "target_url": "https://api.bank.com/hooks/leak",
+            "events": ["ALERT_CREATED"],
+        },
+        headers={"X-Tenant-ID": "bank_attacker"},
+    )
+    assert resp.status_code == 403
+    assert "cannot register webhooks for tenant" in resp.json()["detail"]
+
+
+def test_webhook_health_and_delivery_logs_query() -> None:
+    """Test /health and /deliveries endpoints."""
+    health_resp = client.get("/v1/webhooks/health")
+    assert health_resp.status_code == 200
+    health_data = health_resp.json()
+    assert health_data["status"] == "ok"
+    assert health_data["service"] == "webhook_gateway"
+    assert "active_subscriptions" in health_data
+
+    deliveries_resp = client.get("/v1/webhooks/deliveries?limit=10")
+    assert deliveries_resp.status_code == 200
+    assert "deliveries" in deliveries_resp.json()
+    assert "total_count" in deliveries_resp.json()
+
+
+@pytest.mark.asyncio
+async def test_webhook_exponential_backoff_and_retry() -> None:
+    """Test WebhookDispatcher retry mechanism with exponential backoff on connection failure."""
+    from datetime import UTC, datetime
+
+    from app.application.services.webhook_service import WebhookDeliveryPayload
+    from app.infrastructure.webhook_dispatcher import WebhookDispatcher
+
+    dispatcher = WebhookDispatcher()
+    payload = WebhookDeliveryPayload(
+        event_id="evt_retry_test_1",
+        event_type=WebhookEventType.ALERT_CREATED,
+        payload={"alert_id": "alt_retry"},
+        signature="sha256=test_sig",
+        timestamp=datetime.now(UTC),
+    )
+
+    # Deliver to non-routable synthetic domain with 2 retries and 0.05s initial delay
+    success = await dispatcher.deliver_with_retry(
+        target_url="https://invalid-non-existent-webhook.example.com",
+        delivery=payload,
+        max_retries=2,
+        initial_delay=0.05,
+        backoff_factor=1.5,
+        timeout=0.1,
+    )
+    assert success is False
+
+    # Verify history recorded the failure attempt
+    history = dispatcher.get_delivery_history(limit=5)
+    assert len(history) >= 1
+    assert history[0].delivery_id == "evt_retry_test_1"
+    assert history[0].success is False
+    assert history[0].attempt_count == 2
+
+
+def test_webhook_canonical_api_v1_route_parity() -> None:
+    """Verify canonical /api/v1/webhooks route prefix functions identically to /v1/webhooks."""
+    resp = client.post(
+        "/api/v1/webhooks/subscriptions",
+        json={
+            "tenant_id": "bank_canonical_test",
+            "target_url": "https://api.bank.com/hooks/canonical",
+            "events": ["ALERT_CREATED"],
+        },
+    )
+    assert resp.status_code == 200
+    sub_id = resp.json()["subscription_id"]
+
+    # Verify retrieval via /api/v1
+    list_resp = client.get("/api/v1/webhooks/subscriptions?tenant_id=bank_canonical_test")
+    assert list_resp.status_code == 200
+    assert any(s["subscription_id"] == sub_id for s in list_resp.json()["subscriptions"])
+
 
 

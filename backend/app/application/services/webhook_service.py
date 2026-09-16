@@ -8,6 +8,7 @@ import ipaddress
 import json
 import logging
 import socket
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -57,6 +58,7 @@ class WebhookService:
     """
 
     def __init__(self) -> None:
+        self._lock = threading.RLock()
         self._subscriptions: dict[str, list[WebhookSubscription]] = {}
 
     def register_subscription(
@@ -86,9 +88,10 @@ class WebhookService:
             events=events,
         )
 
-        if tenant_id not in self._subscriptions:
-            self._subscriptions[tenant_id] = []
-        self._subscriptions[tenant_id].append(subscription)
+        with self._lock:
+            if tenant_id not in self._subscriptions:
+                self._subscriptions[tenant_id] = []
+            self._subscriptions[tenant_id].append(subscription)
 
         logger.info(
             "Registered webhook subscription '%s' for tenant '%s' (Target: %s, Events: %s)",
@@ -140,7 +143,8 @@ class WebhookService:
         payload: dict[str, Any],
     ) -> list[WebhookDeliveryPayload]:
         """Signs and dispatches event notification payloads to matching subscribers."""
-        tenant_subs = self._subscriptions.get(tenant_id, [])
+        with self._lock:
+            tenant_subs = list(self._subscriptions.get(tenant_id, []))
         delivered: list[WebhookDeliveryPayload] = []
 
         payload_json_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
@@ -299,6 +303,42 @@ class WebhookService:
             )
             return False
 
-    def get_subscriptions(self, tenant_id: str) -> list[WebhookSubscription]:
-        """Retrieves tenant active webhook subscriptions."""
-        return list(self._subscriptions.get(tenant_id, []))
+    def get_subscriptions(self, tenant_id: str | None = None) -> list[WebhookSubscription]:
+        """Retrieves active webhook subscriptions, optionally filtered by tenant_id."""
+        with self._lock:
+            if tenant_id:
+                return list(self._subscriptions.get(tenant_id, []))
+            all_subs: list[WebhookSubscription] = []
+            for subs in self._subscriptions.values():
+                all_subs.extend(subs)
+            return all_subs
+
+    def get_subscription_by_id(self, subscription_id: str) -> WebhookSubscription | None:
+        """Find an active webhook subscription by its unique ID across tenants."""
+        with self._lock:
+            for subs in self._subscriptions.values():
+                for sub in subs:
+                    if sub.subscription_id == subscription_id:
+                        return sub
+            return None
+
+    def delete_subscription(self, subscription_id: str, tenant_id: str | None = None) -> bool:
+        """Removes a subscription by ID. If tenant_id provided, verifies tenant ownership."""
+        with self._lock:
+            tenants = [tenant_id] if tenant_id else list(self._subscriptions.keys())
+            for t_id in tenants:
+                subs = self._subscriptions.get(t_id, [])
+                for idx, sub in enumerate(subs):
+                    if sub.subscription_id == subscription_id:
+                        subs.pop(idx)
+                        logger.info("Deleted webhook subscription '%s' for tenant '%s'", subscription_id, t_id)
+                        return True
+            return False
+
+    def clear_subscriptions(self, tenant_id: str | None = None) -> None:
+        """Clear all subscriptions or subscriptions for a specific tenant (useful for tests)."""
+        with self._lock:
+            if tenant_id:
+                self._subscriptions.pop(tenant_id, None)
+            else:
+                self._subscriptions.clear()
