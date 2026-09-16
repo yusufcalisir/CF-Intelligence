@@ -40,6 +40,9 @@ def clean_graph_engine() -> GraphEngine:
     engine = GraphEngine()
     engine._entities.clear()
     engine._relationships.clear()
+    from app.presentation.routers import graph
+    graph._graph_engine = engine
+    graph._graph_embedding_service = GraphEmbeddingService(graph_engine=engine, embedding_dim=64)
     return engine
 
 

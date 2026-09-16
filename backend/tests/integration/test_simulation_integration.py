@@ -213,18 +213,26 @@ def test_simulation_with_graph_embedding(
     def progress_callback(sim_id: str, event_type: str, data: dict[str, Any]) -> None:
         events.append((event_type, data))
 
-    simulation = simulation_service.run_simulation(config, progress_callback=progress_callback)
+    try:
+        simulation = simulation_service.run_simulation(config, progress_callback=progress_callback)
 
-    assert simulation.status == SimulationStatus.COMPLETED
+        assert simulation.status == SimulationStatus.COMPLETED
 
-    event_types = [e[0] for e in events]
-    assert "gnn_round_start" in event_types
-    assert "gnn_round_complete" in event_types
+        event_types = [e[0] for e in events]
+        assert "gnn_round_start" in event_types
+        assert "gnn_round_complete" in event_types
 
-    # Ensure embeddings are synchronized and accessible via stats
-    from app.presentation.routers import graph
+        # Ensure embeddings are synchronized and accessible via stats
+        from app.presentation.routers import graph
 
-    stats = graph._graph_embedding_service.get_embedding_stats()
-    assert stats["num_embedded_nodes"] == 9
-    assert stats["embedding_dim"] == 16
-    assert stats["model_parameters"] > 0
+        stats = graph._graph_embedding_service.get_embedding_stats()
+        assert stats["num_embedded_nodes"] == 9
+        assert stats["embedding_dim"] == 16
+        assert stats["model_parameters"] > 0
+    finally:
+        from app.application.services.graph_embedding_service import GraphEmbeddingService
+        from app.presentation.routers import graph
+
+        graph._graph_embedding_service = GraphEmbeddingService(
+            graph_engine=graph._graph_engine, embedding_dim=64
+        )

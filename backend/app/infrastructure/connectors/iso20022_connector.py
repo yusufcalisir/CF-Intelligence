@@ -380,6 +380,10 @@ class ISO20022MessagingConnector(BaseBankConnector):
         acct_id = (
             root.findtext(".//Stmt/Acct/Id/IBAN")
             or root.findtext(".//Stmt/Acct/Id/Othr/Id")
+            or root.findtext(".//DbtrAcct/Id/IBAN")
+            or root.findtext(".//DbtrAcct/Id/Othr/Id")
+            or root.findtext(".//CdtrAcct/Id/IBAN")
+            or root.findtext(".//CdtrAcct/Id/Othr/Id")
         )
         if not acct_id:
             self._log_siem_parse_failure("camt.053", "Missing statement account identifier")
@@ -405,22 +409,31 @@ class ISO20022MessagingConnector(BaseBankConnector):
 
             currency = amt_elem.get("Ccy") or "EUR"
             tx_id = ntry.findtext(".//NtryRef") or f"camt053_entry_{idx}"
+            entry_acct = (
+                ntry.findtext(".//DbtrAcct/Id/IBAN")
+                or ntry.findtext(".//DbtrAcct/Id/Othr/Id")
+                or acct_id
+            )
             counterparty = (
-                ntry.findtext(".//NtryDtls/TxDtls/RltdPties/Cdtr/Nm")
+                ntry.findtext(".//CdtrAcct/Id/IBAN")
+                or ntry.findtext(".//CdtrAcct/Id/Othr/Id")
+                or ntry.findtext(".//NtryDtls/TxDtls/RltdPties/Cdtr/Nm")
                 or ntry.findtext(".//NtryDtls/TxDtls/RltdPties/Dbtr/Nm")
                 or f"COUNTERPARTY_{idx}"
             )
+            entry_country = FinancialMessageParser.extract_country_code(entry_acct) or acct_country
+            counterparty_country = FinancialMessageParser.extract_country_code(counterparty) or entry_country
 
             tx = NormalizedTransaction(
                 transaction_id=tx_id,
-                account_id=acct_id,
+                account_id=entry_acct,
                 counterparty_account_id=counterparty,
                 amount=amount,
                 currency=currency,
                 timestamp=datetime.now(UTC),
                 merchant_category_code="6012",
-                origin_country=acct_country,
-                destination_country=acct_country,
+                origin_country=entry_country,
+                destination_country=counterparty_country,
                 channel_type="ISO20022_CAMT053",
             )
             results.append(tx)
