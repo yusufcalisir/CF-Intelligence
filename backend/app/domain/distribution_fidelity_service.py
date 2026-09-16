@@ -8,6 +8,7 @@ and Feature Covariance Drift.
 from __future__ import annotations
 
 import logging
+import warnings
 from dataclasses import asdict, dataclass
 from typing import Any
 
@@ -109,8 +110,10 @@ def compute_covariance_drift(X_real: np.ndarray, X_synth: np.ndarray) -> float:
     if min_cols < 2:
         return 0.0
 
-    corr_real = np.nan_to_num(np.corrcoef(X_real[:, :min_cols], rowvar=False), nan=0.0)
-    corr_synth = np.nan_to_num(np.corrcoef(X_synth[:, :min_cols], rowvar=False), nan=0.0)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        corr_real = np.nan_to_num(np.corrcoef(X_real[:, :min_cols], rowvar=False), nan=0.0)
+        corr_synth = np.nan_to_num(np.corrcoef(X_synth[:, :min_cols], rowvar=False), nan=0.0)
 
     # Frobenius norm difference
     diff = corr_real - corr_synth

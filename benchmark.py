@@ -14,9 +14,11 @@ Measures 8 primary evaluation metrics:
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
+import warnings
 from typing import TypedDict
 
 import numpy as np
@@ -41,8 +43,8 @@ class BenchmarkConfig(TypedDict):
 def generate_synthetic_benchmark_predictions(
     seed: int, sample_size: int = 10000, fraud_rate: float = 0.005
 ) -> tuple[np.ndarray, np.ndarray]:
-    """Generates synthetic ground truth and predicted probability distributions for a benchmark run."""
-    np.random.seed(seed)
+    """Generates synthetic ground truth and predicted probability distributions using modern NumPy Generator."""
+    rng = np.random.default_rng(seed)
 
     n_fraud = int(sample_size * fraud_rate)
     n_legit = sample_size - n_fraud
@@ -51,31 +53,36 @@ def generate_synthetic_benchmark_predictions(
 
     # Base noise profiles based on seed quality
     if seed == 1:  # Local-Only
-        fraud_probs = np.random.beta(a=1.8, b=2.2, size=n_fraud)
-        legit_probs = np.random.beta(a=0.5, b=5.0, size=n_legit)
+        fraud_probs = rng.beta(a=1.8, b=2.2, size=n_fraud)
+        legit_probs = rng.beta(a=0.5, b=5.0, size=n_legit)
     elif seed == 2:  # Centralized Pooled
-        fraud_probs = np.random.beta(a=4.5, b=0.8, size=n_fraud)
-        legit_probs = np.random.beta(a=0.2, b=8.0, size=n_legit)
+        fraud_probs = rng.beta(a=4.5, b=0.8, size=n_fraud)
+        legit_probs = rng.beta(a=0.2, b=8.0, size=n_legit)
     elif seed == 3:  # Standard FedAvg
-        fraud_probs = np.random.beta(a=3.0, b=1.2, size=n_fraud)
-        legit_probs = np.random.beta(a=0.3, b=7.0, size=n_legit)
+        fraud_probs = rng.beta(a=3.0, b=1.2, size=n_fraud)
+        legit_probs = rng.beta(a=0.3, b=7.0, size=n_legit)
     elif seed == 4:  # FedProx
-        fraud_probs = np.random.beta(a=3.4, b=1.1, size=n_fraud)
-        legit_probs = np.random.beta(a=0.25, b=7.5, size=n_legit)
+        fraud_probs = rng.beta(a=3.4, b=1.1, size=n_fraud)
+        legit_probs = rng.beta(a=0.25, b=7.5, size=n_legit)
     elif seed == 5:  # FedGNN
-        fraud_probs = np.random.beta(a=4.1, b=0.9, size=n_fraud)
-        legit_probs = np.random.beta(a=0.22, b=7.8, size=n_legit)
+        fraud_probs = rng.beta(a=4.1, b=0.9, size=n_fraud)
+        legit_probs = rng.beta(a=0.22, b=7.8, size=n_legit)
     else:  # Federated + Privacy Entity Intelligence
-        fraud_probs = np.random.beta(a=3.8, b=1.0, size=n_fraud)
-        legit_probs = np.random.beta(a=0.24, b=7.6, size=n_legit)
+        fraud_probs = rng.beta(a=3.8, b=1.0, size=n_fraud)
+        legit_probs = rng.beta(a=0.24, b=7.6, size=n_legit)
 
     y_pred = np.concatenate([fraud_probs, legit_probs])
-    shuffle_indices = np.random.permutation(sample_size)
+    shuffle_indices = rng.permutation(sample_size)
 
     return y_true[shuffle_indices], y_pred[shuffle_indices]
 
 
-def run_benchmark_suite() -> list[dict]:
+def run_benchmark_suite(
+    sample_size: int = 10000,
+    n_real_samples: int = 5000,
+    output_path: str | None = None,
+    include_real: bool = True,
+) -> list[dict]:
     """Runs the production scientific benchmark suite across synthetic configurations and real-world datasets."""
     print("=" * 95)
     print(" CFI PLATFORM - SCIENTIFIC BENCHMARK & REAL-WORLD FIDELITY SUITE ")
@@ -140,10 +147,6 @@ def run_benchmark_suite() -> list[dict]:
 
     print("\n>>> 1. SYNTHETIC MULTI-MODEL FEDERATED BENCHMARK MATRIX:")
     print("-" * 95)
-    print(f"{'Model Configuration':<42} | {'PR-AUC':<7} | {'ROC-AUC':<7} | {'Rec@0.1%':<8} | {'Lat(ms)':<7}")
-    print("-" * 95)
-
-    results = []
     headers = [
         "Model Configuration",
         "PR-AUC",
@@ -162,8 +165,9 @@ def run_benchmark_suite() -> list[dict]:
         f"|:{'-' * 42}-|:{'-' * 7}-|:{'-' * 7}-|:{'-' * 14}-|:{'-' * 6}-|:{'-' * 11}-|:{'-' * 11}-|:{'-' * 6}-|:{'-' * 9}-|"
     )
 
+    results = []
     for cfg in configs:
-        y_t, y_p = generate_synthetic_benchmark_predictions(seed=cfg["seed"])
+        y_t, y_p = generate_synthetic_benchmark_predictions(seed=cfg["seed"], sample_size=sample_size)
         metrics = compute_scientific_benchmark(
             model_config_name=cfg["name"],
             y_true=y_t,
@@ -182,39 +186,78 @@ def run_benchmark_suite() -> list[dict]:
         )
 
     # --- Section 2: Real-World Dataset Evaluations (PaySim, IEEE-CIS, Elliptic) ---
-    print("\n" + "=" * 95)
-    print(">>> 2. REAL-WORLD BENCHMARK EVALUATION & DISTRIBUTION FIDELITY AUDIT")
-    print("=" * 95)
-    pilot = DesignPartnerPilotService()
+    if include_real:
+        print("\n" + "=" * 95)
+        print(">>> 2. REAL-WORLD BENCHMARK EVALUATION & DISTRIBUTION FIDELITY AUDIT")
+        print("=" * 95)
+        pilot = DesignPartnerPilotService()
 
-    real_datasets = ["paysim", "ieee_cis", "elliptic"]
-    for d_name in real_datasets:
-        eval_res = pilot.evaluate_reference_benchmark(dataset_name=d_name, n_samples=5_000)
-        perf = eval_res["performance_comparison"]
-        fl_p = perf["federated_learning"]
-        loc_p = perf["isolated_local_model"]
-        adv = perf["federated_advantage"]
-        fid = eval_res["distribution_fidelity"]
+        real_datasets = ["paysim", "ieee_cis", "elliptic"]
+        for d_name in real_datasets:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", RuntimeWarning)
+                eval_res = pilot.evaluate_reference_benchmark(dataset_name=d_name, n_samples=n_real_samples)
 
-        print(f"\n[Dataset: {d_name.upper()}] (Source: {eval_res['source_type']})")
-        print(f"  * Evaluated Samples: {eval_res['total_transactions_evaluated']} | Fraud Rate: {eval_res['actual_fraud_rate_percent']}%")
-        print(f"  * Fidelity Score vs Synth: {fid['overall_fidelity_score']} ({fid['summary_verdict']}) | JS Divergence: {fid['avg_js_divergence']}")
-        print(f"  * FL PR-AUC: {fl_p['pr_auc']} vs Local: {loc_p['pr_auc']} (Delta: +{adv['pr_auc_gain']})")
-        print(f"  * FL Recall@0.1% FPR: {fl_p['recall_at_01_fpr']} vs Local: {loc_p['recall_at_01_fpr']} (Delta: +{adv['recall_at_01_fpr_gain']})")
-        print(f"  * Net Daily Economic Benefit: ${adv['net_daily_economic_benefit_dollars']:,.2f} / 100k daily volume")
+            perf = eval_res["performance_comparison"]
+            fl_p = perf["federated_learning"]
+            loc_p = perf["isolated_local_model"]
+            adv = perf["federated_advantage"]
+            fid = eval_res["distribution_fidelity"]
+
+            print(f"\n[Dataset: {d_name.upper()}] (Source: {eval_res['source_type']})")
+            print(f"  * Evaluated Samples: {eval_res['total_transactions_evaluated']} | Fraud Rate: {eval_res['actual_fraud_rate_percent']}%")
+            print(f"  * Fidelity Score vs Synth: {fid['overall_fidelity_score']} ({fid['summary_verdict']}) | JS Divergence: {fid['avg_js_divergence']}")
+            print(f"  * FL PR-AUC: {fl_p['pr_auc']} vs Local: {loc_p['pr_auc']} (Delta: +{adv['pr_auc_gain']})")
+            print(f"  * FL Recall@0.1% FPR: {fl_p['recall_at_01_fpr']} vs Local: {loc_p['recall_at_01_fpr']} (Delta: +{adv['recall_at_01_fpr_gain']})")
+            print(f"  * Net Daily Economic Benefit: ${adv['net_daily_economic_benefit_dollars']:,.2f} / 100k daily volume")
 
     # Save benchmark results JSON
-    output_dir = os.path.join("storage", "benchmarks")
-    os.makedirs(output_dir, exist_ok=True)
-    out_path = os.path.join(output_dir, "benchmark_results.json")
-    with open(out_path, "w", encoding="utf-8") as f:
+    target_output = output_path or os.path.join("storage", "benchmarks", "benchmark_results.json")
+    out_dir = os.path.dirname(target_output)
+    if out_dir:
+        os.makedirs(out_dir, exist_ok=True)
+    with open(target_output, "w", encoding="utf-8") as f:
         json.dump(results, f, indent=2)
 
-    print(f"\n[+] Benchmark results saved to {out_path}")
+    print(f"\n[+] Benchmark results saved to {target_output}")
     print("=" * 95)
 
     return results
 
 
 if __name__ == "__main__":
-    run_benchmark_suite()
+    parser = argparse.ArgumentParser(
+        description="CFI Platform - Scientific Benchmark Suite & Distribution Fidelity Protocol CLI"
+    )
+    parser.add_argument(
+        "--samples",
+        type=int,
+        default=10000,
+        help="Sample size for synthetic federated evaluations (default: 10000)",
+    )
+    parser.add_argument(
+        "--real-samples",
+        type=int,
+        default=5000,
+        help="Transaction evaluation limit for real-world datasets (default: 5000)",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        type=str,
+        default=os.path.join("storage", "benchmarks", "benchmark_results.json"),
+        help="Output filepath for benchmark JSON report (default: storage/benchmarks/benchmark_results.json)",
+    )
+    parser.add_argument(
+        "--only-synthetic",
+        action="store_true",
+        help="Execute only the 6-model synthetic federated matrix (skip PaySim/IEEE-CIS/Elliptic)",
+    )
+    args = parser.parse_args()
+
+    run_benchmark_suite(
+        sample_size=args.samples,
+        n_real_samples=args.real_samples,
+        output_path=args.output,
+        include_real=not args.only_synthetic,
+    )
