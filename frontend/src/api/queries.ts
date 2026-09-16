@@ -80,7 +80,14 @@ import type {
   ExportFinCENXmlRequest,
   ExportFinCENXmlResponse,
   SARGenerateRequest,
+  RetentionPolicyRequest,
+  RetentionPolicyResponse,
+  RetentionPurgeRequest,
+  GDPRErasureRequest,
+  ErasureAuditRecordResponse,
+  ErasureChainVerificationResponse,
 } from './types';
+
 
 
 
@@ -1313,3 +1320,93 @@ export function useExportFinCENXmlMutation() {
     },
   });
 }
+
+// ── Enterprise Data Retention & GDPR Art. 17 Erasure ────────
+export function useRetentionPoliciesQuery(tenantId: string = 'bank_alpha') {
+  return useQuery<RetentionPolicyResponse[]>({
+    queryKey: ['retention-policies', tenantId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<RetentionPolicyResponse[]>(
+        `/api/v1/compliance/retention/policies?tenant_id=${encodeURIComponent(tenantId)}`
+      );
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+}
+
+export function useConfigureRetentionPolicyMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<RetentionPolicyResponse, Error, RetentionPolicyRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<RetentionPolicyResponse>(
+        '/api/v1/compliance/retention/policies',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['retention-policies', variables.tenant_id] });
+    },
+  });
+}
+
+export function useRetentionPurgeMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ErasureAuditRecordResponse[], Error, RetentionPurgeRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ErasureAuditRecordResponse[]>(
+        '/api/v1/compliance/retention/purge',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['erasure-audit-trail', variables.tenant_id] });
+    },
+  });
+}
+
+export function useExecuteGDPRErasureMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<ErasureAuditRecordResponse, Error, GDPRErasureRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ErasureAuditRecordResponse>(
+        '/api/v1/compliance/gdpr/erasure',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['erasure-audit-trail', variables.tenant_id] });
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
+    },
+  });
+}
+
+export function useErasureAuditTrailQuery(tenantId: string = 'bank_alpha') {
+  return useQuery<ErasureAuditRecordResponse[]>({
+    queryKey: ['erasure-audit-trail', tenantId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ErasureAuditRecordResponse[]>(
+        `/api/v1/compliance/retention/audit-trail?tenant_id=${encodeURIComponent(tenantId)}`
+      );
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+}
+
+export function useVerifyErasureChainQuery(tenantId: string = 'bank_alpha') {
+  return useQuery<ErasureChainVerificationResponse>({
+    queryKey: ['erasure-chain-verify', tenantId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ErasureChainVerificationResponse>(
+        `/api/v1/compliance/retention/audit-trail/verify?tenant_id=${encodeURIComponent(tenantId)}`
+      );
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+}
+

@@ -1575,3 +1575,60 @@ export interface SARGenerateRequest {
   tin_type?: string | null;
   narrative_override?: string | null;
 }
+
+// ── Enterprise Data Retention & GDPR Art. 17 Erasure ────────
+export type RetentionDataCategory =
+  | 'TRANSACTION_LOGS'
+  | 'INFERENCE_AUDITS'
+  | 'GRAPH_EDGES'
+  | 'EXPLAINABILITY_REPORTS'
+  | 'CUSTOMER_ENTITIES';
+
+export type ErasureSanitizationMethod =
+  | 'HARD_DELETE'
+  | 'CRYPTOGRAPHIC_ZEROIZATION'
+  | 'ANONYMIZATION';
+
+export interface RetentionPolicyRequest {
+  tenant_id: string;
+  category: RetentionDataCategory;
+  ttl_days: number;
+  erasure_method?: ErasureSanitizationMethod;
+}
+
+export interface RetentionPolicyResponse {
+  tenant_id: string;
+  category: RetentionDataCategory;
+  ttl_days: number;
+  erasure_method: ErasureSanitizationMethod;
+}
+
+export interface RetentionPurgeRequest {
+  tenant_id: string;
+}
+
+export interface GDPRErasureRequest {
+  tenant_id: string;
+  entity_id_hash: string;
+  category?: RetentionDataCategory | null;
+}
+
+export interface ErasureAuditRecordResponse {
+  erasure_id: string;
+  tenant_id: string;
+  category: RetentionDataCategory;
+  records_erased_count: number;
+  erasure_hash: string;
+  timestamp: string;
+  status: string;
+  prev_erasure_hash?: string | null;
+  affected_tables?: string[];
+}
+
+export interface ErasureChainVerificationResponse {
+  valid: boolean;
+  total_records: number;
+  last_hash: string;
+  tamper_reason?: string | null;
+}
+

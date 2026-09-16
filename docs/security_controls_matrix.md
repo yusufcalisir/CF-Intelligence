@@ -27,13 +27,14 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`ISO27001-A.12.1.3`**| ISO 27001 | Great Expectations 1.x Data Contract Gating & Quarantine Isolation | `datasets.py`, Great Expectations Suite | `test_dataset_ingestor.py` | `PASS` |
 | **`ISO27001-A.14.2.9`**| ISO 27001 | Interactive Byzantine Gradient Injection & Krum Quarantine Shield | `scenarios.py`, `ChaosAttackInjectorPanel.tsx` | `test_attack_injector.py` | `PASS` |
 | **`GDPR-ART-6`** | GDPR Art. 6 | Zero raw PII data pooling; federated gradient exchange only | `FederatedLearningEngine` (`fl_engine.py`) | `test_fl_engine.py` | `PASS` |
-| **`GDPR-ART-17`** | GDPR Art. 17 | Automated TTL data purging, cryptographic zeroization & unlearning | `AutomatedRetentionEngine`, `FederatedUnlearningEngine` | `test_federated_unlearning_engine.py` | `PASS` |
+| **`GDPR-ART-17`** | GDPR Art. 17 | Automated TTL data purging, cryptographic zeroization & unlearning | `AutomatedRetentionEngine`, `FederatedUnlearningEngine` | `test_retention_erasure_engine.py`, `test_retention_erasure_hardening.py`, `test_federated_unlearning_engine.py` | `PASS` |
 | **`SR-11-7-GOV`** | Fed SR 11-7 | Model risk management, concept drift detection & champion gate | `ModelGovernanceService`, `CanaryQualityGate` | `test_sr11_7_model_governance.py`, `test_model_governance_hardening.py` | `PASS` |
 
 ---
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **1,801 automated tests** (1,513 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 2,108 total).
+All controls listed above are automatically verified by the continuous testing pipeline across **1,811 automated tests** (1,523 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 2,118 total).
+
 
 
