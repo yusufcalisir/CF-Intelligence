@@ -937,6 +937,7 @@ else:
     app.include_router(privacy_defense.router)
     app.include_router(settlement.router)
     app.include_router(realtime_inference.router)
+    app.include_router(realtime_inference.api_router)
     app.include_router(compliance.router)
     app.include_router(compliance.api_router)
     app.include_router(optimization.router)

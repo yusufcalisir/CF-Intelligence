@@ -47,6 +47,18 @@ def _eval_model(model: torch.nn.Module, input_tensor: torch.Tensor) -> float:
         return float(model(input_tensor).item())
 
 
+def _eval_model_batch(model: torch.nn.Module, input_tensors: torch.Tensor) -> list[float]:
+    """Evaluate PyTorch model forward pass synchronously for a batch of input tensors."""
+    with torch.no_grad():
+        outputs = model(input_tensors)
+        if outputs.dim() == 0:
+            return [float(outputs.item())]
+        if outputs.dim() == 1:
+            return [float(v) for v in outputs.tolist()]
+        return [float(v[0]) if len(v) > 0 else 0.0 for v in outputs.tolist()]
+
+
+
 _model_service = ModelService(_settings)
 _registry = ModelRegistry()
 _eval_engine = ModelEvaluationEngine(_registry)
@@ -166,100 +178,25 @@ REFERENCE_BOUNDS = {
 }
 
 
-class TransactionPredictRequest(BaseModel):
-    transaction_amount: float = Field(..., ge=0.0, description="Amount of the transaction")
-    merchant_category: str = Field(
-        "grocery",
-        max_length=256,
-        description="Merchant category name (e.g. crypto, grocery, travel)",
-    )
-    country_code: str = Field(
-        "US", max_length=256, description="Originating ISO country code (e.g. US, NG, TR)"
-    )
-    device_type: str = Field(
-        "web_browser", max_length=256, description="Type of device (e.g. web_browser, mobile_app)"
-    )
-    velocity: float = Field(1.0, ge=0.0, description="Transaction velocity (txns/hr)")
-    hour_of_day: int = Field(12, ge=0, le=23, description="Hour of the transaction")
-    merchant_risk_score: float = Field(
-        0.05, ge=0.0, le=1.0, description="Historical fraud rate of the merchant"
-    )
-    customer_history_score: float = Field(
-        0.95, ge=0.0, le=1.0, description="Trustworthiness score of the customer"
-    )
-    chargeback_count: int = Field(0, ge=0, description="Customer chargeback count")
-    account_age_days: int = Field(365, ge=0, description="Age of the customer account in days")
-    bank_id: str | None = Field(
-        None, max_length=256, description="Optional bank identifier. Defaults to gateway ID."
-    )
-    simulation_id: str | None = Field(
-        None, max_length=256, description="Optional simulation run ID to resolve versioned models."
-    )
-    transaction_id: str | None = Field(
-        None, max_length=256, description="Optional client-provided transaction identifier"
-    )
+from app.application.schemas.transaction import (
+    AlertDetails,
+    BatchPredictionItem,
+    BatchPredictionResponse,
+    BatchTransactionPredictRequest,
+    CounterfactualPathItem,
+    ExplainTransactionRequest,
+    ExplainTransactionResponse,
+    FeatureAttributionItem,
+    FeatureContributionItem,
+    RelatedEntityItem,
+    ScoreTransactionRequest,
+    ScoreTransactionResponse,
+    SignalBreakdown,
+    TransactionFeedbackRequest,
+    TransactionPredictRequest,
+    TransactionPredictResponse,
+)
 
-
-class SignalBreakdown(BaseModel):
-    signal_name: str
-    weight: float
-    raw_value: float
-    normalized_score: float
-    explanation: str
-
-
-class AlertDetails(BaseModel):
-    alert_id: str
-    severity: str
-    status: str
-    reason_codes: list[str]
-    explanation: str
-    top_features: list[dict[str, Any]]
-    risk_factors: list[str]
-
-
-class TransactionPredictResponse(BaseModel):
-    transaction_id: str | None = Field(None, description="Transaction identifier")
-    fraud_probability: float
-    risk_score: float
-    is_fraud_suspected: bool
-    risk_level: str
-    breakdown: list[SignalBreakdown]
-    alert_details: AlertDetails | None = None
-    policy_action: str = Field("ALLOW", description="Evaluated action from dynamic policy engine")
-    triggered_rules: list[str] = Field(
-        default_factory=list, description="List of triggered policy rules"
-    )
-
-
-class ScoreTransactionRequest(BaseModel):
-    transaction_id: str = Field(..., max_length=256, description="Unique transaction identifier")
-    account_id: str = Field(..., max_length=256, description="Source account identifier")
-    amount: float = Field(..., ge=0.0, description="Transaction amount")
-    currency: str = Field("EUR", max_length=16, description="ISO 4217 currency code")
-    merchant_id: str = Field(..., max_length=256, description="Target merchant identifier")
-    country: str = Field("EE", max_length=16, description="ISO 3166-1 alpha-2 origin country code")
-    device_id: str = Field(..., max_length=256, description="Device fingerprint identifier")
-
-
-class FeatureContributionItem(BaseModel):
-    feature: str
-    contribution: float
-
-
-class RelatedEntityItem(BaseModel):
-    entity_type: str
-    risk: str
-
-
-class ScoreTransactionResponse(BaseModel):
-    risk_score: int = Field(..., ge=0, le=1000, description="Normalized risk score [0, 1000]")
-    risk_level: str = Field(..., description="LOW, MEDIUM, or HIGH risk classification")
-    decision: str = Field(..., description="Automated decision: ALLOW, REVIEW, or BLOCK")
-    model_version: str = Field("v2.4.1", description="Active global model version")
-    explanations: list[FeatureContributionItem] = Field(default_factory=list)
-    related_entities: list[RelatedEntityItem] = Field(default_factory=list)
-    latency_ms: float = Field(..., description="Response latency in milliseconds")
 
 
 def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
@@ -608,26 +545,224 @@ async def predict_transaction(
         alert_details=alert_details,
         policy_action=policy_action,
         triggered_rules=triggered_rules,
+        latency_ms=round((time.perf_counter() - champ_start) * 1000, 2),
     )
 
 
-class TransactionFeedbackRequest(BaseModel):
-    transaction_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        description="Unique transaction identifier",
-    )
-    actual_label: int = Field(
-        ..., ge=0, le=1, description="Actual outcome (0 for legitimate, 1 for fraud)"
-    )
-    simulation_id: str | None = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.]*$")
-    simulationId: str | None = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.]*$")  # noqa: N815
+@router.post("/predict/batch", response_model=BatchPredictionResponse)
+@limiter.limit("30/minute")
+async def predict_batch(
+    request: Request,
+    payload: BatchTransactionPredictRequest,
+    session: SessionDep,
+    caller_tenant: TenantDep = None,
+    metered_tenant: str = Depends(enforce_tenant_quota),
+) -> BatchPredictionResponse:
+    """Evaluate a batch of transactions in real-time.
 
-    @property
-    def effective_simulation_id(self) -> str:
-        return self.simulation_id or self.simulationId or "live_prod_v2"
+    Batch processes up to 1,000 transaction payloads in a single forward pass,
+    evaluates risk scores, and returns itemized decisions with batch latency metrics.
+    """
+    if caller_tenant and payload.bank_id:
+        enforce_tenant_isolation(caller_tenant, payload.bank_id)
+
+    from app.application.services.tenant_metering import get_tenant_metering_service
+
+    metering = get_tenant_metering_service()
+    target_tenant = payload.bank_id or caller_tenant or metered_tenant or "bank_alpha"
+    allowed, reason = metering.acquire_quota(
+        target_tenant, "INFERENCE", count=len(payload.transactions)
+    )
+    if not allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Batch inference quota exceeded: {reason}",
+            headers={"Retry-After": "3600", "X-Quota-Exceeded": "true"},
+        )
+
+    start_batch = time.perf_counter()
+    try:
+        model = _get_cached_serving_model(payload.simulation_id)
+        network = getattr(model, "network", None)
+        first_layer = (
+            network[0]
+            if isinstance(network, (torch.nn.Sequential, torch.nn.ModuleList, list))
+            and len(network) > 0
+            else None
+        )
+        input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
+
+        txn_dicts = [t.model_dump() for t in payload.transactions]
+        tensors = []
+        for td in txn_dicts:
+            t_tensor = preprocess_transaction(td)
+            if t_tensor.shape[1] < input_dim:
+                t_tensor = torch.nn.functional.pad(
+                    t_tensor, (0, input_dim - t_tensor.shape[1]), value=0.0
+                )
+            elif t_tensor.shape[1] > input_dim:
+                t_tensor = t_tensor[:, :input_dim]
+            tensors.append(t_tensor)
+
+        batch_tensor = torch.cat(tensors, dim=0).to(_model_service.device)
+        probs = await asyncio.to_thread(_eval_model_batch, model, batch_tensor)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Batch inference execution failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Batch inference pipeline execution error: {exc}",
+        )
+
+    items: list[BatchPredictionItem] = []
+    fraud_count = 0
+    batch_item_latency = round(
+        (time.perf_counter() - start_batch) * 1000 / max(1, len(payload.transactions)), 2
+    )
+
+    for i, (t_req, prob) in enumerate(zip(payload.transactions, probs)):
+        t_dict = txn_dicts[i]
+        txn_id = t_req.transaction_id or f"batch_tx_{uuid.uuid4().hex[:8]}"
+        e_hash = f"batch:{target_tenant}:{txn_id}"
+
+        if t_req.chargeback_count > 0:
+            _risk_engine.register_chargeback(e_hash, min(1.0, t_req.chargeback_count / 10.0))
+            for _ in range(min(5, t_req.chargeback_count)):
+                _risk_engine.register_alert(e_hash)
+        _risk_engine.register_baseline(e_hash, {"mean_amount": 100.0, "std_amount": 50.0})
+
+        risk_obj = _risk_engine.score_transaction(
+            transaction=t_dict,
+            ml_prediction=prob,
+            entity_hash=e_hash,
+        )
+        score = risk_obj.score
+        is_fraud = score >= 600.0
+        if is_fraud:
+            fraud_count += 1
+
+        level = (
+            "CRITICAL"
+            if score >= 850.0
+            else "HIGH"
+            if score >= 700.0
+            else "MEDIUM"
+            if score >= 500.0
+            else "LOW"
+        )
+        decision = "BLOCK" if score >= 850.0 else "REVIEW" if score >= 600.0 else "ALLOW"
+
+        items.append(
+            BatchPredictionItem(
+                transaction_id=txn_id,
+                fraud_probability=round(prob, 4),
+                risk_score=round(score, 1),
+                decision=decision,
+                risk_level=level,
+                is_fraud_suspected=is_fraud,
+                policy_action="BLOCK_TRANSACTION" if decision == "BLOCK" else "ALLOW",
+                latency_ms=batch_item_latency,
+            )
+        )
+
+    total_batch_ms = round((time.perf_counter() - start_batch) * 1000, 2)
+    return BatchPredictionResponse(
+        total_processed=len(payload.transactions),
+        fraud_suspected_count=fraud_count,
+        predictions=items,
+        batch_latency_ms=total_batch_ms,
+    )
+
+
+@router.post("/predict/explain", response_model=ExplainTransactionResponse)
+@limiter.limit("60/minute")
+async def explain_transaction(
+    request: Request,
+    payload: ExplainTransactionRequest,
+    caller_tenant: TenantDep = None,
+    metered_tenant: str = Depends(enforce_tenant_quota),
+) -> ExplainTransactionResponse:
+    """Generate SHAP feature attributions and counterfactual remediation paths for a transaction."""
+    if caller_tenant and payload.transaction.bank_id:
+        enforce_tenant_isolation(caller_tenant, payload.transaction.bank_id)
+
+    start_time = time.perf_counter()
+    txn_dict = payload.transaction.model_dump()
+    txn_id = payload.transaction_id or payload.transaction.transaction_id or f"tx_{uuid.uuid4().hex[:8]}"
+
+    try:
+        # Offload CPU-heavy SHAP kernel explanation to threadpool to preserve event loop health
+        shap_features = await asyncio.to_thread(_explainability_service.compute_shap_values, txn_dict)
+
+        attributions: list[FeatureAttributionItem] = []
+        base_val = 0.50
+        predicted_val = 0.50
+
+        for f_item in shap_features:
+            name = f_item.get("feature", "unknown")
+            contrib = float(f_item.get("contribution", 0.0))
+            raw_val = float(f_item.get("raw_value", f_item.get("value", 0.0)))
+            base_val = float(f_item.get("base_value", base_val))
+            predicted_val = float(f_item.get("model_output", predicted_val))
+            direction = "INCREASES_RISK" if contrib > 0 else "DECREASES_RISK"
+            desc = (
+                f"Feature '{name}' increases fraud probability by {abs(contrib):.2%}"
+                if contrib > 0
+                else f"Feature '{name}' decreases fraud risk by {abs(contrib):.2%}"
+            )
+            attributions.append(
+                FeatureAttributionItem(
+                    feature=name,
+                    value=raw_val,
+                    contribution=round(contrib, 4),
+                    direction=direction,
+                    description=desc,
+                )
+            )
+
+        counterfactual_paths: list[CounterfactualPathItem] = []
+        if payload.transaction.transaction_amount > 5000.0:
+            counterfactual_paths.append(
+                CounterfactualPathItem(
+                    feature="transaction_amount",
+                    original_value=payload.transaction.transaction_amount,
+                    target_value=2500.0,
+                    description="Reduce single transfer amount below $5,000 threshold to reduce risk score.",
+                )
+            )
+        if payload.transaction.velocity > 5.0:
+            counterfactual_paths.append(
+                CounterfactualPathItem(
+                    feature="velocity",
+                    original_value=payload.transaction.velocity,
+                    target_value=2.0,
+                    description="Throttle customer transaction velocity to under 3 txns/hr.",
+                )
+            )
+
+        summary = (
+            f"Explanation generated via {payload.method}. "
+            f"Top contributing risk driver: {attributions[0].feature if attributions else 'none'}."
+        )
+
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        return ExplainTransactionResponse(
+            transaction_id=txn_id,
+            method=payload.method,
+            base_value=round(base_val, 4),
+            predicted_score=round(predicted_val, 4),
+            attributions=attributions,
+            summary=summary,
+            counterfactual_paths=counterfactual_paths,
+            latency_ms=latency_ms,
+        )
+    except Exception as exc:
+        logger.error("Explainability pipeline execution failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Explainability execution failed: {exc}",
+        )
 
 
 @router.post("/predict/feedback")
@@ -652,6 +787,7 @@ async def submit_transaction_feedback(payload: TransactionFeedbackRequest) -> di
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to record transaction feedback: {e}",
         )
+
 
 
 @router.post(

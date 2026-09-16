@@ -1834,6 +1834,164 @@ export interface WebhookHealthResponse {
   timestamp: string;
 }
 
+// ── Real-Time Scoring, Batch Predict & Inference Types ──────────────────────
+
+export interface SignalBreakdownItem {
+  signal_name: string;
+  weight: number;
+  raw_value: number;
+  normalized_score: number;
+  explanation: string;
+}
+
+export interface AlertDetailsItem {
+  alert_id: string;
+  severity: string;
+  status: string;
+  reason_codes: string[];
+  explanation: string;
+  top_features: Array<Record<string, any>>;
+  risk_factors: string[];
+}
+
+export interface TransactionPredictRequest {
+  transaction_amount: number;
+  merchant_category?: string;
+  country_code?: string;
+  device_type?: string;
+  velocity?: number;
+  hour_of_day?: number;
+  merchant_risk_score?: number;
+  customer_history_score?: number;
+  chargeback_count?: number;
+  account_age_days?: number;
+  bank_id?: string;
+  simulation_id?: string;
+  transaction_id?: string;
+}
+
+export interface TransactionPredictResponse {
+  transaction_id: string | null;
+  fraud_probability: number;
+  risk_score: number;
+  is_fraud_suspected: boolean;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  breakdown: SignalBreakdownItem[];
+  alert_details?: AlertDetailsItem | null;
+  policy_action: string;
+  triggered_rules: string[];
+  latency_ms: number;
+}
+
+export interface BatchPredictionItem {
+  transaction_id: string;
+  fraud_probability: number;
+  risk_score: number;
+  decision: 'ALLOW' | 'REVIEW' | 'BLOCK';
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  is_fraud_suspected: boolean;
+  policy_action: string;
+  latency_ms: number;
+}
+
+export interface BatchPredictionResponse {
+  total_processed: number;
+  fraud_suspected_count: number;
+  predictions: BatchPredictionItem[];
+  batch_latency_ms: number;
+}
+
+export interface FeatureAttributionItem {
+  feature: string;
+  value: number;
+  contribution: number;
+  direction: 'INCREASES_RISK' | 'DECREASES_RISK';
+  description: string;
+}
+
+export interface CounterfactualPathItem {
+  feature: string;
+  original_value: number;
+  target_value: number;
+  description: string;
+}
+
+export interface ExplainTransactionResponse {
+  transaction_id: string;
+  method: string;
+  base_value: number;
+  predicted_score: number;
+  attributions: FeatureAttributionItem[];
+  summary: string;
+  counterfactual_paths: CounterfactualPathItem[];
+  latency_ms: number;
+}
+
+export interface ScoreTransactionRequest {
+  transaction_id: string;
+  account_id: string;
+  amount: number;
+  currency?: string;
+  merchant_id: string;
+  country?: string;
+  device_id: string;
+}
+
+export interface FeatureContributionItem {
+  feature: string;
+  contribution: number;
+}
+
+export interface RelatedEntityItem {
+  entity_type: string;
+  risk: string;
+}
+
+export interface ScoreTransactionResponse {
+  risk_score: number;
+  risk_level: 'LOW' | 'MEDIUM' | 'HIGH';
+  decision: 'ALLOW' | 'REVIEW' | 'BLOCK';
+  model_version: string;
+  explanations: FeatureContributionItem[];
+  related_entities: RelatedEntityItem[];
+  latency_ms: number;
+}
+
+export interface RealtimeInferenceRequest {
+  transaction_id: string;
+  amount: number;
+  currency?: string;
+  source_account: string;
+  target_account: string;
+  merchant_category?: string;
+  velocity_1h?: number;
+  force_fallback?: boolean;
+}
+
+export interface RealtimeInferenceResponse {
+  transaction_id: string;
+  risk_score: number;
+  decision: 'ALLOW' | 'REVIEW' | 'BLOCK';
+  latency_ms: number;
+  evaluated_by: 'ML_MODEL' | 'HEURISTIC_FALLBACK';
+  explanation: string;
+}
+
+export interface InferenceQuotaResponse {
+  tenant_id: string;
+  tier: string;
+  daily_inferences_limit: number;
+  daily_inferences_used: number;
+  daily_inferences_remaining: number;
+  monthly_fl_rounds_limit: number;
+  monthly_fl_rounds_used: number;
+  monthly_fl_rounds_remaining: number;
+  storage_used_mb: number;
+  max_storage_mb: number;
+  reset_date: string;
+}
+
+
 
 
 

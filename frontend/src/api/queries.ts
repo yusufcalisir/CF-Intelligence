@@ -103,6 +103,15 @@ import type {
   WebhookDeliveryLogsResponse,
   WebhookDeleteResponse,
   WebhookHealthResponse,
+  TransactionPredictRequest,
+  TransactionPredictResponse,
+  BatchPredictionResponse,
+  ExplainTransactionResponse,
+  ScoreTransactionRequest,
+  ScoreTransactionResponse,
+  RealtimeInferenceRequest,
+  RealtimeInferenceResponse,
+  InferenceQuotaResponse,
 } from './types';
 
 
@@ -1628,6 +1637,92 @@ export function useWebhookVerifyMutation() {
     },
   });
 }
+
+// ── Real-Time Scoring, Batch Predict & Inference Hooks ──────────────────────
+
+export function usePredictTransactionMutation() {
+  return useMutation<TransactionPredictResponse, Error, TransactionPredictRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<TransactionPredictResponse>(
+        '/api/v1/predict',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function usePredictBatchMutation() {
+  return useMutation<
+    BatchPredictionResponse,
+    Error,
+    { transactions: TransactionPredictRequest[]; bank_id?: string; simulation_id?: string }
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<BatchPredictionResponse>(
+        '/api/v1/predict/batch',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useExplainTransactionMutation() {
+  return useMutation<
+    ExplainTransactionResponse,
+    Error,
+    { transaction: TransactionPredictRequest; method?: string; simulation_id?: string }
+  >({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ExplainTransactionResponse>(
+        '/api/v1/predict/explain',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useScoreTransactionMutation() {
+  return useMutation<ScoreTransactionResponse, Error, ScoreTransactionRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ScoreTransactionResponse>(
+        '/api/v1/transactions/score',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useRealtimeInferenceScoreMutation() {
+  return useMutation<RealtimeInferenceResponse, Error, RealtimeInferenceRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<RealtimeInferenceResponse>(
+        '/api/v1/inference/score',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useInferenceQuotaQuery(tenantId?: string) {
+  return useQuery<InferenceQuotaResponse>({
+    queryKey: ['inference-quota', tenantId || 'default'],
+    queryFn: async () => {
+      const headers = tenantId ? { 'X-Tenant-ID': tenantId } : undefined;
+      const { data } = await apiClient.get<InferenceQuotaResponse>(
+        '/api/v1/inference/quota',
+        { headers }
+      );
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+}
+
 
 
 

@@ -10,10 +10,15 @@ import time
 from typing import Any
 
 import torch
-from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, Header, Request
 
+from app.application.schemas.transaction import (
+    InferenceQuotaResponse,
+    RealtimeInferenceRequest,
+    RealtimeInferenceResponse,
+)
 from app.config import get_settings
+from app.dependencies import TenantDep, enforce_tenant_quota
 from app.domain.inference_fallback import (
     InferenceDecision,
     InferenceFallbackEngine,
@@ -22,73 +27,8 @@ from app.domain.inference_fallback import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/v1/inference", tags=["Real-Time Inference"])
+api_router = APIRouter(prefix="/api/v1/inference", tags=["Real-Time Inference"])
 
-
-class RealtimeInferenceRequest(BaseModel):
-    """Schema for online transaction authorization requests."""
-
-    transaction_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        json_schema_extra={"example": "tx_88992211"},
-    )
-    amount: float = Field(
-        ...,
-        ge=0.0,
-        le=1_000_000_000.0,
-        json_schema_extra={"example": 1250.50},
-    )
-    currency: str = Field(
-        "USD",
-        min_length=3,
-        max_length=3,
-        pattern=r"^[A-Z]{3}$",
-        json_schema_extra={"example": "USD"},
-    )
-    source_account: str = Field(
-        ...,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        json_schema_extra={"example": "acc_src_991"},
-    )
-    target_account: str = Field(
-        ...,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        json_schema_extra={"example": "acc_dst_002"},
-    )
-    merchant_category: str = Field(
-        "general_retail",
-        min_length=2,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        json_schema_extra={"example": "crypto_exchange"},
-    )
-    velocity_1h: int = Field(
-        1,
-        ge=0,
-        le=10_000,
-        json_schema_extra={"example": 3},
-    )
-    force_fallback: bool = Field(
-        False,
-        description="Simulate model timeout/failure to test fallback engine.",
-    )
-
-
-class RealtimeInferenceResponse(BaseModel):
-    """Schema for online transaction authorization decision responses."""
-
-    transaction_id: str
-    risk_score: float
-    decision: InferenceDecision
-    latency_ms: float
-    evaluated_by: str  # "ML_MODEL" or "HEURISTIC_FALLBACK"
-    explanation: str
 
 
 fallback_engine = InferenceFallbackEngine()
@@ -220,7 +160,42 @@ def get_scripted_model() -> tuple[Any, bool]:
     return _cached_scripted_model, False
 
 
+@router.get("/quota", response_model=InferenceQuotaResponse)
+@api_router.get("/quota", response_model=InferenceQuotaResponse)
+def get_inference_quota(
+    request: Request,
+    x_bank_id: str | None = Header(None, alias="X-Bank-ID"),
+    x_tenant_id: str | None = Header(None, alias="X-Tenant-ID"),
+    caller_tenant: TenantDep = None,
+) -> InferenceQuotaResponse:
+    """Returns real-time tenant inference quotas, limits, and consumption."""
+    from app.application.services.tenant_metering import get_tenant_metering_service
+
+    tenant = x_tenant_id or x_bank_id or caller_tenant or "bank_alpha"
+    metering = get_tenant_metering_service()
+    limits = metering.get_quota_limits(tenant)
+    usage = metering.get_usage(tenant)
+
+    rem_daily = max(0, limits.max_daily_inferences - usage.daily_inferences)
+    rem_monthly = max(0, limits.max_monthly_fl_rounds - usage.monthly_fl_rounds)
+
+    return InferenceQuotaResponse(
+        tenant_id=tenant,
+        tier="ENTERPRISE",
+        daily_inferences_limit=limits.max_daily_inferences,
+        daily_inferences_used=usage.daily_inferences,
+        daily_inferences_remaining=rem_daily,
+        monthly_fl_rounds_limit=limits.max_monthly_fl_rounds,
+        monthly_fl_rounds_used=usage.monthly_fl_rounds,
+        monthly_fl_rounds_remaining=rem_monthly,
+        storage_used_mb=round(usage.storage_used_mb, 2),
+        max_storage_mb=limits.max_storage_mb,
+        reset_date=usage.last_reset_date,
+    )
+
+
 @router.post("/score", response_model=RealtimeInferenceResponse)
+@api_router.post("/score", response_model=RealtimeInferenceResponse)
 def score_transaction_realtime(
     payload: RealtimeInferenceRequest,
 ) -> RealtimeInferenceResponse:
