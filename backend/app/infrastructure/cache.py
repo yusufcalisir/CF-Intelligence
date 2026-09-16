@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import json
 import logging
 import secrets
@@ -335,7 +336,9 @@ class CacheService:
                         end
                         """
                         try:
-                            await c.eval(lua_release, 1, lock_key, token)
+                            lua_res: Any = c.eval(lua_release, 1, lock_key, token)
+                            if inspect.isawaitable(lua_res):
+                                await lua_res
                         except Exception as exc:
                             logger.debug("Redis distributed unlock error key=%s: %s", lock_key, exc)
                 return

@@ -320,6 +320,7 @@ async def test_cache_service_distributed_lock_redis_client() -> None:
     async with cache.distributed_lock("fl_global_round_1", ttl_seconds=10, timeout_seconds=1.0) as acquired:
         assert acquired is True
         mock_redis.set.assert_awaited_once()
+        assert mock_redis.set.await_args is not None
         args, kwargs = mock_redis.set.await_args
         assert args[0] == "lock:fl_global_round_1"
         assert kwargs["nx"] is True
@@ -327,6 +328,7 @@ async def test_cache_service_distributed_lock_redis_client() -> None:
 
     # Verify Lua unlock was evaluated with matching key
     mock_redis.eval.assert_awaited_once()
+    assert mock_redis.eval.await_args is not None
     eval_args, _ = mock_redis.eval.await_args
     assert "redis.call" in eval_args[0]
     assert eval_args[2] == "lock:fl_global_round_1"

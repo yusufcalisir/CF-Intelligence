@@ -8,8 +8,10 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import inspect
 import json
 import logging
+from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
@@ -54,10 +56,13 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
 
             # Replay stored events
             events_key = f"scenario:{scenario_id}:events"
-            stored_events = await r.lrange(events_key, 0, -1)
-            for raw_event in stored_events:
-                await websocket.send_text(raw_event)
-                streaming_ws_manager.record_client_activity(websocket)
+            lrange_res: Any = r.lrange(events_key, 0, -1)
+            stored_events = await lrange_res if inspect.isawaitable(lrange_res) else lrange_res
+            if isinstance(stored_events, (list, tuple)):
+                for raw_event in stored_events:
+                    if isinstance(raw_event, str):
+                        await websocket.send_text(raw_event)
+                        streaming_ws_manager.record_client_activity(websocket)
 
             # Subscribe to live events
             pubsub = r.pubsub()
@@ -69,9 +74,11 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
                     ignore_subscribe_messages=True,
                     timeout=1.0,
                 )
-                if message and message["type"] == "message":
-                    await websocket.send_text(message["data"])
-                    streaming_ws_manager.record_client_activity(websocket)
+                if isinstance(message, dict) and message.get("type") == "message":
+                    data = message.get("data")
+                    if isinstance(data, str):
+                        await websocket.send_text(data)
+                        streaming_ws_manager.record_client_activity(websocket)
 
                 # Send heartbeat every 5 seconds
                 await asyncio.sleep(0.1)
