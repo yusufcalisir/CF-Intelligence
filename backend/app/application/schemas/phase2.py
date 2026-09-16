@@ -15,7 +15,7 @@ from __future__ import annotations
 import re
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # ── Shared sentinel regex (strips ASCII control chars) ────────────────────────
 _SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -677,24 +677,50 @@ class MuleRingDetectionResponse(BaseModel):
     rings: list[MuleRingItem]
     total_rings: int
     cross_bank_rings: int
+    max_risk_score: float = 0.0
 
 
 class SmurfingPatternItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
     pattern_id: str = Field(..., description="Unique identifier of detected smurfing pattern")
-    pattern_type: Literal["FAN_IN", "FAN_OUT", "MULTI_HOP_LAYERING"] = Field(
-        ..., description="Smurfing topology pattern type"
-    )
-    central_entity_id: str = Field(..., description="Central mule or aggregator entity ID")
-    counterparty_ids: list[str] = Field(..., description="List of originators or recipient counterparty entity IDs")
+    pattern_type: str = Field(..., description="Smurfing topology pattern type")
+    central_entity_id: str = Field(default="", description="Central mule or aggregator entity ID")
+    counterparty_ids: list[str] = Field(default_factory=list, description="List of originators or recipient counterparty entity IDs")
     fan_degree: int = Field(..., ge=1, description="Number of converging or dispersing counterparties")
-    severity: Literal["low", "medium", "high", "critical"] = Field(..., description="Smurfing severity level")
+    severity: str = Field(default="medium", description="Smurfing severity level")
     risk_score: float = Field(..., ge=0.0, le=1000.0, description="Assessed risk score for the smurfing cluster")
     detected_at: str = Field(..., description="ISO 8601 timestamp of detection")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_smurfing_item(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            if "central_entity_id" not in data and "hub_entity_id" in data:
+                data["central_entity_id"] = data["hub_entity_id"]
+            if "counterparty_ids" not in data and "spoke_entity_ids" in data:
+                data["counterparty_ids"] = data["spoke_entity_ids"]
+            if "detected_at" in data and not isinstance(data["detected_at"], str):
+                data["detected_at"] = data["detected_at"].isoformat()
+            if "severity" not in data:
+                score = float(data.get("risk_score", 0.0))
+                if score >= 0.8:
+                    data["severity"] = "critical"
+                elif score >= 0.6:
+                    data["severity"] = "high"
+                elif score >= 0.3:
+                    data["severity"] = "medium"
+                else:
+                    data["severity"] = "low"
+        return data
 
 
 class SmurfingDetectionResponse(BaseModel):
     patterns: list[SmurfingPatternItem]
     total_patterns: int
+    fan_in_count: int = 0
+    fan_out_count: int = 0
+    layering_count: int = 0
 
 
 class CypherQueryRequest(BaseModel):
@@ -1098,11 +1124,11 @@ class StreamingGNNTrainStepResponse(BaseModel):
 
 
 class EllipticBenchmarkRequest(BaseModel):
-    n_samples: int = Field(2000, ge=50, le=50000, description="Number of node samples to evaluate")
-    random_seed: int = Field(42, ge=0, description="Random seed for reproducibility")
-    epochs: int = Field(5, ge=1, le=50, description="Number of training epochs")
-    learning_rate: float = Field(0.01, gt=0.0, le=1.0, description="Optimizer learning rate")
-    save_report: bool = Field(True, description="Whether to persist markdown and json reports")
+    n_samples: int = Field(default=2000, ge=50, le=50000, description="Number of node samples to evaluate")
+    random_seed: int = Field(default=42, ge=0, description="Random seed for reproducibility")
+    epochs: int = Field(default=5, ge=1, le=50, description="Number of training epochs")
+    learning_rate: float = Field(default=0.01, gt=0.0, le=1.0, description="Optimizer learning rate")
+    save_report: bool = Field(default=True, description="Whether to persist markdown and json reports")
 
 
 class EllipticPipelineMetrics(BaseModel):

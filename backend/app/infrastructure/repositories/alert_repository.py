@@ -92,7 +92,8 @@ class AlertRepository:
         """Delete an alert by ID. Returns True if deleted, False otherwise."""
         result = await self.session.execute(delete(AlertModel).where(AlertModel.id == alert_id))
         await self.session.commit()
-        return (result.rowcount or 0) > 0
+        rowcount = getattr(result, "rowcount", 0)
+        return (rowcount or 0) > 0
 
     # ── Read ──────────────────────────────────────────────────────────
 

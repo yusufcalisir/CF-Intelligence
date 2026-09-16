@@ -797,7 +797,7 @@ class GraphEngine:
                     | {target for targets in directed_adj.values() for target, _ in targets}
                 )
             )
-            seen_ring_ids: set[str] = set()
+            mem_seen_ring_ids: set[str] = set()
             rings: list[dict[str, Any]] = []
 
             for s in all_nodes:
@@ -812,27 +812,27 @@ class GraphEngine:
                             # Closed cycle back to start node
                             if len(path) >= min_length:
                                 ring_id = hashlib.sha256(":".join(path).encode("utf-8")).hexdigest()[:16]
-                                if ring_id not in seen_ring_ids:
-                                    seen_ring_ids.add(ring_id)
+                                if ring_id not in mem_seen_ring_ids:
+                                    mem_seen_ring_ids.add(ring_id)
 
-                                    banks: list[str] = []
-                                    risk_scores: list[float] = []
+                                    node_banks: list[str] = []
+                                    node_risk_scores: list[float] = []
                                     for nid in path:
                                         ent_val = self._entities.get(nid)
                                         if ent_val:
                                             ent = _dict_to_entity(ent_val)
                                             if ent.bank_id:
-                                                banks.append(ent.bank_id)
-                                            risk_scores.append(RISK_LEVEL_TO_SCORE.get(ent.risk_level.value, 0.5))
+                                                node_banks.append(ent.bank_id)
+                                            node_risk_scores.append(RISK_LEVEL_TO_SCORE.get(ent.risk_level.value, 0.5))
                                         else:
-                                            risk_scores.append(0.5)
+                                            node_risk_scores.append(0.5)
 
-                                    banks_involved = sorted(list(set(banks)))
+                                    banks_involved = sorted(list(set(node_banks)))
                                     if bank_id and bank_id not in banks_involved:
                                         continue
 
                                     is_cross_bank = len(banks_involved) >= 2
-                                    base_risk = sum(risk_scores) / max(len(risk_scores), 1)
+                                    base_risk = sum(node_risk_scores) / max(len(node_risk_scores), 1)
                                     cross_boost = 0.2 if is_cross_bank else 0.0
                                     len_factor = 0.1 if len(path) <= 4 else 0.05
                                     risk_score = round(min(1.0, max(0.1, base_risk + cross_boost + len_factor)), 4)
