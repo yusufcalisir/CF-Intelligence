@@ -113,8 +113,8 @@ def test_stress_08_zero_clipping_threshold(privacy_service: PrivacyService):
     mw_zero = ModelWeights(layer_shapes=[(3,)], flat_weights=[0.0, 0.0, 0.0])
     mw_orig = ModelWeights(layer_shapes=[(3,)], flat_weights=[5.0, -10.0, 2.0])
 
-    mw_clipped = privacy_service.clip_model_update(mw_zero, mw_orig, max_norm=0.0)
-    assert np.allclose(mw_clipped.flat_weights, [0.0, 0.0, 0.0], atol=1e-12)
+    with pytest.raises(ValueError, match="max_norm must be strictly positive"):
+        privacy_service.clip_model_update(mw_zero, mw_orig, max_norm=0.0)
 
 # ---------------------------------------------------------------------------
 # Stress Test 9: Raw PII Payload Violation

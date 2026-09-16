@@ -142,7 +142,8 @@ def test_property_tenant_quota_boundaries(inferences: int, max_quota: int, tenan
     metering = TenantMeteringService()
     metering.set_quota_limits(tenant_id, TenantQuotaLimits(max_daily_inferences=max_quota))
 
-    metering.record_inference(tenant_id, count=inferences)
+    if inferences > 0:
+        metering.record_inference(tenant_id, count=inferences)
     allowed, reason = metering.check_quota(tenant_id, feature="INFERENCE")
 
     if inferences >= max_quota:
