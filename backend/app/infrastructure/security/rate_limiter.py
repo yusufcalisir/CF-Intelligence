@@ -11,10 +11,10 @@ from typing import TYPE_CHECKING
 from slowapi import Limiter
 
 if TYPE_CHECKING:
-    from fastapi import Request
+    from fastapi import Request, WebSocket
 
 
-def get_real_client_ip(request: Request) -> str:
+def get_real_client_ip(request: Request | WebSocket) -> str:
     """Extract real client IP considering trusted reverse proxy headers."""
     forwarded = request.headers.get("x-forwarded-for")
     client_ip = (

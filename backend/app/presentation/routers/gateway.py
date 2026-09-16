@@ -77,7 +77,7 @@ class GatewaySlidingWindowRateLimiter:
             timestamps.append(now)
             self._requests[client_id] = timestamps
             remaining = max_requests - len(timestamps)
-            reset_seconds = int(window_seconds)
+            reset_seconds = window_seconds
             return True, remaining, reset_seconds
 
     def reset(self) -> None:
