@@ -115,7 +115,7 @@ def sign_csr_pem(
             critical=False,
         )
 
-    cert = builder.sign(cast(Any, signing_key), hashes.SHA256())
+    cert = builder.sign(cast("Any", signing_key), hashes.SHA256())
     cert_pem = cert.public_bytes(serialization.Encoding.PEM).decode("utf-8")
     fingerprint = f"SHA256:{cert.fingerprint(hashes.SHA256()).hex()}"
 
