@@ -12,6 +12,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from typing import Any
 
 import redis.asyncio as aioredis
@@ -27,7 +28,8 @@ router = APIRouter()
 
 async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_prod_v2") -> None:
     """Stream training progress events to a WebSocket client."""
-    connected = await training_ws_manager.connect(websocket)
+    room_name = f"simulation:{simulation_id}"
+    connected = await training_ws_manager.connect(websocket, room=room_name)
     if not connected:
         return
     logger.info("WebSocket connected for simulation %s", simulation_id)
@@ -53,6 +55,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             for raw_event in past_events:
                 if isinstance(raw_event, str):
                     await websocket.send_text(raw_event)
+                    training_ws_manager.record_client_activity(websocket)
 
         # Subscribe to live events
         pubsub = redis_client.pubsub()
@@ -68,6 +71,7 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
                 data = message.get("data")
                 if isinstance(data, str):
                     await websocket.send_text(data)
+                    training_ws_manager.record_client_activity(websocket)
 
                     try:
                         event = json.loads(data)
@@ -95,12 +99,31 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             await websocket.send_text(
                 json.dumps({"event": "connected", "status": "idle", "simulation_id": simulation_id})
             )
+            training_ws_manager.record_client_activity(websocket)
             while True:
-                await asyncio.sleep(5.0)
+                try:
+                    inbound = await asyncio.wait_for(websocket.receive_text(), timeout=5.0)
+                    training_ws_manager.record_client_activity(websocket)
+                    if "ping" in inbound.lower():
+                        await websocket.send_text(
+                            json.dumps({"event": "pong", "simulation_id": simulation_id})
+                        )
+                except TimeoutError:
+                    # Send periodic keep-alive heartbeat ping
+                    await websocket.send_text(
+                        json.dumps({
+                            "event": "heartbeat",
+                            "status": "idle",
+                            "simulation_id": simulation_id,
+                            "timestamp": time.time(),
+                        })
+                    )
+        except WebSocketDisconnect:
+            logger.info("Client disconnected from training keep-alive: %s", simulation_id)
         except Exception:
             pass
     finally:
-        await training_ws_manager.disconnect(websocket)
+        await training_ws_manager.disconnect(websocket, room=room_name)
         if redis_client is not None:
             with contextlib.suppress(Exception):
                 await redis_client.aclose()

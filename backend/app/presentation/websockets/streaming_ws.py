@@ -30,7 +30,8 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
     events to the connected client. Also replays any events that
     occurred before the client connected.
     """
-    connected = await streaming_ws_manager.connect(websocket)
+    room_name = f"scenario:{scenario_id}"
+    connected = await streaming_ws_manager.connect(websocket, room=room_name)
     if not connected:
         return
     logger.info("Streaming WebSocket connected: scenario=%s", scenario_id[:8])
@@ -56,6 +57,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
             stored_events = await r.lrange(events_key, 0, -1)
             for raw_event in stored_events:
                 await websocket.send_text(raw_event)
+                streaming_ws_manager.record_client_activity(websocket)
 
             # Subscribe to live events
             pubsub = r.pubsub()
@@ -69,6 +71,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
                 )
                 if message and message["type"] == "message":
                     await websocket.send_text(message["data"])
+                    streaming_ws_manager.record_client_activity(websocket)
 
                 # Send heartbeat every 5 seconds
                 await asyncio.sleep(0.1)
@@ -111,6 +114,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
                             }
                         )
                     )
+                    streaming_ws_manager.record_client_activity(websocket)
                     last_count = current_count
 
                 if status.get("status") in ("completed", "stopped"):
@@ -122,6 +126,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
                             }
                         )
                     )
+                    streaming_ws_manager.record_client_activity(websocket)
                     break
 
                 await asyncio.sleep(0.5)
@@ -131,7 +136,7 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
     except Exception:
         logger.exception("Streaming WebSocket error")
     finally:
-        await streaming_ws_manager.disconnect(websocket)
+        await streaming_ws_manager.disconnect(websocket, room=room_name)
         with contextlib.suppress(Exception):
             await websocket.close()
 
@@ -139,7 +144,8 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
 @router.websocket("/ws/telemetry")
 async def live_telemetry_websocket(websocket: WebSocket) -> None:
     """Stream platform-wide live telemetry, transactions, and fraud alerts."""
-    connected = await global_telemetry_ws_manager.connect(websocket)
+    room_name = "telemetry:global"
+    connected = await global_telemetry_ws_manager.connect(websocket, room=room_name)
     if not connected:
         return
     logger.info("Global telemetry WebSocket connected")
@@ -162,6 +168,7 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
                 }
             )
         )
+        global_telemetry_ws_manager.record_client_activity(websocket)
 
         banks = ["bank_alpha", "bank_beta", "bank_gamma"]
         typologies = [
@@ -174,7 +181,16 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
 
         # Continuous heartbeat and event delivery loop
         while True:
-            await asyncio.sleep(4.0)
+            # Check for inbound client frames or disconnects with timeout
+            try:
+                inbound_data = await asyncio.wait_for(websocket.receive_text(), timeout=4.0)
+                global_telemetry_ws_manager.record_client_activity(websocket)
+                if "ping" in inbound_data.lower():
+                    await websocket.send_text(
+                        json.dumps({"event_type": "PONG", "timestamp": time.time()})
+                    )
+            except TimeoutError:
+                pass
 
             typ, desc, sev, score = random.choice(typologies)
             bank = random.choice(banks)
@@ -196,13 +212,14 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
                 },
             }
             await websocket.send_text(json.dumps(event_payload))
+            global_telemetry_ws_manager.record_client_activity(websocket)
 
     except WebSocketDisconnect:
         logger.info("Global telemetry WebSocket disconnected")
     except Exception:
         logger.exception("Global telemetry WebSocket error")
     finally:
-        await global_telemetry_ws_manager.disconnect(websocket)
+        await global_telemetry_ws_manager.disconnect(websocket, room=room_name)
         with contextlib.suppress(Exception):
             await websocket.close()
 

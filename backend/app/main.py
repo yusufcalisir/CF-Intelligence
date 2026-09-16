@@ -928,7 +928,6 @@ else:
     app.include_router(graph.router)
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
-    app.include_router(streaming_ws.router)
     app.include_router(psd2.router)
     app.include_router(security.router)
     app.include_router(auth.router)
