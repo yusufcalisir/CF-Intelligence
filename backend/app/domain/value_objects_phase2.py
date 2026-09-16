@@ -347,3 +347,32 @@ class GNNExplanationReport:
     subgraph_edges_count: int
     top_contributing_edges: list[EdgeContribution] = field(default_factory=list)
     primary_driver_text: str = ""
+
+
+@dataclass(frozen=True)
+class LIMEFeatureAttribution:
+    """Individual feature attribution from LIME local surrogate linear model."""
+
+    feature: str
+    weight: float  # Surrogate linear regression coefficient
+    value: float  # Instance feature value
+    direction: str  # "INCREASES_RISK" if weight >= 0 else "DECREASES_RISK"
+
+
+@dataclass(frozen=True)
+class LIMEExplanationReport:
+    """LIME (Local Interpretable Model-agnostic Explanations) report.
+
+    Fits an interpretable weighted linear surrogate model g(z) in the local
+    perturbation neighborhood of instance x with exponential kernel weighting:
+        w(z) = exp(-D(x, z)^2 / sigma^2)
+    and L2-regularized Ridge regression.
+    """
+
+    alert_id: str | None
+    intercept: float
+    fidelity_r2: float  # Local surrogate R^2 fidelity score
+    kernel_width: float  # sigma parameter used for distance weighting
+    num_samples: int  # Number of perturbation samples evaluated
+    feature_attributions: list[LIMEFeatureAttribution] = field(default_factory=list)
+    explanation_text: str = ""

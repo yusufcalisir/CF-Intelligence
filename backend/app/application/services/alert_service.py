@@ -609,6 +609,12 @@ class AlertIntelligenceService:
                 return alert
         return None
 
+    def create_alert(self, alert: Alert) -> Alert:
+        """Store an alert directly into the persistent alert store."""
+        with self._lock:
+            self._alert_store.set(alert.id, _alert_to_dict(alert))
+        return alert
+
     def get_alert(self, alert_id: str) -> Alert | None:
         """Fetch alert by ID from store. Zero-mock production lookup."""
         with self._lock:

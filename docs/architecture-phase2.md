@@ -445,6 +445,13 @@ To satisfy strict regulatory requirements ("Right to Explanation" under GDPR Art
 3. **GNNExplainer Subgraph Attribution**:
    - Calculates edge contribution percentages over entity 2-hop neighborhoods via message-passing masking.
    - Highlights specific relationship types (e.g., `SHARES_DEVICE` with known mule account) driving the GraphSAGE risk embedding.
+4. **LIME Local Linear Surrogate (Interpretable Model-Agnostic Explanations)**:
+   - Evaluates local decision surfaces via continuous Gaussian feature perturbations $z \sim \mathcal{N}(x, \sigma^2)$ weighted by an exponential distance kernel $w(z) = \exp(-D(x, z)^2 / \sigma^2)$.
+   - Solves closed-form L2 regularized Ridge regression $\beta = (X_{\mathrm{surr}}^T W X_{\mathrm{surr}} + \lambda I)^{-1} X_{\mathrm{surr}}^T W y$ to extract signed feature attributions and compute surrogate fidelity $R^2$.
+5. **Mathematical Shapley Efficiency & Process-Safe Caching**:
+   - Enforces the efficiency axiom $\sum_{i=1}^M \phi_i = f(x) - \mathbb{E}[f(x)]$ with exact normalization.
+   - Preserves process-wide RNG integrity during KernelSHAP evaluation and protects real-time fast-path caching with `threading.RLock()`.
+
 
 ### 2.7 Production Enterprise Security Suite (mTLS, OIDC, Vault, ABAC, Immutable Audit Chain)
 
@@ -862,8 +869,10 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_streaming_gnn_hardening.py](../backend/tests/unit/test_streaming_gnn_hardening.py) | `streaming_gnn_model`, `flink_graph_streaming`, `streaming_graph_service` | Multi-neighbor index_add_, exponential time decay w(t), Flink burst rate/volume, thread safety, streaming API | 10 | ✅ 100% Pass |
 | [test_elliptic_benchmark_hardening.py](../backend/tests/unit/test_elliptic_benchmark_hardening.py) | `elliptic_benchmark_service` | Real Bitcoin graph parsing, row alignment, genuine PyTorch GraphSAGE training, metrics, concurrency & REST API | 10 | ✅ 100% Pass |
 | [test_advanced_explainability.py](../backend/tests/unit/test_advanced_explainability.py) | `explainability_service` | Counterfactual explanations, deterministic decision replay, GNNExplainer | 6 | ✅ 100% Pass |
+| [test_explainability_hardening.py](../backend/tests/unit/test_explainability_hardening.py) | `explainability_service`, `realtime_explainer` | Shapley efficiency, LIME Ridge surrogate, R^2 fidelity, RNG non-pollution, thread caching & purged mock edges | 10 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **18 Dedicated Suites** | **Collaborative AML Platform Architecture** | **156 Tests** | **100% Pass** |
+| **Total Verified** | **19 Dedicated Suites** | **Collaborative AML Platform Architecture** | **166 Tests** | **100% Pass** |
+
 
 

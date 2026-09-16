@@ -12,19 +12,31 @@ import httpx
 
 from app.infrastructure.cache import get_redis_client
 
+import threading
+
 logger = logging.getLogger(__name__)
 
 
 # Bounded in-memory LRU fallback cache (max 1000 entries) when Redis is unreachable
 _local_shap_cache: OrderedDict[str, str] = OrderedDict()
+_local_cache_lock = threading.RLock()
 _MAX_LOCAL_CACHE_SIZE = 1000
 
 
 def _put_local_cache(key: str, value: str) -> None:
-    _local_shap_cache[key] = value
-    _local_shap_cache.move_to_end(key)
-    while len(_local_shap_cache) > _MAX_LOCAL_CACHE_SIZE:
-        _local_shap_cache.popitem(last=False)
+    with _local_cache_lock:
+        _local_shap_cache[key] = value
+        _local_shap_cache.move_to_end(key)
+        while len(_local_shap_cache) > _MAX_LOCAL_CACHE_SIZE:
+            _local_shap_cache.popitem(last=False)
+
+
+def _get_local_cache(key: str) -> str | None:
+    with _local_cache_lock:
+        val = _local_shap_cache.get(key)
+        if val is not None:
+            _local_shap_cache.move_to_end(key)
+        return val
 
 
 @dataclass
@@ -164,8 +176,9 @@ class FastInferenceExplainer:
         redis_key = f"cfi:shap:{transaction_id}"
 
         # 1. Fast Path: In-memory LRU cache hit
-        if redis_key in _local_shap_cache:
-            data = json.loads(_local_shap_cache[redis_key])
+        cached_local = _get_local_cache(redis_key)
+        if cached_local is not None:
+            data = json.loads(cached_local)
             data["source"] = "LOCAL_CACHE_HIT"
             return data
 

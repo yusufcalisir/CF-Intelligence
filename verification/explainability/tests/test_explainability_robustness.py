@@ -167,10 +167,12 @@ def test_gex11_path_traversal_transaction_id():
 # =====================================================================
 
 def test_gex12_non_existent_gnn_node():
-    """GEX12: Non-existent node_id in explain_gnn_embedding — uses synthetic fallback gracefully."""
+    """GEX12: Non-existent node_id in explain_gnn_embedding — safely returns zero-edge isolated report."""
     gnn_rpt = explainer_service.explain_gnn_embedding("non_existent_node_99999")
     assert gnn_rpt.node_id == "non_existent_node_99999"
-    assert len(gnn_rpt.top_contributing_edges) > 0
+    assert len(gnn_rpt.top_contributing_edges) == 0
+    assert gnn_rpt.subgraph_edges_count == 0
+    assert "Isolated entity" in gnn_rpt.primary_driver_text
 
 
 # =====================================================================

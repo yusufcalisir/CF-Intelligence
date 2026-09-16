@@ -109,14 +109,33 @@ class TestGNNExplainer:
     """Verify GNNExplainer graph attribution over entity neighborhood."""
 
     def test_explain_gnn_embedding_calculates_edge_contributions(self):
-        svc = ExplainabilityService()
+        from app.application.services.graph_engine import GraphEngine
+        from app.domain.entities_phase2 import Entity, Relationship
+        from app.domain.enums import EntityType, RelationshipType
 
+        ge = GraphEngine()
+        ge.register_entity(
+            Entity(id="cust_a1", entity_type=EntityType.CUSTOMER, privacy_id="priv_a1", bank_id="bank_a")
+        )
+        ge.register_entity(
+            Entity(id="dev_x99", entity_type=EntityType.DEVICE, privacy_id="priv_x99", bank_id="bank_a")
+        )
+        ge.add_relationship(
+            Relationship(
+                source_entity_id="cust_a1",
+                target_entity_id="dev_x99",
+                relationship_type=RelationshipType.SHARES_DEVICE,
+            )
+        )
+
+        svc = ExplainabilityService()
         gnn_exp = svc.explain_gnn_embedding("cust_a1")
 
         assert gnn_exp.node_id == "cust_a1"
         assert gnn_exp.subgraph_nodes_count >= 1
         assert len(gnn_exp.top_contributing_edges) >= 1
         assert "Primary GNN Driver" in gnn_exp.primary_driver_text
+        assert gnn_exp.top_contributing_edges[0].target == "dev_x99"
 
         # Verify sum of contribution percentages equals 100%
         total_pct = sum(e.contribution_percentage for e in gnn_exp.top_contributing_edges)

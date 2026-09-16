@@ -24,6 +24,8 @@ from app.domain.value_objects_phase2 import (
     EdgeContribution,
     ExplainabilityReport,
     GNNExplanationReport,
+    LIMEExplanationReport,
+    LIMEFeatureAttribution,
     PolicyRuleEvaluation,
     RiskSignal,
 )
@@ -358,7 +360,6 @@ class ExplainabilityService:
                     return preds
 
                 # Establish a baseline of normal transactions for background reference
-                np.random.seed(42)
                 baseline = np.zeros((30, 10), dtype=np.float32)
                 baseline[:, 0] = np.linspace(0.01, 0.20, 30)  # low amount
                 baseline[:, 1] = np.linspace(0.0, 0.5, 30)   # merchant category
@@ -371,18 +372,29 @@ class ExplainabilityService:
                 baseline[:, 8] = 0.0                          # zero chargebacks
                 baseline[:, 9] = np.linspace(0.20, 1.0, 30)   # moderate to high account age
 
-                explainer = shap.KernelExplainer(predict_fn, baseline)
-                shap_values = explainer.shap_values(input_vector, nsamples=100)
+                # Preserve global numpy RNG state to prevent process-wide seed pollution
+                prev_rng_state = np.random.get_state()
+                try:
+                    np.random.seed(42)
+                    explainer = shap.KernelExplainer(predict_fn, baseline)
+                    shap_values = explainer.shap_values(input_vector, nsamples=100)
+                finally:
+                    np.random.set_state(prev_rng_state)
 
                 # Extract contributions
                 if isinstance(shap_values, list):
-                    shap_vals = np.array(shap_values[0]).flatten()
+                    shap_vals = np.array(shap_values[0], dtype=np.float64).flatten()
                 else:
-                    shap_vals = np.array(shap_values).flatten()
+                    shap_vals = np.array(shap_values, dtype=np.float64).flatten()
 
                 raw_base = explainer.expected_value
                 base_value = float(np.array(raw_base).item()) if hasattr(raw_base, "__iter__") else float(raw_base)
                 model_output = float(predict_fn(input_vector)[0])
+
+                # Enforce Shapley Efficiency Axiom: sum(phi_i) = f(x) - E[f(x)]
+                eff_diff = (model_output - base_value) - float(np.sum(shap_vals))
+                if abs(eff_diff) > 1e-7 and len(shap_vals) > 0:
+                    shap_vals = shap_vals + (eff_diff / len(shap_vals))
 
                 features = []
                 for i, name in enumerate(feature_names):
@@ -416,17 +428,292 @@ class ExplainabilityService:
             "device_type": 0.03,
             "merchant_category": 0.02,
         }
+        base_value = 0.50
+        raw_contribs = {}
         for name, w in feature_weights.items():
             val = txn_dict.get(name, 0.5)
             val = float(val) if isinstance(val, (int, float)) else 0.5
-            contribution = w * (0.5 + 0.5 * min(1.0, val))
+            # Feature contribution reflects directional deviation from normal baseline (0.5)
+            raw_contribs[name] = (w, val, w * (val - 0.5))
+
+        sum_delta = sum(c[2] for c in raw_contribs.values())
+        model_output = round(base_value + sum_delta, 4)
+
+        for name, (w, val, delta) in raw_contribs.items():
             features.append({
                 "feature": name,
-                "contribution": round(contribution, 4),
+                "contribution": round(delta, 4),
+                "value": round(val, 4),
+                "raw_value": round(val, 4),
                 "explanation_method": "fallback_heuristic",
-                "base_value": 0.5,
+                "base_value": base_value,
+                "model_output": model_output,
             })
-        return sorted(features, key=lambda f: f["contribution"], reverse=True)
+        return sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
+
+    def compute_lime_explanation(
+        self,
+        alert: Alert | None = None,
+        transaction: dict | None = None,
+        kernel_width: float = 0.75,
+        num_samples: int = 100,
+        l2_reg: float = 1.0,
+        seed: int = 42,
+    ) -> LIMEExplanationReport:
+        """Compute LIME (Local Interpretable Model-agnostic Explanations) surrogate model.
+
+        Generates local Gaussian perturbations around instance x, weights each
+        perturbed sample using an exponential Euclidean distance kernel:
+            w(z) = exp(-||x - z||^2 / sigma^2)
+        and solves an L2-regularized weighted linear regression (Ridge surrogate):
+            min_w sum_k w_k (f(z_k) - (w_0 + w^T z_k))^2 + lambda ||w||^2
+
+        Returns local surrogate fidelity (R^2) and directional feature coefficients.
+        """
+        import numpy as np
+
+        feature_names = [
+            "transaction_amount",
+            "merchant_category",
+            "country_code",
+            "device_type",
+            "velocity",
+            "hour_of_day",
+            "merchant_risk_score",
+            "customer_history_score",
+            "chargeback_count",
+            "account_age_days",
+        ]
+
+        # 1. Resolve transaction features
+        if transaction:
+            working_txn = transaction.copy()
+        elif alert:
+            top_feat_dict = {
+                f.get("feature"): f.get("contribution")
+                for f in (alert.top_features or [])
+                if isinstance(f, dict)
+            }
+            orig_score = alert.risk_score
+            has_high_amt = (
+                "HIGH-AMT" in alert.reason_codes
+                or orig_score > 600
+                or "transaction_amount" in top_feat_dict
+            )
+            has_geo = "GEO-RISK" in alert.reason_codes or "country_code" in top_feat_dict
+            has_vel = "VEL-001" in alert.reason_codes or "velocity" in top_feat_dict
+            has_merch = "MERCH-RISK" in alert.reason_codes or "merchant_category" in top_feat_dict
+
+            working_txn = {
+                "transaction_amount": 4500.0 if has_high_amt else 150.0,
+                "country_code": "KP" if has_geo else "US",
+                "velocity": 12.0 if has_vel else 1.0,
+                "merchant_category": "gambling" if has_merch else "retail",
+                "device_type": "phone_banking" if orig_score > 700 else "web_browser",
+                "customer_history_score": 0.35 if orig_score > 600 else 0.85,
+                "merchant_risk_score": 0.85 if has_merch else 0.10,
+                "account_age_days": 20 if orig_score > 650 else 365,
+                "hour_of_day": 3.0 if "ODD-HOUR" in alert.reason_codes else 14.0,
+                "chargeback_count": 2.0 if "CB-HIST" in alert.reason_codes else 0.0,
+            }
+        else:
+            working_txn = {}
+
+        # 2. Extract and normalize feature vector to [0, 1]
+        countries = ["US", "GB", "DE", "FR", "CA", "KP", "IR", "SY", "RU"]
+        merchants = ["retail", "grocery", "travel", "electronics", "gambling", "crypto", "wire"]
+        devices = [
+            "mobile_ios",
+            "mobile_android",
+            "web_browser",
+            "pos_terminal",
+            "atm",
+            "api_gateway",
+            "phone_banking",
+        ]
+
+        x_vals: list[float] = []
+        for name in feature_names:
+            val = working_txn.get(name, 0.5)
+            if name == "country_code":
+                idx = countries.index(val) if val in countries else len(countries) - 1
+                norm_val = idx / (len(countries) - 1)
+            elif name == "merchant_category":
+                idx = merchants.index(val) if val in merchants else len(merchants) - 1
+                norm_val = idx / (len(merchants) - 1)
+            elif name == "device_type":
+                idx = devices.index(val) if val in devices else len(devices) - 1
+                norm_val = idx / (len(devices) - 1)
+            elif name == "transaction_amount":
+                norm_val = min(1.0, max(0.0, float(val) / 10000.0))
+            elif name == "account_age_days":
+                norm_val = min(1.0, max(0.0, float(val) / 365.0))
+            elif name == "velocity":
+                norm_val = min(1.0, max(0.0, float(val) / 20.0))
+            elif name == "hour_of_day":
+                norm_val = min(1.0, max(0.0, float(val) / 23.0))
+            elif name == "chargeback_count":
+                norm_val = min(1.0, max(0.0, float(val) / 10.0))
+            else:
+                try:
+                    norm_val = min(1.0, max(0.0, float(val)))
+                except (ValueError, TypeError):
+                    norm_val = 0.5
+            x_vals.append(float(norm_val))
+
+        x_0 = np.array(x_vals, dtype=np.float64)  # Shape: (10,)
+        p = len(x_0)
+
+        # 3. Model predict function
+        import os
+        import torch
+        from app.infrastructure.storage.storage_utils import get_storage_dir
+
+        model_dir = get_storage_dir()
+        model_path = os.path.join(model_dir, "global_model.pt")
+        model = None
+        if os.path.exists(model_path):
+            try:
+                from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel
+
+                state_dict = torch.load(
+                    model_path, map_location=torch.device("cpu"), weights_only=True
+                )
+                input_dim = NUM_FEATURES
+                for weight_key in ("network.0.weight", "module.network.0.weight"):
+                    if (
+                        weight_key in state_dict
+                        and hasattr(state_dict[weight_key], "shape")
+                        and len(state_dict[weight_key].shape) >= 2
+                    ):
+                        input_dim = int(state_dict[weight_key].shape[1])
+                        break
+                model = FraudDetectionModel(input_dim=input_dim)
+                model.load_state_dict(state_dict)
+                model.eval()
+            except Exception as e:
+                logger.warning("Failed to load saved model for LIME: %s", e)
+                model = None
+
+        if not model:
+            try:
+                from app.application.services.model_service import FraudDetectionModel
+
+                model = FraudDetectionModel()
+                model.eval()
+            except Exception as e:
+                logger.warning("Failed to initialize FraudDetectionModel for LIME: %s", e)
+
+        def predict_fn(X_mat: np.ndarray) -> np.ndarray:
+            if model is not None:
+                tensor_x = torch.tensor(X_mat, dtype=torch.float32)
+                if hasattr(model, "network") and len(model.network) > 0:
+                    first_layer = model.network[0]
+                    in_feats = getattr(first_layer, "in_features", None)
+                    if isinstance(in_feats, int):
+                        curr_dim = tensor_x.shape[1]
+                        if curr_dim < in_feats:
+                            tensor_x = torch.nn.functional.pad(
+                                tensor_x, (0, in_feats - curr_dim), value=0.0
+                            )
+                        elif curr_dim > in_feats:
+                            tensor_x = tensor_x[:, :in_feats]
+                with torch.no_grad():
+                    return model(tensor_x).cpu().numpy().reshape(-1)
+            else:
+                weights_vec = np.array(
+                    [0.22, 0.10, 0.12, 0.04, 0.18, 0.08, 0.14, -0.15, 0.12, -0.09],
+                    dtype=np.float64,
+                )
+                return np.clip(0.3 + X_mat @ weights_vec, 0.0, 1.0)
+
+        # 4. Generate local perturbations using local RNG
+        rng = np.random.default_rng(seed)
+        num_samples = max(20, min(1000, num_samples))
+        Z = np.zeros((num_samples, p), dtype=np.float64)
+        Z[0, :] = x_0  # First row is the original instance
+        perturbations = rng.normal(0.0, 0.15, size=(num_samples - 1, p))
+        Z[1:, :] = np.clip(x_0 + perturbations, 0.0, 1.0)
+
+        # 5. Evaluate black-box model predictions on perturbations
+        y = predict_fn(Z)  # Shape: (N,)
+
+        # 6. Calculate Euclidean distances and exponential kernel weights
+        diffs = Z - x_0
+        distances = np.linalg.norm(diffs, axis=1)  # Shape: (N,)
+        sigma = max(0.05, float(kernel_width))
+        weights = np.exp(-(distances ** 2) / (sigma ** 2))  # Shape: (N,)
+
+        # 7. Fit weighted Ridge linear surrogate model: g(z) = beta_0 + beta^T z
+        X_surr = np.hstack([np.ones((num_samples, 1), dtype=np.float64), Z])  # (N, p+1)
+        W = np.diag(weights)  # (N, N)
+
+        # Ridge penalty matrix: zero for intercept, lambda for feature slopes
+        gamma = np.zeros(p + 1, dtype=np.float64)
+        gamma[1:] = float(l2_reg)
+        Lambda = np.diag(gamma)
+
+        # Closed-form Ridge: (X^T W X + Lambda) beta = X^T W y
+        A = X_surr.T @ W @ X_surr + Lambda
+        b = X_surr.T @ W @ y
+
+        try:
+            beta = np.linalg.solve(A, b)
+        except np.linalg.LinAlgError:
+            beta, _, _, _ = np.linalg.lstsq(A, b, rcond=None)
+
+        intercept = float(beta[0])
+        slopes = beta[1:]
+
+        # 8. Compute weighted R^2 fidelity score
+        y_pred = X_surr @ beta
+        w_sum = np.sum(weights)
+        y_w_mean = np.sum(weights * y) / w_sum if w_sum > 0 else np.mean(y)
+        tss = np.sum(weights * ((y - y_w_mean) ** 2))
+        rss = np.sum(weights * ((y - y_pred) ** 2))
+        fidelity_r2 = float(max(0.0, min(1.0, 1.0 - (rss / (tss + 1e-9)))))
+
+        # 9. Format feature attributions
+        attributions: list[LIMEFeatureAttribution] = []
+        for i, name in enumerate(feature_names):
+            w_coeff = float(slopes[i])
+            attributions.append(
+                LIMEFeatureAttribution(
+                    feature=name,
+                    weight=round(w_coeff, 4),
+                    value=round(float(x_0[i]), 4),
+                    direction="INCREASES_RISK" if w_coeff >= 0 else "DECREASES_RISK",
+                )
+            )
+
+        attributions.sort(key=lambda a: abs(a.weight), reverse=True)
+
+        top1 = attributions[0] if len(attributions) > 0 else None
+        top2 = attributions[1] if len(attributions) > 1 else None
+        top_summary = (
+            f"Top risk driver: {top1.feature} ({top1.direction}, weight {top1.weight:+.3f})"
+            if top1
+            else "No dominant risk driver."
+        )
+        if top2:
+            top_summary += (
+                f", followed by {top2.feature} ({top2.direction}, weight {top2.weight:+.3f})."
+            )
+
+        explanation_text = (
+            f"LIME local surrogate explanation (fidelity R²={fidelity_r2:.3f}, kernel width={sigma:.2f}): "
+            f"{top_summary} Local linear model intercept: {intercept:.3f}."
+        )
+
+        return LIMEExplanationReport(
+            alert_id=alert.id if alert else None,
+            intercept=round(intercept, 4),
+            fidelity_r2=round(fidelity_r2, 4),
+            kernel_width=round(sigma, 4),
+            num_samples=num_samples,
+            feature_attributions=attributions,
+            explanation_text=explanation_text,
+        )
 
     def generate_counterfactuals(
         self,
@@ -720,30 +1007,9 @@ class ExplainabilityService:
                     )
                 )
         else:
-            # Fallback synthetic graph attribution for standalone nodes
-            contributions = [
-                EdgeContribution(
-                    source=node_id,
-                    target="mule_account_8912",
-                    relationship_type="shares_device",
-                    weight=0.82,
-                    contribution_percentage=54.6,
-                ),
-                EdgeContribution(
-                    source=node_id,
-                    target="suspicious_ip_192.168.4.12",
-                    relationship_type="shares_ip",
-                    weight=0.45,
-                    contribution_percentage=30.0,
-                ),
-                EdgeContribution(
-                    source=node_id,
-                    target="linked_alert_alt_401",
-                    relationship_type="linked_alert",
-                    weight=0.23,
-                    contribution_percentage=15.4,
-                ),
-            ]
+            # Standalone or isolated node with no graph edges:
+            # Honest zero-mock attribution reporting empty edges without synthetic artifacts
+            contributions = []
 
         # Normalize percentages to sum to 100%
         tot_pct = sum(c.contribution_percentage for c in contributions)
@@ -764,14 +1030,14 @@ class ExplainabilityService:
             f"Primary GNN Driver: {top_driver.relationship_type.upper().replace('_', ' ')} edge with {top_driver.target[:12]} "
             f"contributed {top_driver.contribution_percentage}% to the GraphSAGE risk embedding."
             if top_driver
-            else "Primary GNN Driver: Neighborhood aggregation over connected entity graph."
+            else "Primary GNN Driver: Isolated entity with 0 graph neighbors; risk driven purely by local transaction features."
         )
 
         return GNNExplanationReport(
             node_id=node_id,
-            target_risk_level="HIGH",
-            subgraph_nodes_count=len(subgraph.nodes) or len(neighbors) + 1,
-            subgraph_edges_count=len(subgraph.edges) or len(contributions),
+            target_risk_level="HIGH" if contributions else "LOW",
+            subgraph_nodes_count=len(subgraph.nodes) or (len(neighbors) + 1 if neighbors else 1),
+            subgraph_edges_count=len(subgraph.edges),
             top_contributing_edges=contributions,
             primary_driver_text=driver_text,
         )

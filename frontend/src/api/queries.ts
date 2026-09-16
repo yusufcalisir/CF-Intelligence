@@ -37,6 +37,7 @@ import type {
 
   DecisionReplayReport,
   GNNExplanationReport,
+  LIMEExplanationReport,
   SecurityStatus,
   ABACEvalRequest,
   ABACEvalResponse,
@@ -707,6 +708,23 @@ export function useAlertGNNExplanation(alertId: string | undefined) {
     queryKey: ['alert-gnn-explanation', alertId],
     queryFn: async () => {
       const { data } = await apiClient.get(`/api/v1/alerts/${alertId}/gnn-explanation`);
+      return data;
+    },
+    enabled: !!alertId,
+  });
+}
+
+export function useAlertLIMEExplanation(
+  alertId: string | undefined,
+  kernelWidth: number = 0.75,
+  numSamples: number = 100
+) {
+  return useQuery<LIMEExplanationReport>({
+    queryKey: ['alert-lime-explanation', alertId, kernelWidth, numSamples],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/alerts/${alertId}/lime-explanation`, {
+        params: { kernel_width: kernelWidth, num_samples: numSamples },
+      });
       return data;
     },
     enabled: !!alertId,

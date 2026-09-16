@@ -919,6 +919,24 @@ class GNNExplanationResponse(BaseModel):
     primary_driver_text: str = ""
 
 
+class LIMEFeatureAttributionSchema(BaseModel):
+    feature: str
+    weight: float
+    value: float
+    direction: str
+
+
+class LIMEExplanationResponse(BaseModel):
+    alert_id: str | None = None
+    transaction_id: str | None = None
+    intercept: float
+    fidelity_r2: float
+    kernel_width: float
+    num_samples: int
+    feature_attributions: list[LIMEFeatureAttributionSchema] = []
+    explanation_text: str = ""
+
+
 # ── Real Dataset Ingestion Studio Schemas ─────────
 
 

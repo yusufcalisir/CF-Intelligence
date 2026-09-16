@@ -773,6 +773,24 @@ export interface GNNExplanationReport {
   primary_driver_text: string;
 }
 
+export interface LIMEFeatureAttribution {
+  feature: string;
+  weight: number;
+  value: number;
+  direction: 'INCREASES_RISK' | 'DECREASES_RISK';
+}
+
+export interface LIMEExplanationReport {
+  alert_id?: string;
+  transaction_id?: string;
+  intercept: number;
+  fidelity_r2: number;
+  kernel_width: number;
+  num_samples: number;
+  feature_attributions: LIMEFeatureAttribution[];
+  explanation_text: string;
+}
+
 export interface SecurityStatus {
   mtls: {
     enabled: boolean;

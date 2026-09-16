@@ -154,7 +154,27 @@ def test_inv3_feature_contribution_array_properties(amount: float, velocity: flo
 @settings(deadline=None, max_examples=50)
 def test_inv4_gnn_edge_percentage_sum_invariant(node_suffix: int):
     """Invariant 4: Edge contribution percentages sum to exactly 100.0%."""
+    from app.application.services.graph_engine import GraphEngine
+    from app.domain.entities_phase2 import Entity, Relationship
+    from app.domain.enums import EntityType, RelationshipType
+
     node_id = f"entity_node_{node_suffix}"
+    neighbor_id = f"neighbor_dev_{node_suffix}"
+    ge = GraphEngine()
+    ge.register_entity(
+        Entity(id=node_id, entity_type=EntityType.CUSTOMER, privacy_id=f"p_{node_suffix}", bank_id="b1")
+    )
+    ge.register_entity(
+        Entity(id=neighbor_id, entity_type=EntityType.DEVICE, privacy_id=f"pd_{node_suffix}", bank_id="b1")
+    )
+    ge.add_relationship(
+        Relationship(
+            source_entity_id=node_id,
+            target_entity_id=neighbor_id,
+            relationship_type=RelationshipType.SHARES_DEVICE,
+        )
+    )
+
     gnn_rpt = explainer_service.explain_gnn_embedding(node_id)
 
     assert len(gnn_rpt.top_contributing_edges) > 0, "GNN explanation must return top edges"

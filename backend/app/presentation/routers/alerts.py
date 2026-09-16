@@ -23,6 +23,8 @@ from app.application.schemas.phase2 import (
     ExplainabilityResponse,
     GNNExplanationResponse,
     IntelligenceStatsResponse,
+    LIMEExplanationResponse,
+    LIMEFeatureAttributionSchema,
     PolicyRuleEvaluationSchema,
     SharedIntelligenceResponse,
 )
@@ -425,5 +427,87 @@ async def get_alert_gnn_explanation(
             for e in gnn_exp.top_contributing_edges
         ],
         primary_driver_text=gnn_exp.primary_driver_text,
+    )
+
+
+@router.get("/alerts/{alert_id}/lime-explanation", response_model=LIMEExplanationResponse)
+async def get_alert_lime_explanation(
+    alert_id: str,
+    kernel_width: float = Query(0.75, ge=0.05, le=5.0),
+    num_samples: int = Query(100, ge=20, le=1000),
+    caller_tenant: TenantDep = None,
+) -> LIMEExplanationResponse:
+    """Compute LIME local linear surrogate explanation with exponential kernel weighting."""
+    alert = _alert_service.get_alert(alert_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
+    lime_report = _explainability_service.compute_lime_explanation(
+        alert=alert,
+        kernel_width=kernel_width,
+        num_samples=num_samples,
+    )
+
+    return LIMEExplanationResponse(
+        alert_id=lime_report.alert_id,
+        transaction_id=alert.transaction_id,
+        intercept=lime_report.intercept,
+        fidelity_r2=lime_report.fidelity_r2,
+        kernel_width=lime_report.kernel_width,
+        num_samples=lime_report.num_samples,
+        feature_attributions=[
+            LIMEFeatureAttributionSchema(
+                feature=a.feature,
+                weight=a.weight,
+                value=a.value,
+                direction=a.direction,
+            )
+            for a in lime_report.feature_attributions
+        ],
+        explanation_text=lime_report.explanation_text,
+    )
+
+
+@router.get("/explanation/{transaction_id}/lime", response_model=LIMEExplanationResponse)
+async def get_transaction_lime_explanation(
+    transaction_id: str,
+    kernel_width: float = Query(0.75, ge=0.05, le=5.0),
+    num_samples: int = Query(100, ge=20, le=1000),
+    caller_tenant: TenantDep = None,
+) -> LIMEExplanationResponse:
+    """Compute LIME local linear surrogate explanation for an alert by transaction ID."""
+    alert = _alert_service.get_alert_by_transaction_id(transaction_id)
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found for this transaction ID")
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
+    lime_report = _explainability_service.compute_lime_explanation(
+        alert=alert,
+        kernel_width=kernel_width,
+        num_samples=num_samples,
+    )
+
+    return LIMEExplanationResponse(
+        alert_id=lime_report.alert_id,
+        transaction_id=alert.transaction_id,
+        intercept=lime_report.intercept,
+        fidelity_r2=lime_report.fidelity_r2,
+        kernel_width=lime_report.kernel_width,
+        num_samples=lime_report.num_samples,
+        feature_attributions=[
+            LIMEFeatureAttributionSchema(
+                feature=a.feature,
+                weight=a.weight,
+                value=a.value,
+                direction=a.direction,
+            )
+            for a in lime_report.feature_attributions
+        ],
+        explanation_text=lime_report.explanation_text,
     )
 
