@@ -25,6 +25,7 @@ from app.application.schemas.simulation import (
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.rate_limiter import limiter
+from app.presentation.websockets.manager import training_ws_manager
 
 logger = logging.getLogger(__name__)
 
@@ -401,7 +402,15 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
             event_envelope = {"event_type": event_type, "data": data}
             _simulation_events.push_list(simulation_id, event_envelope)
 
-            # Publish to Redis pub/sub and list for WebSocket streaming consumers
+            # Always broadcast in-process so clients receive events without Redis
+            training_ws_manager.broadcast_to_room_sync(
+                f"simulation:{simulation_id}", event_envelope
+            )
+            training_ws_manager.broadcast_to_room_sync(
+                "simulation:live_prod_v2", event_envelope
+            )
+
+            # Also publish to Redis pub/sub when available (primary path)
             c = _simulation_events.client
             if c:
                 try:

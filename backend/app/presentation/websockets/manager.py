@@ -3,11 +3,19 @@
 Manages active client lifecycles, capacity boundaries, tenant and room-scoped
 multiplexing, asynchronous multi-client fanout with per-client timeouts,
 heartbeat liveness validation, rate-limiting, and graceful dead-connection eviction.
+
+Dual-Path In-Process Event Dispatcher (Phase 70)
+-------------------------------------------------
+Every room maintains a bounded ring-buffer of the last ``ROOM_HISTORY_LIMIT``
+events so newly connected clients can replay history without Redis.  Background
+threads (simulation engine) may call ``broadcast_to_room_sync`` which schedules
+the coroutine into the running event-loop via ``run_coroutine_threadsafe``.
 """
 
 from __future__ import annotations
 
 import asyncio
+import collections
 import contextlib
 import json
 import logging
@@ -16,6 +24,9 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from fastapi import WebSocket
+
+# Maximum history events kept per room for late-joining clients (no Redis needed)
+ROOM_HISTORY_LIMIT: int = 200
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +50,16 @@ class WebSocketConnectionManager:
         self._client_last_seen: dict[WebSocket, float] = {}
         self._inbound_counters: dict[WebSocket, list[float]] = {}
 
+        # In-process event history ring-buffers keyed by room name.
+        # Allows late-joining clients to replay past events without Redis.
+        self._room_history: dict[str, collections.deque[str]] = {}
+
         self._lock = asyncio.Lock()
         self._total_broadcast_count: int = 0
         self._dropped_client_count: int = 0
+        # The running asyncio event-loop, stored on first access so background
+        # threads can schedule coroutines via run_coroutine_threadsafe.
+        self._event_loop: asyncio.AbstractEventLoop | None = None
 
     async def connect(self, websocket: WebSocket, room: str | None = None) -> bool:
         """Accepts connection if within capacity limit, registers room, else closes with 1013."""
@@ -215,12 +233,80 @@ class WebSocketConnectionManager:
         return await self._fanout_send(clients, msg_str)
 
     async def broadcast_to_room(self, room: str, message: dict[str, Any] | str) -> dict[str, int]:
-        """Broadcasts a payload exclusively to clients subscribed to the specified room or tenant."""
+        """Broadcasts a payload exclusively to clients subscribed to the specified room or tenant.
+
+        Also appends the serialised message to the in-process history ring-buffer
+        so late-joining clients can replay past events without Redis.
+        """
         msg_str = json.dumps(message, default=str) if isinstance(message, dict) else message
+
+        # Persist to in-process history ring-buffer (thread-safe via lock)
         async with self._lock:
+            buf = self._room_history.setdefault(
+                room, collections.deque(maxlen=ROOM_HISTORY_LIMIT)
+            )
+            buf.append(msg_str)
             clients = list(self._rooms.get(room, set()))
 
         return await self._fanout_send(clients, msg_str)
+
+    async def _deliver_to_room(self, room: str, msg_str: str) -> dict[str, int]:
+        """Internal: fanout delivery to room clients WITHOUT writing to the ring-buffer.
+
+        Used by broadcast_to_room_sync after it has already eagerly written to
+        the ring-buffer, to avoid double-counting history entries.
+        """
+        async with self._lock:
+            clients = list(self._rooms.get(room, set()))
+        return await self._fanout_send(clients, msg_str)
+
+    def broadcast_to_room_sync(
+        self,
+        room: str,
+        message: dict[str, Any] | str,
+    ) -> None:
+        """Thread-safe fire-and-forget bridge for background threads.
+
+        Eagerly appends to the in-process ring-buffer so the history is available
+        immediately (even before the coroutine runs), then schedules fanout delivery
+        to connected clients via ``_deliver_to_room`` (which does NOT write to the
+        ring-buffer again, preventing double-counting).
+        """
+        msg_str = json.dumps(message, default=str) if isinstance(message, dict) else message
+
+        # Eagerly update the history ring-buffer from the calling thread.
+        # The deque is thread-safe for appends so no lock is needed here.
+        buf = self._room_history.setdefault(room, collections.deque(maxlen=ROOM_HISTORY_LIMIT))
+        buf.append(msg_str)
+
+        loop = self._event_loop
+        if loop is None or not loop.is_running():
+            # No event loop available yet — history is preserved, delivery skipped.
+            logger.debug(
+                "broadcast_to_room_sync: no running event loop for room %s; event buffered only",
+                room,
+            )
+            return
+        # Schedule delivery only (ring-buffer already written above)
+        asyncio.run_coroutine_threadsafe(
+            self._deliver_to_room(room, msg_str),
+            loop,
+        )
+
+    def get_room_history(self, room: str) -> list[str]:
+        """Returns a snapshot of serialised past events for the given room.
+
+        Used by WebSocket handlers to replay history to late-joining clients
+        when Redis is unavailable.
+        """
+        buf = self._room_history.get(room)
+        if buf is None:
+            return []
+        return list(buf)
+
+    def register_event_loop(self, loop: asyncio.AbstractEventLoop) -> None:
+        """Register the asyncio event loop so background threads can schedule coroutines."""
+        self._event_loop = loop
 
     async def send_heartbeat(self, ping_payload: dict[str, Any] | None = None) -> dict[str, int]:
         """Actively pings all connected sockets and evicts dead/unresponsive sockets."""
