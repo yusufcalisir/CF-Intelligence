@@ -1,4 +1,4 @@
-"""Phase 70 — Dual-Path In-Process Event Dispatcher unit tests.
+"""Unit tests for WebSocketConnectionManager in-process event dispatcher.
 
 Verifies:
 - In-process ring-buffer accumulates events on broadcast_to_room
@@ -8,7 +8,7 @@ Verifies:
 - get_room_history returns correct snapshot for late-joining clients
 - Room isolation: ring-buffer events are keyed per room, not cross-contaminated
 - register_event_loop stores the loop reference correctly
-- Training WebSocket fallback path sends connected event + replays history
+- WebSocket fallback path replays buffered history to newly connected clients
 """
 
 from __future__ import annotations
