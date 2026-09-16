@@ -26,6 +26,7 @@ import contextlib
 import contextvars
 import logging
 import os
+import secrets
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -311,33 +312,53 @@ class TenantContextMiddleware(BaseHTTPMiddleware):
                 active_tenant.reset(token_reset)
 
 
+def is_retryable_db_error(err: Exception) -> bool:
+    """Check if a database error represents a transient concurrency conflict.
+
+    Recognizes:
+      - PostgreSQL / CockroachDB SQLSTATE Class 40 (40001 serialization_failure, 40P01 deadlock_detected)
+      - SQLite lock contention ("database is locked", "database table is locked")
+    """
+    if isinstance(err, DBAPIError):
+        orig = getattr(err, "orig", None)
+        if orig:
+            pgcode = getattr(orig, "pgcode", None)
+            if pgcode and str(pgcode).startswith("40"):
+                return True
+            orig_msg = str(orig).lower()
+            if "database is locked" in orig_msg or "locked" in orig_msg:
+                return True
+    err_str = str(err).lower()
+    return any(term in err_str for term in ("40001", "40p01", "serialization_failure", "database is locked", "deadlock"))
+
+
 async def run_cockroach_transaction(
     session_factory: async_sessionmaker[AsyncSession],
     callback: Callable[[AsyncSession], Coroutine[Any, Any, Any]],
     max_retries: int = 5,
+    base_backoff_sec: float = 0.02,
 ) -> Any:
-    """Execute a database transaction block with CockroachDB serializable isolation conflict retry loops.
+    """Execute a database transaction block with CockroachDB/PostgreSQL/SQLite serializable conflict retry loops.
 
-    Saves state by handling SQLSTATE 40001 (serialization_failure) and transparently retrying.
+    Handles SQLSTATE Class 40 (40001 serialization_failure, 40P01 deadlock_detected) and SQLite lock contention
+    with exponential jittered backoff.
     """
     for attempt in range(max_retries):
         async with session_factory() as session, session.begin():
             try:
                 return await callback(session)
-            except DBAPIError as err:
-                # SQLSTATE 40001 represents a retryable transaction failure in CockroachDB/PostgreSQL
-                if (
-                    err.orig
-                    and hasattr(err.orig, "pgcode")
-                    and err.orig.pgcode == "40001"
-                    and attempt < max_retries - 1
-                ):
+            except Exception as err:
+                if is_retryable_db_error(err) and attempt < max_retries - 1:
+                    jitter = (secrets.randbelow(100) / 10000.0) if attempt > 0 else 0.001
+                    backoff = min(0.5, base_backoff_sec * (2**attempt)) + jitter
                     logger.warning(
-                        "CockroachDB serializable transaction conflict (40001) detected. "
-                        "Retrying transaction attempt %d/%d...",
+                        "Database concurrency conflict detected (%s). Retrying transaction attempt %d/%d after %.3fs...",
+                        err,
                         attempt + 1,
                         max_retries,
+                        backoff,
                     )
+                    await asyncio.sleep(backoff)
                     continue
                 raise
 

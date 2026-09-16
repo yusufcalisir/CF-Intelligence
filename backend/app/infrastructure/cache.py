@@ -23,9 +23,16 @@ Key naming convention:
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import json
 import logging
-from typing import Any
+import secrets
+import time
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 import redis.asyncio as aioredis
 
@@ -269,6 +276,88 @@ class CacheService:
         """Invalidates a cached tenant resource."""
         key = self.get_tenant_key(tenant_id, resource_key)
         await self._delete(key)
+
+    # ── Distributed Concurrency Locking ────────────────────────────────
+    _in_memory_locks: dict[str, asyncio.Lock] = {}
+    _in_memory_meta_lock: asyncio.Lock = asyncio.Lock()
+
+    @contextlib.asynccontextmanager
+    async def distributed_lock(
+        self,
+        resource: str,
+        ttl_seconds: int = 30,
+        timeout_seconds: float = 5.0,
+        retry_interval_sec: float = 0.05,
+    ) -> AsyncGenerator[bool, None]:
+        """Async context manager providing atomic distributed locking with token verification.
+
+        If Redis is available:
+          - Atomically acquires lock: ``SET lock:<resource> <token> NX EX <ttl_seconds>``
+          - Releases lock atomically via Lua script verifying token match:
+            ``if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end``
+        If Redis is unavailable (or in-process testing fallback):
+          - Coordinates via local in-memory asyncio.Lock registry with timeout protection.
+
+        Yields True if lock was acquired within timeout_seconds, False otherwise.
+        """
+        c = self.client
+        clean_res = resource.strip(":")
+        lock_key = f"lock:{clean_res}"
+
+        if c is not None:
+            token = secrets.token_hex(16)
+            acquired = False
+            start_time = time.monotonic()
+            redis_failed = False
+            while time.monotonic() - start_time < timeout_seconds:
+                try:
+                    ok = await c.set(lock_key, token, nx=True, ex=ttl_seconds)
+                    if ok:
+                        acquired = True
+                        break
+                except Exception as exc:
+                    logger.debug("Redis distributed lock error key=%s: %s — falling back to in-memory lock", lock_key, exc)
+                    self.__class__._unavailable = True
+                    redis_failed = True
+                    break
+                await asyncio.sleep(retry_interval_sec)
+
+            if not redis_failed:
+                try:
+                    yield acquired
+                finally:
+                    if acquired:
+                        lua_release = """
+                        if redis.call("get", KEYS[1]) == ARGV[1] then
+                            return redis.call("del", KEYS[1])
+                        else
+                            return 0
+                        end
+                        """
+                        try:
+                            await c.eval(lua_release, 1, lock_key, token)
+                        except Exception as exc:
+                            logger.debug("Redis distributed unlock error key=%s: %s", lock_key, exc)
+                return
+
+        # In-memory fallback (when Redis is unavailable, disabled, or throws connection error)
+        async with self._in_memory_meta_lock:
+            if clean_res not in self._in_memory_locks:
+                self._in_memory_locks[clean_res] = asyncio.Lock()
+            mem_lock = self._in_memory_locks[clean_res]
+
+        acquired = False
+        try:
+            await asyncio.wait_for(mem_lock.acquire(), timeout=timeout_seconds)
+            acquired = True
+        except TimeoutError:
+            acquired = False
+
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                mem_lock.release()
 
     # ── Health ─────────────────────────────────────────────────────────
 

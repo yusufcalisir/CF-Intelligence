@@ -101,6 +101,12 @@ def upgrade() -> None:
         sa.Column("risk_factors", sa.JSON, nullable=False, server_default="[]"),
         sa.Column("model_confidence", sa.Float, nullable=False, server_default="0.0"),
         sa.Column("historical_evidence", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("triage_priority", sa.String(20), nullable=False, server_default="p3_medium"),
+        sa.Column("triage_action", sa.String(32), nullable=False, server_default="queue_standard"),
+        sa.Column("sla_minutes", sa.Integer, nullable=False, server_default="1440"),
+        sa.Column("triage_reasons", sa.JSON, nullable=False, server_default="[]"),
+        sa.Column("dedup_key", sa.String(64), nullable=True),
+        sa.Column("dedup_count", sa.Integer, nullable=False, server_default="1"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=True),
     )
