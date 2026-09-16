@@ -68,6 +68,13 @@ import type {
   CopilotDirectGenerationRequest,
   CopilotQueryRequest,
   CopilotQueryResponse,
+  AnalystFeedbackIngestRequest,
+  AnalystFeedbackIngestResponse,
+  FeedbackStatsResponse,
+  RetrainingBatchRequest,
+  RetrainingBatchResponse,
+  DPGradientRequest,
+  DPGradientResponse,
 } from './types';
 
 
@@ -1177,6 +1184,66 @@ export function useDirectGenerateSAR() {
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<CopilotQueryResponse>(
         '/api/v1/copilot/generate-sar',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+// ── Phase 63: Label Feedback Loop & Retraining Store ────────
+export function useFeedbackStats(tenantId: string | undefined) {
+  return useQuery<FeedbackStatsResponse>({
+    queryKey: ['feedback-stats', tenantId],
+    queryFn: async () => {
+      const target = tenantId || 'bank_alpha';
+      const { data } = await apiClient.get<FeedbackStatsResponse>(`/api/v1/feedback/stats/${target}`);
+      return data;
+    },
+    enabled: !!tenantId,
+    refetchInterval: 10000,
+  });
+}
+
+export function useIngestFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation<AnalystFeedbackIngestResponse, Error, AnalystFeedbackIngestRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<AnalystFeedbackIngestResponse>(
+        '/api/v1/feedback/ingest',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['feedback-stats', variables.tenant_id || 'bank_alpha'] });
+    },
+  });
+}
+
+export function useSampleRetrainingBatch() {
+  const queryClient = useQueryClient();
+  return useMutation<RetrainingBatchResponse, Error, RetrainingBatchRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<RetrainingBatchResponse>(
+        '/api/v1/feedback/retraining-batch',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      if (variables.mark_consumed) {
+        queryClient.invalidateQueries({ queryKey: ['feedback-stats', variables.tenant_id || 'bank_alpha'] });
+      }
+    },
+  });
+}
+
+export function useComputeDPGradient() {
+  return useMutation<DPGradientResponse, Error, DPGradientRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<DPGradientResponse>(
+        '/api/v1/feedback/dp-gradient',
         payload
       );
       return data;

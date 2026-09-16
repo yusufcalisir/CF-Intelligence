@@ -323,8 +323,10 @@ class CaseManagementService:
                     )
 
                     feedback_pipeline = LocalLabelFeedbackPipeline()
+                    tenant_id = getattr(case, "bank_id", "bank_alpha") or "bank_alpha"
                     for alert_id in case.alert_ids:
                         feedback_pipeline.ingest_analyst_determination(
+                            tenant_id=tenant_id,
                             alert_id=alert_id,
                             determination="CONFIRMED_FRAUD" if actual_label == 1 else "FALSE_POSITIVE",
                             notes=f"Closed by {actor} with supervisor signoff {collected_signatures}",

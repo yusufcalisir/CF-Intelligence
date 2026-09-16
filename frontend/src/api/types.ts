@@ -1453,4 +1453,81 @@ export interface CopilotQueryResponse {
   supervisor_briefing?: string;
 }
 
+// ── Label Feedback Loop & Retraining Store ────────
+export type FeedbackLabel = 'CONFIRMED_FRAUD' | 'FALSE_POSITIVE';
+
+export interface LabelFeedbackItem {
+  transaction_id_hash: string;
+  label: FeedbackLabel;
+  weight: number;
+  priority: number;
+  feature_vector?: number[] | null;
+  notes?: string | null;
+  metadata?: Record<string, unknown>;
+  recorded_at: string;
+  consumed_for_retraining: boolean;
+}
+
+export interface AnalystFeedbackIngestRequest {
+  tenant_id?: string;
+  transaction_id_hash?: string | null;
+  alert_id?: string | null;
+  determination?: string;
+  priority?: number | null;
+  weight?: number | null;
+  feature_vector?: number[] | null;
+  notes?: string | null;
+  raw_attributes?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AnalystFeedbackIngestResponse {
+  status: string;
+  item: Record<string, unknown>;
+}
+
+export interface FeedbackStatsResponse {
+  tenant_id: string;
+  total_count: number;
+  fraud_count: number;
+  false_positive_count: number;
+  consumed_count: number;
+  unconsumed_count: number;
+  priority_distribution: Record<number, number>;
+}
+
+export interface RetrainingBatchRequest {
+  tenant_id?: string;
+  batch_size?: number;
+  mark_consumed?: boolean;
+  min_priority?: number;
+  stratified?: boolean;
+}
+
+export interface RetrainingBatchResponse {
+  tenant_id: string;
+  batch_size: number;
+  items: Array<Record<string, unknown>>;
+  fraud_count: number;
+  false_positive_count: number;
+  mean_priority: number;
+}
+
+export interface DPGradientRequest {
+  tenant_id?: string;
+  epsilon?: number;
+  delta?: number;
+  clip_norm?: number;
+}
+
+export interface DPGradientResponse {
+  tenant_id: string;
+  delta_weights: number[];
+  sample_count: number;
+  epsilon: number;
+  delta: number;
+  sigma: number;
+}
+
+
 

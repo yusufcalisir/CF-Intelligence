@@ -112,6 +112,10 @@ item = pipeline.ingest_analyst_determination(
      $$\sigma = \frac{C \sqrt{2 \ln(1.25/\delta)}}{\epsilon}$$
      where clipping threshold $C = 1.0$, default privacy budget $\epsilon = 1.0$ (validated within $(0.0, 2.0]$), and $\delta = 10^{-5}$.
    - Prevents re-identification of specific fraud victims or accounts through model inversion attacks.
+4. **Prioritized Retraining Queue (Experience Replay)**:
+   - Buffer items maintain business-impact priority weights ($P \in \{1, 2, 3\}$).
+   - Confirmed fraud verdicts default to $P = 3, w = 2.0$; false positive verdicts default to $P = 1, w = 1.0$.
+   - Retraining batch sampling (`/api/v1/feedback/retraining-batch`) supports balanced stratification to prevent fraud class starvation during federated fine-tuning.
 
 ```python
 # Differential Privacy Gradient Computation
@@ -121,9 +125,25 @@ update = pipeline.compute_dp_gradient_update(tenant_id="bank_alpha", epsilon=1.0
 #     "tenant_id": "bank_alpha",
 #     "delta_weights": [0.03512, 0.07184, 0.10621, 0.14289],
 #     "sample_count": 3,
-#     "epsilon": 1.0
+#     "epsilon": 1.0,
+#     "delta": 1e-05,
+#     "sigma": 4.84379
 # }
 ```
+
+---
+
+## 🌐 Dedicated REST API Endpoints
+
+The label feedback pipeline exposes a dedicated `/api/v1/feedback` REST blueprint registered in `backend/app/main.py`:
+
+| HTTP Method | Endpoint Path | Description | Access Control |
+|:---|:---|:---|:---|
+| `POST` | `/api/v1/feedback/ingest` | Ingests analyst ground-truth verdict with Zero-PII auto-hashing | Analyst / Supervisor |
+| `GET` | `/api/v1/feedback/stats/{tenant_id}` | Retrieves tenant feedback buffer count, fraud ratio, and priority distribution | Bank Investigator |
+| `POST` | `/api/v1/feedback/retraining-batch` | Samples prioritized, stratified batch for local model fine-tuning | Retraining Service |
+| `POST` | `/api/v1/feedback/dp-gradient` | Computes Gaussian-DP-noise-injected weight updates ($\Delta W$) | Local FL Client |
+| `DELETE` | `/api/v1/feedback/buffer/{tenant_id}` | Clears in-memory and on-disk buffer for specified tenant | Tenant Admin |
 
 ---
 
@@ -138,21 +158,33 @@ By continuously closing the loop between human AML investigators and federated o
 
 ## 🧪 Automated Unit Test Suite
 
-The label feedback loop and case management integration are validated across two dedicated test modules totaling **7 automated test cases**:
+The label feedback loop and case management integration are validated across three dedicated test modules totaling **17 automated test cases**:
 
 ```bash
-python -m pytest backend/tests/unit/test_case_management_feedback_loop.py backend/tests/unit/test_label_feedback_pipeline.py -v
+python -m pytest backend/tests/unit/test_label_feedback_pipeline_hardening.py backend/tests/unit/test_label_feedback_pipeline.py backend/tests/unit/test_case_management_feedback_loop.py -v
 ```
 
-### 1. `backend/tests/unit/test_case_management_feedback_loop.py` (4 Tests)
-- `test_case_escalation_and_assignment`: Verifies escalation of alerts into an investigation case and investigator assignment.
-- `test_analyst_determination_closed_confirmed_feedback_loop`: Verifies `closed_confirmed` verdict records label 1 retraining feedback and generates SAR XML.
-- `test_analyst_determination_closed_false_positive_feedback_loop`: Verifies `closed_false_positive` verdict records label 0 retraining feedback.
-- `test_fincen_sar_report_generation_and_download`: Verifies SAR report endpoint returns valid FinCEN XML payload (`EFilingSubmission`).
+### 1. `backend/tests/unit/test_label_feedback_pipeline_hardening.py` (10 Tests)
+- `test_ingest_with_alert_id_auto_hashing_satisfies_zero_pii`: Validates automatic HMAC-SHA256 hashing of arbitrary alert IDs to satisfy $\ge 32$ hex characters.
+- `test_priority_queueing_and_weighted_retraining_batch_sampling`: Validates strict priority ordering ($3 \to 2 \to 1$) and consumption tracking.
+- `test_stratified_batch_sampling_with_class_balance`: Validates stratified sampling ensuring rare confirmed fraud samples are balanced against false positives.
+- `test_thread_safe_concurrent_feedback_ingestion`: Validates race-free ingestion across 20 concurrent worker threads with `RLock`.
+- `test_buffer_persistence_and_atomic_file_restore`: Validates atomic serialization to `storage/{tenant_id}/label_buffer.json` and restoration.
+- `test_dp_gradient_analytical_sigma_and_gaussian_noise`: Validates analytical Gaussian noise scale $\sigma = (C \sqrt{2 \ln(1.25/\delta)}) / \epsilon$.
+- `test_end_to_end_case_service_real_feedback_ingestion`: Validates real `CaseManagementService` terminal status transitions triggering pipeline ingestion.
+- `test_feedback_router_ingest_and_stats_endpoints`: Validates `POST /api/v1/feedback/ingest` (201 Created) and `GET /api/v1/feedback/stats/{tenant_id}` (200 OK).
+- `test_feedback_router_retraining_batch_and_dp_gradient_endpoints`: Validates prioritized batch sampling and DP gradient generation endpoints.
+- `test_invalid_inputs_and_privacy_violation_rejection`: Validates HTTP 400 rejection for missing identifiers, raw IBANs, or invalid $\epsilon > 2.0$.
 
 ### 2. `backend/tests/unit/test_label_feedback_pipeline.py` (3 Tests)
 - `test_local_label_feedback_ingestion_and_buffer_management`: Verifies analyst determination label ingestion and tenant buffer tracking.
 - `test_label_privacy_guard_rejects_unmasked_pii`: Verifies zero-PII enforcement blocking raw IBAN, short identifiers, or unmasked SSN/email keys.
 - `test_dp_gradient_update_computation_with_noise_injection`: Verifies Gaussian DP noise injection on local gradient updates and epsilon boundary checks.
 
-**Test Execution Parity**: 7 passed in 8.85s (100% pass rate).
+### 3. `backend/tests/unit/test_case_management_feedback_loop.py` (4 Tests)
+- `test_case_escalation_and_assignment`: Verifies escalation of alerts into an investigation case and investigator assignment.
+- `test_analyst_determination_closed_confirmed_feedback_loop`: Verifies `closed_confirmed` verdict records label 1 retraining feedback and generates SAR XML.
+- `test_analyst_determination_closed_false_positive_feedback_loop`: Verifies `closed_false_positive` verdict records label 0 retraining feedback.
+- `test_fincen_sar_report_generation_and_download`: Verifies SAR report endpoint returns valid FinCEN XML payload (`EFilingSubmission`).
+
+**Test Execution Parity**: 17 passed in 18.38s (100% pass rate).

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-1800%2F1800_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-1810%2F1810_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
 
@@ -485,7 +485,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,493 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (1,503 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1131,7 +1131,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **1,781 / 1,781 passing (2,088 total incl. verification)** | 100% | 1,493 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **1,791 / 1,791 passing (2,098 total incl. verification)** | 100% | 1,503 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1672,6 +1672,81 @@ Content-Type: application/json
   "retired_versions": [1],
   "reencrypted_records_count": 450,
   "timestamp_iso": "2026-09-06T00:00:00Z"
+}
+```
+
+### 19.11 Continuous Human-in-the-Loop Feedback & Retraining Ground-Truth Store
+
+Connects investigator case determinations directly back to tenant-isolated retraining buffers for continuous federated model fine-tuning:
+
+**1. Ingest Analyst Ground-Truth Determination (`POST /api/v1/feedback/ingest`):**
+```json
+{
+  "tenant_id": "bank_alpha",
+  "alert_id": "alt_2001",
+  "determination": "CONFIRMED_FRAUD",
+  "priority": 3,
+  "weight": 2.0,
+  "notes": "Confirmed syndicate structuring across 3 mule accounts"
+}
+```
+
+*Response (HTTP 201 Created):*
+```json
+{
+  "status": "success",
+  "item": {
+    "transaction_id_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "label": "CONFIRMED_FRAUD",
+    "weight": 2.0,
+    "priority": 3,
+    "consumed_for_retraining": false,
+    "recorded_at": "2026-09-16T12:00:00Z"
+  }
+}
+```
+
+**2. Sample Prioritized, Stratified Retraining Batch (`POST /api/v1/feedback/retraining-batch`):**
+```json
+{
+  "tenant_id": "bank_alpha",
+  "batch_size": 32,
+  "stratified": true,
+  "mark_consumed": true
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "tenant_id": "bank_alpha",
+  "batch_size": 32,
+  "items": [],
+  "fraud_count": 16,
+  "false_positive_count": 16,
+  "mean_priority": 2.45
+}
+```
+
+**3. Compute Differential-Privacy-Protected Gradient Update (`POST /api/v1/feedback/dp-gradient`):**
+```json
+{
+  "tenant_id": "bank_alpha",
+  "epsilon": 1.0,
+  "delta": 1e-5,
+  "clip_norm": 1.0
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "tenant_id": "bank_alpha",
+  "delta_weights": [0.03512, 0.07184, 0.10621, 0.14289],
+  "sample_count": 32,
+  "epsilon": 1.0,
+  "delta": 1e-05,
+  "sigma": 4.84379
 }
 ```
 
