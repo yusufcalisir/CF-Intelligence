@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
@@ -225,10 +225,7 @@ class ModelGovernanceService:
 
             # Safe Disparate Impact Ratio calculation
             if ref_rate == 0.0:
-                if prot_rate == 0.0:
-                    di_ratio = 1.0  # Equal outcome: neither group selected
-                else:
-                    di_ratio = 999.0  # Extreme disparity: protected group selected, reference not
+                di_ratio = 1.0 if prot_rate == 0.0 else 999.0  # Equal outcome or extreme disparity
             else:
                 di_ratio = prot_rate / ref_rate
 

@@ -25,7 +25,6 @@ from fastapi.testclient import TestClient
 from app.application.services.auto_rollback import AutoRollbackManager, RollbackCause
 from app.application.services.automated_retraining import (
     DriftTriggeredRetrainingService,
-    RetrainingCause,
 )
 from app.application.services.drift_service import ModelDriftService
 from app.application.services.retraining_trigger_engine import RetrainingTriggerEngine

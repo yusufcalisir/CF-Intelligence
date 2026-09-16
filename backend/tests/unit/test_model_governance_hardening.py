@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 
@@ -14,7 +13,6 @@ from app.domain.model_governance import (
     DualSignoffGate,
     ModelGovernanceError,
     ModelRegistryVault,
-    ModelStatus,
     SemanticVersion,
     ShadowDeploymentEngine,
 )

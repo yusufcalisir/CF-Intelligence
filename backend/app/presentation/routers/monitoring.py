@@ -116,13 +116,13 @@ class AlertmanagerAlert(BaseModel):
     status: str = "firing"  # "firing" | "resolved"
     labels: dict[str, str] = Field(default_factory=dict)
     annotations: dict[str, str] = Field(default_factory=dict)
-    startsAt: str | None = None
-    endsAt: str | None = None
+    startsAt: str | None = None  # noqa: N815 (Prometheus Alertmanager webhook contract)
+    endsAt: str | None = None  # noqa: N815 (Prometheus Alertmanager webhook contract)
 
 
 class AlertmanagerWebhookPayload(BaseModel):
     version: str | None = "4"
-    groupKey: str | None = None
+    groupKey: str | None = None  # noqa: N815 (Prometheus Alertmanager webhook contract)
     status: str = "firing"
     receiver: str | None = None
     alerts: list[AlertmanagerAlert] = Field(default_factory=list)

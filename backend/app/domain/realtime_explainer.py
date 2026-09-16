@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import threading
 from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from typing import Any
@@ -11,8 +12,6 @@ from typing import Any
 import httpx
 
 from app.infrastructure.cache import get_redis_client
-
-import threading
 
 logger = logging.getLogger(__name__)
 

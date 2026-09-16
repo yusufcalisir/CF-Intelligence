@@ -16,7 +16,6 @@ from app.application.services.label_feedback_pipeline import (
     LocalLabelFeedbackPipeline,
 )
 from app.domain.enums import CasePriority, CaseStatus
-from app.domain.label_privacy_guard import LabelPrivacyViolationError
 from app.main import app
 
 client = TestClient(app)

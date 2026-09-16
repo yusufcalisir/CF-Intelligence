@@ -566,7 +566,9 @@ class ExplainabilityService:
 
         # 3. Model predict function
         import os
+
         import torch
+
         from app.infrastructure.storage.storage_utils import get_storage_dir
 
         model_dir = get_storage_dir()
