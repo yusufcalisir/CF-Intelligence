@@ -1,10 +1,13 @@
 """Financial Message Standard Parsers (ISO 20022, SWIFT MT103, SEPA SCT).
 
-Normalizes message schemas into structured transaction dicts.
+Normalizes message schemas into structured transaction dicts and provides
+cryptographic zero-PII privacy transforms and IBAN/BIC format validation.
 """
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import re
 import xml.etree.ElementTree as ET
 from typing import Any
@@ -20,15 +23,89 @@ class FinancialMessageParser:
     """Ingests, parses, and normalizes standard financial transaction messages."""
 
     @staticmethod
+    def validate_iban(iban: str) -> bool:
+        """Validate an International Bank Account Number (IBAN) using ISO 13616 Mod-97 checksum."""
+        if not iban or not isinstance(iban, str):
+            return False
+        clean_iban = re.sub(r"[\s\-]", "", iban).upper()
+        if len(clean_iban) < 15 or len(clean_iban) > 34:
+            return False
+        if not re.match(r"^[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}$", clean_iban):
+            return False
+        # Move first 4 characters to end
+        rearranged = clean_iban[4:] + clean_iban[:4]
+        # Replace letters with digits (A=10, ..., Z=35)
+        digits = "".join(str(ord(c) - 55) if c.isalpha() else c for c in rearranged)
+        try:
+            return int(digits) % 97 == 1
+        except ValueError:
+            return False
+
+    @staticmethod
+    def validate_bic(bic: str) -> bool:
+        """Validate a Bank Identifier Code (BIC/SWIFT) using ISO 9362 format."""
+        if not bic or not isinstance(bic, str):
+            return False
+        clean_bic = re.sub(r"[\s\-]", "", bic).upper()
+        return bool(re.match(r"^[A-Z]{6}[A-Z0-9]{2}([A-Z0-9]{3})?$", clean_bic))
+
+    @staticmethod
+    def extract_country_code(account: str | None, postal_country: str | None = None) -> str:
+        """Extract 2-letter ISO 3166-1 alpha-2 country code from postal address or account IBAN."""
+        if postal_country and len(postal_country.strip()) == 2 and postal_country.strip().isalpha():
+            return postal_country.strip().upper()
+        if account:
+            clean_acct = re.sub(r"[\s\-/]", "", account)
+            if len(clean_acct) >= 2 and clean_acct[:2].isalpha():
+                return clean_acct[:2].upper()
+        return "XX"
+
+    @staticmethod
+    def to_privacy_preserving_features(
+        parsed_dict: dict[str, Any], salt: str = "cf_privacy_salt_2026"
+    ) -> dict[str, Any]:
+        """Transform parsed message into zero-PII privacy-preserving feature record using HMAC-SHA256."""
+        sender_raw = str(parsed_dict.get("sender_account") or "")
+        receiver_raw = str(parsed_dict.get("receiver_account") or "")
+
+        sender_hash = (
+            hmac.new(salt.encode("utf-8"), sender_raw.encode("utf-8"), hashlib.sha256).hexdigest()
+            if sender_raw
+            else ""
+        )
+        receiver_hash = (
+            hmac.new(salt.encode("utf-8"), receiver_raw.encode("utf-8"), hashlib.sha256).hexdigest()
+            if receiver_raw
+            else ""
+        )
+
+        return {
+            "message_type": parsed_dict.get("message_type", "UNKNOWN"),
+            "transaction_id": parsed_dict.get("transaction_id", ""),
+            "amount": parsed_dict.get("amount", 0.0),
+            "currency": parsed_dict.get("currency", "EUR"),
+            "date": parsed_dict.get("date", ""),
+            "sender_account_hash": sender_hash,
+            "receiver_account_hash": receiver_hash,
+            "sender_bic": parsed_dict.get("sender_bic", ""),
+            "receiver_bic": parsed_dict.get("receiver_bic", ""),
+            "sender_country": parsed_dict.get("sender_country", "XX"),
+            "receiver_country": parsed_dict.get("receiver_country", "XX"),
+            "remittance_info": "[PROTECTED_PII]" if parsed_dict.get("remittance_info") else "",
+        }
+
+    @staticmethod
     def parse_iso_20022_pacs008(xml_content: str) -> dict[str, Any]:
         """Parse ISO 20022 Customer Credit Transfer XML message (pacs.008.001.08)."""
+        if not xml_content or not xml_content.strip():
+            raise FinancialMessageParserError("Empty XML content")
+
         try:
             root = ET.fromstring(xml_content.strip())  # nosec B314
         except ET.ParseError as exc:
             raise FinancialMessageParserError(f"Invalid XML content: {exc}") from exc
 
         # Remove namespaces or resolve them dynamically to prevent lookup issues
-        # We can extract namespace from root tag or use a namespace-wildcard approach
         ns = ""
         m = re.match(r"({.*})", root.tag)
         if m:
@@ -58,10 +135,12 @@ class FinancialMessageParser:
 
         # Amount and Currency
         amt_elem = tx_info.find(f"{ns}IntrBkSttlmAmt")
-        if amt_elem is None:
+        if amt_elem is None or not amt_elem.text or not amt_elem.text.strip():
             raise FinancialMessageParserError("IntrBkSttlmAmt (Settlement Amount) is missing")
         try:
-            amount = float(amt_elem.text.strip()) if amt_elem.text else 0.0
+            amount = float(amt_elem.text.strip())
+            if amount <= 0:
+                raise FinancialMessageParserError("Settlement amount must be greater than zero")
         except ValueError as exc:
             raise FinancialMessageParserError(f"Invalid amount value: {exc}") from exc
         currency = amt_elem.attrib.get("Ccy", "EUR")
@@ -80,8 +159,8 @@ class FinancialMessageParser:
             tx_info, "DbtrAcct/Id/IBAN"
         )
         dbtr_bic = find_text(tx_info, "DbtrAgt/FinInstnId/BICFI")
-        dbtr_country = find_text(tx_info, "Dbtr/PstlAdr/Ctry") or (
-            dbtr_iban[:2] if dbtr_iban else ""
+        dbtr_country = FinancialMessageParser.extract_country_code(
+            dbtr_iban, find_text(tx_info, "Dbtr/PstlAdr/Ctry")
         )
 
         # Creditor (Receiver)
@@ -90,8 +169,8 @@ class FinancialMessageParser:
             tx_info, "CdtrAcct/Id/IBAN"
         )
         cdtr_bic = find_text(tx_info, "CdtrAgt/FinInstnId/BICFI")
-        cdtr_country = find_text(tx_info, "Cdtr/PstlAdr/Ctry") or (
-            cdtr_iban[:2] if cdtr_iban else ""
+        cdtr_country = FinancialMessageParser.extract_country_code(
+            cdtr_iban, find_text(tx_info, "Cdtr/PstlAdr/Ctry")
         )
 
         # Remittance info
@@ -134,11 +213,9 @@ class FinancialMessageParser:
 
         tx_id = get_tag_value("20")
         if not tx_id:
-            # Try to grab reference
             tx_id = "unknown_swift_id"
 
         # Tag 32A contains Date, Currency, Amount (Format: YYMMDDCCYAmount)
-        # Example: 260716EUR12500,00 -> Date: 260716, Ccy: EUR, Amt: 12500.00
         tag32a = get_tag_value("32A")
         amount = 0.0
         currency = "EUR"
@@ -151,16 +228,21 @@ class FinancialMessageParser:
                 amt_str = m.group(3).replace(",", ".")
                 try:
                     amount = float(amt_str)
+                    if amount <= 0:
+                        raise FinancialMessageParserError("Settlement amount must be greater than zero")
                 except ValueError as exc:
                     raise FinancialMessageParserError(
                         f"Invalid MT103 amount format in 32A: {exc}"
                     ) from exc
+            else:
+                raise FinancialMessageParserError("Invalid MT103 32A format")
+        else:
+            raise FinancialMessageParserError("Missing mandatory MT103 field 32A")
 
         # Tag 50A, 50F, or 50K (Debtor/Ordering Customer)
         tag50 = get_tag_value("50K") or get_tag_value("50A") or get_tag_value("50F")
         sender_account = ""
         sender_name = ""
-        sender_country = ""
         if tag50:
             lines = tag50.split("\n")
             if lines[0].startswith("/"):
@@ -168,15 +250,12 @@ class FinancialMessageParser:
                 sender_name = lines[1] if len(lines) > 1 else ""
             else:
                 sender_name = lines[0]
-            # Try to guess country from account if IBAN
-            if sender_account and len(sender_account) > 2 and sender_account[:2].isalpha():
-                sender_country = sender_account[:2].upper()
+        sender_country = FinancialMessageParser.extract_country_code(sender_account)
 
         # Tag 59 or 59A (Creditor/Beneficiary)
         tag59 = get_tag_value("59") or get_tag_value("59A")
         receiver_account = ""
         receiver_name = ""
-        receiver_country = ""
         if tag59:
             lines = tag59.split("\n")
             if lines[0].startswith("/"):
@@ -184,14 +263,17 @@ class FinancialMessageParser:
                 receiver_name = lines[1] if len(lines) > 1 else ""
             else:
                 receiver_name = lines[0]
-            if receiver_account and len(receiver_account) > 2 and receiver_account[:2].isalpha():
-                receiver_country = receiver_account[:2].upper()
+        receiver_country = FinancialMessageParser.extract_country_code(receiver_account)
 
         # Tag 70 (Remittance Info / Details of Payment)
         remittance_info = get_tag_value("70")
 
         # Tag 57A (Account With Institution BIC)
         receiver_bic = get_tag_value("57A")
+        if receiver_country == "XX" and receiver_bic and len(receiver_bic) >= 6:
+            bic_country = receiver_bic[4:6].upper()
+            if bic_country.isalpha():
+                receiver_country = bic_country
 
         return {
             "message_type": "SWIFT_MT103",
@@ -213,15 +295,17 @@ class FinancialMessageParser:
 
     @classmethod
     def parse_sepa_credit_transfer(cls, xml_content: str) -> dict[str, Any]:
-        """Parse SEPA Credit Transfer (often identical format to ISO 20022 pacs.008 or pain.001)."""
-        # Let's delegate to the pacs.008 parser or pain.001 XML parsing
+        """Parse SEPA Credit Transfer (ISO 20022 pacs.008 or pain.001)."""
         try:
             res = cls.parse_iso_20022_pacs008(xml_content)
             res["message_type"] = "SEPA_SCT"
             return res
         except FinancialMessageParserError:
-            # Let's implement a simpler pain.001 parser or custom SCT parser if the format is slightly different
-            root = ET.fromstring(xml_content.strip())  # nosec B314
+            try:
+                root = ET.fromstring(xml_content.strip())  # nosec B314
+            except ET.ParseError as exc:
+                raise FinancialMessageParserError(f"Invalid SEPA XML: {exc}") from exc
+
             ns = ""
             m = re.match(r"({.*})", root.tag)
             if m:
@@ -252,20 +336,26 @@ class FinancialMessageParser:
             amt_elem = tx_info.find(f"{ns}Amt/{ns}InstdAmt")
             if amt_elem is None:
                 amt_elem = tx_info.find(f"{ns}InstdAmt")
-            if amt_elem is None:
+            if amt_elem is None or not amt_elem.text or not amt_elem.text.strip():
                 raise FinancialMessageParserError("Instruction Amount is missing in SEPA payload")
 
-            amount = float(amt_elem.text.strip()) if amt_elem.text else 0.0
+            try:
+                amount = float(amt_elem.text.strip())
+                if amount <= 0:
+                    raise FinancialMessageParserError("Instruction amount must be greater than zero")
+            except ValueError as exc:
+                raise FinancialMessageParserError(f"Invalid SEPA amount format: {exc}") from exc
+
             currency = amt_elem.attrib.get("Ccy", "EUR")
             tx_id = find_text(tx_info, "PmtId/EndToEndId") or "unknown_sepa_id"
 
             dbtr_name = find_text(root, ".//Dbtr/Nm")
-            dbtr_iban = find_text(root, ".//DbtrAcct/Id/IBAN")
-            dbtr_country = dbtr_iban[:2] if dbtr_iban else ""
+            dbtr_iban = find_text(root, ".//DbtrAcct/Id/IBAN") or find_text(root, ".//DbtrAcct/Id/Othr/Id")
+            dbtr_country = FinancialMessageParser.extract_country_code(dbtr_iban)
 
             cdtr_name = find_text(tx_info, "Cdtr/Nm")
-            cdtr_iban = find_text(tx_info, "CdtrAcct/Id/IBAN")
-            cdtr_country = cdtr_iban[:2] if cdtr_iban else ""
+            cdtr_iban = find_text(tx_info, "CdtrAcct/Id/IBAN") or find_text(tx_info, "CdtrAcct/Id/Othr/Id")
+            cdtr_country = FinancialMessageParser.extract_country_code(cdtr_iban)
 
             return {
                 "message_type": "SEPA_SCT",

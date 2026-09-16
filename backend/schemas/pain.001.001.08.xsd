@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="urn:iso:std:iso:20022:tech:xsd:pain.001.001.08"
+           targetNamespace="urn:iso:std:iso:20022:tech:xsd:pain.001.001.08"
+           elementFormDefault="qualified">
+  <xs:element name="Document" type="Document"/>
+  <xs:complexType name="Document">
+    <xs:sequence>
+      <xs:element name="CstmrCdtTrfInitn" type="CstmrCdtTrfInitn"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CstmrCdtTrfInitn">
+    <xs:sequence>
+      <xs:element name="GrpHdr" type="GrpHdr"/>
+      <xs:element name="PmtInf" type="PaymentInstruction" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GrpHdr">
+    <xs:sequence>
+      <xs:element name="MsgId" type="xs:string"/>
+      <xs:element name="CreDtTm" type="xs:string" minOccurs="0"/>
+      <xs:element name="NbOfTxs" type="xs:string" minOccurs="0"/>
+      <xs:element name="InitgPty" type="PartyIdentification" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PaymentInstruction">
+    <xs:sequence>
+      <xs:element name="PmtInfId" type="xs:string" minOccurs="0"/>
+      <xs:element name="PmtMtd" type="xs:string" minOccurs="0"/>
+      <xs:element name="Dbtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="DbtrAcct" type="AccountIdentification" minOccurs="0"/>
+      <xs:element name="DbtrAgt" type="BranchAndFinancialInstitutionIdentification" minOccurs="0"/>
+      <xs:element name="CdtTrfTxInf" type="CreditTransferTransactionInformation" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="CreditTransferTransactionInformation">
+    <xs:sequence>
+      <xs:element name="PmtId" type="PaymentIdentification" minOccurs="0"/>
+      <xs:element name="Amt" type="AmountChoice"/>
+      <xs:element name="Cdtr" type="PartyIdentification" minOccurs="0"/>
+      <xs:element name="CdtrAcct" type="AccountIdentification" minOccurs="0"/>
+      <xs:element name="CdtrAgt" type="BranchAndFinancialInstitutionIdentification" minOccurs="0"/>
+      <xs:element name="RmtInf" type="RemittanceInformation" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PaymentIdentification">
+    <xs:sequence>
+      <xs:element name="EndToEndId" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AmountChoice">
+    <xs:choice>
+      <xs:element name="InstdAmt" type="ActiveOrHistoricCurrencyAndAmount"/>
+      <xs:element name="EqvtAmt" type="EquivalentAmount"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="ActiveOrHistoricCurrencyAndAmount">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="Ccy" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+  <xs:complexType name="EquivalentAmount">
+    <xs:sequence>
+      <xs:element name="Amt" type="ActiveOrHistoricCurrencyAndAmount"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PartyIdentification">
+    <xs:sequence>
+      <xs:element name="Nm" type="xs:string" minOccurs="0"/>
+      <xs:element name="PstlAdr" type="PostalAddress" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PostalAddress">
+    <xs:sequence>
+      <xs:element name="Ctry" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountIdentification">
+    <xs:sequence>
+      <xs:element name="Id" type="AccountChoice"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="AccountChoice">
+    <xs:sequence>
+      <xs:element name="IBAN" type="xs:string" minOccurs="0"/>
+      <xs:element name="Othr" type="OtherAccount" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OtherAccount">
+    <xs:sequence>
+      <xs:element name="Id" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="BranchAndFinancialInstitutionIdentification">
+    <xs:sequence>
+      <xs:element name="FinInstnId" type="FinancialInstitutionIdentification" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FinancialInstitutionIdentification">
+    <xs:sequence>
+      <xs:element name="BICFI" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="RemittanceInformation">
+    <xs:sequence>
+      <xs:element name="Ustrd" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

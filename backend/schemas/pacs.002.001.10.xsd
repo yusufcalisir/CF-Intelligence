@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.002.001.10"
+           targetNamespace="urn:iso:std:iso:20022:tech:xsd:pacs.002.001.10"
+           elementFormDefault="qualified">
+  <xs:element name="Document" type="Document"/>
+  <xs:complexType name="Document">
+    <xs:sequence>
+      <xs:element name="FIToFIPmtStsRpt" type="FIToFIPmtStsRpt"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="FIToFIPmtStsRpt">
+    <xs:sequence>
+      <xs:element name="GrpHdr" type="GrpHdr"/>
+      <xs:element name="OrgnlGrpInfAndSts" type="OriginalGroupInformation" minOccurs="0"/>
+      <xs:element name="TxInfAndSts" type="PaymentTransactionInformation" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="GrpHdr">
+    <xs:sequence>
+      <xs:element name="MsgId" type="xs:string"/>
+      <xs:element name="CreDtTm" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OriginalGroupInformation">
+    <xs:sequence>
+      <xs:element name="OrgnlMsgId" type="xs:string"/>
+      <xs:element name="OrgnlMsgNmId" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="PaymentTransactionInformation">
+    <xs:sequence>
+      <xs:element name="StsId" type="xs:string" minOccurs="0"/>
+      <xs:element name="OrgnlEndToEndId" type="xs:string" minOccurs="0"/>
+      <xs:element name="TxSts" type="xs:string" minOccurs="0"/>
+      <xs:element name="StsRsnInf" type="StatusReasonInformation" minOccurs="0"/>
+      <xs:element name="OrgnlTxRef" type="OriginalTransactionReference" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="StatusReasonInformation">
+    <xs:sequence>
+      <xs:element name="Rsn" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="OriginalTransactionReference">
+    <xs:sequence>
+      <xs:element name="Amt" type="ActiveCurrencyAndAmount" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+  <xs:complexType name="ActiveCurrencyAndAmount">
+    <xs:simpleContent>
+      <xs:extension base="xs:decimal">
+        <xs:attribute name="Ccy" type="xs:string" use="required"/>
+      </xs:extension>
+    </xs:simpleContent>
+  </xs:complexType>
+</xs:schema>

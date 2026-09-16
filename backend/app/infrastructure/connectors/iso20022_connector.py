@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import functools
+import hashlib
+import hmac
+import inspect
 import logging
 import re
 import time
@@ -12,14 +16,12 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, TypeVar
 
+from app.application.services.financial_message_parser import FinancialMessageParser
 from app.infrastructure.connectors.base_connector import BaseBankConnector, NormalizedTransaction
 from app.infrastructure.logging.siem_exporter import SIEMAuditEvent, SIEMLogExporter
 
 if TYPE_CHECKING:
     from collections.abc import Generator
-
-import asyncio
-import inspect
 
 logger = logging.getLogger(__name__)
 
@@ -89,10 +91,17 @@ class ISO20022MessagingConnector(BaseBankConnector):
     """Connector for parsing ISO 20022 MX (pacs.008, pacs.002, camt.053, pain.001) XML and SWIFT MT103 messages."""
 
     def __init__(self) -> None:
+        super().__init__()
         self._parsed_queue: list[NormalizedTransaction] = []
+        self._failed_parse_count: int = 0
         self._schemas_dir = Path("backend/schemas")
         if not self._schemas_dir.exists():
             self._schemas_dir = Path("schemas")
+
+    @property
+    def failed_parse_count(self) -> int:
+        """Returns cumulative count of failed message parses."""
+        return self._failed_parse_count
 
     def _log_siem_parse_failure(self, message_type: str, error_details: str) -> None:
         """Log ISO 20022 parse failure event to SIEM exporter."""
@@ -115,8 +124,13 @@ class ISO20022MessagingConnector(BaseBankConnector):
             self._log_siem_parse_failure(schema_name, "Empty XML content")
             raise ValueError("ISO 20022 XML validation failed: empty content")
 
+        # Reject XML External Entity (XXE) and DTD injection payloads
+        if "<!DOCTYPE" in xml_content or "<!ENTITY" in xml_content:
+            self._log_siem_parse_failure(schema_name, "XXE / DTD injection attempt detected")
+            raise ValueError("ISO 20022 XML validation failed: XXE injection or DTD entities detected")
+
         try:
-            root = ET.fromstring(xml_content)  # nosec B314
+            root = ET.fromstring(xml_content.strip())  # nosec B314
         except ET.ParseError as err:
             self._log_siem_parse_failure(schema_name, f"XML ParseError: {err}")
             raise ValueError(f"ISO 20022 XML validation failed against XSD schema: {err}") from err
@@ -144,12 +158,18 @@ class ISO20022MessagingConnector(BaseBankConnector):
             )
             raise ValueError("ISO 20022 XML validation failed against pain.001 XSD schema")
 
+        if "pacs.002" in schema_name and "FIToFIPmtStsRpt" not in tags and "TxInfAndSts" not in tags and "OrgnlPmtInfAndSts" not in tags:
+            self._log_siem_parse_failure(
+                schema_name, "Missing FIToFIPmtStsRpt element for pacs.002"
+            )
+            raise ValueError("ISO 20022 XML validation failed against pacs.002 XSD schema")
+
     @retry_connector()
     def parse_pacs008_xml(self, xml_content: str) -> NormalizedTransaction:
         """Parses an ISO 20022 pacs.008.001.08 Financial Institution Customer Credit Transfer XML string."""
         self.validate_xml_schema(xml_content, "pacs.008.001.08.xsd")
 
-        root = ET.fromstring(xml_content)  # nosec B314
+        root = ET.fromstring(xml_content.strip())  # nosec B314
 
         for elem in root.iter():
             if "}" in elem.tag:
@@ -157,21 +177,42 @@ class ISO20022MessagingConnector(BaseBankConnector):
 
         msg_id = root.findtext(".//GrpHdr/MsgId") or f"pacs008_{int(datetime.now(UTC).timestamp())}"
         amount_elem = root.find(".//CdtTrfTxInf/IntrBkSttlmAmt")
-        amount = float(amount_elem.text) if amount_elem is not None and amount_elem.text else 100.0
-        currency = (amount_elem.get("Ccy") if amount_elem is not None else None) or "EUR"
+        if amount_elem is None or not amount_elem.text or not amount_elem.text.strip():
+            self._log_siem_parse_failure("pacs.008", "Missing settlement amount IntrBkSttlmAmt")
+            raise ValueError("ISO 20022 XML parsing failed: missing IntrBkSttlmAmt settlement amount")
+
+        try:
+            amount = float(amount_elem.text.strip())
+            if amount <= 0:
+                raise ValueError("Settlement amount must be positive")
+        except ValueError as err:
+            self._log_siem_parse_failure("pacs.008", f"Invalid settlement amount: {err}")
+            raise ValueError(f"ISO 20022 XML parsing failed: invalid settlement amount: {err}") from err
+
+        currency = amount_elem.get("Ccy") or "EUR"
 
         debtor_account = (
-            root.findtext(".//DbtrAcct/Id/Othr/Id")
-            or root.findtext(".//DbtrAcct/Id/IBAN")
-            or "DEBTOR_UNKNOWN"
+            root.findtext(".//DbtrAcct/Id/IBAN")
+            or root.findtext(".//DbtrAcct/Id/Othr/Id")
         )
+        if not debtor_account:
+            self._log_siem_parse_failure("pacs.008", "Missing debtor account")
+            raise ValueError("ISO 20022 XML parsing failed: missing debtor account")
+
         creditor_account = (
-            root.findtext(".//CdtrAcct/Id/Othr/Id")
-            or root.findtext(".//CdtrAcct/Id/IBAN")
-            or "CREDITOR_UNKNOWN"
+            root.findtext(".//CdtrAcct/Id/IBAN")
+            or root.findtext(".//CdtrAcct/Id/Othr/Id")
         )
-        debtor_country = root.findtext(".//Dbtr/PstlAdr/Ctry") or "DE"
-        creditor_country = root.findtext(".//Cdtr/PstlAdr/Ctry") or "FR"
+        if not creditor_account:
+            self._log_siem_parse_failure("pacs.008", "Missing creditor account")
+            raise ValueError("ISO 20022 XML parsing failed: missing creditor account")
+
+        debtor_country = FinancialMessageParser.extract_country_code(
+            debtor_account, root.findtext(".//Dbtr/PstlAdr/Ctry")
+        )
+        creditor_country = FinancialMessageParser.extract_country_code(
+            creditor_account, root.findtext(".//Cdtr/PstlAdr/Ctry")
+        )
 
         tx = NormalizedTransaction(
             transaction_id=msg_id,
@@ -193,7 +234,7 @@ class ISO20022MessagingConnector(BaseBankConnector):
         """Parses an ISO 20022 pain.001.001.08 Customer Credit Transfer Initiation XML string."""
         self.validate_xml_schema(xml_content, "pain.001.001.08.xsd")
 
-        root = ET.fromstring(xml_content)  # nosec B314
+        root = ET.fromstring(xml_content.strip())  # nosec B314
 
         for elem in root.iter():
             if "}" in elem.tag:
@@ -203,18 +244,41 @@ class ISO20022MessagingConnector(BaseBankConnector):
         amount_elem = root.find(".//InstdAmt")
         if amount_elem is None:
             amount_elem = root.find(".//EqvtAmt/Amt")
-        amount = float(amount_elem.text) if amount_elem is not None and amount_elem.text else 250.0
-        currency = (amount_elem.get("Ccy") if amount_elem is not None else None) or "USD"
+        if amount_elem is None or not amount_elem.text or not amount_elem.text.strip():
+            self._log_siem_parse_failure("pain.001", "Missing instruction amount InstdAmt")
+            raise ValueError("ISO 20022 XML parsing failed: missing instruction amount in pain.001")
+
+        try:
+            amount = float(amount_elem.text.strip())
+            if amount <= 0:
+                raise ValueError("Instruction amount must be positive")
+        except ValueError as err:
+            self._log_siem_parse_failure("pain.001", f"Invalid instruction amount: {err}")
+            raise ValueError(f"ISO 20022 XML parsing failed: invalid instruction amount: {err}") from err
+
+        currency = amount_elem.get("Ccy") or "USD"
 
         debtor_account = (
             root.findtext(".//DbtrAcct/Id/IBAN")
             or root.findtext(".//DbtrAcct/Id/Othr/Id")
-            or "PAIN_DEBTOR"
         )
+        if not debtor_account:
+            self._log_siem_parse_failure("pain.001", "Missing debtor account")
+            raise ValueError("ISO 20022 XML parsing failed: missing debtor account in pain.001")
+
         creditor_account = (
             root.findtext(".//CdtrAcct/Id/IBAN")
             or root.findtext(".//CdtrAcct/Id/Othr/Id")
-            or "PAIN_CREDITOR"
+        )
+        if not creditor_account:
+            self._log_siem_parse_failure("pain.001", "Missing creditor account")
+            raise ValueError("ISO 20022 XML parsing failed: missing creditor account in pain.001")
+
+        debtor_country = FinancialMessageParser.extract_country_code(
+            debtor_account, root.findtext(".//Dbtr/PstlAdr/Ctry")
+        )
+        creditor_country = FinancialMessageParser.extract_country_code(
+            creditor_account, root.findtext(".//Cdtr/PstlAdr/Ctry")
         )
 
         tx = NormalizedTransaction(
@@ -225,8 +289,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
             currency=currency,
             timestamp=datetime.now(UTC),
             merchant_category_code="6012",
-            origin_country="US",
-            destination_country="GB",
+            origin_country=debtor_country,
+            destination_country=creditor_country,
             channel_type="ISO20022_PAIN001",
         )
         self._parsed_queue.append(tx)
@@ -242,24 +306,50 @@ class ISO20022MessagingConnector(BaseBankConnector):
         lines = mt103_text.splitlines()
 
         tx_id = f"MT103_{int(datetime.now(UTC).timestamp())}"
-        amount = 500.0
+        amount: float | None = None
         currency = "USD"
-        debtor = "SWIFT_DEBTOR"
-        creditor = "SWIFT_CREDITOR"
+        debtor: str | None = None
+        creditor: str | None = None
+        receiver_bic: str | None = None
 
         for line in lines:
-            if line.startswith(":20:"):
-                tx_id = line.replace(":20:", "").strip()
-            elif line.startswith(":32A:"):
-                val = line.replace(":32A:", "").strip()
+            stripped = line.strip()
+            if stripped.startswith(":20:"):
+                tx_id = stripped.replace(":20:", "").strip()
+            elif stripped.startswith(":32A:"):
+                val = stripped.replace(":32A:", "").strip()
                 m = re.search(r"^[0-9]{6}([A-Z]{3})([0-9,.]+)", val)
                 if m:
                     currency = m.group(1)
-                    amount = float(m.group(2).replace(",", "."))
-            elif line.startswith(":50K:") or line.startswith(":50A:"):
-                debtor = line.split(":", 2)[-1].strip()
-            elif line.startswith(":59:") or line.startswith(":59A:"):
-                creditor = line.split(":", 2)[-1].strip()
+                    try:
+                        amount = float(m.group(2).replace(",", "."))
+                    except ValueError:
+                        amount = None
+            elif stripped.startswith(":50K:") or stripped.startswith(":50A:") or stripped.startswith(":50F:"):
+                debtor = stripped.split(":", 2)[-1].strip()
+            elif stripped.startswith(":59:") or stripped.startswith(":59A:"):
+                creditor = stripped.split(":", 2)[-1].strip()
+            elif stripped.startswith(":57A:"):
+                receiver_bic = stripped.replace(":57A:", "").strip()
+
+        if amount is None or amount <= 0:
+            self._log_siem_parse_failure("SWIFT_MT103", "Missing or non-positive amount in tag :32A:")
+            raise ValueError("SWIFT MT103 parse failed: missing or invalid mandatory field :32A: amount")
+
+        if not debtor:
+            self._log_siem_parse_failure("SWIFT_MT103", "Missing ordering customer tag :50:")
+            raise ValueError("SWIFT MT103 parse failed: missing mandatory ordering customer (:50:)")
+
+        if not creditor:
+            self._log_siem_parse_failure("SWIFT_MT103", "Missing beneficiary customer tag :59:")
+            raise ValueError("SWIFT MT103 parse failed: missing mandatory beneficiary (:59:)")
+
+        origin_country = FinancialMessageParser.extract_country_code(debtor)
+        destination_country = FinancialMessageParser.extract_country_code(creditor)
+        if destination_country == "XX" and receiver_bic and len(receiver_bic) >= 6:
+            bic_country = receiver_bic[4:6].upper()
+            if bic_country.isalpha():
+                destination_country = bic_country
 
         tx = NormalizedTransaction(
             transaction_id=tx_id,
@@ -269,8 +359,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
             currency=currency,
             timestamp=datetime.now(UTC),
             merchant_category_code="6011",
-            origin_country="US",
-            destination_country="GB",
+            origin_country=origin_country,
+            destination_country=destination_country,
             channel_type="SWIFT_MT103",
         )
         self._parsed_queue.append(tx)
@@ -281,7 +371,7 @@ class ISO20022MessagingConnector(BaseBankConnector):
         """Parses an ISO 20022 camt.053.001.08 Bank-to-Customer Statement XML string into a list of NormalizedTransactions."""
         self.validate_xml_schema(xml_content, "camt.053.001.08.xsd")
 
-        root = ET.fromstring(xml_content)  # nosec B314
+        root = ET.fromstring(xml_content.strip())  # nosec B314
 
         for elem in root.iter():
             if "}" in elem.tag:
@@ -290,20 +380,35 @@ class ISO20022MessagingConnector(BaseBankConnector):
         acct_id = (
             root.findtext(".//Stmt/Acct/Id/IBAN")
             or root.findtext(".//Stmt/Acct/Id/Othr/Id")
-            or "STATEMENT_ACCOUNT"
         )
+        if not acct_id:
+            self._log_siem_parse_failure("camt.053", "Missing statement account identifier")
+            raise ValueError("ISO 20022 XML parsing failed: missing statement account identifier in camt.053")
+
+        acct_country = FinancialMessageParser.extract_country_code(acct_id)
         entries = root.findall(".//Stmt/Ntry")
         results: list[NormalizedTransaction] = []
 
         for idx, ntry in enumerate(entries):
             amt_elem = ntry.find(".//Amt")
-            amount = float(amt_elem.text) if amt_elem is not None and amt_elem.text else 0.0
-            currency = (amt_elem.get("Ccy") if amt_elem is not None else None) or "EUR"
+            if amt_elem is None or not amt_elem.text or not amt_elem.text.strip():
+                self._log_siem_parse_failure("camt.053", f"Missing amount in entry index {idx}")
+                raise ValueError(f"ISO 20022 XML parsing failed: statement entry {idx} missing amount")
+
+            try:
+                amount = float(amt_elem.text.strip())
+                if amount <= 0:
+                    raise ValueError("Statement entry amount must be positive")
+            except ValueError as err:
+                self._log_siem_parse_failure("camt.053", f"Invalid entry amount at index {idx}: {err}")
+                raise ValueError(f"ISO 20022 XML parsing failed: statement entry {idx} invalid amount: {err}") from err
+
+            currency = amt_elem.get("Ccy") or "EUR"
             tx_id = ntry.findtext(".//NtryRef") or f"camt053_entry_{idx}"
             counterparty = (
                 ntry.findtext(".//NtryDtls/TxDtls/RltdPties/Cdtr/Nm")
                 or ntry.findtext(".//NtryDtls/TxDtls/RltdPties/Dbtr/Nm")
-                or "COUNTERPARTY_STATEMENT"
+                or f"COUNTERPARTY_{idx}"
             )
 
             tx = NormalizedTransaction(
@@ -314,8 +419,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
                 currency=currency,
                 timestamp=datetime.now(UTC),
                 merchant_category_code="6012",
-                origin_country="EU",
-                destination_country="EU",
+                origin_country=acct_country,
+                destination_country=acct_country,
                 channel_type="ISO20022_CAMT053",
             )
             results.append(tx)
@@ -326,26 +431,39 @@ class ISO20022MessagingConnector(BaseBankConnector):
     @retry_connector()
     def parse_pacs002_xml(self, xml_content: str) -> NormalizedTransaction:
         """Parses an ISO 20022 pacs.002.001.10 Payment Status Report XML string."""
-        root = ET.fromstring(xml_content)  # nosec B314
+        self.validate_xml_schema(xml_content, "pacs.002.001.10.xsd")
+        root = ET.fromstring(xml_content.strip())  # nosec B314
 
         for elem in root.iter():
             if "}" in elem.tag:
                 elem.tag = elem.tag.split("}", 1)[1]
 
         msg_id = root.findtext(".//GrpHdr/MsgId") or f"pacs002_{int(datetime.now(UTC).timestamp())}"
-        status = root.findtext(".//OrgnlPmtInfAndSts/TxInfAndSts/TxSts") or "ACTC"
-        orig_msg_id = root.findtext(".//OrgnlPmtInfAndSts/OrgnlPmtInfId") or "ORIG_UNKNOWN"
+        status = root.findtext(".//OrgnlPmtInfAndSts/TxInfAndSts/TxSts") or root.findtext(".//TxInfAndSts/TxSts") or "ACTC"
+        orig_msg_id = root.findtext(".//OrgnlPmtInfAndSts/OrgnlPmtInfId") or root.findtext(".//OrgnlGrpInfAndSts/OrgnlMsgId") or "ORIG_UNKNOWN"
+
+        amt_elem = root.find(".//OrgnlTxRef/Amt")
+        if amt_elem is None:
+            amt_elem = root.find(".//Amt")
+        amount = 1.0
+        if amt_elem is not None and amt_elem.text and amt_elem.text.strip():
+            try:
+                parsed_amt = float(amt_elem.text.strip())
+                if parsed_amt > 0:
+                    amount = parsed_amt
+            except ValueError:
+                amount = 1.0
 
         tx = NormalizedTransaction(
             transaction_id=msg_id,
             account_id=orig_msg_id,
             counterparty_account_id=f"STATUS_{status}",
-            amount=0.0,
+            amount=amount,
             currency="EUR",
             timestamp=datetime.now(UTC),
             merchant_category_code="6012",
-            origin_country="EU",
-            destination_country="EU",
+            origin_country="XX",
+            destination_country="XX",
             channel_type="ISO20022_PACS002",
         )
         self._parsed_queue.append(tx)
@@ -356,39 +474,65 @@ class ISO20022MessagingConnector(BaseBankConnector):
         while self._parsed_queue:
             yield self._parsed_queue.pop(0)
 
-    def parse_batch(self, payload: Any) -> list[NormalizedTransaction]:
-        """Parses batch of XML/SWIFT message strings."""
+    def parse_batch(self, payload: Any, strict: bool = False) -> list[NormalizedTransaction]:
+        """Parses batch of XML/SWIFT message strings with error tracking and optional strict mode."""
         if isinstance(payload, list):
             results: list[NormalizedTransaction] = []
             for item in payload:
                 if isinstance(item, str):
                     try:
-                        if "<camt.053" in item:
+                        if "camt.053" in item or "BkToCstmrStmt" in item:
                             results.extend(self.parse_camt053_xml(item))
-                        elif "<pain.001" in item:
+                        elif "pain.001" in item or "CstmrCdtTrfInitn" in item:
                             results.append(self.parse_pain001_xml(item))
-                        elif "<pacs.002" in item:
+                        elif "pacs.002" in item or "FIToFIPmtStsRpt" in item:
                             results.append(self.parse_pacs002_xml(item))
-                        elif "<pacs.008" in item or "<Document" in item:
+                        elif "pacs.008" in item or "FIToFICstmrCdtTrf" in item or "<Document" in item:
                             results.append(self.parse_pacs008_xml(item))
                         elif ":20:" in item or ":32A:" in item:
                             results.append(self.parse_swift_mt103(item))
+                        else:
+                            raise ValueError(f"Unrecognized message format in batch item: {item[:64]}")
                     except Exception as err:
+                        self._failed_parse_count += 1
                         self._log_siem_parse_failure("BATCH_ITEM", str(err))
+                        if strict:
+                            raise
             return results
         elif isinstance(payload, str):
             try:
-                if "<camt.053" in payload:
+                if "camt.053" in payload or "BkToCstmrStmt" in payload:
                     return self.parse_camt053_xml(payload)
-                elif "<pain.001" in payload:
+                elif "pain.001" in payload or "CstmrCdtTrfInitn" in payload:
                     return [self.parse_pain001_xml(payload)]
-                elif "<pacs.002" in payload:
+                elif "pacs.002" in payload or "FIToFIPmtStsRpt" in payload:
                     return [self.parse_pacs002_xml(payload)]
-                elif "<pacs.008" in payload or "<Document" in payload:
+                elif "pacs.008" in payload or "FIToFICstmrCdtTrf" in payload or "<Document" in payload:
                     return [self.parse_pacs008_xml(payload)]
                 elif ":20:" in payload or ":32A:" in payload:
                     return [self.parse_swift_mt103(payload)]
+                else:
+                    raise ValueError(f"Unrecognized message format in payload string: {payload[:64]}")
             except Exception as err:
+                self._failed_parse_count += 1
                 self._log_siem_parse_failure("BATCH_STRING", str(err))
                 raise
         return []
+
+    def anonymize_transaction(
+        self, tx: NormalizedTransaction, salt: str = "cf_secagg_salt_2026"
+    ) -> NormalizedTransaction:
+        """Derive zero-PII privacy-preserving NormalizedTransaction using salted HMAC-SHA256 account hashing."""
+        hashed_debtor = hmac.new(
+            salt.encode("utf-8"), tx.account_id.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+        hashed_creditor = hmac.new(
+            salt.encode("utf-8"), tx.counterparty_account_id.encode("utf-8"), hashlib.sha256
+        ).hexdigest()
+
+        return tx.model_copy(
+            update={
+                "account_id": hashed_debtor,
+                "counterparty_account_id": hashed_creditor,
+            }
+        )

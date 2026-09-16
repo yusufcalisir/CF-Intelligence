@@ -29,12 +29,13 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`GDPR-ART-6`** | GDPR Art. 6 | Zero raw PII data pooling; federated gradient exchange only | `FederatedLearningEngine` (`fl_engine.py`) | `test_fl_engine.py` | `PASS` |
 | **`GDPR-ART-17`** | GDPR Art. 17 | Automated TTL data purging, cryptographic zeroization & unlearning | `AutomatedRetentionEngine`, `FederatedUnlearningEngine` | `test_retention_erasure_engine.py`, `test_retention_erasure_hardening.py`, `test_federated_unlearning_engine.py` | `PASS` |
 | **`SR-11-7-GOV`** | Fed SR 11-7 | Model risk management, concept drift detection & champion gate | `ModelGovernanceService`, `CanaryQualityGate` | `test_sr11_7_model_governance.py`, `test_model_governance_hardening.py` | `PASS` |
+| **`ISO20022-MSG`** | ISO 20022 / SWIFT | XML XSD schema validation, XXE defense, ISO 13616 IBAN Mod-97, salted zero-PII hashing | `FinancialMessageParser`, `ISO20022MessagingConnector` | `test_financial_message_parser_hardening.py`, `test_bank_connectors.py` | `PASS` |
 
 ---
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **1,811 automated tests** (1,523 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 2,118 total).
+All controls listed above are automatically verified by the continuous testing pipeline across **1,823 automated tests** (1,535 Backend Pytest + 257 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 2,130 total).
 
 
 
