@@ -109,7 +109,7 @@ def sign_csr_pem(
             cn_val = cns[0].value
             if isinstance(cn_val, bytes):
                 cn_val = cn_val.decode("utf-8")
-            san_dns_names.insert(0, x509.DNSName(str(cn_val)))
+            san_dns_names.insert(0, x509.DNSName(cn_val))
         builder = builder.add_extension(
             x509.SubjectAlternativeName(san_dns_names),
             critical=False,
