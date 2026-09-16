@@ -8,6 +8,20 @@ export const apiClient = axios.create({
   timeout: 30000,
 });
 
+apiClient.interceptors.request.use((config) => {
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('cfi_token') || sessionStorage.getItem('cfi_token');
+    if (token && !config.headers.Authorization) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    const tenantId = localStorage.getItem('cfi_tenant_id') || sessionStorage.getItem('cfi_tenant_id');
+    if (tenantId && !config.headers['X-Tenant-ID']) {
+      config.headers['X-Tenant-ID'] = tenantId;
+    }
+  }
+  return config;
+});
+
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

@@ -7,6 +7,7 @@ import {
   useUpdateCaseStatus,
   useCaseEvidence,
   useAddEvidence,
+  useGenerateCopilotNarrative,
 } from '../api/queries';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
@@ -48,19 +49,17 @@ export default function CaseDetailPage() {
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
 
+  const generateCopilotNarrative = useGenerateCopilotNarrative();
+
   const handleGenerateCopilotNarrative = async () => {
     if (!caseId) return;
     setIsCopilotLoading(true);
     try {
-      const res = await fetch(`/api/v1/cases/${caseId}/copilot/narrative`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ case_id: caseId, include_fincen_narrative: true }),
+      const data = await generateCopilotNarrative.mutateAsync({
+        caseId,
+        request: { case_id: caseId, include_fincen_narrative: true },
       });
-      if (res.ok) {
-        const data = await res.json();
-        setCopilotData(data);
-      }
+      setCopilotData(data);
     } catch (e) {
       console.error('Failed to generate Copilot narrative', e);
     } finally {
