@@ -1,71 +1,25 @@
-# Development overrides — hot reload, volume mounts, debug ports
-version: "3.9"
+# ==============================================================================
+# Development Overrides — Hot-Reload, Live Volume Mounts, and Debug Configuration
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# ==============================================================================
 
 services:
-  gateway:
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8000
-      --reload
-    volumes:
-      - ./backend:/app
+  backend:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.backend
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
     environment:
+      - APP_ENV=development
       - APP_DEBUG=true
-      - APP_LOG_LEVEL=DEBUG
-
-  fl-coordinator:
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8001
-      --reload
+      - LOG_LEVEL=DEBUG
     volumes:
-      - ./backend:/app
-    environment:
-      - APP_DEBUG=true
-      - APP_LOG_LEVEL=DEBUG
-
-  identity-graph:
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8002
-      --reload
-    volumes:
-      - ./backend:/app
-    environment:
-      - APP_DEBUG=true
-      - APP_LOG_LEVEL=DEBUG
-
-  fraud-alert:
-    command: >
-      uvicorn app.main:app
-      --host 0.0.0.0
-      --port 8003
-      --reload
-    volumes:
-      - ./backend:/app
-    environment:
-      - APP_DEBUG=true
-      - APP_LOG_LEVEL=DEBUG
-
-  worker:
-    command: >
-      celery -A app.infrastructure.celery_app worker
-      --loglevel=debug
-      --concurrency=1
-      -E
-    volumes:
-      - ./backend:/app
-
-  flower:
-    command: >
-      celery -A app.infrastructure.celery_app flower
-      --port=5555
-      --debug=true
-    volumes:
-      - ./backend:/app
+      - ./backend:/app/backend
+      - storage-data:/app/storage
+      - logs-data:/app/logs
+    ports:
+      - "8000:8000"
 
   frontend:
     build:
@@ -80,3 +34,7 @@ services:
     environment:
       - VITE_API_URL=http://localhost:8000
       - VITE_WS_URL=ws://localhost:8000
+
+volumes:
+  storage-data:
+  logs-data:

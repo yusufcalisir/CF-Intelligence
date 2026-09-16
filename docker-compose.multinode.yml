@@ -1,4 +1,8 @@
-version: "3.8"
+# ==============================================================================
+# Multi-Node Federated Consortium Simulation Specification
+# Usage:
+#   docker compose -f docker-compose.multinode.yml up --build
+# ==============================================================================
 
 services:
   coordinator:
@@ -10,7 +14,8 @@ services:
       - MODE=coordinator
       - APP_ENV=production
       - APP_LOG_LEVEL=INFO
-      - PORT=50051
+      - PORT=8000
+      - GRPC_PORT=50051
       - CA_CERT_PATH=/app/pki/ca.pem
       - SERVER_CERT_PATH=/app/pki/coordinator/cert.pem
       - SERVER_KEY_PATH=/app/pki/coordinator/key.pem
@@ -23,9 +28,9 @@ services:
       - "50051:50051"
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
       interval: 10s
-      timeout: 5s
+      timeout: 3s
       retries: 3
 
   bank-a:
