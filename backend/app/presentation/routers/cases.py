@@ -581,8 +581,32 @@ async def file_sar_report(
 @api_router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
 async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[str, Any]:
     """Compile and validate FinCEN BSA SAR XML payload with SHA-256 hash (Developer Portal & SIEM)."""
+    target_case_id = (payload.case_id or "").strip()
+    if not target_case_id:
+        avail_cases = _case_service.get_cases(limit=5)
+        avail_ids = [c.id for c in avail_cases]
+        raise HTTPException(
+            status_code=400,
+            detail=f"Missing required case_id for FinCEN SAR XML export. Please select a valid case. Available cases: {avail_ids}",
+        )
+
+    # Resolve active/demo aliases if provided
+    if target_case_id.lower() in ("demo", "latest", "active"):
+        avail_cases = _case_service.get_cases(limit=1)
+        if avail_cases:
+            target_case_id = avail_cases[0].id
+
+    case = _case_service.get_case(target_case_id)
+    if not case:
+        avail_cases = _case_service.get_cases(limit=5)
+        avail_ids = [c.id for c in avail_cases]
+        raise HTTPException(
+            status_code=404,
+            detail=f"Case '{target_case_id}' not found. Please select an active case from: {avail_ids}",
+        )
+
     return await file_sar_report(
-        payload.case_id,
+        target_case_id,
         institution_name=payload.institution_name,
         narrative_override=payload.narrative_override,
     )

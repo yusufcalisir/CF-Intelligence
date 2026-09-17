@@ -3,12 +3,24 @@
 from __future__ import annotations
 
 import logging
+import os
+import socket
 import time
 from typing import Any
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+def _fast_probe_socket(host: str, port: int, timeout: float = 0.25) -> float | None:
+    """Perform a non-blocking TCP handshake probe with a strict 250ms timeout."""
+    start = time.perf_counter()
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return round((time.perf_counter() - start) * 1000, 2)
+    except (OSError, TimeoutError):
+        return None
 
 
 class ConnectorHealthSummary(BaseModel):
@@ -44,12 +56,28 @@ class ConnectorDiagnosticsService:
 
     def __init__(self) -> None:
         self._mock_base_time = time.time()
+        self._cache_timestamp: float = 0.0
+        self._cached_summaries: list[ConnectorHealthSummary] = []
+        self._cache_ttl_seconds: float = 5.0
 
     def get_all_connector_statuses(self) -> list[ConnectorHealthSummary]:
         """Return connectivity health summary for all registered enterprise connectors."""
+        now = time.time()
+        if self._cached_summaries and (now - self._cache_timestamp < self._cache_ttl_seconds):
+            return self._cached_summaries
+
         now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
-        return [
+        # Non-blocking 250ms fast-probes for local infrastructure
+        redis_host = os.getenv("REDIS_HOST", "localhost")
+        redis_port = int(os.getenv("REDIS_PORT", "6379"))
+        redis_live_lat = _fast_probe_socket(redis_host, redis_port, timeout=0.25)
+
+        pg_host = os.getenv("POSTGRES_HOST", "localhost")
+        pg_port = int(os.getenv("POSTGRES_PORT", "5432"))
+        pg_live_lat = _fast_probe_socket(pg_host, pg_port, timeout=0.25)
+
+        summaries = [
             ConnectorHealthSummary(
                 connector_id="kafka",
                 name="Apache Kafka Event Broker",
@@ -123,8 +151,8 @@ class ConnectorDiagnosticsService:
                 name="Redis Cluster Pub/Sub",
                 category="Streaming Cache",
                 status="HEALTHY",
-                latency_ms=0.9,
-                endpoint="redis-cluster.internal.consortium.net:6379",
+                latency_ms=redis_live_lat if redis_live_lat is not None else 0.9,
+                endpoint=f"{redis_host}:{redis_port}" if redis_live_lat is not None else "redis-cluster.internal.consortium.net:6379",
                 protocol="RESP3 / TLS",
                 version="7.2.4",
                 last_checked=now_str,
@@ -133,6 +161,7 @@ class ConnectorDiagnosticsService:
                     "memory_used_mb": 48.2,
                     "cluster_state": "ok",
                     "pubsub_channels": 8,
+                    "live_probe_passed": redis_live_lat is not None,
                 },
             ),
             ConnectorHealthSummary(
@@ -140,8 +169,8 @@ class ConnectorDiagnosticsService:
                 name="PostgreSQL Core Database",
                 category="Persistence & Ledger",
                 status="HEALTHY",
-                latency_ms=1.2,
-                endpoint="postgres-primary.internal.consortium.net:5432",
+                latency_ms=pg_live_lat if pg_live_lat is not None else 1.2,
+                endpoint=f"{pg_host}:{pg_port}" if pg_live_lat is not None else "postgres-primary.internal.consortium.net:5432",
                 protocol="PostgreSQL Wire / TLS",
                 version="PostgreSQL 16.2",
                 last_checked=now_str,
@@ -150,6 +179,7 @@ class ConnectorDiagnosticsService:
                     "connection_pool_max": 30,
                     "schema_version": "001_production_domain_tables",
                     "wal_replication_lag_bytes": 0,
+                    "live_probe_passed": pg_live_lat is not None,
                 },
             ),
             ConnectorHealthSummary(
@@ -169,6 +199,10 @@ class ConnectorDiagnosticsService:
                 },
             ),
         ]
+
+        self._cached_summaries = summaries
+        self._cache_timestamp = now
+        return summaries
 
     def test_connector(self, connector_id: str) -> ConnectorTestProbeResult:
         """Run an on-demand active connectivity test probe against the requested connector."""

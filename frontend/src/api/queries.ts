@@ -1686,7 +1686,9 @@ export function useConnectorDiagnostics() {
   return useQuery<import('./types').DiagnosticsOverviewResponse>({
     queryKey: ['connector-diagnostics'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/api/v1/diagnostics/connectors');
+      const { data } = await apiClient.get('/api/v1/diagnostics/connectors', {
+        timeout: 5000,
+      });
       return data;
     },
     refetchInterval: 15000,

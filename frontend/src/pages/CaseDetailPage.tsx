@@ -8,6 +8,7 @@ import {
   useCaseEvidence,
   useAddEvidence,
   useGenerateCopilotNarrative,
+  useExportFinCENXml,
 } from '../api/queries';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
@@ -43,6 +44,9 @@ export default function CaseDetailPage() {
   const queryClient = useQueryClient();
   const [noteContent, setNoteContent] = useState('');
   const [supervisorSig, setSupervisorSig] = useState('');
+  const [isExportingXml, setIsExportingXml] = useState(false);
+  const [xmlExportSuccess, setXmlExportSuccess] = useState<string | null>(null);
+  const exportFinCEN = useExportFinCENXml();
 
   // Agentic AML Copilot state
   const [copilotData, setCopilotData] = useState<CopilotQueryResponse | null>(null);
@@ -126,6 +130,36 @@ export default function CaseDetailPage() {
     setEvContent('');
     queryClient.invalidateQueries({ queryKey: ['case', caseId] });
     queryClient.invalidateQueries({ queryKey: ['case-evidence', caseId] });
+  };
+
+  const handleExportFinCENXml = async () => {
+    if (!caseId) return;
+    setStatusError(null);
+    setXmlExportSuccess(null);
+    setIsExportingXml(true);
+    try {
+      const res = await exportFinCEN.mutateAsync({
+        case_id: caseId,
+        institution_name: 'Consortium Joint AML Unit',
+      });
+      setXmlExportSuccess(`✅ FinCEN SAR XML generated! SHA-256: ${res.sha256_hash?.slice(0, 16)}...`);
+      const blob = new Blob([res.xml_payload || res.xml], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fincen_sar_${caseId.slice(0, 8)}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'FinCEN XML export failed. Please verify case supervisor signatures.';
+      setStatusError(`❌ ${detail}`);
+    } finally {
+      setIsExportingXml(false);
+    }
   };
 
   if (isLoading) {
@@ -227,6 +261,14 @@ export default function CaseDetailPage() {
                 📥 Download SAR XML
               </a>
             )}
+            <button
+              onClick={handleExportFinCENXml}
+              disabled={isExportingXml}
+              className="px-2.5 py-1 text-xs rounded font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition-colors disabled:opacity-50 flex items-center gap-1 shrink-0"
+              title="Compile validated FinCEN BSA SAR XML"
+            >
+              {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
+            </button>
             {/* Supervisor Signature for Case Closure */}
             {['investigating', 'pending_review', 'escalated', 'sar_filed'].includes(caseData.status) && (
               <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 sm:items-center w-full max-w-full sm:max-w-md mt-3 p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg min-w-0">
@@ -244,6 +286,12 @@ export default function CaseDetailPage() {
             {statusError && (
               <div className="w-full mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium animate-in fade-in">
                 {statusError}
+              </div>
+            )}
+            {/* XML Export Success Toast */}
+            {xmlExportSuccess && (
+              <div className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium animate-in fade-in">
+                {xmlExportSuccess}
               </div>
             )}
           </div>

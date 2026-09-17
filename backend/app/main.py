@@ -356,7 +356,7 @@ def seed_mock_data() -> None:
     entity_svc.increment_alert_count(c1.id)
     entity_svc.update_risk_level(c1.id, RiskLevel.CRITICAL)
 
-    # 4. Create initial demonstration case
+    # 4. Create initial demonstration cases
     case = case_svc.create_case(
         title="High-Risk Activity: Device Sharing & Crypto Outflow",
         priority=CasePriority.P2_HIGH,
@@ -365,6 +365,19 @@ def seed_mock_data() -> None:
     case.assigned_to = "senior_analyst_1"
     case.status = CaseStatus.INVESTIGATING
     case_svc._cases.set(case.id, _case_to_dict(case))
+
+    # Seed canonical demo case CASE-98492 for FinCEN BSA SAR XML export
+    case_98492 = case_svc.create_case(
+        title="Structuring Pattern Detected: Smurfing Indicators",
+        priority=CasePriority.P1_CRITICAL,
+        alert_ids=[a1.id, a3.id],
+        total_risk_score=940.0,
+    )
+    case_98492.id = "CASE-98492"
+    case_98492.assigned_to = "senior_analyst_1"
+    case_98492.status = CaseStatus.INVESTIGATING
+    case_98492.supervisor_signatures = ["SIG_SUPERVISOR_ALICE_9941", "SIG_SUPERVISOR_BOB_8820"]
+    case_svc._cases.set("CASE-98492", _case_to_dict(case_98492))
 
     # 5. Create shared intelligence
     intel = SharedIntelligence(
