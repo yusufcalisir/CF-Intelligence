@@ -19,6 +19,12 @@ import type {
   ExplainabilityReport,
   GraphData,
   GraphStats,
+  MuleRingDetectionResponse,
+  SmurfingDetectionResponse,
+  GraphClusterItem,
+  GraphEdgesResponse,
+  EntityEmbeddingResponse,
+  GNNSimilarityResponse,
   IntelligenceStats,
   RiskWeights,
   ScenarioInfo,
@@ -576,6 +582,75 @@ export function useGraphStats() {
       return data;
     },
     refetchInterval: 10000,
+  });
+}
+
+export function useDetectMuleRings(minLength = 3, maxLength = 7, bankId?: string) {
+  return useQuery<MuleRingDetectionResponse>({
+    queryKey: ['mule-rings', minLength, maxLength, bankId],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/graph/rings', {
+        params: { min_length: minLength, max_length: maxLength, bank_id: bankId },
+      });
+      return data;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useDetectSmurfing(windowHours = 24, minFan = 3, maxDepth = 3, bankId?: string) {
+  return useQuery<SmurfingDetectionResponse>({
+    queryKey: ['smurfing-patterns', windowHours, minFan, maxDepth, bankId],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/graph/smurfing/detect', {
+        params: { window_hours: windowHours, min_fan: minFan, max_depth: maxDepth, bank_id: bankId },
+      });
+      return data;
+    },
+  });
+}
+
+export function useGraphClusters(minSize = 3) {
+  return useQuery<GraphClusterItem[]>({
+    queryKey: ['graph-clusters', minSize],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/graph/clusters/list', {
+        params: { min_size: minSize },
+      });
+      return data;
+    },
+  });
+}
+
+export function useGraphEdges(sourceId?: string, targetId?: string, limit = 50) {
+  return useQuery<GraphEdgesResponse>({
+    queryKey: ['graph-edges', sourceId, targetId, limit],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/graph/edges', {
+        params: { source_id: sourceId, target_id: targetId, limit },
+      });
+      return data;
+    },
+  });
+}
+
+export function useNodeEmbedding(entityId: string | undefined) {
+  return useQuery<EntityEmbeddingResponse>({
+    queryKey: ['node-embedding', entityId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/graph/embeddings/${entityId}`);
+      return data;
+    },
+    enabled: !!entityId,
+  });
+}
+
+export function useSimilarEntities() {
+  return useMutation<GNNSimilarityResponse, Error, { entity_id: string; top_k?: number; threshold?: number }>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/graph/embeddings/similar', payload);
+      return data;
+    },
   });
 }
 

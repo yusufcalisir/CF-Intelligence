@@ -581,6 +581,89 @@ export interface GraphStats {
   database_backend?: string;
 }
 
+export interface MuleRingItem {
+  ring_id: string;
+  length: number;
+  entity_ids: string[];
+  banks_involved: string[];
+  is_cross_bank: boolean;
+  risk_score: number;
+  total_volume: number;
+  detected_at: string;
+}
+
+export interface MuleRingDetectionResponse {
+  total_rings: number;
+  cross_bank_rings: number;
+  max_risk_score: number;
+  rings: MuleRingItem[];
+}
+
+export interface SmurfingPatternItem {
+  pattern_id: string;
+  pattern_type: string;
+  primary_entity: string;
+  connected_entities: string[];
+  total_amount: number;
+  transaction_count: number;
+  risk_score: number;
+  bank_id: string;
+}
+
+export interface SmurfingDetectionResponse {
+  patterns: SmurfingPatternItem[];
+  total_patterns: number;
+  fan_in_count: number;
+  fan_out_count: number;
+  layering_count: number;
+}
+
+export interface GraphClusterItem {
+  cluster_id: number;
+  entity_ids: string[];
+  size: number;
+}
+
+export interface GraphSearchNodeItem {
+  id: string;
+  display_label: string;
+  entity_type: string;
+  bank_id: string;
+  risk_level: string;
+  alert_count: number;
+}
+
+export interface GraphEdgeItem {
+  id: string;
+  source: string;
+  target: string;
+  label: string;
+  type: string;
+  animated: boolean;
+  confidence?: number;
+  relationship_type?: string;
+  style?: Record<string, unknown>;
+  data?: Record<string, unknown>;
+}
+
+export interface GraphEdgesResponse {
+  total_edges: number;
+  count: number;
+  edges: GraphEdgeItem[];
+}
+
+export interface EntityEmbeddingResponse {
+  entity_id: string;
+  embedding: number[];
+  dimension: number;
+}
+
+export interface GNNSimilarityResponse {
+  query_entity_id: string;
+  similar_entities: Array<{ entity_id: string; similarity: number }>;
+  count: number;
+}
+
 
 export interface ScenarioInfo {
   type: string;

@@ -891,6 +891,7 @@ elif service_name == "identity-graph":
     app.include_router(health.router)
     app.include_router(entities.router)
     app.include_router(graph.router)
+    app.include_router(graph.api_router)
 
 elif service_name == "fraud-alert":
     app.include_router(health.router)
@@ -907,6 +908,9 @@ elif service_name == "fraud-alert":
     app.include_router(
         graph.router
     )  # Mounted for read access of graph within streaming engine if queried directly
+    app.include_router(
+        graph.api_router
+    )
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
     app.include_router(streaming_ws.router)
@@ -935,6 +939,7 @@ else:
     app.include_router(entities.router)
     app.include_router(entities.psi_router)
     app.include_router(graph.router)
+    app.include_router(graph.api_router)
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
     app.include_router(psd2.router)
