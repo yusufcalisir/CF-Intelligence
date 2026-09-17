@@ -38,9 +38,10 @@ _diagnostics_service = ConnectorDiagnosticsService()
 
 
 def _get_system_memory() -> tuple[MemoryDiagnostic, ProcessMemoryDiagnostic]:
-    """Extract host and process virtual memory metrics via psutil with fallback."""
     try:
-        import psutil
+        import importlib
+
+        psutil = importlib.import_module("psutil")
 
         vm = psutil.virtual_memory()
         mem_diag = MemoryDiagnostic(

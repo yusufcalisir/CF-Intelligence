@@ -9,6 +9,7 @@ Tests that:
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from typing import Any
 
 import numpy as np
@@ -41,7 +42,7 @@ def dummy_bank_data() -> dict[str, dict[str, np.ndarray]]:
 
 
 @pytest.fixture(autouse=True)
-def cleanup_ray() -> None:
+def cleanup_ray() -> Generator[None, None, None]:
     import sys
 
     if "ray" in sys.modules:

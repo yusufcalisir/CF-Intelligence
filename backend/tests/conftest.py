@@ -3,6 +3,7 @@
 import contextlib
 import importlib.util
 import os
+import sys
 from typing import Any
 
 # Pre-load pyarrow on Windows to initialize C++ DLLs cleanly before pytest collects tests
@@ -109,4 +110,33 @@ def clear_fallback_stores():
     RedisStore._shared_fallback_stores.clear()
     yield
     RedisStore._shared_fallback_stores.clear()
+
+
+# ── Clean C++ Extension Interpreter Teardown ──────────────────────────────────
+_session_exitstatus: int | None = None
+
+
+def pytest_sessionfinish(session: pytest.Session, exitstatus: int) -> None:
+    """Record pytest session exit status after all test items have run."""
+    global _session_exitstatus
+    _session_exitstatus = exitstatus
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Safely flush streams and terminate cleanly during interpreter teardown.
+
+    Prevents C++ native extension background worker threads (PyTorch OpenMP,
+    PyArrow, TenSEAL, Ray) from aborting with SIGABRT (exit code 134:
+    'terminate called without an active exception') during CPython 3.12
+    Py_FinalizeEx thread unwinding on Linux CI environments.
+    """
+    global _session_exitstatus
+    if _session_exitstatus is not None and (
+        os.environ.get("CI") == "true"
+        or os.environ.get("TESTING") == "1"
+        or sys.platform.startswith("linux")
+    ):
+        sys.stdout.flush()
+        sys.stderr.flush()
+        os._exit(_session_exitstatus)
 

@@ -456,6 +456,7 @@ async def gateway_metrics() -> GatewayMetricsResponse:
 @api_router.api_route(
     "/proxy/{service_path:path}",
     methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"],
+    include_in_schema=False,
 )
 async def explicit_gateway_proxy(request: Request, service_path: str):
     """Explicit gateway proxy route forwarding requests under /api/v1/gateway/proxy/*."""
