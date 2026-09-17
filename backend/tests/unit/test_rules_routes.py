@@ -334,3 +334,25 @@ def test_dual_routing_parity():
         assert res_single1.status_code == 200
         assert res_single2.status_code == 200
         assert res_single1.json() == res_single2.json()
+
+
+def test_update_default_rule_toggle_active():
+    """Verify toggling active status on built-in default rules persists and returns 200 (fixes 404 on UI)."""
+    with TestClient(app) as client:
+        # Toggle rule_vel_001 to inactive
+        res = client.put("/api/v1/rules/rule_vel_001", json={"is_active": False})
+        assert res.status_code == 200
+        data = res.json()
+        assert data["id"] == "rule_vel_001"
+        assert data["is_active"] is False
+
+        # Verify single get reflects change
+        res_get = client.get("/api/v1/rules/rule_vel_001")
+        assert res_get.status_code == 200
+        assert res_get.json()["is_active"] is False
+
+        # Toggle back to active
+        res_back = client.put("/api/v1/rules/rule_vel_001", json={"is_active": True})
+        assert res_back.status_code == 200
+        assert res_back.json()["is_active"] is True
+

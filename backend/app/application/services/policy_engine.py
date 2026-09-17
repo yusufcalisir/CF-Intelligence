@@ -351,6 +351,53 @@ class PolicyEngineService:
             _ACTIVE_RULES_CACHE_TIME = now
         return rules
 
+    async def ensure_default_rules(
+        self,
+        session: AsyncSession,
+        default_rules: list[Any],
+    ) -> list[BusinessRuleModel]:
+        """Ensure initial default rules exist in the persistent database.
+
+        If the database repository is empty or missing default seed rules,
+        they are safely persisted so that subsequent GET, PUT, and DELETE
+        operations target real database records.
+        """
+        stmt = select(BusinessRuleModel).order_by(BusinessRuleModel.rule_name)
+        res = await session.execute(stmt)
+        existing = {r.id: r for r in res.scalars().all()}
+
+        new_count = 0
+        for dr in default_rules:
+            dr_id = dr.id if hasattr(dr, "id") else dr.get("id")
+            if dr_id and dr_id not in existing:
+                name = dr.rule_name if hasattr(dr, "rule_name") else dr.get("rule_name")
+                cond = dr.condition if hasattr(dr, "condition") else dr.get("condition")
+                act = dr.action if hasattr(dr, "action") else dr.get("action")
+                active = dr.is_active if hasattr(dr, "is_active") else dr.get("is_active", True)
+
+                # Check if a rule with same rule_name already exists to avoid unique constraint violations
+                name_exists = any(r.rule_name == name for r in existing.values())
+                if not name_exists:
+                    rule = BusinessRuleModel(
+                        id=str(dr_id),
+                        rule_name=str(name),
+                        condition=cond if isinstance(cond, dict) else {},
+                        action=str(act).strip().upper(),
+                        is_active=bool(active),
+                        created_at=datetime.now(UTC),
+                        updated_at=datetime.now(UTC),
+                    )
+                    session.add(rule)
+                    existing[dr_id] = rule
+                    new_count += 1
+
+        if new_count > 0:
+            await session.commit()
+            invalidate_policy_cache()
+            logger.info("Persisted %d default business rules to active database", new_count)
+
+        return list(existing.values())
+
     async def create_rule(
         self,
         session: AsyncSession,
@@ -358,6 +405,7 @@ class PolicyEngineService:
         condition: dict[str, Any],
         action: str = "BLOCK_TRANSACTION",
         is_active: bool = True,
+        rule_id: str | None = None,
     ) -> BusinessRuleModel:
         """Create and persist a new dynamic business rule."""
         if not rule_name or not rule_name.strip():
@@ -372,7 +420,7 @@ class PolicyEngineService:
 
         invalidate_policy_cache()
         rule = BusinessRuleModel(
-            id=str(uuid.uuid4()),
+            id=rule_id.strip() if rule_id and rule_id.strip() else str(uuid.uuid4()),
             rule_name=rule_name.strip(),
             condition=condition,
             action=action.strip().upper(),

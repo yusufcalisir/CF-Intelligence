@@ -7,6 +7,7 @@ for AML & fraud policy rules. Supports both /api/v1/rules and /v1/rules paths.
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
@@ -125,18 +126,49 @@ async def create_business_rule(
         ) from exc
 
 
+def _find_default_rule(rule_id: str) -> BusinessRuleResponse | None:
+    """Find a default rule definition by ID from the seeded registry."""
+    for r in _DEFAULT_RULES:
+        if r.id == rule_id:
+            return r
+    return None
+
+
+def _sync_in_memory_default_rule(
+    rule_id: str,
+    payload: BusinessRuleUpdateRequest,
+) -> BusinessRuleResponse | None:
+    """Synchronize an update to the in-memory default rules array."""
+    for idx, r in enumerate(_DEFAULT_RULES):
+        if r.id == rule_id:
+            updated_data = r.model_dump()
+            if payload.rule_name is not None:
+                updated_data["rule_name"] = payload.rule_name
+            if payload.condition is not None:
+                updated_data["condition"] = payload.condition
+            if payload.action is not None:
+                updated_data["action"] = payload.action
+            if payload.is_active is not None:
+                updated_data["is_active"] = payload.is_active
+            updated_data["updated_at"] = datetime.now(UTC).isoformat()
+            updated_obj = BusinessRuleResponse(**updated_data)
+            _DEFAULT_RULES[idx] = updated_obj
+            return updated_obj
+    return None
+
+
 @router.get("", response_model=list[BusinessRuleResponse])
 @api_router.get("", response_model=list[BusinessRuleResponse])
 async def list_business_rules(session: OptionalSessionDep = None) -> list[BusinessRuleResponse]:
     """Retrieve all business rules configured in the active tenant."""
     if session is not None:
         try:
-            rules = await _policy_service.list_rules(session)
+            rules = await _policy_service.ensure_default_rules(session, _DEFAULT_RULES)
             if rules:
                 return [_to_rule_response(r) for r in rules]
         except Exception as exc:
             logger.warning(
-                "Database query failed for list_business_rules (%s), returning default rules fallback",
+                "Database query/seed failed for list_business_rules (%s), returning default rules fallback",
                 exc,
             )
     return _DEFAULT_RULES
@@ -186,10 +218,26 @@ async def update_business_rule(
             is_active=payload.is_active,
         )
         if not rule:
+            # If not yet persisted in database, check if it is a built-in default rule
+            default_def = _find_default_rule(rule_id)
+            if default_def is not None:
+                rule = await _policy_service.create_rule(
+                    session=session,
+                    rule_id=default_def.id,
+                    rule_name=payload.rule_name if payload.rule_name is not None else default_def.rule_name,
+                    condition=payload.condition if payload.condition is not None else default_def.condition,
+                    action=payload.action if payload.action is not None else default_def.action,
+                    is_active=payload.is_active if payload.is_active is not None else default_def.is_active,
+                )
+                _sync_in_memory_default_rule(rule_id, payload)
+                return _to_rule_response(rule)
+
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Business rule with ID '{rule_id}' not found",
             )
+
+        _sync_in_memory_default_rule(rule_id, payload)
         return _to_rule_response(rule)
     except HTTPException:
         raise
@@ -208,14 +256,30 @@ async def update_business_rule(
 
 @router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
 @api_router.delete("/{rule_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_business_rule(rule_id: str, session: SessionDep) -> None:
+async def delete_business_rule(
+    rule_id: str,
+    session: SessionDep,
+) -> None:
     """Delete a business rule permanently from the database."""
     success = await _policy_service.delete_rule(session, rule_id)
     if not success:
+        # Check if it was a default rule in memory
+        default_def = _find_default_rule(rule_id)
+        if default_def is not None:
+            for idx, r in enumerate(_DEFAULT_RULES):
+                if r.id == rule_id:
+                    _DEFAULT_RULES.pop(idx)
+                    return
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Business rule with ID '{rule_id}' not found",
         )
+
+    # Clean up in-memory list if present
+    for idx, r in enumerate(_DEFAULT_RULES):
+        if r.id == rule_id:
+            _DEFAULT_RULES.pop(idx)
+            break
 
 
 @router.post("/test", response_model=BusinessRuleTestResponse)
