@@ -84,6 +84,12 @@ import type {
   CalibrationReport,
   ActiveAlertItem,
   RetrainTriggerResponse,
+  HealthCheckResponse,
+  ReadinessResponse,
+  SystemDiagnosticResponse,
+  ConceptDriftPsiResponse,
+  FairnessMetricsResponse,
+  TelemetryOverviewResponse,
   ClientCapabilityItem,
   NegotiatedParamsResponse,
   DatasetPreviewRequest,
@@ -1269,6 +1275,72 @@ export function useTriggerAutoRetrain() {
       });
       return data;
     },
+  });
+}
+
+export function useHealth() {
+  return useQuery<HealthCheckResponse>({
+    queryKey: ['platform-health'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/health');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useReadiness() {
+  return useQuery<ReadinessResponse>({
+    queryKey: ['platform-readiness'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/health/ready');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useSystemDiagnostics() {
+  return useQuery<SystemDiagnosticResponse>({
+    queryKey: ['system-diagnostics'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/diagnostics/system');
+      return data;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useConceptDriftPsi() {
+  return useQuery<ConceptDriftPsiResponse>({
+    queryKey: ['monitoring-concept-drift-psi'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/monitoring/drift/psi');
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useFairnessMetrics() {
+  return useQuery<FairnessMetricsResponse>({
+    queryKey: ['monitoring-fairness-metrics'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/monitoring/fairness');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useTelemetryOverview() {
+  return useQuery<TelemetryOverviewResponse>({
+    queryKey: ['monitoring-telemetry-overview'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/monitoring/telemetry');
+      return data;
+    },
+    refetchInterval: 5000,
   });
 }
 

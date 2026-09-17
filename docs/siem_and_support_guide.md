@@ -111,7 +111,11 @@ The compiler scans all log files, environment dumps, and stack traces:
 ## 🧪 Automated Unit Test Suite
 
 ```bash
+# SIEM, Syslog, Splunk, and diagnostic bundle verification (4 tests)
 pytest backend/tests/unit/test_siem_support_diagnostics.py -v
+
+# Platform Observability, Prometheus Metrics, System Diagnostics & Health API (38 tests)
+pytest backend/tests/unit/test_monitoring_and_health_routes.py -v
 ```
 
 **Verification Results:**
@@ -119,3 +123,7 @@ pytest backend/tests/unit/test_siem_support_diagnostics.py -v
 - `test_syslog_format_is_valid_rfc5424`: `PASSED` (UDP socket capture validates `<134>1` envelope)
 - `test_splunk_payload_structure`: `PASSED` (Verifies HEC URL, bearer token, and JSON event body)
 - `test_support_diagnostic_pii_redaction`: `PASSED` (Verifies zero PII leakage in diagnostic bundle)
+- `TestHealthAndReadinessProbes`: `PASSED` (Liveness, readiness 200/503 degraded, dependency breakdown across 3 prefixes)
+- `TestSystemDiagnosticsEndpoints`: `PASSED` (System CPU/memory, process RSS/VMS, sanitized env, connector probes)
+- `TestMonitoringAndObservabilityRoutes`: `PASSED` (Drift analyze, PSI, fairness 80% rule, telemetry, calibration, alerts, retraining)
+- `TestPrometheusMetricsScrape`: `PASSED` (Prometheus text/plain metrics scraping endpoint)

@@ -7,6 +7,19 @@ from app.application.schemas import (
     feedback,
     graph,
     model_registry,
+    observability,
     optimization,
     simulation,
 )
+
+__all__ = [
+    "banks",
+    "copilot",
+    "entities",
+    "feedback",
+    "graph",
+    "model_registry",
+    "observability",
+    "optimization",
+    "simulation",
+]

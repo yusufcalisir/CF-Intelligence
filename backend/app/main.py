@@ -771,7 +771,17 @@ app.add_middleware(DDoSProtectionMiddleware)
 class TenantAccessControlMiddleware(BaseHTTPMiddleware):
     """Enforces multi-tenant broken access control (BOLA/IDOR) prevention across all routes."""
 
-    _EXEMPT_PREFIXES = ("/docs", "/redoc", "/openapi.json", "/health", "/metrics", "/ws/", "/api/v1/onboarding")
+    _EXEMPT_PREFIXES = (
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/health",
+        "/api/v1/health",
+        "/v1/health",
+        "/metrics",
+        "/ws/",
+        "/api/v1/onboarding",
+    )
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
         if any(request.url.path.startswith(p) for p in self._EXEMPT_PREFIXES):
@@ -860,6 +870,7 @@ app.include_router(auth.router)
 app.include_router(onboarding.router)
 app.include_router(design_partner.router)
 app.include_router(diagnostics.router)
+app.include_router(diagnostics.api_router)
 app.include_router(datasets.router)
 app.include_router(copilot.router)
 app.include_router(copilot.api_router)
@@ -873,10 +884,14 @@ if service_name == "gateway":
     from app.presentation.routers import gateway
 
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(gateway.router)
 
 elif service_name in ("fl-coordinator", "coordinator"):
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(simulation.router)
     app.include_router(simulation.api_router)
     app.include_router(simulation.singular_router)
@@ -900,6 +915,8 @@ elif service_name in ("fl-coordinator", "coordinator"):
 
 elif service_name == "identity-graph":
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(entities.router)
     app.include_router(entities.api_router)
     app.include_router(entities.psi_router)
@@ -909,6 +926,8 @@ elif service_name == "identity-graph":
 
 elif service_name == "fraud-alert":
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(alerts.router)
     app.include_router(alerts.api_router)
     app.include_router(cases.router)
@@ -934,10 +953,14 @@ elif service_name == "fraud-alert":
 
 elif service_name.startswith("bank-") or service_name == "bank_client":
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(bank_client.router)
     app.include_router(bank_client.api_router)
 else:
     app.include_router(health.router)
+    app.include_router(health.api_router)
+    app.include_router(health.v1_router)
     app.include_router(maintenance_cron.router)
     app.include_router(simulation.router)
     app.include_router(simulation.api_router)
@@ -975,6 +998,7 @@ else:
     app.include_router(psd2.api_router)
     app.include_router(security.router)
     app.include_router(monitoring.router)
+    app.include_router(monitoring.api_router)
     app.include_router(coordinator.router)
     app.include_router(privacy_defense.router)
     app.include_router(settlement.router)

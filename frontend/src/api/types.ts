@@ -1262,6 +1262,70 @@ export interface RetrainTriggerResponse {
   triggered_at: string;
 }
 
+export interface HealthCheckResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+  version: string;
+  uptime_seconds: number;
+}
+
+export interface DependencyHealthStatus {
+  status: string;
+  latency_ms: number;
+  message?: string | null;
+}
+
+export interface ReadinessResponse {
+  status: 'ready' | 'degraded' | string;
+  checks: Record<string, boolean | DependencyHealthStatus>;
+  timestamp: string;
+}
+
+export interface SystemDiagnosticResponse {
+  platform: string;
+  python_version: string;
+  cpu_count: number;
+  memory: {
+    total_mb: number;
+    available_mb: number;
+    used_mb: number;
+    percent: number;
+  };
+  process_memory: {
+    rss_mb: number;
+    vms_mb: number;
+  };
+  uptime_seconds: number;
+  timestamp: string;
+}
+
+export interface ConceptDriftPsiResponse {
+  concept_drift_psi: number;
+  overall_status: string;
+  alert_level: string;
+  max_feature_psi: number;
+  evaluated_at: string;
+  features: Record<string, number>;
+}
+
+export interface FairnessMetricsResponse {
+  demographic_parity_ratio: number;
+  disparate_impact_ratio: number;
+  equalized_odds_difference: number;
+  satisfies_four_fifths_rule: boolean;
+  evaluated_at: string;
+  protected_attributes: string[];
+}
+
+export interface TelemetryOverviewResponse {
+  uptime_seconds: number;
+  active_requests: number;
+  metrics_scraped_total: number;
+  alerts_firing: number;
+  timestamp: string;
+}
+
 // ── Coordinator Types (Item 18) ─────────────────────────────
 
 export interface HandshakeRequest {
