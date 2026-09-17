@@ -121,12 +121,13 @@ def _setup_tenant_logging() -> None:
     import tempfile
 
     from app.infrastructure.database import active_tenant
+    from app.infrastructure.storage.storage_utils import get_storage_dir
 
     env_dir = os.environ.get("CFI_STORAGE_DIR")
     if env_dir:
         logs_dir = os.path.abspath(os.path.join(env_dir, "logs"))
     else:
-        logs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "storage", "logs"))
+        logs_dir = os.path.abspath(os.path.join(get_storage_dir(), "logs"))
 
     try:
         os.makedirs(logs_dir, exist_ok=True)
@@ -422,24 +423,25 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Start Redis Bank Client Listeners
     redis_listeners = []
-    if service_name.startswith("bank-"):
+    if service_name.startswith("bank-") or service_name == "bank_client":
         try:
             from app.presentation.messaging.redis_listener import RedisBankClientListener
 
             redis_url = settings.redis_url
             if redis_url:
-                listener = RedisBankClientListener(redis_url=redis_url, bank_id=service_name)
+                target_id = service_name if service_name.startswith("bank-") else "bank_a"
+                listener = RedisBankClientListener(redis_url=redis_url, bank_id=target_id)
                 await listener.start()
                 redis_listeners.append(listener)
         except Exception as exc:
             logger.error("Failed to start Redis Bank Client Listener: %s", exc)
-    elif not service_name:
+    elif not service_name or service_name == "monolith":
         try:
             from app.presentation.messaging.redis_listener import RedisBankClientListener
 
             redis_url = settings.redis_url
             if redis_url:
-                for b_id in ["bank-a", "bank-b", "bank-c"]:
+                for b_id in ["bank_a", "bank_b", "bank_c"]:
                     listener = RedisBankClientListener(redis_url=redis_url, bank_id=b_id)
                     await listener.start()
                     redis_listeners.append(listener)

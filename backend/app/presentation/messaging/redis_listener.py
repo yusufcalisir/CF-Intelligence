@@ -40,12 +40,19 @@ class RedisBankClientListener:
         self.pubsub = self.redis.pubsub()
         self.is_running = True
 
-        # Subscribe to command topics for this specific bank
-        await self.pubsub.subscribe(
+        norm_id = self.bank_id.replace("-", "_")
+        channels = [
             f"bank_client_{self.bank_id}_init",
             f"bank_client_{self.bank_id}_train",
             f"bank_client_{self.bank_id}_evaluate",
-        )
+        ]
+        if norm_id != self.bank_id:
+            channels.extend([
+                f"bank_client_{norm_id}_init",
+                f"bank_client_{norm_id}_train",
+                f"bank_client_{norm_id}_evaluate",
+            ])
+        await self.pubsub.subscribe(*channels)
         self._task = asyncio.create_task(self._listen_loop())
         logger.info("Redis Event Listener started for bank %s", self.bank_id)
 
@@ -63,6 +70,11 @@ class RedisBankClientListener:
         logger.info("Redis Event Listener stopped for bank %s", self.bank_id)
 
     async def _listen_loop(self) -> None:
+        norm_id = self.bank_id.replace("-", "_")
+        init_channels = {f"bank_client_{self.bank_id}_init", f"bank_client_{norm_id}_init"}
+        train_channels = {f"bank_client_{self.bank_id}_train", f"bank_client_{norm_id}_train"}
+        eval_channels = {f"bank_client_{self.bank_id}_evaluate", f"bank_client_{norm_id}_evaluate"}
+
         while self.is_running:
             try:
                 if self.pubsub is None:
@@ -76,11 +88,11 @@ class RedisBankClientListener:
                 channel = message["channel"]
                 data = json.loads(message["data"])
 
-                if channel == f"bank_client_{self.bank_id}_init":
+                if channel in init_channels:
                     await self._handle_init(data)
-                elif channel == f"bank_client_{self.bank_id}_train":
+                elif channel in train_channels:
                     await self._handle_train(data)
-                elif channel == f"bank_client_{self.bank_id}_evaluate":
+                elif channel in eval_channels:
                     await self._handle_evaluate(data)
 
             except asyncio.CancelledError:
@@ -148,9 +160,11 @@ class RedisBankClientListener:
             }
 
         if self.redis:
-            await self.redis.publish(
-                f"bank_client_{self.bank_id}_init_response", json.dumps(response)
-            )
+            norm_id = self.bank_id.replace("-", "_")
+            payload = json.dumps(response)
+            await self.redis.publish(f"bank_client_{self.bank_id}_init_response", payload)
+            if norm_id != self.bank_id:
+                await self.redis.publish(f"bank_client_{norm_id}_init_response", payload)
 
     async def _handle_train(self, data: dict[str, Any]) -> None:
         try:
@@ -210,9 +224,11 @@ class RedisBankClientListener:
             response = {"error": str(exc), "correlation_id": data.get("correlation_id")}
 
         if self.redis:
-            await self.redis.publish(
-                f"bank_client_{self.bank_id}_train_response", json.dumps(response)
-            )
+            norm_id = self.bank_id.replace("-", "_")
+            payload = json.dumps(response)
+            await self.redis.publish(f"bank_client_{self.bank_id}_train_response", payload)
+            if norm_id != self.bank_id:
+                await self.redis.publish(f"bank_client_{norm_id}_train_response", payload)
 
     async def _handle_evaluate(self, data: dict[str, Any]) -> None:
         try:
@@ -254,6 +270,8 @@ class RedisBankClientListener:
             response = {"error": str(exc), "correlation_id": data.get("correlation_id")}
 
         if self.redis:
-            await self.redis.publish(
-                f"bank_client_{self.bank_id}_evaluate_response", json.dumps(response)
-            )
+            norm_id = self.bank_id.replace("-", "_")
+            payload = json.dumps(response)
+            await self.redis.publish(f"bank_client_{self.bank_id}_evaluate_response", payload)
+            if norm_id != self.bank_id:
+                await self.redis.publish(f"bank_client_{norm_id}_evaluate_response", payload)
