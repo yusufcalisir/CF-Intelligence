@@ -1135,7 +1135,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,236 / 2,236 passing (2,543 total incl. verification)** | 100% | 1,943 Backend Pytest + 262 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,237 / 2,237 passing (2,544 total incl. verification)** | 100% | 1,944 Backend Pytest + 262 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
