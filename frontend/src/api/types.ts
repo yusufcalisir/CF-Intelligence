@@ -1677,6 +1677,12 @@ export interface DPGradientResponse {
   sigma: number;
 }
 
+export interface ClearFeedbackBufferResponse {
+  status: string;
+  tenant_id: string;
+  cleared_count: number;
+}
+
 // ── FinCEN SAR 2.0 e-Filing & Regulatory Submissions ────────
 export interface SARFilingRecord {
   filing_id: string;

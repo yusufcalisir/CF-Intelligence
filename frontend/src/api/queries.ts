@@ -89,6 +89,7 @@ import type {
   RetrainingBatchResponse,
   DPGradientRequest,
   DPGradientResponse,
+  ClearFeedbackBufferResponse,
   SARFilingRecord,
   SARValidationResult,
   ExportFinCENXmlRequest,
@@ -1492,6 +1493,22 @@ export function useIngestFeedback() {
   });
 }
 
+export function useSubmitAnalystFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation<AnalystFeedbackIngestResponse, Error, AnalystFeedbackIngestRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<AnalystFeedbackIngestResponse>(
+        '/api/v1/feedback/submit',
+        payload
+      );
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['feedback-stats', variables.tenant_id || 'bank_alpha'] });
+    },
+  });
+}
+
 export function useSampleRetrainingBatch() {
   const queryClient = useQueryClient();
   return useMutation<RetrainingBatchResponse, Error, RetrainingBatchRequest>({
@@ -1518,6 +1535,21 @@ export function useComputeDPGradient() {
         payload
       );
       return data;
+    },
+  });
+}
+
+export function useClearFeedbackBuffer() {
+  const queryClient = useQueryClient();
+  return useMutation<ClearFeedbackBufferResponse, Error, string>({
+    mutationFn: async (tenantId) => {
+      const { data } = await apiClient.delete<ClearFeedbackBufferResponse>(
+        `/api/v1/feedback/buffer/${tenantId}`
+      );
+      return data;
+    },
+    onSuccess: (_, tenantId) => {
+      queryClient.invalidateQueries({ queryKey: ['feedback-stats', tenantId] });
     },
   });
 }

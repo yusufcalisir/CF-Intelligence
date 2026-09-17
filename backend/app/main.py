@@ -864,6 +864,7 @@ app.include_router(datasets.router)
 app.include_router(copilot.router)
 app.include_router(copilot.api_router)
 app.include_router(feedback.router)
+app.include_router(feedback.api_router)
 
 
 
