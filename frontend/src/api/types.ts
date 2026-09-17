@@ -1253,35 +1253,70 @@ export interface VaultSealStatusResponse {
   sealed: boolean;
   vault_url: string;
   ha_enabled: boolean;
-  is_healthy: boolean;
-  cluster_name: string;
-  vault_version: string;
-  inspected_at: string;
+  initialized?: boolean;
+  standby?: boolean;
+  mount_point?: string;
+  is_healthy?: boolean;
+  cluster_name?: string;
+  vault_version?: string;
+  inspected_at?: string;
 }
 
 export interface VerifyZKProofRequest {
   proof_id: string;
-  curve: string;
-  proving_scheme: string;
-  public_inputs: number[];
-  proof_data: Record<string, unknown>;
-  prover_id: string;
+  bank_id?: string;
+  round_id?: number;
+  pi_a?: string[];
+  pi_b?: string[][];
+  pi_c?: string[];
+  public_weight_hash?: string;
+  l2_norm_bound?: number;
+  vector_dimension?: number;
+  curve?: string;
+  proving_scheme?: string;
+  public_inputs?: number[];
+  proof_data?: Record<string, unknown>;
+  prover_id?: string;
 }
 
 export interface VerifyZKProofResponse {
   is_valid: boolean;
-  verified_at: string;
-  prover_id: string;
-  scheme: string;
+  status_code?: string;
+  proof_id?: string;
+  bank_id?: string;
+  verification_time_ms?: number;
+  verification_message?: string;
+  pairing_check_passed?: boolean;
+  circuit_metadata?: Record<string, any>;
+  verified_at?: string;
+  prover_id?: string;
+  scheme?: string;
   reason?: string | null;
 }
 
 export interface ZKVerifierStatusResponse {
-  zk_snark_enabled: boolean;
-  supported_curves: string[];
-  total_proofs_verified: number;
-  total_proofs_rejected: number;
-  verification_engine: string;
+  proving_scheme?: string;
+  proving_system?: string;
+  curve?: string;
+  hash_algorithm?: string;
+  verified_proofs_count?: number;
+  rejected_proofs_count?: number;
+  verification_complexity?: string;
+  typical_verification_sla_ms?: number;
+  circuit_type?: string | null;
+  constraints_count?: number | null;
+  constraint_count?: number | null;
+  total_proofs_verified?: number | null;
+  failed_verifications?: number | null;
+  average_verification_time_ms?: number | null;
+  max_l2_norm_bound?: number | null;
+  supported_vector_dimension?: number | null;
+  enclave_hardware_acceleration?: boolean | null;
+  last_verified_proof?: Record<string, any> | null;
+  zk_snark_enabled?: boolean;
+  supported_curves?: string[];
+  total_proofs_rejected?: number;
+  verification_engine?: string;
 }
 
 export interface FeatureDriftResult {

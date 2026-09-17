@@ -127,7 +127,13 @@ export function useRealTimeFraudStream() {
 
         ws.onerror = () => {
           if (!isMounted) return;
-          ws.close();
+          try {
+            if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+              ws.close();
+            }
+          } catch {
+            // Socket already terminating
+          }
         };
 
         ws.onclose = () => {
@@ -153,13 +159,36 @@ export function useRealTimeFraudStream() {
     return () => {
       isMounted = false;
       if (wsRef.current) {
-        wsRef.current.close();
+        const socket = wsRef.current;
+        // Detach listeners immediately to eliminate React StrictMode unmount warnings
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onerror = null;
+        socket.onclose = null;
+        try {
+          if (socket.readyState === WebSocket.OPEN) {
+            socket.close(1000, 'Component unmounted');
+          } else if (socket.readyState === WebSocket.CONNECTING) {
+            socket.onopen = () => {
+              try {
+                socket.close(1000, 'Unmounted while connecting');
+              } catch {
+                // Ignore socket closure errors
+              }
+            };
+          }
+        } catch {
+          // Socket already closed or terminating
+        }
+        wsRef.current = null;
       }
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
       }
       if (mockIntervalRef.current) {
         clearInterval(mockIntervalRef.current);
+        mockIntervalRef.current = null;
       }
     };
   }, [pushStreamEvent, setLatencyMs, setStatus]);
