@@ -869,61 +869,14 @@ _RULE_ACTIONS = Literal[
     "REVIEW",
 ]
 
+from app.application.schemas.rules import (
+    BusinessRuleCreateRequest,
+    BusinessRuleResponse,
+    BusinessRuleTestRequest,
+    BusinessRuleTestResponse,
+    BusinessRuleUpdateRequest,
+)
 
-class BusinessRuleCreateRequest(BaseModel):
-    rule_name: str = Field(
-        ...,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9 _\-]+$",
-        description="Human-readable rule name",
-    )
-    condition: dict = Field(
-        ...,
-        description="Condition JSON AST (e.g. {'and': [...]})",
-    )
-    action: _RULE_ACTIONS = Field(  # type: ignore[valid-type]
-        "BLOCK_TRANSACTION",
-        description="Action to trigger",
-    )
-    is_active: bool = True
-
-    @field_validator("rule_name")
-    @classmethod
-    def sanitize_rule_name(cls, v: str) -> str:
-        return _strip_control(v)
-
-
-class BusinessRuleUpdateRequest(BaseModel):
-    rule_name: str | None = Field(
-        None,
-        min_length=3,
-        max_length=128,
-        pattern=r"^[a-zA-Z0-9 _\-]+$",
-    )
-    condition: dict | None = None
-    action: _RULE_ACTIONS | None = None  # type: ignore[valid-type]
-    is_active: bool | None = None
-
-
-class BusinessRuleResponse(BaseModel):
-    id: str
-    rule_name: str
-    condition: dict
-    action: str
-    is_active: bool
-    created_at: str
-    updated_at: str | None = None
-
-
-class BusinessRuleTestRequest(BaseModel):
-    condition: dict
-    transaction: dict
-
-
-class BusinessRuleTestResponse(BaseModel):
-    matches: bool
-    message: str
 
 
 # ── Advanced Explainability (Counterfactuals, Decision Replay, GNNExplainer) ──

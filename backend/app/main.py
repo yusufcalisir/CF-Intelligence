@@ -897,6 +897,7 @@ elif service_name == "fraud-alert":
     app.include_router(cases.router)
     app.include_router(predict.router)
     app.include_router(rules.router)
+    app.include_router(rules.api_router)
     app.include_router(
         entities.router
     )  # Mounted for read access of entities within streaming engine if queried directly
@@ -924,6 +925,7 @@ else:
     app.include_router(cases.router)
     app.include_router(predict.router)
     app.include_router(rules.router)
+    app.include_router(rules.api_router)
     app.include_router(bank_client.router)
     app.include_router(entities.router)
     app.include_router(entities.psi_router)

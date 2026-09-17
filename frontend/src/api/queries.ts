@@ -29,6 +29,10 @@ import type {
   InvestigatorAuditLog,
   ShadowMetrics,
   BusinessRule,
+  BusinessRuleTestRequest,
+  BusinessRuleTestResponse,
+  RuleEvaluationRequest,
+  RuleEvaluationResponse,
   PSIRequest,
   PSIResponse,
   EntityFuzzyResolveRequest,
@@ -708,14 +712,36 @@ export function useDeleteRule() {
   });
 }
 
+export function useRuleDetails(ruleId: string) {
+  return useQuery<BusinessRule>({
+    queryKey: ['business-rule', ruleId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/rules/${ruleId}`);
+      return data;
+    },
+    enabled: Boolean(ruleId),
+    retry: false,
+  });
+}
+
 export function useTestRule() {
-  return useMutation<{ matches: boolean; message: string }, Error, { condition: Record<string, any>; transaction: Record<string, any> }>({
+  return useMutation<BusinessRuleTestResponse, Error, BusinessRuleTestRequest>({
     mutationFn: async (payload) => {
       const { data } = await apiClient.post('/api/v1/rules/test', payload);
       return data;
     },
   });
 }
+
+export function useEvaluateRules() {
+  return useMutation<RuleEvaluationResponse, Error, RuleEvaluationRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/rules/evaluate', payload);
+      return data;
+    },
+  });
+}
+
 
 export function useRunPSI() {
   return useMutation<PSIResponse, Error, PSIRequest>({

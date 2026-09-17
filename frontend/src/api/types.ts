@@ -654,8 +654,45 @@ export interface BusinessRule {
   condition: Record<string, any>;
   action: string;
   is_active: boolean;
+  description?: string | null;
+  priority?: number;
   created_at: string;
-  updated_at?: string;
+  updated_at?: string | null;
+}
+
+export interface BusinessRuleTestRequest {
+  condition: Record<string, any>;
+  transaction: Record<string, any>;
+}
+
+export interface BusinessRuleTestResponse {
+  matches: boolean;
+  message: string;
+  matched_fields?: string[];
+}
+
+export interface RuleEvaluationRequest {
+  transaction: Record<string, any>;
+  tenant_id?: string | null;
+  stop_on_first_match?: boolean;
+}
+
+export interface RuleEvaluationMatchItem {
+  rule_id: string;
+  rule_name: string;
+  action: string;
+  priority: number;
+  matched_condition: Record<string, any>;
+}
+
+export interface RuleEvaluationResponse {
+  evaluated_rules_count: number;
+  triggered_rules_count: number;
+  highest_severity_action: string;
+  decision: 'ALLOW' | 'REVIEW' | 'BLOCK';
+  risk_score_delta: number;
+  triggered_rules: RuleEvaluationMatchItem[];
+  latency_ms: number;
 }
 
 export interface PSIRequest {

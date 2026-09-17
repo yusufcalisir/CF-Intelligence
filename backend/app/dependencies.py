@@ -149,11 +149,17 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def get_optional_session() -> AsyncGenerator[AsyncSession | None, None]:
+    session_yielded = False
     try:
         async for session in get_async_session():
+            session_yielded = True
             yield session
+            return
     except Exception:
+        if session_yielded:
+            raise
         yield None
+
 
 
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
