@@ -1239,7 +1239,16 @@ export function useRunPSI() {
 export function useFuzzyResolve() {
   return useMutation<FuzzyMatchResponse[], Error, EntityFuzzyResolveRequest>({
     mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/api/v1/entities/fuzzy-resolve', payload);
+      const formattedPayload = {
+        query_name: payload.query_name || payload.raw_identifier || '',
+        raw_identifier: payload.raw_identifier || payload.query_name || '',
+        entity_type: payload.entity_type || 'customer',
+        threshold: payload.threshold ?? payload.similarity_threshold ?? 0.7,
+        similarity_threshold: payload.similarity_threshold ?? payload.threshold ?? 0.7,
+        bank_id: payload.bank_id,
+        limit: payload.limit ?? 50,
+      };
+      const { data } = await apiClient.post('/api/v1/entities/fuzzy-resolve', formattedPayload);
       if (data && Array.isArray(data.matches)) {
         return data.matches.map((m: any) => ({
           entity_id: m.entity?.id || m.entity_id || '',

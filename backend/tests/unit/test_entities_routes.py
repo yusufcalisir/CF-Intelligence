@@ -245,6 +245,14 @@ def test_entity_fuzzy_resolve_minhash():
     assert res_fuzzy_v1.status_code == 200
     assert len(res_fuzzy_v1.json()["matches"]) >= 1
 
+    # Frontend / legacy parameter alias parity (raw_identifier and similarity_threshold)
+    res_fuzzy_alias = client.post(
+        "/api/v1/entities/fuzzy-resolve",
+        json={"raw_identifier": "Alice Test Customer", "similarity_threshold": 0.50, "bank_id": "bank_alpha"},
+    )
+    assert res_fuzzy_alias.status_code == 200
+    assert len(res_fuzzy_alias.json()["matches"]) >= 1
+
 
 def test_hmac_tokenize_zero_pii():
     """Verifies Zero-PII type-salted HMAC tokenization endpoint."""

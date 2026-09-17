@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Sentinel regex to strip ASCII control characters
 _SAFE_TEXT_RE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
@@ -231,13 +231,17 @@ class PSIMatchDirectResponse(BaseModel):
 class EntityFuzzyResolveRequest(BaseModel):
     """Request to resolve customer records via MinHash LSH fuzzy similarity."""
 
-    model_config = ConfigDict(extra="ignore")
+    model_config = ConfigDict(extra="ignore", populate_by_name=True)
 
     query_name: str = Field(
-        ...,
-        min_length=1,
+        default="",
         max_length=256,
         description="Entity name or alias to fuzzy-match",
+    )
+    raw_identifier: str | None = Field(
+        default=None,
+        max_length=256,
+        description="Legacy alias for query_name",
     )
     entity_type: str = Field(
         default="customer",
@@ -248,6 +252,12 @@ class EntityFuzzyResolveRequest(BaseModel):
         ge=0.0,
         le=1.0,
         description="Minimum Jaccard similarity score [0.0, 1.0]",
+    )
+    similarity_threshold: float | None = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Legacy alias for threshold",
     )
     bank_id: str | None = Field(
         default=None,
@@ -260,6 +270,23 @@ class EntityFuzzyResolveRequest(BaseModel):
         le=200,
         description="Maximum matched candidates to return",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def remap_legacy_fields(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            # Resolve query_name from raw_identifier if missing
+            if not data.get("query_name") and data.get("raw_identifier"):
+                data["query_name"] = data["raw_identifier"]
+            elif not data.get("raw_identifier") and data.get("query_name"):
+                data["raw_identifier"] = data["query_name"]
+
+            # Resolve threshold from similarity_threshold if missing
+            if data.get("threshold") is None and data.get("similarity_threshold") is not None:
+                data["threshold"] = data["similarity_threshold"]
+            elif data.get("similarity_threshold") is None and data.get("threshold") is not None:
+                data["similarity_threshold"] = data["threshold"]
+        return data
 
     @field_validator("query_name")
     @classmethod

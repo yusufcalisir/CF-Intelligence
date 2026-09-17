@@ -254,10 +254,19 @@ async def run_fuzzy_resolve(
         except ValueError:
             et = EntityType.CUSTOMER
 
+    query_text = req.query_name or req.raw_identifier or ""
+    if not query_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="query_name (or raw_identifier) must not be empty.",
+        )
+
+    thresh = req.threshold if req.threshold is not None else (req.similarity_threshold if req.similarity_threshold is not None else 0.70)
+
     matches = _entity_service.resolve_fuzzy_entities(
-        query_name=req.query_name,
+        query_name=query_text,
         entity_type=et,
-        threshold=req.threshold,
+        threshold=thresh,
         bank_id=req.bank_id,
         limit=req.limit,
     )

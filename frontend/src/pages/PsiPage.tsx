@@ -120,40 +120,21 @@ export default function PsiPage() {
     setSimScore(matches / s1.length);
   }, [name1, name2]);
 
-  // Simulated log generator for Enclave Execution
-  const addEnclaveLog = (msg: string, delay: number) => {
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        setLogs((prev) => [...prev, `[${new Date().toLocaleTimeString()}] ${msg}`]);
-        resolve();
-      }, delay);
-    });
-  };
-
-  const handleRunPSI = async (e: React.FormEvent) => {
+  const handleRunPSI = (e: React.FormEvent) => {
     e.preventDefault();
     if (bankA === bankB) {
       alert('Please select two different banks to run Private Set Intersection.');
       return;
     }
 
-    setLogs([]);
+    const now = () => new Date().toLocaleTimeString();
+    setLogs([
+      `[${now()}] Initiating Diffie-Hellman 2048-bit Private Set Intersection...`,
+      `[${now()}] Source: ${bankA.toUpperCase()} ⟷ Target: ${bankB.toUpperCase()}`,
+      `[${now()}] Execution Mode: ${enableTee ? 'Intel SGX Secure Hardware Enclave' : 'Standard Diffie-Hellman Commutative Multiplying'}`,
+      `[${now()}] Transmitting blinded hash elements across zero-trust boundary...`,
+    ]);
     setLogsRunning(true);
-
-    if (enableTee) {
-      await addEnclaveLog('Initializing secure SGX hardware enclave connection...', 200);
-      await addEnclaveLog('Verifying remote attestation payload...', 400);
-      await addEnclaveLog('Enclave Signature MRENCLAVE match found: 0x8fae3f19114d7a8... ✅', 300);
-      await addEnclaveLog('Enclave Signer MRSIGNER match found: 0xc4b220e897bd21ab163... ✅', 200);
-      await addEnclaveLog('Attestation validation signature check: SUCCESS.', 200);
-      await addEnclaveLog('Spinning up multi-party computation engine inside SGX enclave...', 400);
-    } else {
-      await addEnclaveLog('Establishing direct secure multi-party communication channel...', 300);
-      await addEnclaveLog('Retrieving ephemeral Diffie-Hellman parameters...', 300);
-    }
-
-    await addEnclaveLog('Exchanging blind signature keys between participants...', 300);
-    await addEnclaveLog('Running cryptographic set intersection protocol...', 400);
 
     runPSIMutation.mutate(
       {
@@ -165,16 +146,30 @@ export default function PsiPage() {
         enable_tee: enableTee,
       },
       {
-        onSuccess: async (data) => {
+        onSuccess: (data) => {
           setLogsRunning(false);
-          await addEnclaveLog(`Protocol successfully completed. Found ${data.matches.length} matching entities.`, 100);
-          if (enableTee) {
-            await addEnclaveLog('Clearing secure memory cache. Enclave connection closed.', 200);
+          const t = now();
+          const stats = data.stats;
+          const newEntries: string[] = [
+            `[${t}] Cryptographic set intersection completed successfully.`,
+            `[${t}] Attestation: ${stats?.attestation_verified ? 'Verified (SGX Quote Matched ✅)' : 'Active (Local Cryptographic Simulation)'}`,
+          ];
+          if (stats?.mrenclave) {
+            newEntries.push(`[${t}] MRENCLAVE: ${stats.mrenclave}`);
           }
+          if (stats?.mrsigner) {
+            newEntries.push(`[${t}] MRSIGNER: ${stats.mrsigner}`);
+          }
+          newEntries.push(
+            `[${t}] Computation Latency: ${stats?.computation_time_ms ?? 0} ms | Bandwidth: ${stats?.data_exchanged_bytes ?? 0} bytes`,
+            `[${t}] Cardinality: |${bankA}| = ${stats?.num_entities_a ?? 0}, |${bankB}| = ${stats?.num_entities_b ?? 0}`,
+            `[${t}] Result: Found ${data.matches.length} matching entity intersections under Zero Raw PII.`
+          );
+          setLogs((prev) => [...prev, ...newEntries]);
         },
-        onError: async (err) => {
+        onError: (err) => {
           setLogsRunning(false);
-          await addEnclaveLog(`❌ Protocol error: ${err.message}`, 100);
+          setLogs((prev) => [...prev, `[${now()}] ❌ Protocol execution error: ${err.message}`]);
         },
       }
     );
@@ -183,8 +178,10 @@ export default function PsiPage() {
   const handleFuzzyResolve = (e: React.FormEvent) => {
     e.preventDefault();
     fuzzyResolveMutation.mutate({
+      query_name: searchQuery,
       raw_identifier: searchQuery,
       entity_type: searchType,
+      threshold: searchThreshold,
       similarity_threshold: searchThreshold,
       limit: 10,
     });

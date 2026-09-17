@@ -426,7 +426,13 @@ class EntityResolutionService:
                     continue
                 sig = e.attributes.get("minhash_signature")
                 if not sig:
-                    continue
+                    text_for_sig = e.attributes.get("raw_standardized") or e.display_label
+                    if text_for_sig:
+                        sig = compute_minhash_signature(
+                            text_for_sig, num_hashes=self._fuzzy_matcher.num_hashes
+                        )
+                    else:
+                        continue
                 sim = calculate_jaccard_similarity(query_sig, sig)
                 if sim >= threshold:
                     results.append({"entity": e, "similarity_score": round(sim, 2)})
