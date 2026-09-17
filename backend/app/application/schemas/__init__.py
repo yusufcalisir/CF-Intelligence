@@ -21,6 +21,7 @@ from app.application.schemas import (
     security,
     settlement,
     simulation,
+    websockets,
 )
 
 __all__ = [
@@ -45,4 +46,5 @@ __all__ = [
     "security",
     "settlement",
     "simulation",
+    "websockets",
 ]

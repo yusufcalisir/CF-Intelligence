@@ -367,8 +367,39 @@ class WebSocketConnectionManager:
         """Returns list of active rooms."""
         return sorted(self._rooms.keys())
 
+    def reset(self) -> None:
+        """Resets internal state for test isolation."""
+        self._active_connections.clear()
+        self._rooms.clear()
+        self._ws_rooms.clear()
+        self._client_last_seen.clear()
+        self._inbound_counters.clear()
+        self._room_history.clear()
+        self._total_broadcast_count = 0
+        self._dropped_client_count = 0
+        self._event_loop = None
+
+    def get_manager_health(self) -> dict[str, Any]:
+        """Returns operational health diagnostics for the manager instance."""
+        return {
+            "status": "HEALTHY",
+            "active_connections": len(self._active_connections),
+            "max_connections": self.max_connections,
+            "send_timeout_seconds": self.send_timeout,
+            "max_payload_bytes": self.max_payload_bytes,
+            "active_rooms": len(self._rooms),
+            "total_broadcasts": self._total_broadcast_count,
+            "total_evictions": self._dropped_client_count,
+        }
+
 
 # Global singleton manager instances
 global_telemetry_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
 training_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
 streaming_ws_manager = WebSocketConnectionManager(max_connections=250, send_timeout_seconds=1.5)
+
+
+def broadcast_telemetry_event(event: dict[str, Any] | str) -> None:
+    """Thread-safe convenience bridge to dispatch live platform telemetry to connected clients."""
+    global_telemetry_ws_manager.broadcast_to_room_sync("telemetry:global", event)
+

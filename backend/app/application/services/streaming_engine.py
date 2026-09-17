@@ -134,6 +134,15 @@ class StreamingEngine:
                 await redis_client.rpush(events_key, json.dumps(event_data))
                 await redis_client.expire(events_key, 3600)
 
+            # Dual-path in-process event dispatching (zero Redis fallback)
+            try:
+                from app.presentation.websockets.manager import streaming_ws_manager
+
+                room_name = f"scenario:{scenario.id}"
+                streaming_ws_manager.broadcast_to_room_sync(room_name, event_data)
+            except Exception as broadcast_err:
+                logger.debug("Failed to dispatch in-process streaming event: %s", broadcast_err)
+
             # Process the event locally to populate in-memory stores
             try:
                 await self._process_streaming_event(event)

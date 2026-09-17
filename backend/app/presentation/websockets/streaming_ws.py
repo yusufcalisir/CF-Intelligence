@@ -1,7 +1,12 @@
-"""WebSocket endpoint for streaming scenario events.
+"""WebSocket endpoint for streaming scenario events and platform telemetry.
 
-Clients connect to /ws/streaming/{scenario_id} and receive
-real-time events as they are generated during scenario replay.
+Clients connect to:
+- /ws/streaming/{scenario_id} or /ws/scenarios/{scenario_id} (and versioned /api/v1/ws/... aliases)
+- /ws/telemetry (and versioned /api/v1/ws/telemetry aliases)
+
+Dual-path In-Process Event Dispatcher:
+- Primary path: Redis pub/sub (used when Redis is connected).
+- Fallback path: In-process ring-buffer history replay + WebSocketConnectionManager fanout.
 """
 
 from __future__ import annotations
@@ -11,6 +16,7 @@ import contextlib
 import inspect
 import json
 import logging
+import time
 from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
@@ -24,19 +30,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["streaming"])
 
 
-@router.websocket("/ws/streaming/{scenario_id}")
-async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
-    """Stream scenario events via WebSocket.
-
-    Subscribes to Redis pub/sub for the given scenario and forwards
-    events to the connected client. Also replays any events that
-    occurred before the client connected.
-    """
+async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> None:
+    """Stream scenario events via WebSocket with dual-path in-process resilience."""
     room_name = f"scenario:{scenario_id}"
     connected = await streaming_ws_manager.connect(websocket, room=room_name)
     if not connected:
         return
     logger.info("Streaming WebSocket connected: scenario=%s", scenario_id[:8])
+
+    try:
+        loop = asyncio.get_running_loop()
+        streaming_ws_manager.register_event_loop(loop)
+    except RuntimeError:
+        pass
 
     try:
         # Try to connect to Redis for pub/sub
@@ -49,12 +55,14 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
             r = aioredis.from_url(
                 settings.redis_url,
                 decode_responses=True,
-                socket_connect_timeout=0.5,
-                socket_timeout=1.0,
+                socket_connect_timeout=0.2,
+                socket_timeout=0.3,
                 retry_on_timeout=False,
             )
+            # Fast ping check to verify Redis reachability
+            await asyncio.wait_for(r.ping(), timeout=0.2)
 
-            # Replay stored events
+            # Replay stored events from Redis
             events_key = f"scenario:{scenario_id}:events"
             lrange_res: Any = r.lrange(events_key, 0, -1)
             stored_events = await lrange_res if inspect.isawaitable(lrange_res) else lrange_res
@@ -70,9 +78,28 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
             await pubsub.subscribe(channel)
 
             while True:
+                # Check for inbound frames (pings, heartbeats, validation)
+                try:
+                    inbound = await asyncio.wait_for(websocket.receive_text(), timeout=0.1)
+                    streaming_ws_manager.record_client_activity(websocket)
+                    if not streaming_ws_manager.validate_frame_size(inbound):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1009, reason="Payload too large")
+                        return
+                    if not streaming_ws_manager.check_inbound_rate_limit(websocket):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1008, reason="Rate limit exceeded")
+                        return
+                    if "ping" in inbound.lower():
+                        await websocket.send_text(
+                            json.dumps({"event_type": "PONG", "scenario_id": scenario_id, "timestamp": time.time()})
+                        )
+                except TimeoutError:
+                    pass
+
                 message = await pubsub.get_message(
                     ignore_subscribe_messages=True,
-                    timeout=1.0,
+                    timeout=0.5,
                 )
                 if isinstance(message, dict) and message.get("type") == "message":
                     data = message.get("data")
@@ -80,61 +107,93 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
                         await websocket.send_text(data)
                         streaming_ws_manager.record_client_activity(websocket)
 
-                # Send heartbeat every 5 seconds
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(0.05)
 
         except Exception:
-            # Fallback: poll the streaming engine directly
-            logger.warning(
-                "Redis unavailable for streaming — using polling fallback",
+            # Fallback: Dual-path in-process ring-buffer replay + engine status polling
+            logger.info(
+                "Redis unavailable for scenario %s — switching to dual-path in-process dispatcher",
+                scenario_id[:8],
             )
+            # 1. Replay in-process history ring-buffer for late-joining clients
+            history = streaming_ws_manager.get_room_history(room_name)
+            for raw_event in history:
+                try:
+                    await websocket.send_text(raw_event)
+                    streaming_ws_manager.record_client_activity(websocket)
+                except Exception:
+                    return
+
             from app.presentation.routers.scenarios import get_streaming_engine
 
             engine = get_streaming_engine()
             last_count = 0
+            last_heartbeat = time.time()
 
             while True:
+                # Check for inbound frames (ping/pong, rate limit, frame size)
+                try:
+                    inbound = await asyncio.wait_for(websocket.receive_text(), timeout=0.5)
+                    streaming_ws_manager.record_client_activity(websocket)
+                    if not streaming_ws_manager.validate_frame_size(inbound):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1009, reason="Payload too large")
+                        return
+                    if not streaming_ws_manager.check_inbound_rate_limit(websocket):
+                        with contextlib.suppress(Exception):
+                            await websocket.close(code=1008, reason="Rate limit exceeded")
+                        return
+                    if "ping" in inbound.lower():
+                        await websocket.send_text(
+                            json.dumps({"event_type": "PONG", "scenario_id": scenario_id, "timestamp": time.time()})
+                        )
+                except TimeoutError:
+                    pass
+
                 status = engine.get_scenario_status(scenario_id)
-                if not status:
+                if status:
+                    current_count = status.get("delivered_events", 0)
+                    if current_count > last_count:
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "event_type": "progress",
+                                    "payload": {
+                                        "delivered": current_count,
+                                        "total": status["total_events"],
+                                        "status": status["status"],
+                                    },
+                                }
+                            )
+                        )
+                        streaming_ws_manager.record_client_activity(websocket)
+                        last_count = current_count
+
+                    if status.get("status") in ("completed", "stopped"):
+                        await websocket.send_text(
+                            json.dumps(
+                                {
+                                    "event_type": "scenario_complete",
+                                    "payload": {"status": status["status"]},
+                                }
+                            )
+                        )
+                        streaming_ws_manager.record_client_activity(websocket)
+                        break
+
+                # Periodic heartbeat every 5s if idle
+                now = time.time()
+                if now - last_heartbeat >= 5.0:
+                    last_heartbeat = now
                     await websocket.send_text(
                         json.dumps(
                             {
-                                "event_type": "error",
-                                "payload": {"message": "Scenario not found"},
+                                "event_type": "HEARTBEAT",
+                                "scenario_id": scenario_id,
+                                "timestamp": now,
                             }
                         )
                     )
-                    break
-
-                current_count = status.get("delivered_events", 0)
-
-                if current_count > last_count:
-                    await websocket.send_text(
-                        json.dumps(
-                            {
-                                "event_type": "progress",
-                                "payload": {
-                                    "delivered": current_count,
-                                    "total": status["total_events"],
-                                    "status": status["status"],
-                                },
-                            }
-                        )
-                    )
-                    streaming_ws_manager.record_client_activity(websocket)
-                    last_count = current_count
-
-                if status.get("status") in ("completed", "stopped"):
-                    await websocket.send_text(
-                        json.dumps(
-                            {
-                                "event_type": "scenario_complete",
-                                "payload": {"status": status["status"]},
-                            }
-                        )
-                    )
-                    streaming_ws_manager.record_client_activity(websocket)
-                    break
 
                 await asyncio.sleep(0.5)
 
@@ -148,7 +207,31 @@ async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
             await websocket.close()
 
 
+@router.websocket("/ws/streaming/{scenario_id}")
+@router.websocket("/ws/scenarios/{scenario_id}")
+@router.websocket("/api/v1/ws/streaming/{scenario_id}")
+@router.websocket("/v1/ws/streaming/{scenario_id}")
+@router.websocket("/api/v1/ws/scenarios/{scenario_id}")
+@router.websocket("/v1/ws/scenarios/{scenario_id}")
+async def streaming_websocket(websocket: WebSocket, scenario_id: str) -> None:
+    """Stream scenario events via WebSocket with dual-path resilience."""
+    await _handle_scenario_stream(websocket, scenario_id)
+
+
+@router.websocket("/ws/streaming")
+@router.websocket("/ws/scenarios")
+@router.websocket("/api/v1/ws/streaming")
+@router.websocket("/v1/ws/streaming")
+@router.websocket("/api/v1/ws/scenarios")
+@router.websocket("/v1/ws/scenarios")
+async def streaming_websocket_default(websocket: WebSocket) -> None:
+    """Stream default scenario events via WebSocket."""
+    await _handle_scenario_stream(websocket, "default_scenario")
+
+
 @router.websocket("/ws/telemetry")
+@router.websocket("/api/v1/ws/telemetry")
+@router.websocket("/v1/ws/telemetry")
 async def live_telemetry_websocket(websocket: WebSocket) -> None:
     """Stream platform-wide live telemetry, transactions, and fraud alerts."""
     room_name = "telemetry:global"
@@ -158,8 +241,13 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
     logger.info("Global telemetry WebSocket connected")
 
     try:
+        loop = asyncio.get_running_loop()
+        global_telemetry_ws_manager.register_event_loop(loop)
+    except RuntimeError:
+        pass
+
+    try:
         import random
-        import time
 
         # Send initial connected banner
         await websocket.send_text(
@@ -192,6 +280,18 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
             try:
                 inbound_data = await asyncio.wait_for(websocket.receive_text(), timeout=4.0)
                 global_telemetry_ws_manager.record_client_activity(websocket)
+
+                # Validate inbound frame size and rate limit
+                if not global_telemetry_ws_manager.validate_frame_size(inbound_data):
+                    with contextlib.suppress(Exception):
+                        await websocket.close(code=1009, reason="Payload too large")
+                    return
+
+                if not global_telemetry_ws_manager.check_inbound_rate_limit(websocket):
+                    with contextlib.suppress(Exception):
+                        await websocket.close(code=1008, reason="Rate limit exceeded")
+                    return
+
                 if "ping" in inbound_data.lower():
                     await websocket.send_text(
                         json.dumps({"event_type": "PONG", "timestamp": time.time()})
@@ -229,4 +329,3 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
         await global_telemetry_ws_manager.disconnect(websocket, room=room_name)
         with contextlib.suppress(Exception):
             await websocket.close()
-

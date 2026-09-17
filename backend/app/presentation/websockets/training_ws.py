@@ -33,19 +33,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# Per-room asyncio queues that the in-process fallback path listens on.
-# Keyed by room name (e.g. "simulation:<id>").  Created lazily.
-_room_queues: dict[str, asyncio.Queue[str]] = {}
-_room_queues_lock = asyncio.Lock()
-
-
-async def _get_or_create_room_queue(room: str) -> asyncio.Queue[str]:
-    """Return (creating if necessary) the asyncio.Queue for *room*."""
-    async with _room_queues_lock:
-        if room not in _room_queues:
-            _room_queues[room] = asyncio.Queue(maxsize=500)
-        return _room_queues[room]
-
 
 async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_prod_v2") -> None:
     """Stream training progress events to a WebSocket client.
@@ -78,10 +65,10 @@ async def _handle_training_ws(websocket: WebSocket, simulation_id: str = "live_p
             redis_url = f"redis://{redis_url}"
 
         redis_client = aioredis.from_url(
-            redis_url, decode_responses=True, socket_connect_timeout=2.0
+            redis_url, decode_responses=True, socket_connect_timeout=0.2
         )
         # Probe connectivity with a lightweight ping
-        await asyncio.wait_for(redis_client.ping(), timeout=2.0)
+        await asyncio.wait_for(redis_client.ping(), timeout=0.2)
         redis_available = True
         logger.debug("Redis available for simulation %s — using primary path", simulation_id)
     except Exception as exc:
@@ -216,9 +203,17 @@ async def _stream_via_inprocess(
         try:
             inbound = await asyncio.wait_for(websocket.receive_text(), timeout=1.0)
             training_ws_manager.record_client_activity(websocket)
+            if not training_ws_manager.validate_frame_size(inbound):
+                with contextlib.suppress(Exception):
+                    await websocket.close(code=1009, reason="Payload too large")
+                return
+            if not training_ws_manager.check_inbound_rate_limit(websocket):
+                with contextlib.suppress(Exception):
+                    await websocket.close(code=1008, reason="Rate limit exceeded")
+                return
             if "ping" in inbound.lower():
                 await websocket.send_text(
-                    json.dumps({"event": "pong", "simulation_id": simulation_id})
+                    json.dumps({"event": "pong", "simulation_id": simulation_id, "timestamp": time.time()})
                 )
         except TimeoutError:
             pass  # No inbound frame; continue keep-alive logic
@@ -260,11 +255,15 @@ def _is_awaitable(obj: Any) -> bool:
 
 
 @router.websocket("/ws/training")
+@router.websocket("/api/v1/ws/training")
+@router.websocket("/v1/ws/training")
 async def training_websocket_default(websocket: WebSocket) -> None:
     await _handle_training_ws(websocket, "live_prod_v2")
 
 
 @router.websocket("/ws/training/{simulation_id}")
 @router.websocket("/api/v1/training/ws/{simulation_id}")
+@router.websocket("/api/v1/ws/training/{simulation_id}")
+@router.websocket("/v1/ws/training/{simulation_id}")
 async def training_websocket(websocket: WebSocket, simulation_id: str) -> None:
     await _handle_training_ws(websocket, simulation_id)

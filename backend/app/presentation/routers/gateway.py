@@ -749,7 +749,7 @@ async def ws_proxy(websocket: WebSocket, path: str):
     target_service = None
     if ws_path.startswith("/ws/training"):
         target_service = "fl-coordinator"
-    elif ws_path.startswith("/ws/streaming"):
+    elif ws_path.startswith(("/ws/streaming", "/ws/scenarios", "/ws/telemetry")):
         target_service = "fraud-alert"
 
     if not target_service:

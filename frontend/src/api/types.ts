@@ -3199,6 +3199,71 @@ export interface SARFilingDetailResponse extends SARFilingRecord {
   xml_content: string;
 }
 
+// ── Real-Time WebSocket & Telemetry Stream Schemas ───────────
 
+export interface WebSocketConnectPayload {
+  status: string;
+  engine: string;
+  active_banks: string[];
+}
 
+export interface WebSocketConnectBanner {
+  event_type: 'CONNECTED';
+  timestamp: number;
+  payload: WebSocketConnectPayload;
+}
 
+export interface WebSocketPongResponse {
+  event_type: 'PONG' | 'pong';
+  timestamp: number;
+  simulation_id?: string;
+}
+
+export interface WebSocketInProcessConnectBanner {
+  event: 'connected';
+  status: 'streaming';
+  mode: 'in_process' | 'redis';
+  simulation_id: string;
+}
+
+export interface WebSocketHeartbeatFrame {
+  event: 'heartbeat';
+  status: 'streaming';
+  mode: 'in_process' | 'redis';
+  simulation_id: string;
+  timestamp: number;
+}
+
+export interface WebSocketErrorFrame {
+  event_type: 'ERROR' | 'RATE_LIMIT_EXCEEDED' | 'PAYLOAD_TOO_LARGE';
+  code: number;
+  message: string;
+  timestamp: number;
+}
+
+export interface ScenarioStreamingProgressPayload {
+  delivered: number;
+  total: number;
+  status: string;
+}
+
+export interface ScenarioStreamingEvent {
+  event_id?: string;
+  event_type: string;
+  bank_id?: string;
+  timestamp?: string | number;
+  payload: Record<string, unknown>;
+  sequence?: number;
+  total?: number;
+  scenario_id?: string;
+}
+
+export interface TrainingRoundProgressPayload {
+  simulation_id: string;
+  round_number: number;
+  total_rounds: number;
+  loss: number;
+  auc?: number;
+  participating_banks: string[];
+  per_bank_auc?: Record<string, number>;
+}
