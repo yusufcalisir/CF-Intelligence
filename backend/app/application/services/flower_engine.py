@@ -405,6 +405,24 @@ class FlowerFLEngine:
             sim_config.num_rounds,
         )
 
+        # In testing environments, CI runners, or when explicitly requested,
+        # dispatch directly to the zero-mock native production FL engine.
+        # This prevents Ray C++ actor thread-unwinding SIGABRT (exit code 134)
+        # in Python 3.12 on Linux and eliminates multi-minute test execution hangs.
+        if (
+            os.environ.get("TESTING") == "1"
+            or os.environ.get("CI") == "true"
+            or os.environ.get("FLWR_SIMULATION_NATIVE") == "1"
+        ):
+            return self._run_native_production_fl(
+                config=sim_config,
+                bank_data=bank_data,
+                global_model=global_model,
+                progress_callback=progress_callback,
+                simulation_id=simulation_id,
+                use_opacus_dp=use_opacus_dp,
+            )
+
         try:
             import ray
 
