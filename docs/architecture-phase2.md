@@ -423,7 +423,7 @@ To handle massive scales of customer relationships, transactions, and alert link
 * **Topological Ring Analytics & Mule Loop Detection**:
   - Detects closed transaction cycles of length $L \in [3, 7]$ using directed DFS traversal in memory or native Cypher variable-length path matching `MATCH path = (start:Entity)-[r*3..7]->(start)`.
   - Implements canonical rotation deduplication: rotates each cycle to begin with its lexicographically minimum entity ID, preventing identical cycle duplicates under cyclic permutations. Assigns deterministic SHA-256 ring digests.
-  - Multi-bank risk scoring: evaluates cross-bank boundaries ($\text{banks\_involved} \ge 2$), entity risk baselines, and cycle compactness.
+  - Multi-bank risk scoring: evaluates cross-bank boundaries ($\mathrm{banks}_{\mathrm{involved}} \ge 2$), entity risk baselines, and cycle compactness.
 * **Multi-Hop Financial Smurfing Detection**:
   - *Fan-In (Aggregation Mules)*: Identifies hubs receiving convergent micro-deposits from $\ge 3$ distinct sources.
   - *Fan-Out (Dispersion Mules)*: Identifies hubs dispersing funds to $\ge 3$ target accounts to circumvent reporting thresholds.

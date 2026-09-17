@@ -250,7 +250,7 @@ Synthesizes a standardized 5-paragraph FinCEN SAR narrative:
 - Compiles XML adhering strictly to `schemas/FinCEN_SAR_2.0.xsd`:
   - `<SubmissionHeader>`: `ActivityType="SAR"`, `SubmissionType="New"`, `CreatedTimestamp`.
   - `<Activity>`: `ActivityID`, `ActivityStatus`, `ReportingInstitution`.
-  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`). Unlinked alerts dynamically derive a deterministic zero-PII subject privacy hash ($\mathrm{SHA\text{-}256}(\text{"case\_subject:"} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) eliminating static mock constants.
+  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`). Unlinked alerts dynamically derive a deterministic zero-PII subject privacy hash ($\mathrm{SHA\text{-}256}(\mathrm{prefix}_{\mathrm{subject}} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) eliminating static mock constants.
   - `<SuspiciousActivityDetails>`: Composite `TotalRiskScore`, `Priority`, linked `AlertIds`.
   - `<Narrative>`: Summary, investigator notes, and cryptographically signed event timeline.
 - **Validation Mandate**: Validates generated XML against `schemas/FinCEN_SAR_2.0.xsd` using `lxml.etree.XMLSchema`. Malformed XML or missing required elements raises [`SARValidationError`](../backend/app/application/services/regulatory_reporter.py#L24).
@@ -361,7 +361,7 @@ pytest backend/tests/unit/test_case_management_workbench.py \
 | [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_timeline_cryptographic_hash_integrity_verification` | Verifies intact SHA-256 parent hash chain across investigation timeline | `PASSED` |
 | [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_timeline_hash_corruption_detection` | Detects timeline event tampering with exact corrupted index | `PASSED` |
 | [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_case_service_thread_safety_under_concurrent_writes` | Validates concurrent multithreaded mutations with RLock | `PASSED` |
-| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_repository_terminal_status_and_linking` | Verifies CaseRepository closed_at setting and alert linking | `PASSED` |
+| [`test_case_lifecycle_hardening.py`](../backend/tests/unit/test_case_lifecycle_hardening.py) | `test_case_repository_terminal_status_and_linking` | Verifies CaseRepository closed_at setting and alert linking | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_xml_passes_xsd_validation` | SAR XML conforms to FinCEN BSA 2.0 schema elements | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_xml_fails_when_violating_xsd_schema` | Missing mandatory XSD elements raises `SARValidationError` | `PASSED` |
 | [`test_regulatory_reporter.py`](../backend/tests/unit/test_regulatory_reporter.py) | `test_sar_rejected_for_unresolved_case` | Attempting to generate SAR XML for open/investigating case raises `SARValidationError` | `PASSED` |

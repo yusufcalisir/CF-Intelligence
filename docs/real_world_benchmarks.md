@@ -94,7 +94,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Statistical Verification (`compute_partition_stats`)**:
   - Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c |P_i(c) - P_{\text{global}}(c)| \in [0, 1]$).
   - Shannon Label Entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$).
-  - Boundary Donor Rebalancing: Strictly guarantees $|D_i| \ge \text{min\_size}$ without distorting natural Dirichlet concentration.
+  - Boundary Donor Rebalancing: Strictly guarantees $|D_i| \ge \mathrm{size}_{\mathrm{min}}$ without distorting natural Dirichlet concentration.
 
 ---
 
