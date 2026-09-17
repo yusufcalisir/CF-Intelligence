@@ -2640,149 +2640,39 @@ export interface PSIStatsResponse {
   zero_raw_pii_guarantee: string;
 }
 
-// ── Bank Onboarding Types ────────────────────────────────────────────────────
-export interface BankRegisterRequest {
-  bank_id: string;
-  legal_name: string;
-  jurisdiction: string;
+// ── Bank Onboarding & PKI Types ────
+
+export interface BankCABundleResponse {
+  root_ca_pem: string;
+  ca_fingerprint: string;
+  issuer: string;
+  valid_until: string;
+  crl_distribution_point: string;
+}
+
+// ── Design Partner Commercial Pilot Types ────
+
+export interface PilotLeadRequest {
+  institution_name: string;
+  contact_name: string;
   contact_email: string;
-  data_residency_region: string;
+  tier?: string;
+  jurisdiction?: string;
+  monthly_tx_volume?: number;
+  notes?: string;
 }
 
-export interface BankOnboardingBundleResponse {
-  bank_id: string;
-  status: string;
-  legal_name: string;
-  jurisdiction: string;
-  contact_email: string;
-  data_residency_region: string;
-  cert_fingerprint: string;
-  mtls_cert_pem: string;
-  mtls_key_pem: string;
-  connector_config_yaml: string;
-  coordinator_endpoint: string;
-  certificate_pem?: string | null;
-  private_key_pem?: string | null;
-}
-
-export interface BankStatusResponse {
-  bank_id: string;
-  legal_name: string;
-  jurisdiction: string;
-  status: string;
-  cert_fingerprint?: string | null;
-  vault_key_path?: string | null;
-  schema_provisioned: boolean;
-  created_at: string;
-  activated_at?: string | null;
-  name?: string | null;
-}
-
-export interface CertRotationResponse {
-  bank_id: string;
-  mtls_cert_pem: string;
-  mtls_key_pem: string;
-  cert_fingerprint: string;
-}
-
-export interface BankCSRSignRequest {
-  csr_pem: string;
-  days_valid?: number;
-}
-
-export interface BankCSRSignResponse {
-  bank_id: string;
-  signed_cert_pem: string;
-  cert_fingerprint: string;
-  expires_at: string;
-}
-
-// ── Design Partner Types ─────────────────────────────────────────────────────
-export interface IngestionValidationRequest {
-  partner_name: string;
-  schema_format?: string;
-  sample_records: Array<Record<string, unknown>>;
-}
-
-export interface PiiViolationDetail {
-  column: string;
-  pii_type: string;
-  sample_count: number;
-  remediation: string;
-}
-
-export interface IngestionValidationResponse {
-  partner_name: string;
-  schema_format: string;
-  is_clean_zero_pii: boolean;
-  total_records_scanned: number;
-  violations: PiiViolationDetail[];
-  status: string;
-  guidance: string;
-}
-
-export interface DistributionFidelityResponse {
-  dataset_name: string;
-  degradation_metrics?: Record<string, unknown>;
-  feature_shifts?: Record<string, unknown>;
-}
-
-export interface PilotComplianceItem {
-  standard: string;
-  clause: string;
-  status: string;
-  evidence: string;
-}
-
-export interface PilotComplianceChecklistResponse {
-  partner_name: string;
-  jurisdiction: string;
-  overall_readiness_score: number;
-  status: string;
-  compliance_items: PilotComplianceItem[];
-  cryptographic_guarantees: Record<string, string>;
-}
-
-export interface PartnerLeadRequest {
-  partner_name: string;
-  contact_email: string;
-  jurisdiction: string;
-  institution_type?: string;
-  daily_volume?: number;
-}
-
-export interface PartnerLeadResponse {
+export interface PilotLeadResponse {
   lead_id: string;
-  partner_name: string;
+  institution_name: string;
   status: string;
   assigned_tier: string;
-  onboarding_wizard_url: string;
+  sandbox_provisioned: boolean;
+  created_at: string;
 }
 
-export interface PilotStatusResponse {
-  partner_name: string;
-  status: string;
-  supported_schemas: string[];
-  benchmarks_available: string[];
-  sandbox_mode: string;
-}
+// ── Admin Web Console & Multi-Tenant Types ────
 
-export interface PilotFeedbackRequest {
-  partner_name: string;
-  contact_email: string;
-  satisfaction_rating: number;
-  category?: string;
-  comments: string;
-}
-
-export interface PilotFeedbackResponse {
-  feedback_id: string;
-  partner_name: string;
-  recorded_at: string;
-  status: string;
-}
-
-// ── Admin Web Console Types ──────────────────────────────────────────────────
 export interface AdminDashboardSummaryResponse {
   active_bank_nodes_count: number;
   federated_rounds_completed: number;
@@ -2791,50 +2681,50 @@ export interface AdminDashboardSummaryResponse {
   sla_compliance_pct: number;
 }
 
-export interface RoleConfigResponse {
-  role: string;
+export interface AdminRoleConfigResponse {
+  role: 'EXECUTIVE' | 'COMPLIANCE_OFFICER' | 'ML_ENGINEER' | 'FRAUD_INVESTIGATOR';
   visible_widgets: string[];
   permissions: string[];
   theme: string;
 }
 
 export interface AdminConfigResponse {
-  platform_title: string;
   environment: string;
-  enclave_mode: string;
-  default_dp_epsilon: number;
-  default_dp_delta: number;
-  secagg_protocol: string;
-  max_active_tenants: number;
-  api_version: string;
+  app_version: string;
+  multi_tenant_enabled: boolean;
+  hsm_vault_status: string;
+  rate_limit_rpm: number;
+  max_federated_clients: number;
+  cors_allowed_origins: string[];
+  active_features: Record<string, boolean>;
 }
 
-export interface TenantPartitionItem {
-  tenant_id: string;
+export interface TenantItem {
+  bank_id: string;
   legal_name: string;
-  status: string;
-  schema_name: string;
   jurisdiction: string;
-  kms_vault_path: string;
-}
-
-export interface TenantPartitionResponse {
-  total_tenants: number;
-  active_tenants: number;
-  partitions: TenantPartitionItem[];
-}
-
-export interface AdminMaintenanceResponse {
   status: string;
-  database_pool_status: string;
-  redis_cache_status: string;
-  vault_transit_status: string;
-  background_worker_count: number;
-  disk_free_mb: number;
-  last_vacuum_iso?: string | null;
+  schema_provisioned: boolean;
+  created_at: string;
 }
 
-// ── Maintenance Cron Types ───────────────────────────────────────────────────
+export interface AdminTenantListResponse {
+  total_tenants: number;
+  tenants: TenantItem[];
+}
+
+export interface MaintenanceWindowResponse {
+  status: string;
+  active_window: boolean;
+  next_scheduled_maintenance: string;
+  last_vacuum_at: string;
+  last_key_rotation_at: string;
+  storage_healthy: boolean;
+  details: Record<string, any>;
+}
+
+// ── Maintenance CronJob Execution Types ────
+
 export interface CronCleanupResponse {
   status: string;
   expired_sessions_purged: number;
@@ -2852,12 +2742,6 @@ export interface CronHealthStatusResponse {
   timestamp_iso: string;
 }
 
-export interface CronKeyRotationRequest {
-  tenant_ids?: string[] | null;
-  auto_reencrypt?: boolean;
-  revoke_retired?: boolean;
-}
-
 export interface CronKeyRotationResponse {
   status: string;
   tenants_rotated: string[];
@@ -2866,18 +2750,16 @@ export interface CronKeyRotationResponse {
   timestamp_iso: string;
 }
 
-export interface CronTaskScheduleItem {
-  job_name: string;
-  cron_expression: string;
+export interface CronScheduleItem {
+  job_id: string;
+  schedule_cron: string;
   description: string;
-  estimated_duration_sec: number;
-  is_active: boolean;
+  last_run: string | null;
+  next_run: string;
 }
 
 export interface CronScheduleResponse {
-  schedule_version: string;
-  timezone: string;
-  tasks: CronTaskScheduleItem[];
+  scheduled_jobs: CronScheduleItem[];
 }
 
 

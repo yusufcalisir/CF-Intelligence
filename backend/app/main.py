@@ -33,6 +33,7 @@ from app.config import get_settings
 from app.infrastructure.security.error_handler import format_safe_error_response
 from app.infrastructure.security.security_headers import SecurityHeadersMiddleware
 from app.presentation.routers import (
+    admin_console,
     alerts,
     auth,
     bank_client,
@@ -41,6 +42,7 @@ from app.presentation.routers import (
     compliance,
     coordinator,
     dashboard,
+    design_partner,
     diagnostics,
     entities,
     gateway,
@@ -49,6 +51,7 @@ from app.presentation.routers import (
     maintenance_cron,
     model_registry,
     monitoring,
+    onboarding,
     optimization,
     predict,
     privacy_defense,
@@ -864,28 +867,11 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import (
-    admin_console,
-    auth,
-    copilot,
-    datasets,
-    design_partner,
-    feedback,
-    maintenance_cron,
-    onboarding,
-)
+from app.presentation.routers import auth, copilot, datasets, design_partner, feedback, onboarding
 
 app.include_router(auth.router)
 app.include_router(onboarding.router)
-app.include_router(onboarding.api_router)
 app.include_router(design_partner.router)
-app.include_router(design_partner.api_router)
-app.include_router(admin_console.router)
-app.include_router(admin_console.dashboard_router)
-app.include_router(admin_console.admin_router)
-app.include_router(admin_console.admin_v1_router)
-app.include_router(maintenance_cron.router)
-app.include_router(maintenance_cron.api_router)
 app.include_router(diagnostics.router)
 app.include_router(diagnostics.api_router)
 app.include_router(datasets.router)
@@ -929,6 +915,16 @@ elif service_name in ("fl-coordinator", "coordinator"):
     app.include_router(optimization.api_router)
     app.include_router(optimization.admin_router)
     app.include_router(optimization.admin_api_router)
+    app.include_router(onboarding.router)
+    app.include_router(onboarding.api_router)
+    app.include_router(design_partner.router)
+    app.include_router(design_partner.api_router)
+    app.include_router(admin_console.router)
+    app.include_router(admin_console.api_router)
+    app.include_router(admin_console.admin_router)
+    app.include_router(admin_console.admin_v1_router)
+    app.include_router(maintenance_cron.router)
+    app.include_router(maintenance_cron.api_router)
 
 elif service_name == "identity-graph":
     app.include_router(health.router)
@@ -978,6 +974,16 @@ else:
     app.include_router(health.router)
     app.include_router(health.api_router)
     app.include_router(health.v1_router)
+    app.include_router(maintenance_cron.router)
+    app.include_router(maintenance_cron.api_router)
+    app.include_router(onboarding.router)
+    app.include_router(onboarding.api_router)
+    app.include_router(design_partner.router)
+    app.include_router(design_partner.api_router)
+    app.include_router(admin_console.router)
+    app.include_router(admin_console.api_router)
+    app.include_router(admin_console.admin_router)
+    app.include_router(admin_console.admin_v1_router)
     app.include_router(simulation.router)
     app.include_router(simulation.api_router)
     app.include_router(simulation.singular_router)

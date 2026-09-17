@@ -34,29 +34,6 @@ import type {
   ScenarioStopResponse,
   ActiveScenarioItem,
   MerchantRiskItem,
-  BankRegisterRequest,
-  BankOnboardingBundleResponse,
-  BankStatusResponse,
-  CertRotationResponse,
-  BankCSRSignRequest,
-  BankCSRSignResponse,
-  IngestionValidationRequest,
-  IngestionValidationResponse,
-  PartnerLeadRequest,
-  PartnerLeadResponse,
-  PilotStatusResponse,
-  PilotFeedbackRequest,
-  PilotFeedbackResponse,
-  AdminDashboardSummaryResponse,
-  RoleConfigResponse,
-  AdminConfigResponse,
-  TenantPartitionResponse,
-  AdminMaintenanceResponse,
-  CronCleanupResponse,
-  CronHealthStatusResponse,
-  CronKeyRotationRequest,
-  CronKeyRotationResponse,
-  CronScheduleResponse,
   AttackInjectionRequest,
   AttackInjectionResponse,
   SharedIntelligence,
@@ -194,6 +171,17 @@ import type {
   PaymentStatusResponse,
   ISO20022ParseRequest,
   ISO20022ParseResponse,
+  BankCABundleResponse,
+  PilotLeadRequest,
+  PilotLeadResponse,
+  AdminDashboardSummaryResponse,
+  AdminRoleConfigResponse,
+  AdminConfigResponse,
+  AdminTenantListResponse,
+  MaintenanceWindowResponse,
+  CronCleanupResponse,
+  CronHealthStatusResponse,
+  CronScheduleResponse,
 } from './types';
 
 
@@ -1573,12 +1561,12 @@ export function usePilotReadinessChecklist(partnerName: string = 'Design Partner
 
 export function useValidateDataIngestion() {
   return useMutation<
-    IngestionValidationResponse,
+    import('./types').PiiValidationResponse,
     Error,
-    IngestionValidationRequest
+    { partner_name: string; schema_format: string; sample_records: Array<Record<string, any>> }
   >({
     mutationFn: async (payload) => {
-      const { data } = await apiClient.post<IngestionValidationResponse>('/api/v1/design-partner/validate-ingest', payload);
+      const { data } = await apiClient.post('/api/v1/design-partner/validate-ingest', payload);
       return data;
     },
   });
@@ -2542,195 +2530,132 @@ export function usePSIProtocolStats() {
   });
 }
 
-// ── Bank Onboarding Hooks ────────────────────────────────────────────────────
-export function useBankOnboardingList() {
-  return useQuery<BankStatusResponse[]>({
-    queryKey: ['onboarding-banks'],
+// ── Bank Onboarding & CA Trust Bundle Hooks ────
+
+export function useBankCABundle() {
+  return useQuery<BankCABundleResponse>({
+    queryKey: ['bank-ca-bundle'],
     queryFn: async () => {
-      const { data } = await apiClient.get<BankStatusResponse[]>('/api/v1/onboarding/banks');
+      const { data } = await apiClient.get<BankCABundleResponse>('/api/v1/onboarding/ca-bundle');
       return data;
     },
-    refetchInterval: 10000,
   });
 }
 
-export function useBankStatus(bankId: string | undefined) {
-  return useQuery<BankStatusResponse>({
-    queryKey: ['onboarding-bank-status', bankId],
-    queryFn: async () => {
-      const { data } = await apiClient.get<BankStatusResponse>(`/api/v1/onboarding/banks/${bankId}/status`);
-      return data;
-    },
-    enabled: !!bankId,
-  });
-}
+// ── Design Partner Commercial Pilot Hooks ────
 
-export function useRegisterBank() {
+export function useEnrollPilotLead() {
   const queryClient = useQueryClient();
-  return useMutation<BankOnboardingBundleResponse, Error, BankRegisterRequest>({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post<BankOnboardingBundleResponse>('/api/v1/onboarding/register', payload);
+  return useMutation<PilotLeadResponse, Error, PilotLeadRequest>({
+    mutationFn: async (payload: PilotLeadRequest) => {
+      const { data } = await apiClient.post<PilotLeadResponse>('/api/v1/design-partner/leads', payload);
       return data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['onboarding-banks'] });
+      queryClient.invalidateQueries({ queryKey: ['pilot-leads'] });
     },
   });
 }
 
-export function useSignBankCSR() {
-  return useMutation<BankCSRSignResponse, Error, { bankId: string; request: BankCSRSignRequest }>({
-    mutationFn: async ({ bankId, request }) => {
-      const { data } = await apiClient.post<BankCSRSignResponse>(
-        `/api/v1/onboarding/banks/${bankId}/sign-csr`,
-        request
-      );
-      return data;
-    },
-  });
-}
-
-export function useRotateBankCert() {
-  return useMutation<CertRotationResponse, Error, string>({
-    mutationFn: async (bankId) => {
-      const { data } = await apiClient.post<CertRotationResponse>(
-        `/api/v1/onboarding/banks/${bankId}/rotate-cert`
-      );
-      return data;
-    },
-  });
-}
-
-// ── Design Partner Hooks ─────────────────────────────────────────────────────
-export function useDesignPartnerLead() {
-  return useMutation<PartnerLeadResponse, Error, PartnerLeadRequest>({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post<PartnerLeadResponse>('/api/v1/design-partner/leads', payload);
-      return data;
-    },
-  });
-}
-
-export function useDesignPartnerPilotStatus(partnerName: string = 'Design Partner Bank') {
-  return useQuery<PilotStatusResponse>({
-    queryKey: ['design-partner-pilot-status', partnerName],
+export function usePilotLeads() {
+  return useQuery<PilotLeadResponse[]>({
+    queryKey: ['pilot-leads'],
     queryFn: async () => {
-      const { data } = await apiClient.get<PilotStatusResponse>('/api/v1/design-partner/pilot', {
-        params: { partner_name: partnerName },
-      });
-      return data;
-    },
-    staleTime: 60000,
-  });
-}
-
-export function useDesignPartnerFeedback() {
-  return useMutation<PilotFeedbackResponse, Error, PilotFeedbackRequest>({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post<PilotFeedbackResponse>('/api/v1/design-partner/feedback', payload);
+      const { data } = await apiClient.get<PilotLeadResponse[]>('/api/v1/design-partner/leads');
       return data;
     },
   });
 }
 
-// ── Admin Web Console Hooks ──────────────────────────────────────────────────
+// ── Admin Web Console & Multi-Tenant Administration Hooks ────
+
 export function useAdminDashboardSummary() {
   return useQuery<AdminDashboardSummaryResponse>({
     queryKey: ['admin-dashboard-summary'],
     queryFn: async () => {
-      const { data } = await apiClient.get<AdminDashboardSummaryResponse>('/v1/admin/dashboard/summary');
+      const { data } = await apiClient.get<AdminDashboardSummaryResponse>('/api/v1/admin/dashboard/summary');
       return data;
     },
-    refetchInterval: 15000,
   });
 }
 
 export function useAdminRoleConfig(role: string = 'EXECUTIVE') {
-  return useQuery<RoleConfigResponse>({
+  return useQuery<AdminRoleConfigResponse>({
     queryKey: ['admin-role-config', role],
     queryFn: async () => {
-      const { data } = await apiClient.get<RoleConfigResponse>('/v1/admin/dashboard/role-config', {
+      const { data } = await apiClient.get<AdminRoleConfigResponse>('/api/v1/admin/dashboard/role-config', {
         params: { role },
       });
       return data;
     },
-    staleTime: 300000,
   });
 }
 
-export function useAdminConfig() {
+export function useAdminSystemConfig() {
   return useQuery<AdminConfigResponse>({
-    queryKey: ['admin-platform-config'],
+    queryKey: ['admin-system-config'],
     queryFn: async () => {
       const { data } = await apiClient.get<AdminConfigResponse>('/api/v1/admin/config');
       return data;
     },
-    staleTime: 60000,
   });
 }
 
 export function useAdminTenants() {
-  return useQuery<TenantPartitionResponse>({
+  return useQuery<AdminTenantListResponse>({
     queryKey: ['admin-tenants'],
     queryFn: async () => {
-      const { data } = await apiClient.get<TenantPartitionResponse>('/api/v1/admin/tenants');
+      const { data } = await apiClient.get<AdminTenantListResponse>('/api/v1/admin/tenants');
       return data;
     },
-    refetchInterval: 30000,
   });
 }
 
-export function useAdminMaintenance() {
-  return useQuery<AdminMaintenanceResponse>({
-    queryKey: ['admin-maintenance-status'],
+export function useAdminMaintenanceWindow() {
+  return useQuery<MaintenanceWindowResponse>({
+    queryKey: ['admin-maintenance-window'],
     queryFn: async () => {
-      const { data } = await apiClient.get<AdminMaintenanceResponse>('/api/v1/admin/maintenance');
+      const { data } = await apiClient.get<MaintenanceWindowResponse>('/api/v1/admin/maintenance');
       return data;
     },
-    refetchInterval: 30000,
   });
 }
 
-// ── Maintenance Cron Hooks ───────────────────────────────────────────────────
+// ── Maintenance CronJob Query Hooks ────
+
+export function useExecuteSystemCleanup() {
+  const queryClient = useQueryClient();
+  return useMutation<CronCleanupResponse, Error, void>({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<CronCleanupResponse>('/api/v1/cron/cleanup-sessions');
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cron-health-check'] });
+    },
+  });
+}
+
 export function useCronHealthCheck() {
   return useQuery<CronHealthStatusResponse>({
     queryKey: ['cron-health-check'],
     queryFn: async () => {
-      const { data } = await apiClient.get<CronHealthStatusResponse>('/v1/cron/health-check');
+      const { data } = await apiClient.get<CronHealthStatusResponse>('/api/v1/cron/health-check');
       return data;
     },
-    refetchInterval: 30000,
   });
 }
 
-export function useCronSchedule() {
+export function useCronSchedules() {
   return useQuery<CronScheduleResponse>({
-    queryKey: ['cron-maintenance-schedule'],
+    queryKey: ['cron-schedules'],
     queryFn: async () => {
-      const { data } = await apiClient.get<CronScheduleResponse>('/v1/cron/schedule');
-      return data;
-    },
-    staleTime: 300000,
-  });
-}
-
-export function useTriggerCronCleanup() {
-  return useMutation<CronCleanupResponse, Error, void>({
-    mutationFn: async () => {
-      const { data } = await apiClient.post<CronCleanupResponse>('/v1/cron/cleanup-sessions');
+      const { data } = await apiClient.get<CronScheduleResponse>('/api/v1/cron/schedule');
       return data;
     },
   });
 }
 
-export function useRotateCronKeys() {
-  return useMutation<CronKeyRotationResponse, Error, CronKeyRotationRequest | undefined>({
-    mutationFn: async (payload) => {
-      const { data } = await apiClient.post<CronKeyRotationResponse>('/v1/cron/rotate-keys', payload || {});
-      return data;
-    },
-  });
-}
 
 
 
