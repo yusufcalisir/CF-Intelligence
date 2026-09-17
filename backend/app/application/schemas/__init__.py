@@ -2,9 +2,11 @@
 
 from app.application.schemas import (
     admin_console,
+    compliance,
     coordinator,
     copilot,
     dashboard,
+    datasets,
     design_partner,
     entities,
     feedback,
@@ -22,9 +24,11 @@ from app.application.schemas import (
 __all__ = [
     "admin_console",
     "banks",
+    "compliance",
     "coordinator",
     "copilot",
     "dashboard",
+    "datasets",
     "design_partner",
     "entities",
     "feedback",

@@ -3036,4 +3036,113 @@ export interface SlashPenaltyReceipt {
 
 export type SlashedNodesCatalog = Record<string, SlashRecord[]>;
 
+// ── Compliance, FinCEN SAR 2.0 & GDPR Erasure Types ─────────────────
+
+export interface FairnessAuditRequest {
+  y_pred_probs: number[];
+  sensitive_attributes: number[];
+  y_true?: number[] | null;
+  threshold?: number;
+}
+
+export interface FairnessAuditResponse {
+  threshold: number;
+  sample_count: number;
+  protected_count: number;
+  reference_count: number;
+  protected_selection_rate: number;
+  reference_selection_rate: number;
+  disparate_impact_ratio: number;
+  demographic_parity_difference: number;
+  eeoc_80_percent_rule: string;
+  overall_fairness_status: string;
+  equal_opportunity_difference?: number | null;
+  average_odds_difference?: number | null;
+  protected_tpr?: number | null;
+  reference_tpr?: number | null;
+  protected_fpr?: number | null;
+  reference_fpr?: number | null;
+  status?: string | null;
+}
+
+export interface CanaryGateRequest {
+  candidate_metrics: Record<string, any>;
+  champion_metrics?: Record<string, any> | null;
+}
+
+export interface CanaryGateResponse {
+  passed: boolean;
+  decision: string;
+  checks: Record<string, boolean>;
+  reasons: string[];
+  metrics: Record<string, any>;
+}
+
+export interface SOC2ControlEvidenceItem {
+  title: string;
+  status: string;
+  evidence: string;
+}
+
+export interface SOC2EvidenceReportResponse {
+  report_id: string;
+  timestamp: string;
+  compliance_status: string;
+  total_controls_audited: number;
+  passed_controls: number;
+  failed_controls: number;
+  controls: Record<string, SOC2ControlEvidenceItem>;
+}
+
+export interface SR117ClauseItem {
+  clause_id: string;
+  title: string;
+  status: string;
+  specification: string;
+  evidence: string;
+}
+
+export interface SR117AuditReportResponse {
+  pillar: string;
+  framework: string;
+  compliance_score_pct: number;
+  overall_status: string;
+  total_clauses: number;
+  passed_clauses: number;
+  clauses: SR117ClauseItem[];
+  audited_at: string;
+}
+
+export interface SR117MilestoneItem {
+  quarter: string;
+  milestone: string;
+  focus_areas: string[];
+  deadline: string;
+  status: string;
+  lead_auditor: string;
+}
+
+export interface SR117ScheduleResponse {
+  framework: string;
+  reference_year: number;
+  overall_mrm_status: string;
+  next_audit_milestone: string;
+  next_audit_deadline: string;
+  cadence: string;
+  milestones: SR117MilestoneItem[];
+}
+
+export interface SARValidateRequest {
+  xml_content: string;
+}
+
+export type SARValidationResponse = SARValidationResult;
+export type SARFilingRecordResponse = SARFilingRecord;
+
+export interface SARFilingDetailResponse extends SARFilingRecord {
+  xml_content: string;
+}
+
+
+
 

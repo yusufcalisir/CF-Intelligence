@@ -130,12 +130,20 @@ import type {
   ExportFinCENXmlRequest,
   ExportFinCENXmlResponse,
   SARGenerateRequest,
+  SARFilingDetailResponse,
   RetentionPolicyRequest,
   RetentionPolicyResponse,
   RetentionPurgeRequest,
   GDPRErasureRequest,
   ErasureAuditRecordResponse,
   ErasureChainVerificationResponse,
+  FairnessAuditRequest,
+  FairnessAuditResponse,
+  CanaryGateRequest,
+  CanaryGateResponse,
+  SOC2EvidenceReportResponse,
+  SR117AuditReportResponse,
+  SR117ScheduleResponse,
   LoginRequest,
   LoginResponse,
   RefreshTokenRequest,
@@ -2978,6 +2986,69 @@ export function useSlashedNodes() {
     },
   });
 }
+
+// ── Compliance, Model Governance & FinCEN SAR Hooks ──
+
+export function useSoc2EvidenceQuery() {
+  return useQuery<SOC2EvidenceReportResponse>({
+    queryKey: ['soc2-evidence'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SOC2EvidenceReportResponse>('/api/v1/compliance/soc2-evidence');
+      return data;
+    },
+  });
+}
+
+export function useSr117AuditQuery() {
+  return useQuery<SR117AuditReportResponse>({
+    queryKey: ['sr117-audit'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SR117AuditReportResponse>('/api/v1/compliance/sr11-7/audit');
+      return data;
+    },
+  });
+}
+
+export function useSr117ScheduleQuery(year: number = 2026) {
+  return useQuery<SR117ScheduleResponse>({
+    queryKey: ['sr117-schedule', year],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SR117ScheduleResponse>(`/api/v1/compliance/sr11-7/schedule?year=${year}`);
+      return data;
+    },
+  });
+}
+
+export function useEvaluateFairnessMutation() {
+  return useMutation<FairnessAuditResponse, Error, FairnessAuditRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<FairnessAuditResponse>('/api/v1/compliance/fairness/evaluate', payload);
+      return data;
+    },
+  });
+}
+
+export function useEvaluateCanaryGateMutation() {
+  return useMutation<CanaryGateResponse, Error, CanaryGateRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CanaryGateResponse>('/api/v1/compliance/sr11-7/canary-gate', payload);
+      return data;
+    },
+  });
+}
+
+export function useSarFilingDetailQuery(filingId: string) {
+  return useQuery<SARFilingDetailResponse>({
+    queryKey: ['sar-filing-detail', filingId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SARFilingDetailResponse>(`/api/v1/compliance/sar/filings/${filingId}`);
+      return data;
+    },
+    enabled: Boolean(filingId),
+  });
+}
+
+
 
 
 

@@ -7,12 +7,13 @@ Great Expectations data contract audits, and consortium partition enrollment.
 from __future__ import annotations
 
 import logging
+import threading
 import uuid
 from typing import Any, Literal
 
 from fastapi import APIRouter
 
-from app.application.schemas.phase2 import (
+from app.application.schemas.datasets import (
     ColumnMappingItem,
     DatasetConsortiumEnrollRequest,
     DatasetConsortiumEnrollResponse,
@@ -24,9 +25,13 @@ from app.application.schemas.phase2 import (
 )
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
 
-# In-memory storage for preview and audit states
+# Legacy and Canonical Routers for dual-prefix support (/v1/datasets and /api/v1/datasets)
+router = APIRouter(prefix="/v1/datasets", tags=["datasets"])
+api_router = APIRouter(prefix="/api/v1/datasets", tags=["datasets"])
+
+# In-memory storage for preview and audit states with thread-safe locking
+_STORE_LOCK = threading.Lock()
 _PREVIEW_STORE: dict[str, dict[str, Any]] = {}
 _AUDIT_STORE: dict[str, dict[str, Any]] = {}
 
@@ -55,7 +60,6 @@ def _infer_target_signal(col_name: str) -> tuple[str, float]:
     return "custom_feature", 0.30
 
 
-@router.post("/validate-preview", response_model=DatasetPreviewResponse)
 async def validate_dataset_preview(req: DatasetPreviewRequest) -> DatasetPreviewResponse:
     """Pre-flight client sandbox inspection: verifies magic bytes, infers columns,
     scans for raw PII, and generates schema mappings.
@@ -118,20 +122,22 @@ async def validate_dataset_preview(req: DatasetPreviewRequest) -> DatasetPreview
         pii_masked_receipt=f"HMAC-SHA256-SALTED-{uuid.uuid4().hex[:12].upper()}" if pii_violations > 0 else "ZERO-PII-VERIFIED",
     )
 
-    _PREVIEW_STORE[preview_id] = {
-        "request": req.model_dump(),
-        "response": response_data.model_dump(),
-    }
+    with _STORE_LOCK:
+        _PREVIEW_STORE[preview_id] = {
+            "request": req.model_dump(),
+            "response": response_data.model_dump(),
+        }
     return response_data
 
 
-@router.post("/contract-audit", response_model=DatasetContractAuditResponse)
 async def audit_dataset_contract(req: DatasetContractAuditRequest) -> DatasetContractAuditResponse:
     """Execute Great Expectations 1.x & Pandera data contract checks on imported dataset.
     Detects invalid distributions, null violations, and Non-IID Dirichlet concentration.
     """
     audit_id = f"AUD-{uuid.uuid4().hex[:8].upper()}"
-    preview_data = _PREVIEW_STORE.get(req.preview_id, {})
+
+    with _STORE_LOCK:
+        preview_data = _PREVIEW_STORE.get(req.preview_id, {})
     total_records = preview_data.get("response", {}).get("row_count_estimate", 5000)
 
     # Check for malformed contract test flag
@@ -250,15 +256,17 @@ async def audit_dataset_contract(req: DatasetContractAuditRequest) -> DatasetCon
         audit_message=audit_msg,
     )
 
-    _AUDIT_STORE[audit_id] = response.model_dump()
+    with _STORE_LOCK:
+        _AUDIT_STORE[audit_id] = response.model_dump()
     return response
 
 
-@router.post("/consortium-enroll", response_model=DatasetConsortiumEnrollResponse)
 async def enroll_dataset_to_consortium(req: DatasetConsortiumEnrollRequest) -> DatasetConsortiumEnrollResponse:
     """Assign audited dataset to target bank node partition in the federated network."""
     enrollment_id = f"ENROLL-{uuid.uuid4().hex[:8].upper()}"
-    audit_data = _AUDIT_STORE.get(req.audit_id, {})
+
+    with _STORE_LOCK:
+        audit_data = _AUDIT_STORE.get(req.audit_id, {})
     total_records = audit_data.get("passed_records", 5000)
 
     logger.info(
@@ -277,4 +285,33 @@ async def enroll_dataset_to_consortium(req: DatasetConsortiumEnrollRequest) -> D
         features_dimension=9,
         partition_assigned=f"{req.target_bank_id}_custom_partition_v1",
         next_action_url=f"/operations?custom_enrolled={req.target_bank_id}&records={total_records}",
+    )
+
+
+# ── Route Binding to Router Variants ──────────────────────────
+
+for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
+    r.add_api_route(
+        "/validate-preview",
+        validate_dataset_preview,
+        methods=["POST"],
+        response_model=DatasetPreviewResponse,
+        summary="Pre-Flight Dataset Inspection & Canonical Signal Mapping",
+        operation_id=f"{prefix_tag}_validate_dataset_preview",
+    )
+    r.add_api_route(
+        "/contract-audit",
+        audit_dataset_contract,
+        methods=["POST"],
+        response_model=DatasetContractAuditResponse,
+        summary="Great Expectations 1.x & Pandera Contract Gating Audit",
+        operation_id=f"{prefix_tag}_audit_dataset_contract",
+    )
+    r.add_api_route(
+        "/consortium-enroll",
+        enroll_dataset_to_consortium,
+        methods=["POST"],
+        response_model=DatasetConsortiumEnrollResponse,
+        summary="Assign Audited Dataset Partition to Bank Node Partition",
+        operation_id=f"{prefix_tag}_enroll_dataset_to_consortium",
     )
