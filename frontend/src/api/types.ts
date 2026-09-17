@@ -1559,6 +1559,7 @@ export interface CopilotDirectGenerationRequest {
   graph_nodes?: Array<Record<string, unknown>> | Record<string, unknown>;
   custom_investigator_notes?: string | null;
   risk_score?: number | null;
+  require_existing_case?: boolean;
 }
 
 export interface CopilotQueryResponse {
@@ -1579,6 +1580,25 @@ export interface CopilotQueryResponse {
   timeline_event_count?: number;
   sar_narrative?: string;
   supervisor_briefing?: string;
+}
+
+export interface AssembledEvidenceResponse {
+  case_id: string;
+  case_title: string;
+  case_status: string;
+  total_risk_score: number;
+  evidence_hash: string;
+  evidence_count: number;
+  timeline_event_count: number;
+  pii_sanitized_count: number;
+  assembled_at: number;
+}
+
+export interface CopilotStatusResponse {
+  status: string;
+  zero_pii_engine: string;
+  synthesized_analyses_count: number;
+  timestamp: string;
 }
 
 // ── Label Feedback Loop & Retraining Store ────────

@@ -80,6 +80,8 @@ import type {
   CopilotDirectGenerationRequest,
   CopilotQueryRequest,
   CopilotQueryResponse,
+  AssembledEvidenceResponse,
+  CopilotStatusResponse,
   AnalystFeedbackIngestRequest,
   AnalystFeedbackIngestResponse,
   FeedbackStatsResponse,
@@ -1401,6 +1403,61 @@ export function useDirectGenerateSAR() {
         payload
       );
       return data;
+    },
+  });
+}
+
+export function useAssembleEvidence() {
+  return useMutation<AssembledEvidenceResponse, Error, CopilotDirectGenerationRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<AssembledEvidenceResponse>(
+        '/api/v1/copilot/assemble-evidence',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useCopilotStatus() {
+  return useQuery<CopilotStatusResponse>({
+    queryKey: ['copilot-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CopilotStatusResponse>('/api/v1/copilot/status');
+      return data;
+    },
+    refetchInterval: 30000,
+  });
+}
+
+export function useCopilotCaseEvidence(caseId: string | undefined) {
+  return useQuery<AssembledEvidenceResponse>({
+    queryKey: ['copilot-case-evidence', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<AssembledEvidenceResponse>(
+        `/api/v1/copilot/cases/${caseId}/evidence`
+      );
+      return data;
+    },
+    enabled: !!caseId,
+    retry: false,
+  });
+}
+
+export function useCopilotCaseNarrative() {
+  const queryClient = useQueryClient();
+  return useMutation<CopilotQueryResponse, Error, { caseId: string; request?: CopilotQueryRequest }>({
+    mutationFn: async ({ caseId, request }) => {
+      const { data } = await apiClient.post<CopilotQueryResponse>(
+        `/api/v1/copilot/cases/${caseId}/narrative`,
+        request || { case_id: caseId }
+      );
+      return data;
+    },
+    onSuccess: (_, { caseId }) => {
+      queryClient.invalidateQueries({ queryKey: ['copilot-summary', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['copilot-evidence', caseId] });
+      queryClient.invalidateQueries({ queryKey: ['copilot-case-evidence', caseId] });
     },
   });
 }
