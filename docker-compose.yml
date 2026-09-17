@@ -30,7 +30,7 @@ services:
       timeout: 3s
       retries: 3
 
-  # ── 2. Frontend Web Container (React 18 SPA) ────────────────────────────────
+  # ── 2. Frontend Web Container (React 19 SPA) ────────────────────────────────
   frontend:
     build:
       context: .
