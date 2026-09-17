@@ -18,6 +18,7 @@ class SimulationStatus(StrEnum):
     EVALUATING = "evaluating"
     COMPLETED = "completed"
     FAILED = "failed"
+    STOPPED = "stopped"
 
 
 class BankTier(StrEnum):

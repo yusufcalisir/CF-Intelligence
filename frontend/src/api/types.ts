@@ -287,6 +287,62 @@ export interface SimulationCreateResponse {
   message: string;
 }
 
+export interface SimulationStatusResponse {
+  id: string;
+  status: string;
+  current_round: number;
+  total_rounds: number;
+  progress_pct: number;
+  error_message?: string | null;
+}
+
+export interface SimulationStopRequest {
+  simulation_id: string;
+  reason?: string | null;
+}
+
+export interface SimulationStopResponse {
+  simulation_id: string;
+  status: string;
+  message: string;
+  stopped_at: string;
+}
+
+export interface TrainingProgressResponse {
+  simulation_id?: string | null;
+  event_type: string;
+  status?: string | null;
+  current_round: number;
+  total_rounds: number;
+  progress_pct: number;
+  data: Record<string, any>;
+}
+
+export interface TrainingMetricsSummaryResponse {
+  simulation_id: string;
+  total_rounds: number;
+  global_losses: number[];
+  auc_history: number[];
+  per_bank_auc: Record<string, number[]>;
+  per_bank_loss: Record<string, number[]>;
+}
+
+export interface TrainingHistoryItem {
+  simulation_id: string;
+  status: string;
+  current_round: number;
+  total_rounds: number;
+  progress_pct: number;
+  created_at?: string | null;
+  completed_at?: string | null;
+  duration_seconds?: number | null;
+}
+
+export interface TrainingHistoryResponse {
+  total_count: number;
+  runs: TrainingHistoryItem[];
+}
+
 export interface BankInfo {
   id: string;
   name: string;

@@ -9,9 +9,17 @@ from __future__ import annotations
 import json
 import logging
 
-from fastapi import APIRouter, HTTPException, Request, status
+from datetime import datetime, timezone
+import json
+import logging
+import threading
+import uuid
+from typing import Any
+
+from fastapi import APIRouter, HTTPException, Path, Query, Request, status
 
 from app.application.schemas.simulation import (
+    AIActReportResponse,
     BankComparisonResponse,
     BankResponse,
     ComparisonResponse,
@@ -20,7 +28,11 @@ from app.application.schemas.simulation import (
     SimulationConfigRequest,
     SimulationCreateResponse,
     SimulationDetailResponse,
+    SimulationStatusResponse,
+    SimulationStopRequest,
+    SimulationStopResponse,
     SimulationSummaryResponse,
+    TrainingRoundResponse,
 )
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 from app.infrastructure.redis_store import RedisStore
@@ -30,15 +42,54 @@ from app.presentation.websockets.manager import training_ws_manager
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/simulations", tags=["simulations"])
+api_router = APIRouter(prefix="/v1/simulations", tags=["simulations"])
+singular_router = APIRouter(prefix="/api/v1/simulation", tags=["simulation"])
+singular_api_router = APIRouter(prefix="/v1/simulation", tags=["simulation"])
 
 
 # ── Redis-backed stores ───────────────────────────
 _simulation_results = RedisStore("sim_results")
 _simulation_events = RedisStore("sim_events")
+_stop_events: dict[str, threading.Event] = {}
 
 
 @router.post(
     "",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@router.post(
+    "/start",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@api_router.post(
+    "",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@api_router.post(
+    "/start",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@singular_router.post(
+    "",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@singular_router.post(
+    "/start",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@singular_api_router.post(
+    "",
+    response_model=SimulationCreateResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+@singular_api_router.post(
+    "/start",
     response_model=SimulationCreateResponse,
     status_code=status.HTTP_202_ACCEPTED,
 )
@@ -50,12 +101,10 @@ async def create_simulation(
     """Start a new federated learning simulation.
 
     Runs the simulation in a background thread within the web process.
-    Poll GET /simulations/{id} for progress.
+    Poll GET /simulations/{id} or GET /simulation/{id}/status for progress.
     """
-    import threading
-    import uuid
-
     simulation_id = str(uuid.uuid4())
+    _stop_events[simulation_id] = threading.Event()
 
     # Build config dict
     config_dict = {
@@ -138,10 +187,11 @@ async def create_simulation(
 
 
 @router.get("", response_model=list[SimulationSummaryResponse])
+@api_router.get("", response_model=list[SimulationSummaryResponse])
+@singular_router.get("", response_model=list[SimulationSummaryResponse])
+@singular_api_router.get("", response_model=list[SimulationSummaryResponse])
 async def list_simulations() -> list[SimulationSummaryResponse]:
     """List all simulation runs."""
-    # Results are updated in-place by background threads
-
     summaries = []
     for sim in _simulation_results.list_values():
         summaries.append(
@@ -156,11 +206,198 @@ async def list_simulations() -> list[SimulationSummaryResponse]:
                 duration_seconds=sim.get("duration_seconds"),
             )
         )
-
     return summaries
 
 
+@router.post("/stop", response_model=SimulationStopResponse)
+@api_router.post("/stop", response_model=SimulationStopResponse)
+@singular_router.post("/stop", response_model=SimulationStopResponse)
+@singular_api_router.post("/stop", response_model=SimulationStopResponse)
+async def stop_simulation_body(
+    payload: SimulationStopRequest,
+) -> SimulationStopResponse:
+    """Gracefully terminate a running simulation via JSON body."""
+    return await stop_simulation(simulation_id=payload.simulation_id, reason=payload.reason)
+
+
+@router.get("/{simulation_id}/status", response_model=SimulationStatusResponse)
+@api_router.get("/{simulation_id}/status", response_model=SimulationStatusResponse)
+@singular_router.get("/{simulation_id}/status", response_model=SimulationStatusResponse)
+@singular_api_router.get("/{simulation_id}/status", response_model=SimulationStatusResponse)
+async def get_simulation_status(
+    simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
+) -> SimulationStatusResponse:
+    """Get lightweight progress status and execution phase of a simulation."""
+    sim = _simulation_results.get(simulation_id)
+    if not sim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found",
+        )
+    return SimulationStatusResponse(
+        id=sim["id"],
+        status=SimulationStatus(sim["status"]),
+        current_round=sim.get("current_round", 0),
+        total_rounds=sim.get("total_rounds", 10),
+        progress_pct=_calc_progress(sim),
+        error_message=sim.get("error_message"),
+    )
+
+
+@router.post("/{simulation_id}/stop", response_model=SimulationStopResponse)
+@api_router.post("/{simulation_id}/stop", response_model=SimulationStopResponse)
+@singular_router.post("/{simulation_id}/stop", response_model=SimulationStopResponse)
+@singular_api_router.post("/{simulation_id}/stop", response_model=SimulationStopResponse)
+async def stop_simulation(
+    simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
+    reason: str | None = Query(default=None, max_length=255, description="Optional cancellation reason"),
+) -> SimulationStopResponse:
+    """Gracefully terminate a running federated learning simulation."""
+    sim = _simulation_results.get(simulation_id)
+    if not sim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found",
+        )
+    current_status = sim.get("status")
+    if current_status in (
+        SimulationStatus.COMPLETED.value,
+        SimulationStatus.FAILED.value,
+        SimulationStatus.STOPPED.value,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Simulation '{simulation_id}' is already in terminal state '{current_status}'.",
+        )
+
+    # Signal stop event to background thread
+    stop_event = _stop_events.get(simulation_id)
+    if stop_event:
+        stop_event.set()
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    sim["status"] = SimulationStatus.STOPPED.value
+    sim["completed_at"] = now_iso
+    sim["error_message"] = reason or "Simulation stopped gracefully by operator."
+    sim["progress_pct"] = 100.0
+    _simulation_results.set(simulation_id, sim)
+
+    # Broadcast stop event
+    stop_payload = {
+        "event_type": "simulation_stopped",
+        "data": {
+            "simulation_id": simulation_id,
+            "reason": reason or "Operator termination request",
+            "stopped_at": now_iso,
+        },
+    }
+    _simulation_events.push_list(simulation_id, stop_payload)
+    training_ws_manager.broadcast_to_room_sync(f"simulation:{simulation_id}", stop_payload)
+    training_ws_manager.broadcast_to_room_sync("simulation:live_prod_v2", stop_payload)
+
+    return SimulationStopResponse(
+        simulation_id=simulation_id,
+        status=SimulationStatus.STOPPED,
+        message=f"Simulation '{simulation_id}' successfully stopped.",
+        stopped_at=now_iso,
+    )
+
+
+@router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
+@api_router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
+@singular_router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
+@singular_api_router.get("/{simulation_id}/rounds", response_model=list[TrainingRoundResponse])
+async def get_simulation_rounds(
+    simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
+) -> list[TrainingRoundResponse]:
+    """Retrieve all completed training rounds for a simulation."""
+    sim = _simulation_results.get(simulation_id)
+    if not sim:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Simulation '{simulation_id}' not found",
+        )
+
+    events = _simulation_events.get_list(simulation_id)
+    rounds: list[TrainingRoundResponse] = []
+    for event in events:
+        if event.get("event_type") == "round_complete":
+            data = event.get("data", {})
+            rounds.append(
+                TrainingRoundResponse(
+                    round_number=data.get("round", 0),
+                    total_rounds=data.get("total", sim.get("total_rounds", 10)),
+                    global_loss=float(data.get("loss", 0.0)),
+                    auc=float(data.get("auc", 0.0)),
+                    per_bank_auc=data.get("per_bank_auc", {}),
+                    per_bank_loss=data.get("per_bank_loss", {}),
+                    participating_banks=data.get("participants", []),
+                    dropped_banks=data.get("dropped", []),
+                    duration_ms=float(data.get("duration_ms", 0.0)),
+                    privacy_budget=float(data.get("privacy_budget", 0.0)),
+                    feature_importance=data.get("feature_importance", {}),
+                    canary_info=data.get("canary_info", {}),
+                )
+            )
+    return rounds
+
+
+@router.get("/{simulation_id}/comparison", response_model=ComparisonResponse)
+@api_router.get("/{simulation_id}/comparison", response_model=ComparisonResponse)
+@singular_router.get("/{simulation_id}/comparison", response_model=ComparisonResponse)
+@singular_api_router.get("/{simulation_id}/comparison", response_model=ComparisonResponse)
+async def get_comparison(simulation_id: str) -> ComparisonResponse:
+    """Get local vs federated comparison for all banks."""
+
+    sim = _simulation_results.get(simulation_id)
+    if not sim:
+        raise HTTPException(status_code=404, detail="Simulation not found")
+
+    if sim["status"] != SimulationStatus.COMPLETED.value:
+        raise HTTPException(status_code=400, detail="Simulation not yet completed")
+
+    bank_comparisons = []
+    total_improvement: dict[str, float] = {}
+
+    for bank_data in sim.get("banks", []):
+        local = bank_data.get("local_metrics")
+        federated = bank_data.get("federated_metrics")
+        if not local or not federated:
+            continue
+
+        local_resp = _build_metrics_response(local)
+        fed_resp = _build_metrics_response(federated)
+        if local_resp is None or fed_resp is None:
+            continue
+
+        improvement = bank_data.get("improvement", {})
+        bank_comparisons.append(
+            BankComparisonResponse(
+                bank_id=bank_data["id"],
+                bank_name=bank_data["name"],
+                local_metrics=local_resp,
+                federated_metrics=fed_resp,
+                improvement=improvement,
+            )
+        )
+
+        for k, v in improvement.items():
+            total_improvement[k] = total_improvement.get(k, 0) + v
+
+    n = len(bank_comparisons) or 1
+    avg_improvement = {k: round(v / n, 4) for k, v in total_improvement.items()}
+
+    return ComparisonResponse(
+        simulation_id=simulation_id,
+        banks=bank_comparisons,
+        aggregate_improvement=avg_improvement,
+    )
+
+
 @router.get("/{simulation_id}", response_model=SimulationDetailResponse)
+@api_router.get("/{simulation_id}", response_model=SimulationDetailResponse)
+@singular_router.get("/{simulation_id}", response_model=SimulationDetailResponse)
+@singular_api_router.get("/{simulation_id}", response_model=SimulationDetailResponse)
 async def get_simulation(simulation_id: str) -> SimulationDetailResponse:
     """Get full simulation details including metrics."""
 
@@ -264,55 +501,6 @@ async def get_simulation(simulation_id: str) -> SimulationDetailResponse:
     )
 
 
-@router.get("/{simulation_id}/comparison", response_model=ComparisonResponse)
-async def get_comparison(simulation_id: str) -> ComparisonResponse:
-    """Get local vs federated comparison for all banks."""
-
-    sim = _simulation_results.get(simulation_id)
-    if not sim:
-        raise HTTPException(status_code=404, detail="Simulation not found")
-
-    if sim["status"] != SimulationStatus.COMPLETED.value:
-        raise HTTPException(status_code=400, detail="Simulation not yet completed")
-
-    bank_comparisons = []
-    total_improvement: dict[str, float] = {}
-
-    for bank_data in sim.get("banks", []):
-        local = bank_data.get("local_metrics")
-        federated = bank_data.get("federated_metrics")
-        if not local or not federated:
-            continue
-
-        local_resp = _build_metrics_response(local)
-        fed_resp = _build_metrics_response(federated)
-        if local_resp is None or fed_resp is None:
-            continue
-
-        improvement = bank_data.get("improvement", {})
-        bank_comparisons.append(
-            BankComparisonResponse(
-                bank_id=bank_data["id"],
-                bank_name=bank_data["name"],
-                local_metrics=local_resp,
-                federated_metrics=fed_resp,
-                improvement=improvement,
-            )
-        )
-
-        for k, v in improvement.items():
-            total_improvement[k] = total_improvement.get(k, 0) + v
-
-    n = len(bank_comparisons) or 1
-    avg_improvement = {k: round(v / n, 4) for k, v in total_improvement.items()}
-
-    return ComparisonResponse(
-        simulation_id=simulation_id,
-        banks=bank_comparisons,
-        aggregate_improvement=avg_improvement,
-    )
-
-
 # ── Helpers ─────────────────────────────────────
 
 
@@ -368,6 +556,11 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
         # passed by the service may differ from our simulation_id.  We always look up
         # by our own simulation_id (the key stored in _simulation_results).
         def progress_cb(_sim_id: str, event_type: str, data: dict[str, Any]) -> None:
+            stop_evt = _stop_events.get(simulation_id)
+            if stop_evt and stop_evt.is_set():
+                logger.info("Simulation %s received stop signal. Aborting progress callback.", simulation_id)
+                return
+
             sim = _simulation_results.get(simulation_id)
             if sim:
                 if event_type == "status":
@@ -501,9 +694,11 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
 
 def _calc_progress(sim: dict) -> float:
     status = sim.get("status")
-    if status == SimulationStatus.COMPLETED.value:
-        return 100.0
-    if status == SimulationStatus.FAILED.value:
+    if status in (
+        SimulationStatus.COMPLETED.value,
+        SimulationStatus.FAILED.value,
+        SimulationStatus.STOPPED.value,
+    ):
         return 100.0
     if status == SimulationStatus.EVALUATING.value:
         return 95.0
@@ -551,8 +746,13 @@ def _build_profile_response(data: dict | None) -> DataProfileResponse | None:
     return DataProfileResponse(**data)
 
 
-@router.get("/{simulation_id}/ai-act-report")
-async def get_ai_act_report(simulation_id: str) -> dict:
+@router.get("/{simulation_id}/ai-act-report", response_model=AIActReportResponse)
+@api_router.get("/{simulation_id}/ai-act-report", response_model=AIActReportResponse)
+@singular_router.get("/{simulation_id}/ai-act-report", response_model=AIActReportResponse)
+@singular_api_router.get("/{simulation_id}/ai-act-report", response_model=AIActReportResponse)
+async def get_ai_act_report(
+    simulation_id: str = Path(..., min_length=1, description="Simulation run identifier"),
+) -> dict:
     """Retrieve the generated EU AI Act Compliance Report JSON log."""
     import hashlib
     import json

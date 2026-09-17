@@ -302,5 +302,108 @@ class BankComparisonResponse(BaseModel):
     improvement: dict[str, float]
 
 
+class SimulationStatusResponse(BaseModel):
+    """Lightweight simulation status response."""
+
+    id: str
+    status: SimulationStatus
+    current_round: int
+    total_rounds: int
+    progress_pct: float
+    error_message: str | None = None
+
+
+class SimulationStopRequest(BaseModel):
+    """Request to gracefully terminate a running simulation."""
+
+    simulation_id: str = Field(..., min_length=1, description="Unique simulation run identifier")
+    reason: str | None = Field(default=None, max_length=255, description="Reason for cancellation")
+
+
+class SimulationStopResponse(BaseModel):
+    """Response returned upon stopping a simulation."""
+
+    simulation_id: str
+    status: SimulationStatus
+    message: str
+    stopped_at: str
+
+
+class TrainingRoundResponse(BaseModel):
+    """Round-by-round training telemetry metrics."""
+
+    round_number: int
+    total_rounds: int
+    global_loss: float
+    auc: float = 0.0
+    per_bank_auc: dict[str, float] = Field(default_factory=dict)
+    per_bank_loss: dict[str, float] = Field(default_factory=dict)
+    participating_banks: list[str] = Field(default_factory=list)
+    dropped_banks: list[str] = Field(default_factory=list)
+    duration_ms: float = 0.0
+    privacy_budget: float = 0.0
+    feature_importance: dict[str, float] = Field(default_factory=dict)
+    canary_info: dict[str, Any] = Field(default_factory=dict)
+
+
+class TrainingProgressResponse(BaseModel):
+    """Real-time training progress event envelope."""
+
+    simulation_id: str | None = None
+    event_type: str = "unknown"
+    status: str | None = None
+    current_round: int = 0
+    total_rounds: int = 0
+    progress_pct: float = 0.0
+    data: dict[str, Any] = Field(default_factory=dict)
+
+
+class TrainingMetricsSummaryResponse(BaseModel):
+    """Convergence and AUC telemetry summary across all rounds."""
+
+    simulation_id: str
+    total_rounds: int
+    global_losses: list[float] = Field(default_factory=list)
+    auc_history: list[float] = Field(default_factory=list)
+    per_bank_auc: dict[str, list[float]] = Field(default_factory=dict)
+    per_bank_loss: dict[str, list[float]] = Field(default_factory=dict)
+
+
+class TrainingHistoryItem(BaseModel):
+    """Historical training run summary item."""
+
+    simulation_id: str
+    status: str
+    current_round: int = 0
+    total_rounds: int = 0
+    progress_pct: float = 0.0
+    created_at: str | None = None
+    completed_at: str | None = None
+    duration_seconds: float | None = None
+
+
+class TrainingHistoryResponse(BaseModel):
+    """Paginated list of historical federated learning simulation runs."""
+
+    total_count: int
+    runs: list[TrainingHistoryItem] = Field(default_factory=list)
+
+
+class AIActReportResponse(BaseModel):
+    """EU AI Act Article 10-15 Compliance Audit Report."""
+
+    simulation_id: str
+    report_type: str = "EU_AI_ACT_COMPLIANCE"
+    generated_at: str
+    note: str | None = None
+    regulation_version: str = "EU AI Act 2024/1689"
+    system_metadata: dict[str, Any] = Field(default_factory=dict)
+    training_summary: dict[str, Any] = Field(default_factory=dict)
+    bias_audit: dict[str, Any] = Field(default_factory=dict)
+    article_compliance: dict[str, Any] = Field(default_factory=dict)
+    compliance_certification: dict[str, Any] = Field(default_factory=dict)
+
+
 # Rebuild models to resolve forward references
 SimulationDetailResponse.model_rebuild()
+

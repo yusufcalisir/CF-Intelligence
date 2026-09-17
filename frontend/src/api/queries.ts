@@ -36,8 +36,14 @@ import type {
   SimulationConfig,
   SimulationCreateResponse,
   SimulationDetail,
+  SimulationStatusResponse,
+  SimulationStopRequest,
+  SimulationStopResponse,
   SimulationSummary,
   TrainingRound,
+  TrainingProgressResponse,
+  TrainingMetricsSummaryResponse,
+  TrainingHistoryResponse,
   ModelVersion,
   Evidence,
   InvestigatorAuditLog,
@@ -217,6 +223,39 @@ export function useCreateSimulation() {
   });
 }
 
+export function useSimulationStatus(id: string | undefined) {
+  return useQuery<SimulationStatusResponse>({
+    queryKey: ['simulation-status', id],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/simulation/${id}/status`);
+      return data;
+    },
+    enabled: !!id,
+    refetchInterval: (query) => {
+      const st = query.state.data?.status;
+      if (st === 'completed' || st === 'failed' || st === 'stopped') return false;
+      return 1500;
+    },
+  });
+}
+
+export function useStopSimulation() {
+  const queryClient = useQueryClient();
+  return useMutation<SimulationStopResponse, Error, SimulationStopRequest>({
+    mutationFn: async ({ simulation_id, reason }) => {
+      const { data } = await apiClient.post(`/api/v1/simulation/${simulation_id}/stop`, null, {
+        params: reason ? { reason } : undefined,
+      });
+      return data;
+    },
+    onSuccess: (_, { simulation_id }) => {
+      queryClient.invalidateQueries({ queryKey: ['simulations'] });
+      queryClient.invalidateQueries({ queryKey: ['simulation', simulation_id] });
+      queryClient.invalidateQueries({ queryKey: ['simulation-status', simulation_id] });
+    },
+  });
+}
+
 export function useBanks() {
   return useQuery<BankInfo[]>({
     queryKey: ['banks'],
@@ -281,6 +320,46 @@ export function useTrainingRounds(simulationId: string | undefined) {
       if (query.state.error) return false;
       return 1000;
     },
+  });
+}
+
+export function useTrainingProgress(simulationId?: string) {
+  return useQuery<TrainingProgressResponse>({
+    queryKey: ['training-progress', simulationId],
+    queryFn: async () => {
+      const url = simulationId
+        ? `/api/v1/training/${simulationId}/progress`
+        : '/api/v1/training/progress';
+      const { data } = await apiClient.get(url);
+      return data;
+    },
+    refetchInterval: 1000,
+  });
+}
+
+export function useTrainingMetrics(simulationId?: string) {
+  return useQuery<TrainingMetricsSummaryResponse>({
+    queryKey: ['training-metrics', simulationId],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/training/metrics', {
+        params: simulationId ? { simulation_id: simulationId } : undefined,
+      });
+      return data;
+    },
+    refetchInterval: 3000,
+  });
+}
+
+export function useTrainingHistory(limit: number = 10) {
+  return useQuery<TrainingHistoryResponse>({
+    queryKey: ['training-history', limit],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/training/history', {
+        params: { limit },
+      });
+      return data;
+    },
+    staleTime: 10000,
   });
 }
 
