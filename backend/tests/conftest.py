@@ -2,6 +2,7 @@
 
 import contextlib
 import importlib.util
+import os
 from typing import Any
 
 # Pre-load pyarrow on Windows to initialize C++ DLLs cleanly before pytest collects tests
@@ -12,6 +13,41 @@ if importlib.util.find_spec("pyarrow") is not None:
 import pytest
 
 from tests.factories.data_factory import TestDataFactory
+
+
+# ── DDoS Throttle bypass ───────────────────────────────────────────────────────
+# Setting TESTING=1 before the app module is imported causes DDoSProtectionMiddleware
+# to skip all volumetric counting, preventing cross-test 429 bleed from the
+# shared class-level _requests dict.
+os.environ.setdefault("TESTING", "1")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _set_testing_env():
+    """Ensure TESTING=1 is present for the entire pytest session."""
+    os.environ["TESTING"] = "1"
+    yield
+    os.environ.pop("TESTING", None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_ddos_state():
+    """Reset DDoSProtectionMiddleware's class-level shared request counter before each test."""
+    try:
+        from app.main import DDoSProtectionMiddleware
+
+        with DDoSProtectionMiddleware._lock:
+            DDoSProtectionMiddleware._requests.clear()
+    except Exception:  # noqa: BLE001
+        pass
+    yield
+    try:
+        from app.main import DDoSProtectionMiddleware
+
+        with DDoSProtectionMiddleware._lock:
+            DDoSProtectionMiddleware._requests.clear()
+    except Exception:  # noqa: BLE001
+        pass
 
 
 @pytest.fixture
@@ -74,3 +110,4 @@ def clear_fallback_stores():
     RedisStore._shared_fallback_stores.clear()
     yield
     RedisStore._shared_fallback_stores.clear()
+

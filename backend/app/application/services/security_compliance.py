@@ -193,7 +193,7 @@ class SecurityComplianceEngine:
         all_passed = all(c["status"] == "PASS" for c in controls_results.values())
 
         report = {
-            "report_id": f"soc2_evidence_{datetime.now(UTC).strftime('%Y%m%d_%H%M%S')}",
+            "report_id": f"soc2_evidence_{datetime.now(UTC).strftime('%Y%m%d_%H%M')}",
             "timestamp": datetime.now(UTC).isoformat(),
             "compliance_status": "COMPLIANT" if all_passed else "NON_COMPLIANT",
             "total_controls_audited": len(controls_results),

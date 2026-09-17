@@ -1,5 +1,6 @@
 """Unit tests for DDoSProtectionMiddleware memory pruning and rate limiting."""
 
+import os
 import time
 from unittest.mock import MagicMock
 
@@ -7,6 +8,15 @@ import pytest
 from fastapi import Request
 
 from app.main import DDoSProtectionMiddleware
+
+
+@pytest.fixture(autouse=True)
+def _enable_ddos_for_unit_tests():
+    """Temporarily disable the TESTING bypass so real DDoS logic executes in these unit tests."""
+    old = os.environ.pop("TESTING", None)
+    yield
+    if old is not None:
+        os.environ["TESTING"] = old
 
 
 @pytest.mark.asyncio
@@ -78,3 +88,4 @@ async def test_ddos_middleware_rate_limiting():
 
     response = await middleware.dispatch(request, call_next_mock)
     assert response.status_code == 429
+

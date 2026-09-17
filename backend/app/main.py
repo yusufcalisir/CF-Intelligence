@@ -697,6 +697,12 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
     _lock = Lock()
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+        # Bypass throttling in test environments to prevent class-level shared
+        # state from accumulating across pytest sessions and triggering 429s.
+        import os
+        if os.environ.get("TESTING") == "1":
+            return await call_next(request)
+
         # Extract real client IP considering trusted reverse proxy headers (Vercel, Cloudflare, AWS ALB)
         forwarded = request.headers.get("x-forwarded-for")
         client_ip = (
