@@ -90,6 +90,8 @@ import type {
   DatasetConsortiumEnrollResponse,
   TuneRequest,
   TuneResponse,
+  HyperparameterRangesResponse,
+  ParetoFrontResponse,
   UnlearnBankRequest,
   UnlearnBankResponse,
   CalibrateNoiseRequest,
@@ -1479,6 +1481,29 @@ export function useTriggerHyperparameterTuning() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['optimization-studies'] });
+    },
+  });
+}
+
+export function useHyperparameterRanges() {
+  return useQuery<HyperparameterRangesResponse>({
+    queryKey: ['optimization-hyperparameters'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<HyperparameterRangesResponse>('/api/v1/optimization/hyperparameters');
+      return data;
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useParetoFront(studyName?: string) {
+  return useQuery<ParetoFrontResponse>({
+    queryKey: ['optimization-pareto', studyName],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ParetoFrontResponse>('/api/v1/optimization/pareto', {
+        params: studyName ? { study_name: studyName } : undefined,
+      });
+      return data;
     },
   });
 }

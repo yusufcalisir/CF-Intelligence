@@ -1606,6 +1606,47 @@ export interface TuneResponse {
   duration_ms: number;
 }
 
+export interface HyperparameterBound {
+  name: string;
+  type: string;
+  range?: [number, number] | null;
+  choices?: any[] | null;
+  scale: string;
+  default_value: any;
+  description: string;
+}
+
+export interface HyperparameterRangesResponse {
+  search_space: Record<string, HyperparameterBound>;
+  sampler: string;
+  pruner: string;
+  default_objective: string;
+}
+
+export interface ParetoPoint {
+  trial_id: number;
+  learning_rate: number;
+  batch_size: number;
+  fedprox_mu: number;
+  dp_epsilon: number;
+  auc_roc: number;
+  latency_ms: number;
+  is_pareto_optimal: boolean;
+}
+
+export interface ParetoFrontResponse {
+  total_evaluated_points: number;
+  pareto_optimal_count: number;
+  pareto_points: ParetoPoint[];
+  recommendation?: ParetoPoint | null;
+}
+
+export interface StudyListResponse {
+  studies: string[];
+  total_studies: number;
+}
+
+
 export interface UnlearnBankRequest {
   target_bank_id: string;
   unlearning_method?: string;
