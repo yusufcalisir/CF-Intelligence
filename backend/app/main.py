@@ -890,6 +890,9 @@ elif service_name in ("fl-coordinator", "coordinator"):
 elif service_name == "identity-graph":
     app.include_router(health.router)
     app.include_router(entities.router)
+    app.include_router(entities.api_router)
+    app.include_router(entities.psi_router)
+    app.include_router(entities.psi_api_router)
     app.include_router(graph.router)
     app.include_router(graph.api_router)
 
@@ -905,6 +908,9 @@ elif service_name == "fraud-alert":
     app.include_router(
         entities.router
     )  # Mounted for read access of entities within streaming engine if queried directly
+    app.include_router(
+        entities.api_router
+    )
     app.include_router(
         graph.router
     )  # Mounted for read access of graph within streaming engine if queried directly
@@ -937,7 +943,9 @@ else:
     app.include_router(rules.api_router)
     app.include_router(bank_client.router)
     app.include_router(entities.router)
+    app.include_router(entities.api_router)
     app.include_router(entities.psi_router)
+    app.include_router(entities.psi_api_router)
     app.include_router(graph.router)
     app.include_router(graph.api_router)
     app.include_router(scenarios.router)

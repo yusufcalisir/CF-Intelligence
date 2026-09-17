@@ -2340,9 +2340,54 @@ export interface ISO20022ParseResponse {
   is_valid_creditor_iban: boolean;
   privacy_features?: Record<string, unknown>;
 }
+export interface EntityRelationshipItem {
+  id: string;
+  source_entity_id: string;
+  target_entity_id: string;
+  relationship_type: string;
+  confidence: number;
+  evidence: string;
+  created_at: string;
+}
 
+export interface EntityDeleteResponse {
+  deleted: boolean;
+  entity_id: string;
+  policy: string;
+}
 
+export interface HMACTokenizeRequest {
+  identifier: string;
+  tenant_salt?: string;
+}
 
+export interface HMACTokenizeResponse {
+  hmac_token: string;
+  policy: string;
+  algorithm: string;
+}
 
+export interface PSIMatchDirectRequest {
+  source_bank_id?: string;
+  target_bank_id?: string;
+  client_ecdh_blinded_hashes?: string[];
+  enable_fuzzy?: boolean;
+}
+
+export interface PSIMatchDirectResponse {
+  protocol: string;
+  matched_cardinality: number;
+  matches: Array<Record<string, unknown>>;
+  stats: Record<string, unknown>;
+  zero_raw_pii_enforced: boolean;
+}
+
+export interface PSIStatsResponse {
+  protocol: string;
+  prime_bit_length: number;
+  hash_function: string;
+  supported_modes: string[];
+  zero_raw_pii_guarantee: string;
+}
 
 

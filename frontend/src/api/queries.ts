@@ -49,6 +49,13 @@ import type {
   RuleEvaluationResponse,
   PSIRequest,
   PSIResponse,
+  PSIMatchDirectRequest,
+  PSIMatchDirectResponse,
+  PSIStatsResponse,
+  EntityRelationshipItem,
+  EntityDeleteResponse,
+  HMACTokenizeRequest,
+  HMACTokenizeResponse,
   EntityFuzzyResolveRequest,
   FuzzyMatchResponse,
   CounterfactualExplanation,
@@ -2166,6 +2173,60 @@ export function useParseISO20022Mutation() {
     },
   });
 }
+
+export function useEntityRelationships(entityId?: string) {
+  return useQuery<EntityRelationshipItem[]>({
+    queryKey: ['entity-relationships', entityId],
+    queryFn: async () => {
+      if (!entityId) return [];
+      const { data } = await apiClient.get<EntityRelationshipItem[]>(`/api/v1/entities/${entityId}/relationships`);
+      return data;
+    },
+    enabled: !!entityId,
+  });
+}
+
+export function useDeleteEntity() {
+  const queryClient = useQueryClient();
+  return useMutation<EntityDeleteResponse, Error, string>({
+    mutationFn: async (entityId: string) => {
+      const { data } = await apiClient.delete<EntityDeleteResponse>(`/api/v1/entities/${entityId}`);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['entities'] });
+    },
+  });
+}
+
+export function useHMACTokenize() {
+  return useMutation<HMACTokenizeResponse, Error, HMACTokenizeRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<HMACTokenizeResponse>('/api/v1/entities/hmac-tokenize', payload);
+      return data;
+    },
+  });
+}
+
+export function usePSIMatchDirect() {
+  return useMutation<PSIMatchDirectResponse, Error, PSIMatchDirectRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<PSIMatchDirectResponse>('/api/v1/psi/match', payload);
+      return data;
+    },
+  });
+}
+
+export function usePSIProtocolStats() {
+  return useQuery<PSIStatsResponse>({
+    queryKey: ['psi-protocol-stats'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PSIStatsResponse>('/api/v1/psi/stats');
+      return data;
+    },
+  });
+}
+
 
 
 
