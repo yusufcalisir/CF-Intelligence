@@ -215,6 +215,10 @@ class AsyncFLEngine:
                 else:
                     new_global[layer] = current_arr.copy()
 
+            for layer, client_arr in client_weights.items():
+                if layer not in new_global:
+                    new_global[layer] = client_arr.copy()
+
             self.global_weights = new_global
             self.total_updates += 1
             if advance_round:

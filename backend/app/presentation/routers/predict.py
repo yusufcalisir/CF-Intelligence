@@ -16,7 +16,16 @@ import uuid
 from typing import Any
 
 import torch
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    Header,
+    HTTPException,
+    Request,
+    Response,
+    status,
+)
 
 from app.application.schemas.transaction import (
     AlertDetails,
@@ -247,6 +256,7 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
 @limiter.limit("60/minute")
 async def predict_transaction(
     request: Request,
+    response: Response,
     payload: TransactionPredictRequest,
     session: SessionDep,
     background_tasks: BackgroundTasks,

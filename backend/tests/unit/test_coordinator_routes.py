@@ -19,13 +19,17 @@ from app.main import app
 @pytest.fixture(autouse=True)
 def clean_coordinator_state() -> Generator[None, None, None]:
     """Ensures clean service state across test executions."""
+    from app.domain.async_fl_engine import AsyncFLEngine
+
     consortium_governance_service.reset()
     coordinator_service.registry.clear()
     coordinator_service.rounds.clear()
+    coordinator_service.async_fl_engine = AsyncFLEngine(current_round=1, alpha_staleness=0.5, learning_rate=0.8)
     yield
     consortium_governance_service.reset()
     coordinator_service.registry.clear()
     coordinator_service.rounds.clear()
+    coordinator_service.async_fl_engine = AsyncFLEngine(current_round=1, alpha_staleness=0.5, learning_rate=0.8)
 
 
 

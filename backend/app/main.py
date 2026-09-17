@@ -697,12 +697,6 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
     _lock = Lock()
 
     async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        # Bypass throttling in test environments to prevent class-level shared
-        # state from accumulating across pytest sessions and triggering 429s.
-        import os
-        if os.environ.get("TESTING") == "1":
-            return await call_next(request)
-
         # Extract real client IP considering trusted reverse proxy headers (Vercel, Cloudflare, AWS ALB)
         forwarded = request.headers.get("x-forwarded-for")
         client_ip = (
@@ -711,6 +705,12 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
             or (forwarded.split(",")[0].strip() if forwarded else None)
             or (request.client.host if request.client else "unknown")
         )
+
+        # Bypass throttling in test environments only for standard testclient/loopback
+        # to prevent cross-test 429 accumulation while allowing real burst testing on explicit IPs.
+        import os
+        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
+            return await call_next(request)
         now = time.time()
         cutoff = now - self._WINDOW_SECONDS
 

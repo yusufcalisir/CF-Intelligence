@@ -42,13 +42,17 @@ def dummy_bank_data() -> dict[str, dict[str, np.ndarray]]:
 
 @pytest.fixture(autouse=True)
 def cleanup_ray() -> None:
-    import ray
+    import sys
 
-    if ray.is_initialized():
-        ray.shutdown()
+    if "ray" in sys.modules:
+        ray = sys.modules["ray"]
+        if hasattr(ray, "is_initialized") and ray.is_initialized():
+            ray.shutdown()
     yield
-    if ray.is_initialized():
-        ray.shutdown()
+    if "ray" in sys.modules:
+        ray = sys.modules["ray"]
+        if hasattr(ray, "is_initialized") and ray.is_initialized():
+            ray.shutdown()
 
 
 class TestFlowerEngine:
