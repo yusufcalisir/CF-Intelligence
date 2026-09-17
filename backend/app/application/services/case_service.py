@@ -24,6 +24,12 @@ from app.infrastructure.redis_store import RedisStore
 logger = logging.getLogger(__name__)
 
 
+class CaseNotFoundError(ValueError):
+    """Raised when a requested case is not found in the persistence store."""
+
+    pass
+
+
 def _hash_event(event: CaseEvent, parent_hash: str) -> str:
     """Generate SHA-256 block hash for timeline event signing."""
     event_str = f"{event.timestamp.isoformat()}|{event.event_type}|{event.description}|{event.actor}|{parent_hash}"
@@ -606,7 +612,7 @@ class CaseManagementService:
     def _get_case(self, case_id: str) -> Case:
         val = self._cases.get(case_id)
         if not val:
-            raise ValueError(f"Case not found: {case_id}")
+            raise CaseNotFoundError(f"Case not found: {case_id}")
         return _dict_to_case(val)
 
 

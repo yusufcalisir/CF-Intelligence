@@ -10,6 +10,10 @@ import type {
   BankInfo,
   Case,
   CaseSummary,
+  CaseEscalatePayload,
+  CaseSignPayload,
+  CaseResolvePayload,
+  TimelineVerificationResponse,
   DashboardStats,
   Entity,
   ExplainabilityReport,
@@ -449,6 +453,89 @@ export function useAddCaseNote() {
     },
   });
 }
+
+export function useEscalateCase() {
+  const queryClient = useQueryClient();
+  return useMutation<Case, Error, CaseEscalatePayload>({
+    mutationFn: async ({ caseId, ...body }) => {
+      const { data } = await apiClient.post(`/api/v1/cases/${caseId}/escalate`, body);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+  });
+}
+
+export function useSignCase() {
+  const queryClient = useQueryClient();
+  return useMutation<Case, Error, CaseSignPayload>({
+    mutationFn: async ({ caseId, ...body }) => {
+      const { data } = await apiClient.post(`/api/v1/cases/${caseId}/sign`, body);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+    },
+  });
+}
+
+export function useResolveCase() {
+  const queryClient = useQueryClient();
+  return useMutation<Case, Error, CaseResolvePayload>({
+    mutationFn: async ({ caseId, ...body }) => {
+      const { data } = await apiClient.post(`/api/v1/cases/${caseId}/resolve`, body);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+    },
+  });
+}
+
+export function useLinkAlertToCase() {
+  const queryClient = useQueryClient();
+  return useMutation<Case, Error, { caseId: string; alert_id: string }>({
+    mutationFn: async ({ caseId, ...body }) => {
+      const { data } = await apiClient.post(`/api/v1/cases/${caseId}/alerts`, body);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['case', variables.caseId] });
+      queryClient.invalidateQueries({ queryKey: ['cases'] });
+    },
+  });
+}
+
+export function useCaseTimeline(caseId: string | undefined) {
+  return useQuery({
+    queryKey: ['case-timeline', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/cases/${caseId}/timeline`);
+      return data;
+    },
+    enabled: !!caseId,
+  });
+}
+
+export function useVerifyCaseTimeline(caseId: string | undefined) {
+  return useQuery<TimelineVerificationResponse>({
+    queryKey: ['case-timeline-verify', caseId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/cases/${caseId}/timeline/verify`);
+      return data;
+    },
+    enabled: !!caseId,
+  });
+}
+
+export const useExportFinCENXml = useExportFinCENXmlMutation;
+
 
 // ── Phase 2: Entities ──────────────────────
 

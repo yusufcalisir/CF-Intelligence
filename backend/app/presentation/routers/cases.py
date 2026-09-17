@@ -1,7 +1,8 @@
 """Case management API endpoints.
 
 CRUD operations for investigation cases with status transitions,
-notes, alert linking, and timeline.
+notes, alert linking, evidence registry, Four-Eyes dual control,
+and FinCEN SAR regulatory filings.
 """
 
 from __future__ import annotations
@@ -11,9 +12,8 @@ from typing import Any
 
 from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel, Field
 
-from app.application.schemas.phase2 import (
+from app.application.schemas.cases import (
     CaseCreateRequest,
     CaseEscalateRequest,
     CaseEventResponse,
@@ -27,6 +27,8 @@ from app.application.schemas.phase2 import (
     CaseSummaryResponse,
     EvidenceRequest,
     EvidenceResponse,
+    ExportFinCENXmlRequest,
+    ExportFinCENXmlResponse,
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
     TimelineVerificationResponse,
@@ -35,6 +37,7 @@ from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.case_service import (
     AuditService,
     CaseManagementService,
+    CaseNotFoundError,
     EvidenceRegistryService,
     _case_to_dict,
 )
@@ -44,7 +47,10 @@ from app.domain.enums import CasePriority, CaseStatus
 from app.domain.value_objects_copilot import CopilotQueryRequest, CopilotQueryResponse
 
 logger = logging.getLogger(__name__)
+
+# Dual-routing support for both /api/v1/cases and /v1/cases prefixes
 router = APIRouter(prefix="/api/v1/cases", tags=["cases"])
+api_router = APIRouter(prefix="/v1/cases", tags=["cases"])
 
 _case_service = CaseManagementService()
 _evidence_service = EvidenceRegistryService()
@@ -59,6 +65,7 @@ def get_evidence_service() -> EvidenceRegistryService:
 
 
 @router.get("", response_model=list[CaseSummaryResponse])
+@api_router.get("", response_model=list[CaseSummaryResponse])
 async def list_cases(
     status: str | None = Query(None),
     priority: str | None = Query(None),
@@ -99,6 +106,7 @@ async def list_cases(
 
 
 @router.get("/audit/logs", response_model=list[InvestigatorAuditLogResponse])
+@api_router.get("/audit/logs", response_model=list[InvestigatorAuditLogResponse])
 async def get_audit_logs(
     limit: int = Query(100, ge=1, le=500),
 ) -> list[InvestigatorAuditLogResponse]:
@@ -109,6 +117,7 @@ async def get_audit_logs(
 
 
 @router.post("/audit/session", response_model=dict)
+@api_router.post("/audit/session", response_model=dict)
 async def log_session_duration(req: SessionDurationRequest) -> dict:
     """Log investigator session duration."""
     audit_svc = AuditService()
@@ -122,6 +131,7 @@ async def log_session_duration(req: SessionDurationRequest) -> dict:
 
 
 @router.post("", response_model=CaseResponse)
+@api_router.post("", response_model=CaseResponse)
 async def create_case(
     req: CaseCreateRequest,
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
@@ -170,13 +180,14 @@ async def create_case(
 
 
 @router.get("/{case_id}", response_model=CaseResponse)
+@api_router.get("/{case_id}", response_model=CaseResponse)
 async def get_case(
     case_id: str, actor: str = Query("analyst"), caller_tenant: TenantDep = None
 ) -> CaseResponse:
     """Get case detail with tenant isolation check."""
     case = _case_service.get_case(case_id)
     if not case:
-        raise HTTPException(status_code=404, detail="Case not found")
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
 
     if caller_tenant and case.alert_ids:
         from app.presentation.routers.alerts import get_alert_service
@@ -191,8 +202,10 @@ async def get_case(
     return _serialize_case(case)
 
 
-
 @router.patch("/{case_id}", response_model=CaseResponse)
+@api_router.patch("/{case_id}", response_model=CaseResponse)
+@router.put("/{case_id}/status", response_model=CaseResponse)
+@api_router.put("/{case_id}/status", response_model=CaseResponse)
 async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseResponse:
     """Update case status with transition validation and dual-control signoff."""
     try:
@@ -206,28 +219,38 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
             supervisor_signatures=req.supervisor_signatures,
         )
         return _serialize_case(case)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{case_id}/escalate", response_model=CaseResponse)
+@api_router.post("/{case_id}/escalate", response_model=CaseResponse)
 async def escalate_case(case_id: str, req: CaseEscalateRequest) -> CaseResponse:
     """Escalate a case to PENDING_REVIEW for Four-Eyes supervisor evaluation."""
     try:
         _case_service.add_note(case_id, author=req.actor, content=f"Escalation justification: {req.reason}")
         case = _case_service.change_status(case_id, CaseStatus.PENDING_REVIEW, actor=req.actor)
         return _serialize_case(case)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{case_id}/sign", response_model=CaseResponse)
+@api_router.post("/{case_id}/sign", response_model=CaseResponse)
 async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
     """Record a supervisor dual-control signature on a case under review."""
     try:
         case = _case_service.get_case(case_id)
         if not case:
-            raise HTTPException(status_code=404, detail="Case not found")
+            raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
         if req.action == "REJECT":
             case = _case_service.change_status(
                 case_id,
@@ -259,13 +282,33 @@ async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
         )
         _case_service._cases.set(case.id, _case_to_dict(case))
         return _serialize_case(case)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.post("/{case_id}/resolve", response_model=CaseResponse)
+@api_router.post("/{case_id}/resolve", response_model=CaseResponse)
 async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
     """Resolve and close a case under strict Four-Eyes dual control."""
+    # Check that supervisors are distinct identities
+    if req.primary_supervisor.strip().lower() == req.secondary_supervisor.strip().lower():
+        raise HTTPException(
+            status_code=400,
+            detail="Primary and secondary supervisors must be distinct individuals (Four-Eyes dual control).",
+        )
+    # Check separation of duties: supervisor signatures must not match analyst actor
+    analyst_clean = req.actor.replace("analyst:", "").strip().lower()
+    for s_id in (req.primary_supervisor, req.secondary_supervisor):
+        if s_id.replace("supervisor:", "").strip().lower() == analyst_clean:
+            raise HTTPException(
+                status_code=400,
+                detail="Supervisor signature must be different from the analyst actor (Four-Eyes Principle).",
+            )
+
     try:
         target_status = (
             CaseStatus.CLOSED_CONFIRMED
@@ -280,11 +323,16 @@ async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
             second_supervisor_signature=f"supervisor:{req.secondary_supervisor}",
         )
         return _serialize_case(case)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
+        if "not found" in str(e).lower():
+            raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)
+@api_router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)
 async def verify_case_timeline(case_id: str) -> TimelineVerificationResponse:
     """Verify cryptographic SHA-256 parent hash chain of the case investigation timeline."""
     try:
@@ -297,11 +345,14 @@ async def verify_case_timeline(case_id: str) -> TimelineVerificationResponse:
             chain_hashes=result["chain_hashes"],
             message=result["message"],
         )
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{case_id}/notes", response_model=CaseNoteResponse)
+@api_router.post("/{case_id}/notes", response_model=CaseNoteResponse)
 async def add_note(case_id: str, req: CaseNoteRequest) -> CaseNoteResponse:
     """Add an investigation note."""
     try:
@@ -313,21 +364,27 @@ async def add_note(case_id: str, req: CaseNoteRequest) -> CaseNoteResponse:
             content=note.content,
             created_at=note.created_at.isoformat(),
         )
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.post("/{case_id}/alerts", response_model=CaseResponse)
+@api_router.post("/{case_id}/alerts", response_model=CaseResponse)
 async def link_alert(case_id: str, req: CaseLinkAlertRequest) -> CaseResponse:
     """Link an alert to a case."""
     try:
         case = _case_service.link_alert(case_id, req.alert_id)
         return _serialize_case(case)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{case_id}/timeline", response_model=list[CaseEventResponse])
+@api_router.get("/{case_id}/timeline", response_model=list[CaseEventResponse])
 async def get_timeline(case_id: str) -> list[CaseEventResponse]:
     """Get investigation timeline."""
     try:
@@ -342,21 +399,27 @@ async def get_timeline(case_id: str) -> list[CaseEventResponse]:
             )
             for e in events
         ]
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{case_id}/export")
+@api_router.get("/{case_id}/export")
 async def export_case(case_id: str) -> dict:
     """Export investigation summary as markdown."""
     try:
         summary = _case_service.export_summary(case_id)
         return {"case_id": case_id, "format": "markdown", "content": summary}
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{case_id}/sar-report")
+@api_router.get("/{case_id}/sar-report")
 async def download_sar_report(case_id: str) -> FileResponse:
     """Download generated FinCEN SAR XML report for the case."""
     import os
@@ -391,6 +454,7 @@ async def download_sar_report(case_id: str) -> FileResponse:
 
 
 @router.post("/{case_id}/evidence", response_model=EvidenceResponse)
+@api_router.post("/{case_id}/evidence", response_model=EvidenceResponse)
 async def register_evidence(case_id: str, req: EvidenceRequest) -> EvidenceResponse:
     """Register new case evidence with SHA-256 hash verification."""
     try:
@@ -404,13 +468,19 @@ async def register_evidence(case_id: str, req: EvidenceRequest) -> EvidenceRespo
             uploaded_by=req.uploaded_by,
         )
         return EvidenceResponse(**ev)
+    except CaseNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
 
 @router.get("/{case_id}/evidence", response_model=list[EvidenceResponse])
+@api_router.get("/{case_id}/evidence", response_model=list[EvidenceResponse])
 async def get_case_evidence(case_id: str) -> list[EvidenceResponse]:
     """Retrieve all evidence registered for a case."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
     registry = EvidenceRegistryService()
     ev_list = registry.get_case_evidence(case_id)
     return [EvidenceResponse(**ev) for ev in ev_list]
@@ -424,7 +494,7 @@ def _serialize_case(case: Any) -> CaseResponse:
         priority=case.priority.value,
         assigned_to=case.assigned_to,
         alert_ids=case.alert_ids,
-        evidence_ids=getattr(case, "evidence_ids", []),
+        evidence_ids=getattr(case, "evidence_ids", []) or [],
         notes=[
             CaseNoteResponse(
                 id=n.id,
@@ -441,7 +511,7 @@ def _serialize_case(case: Any) -> CaseResponse:
                 description=e.description,
                 actor=e.actor,
                 timestamp=e.timestamp.isoformat(),
-                metadata=e.metadata,
+                metadata=e.metadata or {},
             )
             for e in case.timeline
         ],
@@ -457,6 +527,7 @@ def _serialize_case(case: Any) -> CaseResponse:
 
 
 @router.post("/{case_id}/file-sar")
+@api_router.post("/{case_id}/file-sar")
 async def file_sar_report(
     case_id: str,
     institution_name: str | None = None,
@@ -506,24 +577,8 @@ async def file_sar_report(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
-class ExportFinCENXmlRequest(BaseModel):
-    case_id: str = Field(..., description="ID of confirmed fraud case to compile SAR XML for")
-    filer_id: str | None = Field(None, description="Optional compliance officer or filer identifier")
-    narrative_override: str | None = Field(None, description="Optional custom SAR narrative override")
-    institution_name: str | None = Field(None, description="Optional reporting financial institution override")
-
-
-class ExportFinCENXmlResponse(BaseModel):
-    submission_id: str
-    status: str
-    xml: str
-    xml_payload: str | None = None
-    sha256_hash: str | None = None
-    filing_status: str | None = None
-    pdf_download_url: str
-
-
 @router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
+@api_router.post("/export/fincen-xml", response_model=ExportFinCENXmlResponse)
 async def export_fincen_xml_endpoint(payload: ExportFinCENXmlRequest) -> dict[str, Any]:
     """Compile and validate FinCEN BSA SAR XML payload with SHA-256 hash (Developer Portal & SIEM)."""
     return await file_sar_report(
@@ -539,6 +594,7 @@ _aml_copilot = AMLAgenticCopilot()
 
 
 @router.post("/{case_id}/copilot/narrative", response_model=CopilotQueryResponse)
+@api_router.post("/{case_id}/copilot/narrative", response_model=CopilotQueryResponse)
 async def generate_copilot_narrative(
     case_id: str,
     req: CopilotQueryRequest | None = None,
@@ -602,6 +658,7 @@ async def generate_copilot_narrative(
 
 
 @router.get("/{case_id}/copilot/summary")
+@api_router.get("/{case_id}/copilot/summary")
 async def get_copilot_summary(case_id: str) -> dict[str, Any]:
     """Get structured Copilot findings and 4-Eyes disposition for a case."""
     c_obj = _case_service.get_case(case_id)
@@ -647,6 +704,7 @@ async def get_copilot_summary(case_id: str) -> dict[str, Any]:
 
 
 @router.get("/{case_id}/copilot/evidence")
+@api_router.get("/{case_id}/copilot/evidence")
 async def get_copilot_case_evidence(case_id: str) -> dict[str, Any]:
     """Get assembled cryptographic case evidence dossier."""
     c_obj = _case_service.get_case(case_id)

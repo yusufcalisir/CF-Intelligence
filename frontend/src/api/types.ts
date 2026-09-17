@@ -464,6 +464,51 @@ export interface CaseEvent {
   metadata: Record<string, unknown>;
 }
 
+export interface TimelineVerificationResponse {
+  case_id: string;
+  is_valid: boolean;
+  event_count: number;
+  corrupted_index: number | null;
+  chain_hashes: string[];
+  message: string;
+}
+
+export interface CaseCreatePayload {
+  title: string;
+  priority?: string;
+  alert_ids?: string[];
+}
+
+export interface CaseStatusUpdatePayload {
+  caseId: string;
+  status: string;
+  actor?: string;
+  supervisor_signature?: string;
+  second_supervisor_signature?: string;
+  supervisor_signatures?: string[];
+}
+
+export interface CaseEscalatePayload {
+  caseId: string;
+  reason: string;
+  actor?: string;
+}
+
+export interface CaseSignPayload {
+  caseId: string;
+  supervisor_id: string;
+  action?: 'APPROVE' | 'REJECT';
+  notes?: string;
+}
+
+export interface CaseResolvePayload {
+  caseId: string;
+  resolution: 'CONFIRMED_FRAUD' | 'FALSE_POSITIVE';
+  primary_supervisor: string;
+  secondary_supervisor: string;
+  actor?: string;
+}
+
 export interface Entity {
   id: string;
   entity_type: string;
