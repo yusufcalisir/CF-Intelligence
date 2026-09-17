@@ -7,7 +7,7 @@ validation, payment initiation, XXE injection protection, and dual routing.
 from __future__ import annotations
 
 import time
-from typing import Generator
+from collections.abc import Generator
 
 import jwt
 import pytest

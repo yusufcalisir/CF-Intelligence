@@ -8,12 +8,9 @@ from __future__ import annotations
 
 import json
 import logging
-
-from datetime import datetime, timezone
-import json
-import logging
 import threading
 import uuid
+from datetime import UTC, datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Path, Query, Request, status
@@ -275,7 +272,7 @@ async def stop_simulation(
     if stop_event:
         stop_event.set()
 
-    now_iso = datetime.now(timezone.utc).isoformat()
+    now_iso = datetime.now(UTC).isoformat()
     sim["status"] = SimulationStatus.STOPPED.value
     sim["completed_at"] = now_iso
     sim["error_message"] = reason or "Simulation stopped gracefully by operator."
@@ -511,7 +508,6 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
     can return real-time progress without Celery or Redis.
     """
     from dataclasses import asdict
-    from typing import Any
 
     from app.application.services.data_generator import DataGenerator
     from app.application.services.fl_engine import FederatedLearningEngine
@@ -757,7 +753,7 @@ async def get_ai_act_report(
     import hashlib
     import json
     import os
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     from app.infrastructure.storage.storage_utils import get_storage_dir
 

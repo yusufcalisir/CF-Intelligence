@@ -8,7 +8,8 @@ Zero-PII type-salted HMAC tokenization, and GDPR right-to-erasure workflows.
 from __future__ import annotations
 
 import re
-from typing import Any, Literal
+from typing import Any
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Sentinel regex to strip ASCII control characters

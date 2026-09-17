@@ -7,7 +7,6 @@ import os
 import platform
 import time
 from datetime import UTC, datetime
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -164,9 +163,11 @@ def test_connector_connection(req: ConnectorProbeRequest) -> ConnectorTestProbeR
         raw_res = _diagnostics_service.test_connector(cid.lower())
         return ConnectorTestProbeResult(
             connector_id=raw_res.connector_id,
+            name=raw_res.name,
             success=raw_res.success,
             status_code=raw_res.status_code,
             round_trip_ms=raw_res.round_trip_ms,
+            handshake_summary=raw_res.handshake_summary,
             diagnostics_log=raw_res.diagnostics_log,
             payload_sample=raw_res.payload_sample,
         )

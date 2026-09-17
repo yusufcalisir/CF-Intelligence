@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi.testclient import TestClient
 
+from app.application.schemas.optimization import ParetoPoint
 from app.main import app
 from app.presentation.routers.optimization import (
     MAX_STORED_STUDIES,
@@ -14,10 +15,8 @@ from app.presentation.routers.optimization import (
     _compute_pareto_dominance,
     get_stored_study,
     list_stored_study_names,
-    remove_stored_study,
     store_study_result,
 )
-from app.application.schemas.optimization import ParetoPoint
 
 client = TestClient(app)
 

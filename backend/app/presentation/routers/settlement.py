@@ -26,10 +26,10 @@ from app.application.schemas.settlement import (
     QuarantineResponse,
     SettlementReceiptResponse,
     SettlementTriggerRequest,
+    SlashedNodesResponse,
     SlashRecordItem,
     SlashRequest,
     SlashResponse,
-    SlashedNodesResponse,
 )
 from app.infrastructure.security.smart_contract_driver import (
     EpochAlreadySettledError,

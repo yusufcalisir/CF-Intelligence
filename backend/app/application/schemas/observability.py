@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 from typing import Any
-from pydantic import BaseModel, Field
 
+from pydantic import BaseModel, Field
 
 # ── Health & Readiness Schemas ───────────────────────────────────────────────
 
@@ -121,9 +121,11 @@ class ConnectorTestProbeResult(BaseModel):
     """Result of an on-demand active connectivity test probe."""
 
     connector_id: str
+    name: str = ""
     success: bool
     status_code: int
     round_trip_ms: float
+    handshake_summary: str = ""
     diagnostics_log: list[str]
     payload_sample: dict[str, Any] = Field(default_factory=dict)
 

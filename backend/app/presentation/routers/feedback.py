@@ -9,7 +9,6 @@ Supports dual routing: /api/v1/feedback and /v1/feedback.
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
 

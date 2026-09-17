@@ -210,7 +210,7 @@ class TenantKMSManager:
 
         logger.info("Rotated KMS key for tenant '%s' to version %d", clean_tenant, new_ver)
         return {
-            "status": "active",
+            "status": "ROTATED",
             "bank_id": clean_tenant,
             "tenant_id": clean_tenant,
             "key_name": f"tenant_{clean_tenant}",

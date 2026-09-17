@@ -9,8 +9,8 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.entities_phase2 import Alert, Entity
-from app.domain.enums import AlertSeverity, EntityType, RiskLevel
+from app.domain.entities_phase2 import Alert
+from app.domain.enums import AlertSeverity, EntityType
 from app.main import app
 from app.presentation.routers.alerts import get_alert_service
 from app.presentation.routers.dashboard import get_risk_engine

@@ -13,7 +13,6 @@ from fastapi import APIRouter, HTTPException, Query, status
 
 from app.application.schemas.observability import (
     ActiveAlertResponse,
-    AlertmanagerAlert,
     AlertmanagerWebhookPayload,
     CalibrationBinResponse,
     CalibrationResponse,
@@ -22,8 +21,8 @@ from app.application.schemas.observability import (
     DriftEvaluationRequest,
     FairnessMetricsResponse,
     FeatureDriftResponse,
-    RetrainTriggerResponse,
     RetrainingJobResponse,
+    RetrainTriggerResponse,
     TelemetryOverviewResponse,
 )
 from app.application.services.automated_retraining import (

@@ -6,7 +6,7 @@ tenant lifecycle transitions, dynamic admin dashboard metrics, and cron jobs.
 
 from __future__ import annotations
 
-from typing import AsyncGenerator
+from collections.abc import AsyncGenerator
 
 import pytest
 import pytest_asyncio

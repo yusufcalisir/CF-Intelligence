@@ -68,6 +68,9 @@ def test_developer_portal_psi_match_direct(client: TestClient) -> None:
 
 def test_developer_portal_training_rounds_alias(client: TestClient) -> None:
     """Verify GET /api/v1/training/rounds/{simulation_id} returns round history."""
+    from app.presentation.routers.simulation import _simulation_results
+
+    _simulation_results.set("sim_demo_01", {"id": "sim_demo_01", "total_rounds": 5})
     resp = client.get("/api/v1/training/rounds/sim_demo_01")
     assert resp.status_code == 200
     assert isinstance(resp.json(), list)

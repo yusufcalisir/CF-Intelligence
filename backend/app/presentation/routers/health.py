@@ -7,7 +7,8 @@ import time
 from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response, status
+from fastapi import APIRouter, Response, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.application.schemas.observability import (
@@ -140,6 +141,43 @@ async def _perform_dependencies_evaluation() -> dict[str, DependencyHealthStatus
         "vault": await check_vault_component_health(),
         "enclave": await check_enclave_component_health(),
     }
+
+
+async def readiness(response: Response | None = None) -> JSONResponse:
+    """Readiness probe function export for backward-compatibility and verification tests."""
+    db_ok = False
+    try:
+        db_res = await check_db_health()
+        db_ok = (db_res.status == "HEALTHY") if hasattr(db_res, "status") else bool(db_res)
+    except Exception:
+        db_ok = False
+
+    redis_ok = False
+    try:
+        redis_res = await check_redis_component_health()
+        redis_ok = (redis_res.status == "HEALTHY") if hasattr(redis_res, "status") else bool(redis_res)
+    except Exception:
+        redis_ok = False
+
+    checks: dict[str, Any] = {
+        "database": db_ok,
+        "redis": redis_ok,
+    }
+    all_healthy = all(checks.values())
+    status_code = status.HTTP_200_OK if all_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
+    overall_status = "ready" if all_healthy else "degraded"
+
+    if response is not None:
+        response.status_code = status_code
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": overall_status,
+            "checks": checks,
+            "timestamp": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        },
+    )
 
 
 # ── Root Router Endpoints ───────────────────────────────────────────────────

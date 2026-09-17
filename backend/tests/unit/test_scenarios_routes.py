@@ -10,7 +10,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.presentation.routers.scenarios import get_scenario_simulator, get_streaming_engine
 
 
 @pytest.fixture

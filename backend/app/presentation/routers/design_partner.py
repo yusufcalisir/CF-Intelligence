@@ -338,7 +338,7 @@ async def enroll_pilot_lead(request: PilotLeadRequest) -> PilotLeadResponse:
         _enrolled_leads.append(record)
 
     logger.info("Enrolled design partner lead: %s (%s)", request.institution_name, lead_id)
-    return PilotLeadResponse(**record)
+    return PilotLeadResponse.model_validate(record)
 
 
 @router.get(

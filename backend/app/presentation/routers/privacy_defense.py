@@ -15,8 +15,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from fastapi import APIRouter
 import numpy as np
+from fastapi import APIRouter
 
 from app.application.schemas.privacy_defense import (
     AggregationMethodItem,

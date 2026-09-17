@@ -76,17 +76,15 @@ async def dashboard_stats(
 
     cross_matches = 0
     for p_id, banks in privacy_to_banks.items():
-        if len(banks) > 1:
-            if not bank_id or bank_id in banks:
-                cross_matches += 1
+        if len(banks) > 1 and (not bank_id or bank_id in banks):
+            cross_matches += 1
 
     # 2. Add clusters with entities spanning distinct bank tenants
     entity_map = {e.id: e for e in raw_entities}
     for cluster in clusters:
         cluster_banks = {entity_map[node_id].bank_id for node_id in cluster if node_id in entity_map and entity_map[node_id].bank_id}
-        if len(cluster_banks) > 1:
-            if not bank_id or bank_id in cluster_banks:
-                cross_matches += 1
+        if len(cluster_banks) > 1 and (not bank_id or bank_id in cluster_banks):
+            cross_matches += 1
 
     return DashboardStatsResponse(
         total_alerts=len(all_alerts),

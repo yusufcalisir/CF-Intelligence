@@ -386,7 +386,7 @@ async def initiate_payment(
     with _store_lock:
         _payments[payment_id] = payment_record
 
-    return PaymentInitiationResponse(**payment_record)
+    return PaymentInitiationResponse.model_validate(payment_record)
 
 
 @_base_router.get("/payments/{payment_id}", response_model=PaymentStatusResponse)

@@ -17,8 +17,25 @@ from typing import Any
 
 import torch
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request, status
-from pydantic import BaseModel, Field
 
+from app.application.schemas.transaction import (
+    AlertDetails,
+    BatchPredictionItem,
+    BatchPredictionResponse,
+    BatchTransactionPredictRequest,
+    CounterfactualPathItem,
+    ExplainTransactionRequest,
+    ExplainTransactionResponse,
+    FeatureAttributionItem,
+    FeatureContributionItem,
+    RelatedEntityItem,
+    ScoreTransactionRequest,
+    ScoreTransactionResponse,
+    SignalBreakdown,
+    TransactionFeedbackRequest,
+    TransactionPredictRequest,
+    TransactionPredictResponse,
+)
 from app.application.services.alert_service import AlertIntelligenceService
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.feature_store_service import FeatureStoreService
@@ -176,27 +193,6 @@ REFERENCE_BOUNDS = {
     "chargeback_count": (0.0, 10.0),
     "account_age_days": (0.0, 1000.0),
 }
-
-
-from app.application.schemas.transaction import (
-    AlertDetails,
-    BatchPredictionItem,
-    BatchPredictionResponse,
-    BatchTransactionPredictRequest,
-    CounterfactualPathItem,
-    ExplainTransactionRequest,
-    ExplainTransactionResponse,
-    FeatureAttributionItem,
-    FeatureContributionItem,
-    RelatedEntityItem,
-    ScoreTransactionRequest,
-    ScoreTransactionResponse,
-    SignalBreakdown,
-    TransactionFeedbackRequest,
-    TransactionPredictRequest,
-    TransactionPredictResponse,
-)
-
 
 
 def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:

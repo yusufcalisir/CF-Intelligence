@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import numpy as np
 from fastapi import APIRouter, HTTPException, Path, status
@@ -105,7 +105,7 @@ async def scenario_status(
                 total_events=len(scenario.events),
                 delivered_events=len(scenario.events),
                 speed_multiplier=1.0,
-                started_at=datetime.now(timezone.utc).isoformat(),
+                started_at=datetime.now(UTC).isoformat(),
             )
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

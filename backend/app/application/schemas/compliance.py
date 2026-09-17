@@ -6,7 +6,6 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 # ── Algorithmic Fairness & Model Governance ───────────────────────────
 
 

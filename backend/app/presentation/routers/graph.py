@@ -580,9 +580,10 @@ async def embedding_fraud_clusters(req: GNNEmbeddingClusterRequest) -> GNNEmbedd
         similarity_threshold=req.similarity_threshold,
         min_cluster_size=req.min_cluster_size,
     )
+    cluster_nodes = [c["node_ids"] for c in clusters]
     return GNNEmbeddingClusterResponse(
-        clusters=clusters,
-        total_clusters=len(clusters),
+        clusters=cluster_nodes,
+        total_clusters=len(cluster_nodes),
     )
 
 

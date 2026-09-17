@@ -300,8 +300,8 @@ class TestFederatedUnlearningEngine(unittest.TestCase):
         async def run_async_tests():
             # 1. Status query
             status = await get_unlearning_status()
-            self.assertEqual(status["engine_status"], "ACTIVE")
-            self.assertIn("PROJECTED_GRADIENT_ASCENT", status["supported_methods"])
+            self.assertEqual(status.engine_status, "ACTIVE")
+            self.assertIn("PROJECTED_GRADIENT_ASCENT", status.supported_methods)
 
             # 2. Trigger PGA unlearning via router
             req = UnlearnBankRequest(
@@ -312,10 +312,10 @@ class TestFederatedUnlearningEngine(unittest.TestCase):
                 projection_radius=0.10,
             )
             res = await router_unlearn(req)
-            self.assertEqual(res["target_bank_id"], "bank_test")
-            self.assertEqual(res["unlearning_method"], "PROJECTED_GRADIENT_ASCENT")
-            self.assertTrue(res["erasure_verified"])
-            self.assertGreater(res["parameter_drift_delta"], 0.0)
+            self.assertEqual(res.target_bank_id, "bank_test")
+            self.assertEqual(res.unlearning_method, "PROJECTED_GRADIENT_ASCENT")
+            self.assertTrue(res.erasure_verified)
+            self.assertGreater(res.parameter_drift_delta, 0.0)
 
         asyncio.run(run_async_tests())
 

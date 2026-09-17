@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application.services.policy_engine import invalidate_policy_cache
-from app.dependencies import get_optional_session, get_session
+from app.dependencies import get_session
 from app.infrastructure.models import BusinessRuleModel
 from app.main import app
 

@@ -85,12 +85,10 @@ class BusinessRuleCreateRequest(BaseModel):
     @classmethod
     def validate_action(cls, v: str) -> str:
         clean = v.strip().upper()
-        if clean not in _RULE_ACTIONS_TUPLE:
-            # Allow custom upper-case actions up to 50 chars
-            if not re.match(r"^[A-Z0-9_]{3,50}$", clean):
-                raise ValueError(
-                    f"Action must be one of {_RULE_ACTIONS_TUPLE} or a valid uppercase identifier (3-50 chars)."
-                )
+        if clean not in _RULE_ACTIONS_TUPLE and not re.match(r"^[A-Z0-9_]{3,50}$", clean):
+            raise ValueError(
+                f"Action must be one of {_RULE_ACTIONS_TUPLE} or a valid uppercase identifier (3-50 chars)."
+            )
         return clean
 
 

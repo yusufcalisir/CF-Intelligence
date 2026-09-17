@@ -75,9 +75,9 @@ class HyperparameterBound(BaseModel):
 
     name: str
     type: str = Field(..., description="Parameter data type: float, int, categorical")
-    range: list[float] | None = Field(None, description="[min, max] range for numerical parameters")
-    choices: list[Any] | None = Field(None, description="Allowed choices for categorical parameters")
-    scale: str = Field("linear", description="Sampling scale: linear, log")
+    range: list[float] | None = Field(default=None, description="[min, max] range for numerical parameters")
+    choices: list[Any] | None = Field(default=None, description="Allowed choices for categorical parameters")
+    scale: str = Field(default="linear", description="Sampling scale: linear, log")
     default_value: Any = Field(..., description="Default baseline value")
     description: str = Field(..., description="Parameter functionality description")
 

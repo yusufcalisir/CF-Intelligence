@@ -477,11 +477,6 @@ class ConsortiumGovernanceService:
                 return []
             return list(consortium.members.values())
 
-    def get_consortium(self, consortium_id: str) -> Consortium | None:
-        """Retrieves consortium entity by ID."""
-        with self._lock:
-            return self._consortia.get(consortium_id.lower().strip())
-
     def add_member(
         self,
         consortium_id: str,

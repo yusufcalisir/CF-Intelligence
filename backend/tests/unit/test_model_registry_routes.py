@@ -4,14 +4,13 @@ from __future__ import annotations
 
 import shutil
 import tempfile
-from datetime import UTC, datetime
 
 import pytest
 import torch
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.presentation.routers.model_registry import deployer, registry
+from app.presentation.routers.model_registry import registry
 
 client = TestClient(app)
 

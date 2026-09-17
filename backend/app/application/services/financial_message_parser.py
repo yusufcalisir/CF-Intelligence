@@ -21,7 +21,7 @@ try:
         ExternalReferenceForbidden,
     )
 except ImportError:  # pragma: no cover
-    dET = None
+    dET = None  # noqa: N816
     DefusedXmlException = Exception
     DTDForbidden = Exception
     EntitiesForbidden = Exception

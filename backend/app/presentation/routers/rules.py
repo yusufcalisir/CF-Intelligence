@@ -23,7 +23,6 @@ from app.application.schemas.rules import (
 )
 from app.application.services.policy_engine import (
     PolicyEngineService,
-    validate_condition_ast,
 )
 from app.dependencies import OptionalSessionDep, SessionDep  # noqa: TC001
 

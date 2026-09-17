@@ -7,13 +7,12 @@ allowing the coordinator to trigger local training and validation over HTTP.
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import numpy as np
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from pydantic import BaseModel, Field
 
 from app.application.schemas.banks import (
     BankClientStatusResponse,
@@ -367,7 +366,7 @@ async def edge_heartbeat(payload: EdgeHeartbeatRequest) -> EdgeHeartbeatResponse
         bank_id=payload.bank_id,
         server_time=time.time(),
         next_heartbeat_seconds=15,
-        attestation_verified=True if payload.attestation_quote is None or len(payload.attestation_quote) > 0 else False,
+        attestation_verified=bool(payload.attestation_quote is None or len(payload.attestation_quote) > 0),
     )
 
 

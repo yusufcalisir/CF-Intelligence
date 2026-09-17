@@ -6,7 +6,7 @@ Gnosis Safe 2-of-3 multi-sig governance proposals, and participant node quaranti
 
 from __future__ import annotations
 
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient

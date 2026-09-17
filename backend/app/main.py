@@ -867,7 +867,7 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import auth, copilot, datasets, design_partner, feedback, onboarding
+from app.presentation.routers import copilot, datasets, feedback
 
 app.include_router(auth.router)
 app.include_router(onboarding.router)

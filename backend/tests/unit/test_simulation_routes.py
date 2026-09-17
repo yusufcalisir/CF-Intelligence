@@ -7,8 +7,8 @@ metrics aggregation, and EU AI Act report generation.
 
 from __future__ import annotations
 
-from typing import Any
 import uuid
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient

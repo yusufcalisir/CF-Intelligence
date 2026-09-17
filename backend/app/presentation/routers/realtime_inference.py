@@ -10,7 +10,7 @@ import time
 from typing import Any
 
 import torch
-from fastapi import APIRouter, Depends, Header, Request
+from fastapi import APIRouter, Header, Request
 
 from app.application.schemas.transaction import (
     InferenceQuotaResponse,
@@ -18,7 +18,7 @@ from app.application.schemas.transaction import (
     RealtimeInferenceResponse,
 )
 from app.config import get_settings
-from app.dependencies import TenantDep, enforce_tenant_quota
+from app.dependencies import TenantDep
 from app.domain.inference_fallback import (
     InferenceDecision,
     InferenceFallbackEngine,

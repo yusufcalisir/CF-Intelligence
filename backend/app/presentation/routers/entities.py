@@ -6,6 +6,7 @@ MinHash LSH fuzzy identity linkage, type-salted HMAC tokenization, and GDPR righ
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
@@ -22,10 +23,8 @@ from app.application.schemas.entities import (
     EntityResponse,
     HMACTokenizeRequest,
     HMACTokenizeResponse,
-    PSIMatch,
     PSIMatchDirectRequest,
     PSIMatchDirectResponse,
-    PSIProtocolStats,
     PSIRequest,
     PSIResponse,
     PSIStatsResponse,
@@ -206,7 +205,7 @@ async def get_entity_relationships(
             target_entity_id=r.target_entity_id,
             relationship_type=r.relationship_type.value,
             confidence=r.confidence,
-            evidence=r.evidence or "",
+            evidence=json.dumps(r.evidence) if isinstance(r.evidence, (list, dict)) else str(r.evidence or ""),
             created_at=r.created_at.isoformat(),
         )
         for r in rels

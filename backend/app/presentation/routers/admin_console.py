@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy import func, select
@@ -120,7 +119,7 @@ async def get_dashboard_summary(
 
         # Dynamic query 3: Global Model AUC
         auc_res = await session.execute(
-            select(GlobalModelModel.auc).order_by(GlobalModelModel.round_num.desc()).limit(1)
+            select(GlobalModelModel.auc).order_by(GlobalModelModel.created_at.desc()).limit(1)
         )
         db_auc = auc_res.scalar_one_or_none()
         if db_auc is not None and db_auc > 0.0:

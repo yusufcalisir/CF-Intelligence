@@ -69,6 +69,9 @@ class SharedIntelligenceResponse(BaseModel):
 
 # ── Cases ─────────────────────────────────────
 from app.application.schemas.cases import (
+    _CASE_PRIORITIES,
+    _CASE_STATUSES,
+    _EVIDENCE_TYPES,
     CaseCreateRequest,
     CaseEscalateRequest,
     CaseEventResponse,
@@ -87,12 +90,7 @@ from app.application.schemas.cases import (
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
     TimelineVerificationResponse,
-    _CASE_PRIORITIES,
-    _CASE_STATUSES,
-    _EVIDENCE_TYPES,
 )
-
-
 
 # ── Entities ──────────────────────────────────
 
@@ -583,21 +581,6 @@ class GNNInferEmbeddingResponse(BaseModel):
 
 
 # ── Evidence & Audit ──────────────────────────
-
-_EVIDENCE_TYPES = Literal[
-    "document",
-    "kyc_profile",
-    "ledger_proof",
-    "screenshot",
-    "log_excerpt",
-    "TRANSACTION_LEDGER",
-    "NETWORK_GRAPH",
-    "SWIFT_LOG",
-    "IP_INTELLIGENCE",
-    "KYC_DOCUMENT",
-]
-
-
 # Evidence & Audit schemas re-exported from app.application.schemas.cases above
 
 

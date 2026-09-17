@@ -309,8 +309,8 @@ async def get_bank_status(
     summary="Cryptographically sign an institutional CSR via PKI wizard",
 )
 async def sign_bank_csr(
+    payload: BankCSRSignRequest,
     bank_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
-    payload: BankCSRSignRequest = ...,
     session: AsyncSession = Depends(get_async_session),
 ) -> Any:
     """Signs an institutional X.509 Certificate Signing Request (CSR) for an onboarded bank node."""

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -225,11 +225,14 @@ class RiskPropagationResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    total_entities_evaluated: int
-    high_risk_propagations: int
-    iterations_run: int
-    max_score_delta: float
-    converged: bool
+    updated_nodes_count: int = 0
+    max_score: float = 0.0
+    avg_score_change: float = 0.0
+    total_entities_evaluated: int = 0
+    high_risk_propagations: int = 0
+    iterations_run: int = 0
+    max_score_delta: float = 0.0
+    converged: bool = True
 
 
 class CommunityAnalyticsResponse(BaseModel):
@@ -252,11 +255,16 @@ class TemporalAnomalyResponse(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    anomaly_id: str
-    edge_ids: list[str]
-    velocity_ratio: float
-    start_time: str
-    end_time: str
+    subgraph_id: int = 0
+    node_ids: list[str] = Field(default_factory=list)
+    edges_count: int = 0
+    velocity_score: float = 0.0
+    time_window_start: str = ""
+    anomaly_id: str = ""
+    edge_ids: list[str] = Field(default_factory=list)
+    velocity_ratio: float = 0.0
+    start_time: str = ""
+    end_time: str = ""
 
 
 class GNNTrainRequest(BaseModel):

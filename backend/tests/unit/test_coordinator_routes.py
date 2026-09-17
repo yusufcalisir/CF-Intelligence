@@ -6,7 +6,7 @@ asynchronous parameter updates, dynamic quorum verification, and weighted consor
 
 from __future__ import annotations
 
-from typing import Generator
+from collections.abc import Generator
 
 import pytest
 from fastapi.testclient import TestClient
