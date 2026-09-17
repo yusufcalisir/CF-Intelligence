@@ -368,12 +368,18 @@ class PolicyEngineService:
 
         new_count = 0
         for dr in default_rules:
-            dr_id = dr.id if hasattr(dr, "id") else dr.get("id")
-            if dr_id and dr_id not in existing:
-                name = dr.rule_name if hasattr(dr, "rule_name") else dr.get("rule_name")
-                cond = dr.condition if hasattr(dr, "condition") else dr.get("condition")
-                act = dr.action if hasattr(dr, "action") else dr.get("action")
-                active = dr.is_active if hasattr(dr, "is_active") else dr.get("is_active", True)
+            if isinstance(dr, dict):
+                dr_id = dr.get("id")
+                name = dr.get("rule_name")
+                cond = dr.get("condition")
+                act = dr.get("action")
+                active = dr.get("is_active", True)
+            else:
+                dr_id = getattr(dr, "id", None)
+                name = getattr(dr, "rule_name", None)
+                cond = getattr(dr, "condition", None)
+                act = getattr(dr, "action", None)
+                active = getattr(dr, "is_active", True)
 
                 # Check if a rule with same rule_name already exists to avoid unique constraint violations
                 name_exists = any(r.rule_name == name for r in existing.values())
@@ -545,11 +551,18 @@ class PolicyEngineService:
         risk_score_delta = 0.0
 
         for r in rules:
-            cond = r.condition if hasattr(r, "condition") else r.get("condition", {})
-            action = (r.action if hasattr(r, "action") else r.get("action", "ALLOW")).strip().upper()
-            rule_id = r.id if hasattr(r, "id") else r.get("id", "rule_unknown")
-            rule_name = r.rule_name if hasattr(r, "rule_name") else r.get("rule_name", "Unknown Rule")
-            priority = getattr(r, "priority", 100)
+            if isinstance(r, dict):
+                cond = r.get("condition", {})
+                action = str(r.get("action", "ALLOW")).strip().upper()
+                rule_id = str(r.get("id", "rule_unknown"))
+                rule_name = str(r.get("rule_name", "Unknown Rule"))
+                priority = r.get("priority", 100)
+            else:
+                cond = getattr(r, "condition", {})
+                action = str(getattr(r, "action", "ALLOW")).strip().upper()
+                rule_id = str(getattr(r, "id", "rule_unknown"))
+                rule_name = str(getattr(r, "rule_name", "Unknown Rule"))
+                priority = getattr(r, "priority", 100)
 
             matches, _ = evaluate_condition_with_trace(cond, transaction)
             if matches:
