@@ -182,7 +182,36 @@ import type {
   CronCleanupResponse,
   CronHealthStatusResponse,
   CronScheduleResponse,
+  ConsortiumAlliance,
+  ConsortiumMember,
+  CreateConsortiumPayload,
+  GovernanceProposal,
+  CreateMembershipProposalPayload,
+  CreatePolicyProposalPayload,
+  VoteProposalPayload,
+  VoteProposalReceipt,
+  CoordinatorClientCapability,
+  CoordinatorQuorumStatus,
+  CoordinatorAsyncStatus,
+  SettlementContractInfo,
+  SettlementReceipt,
+  SettlementTriggerPayload,
+  PayoutClaimPayload,
+  PayoutClaimReceipt,
+  MultiSigProposal,
+  MultiSigProposePayload,
+  MultiSigProposeReceipt,
+  MultiSigConfirmPayload,
+  MultiSigConfirmReceipt,
+  MultiSigRevokePayload,
+  MultiSigRevokeReceipt,
+  QuarantinePayload,
+  QuarantineReceipt,
+  SlashPenaltyPayload,
+  SlashPenaltyReceipt,
+  SlashedNodesCatalog,
 } from './types';
+
 
 
 
@@ -2655,6 +2684,301 @@ export function useCronSchedules() {
     },
   });
 }
+
+// ── Consortium Governance & Coordinator Hooks ────
+
+export function useConsortium(consortiumId: string = 'cfi-consortium') {
+  return useQuery<ConsortiumAlliance>({
+    queryKey: ['consortium', consortiumId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ConsortiumAlliance>(`/api/v1/coordinator/consortium/${consortiumId}`);
+      return data;
+    },
+    enabled: Boolean(consortiumId),
+  });
+}
+
+export function useConsortiumMembers(consortiumId: string = 'cfi-consortium') {
+  return useQuery<ConsortiumMember[]>({
+    queryKey: ['consortium-members', consortiumId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ConsortiumMember[]>(`/api/v1/coordinator/consortium/${consortiumId}/members`);
+      return data;
+    },
+    enabled: Boolean(consortiumId),
+  });
+}
+
+export function useCreateConsortium() {
+  const queryClient = useQueryClient();
+  return useMutation<ConsortiumAlliance, Error, CreateConsortiumPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ConsortiumAlliance>('/api/v1/coordinator/consortium', payload);
+      return data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['consortium', data.consortium_id] });
+      queryClient.invalidateQueries({ queryKey: ['consortium-members', data.consortium_id] });
+    },
+  });
+}
+
+
+export function useGovernanceProposals(consortiumId: string = 'cfi-consortium', status?: string) {
+  return useQuery<GovernanceProposal[]>({
+    queryKey: ['governance-proposals', consortiumId, status],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      params.append('consortium_id', consortiumId);
+      if (status) params.append('status', status);
+      const { data } = await apiClient.get<GovernanceProposal[]>(`/api/v1/coordinator/proposals?${params.toString()}`);
+      return data;
+    },
+  });
+}
+
+export function useGovernanceProposal(proposalId: string | undefined) {
+  return useQuery<GovernanceProposal>({
+    queryKey: ['governance-proposal', proposalId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<GovernanceProposal>(`/api/v1/coordinator/proposals/${proposalId}`);
+      return data;
+    },
+    enabled: Boolean(proposalId),
+  });
+}
+
+export function useCreateMembershipProposal() {
+  const queryClient = useQueryClient();
+  return useMutation<GovernanceProposal, Error, CreateMembershipProposalPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<GovernanceProposal>('/api/v1/coordinator/proposals/membership', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['governance-proposals'] });
+    },
+  });
+}
+
+export function useCreatePolicyProposal() {
+  const queryClient = useQueryClient();
+  return useMutation<GovernanceProposal, Error, CreatePolicyProposalPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<GovernanceProposal>('/api/v1/coordinator/proposals/policy', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['governance-proposals'] });
+    },
+  });
+}
+
+export function useVoteProposal() {
+  const queryClient = useQueryClient();
+  return useMutation<VoteProposalReceipt, Error, { proposalId: string; payload: VoteProposalPayload }>({
+    mutationFn: async ({ proposalId, payload }) => {
+      const { data } = await apiClient.post<VoteProposalReceipt>(`/api/v1/coordinator/proposals/${proposalId}/vote`, payload);
+      return data;
+    },
+    onSuccess: (_, { proposalId }) => {
+      queryClient.invalidateQueries({ queryKey: ['governance-proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['governance-proposal', proposalId] });
+    },
+  });
+}
+
+export function useCoordinatorClients() {
+  return useQuery<CoordinatorClientCapability[]>({
+    queryKey: ['coordinator-clients'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CoordinatorClientCapability[]>('/api/v1/coordinator/clients');
+      return data;
+    },
+  });
+}
+
+export function useCoordinatorQuorumStatus(roundId?: number) {
+  return useQuery<CoordinatorQuorumStatus>({
+    queryKey: ['coordinator-quorum', roundId],
+    queryFn: async () => {
+      const url = roundId ? `/api/v1/coordinator/quorum-status?round_id=${roundId}` : '/api/v1/coordinator/quorum-status';
+      const { data } = await apiClient.get<CoordinatorQuorumStatus>(url);
+      return data;
+    },
+  });
+}
+
+export function useCoordinatorAsyncStatus() {
+  return useQuery<CoordinatorAsyncStatus>({
+    queryKey: ['coordinator-async-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<CoordinatorAsyncStatus>('/api/v1/coordinator/async-status');
+      return data;
+    },
+  });
+}
+
+// ── Web3 & CBDC Smart Contract Settlement Hooks ────
+
+export function useSettlementContractInfo() {
+  return useQuery<SettlementContractInfo>({
+    queryKey: ['settlement-contract-info'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SettlementContractInfo>('/api/v1/settlement/contract-info');
+      return data;
+    },
+  });
+}
+
+export function useSettlementHistory() {
+  return useQuery<SettlementReceipt[]>({
+    queryKey: ['settlement-history'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SettlementReceipt[]>('/api/v1/settlement/history');
+      return data;
+    },
+  });
+}
+
+export function useTriggerSettlement() {
+  const queryClient = useQueryClient();
+  return useMutation<SettlementReceipt, Error, SettlementTriggerPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<SettlementReceipt>('/api/v1/settlement/trigger', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settlement-history'] });
+      queryClient.invalidateQueries({ queryKey: ['settlement-contract-info'] });
+    },
+  });
+}
+
+export function useClaimPayout() {
+  const queryClient = useQueryClient();
+  return useMutation<PayoutClaimReceipt, Error, PayoutClaimPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<PayoutClaimReceipt>('/api/v1/settlement/claim', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settlement-history'] });
+      queryClient.invalidateQueries({ queryKey: ['settlement-contract-info'] });
+    },
+  });
+}
+
+export function useMultiSigProposals() {
+  return useQuery<MultiSigProposal[]>({
+    queryKey: ['multisig-proposals'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<MultiSigProposal[]>('/api/v1/settlement/multisig/proposals');
+      return data;
+    },
+  });
+}
+
+export function useMultiSigProposal(txId: number | undefined) {
+  return useQuery<MultiSigProposal>({
+    queryKey: ['multisig-proposal', txId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<MultiSigProposal>(`/api/v1/settlement/multisig/proposals/${txId}`);
+      return data;
+    },
+    enabled: txId !== undefined,
+  });
+}
+
+export function useProposeMultiSigAction() {
+  const queryClient = useQueryClient();
+  return useMutation<MultiSigProposeReceipt, Error, MultiSigProposePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<MultiSigProposeReceipt>('/api/v1/settlement/multisig/propose', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['multisig-proposals'] });
+    },
+  });
+}
+
+export function useConfirmMultiSigAction() {
+  const queryClient = useQueryClient();
+  return useMutation<MultiSigConfirmReceipt, Error, MultiSigConfirmPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<MultiSigConfirmReceipt>('/api/v1/settlement/multisig/confirm', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['multisig-proposals'] });
+    },
+  });
+}
+
+export function useRevokeMultiSigAction() {
+  const queryClient = useQueryClient();
+  return useMutation<MultiSigRevokeReceipt, Error, MultiSigRevokePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<MultiSigRevokeReceipt>('/api/v1/settlement/multisig/revoke', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['multisig-proposals'] });
+    },
+  });
+}
+
+export function useQuarantineBank() {
+  const queryClient = useQueryClient();
+  return useMutation<QuarantineReceipt, Error, QuarantinePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<QuarantineReceipt>('/api/v1/settlement/quarantine', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settlement-contract-info'] });
+    },
+  });
+}
+
+export function useClearQuarantine() {
+  const queryClient = useQueryClient();
+  return useMutation<QuarantineReceipt, Error, QuarantinePayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<QuarantineReceipt>('/api/v1/settlement/clear-quarantine', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settlement-contract-info'] });
+    },
+  });
+}
+
+export function useSlashBank() {
+  const queryClient = useQueryClient();
+  return useMutation<SlashPenaltyReceipt, Error, SlashPenaltyPayload>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<SlashPenaltyReceipt>('/api/v1/settlement/slash', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['settlement-contract-info'] });
+      queryClient.invalidateQueries({ queryKey: ['slashed-nodes'] });
+    },
+  });
+}
+
+export function useSlashedNodes() {
+  return useQuery<SlashedNodesCatalog>({
+    queryKey: ['slashed-nodes'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SlashedNodesCatalog>('/api/v1/settlement/slashed');
+      return data;
+    },
+  });
+}
+
 
 
 

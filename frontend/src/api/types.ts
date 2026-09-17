@@ -2762,4 +2762,278 @@ export interface CronScheduleResponse {
   scheduled_jobs: CronScheduleItem[];
 }
 
+// ── Consortium Governance & Coordinator Types ────
+
+export interface ConsortiumMember {
+  bank_id: string;
+  role: 'FOUNDER' | 'FULL_MEMBER' | 'OBSERVER' | string;
+  voting_power: number;
+  joined_at: string;
+  can_vote: boolean;
+}
+
+export interface ConsortiumAlliance {
+  consortium_id: string;
+  name: string;
+  quorum_ratio: number;
+  min_members_n: number;
+  max_epsilon: number;
+  status: 'ACTIVE' | 'DRAFT' | 'SUSPENDED' | string;
+  members: ConsortiumMember[];
+  created_at: string;
+}
+
+export interface CreateConsortiumPayload {
+  consortium_id: string;
+  name: string;
+  founder_bank_id: string;
+  quorum_ratio?: number;
+  max_epsilon?: number;
+  min_members_n?: number;
+}
+
+export interface GovernanceProposal {
+  proposal_id: string;
+  consortium_id: string;
+  creator_bank_id: string;
+  target_bank_id: string;
+  action: 'ADD_MEMBER' | 'REMOVE_MEMBER' | 'UPDATE_POLICY' | string;
+  required_quorum_ratio: number;
+  votes_for: string[];
+  votes_against: string[];
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CANCELLED' | string;
+  created_at: string;
+  expires_at?: string | null;
+  rejection_reason?: string | null;
+  metadata: Record<string, any>;
+}
+
+export interface CreateMembershipProposalPayload {
+  consortium_id: string;
+  creator_bank_id: string;
+  target_bank_id: string;
+  action?: 'ADD_MEMBER' | 'REMOVE_MEMBER';
+  ttl_seconds?: number;
+  metadata?: Record<string, any>;
+}
+
+export interface CreatePolicyProposalPayload {
+  consortium_id: string;
+  creator_bank_id: string;
+  policy_updates: Record<string, any>;
+  ttl_seconds?: number;
+}
+
+export interface VoteProposalPayload {
+  bank_id: string;
+  approve: boolean;
+}
+
+export interface VoteProposalReceipt {
+  proposal_id: string;
+  status: string;
+  votes_for_count: number;
+  votes_against_count: number;
+  votes_for: string[];
+  votes_against: string[];
+  resolved: boolean;
+}
+
+export interface CoordinatorHandshakePayload {
+  bank_id: string;
+  pytorch_version: string;
+  python_version: string;
+  hardware_type: string;
+  ram_gb: number;
+  device_count?: number;
+}
+
+export interface CoordinatorHandshakeResponse {
+  registered: boolean;
+  status: string;
+  reason?: string | null;
+  client_profile?: Record<string, any> | null;
+  registered_at: number;
+}
+
+export interface CoordinatorClientCapability {
+  bank_id: string;
+  pytorch_version: string;
+  python_version: string;
+  hardware_type: string;
+  ram_gb: number;
+  device_count: number;
+  status: string;
+  last_heartbeat_ago_seconds: number;
+}
+
+export interface CoordinatorQuorumStatus {
+  round_number: number;
+  registered_nodes_count: number;
+  submitted_nodes_count: number;
+  quorum_threshold_pct: number;
+  current_quorum_pct: number;
+  state: string;
+  start_time: string;
+  target_window_seconds: number;
+  time_remaining_seconds: number;
+}
+
+export interface CoordinatorAsyncStatus {
+  current_round: number;
+  alpha_staleness: number;
+  learning_rate: number;
+  max_staleness: number;
+  staleness_function: string;
+  total_updates: number;
+  dropped_updates: number;
+  applied_updates: number;
+  average_staleness: number;
+  max_observed_staleness: number;
+}
+
+// ── Web3 & CBDC Smart Contract Settlement Types ────
+
+export interface SettlementContractInfo {
+  contract_address: string;
+  coordinator_address: string;
+  network_name: string;
+  chain_id: number;
+  current_block_height: number;
+  supported_currencies: string[];
+  total_settlements_executed: number;
+  total_quarantined_nodes: number;
+  total_slashed_nodes: number;
+  abi: any[];
+}
+
+export interface SettlementReceipt {
+  epoch_id: string;
+  status: string;
+  transaction_hash: string;
+  block_number: number;
+  block_timestamp: string;
+  contract_address: string;
+  coordinator_address: string;
+  currency: string;
+  total_pool_usd: number;
+  total_distributed_usd: number;
+  total_distributed_wei: string;
+  gas_used: number;
+  effective_gas_price_gwei: number;
+  audit_proof_hash: string;
+  payouts: OnChainPayout[];
+}
+
+export interface SettlementTriggerPayload {
+  epoch_id: string;
+  contributions: Record<string, number>;
+  quarantine_statuses?: Record<string, boolean>;
+  audit_proof_hash: string;
+  total_pool_usd?: number;
+  currency?: string;
+}
+
+export interface PayoutClaimPayload {
+  epoch_id: string;
+  claimant_bank: string;
+  claimant_wallet?: string;
+  signature?: string;
+}
+
+export interface PayoutClaimReceipt {
+  claim_id: string;
+  epoch_id: string;
+  claimant_bank: string;
+  claimant_wallet: string;
+  payout_usd: number;
+  payout_wei: string;
+  currency: string;
+  transaction_hash: string;
+  block_number: number;
+  claimed_at: string;
+  status: string;
+}
+
+export interface MultiSigProposal {
+  tx_id: number;
+  action_type: string;
+  epoch_id: number;
+  payload_hash: string;
+  payload_summary: string;
+  confirmation_count: number;
+  threshold: number;
+  executed: boolean;
+  confirmations: Record<string, boolean>;
+  proposer: string;
+  created_at: string;
+}
+
+export interface MultiSigProposePayload {
+  proposer_wallet: string;
+  action_type: string;
+  epoch_id?: number;
+  payload?: Record<string, any>;
+}
+
+export interface MultiSigProposeReceipt {
+  status: string;
+  tx_id: number;
+  executed: boolean;
+}
+
+export interface MultiSigConfirmPayload {
+  tx_id: number;
+  owner_wallet: string;
+}
+
+export interface MultiSigConfirmReceipt {
+  status: string;
+  tx_id: number;
+  confirmation_count: number;
+  executed: boolean;
+}
+
+export interface MultiSigRevokePayload {
+  tx_id: number;
+  owner_wallet: string;
+}
+
+export interface MultiSigRevokeReceipt {
+  status: string;
+  tx_id: number;
+  confirmation_count: number;
+  executed: boolean;
+}
+
+export interface QuarantinePayload {
+  bank_name_or_wallet: string;
+  reason?: string;
+}
+
+export interface QuarantineReceipt {
+  status: string;
+  message: string;
+}
+
+export interface SlashPenaltyPayload {
+  bank_name_or_wallet: string;
+  penalty_usd: number;
+  reason?: string;
+}
+
+export interface SlashRecord {
+  bank: string;
+  penalty_usd: number;
+  reason: string;
+  timestamp: string;
+}
+
+export interface SlashPenaltyReceipt {
+  status: string;
+  slashed_record: SlashRecord;
+}
+
+export type SlashedNodesCatalog = Record<string, SlashRecord[]>;
+
 

@@ -1,69 +1,114 @@
 """Web3 & CBDC Smart Contract Incentive Settlement API Endpoints."""
 
+from __future__ import annotations
+
+import hashlib
+import logging
+import uuid
+from datetime import UTC, datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Path, status
 
+from app.application.schemas.settlement import (
+    ContractInfoResponse,
+    MultiSigConfirmRequest,
+    MultiSigConfirmResponse,
+    MultiSigProposalItem,
+    MultiSigProposeRequest,
+    MultiSigProposeResponse,
+    MultiSigRevokeRequest,
+    MultiSigRevokeResponse,
+    OnChainPayoutItem,
+    PayoutClaimRequest,
+    PayoutClaimResponse,
+    QuarantineRequest,
+    QuarantineResponse,
+    SettlementReceiptResponse,
+    SettlementTriggerRequest,
+    SlashRecordItem,
+    SlashRequest,
+    SlashResponse,
+    SlashedNodesResponse,
+)
 from app.infrastructure.security.smart_contract_driver import (
     EpochAlreadySettledError,
     InvalidSettlementParameterError,
     SmartContractSettlementDriver,
 )
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/v1/settlement", tags=["settlement"])
+api_router = APIRouter(prefix="/v1/settlement", tags=["settlement"])
+
+# In-memory participant claim tracker to prevent double-claiming
+_CLAIMED_PAYOUTS: set[str] = set()
 
 
-class SettlementTriggerRequest(BaseModel):
-    epoch_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        description="Unique epoch identifier",
-    )
-    contributions: dict[str, float] = Field(
-        ...,
-        description="Bank ID to contribution score mapping",
-    )
-    quarantine_statuses: dict[str, bool] = Field(default_factory=dict)
-    audit_proof_hash: str = Field(
-        ...,
-        min_length=16,
-        max_length=128,
-        pattern=r"^[a-fA-F0-9]+$",
-        description="Keccak-256 hex audit proof hash",
-    )
-    total_pool_usd: float = Field(
-        100000.0,
-        ge=0.0,
-        le=1_000_000_000.0,
-        description="Total USD pool amount [0, 1B]",
-    )
-    currency: str = Field(
-        "wCBDC",
-        max_length=16,
-        pattern=r"^[a-zA-Z0-9]+$",
-        description="Currency code (e.g. wCBDC, USDC)",
+def _format_receipt(receipt: dict[str, Any]) -> SettlementReceiptResponse:
+    payouts = [
+        OnChainPayoutItem(
+            bank_name=p["bank_name"],
+            wallet_address=p["wallet_address"],
+            shapley_score=p["shapley_score"],
+            shapley_basis_points=p["shapley_basis_points"],
+            share_percent=p["share_percent"],
+            payout_usd=p["payout_usd"],
+            payout_wei=str(p["payout_wei"]),
+            is_quarantined=p["is_quarantined"],
+            status=p["status"],
+        )
+        for p in receipt.get("payouts", [])
+    ]
+    return SettlementReceiptResponse(
+        epoch_id=receipt["epoch_id"],
+        status=receipt.get("status", "SUCCESS"),
+        transaction_hash=receipt["transaction_hash"],
+        block_number=receipt["block_number"],
+        block_timestamp=receipt["block_timestamp"],
+        contract_address=receipt["contract_address"],
+        coordinator_address=receipt["coordinator_address"],
+        currency=receipt.get("currency", "wCBDC"),
+        total_pool_usd=receipt["total_pool_usd"],
+        total_distributed_usd=receipt["total_distributed_usd"],
+        total_distributed_wei=str(receipt["total_distributed_wei"]),
+        gas_used=receipt.get("gas_used", 142850),
+        effective_gas_price_gwei=receipt.get("effective_gas_price_gwei", 15.5),
+        audit_proof_hash=receipt["audit_proof_hash"],
+        payouts=payouts,
     )
 
 
-@router.get("/contract-info")
-async def get_contract_info() -> dict[str, Any]:
-    """Returns metadata and ABI for the deployed Consortium Incentive Settlement Smart Contract."""
+# ── Contract & History Endpoints ──────────────────────────────
+
+
+async def get_contract_info() -> ContractInfoResponse:
+    """Returns metadata and ABI for deployed Consortium Incentive Settlement Smart Contract."""
     driver = SmartContractSettlementDriver.get_instance()
-    return driver.get_contract_info()
+    info = driver.get_contract_info()
+    return ContractInfoResponse(
+        contract_address=info["contract_address"],
+        coordinator_address=info["coordinator_address"],
+        network_name=info["network_name"],
+        chain_id=info["chain_id"],
+        current_block_height=info["current_block_height"],
+        supported_currencies=info["supported_currencies"],
+        total_settlements_executed=info["total_settlements_executed"],
+        total_quarantined_nodes=info["total_quarantined_nodes"],
+        total_slashed_nodes=info["total_slashed_nodes"],
+        abi=info["abi"],
+    )
 
 
-@router.get("/history")
-async def get_settlement_history() -> list[dict[str, Any]]:
-    """Returns the log of executed on-chain Web3 / CBDC settlement receipts."""
+async def get_settlement_history() -> list[SettlementReceiptResponse]:
+    """Returns log of executed on-chain Web3 / CBDC settlement receipts."""
     driver = SmartContractSettlementDriver.get_instance()
-    return driver.get_settlement_history()
+    history = driver.get_settlement_history()
+    return [_format_receipt(r) for r in history]
 
 
-@router.post("/trigger")
-async def trigger_settlement(payload: SettlementTriggerRequest) -> dict[str, Any]:
+async def trigger_settlement(payload: SettlementTriggerRequest) -> SettlementReceiptResponse:
     """Manually triggers smart contract incentive settlement for a simulation epoch."""
     try:
         driver = SmartContractSettlementDriver.get_instance()
@@ -75,113 +120,136 @@ async def trigger_settlement(payload: SettlementTriggerRequest) -> dict[str, Any
             total_pool_usd=payload.total_pool_usd,
             currency=payload.currency,
         )
-        return receipt
+        return _format_receipt(receipt)
     except EpochAlreadySettledError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except InvalidSettlementParameterError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Settlement execution failed: {exc}") from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Settlement execution failed: {exc}",
+        ) from exc
 
 
-class MultiSigProposeRequest(BaseModel):
-    proposer_wallet: str = Field(
-        ...,
-        min_length=10,
-        max_length=64,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="EIP-55 checksummed Ethereum wallet address (0x + 40 hex chars)",
+# ── Participant Payout Claims ─────────────────────────────────
+
+
+async def claim_participant_payout(req: PayoutClaimRequest) -> PayoutClaimResponse:
+    """Participant bank withdrawal claim against settled smart contract funds."""
+    driver = SmartContractSettlementDriver.get_instance()
+    matching_epoch = next(
+        (r for r in driver.settlement_history if r.get("epoch_id") == req.epoch_id), None
     )
-    action_type: str = Field(
-        ...,
-        max_length=64,
-        pattern=r"^[A-Z_]+$",
-        description="Action type enum string e.g. QUARANTINE_BANK",
-    )
-    epoch_id: int = Field(..., ge=0, le=1_000_000)
-    payload: dict[str, Any] = Field(default_factory=dict)
+    if not matching_epoch:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Settlement epoch '{req.epoch_id}' not found.",
+        )
 
-
-class MultiSigConfirmRequest(BaseModel):
-    tx_id: int = Field(..., ge=0, le=1_000_000)
-    owner_wallet: str = Field(
-        ...,
-        min_length=10,
-        max_length=64,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="EIP-55 checksummed Ethereum wallet address",
-    )
-
-
-class MultiSigRevokeRequest(BaseModel):
-    tx_id: int = Field(..., ge=0, le=1_000_000)
-    owner_wallet: str = Field(
-        ...,
-        min_length=10,
-        max_length=64,
-        pattern=r"^0x[a-fA-F0-9]{40}$",
-        description="EIP-55 checksummed Ethereum wallet address",
+    norm_claimant = req.claimant_bank.strip().lower()
+    payout_record = next(
+        (
+            p
+            for p in matching_epoch.get("payouts", [])
+            if p.get("bank_name", "").strip().lower() == norm_claimant
+            or (req.claimant_wallet and p.get("wallet_address", "").lower() == req.claimant_wallet.lower())
+        ),
+        None,
     )
 
+    if not payout_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Bank '{req.claimant_bank}' has no allocated incentive payouts in epoch '{req.epoch_id}'.",
+        )
 
-class QuarantineRequest(BaseModel):
-    bank_name_or_wallet: str = Field(..., min_length=2, max_length=128)
-    reason: str = Field(default="Adversarial behavior detected", max_length=256)
+    if payout_record.get("is_quarantined") or payout_record.get("status") == "BLOCKED_QUARANTINE":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Payout for bank '{req.claimant_bank}' is blocked: participant is quarantined on-chain.",
+        )
+
+    claim_key = f"{req.epoch_id}:{norm_claimant}"
+    if claim_key in _CLAIMED_PAYOUTS:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Incentive payout for epoch '{req.epoch_id}' and bank '{req.claimant_bank}' has already been claimed.",
+        )
+
+    _CLAIMED_PAYOUTS.add(claim_key)
+    claim_id = f"claim_{uuid.uuid4().hex[:12]}"
+    tx_hash = f"0x{hashlib.sha256(f'{claim_id}:{req.epoch_id}:{payout_record['wallet_address']}'.encode()).hexdigest()}"
+
+    return PayoutClaimResponse(
+        claim_id=claim_id,
+        epoch_id=req.epoch_id,
+        claimant_bank=payout_record["bank_name"],
+        claimant_wallet=payout_record["wallet_address"],
+        payout_usd=payout_record["payout_usd"],
+        payout_wei=str(payout_record["payout_wei"]),
+        currency=matching_epoch.get("currency", "wCBDC"),
+        transaction_hash=tx_hash,
+        block_number=matching_epoch.get("block_number", 5000001) + 1,
+        claimed_at=datetime.now(UTC).isoformat(),
+        status="CLAIMED",
+    )
 
 
-class SlashRequest(BaseModel):
-    bank_name_or_wallet: str = Field(..., min_length=2, max_length=128)
-    penalty_usd: float = Field(..., gt=0.0, le=10_000_000.0)
-    reason: str = Field(default="Byzantine gradient poisoning", max_length=256)
+# ── Gnosis Safe Multi-Sig Governance ──────────────────────────
 
 
-@router.get("/multisig/proposals")
-async def get_multisig_proposals() -> list[dict[str, Any]]:
+async def get_multisig_proposals() -> list[MultiSigProposalItem]:
     """Returns list of active Gnosis Safe 2-of-3 multi-sig coordinator proposals."""
     driver = SmartContractSettlementDriver.get_instance()
     props = driver.multisig_driver.get_all_proposals()
     return [
-        {
-            "tx_id": p.tx_id,
-            "action_type": p.action_type,
-            "epoch_id": p.epoch_id,
-            "payload_hash": p.payload_hash,
-            "payload_summary": p.payload_summary,
-            "confirmation_count": p.confirmation_count,
-            "threshold": p.threshold,
-            "executed": p.executed,
-            "confirmations": p.confirmations,
-            "proposer": p.proposer,
-            "created_at": p.created_at,
-        }
+        MultiSigProposalItem(
+            tx_id=p.tx_id,
+            action_type=p.action_type.value if hasattr(p.action_type, "value") else str(p.action_type),
+            epoch_id=p.epoch_id,
+            payload_hash=p.payload_hash,
+            payload_summary=p.payload_summary,
+            confirmation_count=p.confirmation_count,
+            threshold=p.threshold,
+            executed=p.executed,
+            confirmations=p.confirmations,
+            proposer=p.proposer,
+            created_at=p.created_at,
+        )
         for p in props
     ]
 
 
-@router.get("/multisig/proposals/{tx_id}")
-async def get_multisig_proposal_by_id(tx_id: int) -> dict[str, Any]:
+async def get_multisig_proposal_by_id(
+    tx_id: int = Path(..., ge=0, le=1_000_000, description="Transaction ID"),
+) -> MultiSigProposalItem:
     """Returns details for a single Gnosis Safe proposal."""
     driver = SmartContractSettlementDriver.get_instance()
     prop = driver.multisig_driver.get_proposal(tx_id)
     if prop is None:
-        raise HTTPException(status_code=404, detail=f"Proposal #{tx_id} does not exist.")
-    return {
-        "tx_id": prop.tx_id,
-        "action_type": prop.action_type,
-        "epoch_id": prop.epoch_id,
-        "payload_hash": prop.payload_hash,
-        "payload_summary": prop.payload_summary,
-        "confirmation_count": prop.confirmation_count,
-        "threshold": prop.threshold,
-        "executed": prop.executed,
-        "confirmations": prop.confirmations,
-        "proposer": prop.proposer,
-        "created_at": prop.created_at,
-    }
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal #{tx_id} does not exist.",
+        )
+    return MultiSigProposalItem(
+        tx_id=prop.tx_id,
+        action_type=prop.action_type.value if hasattr(prop.action_type, "value") else str(prop.action_type),
+        epoch_id=prop.epoch_id,
+        payload_hash=prop.payload_hash,
+        payload_summary=prop.payload_summary,
+        confirmation_count=prop.confirmation_count,
+        threshold=prop.threshold,
+        executed=prop.executed,
+        confirmations=prop.confirmations,
+        proposer=prop.proposer,
+        created_at=prop.created_at,
+    )
 
 
-@router.post("/multisig/propose")
-async def propose_multisig_action(req: MultiSigProposeRequest) -> dict[str, Any]:
+async def propose_multisig_action(req: MultiSigProposeRequest) -> MultiSigProposeResponse:
     """Submits a new 2-of-3 threshold multi-sig proposal for coordinator governance."""
     try:
         driver = SmartContractSettlementDriver.get_instance()
@@ -191,92 +259,135 @@ async def propose_multisig_action(req: MultiSigProposeRequest) -> dict[str, Any]
             epoch_id=req.epoch_id,
             payload=req.payload,
         )
-        return {"status": "SUCCESS", "tx_id": prop.tx_id, "executed": prop.executed}
+        return MultiSigProposeResponse(status="SUCCESS", tx_id=prop.tx_id, executed=prop.executed)
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
-@router.post("/multisig/confirm")
-async def confirm_multisig_action(req: MultiSigConfirmRequest) -> dict[str, Any]:
+async def confirm_multisig_action(req: MultiSigConfirmRequest) -> MultiSigConfirmResponse:
     """Confirms a pending multi-sig proposal with a trustee signature."""
     try:
         driver = SmartContractSettlementDriver.get_instance()
         prop = driver.multisig_driver.confirm_proposal(
             tx_id=req.tx_id, owner_wallet=req.owner_wallet
         )
-        return {
-            "status": "SUCCESS",
-            "tx_id": prop.tx_id,
-            "confirmation_count": prop.confirmation_count,
-            "executed": prop.executed,
-        }
+        return MultiSigConfirmResponse(
+            status="SUCCESS",
+            tx_id=prop.tx_id,
+            confirmation_count=prop.confirmation_count,
+            executed=prop.executed,
+        )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
-@router.post("/multisig/revoke")
-async def revoke_multisig_action(req: MultiSigRevokeRequest) -> dict[str, Any]:
+async def revoke_multisig_action(req: MultiSigRevokeRequest) -> MultiSigRevokeResponse:
     """Revokes a trustee confirmation for a pending multi-sig proposal."""
     try:
         driver = SmartContractSettlementDriver.get_instance()
         prop = driver.multisig_driver.revoke_confirmation(
             tx_id=req.tx_id, owner_wallet=req.owner_wallet
         )
-        return {
-            "status": "SUCCESS",
-            "tx_id": prop.tx_id,
-            "confirmation_count": prop.confirmation_count,
-            "executed": prop.executed,
-        }
+        return MultiSigRevokeResponse(
+            status="SUCCESS",
+            tx_id=prop.tx_id,
+            confirmation_count=prop.confirmation_count,
+            executed=prop.executed,
+        )
     except KeyError as exc:
-        raise HTTPException(status_code=404, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except (ValueError, RuntimeError) as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 
-@router.post("/quarantine")
-async def quarantine_bank_node(req: QuarantineRequest) -> dict[str, Any]:
+# ── Quarantine & Slashing Controls ────────────────────────────
+
+
+async def quarantine_bank_node(req: QuarantineRequest) -> QuarantineResponse:
     """Quarantines a participant node on-chain."""
     driver = SmartContractSettlementDriver.get_instance()
     driver.quarantine_bank(req.bank_name_or_wallet, req.reason)
-    return {
-        "status": "SUCCESS",
-        "message": f"Bank node '{req.bank_name_or_wallet}' quarantined on-chain.",
-    }
+    return QuarantineResponse(
+        status="SUCCESS",
+        message=f"Bank node '{req.bank_name_or_wallet}' quarantined on-chain.",
+    )
 
 
-@router.post("/clear-quarantine")
-async def clear_bank_quarantine_node(req: QuarantineRequest) -> dict[str, Any]:
+async def clear_bank_quarantine_node(req: QuarantineRequest) -> QuarantineResponse:
     """Clears quarantine status for a participant node on-chain."""
     driver = SmartContractSettlementDriver.get_instance()
     driver.clear_quarantine(req.bank_name_or_wallet)
-    return {
-        "status": "SUCCESS",
-        "message": f"Quarantine cleared for '{req.bank_name_or_wallet}'.",
-    }
+    return QuarantineResponse(
+        status="SUCCESS",
+        message=f"Quarantine cleared for '{req.bank_name_or_wallet}'.",
+    )
 
 
-@router.post("/slash")
-async def slash_bank_node(req: SlashRequest) -> dict[str, Any]:
+async def slash_bank_node(req: SlashRequest) -> SlashResponse:
     """Slashes a Byzantine malicious node on-chain."""
     try:
         driver = SmartContractSettlementDriver.get_instance()
         record = driver.slash_bank(req.bank_name_or_wallet, req.penalty_usd, req.reason)
-        return {"status": "SUCCESS", "slashed_record": record}
+        return SlashResponse(
+            status="SUCCESS",
+            slashed_record=SlashRecordItem(
+                bank=record["bank"],
+                penalty_usd=record["penalty_usd"],
+                reason=record["reason"],
+                timestamp=record["timestamp"],
+            ),
+        )
     except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
-@router.get("/slashed")
-async def get_slashed_nodes() -> dict[str, Any]:
+async def get_slashed_nodes() -> SlashedNodesResponse:
     """Returns all recorded Byzantine slashing events."""
     driver = SmartContractSettlementDriver.get_instance()
-    return driver.get_slashed_penalties()
+    raw = driver.get_slashed_penalties()
+    formatted = {
+        bank: [
+            SlashRecordItem(
+                bank=r["bank"],
+                penalty_usd=r["penalty_usd"],
+                reason=r["reason"],
+                timestamp=r["timestamp"],
+            )
+            for r in recs
+        ]
+        for bank, recs in raw.items()
+    }
+    return SlashedNodesResponse(root=formatted)
+
+
+# ── Route Binding to Router Variants ──────────────────────────
+
+for r in (router, api_router):
+    r.add_api_route("/contract-info", get_contract_info, methods=["GET"], response_model=ContractInfoResponse)
+    r.add_api_route("/history", get_settlement_history, methods=["GET"], response_model=list[SettlementReceiptResponse])
+    r.add_api_route("/epochs", get_settlement_history, methods=["GET"], response_model=list[SettlementReceiptResponse])
+    r.add_api_route("/trigger", trigger_settlement, methods=["POST"], response_model=SettlementReceiptResponse)
+    r.add_api_route("/claim", claim_participant_payout, methods=["POST"], response_model=PayoutClaimResponse)
+    r.add_api_route("/multisig/proposals", get_multisig_proposals, methods=["GET"], response_model=list[MultiSigProposalItem])
+    r.add_api_route("/multisig/proposals/{tx_id}", get_multisig_proposal_by_id, methods=["GET"], response_model=MultiSigProposalItem)
+    r.add_api_route("/multisig/propose", propose_multisig_action, methods=["POST"], response_model=MultiSigProposeResponse)
+    r.add_api_route("/multisig/confirm", confirm_multisig_action, methods=["POST"], response_model=MultiSigConfirmResponse)
+    r.add_api_route("/multisig/revoke", revoke_multisig_action, methods=["POST"], response_model=MultiSigRevokeResponse)
+    r.add_api_route("/quarantine", quarantine_bank_node, methods=["POST"], response_model=QuarantineResponse)
+    r.add_api_route("/clear-quarantine", clear_bank_quarantine_node, methods=["POST"], response_model=QuarantineResponse)
+    r.add_api_route("/slash", slash_bank_node, methods=["POST"], response_model=SlashResponse)
+    r.add_api_route("/slashed", get_slashed_nodes, methods=["GET"], response_model=SlashedNodesResponse)

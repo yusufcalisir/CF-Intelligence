@@ -1,166 +1,100 @@
-"""Federated Learning Coordinator Endpoints.
+"""Federated Learning Coordinator & Consortium Governance Endpoints.
 
 Exposes REST APIs for dynamic bank client handshake, status checks, capability negotiation,
-and registration list lookup.
+registration lookup, weighted consortium governance proposals, and dynamic quorum verification.
 """
 
 from __future__ import annotations
 
+import logging
 import time
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Path, Query, status
 
+from app.application.schemas.coordinator import (
+    AsyncFLEngineStatusResponse,
+    AsyncUpdateRequest,
+    AsyncUpdateResponse,
+    ClientCapabilityResponse,
+    ConsortiumMemberResponse,
+    ConsortiumResponse,
+    CreateConsortiumRequest,
+    CreateMembershipProposalRequest,
+    CreatePolicyProposalRequest,
+    HandshakeRequest,
+    HandshakeResponse,
+    HeartbeatRequest,
+    HeartbeatResponse,
+    NegotiatedResponse,
+    NegotiateRequest,
+    ProposalResponse,
+    PruneRoundsResponse,
+    QuorumStatusResponse,
+    VoteProposalRequest,
+    VoteProposalResponse,
+)
+from app.application.services.consortium_service import consortium_governance_service
 from app.application.services.coordinator_service import coordinator_service
+from app.domain.consortium_governance import (
+    Consortium,
+    MembershipProposal,
+    ProposalAction,
+    ProposalStatus,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/coordinator", tags=["coordinator"])
+api_router = APIRouter(prefix="/v1/coordinator", tags=["coordinator"])
 
 
-# ── Schemas ───────────────────────────────────────────────────
+# ── Domain Mapping Helpers ────────────────────────────────────
 
 
-class HandshakeRequest(BaseModel):
-    bank_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        description="Unique bank tenant ID",
-    )
-    pytorch_version: str = Field(
-        ...,
-        max_length=32,
-        pattern=r"^[0-9]+\.[0-9]+.*$",
-        description="PyTorch installation version",
-    )
-    python_version: str = Field(
-        ...,
-        max_length=32,
-        pattern=r"^[0-9]+\.[0-9]+.*$",
-        description="Python execution runtime version",
-    )
-    hardware_type: str = Field(
-        ...,
-        max_length=32,
-        pattern=r"^[a-zA-Z0-9_]+$",
-        description="Available accelerator e.g. cuda or cpu",
-    )
-    ram_gb: float = Field(
-        ...,
-        ge=0.5,
-        le=8192.0,
-        description="Installed RAM in gigabytes [0.5, 8192]",
-    )
-    device_count: int = Field(
-        default=1,
-        ge=0,
-        le=64,
-        description="Number of available GPUs [0, 64]",
+def _proposal_to_response(prop: MembershipProposal) -> ProposalResponse:
+    return ProposalResponse(
+        proposal_id=prop.proposal_id,
+        consortium_id=prop.consortium_id,
+        creator_bank_id=prop.creator_bank_id,
+        target_bank_id=prop.target_bank_id,
+        action=prop.action.value if hasattr(prop.action, "value") else str(prop.action),
+        required_quorum_ratio=prop.required_quorum_ratio,
+        votes_for=sorted(prop.votes_for),
+        votes_against=sorted(prop.votes_against),
+        status=prop.status.value if hasattr(prop.status, "value") else str(prop.status),
+        created_at=prop.created_at.isoformat() if hasattr(prop.created_at, "isoformat") else str(prop.created_at),
+        expires_at=prop.expires_at.isoformat() if prop.expires_at and hasattr(prop.expires_at, "isoformat") else (str(prop.expires_at) if prop.expires_at else None),
+        rejection_reason=prop.rejection_reason,
+        metadata=prop.metadata,
     )
 
 
-class HandshakeResponse(BaseModel):
-    registered: bool
-    status: str
-    reason: str | None = None
-    client_profile: Any | None = None
-    registered_at: float
-
-
-class HeartbeatRequest(BaseModel):
-    bank_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
+def _consortium_to_response(c: Consortium) -> ConsortiumResponse:
+    return ConsortiumResponse(
+        consortium_id=c.consortium_id,
+        name=c.name,
+        quorum_ratio=c.quorum_ratio,
+        min_members_n=c.min_members_n,
+        max_epsilon=c.max_epsilon,
+        status=c.status.value if hasattr(c.status, "value") else str(c.status),
+        members=[
+            ConsortiumMemberResponse(
+                bank_id=m.bank_id,
+                role=m.role.value if hasattr(m.role, "value") else str(m.role),
+                voting_power=m.voting_power,
+                joined_at=m.joined_at.isoformat() if hasattr(m.joined_at, "isoformat") else str(m.joined_at),
+                can_vote=m.can_vote,
+            )
+            for m in sorted(c.members.values(), key=lambda m: m.bank_id)
+        ],
+        created_at=c.created_at.isoformat() if hasattr(c.created_at, "isoformat") else str(c.created_at),
     )
 
 
-class HeartbeatResponse(BaseModel):
-    success: bool
-    status: str
-    timestamp: float
+# ── Client Registration & Heartbeat Endpoints ─────────────────
 
 
-class NegotiatedResponse(BaseModel):
-    bank_id: str
-    batch_size: int
-    local_epochs: int
-    gradient_accumulation_steps: int
-    use_cuda: bool
-    status: str
-
-
-class ClientCapabilityResponse(BaseModel):
-    bank_id: str
-    pytorch_version: str
-    python_version: str
-    hardware_type: str
-    ram_gb: float
-    device_count: int
-    status: str
-    last_heartbeat_ago_seconds: float
-
-
-class AsyncUpdateRequest(BaseModel):
-    bank_id: str = Field(
-        ..., min_length=3, max_length=64, description="Unique bank tenant ID"
-    )
-    submitted_round: int = Field(
-        ..., ge=1, description="Round number client base model was trained on"
-    )
-    client_weights: dict[str, list[float]] = Field(
-        ..., description="Flattened or 1D list of parameter weights per layer"
-    )
-    layer_shapes: dict[str, list[int]] | None = Field(
-        default=None, description="Optional tensor dimensions to reconstruct multi-dimensional weights"
-    )
-    sample_count: int = Field(
-        default=100, ge=1, description="Number of local training samples"
-    )
-
-
-class AsyncUpdateResponse(BaseModel):
-    success: bool
-    bank_id: str
-    submitted_round: int
-    current_round: int
-    staleness_tau: int
-    staleness_attenuation: float
-    effective_alpha: float
-    layer_keys: list[str]
-
-
-class QuorumStatusResponse(BaseModel):
-    round_number: int
-    registered_nodes_count: int
-    submitted_nodes_count: int
-    quorum_threshold_pct: float
-    current_quorum_pct: float
-    state: str
-    start_time: str
-    target_window_seconds: int
-    time_remaining_seconds: float
-
-
-class AsyncFLEngineStatusResponse(BaseModel):
-    current_round: int
-    alpha_staleness: float
-    learning_rate: float
-    max_staleness: int
-    staleness_function: str
-    total_updates: int
-    dropped_updates: int
-    applied_updates: int
-    average_staleness: float
-    max_observed_staleness: int
-
-
-# ── Endpoints ─────────────────────────────────────────────────
-
-
-@router.post("/handshake", response_model=HandshakeResponse)
 async def perform_handshake(req: HandshakeRequest) -> HandshakeResponse:
     """Register client capabilities dynamically to negotiate compatible execution params."""
     res = coordinator_service.register_client(
@@ -171,16 +105,24 @@ async def perform_handshake(req: HandshakeRequest) -> HandshakeResponse:
         ram_gb=req.ram_gb,
         device_count=req.device_count,
     )
+    profile = res.get("client_profile")
+    profile_dict: dict[str, Any] | None = None
+    if profile is not None:
+        if hasattr(profile, "__dict__"):
+            profile_dict = dict(profile.__dict__)
+        elif isinstance(profile, dict):
+            profile_dict = profile
+
     return HandshakeResponse(
         registered=res["registered"],
         status=res["status"],
         reason=res.get("reason"),
-        client_profile=res.get("client_profile"),
+        client_profile=profile_dict,
         registered_at=time.time(),
     )
 
 
-@router.post("/heartbeat", response_model=HeartbeatResponse)
+
 async def post_heartbeat(req: HeartbeatRequest) -> HeartbeatResponse:
     """Post heartbeat check-in to remain in the active participant registry."""
     success = coordinator_service.record_heartbeat(req.bank_id)
@@ -196,14 +138,12 @@ async def post_heartbeat(req: HeartbeatRequest) -> HeartbeatResponse:
     )
 
 
-@router.get("/clients", response_model=list[ClientCapabilityResponse])
 async def list_registered_clients() -> list[ClientCapabilityResponse]:
     """Retrieve capability profiles of all dynamically registered banks."""
-    # Force updating statuses
     _ = coordinator_service.get_active_clients()
 
     now = time.time()
-    results = []
+    results: list[ClientCapabilityResponse] = []
     for client in coordinator_service.registry.values():
         results.append(
             ClientCapabilityResponse(
@@ -217,24 +157,13 @@ async def list_registered_clients() -> list[ClientCapabilityResponse]:
                 last_heartbeat_ago_seconds=round(now - client.last_heartbeat, 1),
             )
         )
-    return results
+    return sorted(results, key=lambda c: c.bank_id)
 
 
-class NegotiateRequest(BaseModel):
-    bank_id: str = Field(..., min_length=3, max_length=64)
-    base_batch_size: int = Field(default=32, ge=1, le=4096)
-    base_epochs: int = Field(default=5, ge=1, le=100)
-    hardware_type: str | None = None
-    available_vram_gb: float | None = None
-    bandwidth_mbps: float | None = None
-    local_sample_count: int | None = None
-
-
-@router.get("/negotiate", response_model=NegotiatedResponse)
 async def negotiate_training_params(
-    bank_id: str,
-    base_batch_size: int = 32,
-    base_epochs: int = 5,
+    bank_id: str = Query(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+    base_batch_size: int = Query(default=32, ge=1, le=4096),
+    base_epochs: int = Query(default=5, ge=1, le=100),
 ) -> NegotiatedResponse:
     """Get training hyper-parameters customized for a bank client's runtime capability."""
     neg = coordinator_service.negotiate_parameters(bank_id, base_batch_size, base_epochs)
@@ -248,7 +177,6 @@ async def negotiate_training_params(
     )
 
 
-@router.post("/negotiate", response_model=NegotiatedResponse)
 async def negotiate_training_params_post(
     req: NegotiateRequest,
 ) -> NegotiatedResponse:
@@ -266,7 +194,6 @@ async def negotiate_training_params_post(
     )
 
 
-@router.post("/async-update", response_model=AsyncUpdateResponse)
 async def submit_async_update(req: AsyncUpdateRequest) -> AsyncUpdateResponse:
     """Submit an asynchronous parameter update attenuated by staleness S(tau)."""
     import numpy as np
@@ -300,15 +227,15 @@ async def submit_async_update(req: AsyncUpdateRequest) -> AsyncUpdateResponse:
     return AsyncUpdateResponse(**res)
 
 
-@router.get("/async-status", response_model=AsyncFLEngineStatusResponse)
 async def get_async_engine_status() -> AsyncFLEngineStatusResponse:
     """Retrieve runtime staleness damping metrics and hyperparameters of the FedAsync engine."""
     metrics = coordinator_service.async_fl_engine.get_staleness_metrics()
     return AsyncFLEngineStatusResponse(**metrics)
 
 
-@router.get("/quorum-status", response_model=QuorumStatusResponse)
-async def get_dynamic_quorum_status(round_id: int | None = None) -> QuorumStatusResponse:
+async def get_dynamic_quorum_status(
+    round_id: int | None = Query(default=None, ge=1),
+) -> QuorumStatusResponse:
     """Inspect dynamic quorum threshold progress and countdown for active/specified training round."""
     q_status = coordinator_service.get_quorum_status(round_id)
     return QuorumStatusResponse(
@@ -324,8 +251,191 @@ async def get_dynamic_quorum_status(round_id: int | None = None) -> QuorumStatus
     )
 
 
-@router.post("/rounds/prune")
-async def prune_historical_rounds(keep_last: int = 50) -> dict[str, Any]:
+async def prune_historical_rounds(
+    keep_last: int = Query(default=50, ge=1, le=1000),
+) -> PruneRoundsResponse:
     """Prune historical in-memory round states to prevent heap memory accumulation."""
     pruned = coordinator_service.prune_completed_rounds(keep_last=keep_last)
-    return {"pruned_rounds_count": pruned, "keep_last": keep_last}
+    return PruneRoundsResponse(pruned_rounds_count=pruned, keep_last=keep_last)
+
+
+# ── Consortium Governance & Proposal Endpoints ────────────────
+
+
+async def get_consortium_by_id(
+    consortium_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> ConsortiumResponse:
+    """Retrieve details, status and membership roster of a consortium alliance."""
+    c = consortium_governance_service.get_consortium(consortium_id)
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Consortium '{consortium_id}' does not exist.",
+        )
+    return _consortium_to_response(c)
+
+
+async def create_new_consortium(req: CreateConsortiumRequest) -> ConsortiumResponse:
+    """Establish a new multi-bank federated consortium alliance."""
+    try:
+        c = consortium_governance_service.create_consortium(
+            consortium_id=req.consortium_id,
+            name=req.name,
+            founder_bank_id=req.founder_bank_id,
+            quorum_ratio=req.quorum_ratio,
+            max_epsilon=req.max_epsilon,
+            min_members_n=req.min_members_n,
+        )
+        return _consortium_to_response(c)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+async def list_consortium_members(
+    consortium_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> list[ConsortiumMemberResponse]:
+    """Retrieve full list of registered bank members for a consortium."""
+    c = consortium_governance_service.get_consortium(consortium_id)
+    if not c:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Consortium '{consortium_id}' does not exist.",
+        )
+    members = consortium_governance_service.list_members(consortium_id)
+    return [
+        ConsortiumMemberResponse(
+            bank_id=m.bank_id,
+            role=m.role.value if hasattr(m.role, "value") else str(m.role),
+            voting_power=m.voting_power,
+            joined_at=m.joined_at.isoformat() if hasattr(m.joined_at, "isoformat") else str(m.joined_at),
+            can_vote=m.can_vote,
+        )
+        for m in sorted(members, key=lambda m: m.bank_id)
+    ]
+
+
+async def list_governance_proposals(
+    consortium_id: str = Query(default="cfi-consortium", min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+    status_filter: str | None = Query(default=None, alias="status", pattern=r"^(PENDING|APPROVED|REJECTED|EXPIRED|CANCELLED)$"),
+) -> list[ProposalResponse]:
+    """List active and historical voting proposals for a consortium alliance."""
+    st = ProposalStatus(status_filter) if status_filter else None
+    props = consortium_governance_service.list_proposals(consortium_id, status=st)
+    return [_proposal_to_response(p) for p in props]
+
+
+async def get_governance_proposal_by_id(
+    proposal_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> ProposalResponse:
+    """Retrieve specific proposal details, vote counts and resolution state."""
+    prop = consortium_governance_service.get_proposal(proposal_id)
+    if not prop:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Proposal '{proposal_id}' does not exist.",
+        )
+    return _proposal_to_response(prop)
+
+
+async def create_membership_proposal(req: CreateMembershipProposalRequest) -> ProposalResponse:
+    """Open a member onboarding or removal voting proposal."""
+    try:
+        action = ProposalAction(req.action)
+        prop = consortium_governance_service.propose_membership_change(
+            consortium_id=req.consortium_id,
+            creator_bank_id=req.creator_bank_id,
+            target_bank_id=req.target_bank_id,
+            action=action,
+            ttl_seconds=req.ttl_seconds,
+            metadata=req.metadata,
+        )
+        return _proposal_to_response(prop)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+async def create_policy_proposal(req: CreatePolicyProposalRequest) -> ProposalResponse:
+    """Open a policy modification voting proposal (e.g. quorum, epsilon)."""
+    try:
+        prop = consortium_governance_service.propose_policy_update(
+            consortium_id=req.consortium_id,
+            creator_bank_id=req.creator_bank_id,
+            policy_updates=req.policy_updates,
+            ttl_seconds=req.ttl_seconds,
+        )
+        return _proposal_to_response(prop)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+async def cast_governance_vote(
+    req: VoteProposalRequest,
+    proposal_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> VoteProposalResponse:
+    """Cast a weighted vote FOR or AGAINST an active consortium proposal."""
+    try:
+        prop = consortium_governance_service.cast_vote(
+            proposal_id=proposal_id,
+            bank_id=req.bank_id,
+            approve=req.approve,
+        )
+        return VoteProposalResponse(
+            proposal_id=prop.proposal_id,
+            status=prop.status.value if hasattr(prop.status, "value") else str(prop.status),
+            votes_for_count=len(prop.votes_for),
+            votes_against_count=len(prop.votes_against),
+            votes_for=sorted(prop.votes_for),
+            votes_against=sorted(prop.votes_against),
+            resolved=prop.status in (ProposalStatus.APPROVED, ProposalStatus.REJECTED),
+        )
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+async def cancel_governance_proposal(
+    proposal_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+    creator_bank_id: str = Query(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> ProposalResponse:
+    """Cancel an open voting proposal by the original sponsoring institution."""
+    try:
+        prop = consortium_governance_service.cancel_proposal(
+            proposal_id=proposal_id,
+            creator_bank_id=creator_bank_id,
+        )
+        return _proposal_to_response(prop)
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+
+
+# ── Route Binding to Router Variants ──────────────────────────
+
+for r in (router, api_router):
+    r.add_api_route("/handshake", perform_handshake, methods=["POST"], response_model=HandshakeResponse)
+    r.add_api_route("/heartbeat", post_heartbeat, methods=["POST"], response_model=HeartbeatResponse)
+    r.add_api_route("/clients", list_registered_clients, methods=["GET"], response_model=list[ClientCapabilityResponse])
+    r.add_api_route("/negotiate", negotiate_training_params, methods=["GET"], response_model=NegotiatedResponse)
+    r.add_api_route("/negotiate", negotiate_training_params_post, methods=["POST"], response_model=NegotiatedResponse)
+    r.add_api_route("/async-update", submit_async_update, methods=["POST"], response_model=AsyncUpdateResponse)
+    r.add_api_route("/async-status", get_async_engine_status, methods=["GET"], response_model=AsyncFLEngineStatusResponse)
+    r.add_api_route("/quorum-status", get_dynamic_quorum_status, methods=["GET"], response_model=QuorumStatusResponse)
+    r.add_api_route("/quorum", get_dynamic_quorum_status, methods=["GET"], response_model=QuorumStatusResponse)
+    r.add_api_route("/rounds/prune", prune_historical_rounds, methods=["POST"], response_model=PruneRoundsResponse)
+
+    # Governance routes
+    r.add_api_route("/consortium/{consortium_id}", get_consortium_by_id, methods=["GET"], response_model=ConsortiumResponse)
+    r.add_api_route("/consortium", create_new_consortium, methods=["POST"], response_model=ConsortiumResponse, status_code=status.HTTP_201_CREATED)
+    r.add_api_route("/consortium/{consortium_id}/members", list_consortium_members, methods=["GET"], response_model=list[ConsortiumMemberResponse])
+    r.add_api_route("/proposals", list_governance_proposals, methods=["GET"], response_model=list[ProposalResponse])
+    r.add_api_route("/proposals/{proposal_id}", get_governance_proposal_by_id, methods=["GET"], response_model=ProposalResponse)
+    r.add_api_route("/proposals/membership", create_membership_proposal, methods=["POST"], response_model=ProposalResponse, status_code=status.HTTP_201_CREATED)
+    r.add_api_route("/proposals/policy", create_policy_proposal, methods=["POST"], response_model=ProposalResponse, status_code=status.HTTP_201_CREATED)
+    r.add_api_route("/proposals/{proposal_id}/vote", cast_governance_vote, methods=["POST"], response_model=VoteProposalResponse)
+    r.add_api_route("/proposals/{proposal_id}/cancel", cancel_governance_proposal, methods=["POST"], response_model=ProposalResponse)

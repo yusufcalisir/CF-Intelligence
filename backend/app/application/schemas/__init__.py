@@ -2,7 +2,7 @@
 
 from app.application.schemas import (
     admin_console,
-    banks,
+    coordinator,
     copilot,
     dashboard,
     design_partner,
@@ -15,12 +15,14 @@ from app.application.schemas import (
     onboarding,
     optimization,
     scenarios,
+    settlement,
     simulation,
 )
 
 __all__ = [
     "admin_console",
     "banks",
+    "coordinator",
     "copilot",
     "dashboard",
     "design_partner",
@@ -33,5 +35,6 @@ __all__ = [
     "onboarding",
     "optimization",
     "scenarios",
+    "settlement",
     "simulation",
 ]

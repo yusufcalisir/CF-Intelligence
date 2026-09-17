@@ -476,3 +476,53 @@ class ConsortiumGovernanceService:
             if not consortium:
                 return []
             return list(consortium.members.values())
+
+    def get_consortium(self, consortium_id: str) -> Consortium | None:
+        """Retrieves consortium entity by ID."""
+        with self._lock:
+            return self._consortia.get(consortium_id.lower().strip())
+
+    def add_member(
+        self,
+        consortium_id: str,
+        bank_id: str,
+        role: MemberRole = MemberRole.FULL_MEMBER,
+        voting_power: float = 1.0,
+    ) -> ConsortiumMember:
+        """Directly registers a member institution into a consortium."""
+        with self._lock:
+            clean_id = consortium_id.lower().strip()
+            clean_bank = bank_id.lower().strip()
+            if clean_id not in self._consortia:
+                raise KeyError(f"Consortium '{clean_id}' does not exist.")
+            member = ConsortiumMember(bank_id=clean_bank, role=role, voting_power=voting_power)
+            self._consortia[clean_id].members[clean_bank] = member
+            return member
+
+    def reset(self) -> None:
+        """Resets service state for clean test isolation."""
+        with self._lock:
+            self._consortia.clear()
+            self._proposals.clear()
+            init_default_consortium(self)
+
+
+def init_default_consortium(service: ConsortiumGovernanceService) -> Consortium:
+    """Initializes canonical consortium with founding and participant institutions."""
+    c = service.create_consortium(
+        consortium_id="cfi-consortium",
+        name="Cross-Bank Federated Intelligence Consortium",
+        founder_bank_id="bank_a",
+        quorum_ratio=0.51,
+        max_epsilon=5.0,
+        min_members_n=2,
+    )
+    service.add_member("cfi-consortium", "bank_b", role=MemberRole.FULL_MEMBER, voting_power=1.0)
+    service.add_member("cfi-consortium", "bank_c", role=MemberRole.FULL_MEMBER, voting_power=1.0)
+    return c
+
+
+# Global singleton instance
+consortium_governance_service = ConsortiumGovernanceService()
+init_default_consortium(consortium_governance_service)
+
