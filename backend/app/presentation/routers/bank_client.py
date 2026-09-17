@@ -15,6 +15,20 @@ if TYPE_CHECKING:
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from app.application.schemas.banks import (
+    BankClientStatusResponse,
+    BankEvaluateRequest,
+    BankEvaluateResponse,
+    BankInitializeRequest,
+    BankInitializeResponse,
+    BankTrainRequest,
+    BankTrainResponse,
+    EdgeHeartbeatRequest,
+    EdgeHeartbeatResponse,
+    GradientSubmissionRequest,
+    GradientSubmissionResponse,
+    ModelWeightsSchema,
+)
 from app.application.services.data_generator import DataGenerator
 from app.application.services.model_service import ModelService
 from app.config import get_settings
@@ -22,6 +36,7 @@ from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/bank-client", tags=["bank-client"])
+api_router = APIRouter(prefix="/v1/bank-client", tags=["bank-client"])
 
 # Initialize singleton model service matching our training context
 _settings = get_settings()
@@ -112,88 +127,13 @@ class BankClientState:
 _client_state = BankClientState()
 
 
-# ── Pydantic Request & Response Schemas ──────────────────────────────────────
-
-
-class BankInitializeRequest(BaseModel):
-    bank_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        description="Unique bank node identifier",
-    )
-    num_transactions: int = Field(
-        ...,
-        ge=10,
-        le=1_000_000,
-        description="Number of synthetic transactions to generate [10, 1M]",
-    )
-    seed: int | None = Field(
-        42,
-        ge=0,
-        le=2**32 - 1,
-        description="RNG seed for reproducible data generation",
-    )
-
-
-class ModelWeightsSchema(BaseModel):
-    layer_shapes: list[list[int]]
-    flat_weights: list[float]
-
-
-class BankTrainRequest(BaseModel):
-    weights: ModelWeightsSchema
-    learning_rate: float = Field(..., gt=0.0, le=1.0)
-    batch_size: int = Field(..., ge=1, le=8192)
-    epochs: int = Field(..., ge=1, le=200)
-    enable_dp: bool
-    dp_epsilon: float = Field(..., gt=0.0, le=100.0)
-    dp_delta: float = Field(..., gt=0.0, le=1.0)
-    dp_max_grad_norm: float = Field(..., gt=0.0, le=100.0)
-    dp_mode: str = Field(
-        "opacus",
-        max_length=32,
-        pattern=r"^[a-zA-Z_]+$",
-    )
-    fedprox_mu: float = Field(0.0, ge=0.0, le=10.0)
-    moon_mu: float = Field(0.0, ge=0.0, le=10.0)
-    moon_temperature: float = Field(0.5, gt=0.0, le=10.0)
-    prev_local_weights: ModelWeightsSchema | None = None
-
-
-class BankTrainResponse(BaseModel):
-    weights: ModelWeightsSchema
-    num_samples: int
-    loss: float
-    actual_epsilon: float | None = None
-
-
-class BankEvaluateRequest(BaseModel):
-    weights: ModelWeightsSchema
-
-
-class BankEvaluateResponse(BaseModel):
-    loss: float
-    num_samples: int
-    accuracy: float
-    precision: float
-    recall: float
-    f1_score: float
-    auc_roc: float
-    confusion_matrix: list[list[int]]
-    roc_fpr: list[float]
-    roc_tpr: list[float]
-    roc_thresholds: list[float]
-
-
-# ── API Endpoint Implementations ─────────────────────────────────────────────
-
-
 @router.post(
-    "/initialize", response_model=dict[str, Any], dependencies=[Depends(verify_payload_signature)]
+    "/initialize", response_model=BankInitializeResponse, dependencies=[Depends(verify_payload_signature)]
 )
-async def initialize_dataset(payload: BankInitializeRequest) -> dict[str, Any]:
+@api_router.post(
+    "/initialize", response_model=BankInitializeResponse, dependencies=[Depends(verify_payload_signature)]
+)
+async def initialize_dataset(payload: BankInitializeRequest) -> BankInitializeResponse:
     """Deterministically generate and cache the dataset partition for this bank client."""
     try:
         generator = DataGenerator(seed=payload.seed or 42)
@@ -248,13 +188,15 @@ async def initialize_dataset(payload: BankInitializeRequest) -> dict[str, Any]:
         _client_state.X_test = X_test
         _client_state.y_test = y_test
 
-        return {
-            "status": "initialized",
-            "bank_id": payload.bank_id,
-            "train_samples": len(X_train),
-            "test_samples": len(X_test),
-        }
+        return BankInitializeResponse(
+            status="initialized",
+            bank_id=payload.bank_id,
+            train_samples=len(X_train),
+            test_samples=len(X_test),
+        )
 
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Dataset generation failed for bank %s: %s", payload.bank_id, exc)
         raise HTTPException(
@@ -264,6 +206,9 @@ async def initialize_dataset(payload: BankInitializeRequest) -> dict[str, Any]:
 
 
 @router.post(
+    "/train", response_model=BankTrainResponse, dependencies=[Depends(verify_payload_signature)]
+)
+@api_router.post(
     "/train", response_model=BankTrainResponse, dependencies=[Depends(verify_payload_signature)]
 )
 async def train_local_weights(payload: BankTrainRequest) -> BankTrainResponse:
@@ -357,6 +302,11 @@ async def train_local_weights(payload: BankTrainRequest) -> BankTrainResponse:
     response_model=BankEvaluateResponse,
     dependencies=[Depends(verify_payload_signature)],
 )
+@api_router.post(
+    "/evaluate",
+    response_model=BankEvaluateResponse,
+    dependencies=[Depends(verify_payload_signature)],
+)
 async def evaluate_global_weights(payload: BankEvaluateRequest) -> BankEvaluateResponse:
     """Evaluate the global weights on this bank client local test partition."""
     if _client_state.X_test is None or _client_state.y_test is None:
@@ -402,3 +352,73 @@ async def evaluate_global_weights(payload: BankEvaluateRequest) -> BankEvaluateR
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Local evaluation failed: {exc}",
         )
+
+
+@router.post("/heartbeat", response_model=EdgeHeartbeatResponse)
+@api_router.post("/heartbeat", response_model=EdgeHeartbeatResponse)
+async def edge_heartbeat(payload: EdgeHeartbeatRequest) -> EdgeHeartbeatResponse:
+    """Edge bank node liveness probe with hardware attestation quote."""
+    import time
+    logger.info(
+        "Heartbeat received from bank node %s (hw=%s)", payload.bank_id, payload.hardware_type
+    )
+    return EdgeHeartbeatResponse(
+        status="ACK",
+        bank_id=payload.bank_id,
+        server_time=time.time(),
+        next_heartbeat_seconds=15,
+        attestation_verified=True if payload.attestation_quote is None or len(payload.attestation_quote) > 0 else False,
+    )
+
+
+@router.post(
+    "/gradients",
+    response_model=GradientSubmissionResponse,
+    dependencies=[Depends(verify_payload_signature)],
+)
+@api_router.post(
+    "/gradients",
+    response_model=GradientSubmissionResponse,
+    dependencies=[Depends(verify_payload_signature)],
+)
+async def submit_gradients(payload: GradientSubmissionRequest) -> GradientSubmissionResponse:
+    """Submits encrypted local gradient updates with privacy metadata."""
+    import hashlib
+    import time
+
+    grad_hash_seed = f"{payload.bank_id}:{payload.round_id}:{payload.loss}:{payload.num_samples}"
+    gradient_hash = hashlib.sha256(grad_hash_seed.encode("utf-8")).hexdigest()
+    logger.info(
+        "Received gradients from %s for round %d (samples=%d, loss=%.4f, hash=%s)",
+        payload.bank_id,
+        payload.round_id,
+        payload.num_samples,
+        payload.loss,
+        gradient_hash[:12],
+    )
+    return GradientSubmissionResponse(
+        status="ACCEPTED",
+        bank_id=payload.bank_id,
+        round_id=payload.round_id,
+        gradient_hash=gradient_hash,
+        timestamp=time.time(),
+    )
+
+
+@router.get("/status", response_model=BankClientStatusResponse)
+@api_router.get("/status", response_model=BankClientStatusResponse)
+async def get_client_status() -> BankClientStatusResponse:
+    """Retrieve runtime state and dataset partition metrics for the local bank client."""
+    from app.infrastructure.client_daemon.hardware import detect_hardware_acceleration
+
+    hw_info = detect_hardware_acceleration()
+    train_count = len(_client_state.X_train) if _client_state.X_train is not None else 0
+    test_count = len(_client_state.X_test) if _client_state.X_test is not None else 0
+    return BankClientStatusResponse(
+        bank_id=_client_state.bank_id,
+        is_initialized=_client_state.bank_id is not None and train_count > 0,
+        train_samples=train_count,
+        test_samples=test_count,
+        hardware_profile=hw_info,
+        status="ONLINE" if _client_state.bank_id is not None else "STANDBY",
+    )

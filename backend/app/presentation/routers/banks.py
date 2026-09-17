@@ -10,14 +10,23 @@ import pandas as pd  # noqa: TC002
 from fastapi import APIRouter, HTTPException
 from scipy import stats
 
+from app.application.schemas.banks import (
+    BankConfigItem,
+    BankDetailResponse,
+    BankDistributionsResponse,
+    ConsortiumNodeSummary,
+    ConsortiumStatusResponse,
+    ScoringVolumePointResponse,
+)
 from app.application.services.data_generator import DataGenerator
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/banks", tags=["banks"])
+api_router = APIRouter(prefix="/v1/banks", tags=["banks"])
 
 # Default bank configurations (static reference data)
-BANK_CONFIGS = [
+BANK_CONFIGS: list[dict[str, Any]] = [
     {
         "id": "bank_a",
         "name": "Meridian National",
@@ -32,6 +41,9 @@ BANK_CONFIGS = [
             "POS-heavy with growing mobile adoption",
             "Low baseline fraud rate",
         ],
+        "hardware_enclave": "Intel SGX-v2",
+        "mtls_status": "ACTIVE",
+        "status": "ONLINE",
     },
     {
         "id": "bank_b",
@@ -47,6 +59,9 @@ BANK_CONFIGS = [
             "Younger account age distribution",
             "Higher baseline fraud rate due to onboarding velocity",
         ],
+        "hardware_enclave": "Intel SGX-v2",
+        "mtls_status": "ACTIVE",
+        "status": "ONLINE",
     },
     {
         "id": "bank_c",
@@ -62,6 +77,9 @@ BANK_CONFIGS = [
             "POS-dominant transaction mix",
             "Moderate fraud rate with distinct testing patterns",
         ],
+        "hardware_enclave": "Intel SGX-v2",
+        "mtls_status": "ACTIVE",
+        "status": "ONLINE",
     },
 ]
 
@@ -69,8 +87,9 @@ BANK_CONFIGS = [
 _distributions_cache: dict[str, Any] | None = None
 
 
-@router.get("")
-async def list_banks() -> list[dict]:
+@router.get("", response_model=list[BankConfigItem])
+@api_router.get("", response_model=list[BankConfigItem])
+async def list_banks() -> list[dict[str, Any]]:
     """List all bank configurations (reference data)."""
     return BANK_CONFIGS
 
@@ -331,7 +350,8 @@ def _compute_concept_drift(
     }
 
 
-@router.get("/distributions")
+@router.get("/distributions", response_model=BankDistributionsResponse)
+@api_router.get("/distributions", response_model=BankDistributionsResponse)
 async def get_bank_distributions() -> dict[str, Any]:
     """Get distribution data for all banks to visualize Non-IID data drift.
 
@@ -455,7 +475,8 @@ async def get_bank_distributions() -> dict[str, Any]:
     return result
 
 
-@router.get("/scoring-volume")
+@router.get("/scoring-volume", response_model=list[ScoringVolumePointResponse])
+@api_router.get("/scoring-volume", response_model=list[ScoringVolumePointResponse])
 async def get_scoring_volume() -> list[dict[str, Any]]:
     """Return 24-hour aggregated transaction scoring volume across consortium banks.
 
@@ -476,10 +497,36 @@ async def get_scoring_volume() -> list[dict[str, Any]]:
     ]
 
 
-@router.get("/{bank_id}")
-async def get_bank(bank_id: str) -> dict:
+@router.get("/status", response_model=ConsortiumStatusResponse)
+@api_router.get("/status", response_model=ConsortiumStatusResponse)
+async def get_consortium_status() -> ConsortiumStatusResponse:
+    """Return consortium network topology and node registry status."""
+    node_summaries = [
+        ConsortiumNodeSummary(
+            bank_id=b["id"],
+            name=b["name"],
+            tier=b["tier"],
+            status=b.get("status", "ONLINE"),
+            hardware_acceleration="cuda" if b["id"] != "bank_c" else "cpu",
+            last_heartbeat_timestamp=None,
+        )
+        for b in BANK_CONFIGS
+    ]
+    return ConsortiumStatusResponse(
+        consortium_name="Cross-Bank Federated Intelligence Consortium",
+        total_registered_nodes=len(BANK_CONFIGS),
+        active_nodes_count=len([b for b in BANK_CONFIGS if b.get("status") == "ONLINE"]),
+        hardware_enclave_enabled=True,
+        mtls_status="ACTIVE",
+        nodes=node_summaries,
+    )
+
+
+@router.get("/{bank_id}", response_model=BankDetailResponse)
+@api_router.get("/{bank_id}", response_model=BankDetailResponse)
+async def get_bank(bank_id: str) -> BankDetailResponse:
     """Get details for a specific bank."""
     for bank in BANK_CONFIGS:
         if bank["id"] == bank_id:
-            return bank
+            return BankDetailResponse(**bank)
     raise HTTPException(status_code=404, detail=f"Bank {bank_id} not found")

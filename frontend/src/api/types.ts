@@ -352,6 +352,27 @@ export interface BankInfo {
   default_transactions: number;
   fraud_pattern: string;
   characteristics: string[];
+  hardware_enclave?: string;
+  mtls_status?: string;
+  status?: string;
+}
+
+export interface ConsortiumNodeSummary {
+  bank_id: string;
+  name: string;
+  tier: string;
+  status: string;
+  hardware_acceleration?: string;
+  last_heartbeat_timestamp?: number | null;
+}
+
+export interface ConsortiumStatusResponse {
+  consortium_name: string;
+  total_registered_nodes: number;
+  active_nodes_count: number;
+  hardware_enclave_enabled: boolean;
+  mtls_status: string;
+  nodes: ConsortiumNodeSummary[];
 }
 
 export interface TrainingEvent {

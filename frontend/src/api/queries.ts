@@ -8,6 +8,7 @@ import type {
   AlertTriageEvaluateResponse,
   BankDistributions,
   BankInfo,
+  ConsortiumStatusResponse,
   Case,
   CaseSummary,
   CaseEscalatePayload,
@@ -299,6 +300,17 @@ export function useScoringVolume() {
       return data;
     },
     staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useConsortiumStatus() {
+  return useQuery<ConsortiumStatusResponse>({
+    queryKey: ['consortium-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/banks/status');
+      return data;
+    },
+    staleTime: 30 * 1000,
   });
 }
 

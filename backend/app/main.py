@@ -882,6 +882,7 @@ elif service_name in ("fl-coordinator", "coordinator"):
     app.include_router(simulation.singular_router)
     app.include_router(simulation.singular_api_router)
     app.include_router(banks.router)
+    app.include_router(banks.api_router)
     app.include_router(training.router)
     app.include_router(training.api_router)
     app.include_router(model_registry.router)
@@ -928,6 +929,7 @@ elif service_name == "fraud-alert":
 elif service_name.startswith("bank-") or service_name == "bank_client":
     app.include_router(health.router)
     app.include_router(bank_client.router)
+    app.include_router(bank_client.api_router)
 else:
     app.include_router(health.router)
     app.include_router(maintenance_cron.router)
@@ -937,6 +939,7 @@ else:
     app.include_router(simulation.singular_api_router)
 
     app.include_router(banks.router)
+    app.include_router(banks.api_router)
     app.include_router(training.router)
     app.include_router(training.api_router)
     app.include_router(model_registry.router)
@@ -950,6 +953,7 @@ else:
     app.include_router(rules.router)
     app.include_router(rules.api_router)
     app.include_router(bank_client.router)
+    app.include_router(bank_client.api_router)
     app.include_router(entities.router)
     app.include_router(entities.api_router)
     app.include_router(entities.psi_router)

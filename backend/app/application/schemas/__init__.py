@@ -1,3 +1,3 @@
 """Application schemas — Pydantic models for API request/response validation."""
 
-from app.application.schemas import copilot, entities, feedback, graph, simulation
+from app.application.schemas import banks, copilot, entities, feedback, graph, simulation
