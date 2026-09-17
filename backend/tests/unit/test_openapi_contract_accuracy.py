@@ -1,9 +1,10 @@
 """
-Unit test for Phase 18: API Contract & OpenAPI Spec Accuracy.
+Unit tests for API contract, OpenAPI specification, and interactive documentation viewers.
 Verifies:
 1. Dynamic OpenAPI schema generation and path completeness.
 2. Endpoint request/response models match live schemas.
 3. POST /api/v1/cases/export/fincen-xml operates correctly.
+4. Dark-mode Swagger UI (/docs), ReDoc (/redoc), and Scalar (/scalar) endpoints.
 """
 
 import pytest
@@ -66,3 +67,32 @@ def test_fincen_xml_export_endpoint(client):
     assert "submission_id" in data
     assert "<EFilingSubmission" in data["xml"]
     assert "<ReportingInstitution>" in data["xml"]
+
+
+def test_swagger_ui_html_dark_theme(client):
+    """Verify GET /docs serves dark-mode Swagger UI with CFI brand navigation."""
+    resp = client.get("/docs")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "cfi-topbar" in resp.text
+    assert "SwaggerUIBundle" in resp.text
+    assert "--bg-primary" in resp.text
+
+
+def test_redoc_html_dark_theme(client):
+    """Verify GET /redoc serves dark-mode ReDoc with CFI brand navigation."""
+    resp = client.get("/redoc")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "cfi-topbar" in resp.text
+    assert "Redoc.init" in resp.text
+
+
+def test_scalar_html_dark_theme(client):
+    """Verify GET /scalar serves dark-mode Scalar API Reference with CFI brand navigation."""
+    resp = client.get("/scalar")
+    assert resp.status_code == 200
+    assert "text/html" in resp.headers["content-type"]
+    assert "cfi-topbar" in resp.text
+    assert "api-reference" in resp.text
+

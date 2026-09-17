@@ -44,14 +44,13 @@ const API_ENDPOINTS: ApiEndpointSpec[] = [
       'Content-Type': 'application/json',
     },
     requestBodySample: {
-      bank_id: 'bank_alpha',
-      account_id_hash: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4',
+      transaction_id: 'txn_994821',
+      account_id: '8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4',
       amount: 450000.0,
       currency: 'EUR',
-      merchant_category_code: '6012',
-      transaction_type: 'cross_border_wire',
-      velocity_1h_count: 8,
-      is_new_device: true,
+      merchant_id: 'merchant_wire_6012',
+      country: 'EE',
+      device_id: 'dev_fp_9410',
     },
     responseBodySample: {
       transaction_id: 'txn_994821',
@@ -500,6 +499,11 @@ export default function ApiDocsPage() {
 
   const [copiedCode, setCopiedCode] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [requestPayloadText, setRequestPayloadText] = useState<string>(
+    API_ENDPOINTS[0]?.requestBodySample
+      ? JSON.stringify(API_ENDPOINTS[0].requestBodySample, null, 2)
+      : ''
+  );
   const [executionResult, setExecutionResult] = useState<{
     statusCode: number;
     latencyMs: number;
@@ -509,6 +513,14 @@ export default function ApiDocsPage() {
   const docsUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/docs';
   const scalarUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/scalar';
   const redocUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/redoc';
+
+  const handleSelectEndpoint = (endpoint: ApiEndpointSpec) => {
+    setSelectedEndpoint(endpoint);
+    setRequestPayloadText(
+      endpoint.requestBodySample ? JSON.stringify(endpoint.requestBodySample, null, 2) : ''
+    );
+    setExecutionResult(null);
+  };
 
   const handleCopyCode = () => {
     const code = generateSdkCode(selectedEndpoint, selectedLang);
@@ -528,57 +540,131 @@ export default function ApiDocsPage() {
         const elapsed = Math.round(performance.now() - start);
         setExecutionResult({ statusCode: res.status, latencyMs: elapsed, data: res.data });
       } else if (selectedEndpoint.method === 'POST') {
-        const res = await apiClient.post(selectedEndpoint.path, selectedEndpoint.requestBodySample ?? {});
+        let payload = selectedEndpoint.requestBodySample ?? {};
+        if (requestPayloadText.trim()) {
+          try {
+            payload = JSON.parse(requestPayloadText);
+          } catch {
+            throw new Error('Invalid JSON format in Request Body editor.');
+          }
+        }
+        const res = await apiClient.post(selectedEndpoint.path, payload);
         const elapsed = Math.round(performance.now() - start);
         setExecutionResult({ statusCode: res.status, latencyMs: elapsed, data: res.data });
+      } else if (selectedEndpoint.method === 'WS') {
+        // Test live WebSocket connectivity probe
+        const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsHost = (import.meta.env.VITE_API_URL ?? window.location.origin)
+          .replace(/^https?:\/\//, '')
+          .replace(/\/+$/, '');
+        const wsUrl = `${wsProtocol}//${wsHost}${selectedEndpoint.path}`;
+
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            try { ws.close(); } catch {}
+            reject(new Error('WebSocket connection timed out after 3000ms.'));
+          }, 3000);
+
+          const ws = new WebSocket(wsUrl);
+          ws.onopen = () => {
+            ws.send(JSON.stringify({ type: 'PING' }));
+          };
+          ws.onmessage = (event) => {
+            clearTimeout(timeout);
+            try {
+              const parsed = JSON.parse(event.data);
+              const elapsed = Math.round(performance.now() - start);
+              setExecutionResult({
+                statusCode: 101,
+                latencyMs: elapsed,
+                data: {
+                  protocol: 'WebSocket RFC 6455',
+                  connection_status: 'CONNECTED',
+                  received_frame: parsed,
+                },
+              });
+              ws.close();
+              resolve();
+            } catch {
+              clearTimeout(timeout);
+              const elapsed = Math.round(performance.now() - start);
+              setExecutionResult({
+                statusCode: 101,
+                latencyMs: elapsed,
+                data: {
+                  protocol: 'WebSocket RFC 6455',
+                  connection_status: 'CONNECTED',
+                  received_raw: event.data,
+                },
+              });
+              ws.close();
+              resolve();
+            }
+          };
+          ws.onerror = (err) => {
+            clearTimeout(timeout);
+            reject(err);
+          };
+        });
       }
     } catch (err: any) {
       const elapsed = Math.round(performance.now() - start);
       setExecutionResult({
-        statusCode: err.response?.status ?? 500,
+        statusCode: err.response?.status ?? (err.message?.includes('JSON') ? 400 : 500),
         latencyMs: elapsed,
-        data: err.response?.data ?? { error: err.message },
+        data: err.response?.data ?? { error: err.message || 'Request execution failed' },
       });
     } finally {
       setIsExecuting(false);
     }
   };
 
-  const handleDownloadSpec = () => {
-    const jsonStr = JSON.stringify(
-      {
-        openapi: '3.1.0',
-        info: {
-          title: 'Collaborative Fraud Intelligence API',
-          version: '2.4.1',
-          description: 'Privacy-Preserving Federated Learning & Consortium AML API Specification',
-        },
-        paths: API_ENDPOINTS.reduce((acc, ep) => {
-          acc[ep.path] = {
-            [ep.method.toLowerCase()]: {
-              summary: ep.title,
-              description: ep.description,
-              responses: {
-                '200': {
-                  description: 'Successful Operation',
+  const handleDownloadSpec = async () => {
+    try {
+      const res = await apiClient.get('/openapi.json');
+      const blob = new Blob([JSON.stringify(res.data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cfi-openapi-spec.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      const jsonStr = JSON.stringify(
+        {
+          openapi: '3.1.0',
+          info: {
+            title: 'Collaborative Fraud Intelligence API',
+            version: '2.4.1',
+            description: 'Privacy-Preserving Federated Learning & Consortium AML API Specification',
+          },
+          paths: API_ENDPOINTS.reduce((acc, ep) => {
+            acc[ep.path] = {
+              [ep.method.toLowerCase()]: {
+                summary: ep.title,
+                description: ep.description,
+                responses: {
+                  '200': {
+                    description: 'Successful Operation',
+                  },
                 },
               },
-            },
-          };
-          return acc;
-        }, {} as Record<string, any>),
-      },
-      null,
-      2
-    );
+            };
+            return acc;
+          }, {} as Record<string, any>),
+        },
+        null,
+        2
+      );
 
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'cfi-openapi-spec.json';
-    a.click();
-    URL.revokeObjectURL(url);
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cfi-openapi-spec.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   return (
@@ -656,8 +742,7 @@ export default function ApiDocsPage() {
                 <button
                   key={endpoint.id}
                   onClick={() => {
-                    setSelectedEndpoint(endpoint);
-                    setExecutionResult(null);
+                    handleSelectEndpoint(endpoint);
                   }}
                   className={`w-full p-3 rounded-xl transition-all border text-left flex items-start gap-2.5 cursor-pointer ${
                     isSelected
@@ -789,13 +874,31 @@ export default function ApiDocsPage() {
               </button>
             </div>
 
-            {/* Request Payload Sample */}
+            {/* Request Payload Editor */}
             {selectedEndpoint.requestBodySample && (
-              <div>
-                <span className="text-[10px] font-mono text-slate-400 uppercase mb-1 block">Request Body (JSON)</span>
-                <pre className="p-3 rounded-xl bg-black/60 border border-white/5 font-mono text-[11px] text-slate-300 overflow-x-auto max-h-40">
-                  {JSON.stringify(selectedEndpoint.requestBodySample, null, 2)}
-                </pre>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono text-slate-400 uppercase">Request Body (Editable JSON)</span>
+                  <button
+                    onClick={() => {
+                      setRequestPayloadText(
+                        selectedEndpoint.requestBodySample
+                          ? JSON.stringify(selectedEndpoint.requestBodySample, null, 2)
+                          : ''
+                      );
+                    }}
+                    className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 transition-colors cursor-pointer"
+                  >
+                    Reset Payload
+                  </button>
+                </div>
+                <textarea
+                  rows={6}
+                  value={requestPayloadText}
+                  onChange={(e) => setRequestPayloadText(e.target.value)}
+                  className="w-full p-3 rounded-xl bg-black/60 border border-white/10 font-mono text-[11px] text-slate-200 focus:outline-none focus:border-indigo-500 transition-all leading-relaxed resize-y"
+                  placeholder="Enter JSON request payload..."
+                />
               </div>
             )}
 
@@ -810,15 +913,44 @@ export default function ApiDocsPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono text-slate-400 uppercase">Live Server Response</span>
                     <div className="flex items-center gap-2">
-                      <span className="px-2 py-0.2 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                        HTTP {executionResult.statusCode} OK
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+                          executionResult.statusCode >= 200 && executionResult.statusCode < 300
+                            ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                            : executionResult.statusCode >= 400 && executionResult.statusCode < 500
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                        }`}
+                      >
+                        HTTP {executionResult.statusCode}{' '}
+                        {executionResult.statusCode === 200
+                          ? 'OK'
+                          : executionResult.statusCode === 201
+                          ? 'CREATED'
+                          : executionResult.statusCode === 101
+                          ? 'SWITCHING PROTOCOLS'
+                          : executionResult.statusCode === 400
+                          ? 'BAD REQUEST'
+                          : executionResult.statusCode === 404
+                          ? 'NOT FOUND'
+                          : executionResult.statusCode === 422
+                          ? 'UNPROCESSABLE'
+                          : ''}
                       </span>
                       <span className="text-xs font-mono text-cyan-300">
                         Latency: {executionResult.latencyMs} ms
                       </span>
                     </div>
                   </div>
-                  <pre className="p-3 rounded-xl bg-black/80 border border-emerald-500/30 font-mono text-[11px] text-emerald-300 overflow-x-auto max-h-56">
+                  <pre
+                    className={`p-3 rounded-xl bg-black/80 border font-mono text-[11px] overflow-x-auto max-h-56 ${
+                      executionResult.statusCode >= 200 && executionResult.statusCode < 300
+                        ? 'border-emerald-500/30 text-emerald-300'
+                        : executionResult.statusCode >= 400 && executionResult.statusCode < 500
+                        ? 'border-amber-500/30 text-amber-300'
+                        : 'border-rose-500/30 text-rose-300'
+                    }`}
+                  >
                     {JSON.stringify(executionResult.data, null, 2)}
                   </pre>
                 </motion.div>

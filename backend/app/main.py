@@ -504,8 +504,8 @@ app = FastAPI(
     description=app_description,
     version="0.2.0",
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None,
+    redoc_url=None,
 )
 
 # ── Endpoint-Specific Rate Limiting (slowapi) ─────────────────────────────────
@@ -1066,10 +1066,396 @@ async def root() -> dict:
         "service": app_title,
         "version": "0.2.0",
         "docs": "/docs",
+        "redoc": "/redoc",
         "scalar": "/scalar",
         "health": "/health",
         "service_name": service_name or "monolith",
     }
+
+
+_CFI_DOCS_TOPBAR_HTML = """
+  <div class="cfi-topbar">
+    <a href="/" class="cfi-brand">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <span style="font-weight: 700; font-size: 14px; letter-spacing: -0.01em;">CF-Intelligence</span>
+      <span class="cfi-badge">OpenAPI 3.1</span>
+    </a>
+    <div class="cfi-nav-links">
+      <a href="/docs" class="cfi-nav-link {docs_active}">Swagger UI</a>
+      <a href="/redoc" class="cfi-nav-link {redoc_active}">ReDoc</a>
+      <a href="/scalar" class="cfi-nav-link {scalar_active}">Scalar</a>
+      <a href="/openapi.json" target="_blank" class="cfi-nav-link">openapi.json ↗</a>
+    </div>
+  </div>
+"""
+
+_CFI_DOCS_NAV_CSS = """
+    /* Branded Top Navigation Bar */
+    .cfi-topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 24px;
+      background: rgba(11, 15, 25, 0.95);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    .cfi-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: #fff;
+    }
+    .cfi-badge {
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      background: rgba(99, 102, 241, 0.15);
+      color: #a5b4fc;
+      border: 1px solid rgba(99, 102, 241, 0.3);
+    }
+    .cfi-nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .cfi-nav-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.15s ease-in-out;
+    }
+    .cfi-nav-link.active {
+      background: rgba(99, 102, 241, 0.2);
+      color: #e0e7ff;
+      border: 1px solid rgba(99, 102, 241, 0.4);
+    }
+    .cfi-nav-link:not(.active) {
+      background: rgba(255, 255, 255, 0.05);
+      color: #94a3b8;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+    .cfi-nav-link:not(.active):hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #f8fafc;
+    }
+"""
+
+
+@app.get("/docs", include_in_schema=False, response_class=HTMLResponse)
+async def swagger_ui_html() -> HTMLResponse:
+    """Serve customized dark-mode Swagger UI documentation."""
+    from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
+
+    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "active").replace("{redoc_active}", "").replace("{scalar_active}", "")
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CF-Intelligence | Swagger UI</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <style>
+    :root {{
+      --bg-primary: #030712;
+      --bg-surface: #0b0f19;
+      --bg-card: #0f172a;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-indigo: #6366f1;
+      --accent-emerald: #10b981;
+    }}
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-primary);
+      color: var(--text-main);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }}
+    ::-webkit-scrollbar {{ width: 8px; height: 8px; }}
+    ::-webkit-scrollbar-track {{ background: var(--bg-primary); }}
+    ::-webkit-scrollbar-thumb {{ background: #1e293b; border-radius: 4px; }}
+    ::-webkit-scrollbar-thumb:hover {{ background: #334155; }}
+
+    {_CFI_DOCS_NAV_CSS}
+
+    /* Swagger UI Dark Mode Overrides */
+    .swagger-ui {{
+      color: var(--text-main);
+      font-family: 'Inter', sans-serif;
+    }}
+    .swagger-ui .topbar {{ display: none !important; }}
+    .swagger-ui .wrapper {{ max-width: 1300px; padding: 24px; }}
+    .swagger-ui .info {{ margin: 20px 0; }}
+    .swagger-ui .info .title {{
+      color: #f8fafc !important;
+      font-family: 'Inter', sans-serif;
+      font-weight: 800;
+      font-size: 28px;
+      letter-spacing: -0.02em;
+    }}
+    .swagger-ui .info p, .swagger-ui .info li {{
+      color: var(--text-muted) !important;
+      font-size: 14px;
+      line-height: 1.6;
+    }}
+    .swagger-ui .scheme-container {{
+      background: var(--bg-surface) !important;
+      box-shadow: none !important;
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 16px 20px !important;
+      margin-bottom: 24px;
+    }}
+    .swagger-ui .opblock-tag {{
+      color: #f8fafc !important;
+      font-family: 'Inter', sans-serif;
+      border-bottom: 1px solid var(--border-color) !important;
+      font-weight: 700;
+      font-size: 18px;
+      padding: 16px 0 8px 0;
+    }}
+    .swagger-ui .opblock-tag small {{ color: var(--text-muted) !important; font-size: 13px; }}
+    .swagger-ui .opblock {{
+      background: var(--bg-card) !important;
+      border-radius: 12px !important;
+      border: 1px solid var(--border-color) !important;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+      margin: 0 0 12px 0 !important;
+      transition: border-color 0.15s ease;
+    }}
+    .swagger-ui .opblock:hover {{
+      border-color: rgba(99, 102, 241, 0.35) !important;
+    }}
+    .swagger-ui .opblock .opblock-summary {{
+      border-bottom: 1px solid transparent;
+      padding: 10px 16px;
+    }}
+    .swagger-ui .opblock.is-open .opblock-summary {{
+      border-bottom: 1px solid var(--border-color);
+    }}
+    .swagger-ui .opblock .opblock-summary-path,
+    .swagger-ui .opblock .opblock-summary-path__deprecated {{
+      color: #f1f5f9 !important;
+      font-family: 'JetBrains Mono', monospace !important;
+      font-size: 13px !important;
+      font-weight: 600 !important;
+    }}
+    .swagger-ui .opblock .opblock-summary-description {{
+      color: var(--text-muted) !important;
+      font-size: 12px !important;
+    }}
+    .swagger-ui .opblock .opblock-summary-method {{
+      border-radius: 8px !important;
+      font-family: 'JetBrains Mono', monospace !important;
+      font-weight: 700 !important;
+      font-size: 12px !important;
+      padding: 4px 12px !important;
+    }}
+    .swagger-ui .opblock.opblock-get {{ border-color: rgba(56, 189, 248, 0.3) !important; background: rgba(56, 189, 248, 0.04) !important; }}
+    .swagger-ui .opblock.opblock-get .opblock-summary-method {{ background: #0284c7 !important; }}
+    .swagger-ui .opblock.opblock-post {{ border-color: rgba(52, 211, 153, 0.3) !important; background: rgba(52, 211, 153, 0.04) !important; }}
+    .swagger-ui .opblock.opblock-post .opblock-summary-method {{ background: #059669 !important; }}
+    .swagger-ui .opblock.opblock-put {{ border-color: rgba(251, 191, 36, 0.3) !important; background: rgba(251, 191, 36, 0.04) !important; }}
+    .swagger-ui .opblock.opblock-put .opblock-summary-method {{ background: #d97706 !important; }}
+    .swagger-ui .opblock.opblock-delete {{ border-color: rgba(248, 113, 113, 0.3) !important; background: rgba(248, 113, 113, 0.04) !important; }}
+    .swagger-ui .opblock.opblock-delete .opblock-summary-method {{ background: #dc2626 !important; }}
+
+    .swagger-ui .opblock-body {{ background: var(--bg-surface) !important; padding: 16px !important; }}
+    .swagger-ui .opblock-description-wrapper p, .swagger-ui .opblock-external-docs-wrapper p, .swagger-ui .opblock-title_normal p {{
+      color: var(--text-muted) !important;
+    }}
+    .swagger-ui table thead tr th, .swagger-ui table thead tr td {{
+      color: #f1f5f9 !important;
+      border-bottom: 1px solid var(--border-color) !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+    }}
+    .swagger-ui .parameter__name {{ color: #e2e8f0 !important; font-family: 'JetBrains Mono', monospace; }}
+    .swagger-ui .parameter__type {{ color: #818cf8 !important; font-family: 'JetBrains Mono', monospace; }}
+    .swagger-ui input[type=text], .swagger-ui textarea {{
+      background: #020617 !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 8px !important;
+      font-family: 'JetBrains Mono', monospace !important;
+    }}
+    .swagger-ui select {{
+      background: #0f172a !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 8px !important;
+    }}
+    .swagger-ui .btn {{
+      border-radius: 8px !important;
+      font-weight: 600 !important;
+      font-size: 12px !important;
+      transition: all 0.15s ease;
+    }}
+    .swagger-ui .btn.execute {{
+      background: #10b981 !important;
+      border-color: #10b981 !important;
+      color: #fff !important;
+      font-weight: 700 !important;
+    }}
+    .swagger-ui .btn.authorize {{
+      border-color: #6366f1 !important;
+      color: #818cf8 !important;
+    }}
+    .swagger-ui .btn.authorize svg {{ fill: #818cf8 !important; }}
+    .swagger-ui .responses-inner h4, .swagger-ui .responses-inner h5 {{ color: #f8fafc !important; }}
+    .swagger-ui .response-col_status {{ color: #34d399 !important; font-family: 'JetBrains Mono', monospace; }}
+    .swagger-ui .response-col_description {{ color: var(--text-muted) !important; }}
+    .swagger-ui pre.microlight, .swagger-ui .highlight-code {{
+      background: #020617 !important;
+      border: 1px solid var(--border-color) !important;
+      border-radius: 8px !important;
+      color: #f1f5f9 !important;
+      font-family: 'JetBrains Mono', monospace !important;
+    }}
+    .swagger-ui section.models {{
+      border: 1px solid var(--border-color) !important;
+      background: var(--bg-surface) !important;
+      border-radius: 12px !important;
+    }}
+    .swagger-ui section.models h4 {{ color: #f8fafc !important; }}
+    .swagger-ui .model-box {{ background: var(--bg-card) !important; }}
+    .swagger-ui .model {{ color: #cbd5e1 !important; font-family: 'JetBrains Mono', monospace; }}
+    .swagger-ui .model-title {{ color: #f1f5f9 !important; }}
+  </style>
+</head>
+<body>
+  {topbar}
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>
+    window.onload = () => {{
+      window.ui = SwaggerUIBundle({{
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIBundle.SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout",
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        filter: true,
+        tryItOutEnabled: true,
+        syntaxHighlight: {{
+          theme: "monokai"
+        }}
+      }});
+    }};
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(
+        content=html_content,
+        headers={"Content-Security-Policy": _DOCS_CSP_DIRECTIVES},
+    )
+
+
+@app.get("/redoc", include_in_schema=False, response_class=HTMLResponse)
+async def redoc_html() -> HTMLResponse:
+    """Serve customized dark-mode ReDoc technical documentation."""
+    from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
+
+    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "").replace("{redoc_active}", "active").replace("{scalar_active}", "")
+    html_content = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>CF-Intelligence | ReDoc Technical Reference</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    body {{
+      margin: 0;
+      padding: 0;
+      background-color: #030712;
+      color: #f8fafc;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    }}
+    ::-webkit-scrollbar {{ width: 8px; height: 8px; }}
+    ::-webkit-scrollbar-track {{ background: #030712; }}
+    ::-webkit-scrollbar-thumb {{ background: #1e293b; border-radius: 4px; }}
+    ::-webkit-scrollbar-thumb:hover {{ background: #334155; }}
+
+    {_CFI_DOCS_NAV_CSS}
+  </style>
+</head>
+<body>
+  {topbar}
+  <redoc spec-url="/openapi.json"></redoc>
+  <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"></script>
+  <script>
+    Redoc.init('/openapi.json', {{
+      theme: {{
+        colors: {{
+          primary: {{ main: '#6366f1' }},
+          success: {{ main: '#10b981' }},
+          warning: {{ main: '#f59e0b' }},
+          error: {{ main: '#ef4444' }},
+          text: {{ primary: '#f8fafc', secondary: '#94a3b8' }},
+          http: {{
+            get: '#38bdf8',
+            post: '#34d399',
+            put: '#fbbf24',
+            delete: '#f87171'
+          }}
+        }},
+        sidebar: {{
+          backgroundColor: '#0b0f19',
+          textColor: '#e2e8f0',
+          activeTextColor: '#818cf8'
+        }},
+        rightPanel: {{
+          backgroundColor: '#030712',
+          textColor: '#f8fafc'
+        }},
+        typography: {{
+          fontSize: '14px',
+          fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+          headings: {{
+            fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, sans-serif',
+            fontWeight: '700'
+          }},
+          code: {{
+            fontFamily: 'JetBrains Mono, monospace',
+            backgroundColor: '#0f172a'
+          }}
+        }}
+      }}
+    }}, document.querySelector('redoc'));
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(
+        content=html_content,
+        headers={"Content-Security-Policy": _DOCS_CSP_DIRECTIVES},
+    )
 
 
 @app.get("/scalar", include_in_schema=False, response_class=HTMLResponse)
@@ -1077,7 +1463,8 @@ async def scalar_api_reference() -> HTMLResponse:
     """Serve modern dark-themed Scalar API Reference documentation in 3-column layout."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
-    html_content = """<!doctype html>
+    topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "").replace("{redoc_active}", "").replace("{scalar_active}", "active")
+    html_content = f"""<!doctype html>
 <html lang="en">
   <head>
     <title>CF-Intelligence | Enterprise API Reference</title>
@@ -1087,26 +1474,29 @@ async def scalar_api_reference() -> HTMLResponse:
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <style>
-      :root {
+      :root {{
         --scalar-font: 'Inter', system-ui, -apple-system, sans-serif;
         --scalar-font-code: 'JetBrains Mono', monospace;
-      }
-      body {
+      }}
+      body {{
         margin: 0;
         background-color: #0b0f19;
         font-family: var(--scalar-font);
-      }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: #0b0f19; }
-      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-      ::-webkit-scrollbar-thumb:hover { background: #334155; }
+      }}
+      ::-webkit-scrollbar {{ width: 8px; height: 8px; }}
+      ::-webkit-scrollbar-track {{ background: #0b0f19; }}
+      ::-webkit-scrollbar-thumb {{ background: #1e293b; border-radius: 4px; }}
+      ::-webkit-scrollbar-thumb:hover {{ background: #334155; }}
+
+      {_CFI_DOCS_NAV_CSS}
     </style>
   </head>
   <body>
+    {topbar}
     <script
       id="api-reference"
       data-url="/openapi.json"
-      data-configuration='{"theme":"deepSpace","layout":"classic","darkMode":true,"showSidebar":true,"hideModels":false,"searchHotKey":"k","defaultHttpClient":{"targetKey":"python","clientKey":"httpx"}}'
+      data-configuration='{{"theme":"deepSpace","layout":"classic","darkMode":true,"showSidebar":true,"hideModels":false,"searchHotKey":"k","defaultHttpClient":{{"targetKey":"python","clientKey":"httpx"}}}}'
       src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest">
     </script>
   </body>
