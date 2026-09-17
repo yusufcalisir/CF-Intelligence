@@ -211,6 +211,54 @@ export interface ModelVersion {
   created_at: string;
 }
 
+export interface SR117ValidationResult {
+  passed: boolean;
+  rule_name: string;
+  checks: Record<string, any>;
+  recommendations: string[];
+}
+
+export interface ModelPromoteRequest {
+  target_status?: string;
+  enforce_sr11_7?: boolean;
+  min_auc?: number;
+  min_fairness_score?: number;
+}
+
+export interface ModelPromoteResponse {
+  version: number;
+  target_status: string;
+  message: string;
+  is_active: boolean;
+  status: string;
+  sr11_7_validation?: SR117ValidationResult | null;
+  timestamp?: string | null;
+}
+
+export interface ModelSummary {
+  simulation_id: string;
+  active_version?: number | null;
+  champion_status: string;
+  total_versions: number;
+  latest_metrics: Record<string, any>;
+  sr11_7_compliant: boolean;
+  last_updated?: string | null;
+}
+
+export interface ModelInventoryResponse {
+  models: ModelSummary[];
+  total_models: number;
+}
+
+export interface CanaryDecisionItem {
+  round: number;
+  version: number;
+  candidate_auc: number;
+  promoted_auc: number;
+  is_promoted: boolean;
+  reason: string;
+}
+
 export interface TrainingRound {
   round_number: number;
   total_rounds: number;

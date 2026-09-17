@@ -101,9 +101,15 @@ To avoid locking or breaking active transactions during the `DUAL_VERSION_ACTIVE
 ## 🧪 Automated Test Suite Validation
 
 ```bash
+# Core service state machine & instance update tests
 pytest backend/tests/unit/test_zero_downtime_deployment.py -v
+
+# Zero-downtime REST API route lifecycle & multi-prefix parity tests
+pytest backend/tests/unit/test_model_registry_routes.py -v
 ```
 
 **Verification Results:**
 - `test_zero_downtime_upgrade_initiation_and_connection_draining`: `PASSED`
 - `test_rolling_instance_update_and_finalization`: `PASSED` (Verifies version promotion to target release)
+- `TestZeroDowntimeDeploymentLifecycle.test_full_upgrade_lifecycle`: `PASSED` (REST initiate $\to$ drain $\to$ rolling-update $\to$ finalize)
+- `TestZeroDowntimeDeploymentLifecycle.test_deployment_abort_flow`: `PASSED` (Rollback & abort with failure rationale)

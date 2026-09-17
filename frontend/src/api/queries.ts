@@ -46,6 +46,10 @@ import type {
   TrainingMetricsSummaryResponse,
   TrainingHistoryResponse,
   ModelVersion,
+  ModelInventoryResponse,
+  ModelPromoteRequest,
+  ModelPromoteResponse,
+  CanaryDecisionItem,
   Evidence,
   InvestigatorAuditLog,
   ShadowMetrics,
@@ -873,14 +877,46 @@ export function useRollbackModel() {
 }
 
 export function useCanaryHistory(simulationId: string | undefined) {
-  return useQuery<any[]>({
+  return useQuery<CanaryDecisionItem[]>({
     queryKey: ['canary-history', simulationId],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/api/v1/registry/${simulationId}/canary`);
+      const { data } = await apiClient.get<CanaryDecisionItem[]>(`/api/v1/registry/${simulationId}/canary`);
       return data;
     },
     enabled: !!simulationId,
     refetchInterval: 3000,
+  });
+}
+
+export function useModelInventory() {
+  return useQuery<ModelInventoryResponse>({
+    queryKey: ['model-inventory'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ModelInventoryResponse>('/api/v1/models');
+      return data;
+    },
+    staleTime: 10 * 1000,
+  });
+}
+
+export function usePromoteModelVersion() {
+  const queryClient = useQueryClient();
+  return useMutation<
+    ModelPromoteResponse,
+    Error,
+    { simulationId: string; version: number; payload?: ModelPromoteRequest }
+  >({
+    mutationFn: async ({ simulationId, version, payload }) => {
+      const { data } = await apiClient.post<ModelPromoteResponse>(
+        `/api/v1/registry/${simulationId}/versions/${version}/promote`,
+        payload || { target_status: 'champion', enforce_sr11_7: true }
+      );
+      return data;
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: ['model-versions', vars.simulationId] });
+      queryClient.invalidateQueries({ queryKey: ['model-inventory'] });
+    },
   });
 }
 

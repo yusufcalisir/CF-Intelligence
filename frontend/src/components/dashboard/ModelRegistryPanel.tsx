@@ -385,14 +385,14 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
                     <div>
                       <span className="text-[9px] text-[var(--color-text-muted)]">Candidate:</span>{' '}
                       <span className="font-bold text-[var(--color-text-primary)]">
-                        {item.candidate_auc.toFixed(4)}
+                        {(item.candidate_auc ?? 0).toFixed(4)}
                       </span>
                     </div>
                     <div className="h-3 w-[1px] bg-[var(--color-border-subtle)]" />
                     <div>
                       <span className="text-[9px] text-[var(--color-text-muted)]">Previous:</span>{' '}
                       <span className="font-bold text-[var(--color-text-secondary)]">
-                        {item.promoted_auc > 0 ? item.promoted_auc.toFixed(4) : 'None'}
+                        {(item.promoted_auc ?? 0) > 0 ? (item.promoted_auc ?? 0).toFixed(4) : 'None'}
                       </span>
                     </div>
                   </div>

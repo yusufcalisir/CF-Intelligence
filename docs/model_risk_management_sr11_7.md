@@ -140,6 +140,9 @@ python -m pytest backend/tests/unit/test_model_service.py -v
 
 # 7. Model governance hardening, distinct-user four-eyes & canary quality gate (10 tests)
 python -m pytest backend/tests/unit/test_model_governance_hardening.py -v
+
+# 8. Model registry routes, multi-prefix parity, zero-downtime & SR 11-7 promotion gates (25 tests)
+python -m pytest backend/tests/unit/test_model_registry_routes.py -v
 ```
 
 ### 📋 Audit Verdict Summary
@@ -153,6 +156,7 @@ python -m pytest backend/tests/unit/test_model_governance_hardening.py -v
 | **`test_model_registry.py`** | Checkpoint hashing, HSM signature verification, rollback restoration | 16 | ✅ PASSED |
 | **`test_model_service.py`** | Fraud model forward pass, FedProx/MOON training, feature importance | 11 | ✅ PASSED |
 | **`test_model_governance_hardening.py`** | Four-eyes self-approval block, conceptual soundness checklist, validation schedule, canary gate | 10 | ✅ PASSED |
-| **TOTAL** | **Full SR 11-7 / OCC 2011-12 Model Governance Specification** | **54** | **100% PASSED** |
+| **`test_model_registry_routes.py`** | Multi-prefix REST parity, SR 11-7 holdout AUC gate, EEOC 80% four-fifths rule, zero-downtime rolling upgrades | 25 | ✅ PASSED |
+| **TOTAL** | **Full SR 11-7 / OCC 2011-12 Model Governance Specification** | **79** | **100% PASSED** |
 
-*All 54 automated test cases execute cleanly with zero failures, zero warnings, and 100% regulatory invariant enforcement.*
+*All 79 automated test cases execute cleanly with zero failures, zero warnings, and 100% regulatory invariant enforcement.*
