@@ -99,6 +99,63 @@ def test_validate_data_ingestion_invalid_schema_format(client: TestClient) -> No
     assert response.status_code == 422
 
 
+@pytest.mark.parametrize("prefix", ["/api/v1/design-partner", "/v1/design-partner"])
+def test_scan_pii_sanitization_and_hmac_preview(client: TestClient, prefix: str) -> None:
+    """Verify that /scan-pii catches raw PII, provides tokenized previews, and generates sanitized records."""
+    payload = {
+        "partner_name": "Nordic Trial Bank",
+        "schema_format": "ISO_20022",
+        "sample_records": [
+            {
+                "tx_id": "tx_dirty_01",
+                "card_number": "4532 9999 1111 2222",
+                "customer_email": "compliance.officer@bank.de",
+                "amount": 550.0,
+            }
+        ],
+    }
+    response = client.post(f"{prefix}/scan-pii", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["is_clean_zero_pii"] is False
+    assert data["status"] == "REMEDIATION_REQUIRED"
+    assert len(data["violations"]) >= 2
+
+    # Check sanitized_sample presence on violations
+    for v in data["violations"]:
+        assert v["sanitized_sample"] is not None
+        assert v["sanitized_sample"].startswith("hmac_sha256:")
+
+    # Check sanitized_records payload
+    assert data["sanitized_records"] is not None
+    assert len(data["sanitized_records"]) == 1
+    sanitized_rec = data["sanitized_records"][0]
+    assert sanitized_rec["card_number"].startswith("hmac_sha256:")
+    assert sanitized_rec["customer_email"].startswith("hmac_sha256:")
+    assert sanitized_rec["amount"] == 550.0
+
+
+@pytest.mark.parametrize("prefix", ["/api/v1/design-partner", "/v1/design-partner"])
+def test_inject_simulated_pii_violation(client: TestClient, prefix: str) -> None:
+    """Verify that /inject-pii-violation generates synthetic records with intentional PII and HMAC previews."""
+    payload = {
+        "partner_name": "Sandbox Partner Bank",
+        "violation_types": ["credit_card", "email", "iban"],
+        "record_count": 4,
+    }
+    response = client.post(f"{prefix}/inject-pii-violation", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["partner_name"] == "Sandbox Partner Bank"
+    assert len(data["sample_records"]) == 4
+    assert data["injected_violations_count"] == 12  # 3 types * 4 records
+    assert set(data["violation_fields"]) == {"credit_card", "email", "iban"}
+    assert "hmac_sanitization_preview" in data
+    assert "credit_card" in data["hmac_sanitization_preview"]
+    assert data["hmac_sanitization_preview"]["credit_card"].startswith("hmac_sha256:")
+
+
+
 # ── Benchmark Evaluation ─────────────────────────────────────────────────────
 
 

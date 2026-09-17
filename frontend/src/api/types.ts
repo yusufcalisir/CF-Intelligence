@@ -1643,19 +1643,38 @@ export interface PilotComplianceChecklist {
   cryptographic_guarantees: Record<string, string>;
 }
 
+export interface PiiViolationItem {
+  column: string;
+  pii_type: string;
+  sample_count: number;
+  remediation: string;
+  sanitized_sample?: string;
+}
+
 export interface PiiValidationResponse {
   partner_name: string;
   schema_format: string;
   is_clean_zero_pii: boolean;
   total_records_scanned: number;
-  violations: Array<{
-    column: string;
-    pii_type: string;
-    sample_count: number;
-    remediation: string;
-  }>;
+  violations: PiiViolationItem[];
   status: string;
   guidance: string;
+  sanitized_records?: Array<Record<string, any>>;
+}
+
+export interface InjectPiiViolationRequest {
+  partner_name?: string;
+  violation_types?: string[];
+  record_count?: number;
+}
+
+export interface InjectPiiViolationResponse {
+  partner_name: string;
+  sample_records: Array<Record<string, any>>;
+  injected_violations_count: number;
+  violation_fields: string[];
+  description: string;
+  hmac_sanitization_preview: Record<string, string>;
 }
 
 // ── Connector Diagnostics & Infrastructure Health ────
@@ -3267,3 +3286,4 @@ export interface TrainingRoundProgressPayload {
   participating_banks: string[];
   per_bank_auc?: Record<string, number>;
 }
+

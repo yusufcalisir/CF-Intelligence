@@ -1635,6 +1635,7 @@ export function useBenchmarkEvaluation(dataset: string = 'paysim', nSamples: num
     queryFn: async () => {
       const { data } = await apiClient.get('/api/v1/design-partner/evaluate-benchmark', {
         params: { dataset, n_samples: nSamples, daily_volume: dailyVolume },
+        timeout: 30000,
       });
       return data;
     },
@@ -1648,6 +1649,7 @@ export function useDistributionFidelity(dataset: string = 'paysim') {
     queryFn: async () => {
       const { data } = await apiClient.get('/api/v1/design-partner/distribution-fidelity', {
         params: { dataset },
+        timeout: 15000,
       });
       return data;
     },
@@ -1661,20 +1663,41 @@ export function usePilotReadinessChecklist(partnerName: string = 'Design Partner
     queryFn: async () => {
       const { data } = await apiClient.get('/api/v1/design-partner/readiness-checklist', {
         params: { partner_name: partnerName, jurisdiction },
+        timeout: 30000,
       });
       return data;
     },
+    staleTime: 60000,
   });
 }
 
-export function useValidateDataIngestion() {
+export function useScanPii() {
   return useMutation<
     import('./types').PiiValidationResponse,
     Error,
     { partner_name: string; schema_format: string; sample_records: Array<Record<string, any>> }
   >({
     mutationFn: async (payload) => {
-      const { data } = await apiClient.post('/api/v1/design-partner/validate-ingest', payload);
+      const { data } = await apiClient.post('/api/v1/design-partner/scan-pii', payload, {
+        timeout: 15000,
+      });
+      return data;
+    },
+  });
+}
+
+export const useValidateDataIngestion = useScanPii;
+
+export function useInjectPiiViolation() {
+  return useMutation<
+    import('./types').InjectPiiViolationResponse,
+    Error,
+    import('./types').InjectPiiViolationRequest | undefined
+  >({
+    mutationFn: async (payload = {}) => {
+      const { data } = await apiClient.post('/api/v1/design-partner/inject-pii-violation', payload, {
+        timeout: 15000,
+      });
       return data;
     },
   });

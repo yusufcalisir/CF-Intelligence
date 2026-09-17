@@ -14,7 +14,8 @@ import {
 import {
   useBenchmarkEvaluation,
   usePilotReadinessChecklist,
-  useValidateDataIngestion,
+  useScanPii,
+  useInjectPiiViolation,
 } from '../api/queries';
 import ConfusionMatrix from '../components/charts/ConfusionMatrix';
 
@@ -51,7 +52,8 @@ export const BenchmarkHubPage: React.FC = () => {
     : null;
 
   const { data: readinessData } = usePilotReadinessChecklist(partnerName, 'EU/TR/US');
-  const validatePiiMutation = useValidateDataIngestion();
+  const validatePiiMutation = useScanPii();
+  const injectPiiMutation = useInjectPiiViolation();
 
   const handlePiiValidation = () => {
     try {
@@ -64,6 +66,26 @@ export const BenchmarkHubPage: React.FC = () => {
     } catch {
       alert('Invalid JSON input for PII scanning.');
     }
+  };
+
+  const handleInjectViolation = () => {
+    injectPiiMutation.mutate(
+      { partner_name: partnerName, record_count: 3 },
+      {
+        onSuccess: (data) => {
+          const formatted = JSON.stringify(data.sample_records, null, 2);
+          setPiiScanInput(formatted);
+          validatePiiMutation.mutate({
+            partner_name: partnerName,
+            schema_format: 'ISO_20022',
+            sample_records: data.sample_records,
+          });
+        },
+        onError: () => {
+          alert('Failed to connect to simulated PII injection endpoint.');
+        },
+      }
+    );
   };
 
   const datasetDescriptions: Record<string, { title: string; subtitle: string; badge: string; sourceLink: string }> = {
@@ -729,27 +751,25 @@ export const BenchmarkHubPage: React.FC = () => {
                   )}
                 </button>
                 <button
-                  onClick={() => {
-                    setPiiScanInput(
-                      JSON.stringify(
-                        [
-                          { tx_id: 'TX_DIRTY', credit_card: '4532-1234-5678-9012', customer_email: 'test@bank.com', amount: 99.0 },
-                        ],
-                        null,
-                        2
-                      )
-                    );
-                  }}
-                  className="h-11 min-h-[44px] px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition-all border border-slate-700 flex items-center justify-center whitespace-nowrap shrink-0 cursor-pointer"
+                  onClick={handleInjectViolation}
+                  disabled={injectPiiMutation.isPending}
+                  className="h-11 min-h-[44px] px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-xl transition-all border border-slate-700 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 cursor-pointer disabled:opacity-50"
                 >
-                  Inject Simulated PII Violation
+                  {injectPiiMutation.isPending ? (
+                    <>
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span>Injecting Violations...</span>
+                    </>
+                  ) : (
+                    <span>Inject Simulated PII Violation</span>
+                  )}
                 </button>
               </div>
 
               {/* Scan Results */}
               {validatePiiMutation.data && (
                 <div
-                  className={`p-4 rounded-xl border text-xs space-y-2 ${
+                  className={`p-4 rounded-xl border text-xs space-y-3 ${
                     validatePiiMutation.data.is_clean_zero_pii
                       ? 'bg-emerald-950/20 border-emerald-800/60 text-emerald-300'
                       : 'bg-rose-950/20 border-rose-800/60 text-rose-300'
@@ -757,18 +777,38 @@ export const BenchmarkHubPage: React.FC = () => {
                 >
                   <div className="font-bold flex items-center gap-2">
                     {validatePiiMutation.data.is_clean_zero_pii ? (
-                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
                     ) : (
-                      <AlertTriangle className="w-4 h-4 text-rose-400" />
+                      <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
                     )}
-                    Status: {validatePiiMutation.data.status}
+                    <span>Status: {validatePiiMutation.data.status}</span>
                   </div>
                   <p>{validatePiiMutation.data.guidance}</p>
                   {validatePiiMutation.data.violations?.map((v, i) => (
-                    <div key={i} className="bg-slate-950/80 p-2.5 rounded border border-rose-800/40 text-slate-300 font-mono text-[11px]">
-                      Violation on column <span className="text-rose-400 font-bold">{v.column}</span>: {v.pii_type} detected. Remediation: {v.remediation}
+                    <div key={i} className="bg-slate-950/80 p-3 rounded border border-rose-800/40 text-slate-300 font-mono text-[11px] space-y-1.5">
+                      <div>
+                        Violation on column <span className="text-rose-400 font-bold">{v.column}</span>: {v.pii_type} detected. Remediation: {v.remediation}
+                      </div>
+                      {v.sanitized_sample && (
+                        <div className="text-[10px] text-indigo-300 bg-indigo-950/50 p-1.5 rounded border border-indigo-500/20 break-all">
+                          <span className="text-slate-400 font-sans font-semibold">Zero-PII Token Preview: </span>
+                          <span className="text-emerald-400 font-mono font-bold">{v.sanitized_sample}</span>
+                        </div>
+                      )}
                     </div>
                   ))}
+
+                  {validatePiiMutation.data.sanitized_records && validatePiiMutation.data.sanitized_records.length > 0 && (
+                    <div className="mt-3 p-3 rounded-lg bg-slate-950/90 border border-slate-800 space-y-1.5">
+                      <div className="text-[10px] uppercase font-semibold text-emerald-400 flex items-center justify-between">
+                        <span>Sanitized Zero-PII Payload Preview (HMAC-SHA256)</span>
+                        <span className="text-slate-500 font-mono">{validatePiiMutation.data.sanitized_records.length} records</span>
+                      </div>
+                      <pre className="text-[10px] font-mono text-slate-300 overflow-x-auto max-h-36 p-2 rounded bg-slate-900 border border-slate-800">
+                        {JSON.stringify(validatePiiMutation.data.sanitized_records, null, 2)}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

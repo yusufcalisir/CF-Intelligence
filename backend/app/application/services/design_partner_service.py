@@ -68,6 +68,8 @@ class DesignPartnerPilotService:
 
     def __init__(self, hmac_secret_salt: bytes = b"cf-intelligence-pilot-salt-2026") -> None:
         self.salt = hmac_secret_salt
+        self._benchmark_cache: dict[tuple[str, int, int], dict[str, Any]] = {}
+        self._checklist_cache: dict[tuple[str, str], PilotComplianceChecklist] = {}
 
     def hash_pii_identifier(self, raw_value: str, entity_type: str = "ACCOUNT") -> str:
         """Type-salted HMAC-SHA256 entity tokenization."""
@@ -85,12 +87,14 @@ class DesignPartnerPilotService:
             for pii_name, pattern in PII_PATTERNS.items():
                 matched_samples = [v for v in sample_vals if pattern.search(v)]
                 if matched_samples:
+                    sample_token = self.hash_pii_identifier(matched_samples[0], entity_type=pii_name.upper())
                     violations.append(
                         {
                             "column": col,
                             "pii_type": pii_name,
                             "sample_count": len(matched_samples),
                             "remediation": f"Apply type-salted HMAC-SHA256 on column '{col}' before ingestion.",
+                            "sanitized_sample": f"hmac_sha256:{sample_token[:16]}...{sample_token[-8:]}",
                         }
                     )
                     break
@@ -102,10 +106,73 @@ class DesignPartnerPilotService:
             hash_salt_applied=True,
         )
 
+    def inject_simulated_pii_violation(
+        self,
+        partner_name: str = "Design Partner Bank",
+        violation_types: list[str] | None = None,
+        record_count: int = 3,
+    ) -> dict[str, Any]:
+        """Generate realistic synthetic transactions with intentional PII violations for testing."""
+        all_types = ["credit_card", "iban", "email", "phone", "ssn_tckn"]
+        selected_types = [t for t in (violation_types or all_types) if t in all_types]
+        if not selected_types:
+            selected_types = all_types
+
+        sample_records: list[dict[str, Any]] = []
+        raw_values: dict[str, str] = {
+            "credit_card": "4532-8912-3456-7890",
+            "iban": "DE89370400440532013000",
+            "email": "sarah.compliance@consortium-bank.com",
+            "phone": "+44 20 7946 0958",
+            "ssn_tckn": "12345678901",
+        }
+
+        for i in range(record_count):
+            rec: dict[str, Any] = {
+                "tx_id": f"TX_PII_SIM_{i+1:03d}",
+                "amount": round(120.0 + (i * 85.5), 2),
+                "currency": "EUR",
+                "channel": "OPEN_BANKING_API",
+                "sender_account": f"ACC_{1000 + i}",
+            }
+            if "credit_card" in selected_types:
+                rec["card_number"] = raw_values["credit_card"]
+            if "email" in selected_types:
+                rec["customer_email"] = f"user_{i+1}_{raw_values['email']}"
+            if "iban" in selected_types:
+                rec["beneficiary_iban"] = raw_values["iban"]
+            if "phone" in selected_types:
+                rec["customer_phone"] = raw_values["phone"]
+            if "ssn_tckn" in selected_types:
+                rec["national_tax_id"] = raw_values["ssn_tckn"]
+            sample_records.append(rec)
+
+        preview = {
+            field: f"hmac_sha256:{self.hash_pii_identifier(raw_val, entity_type=field.upper())}"
+            for field, raw_val in raw_values.items()
+            if field in selected_types
+        }
+
+        return {
+            "partner_name": partner_name,
+            "sample_records": sample_records,
+            "injected_violations_count": len(selected_types) * record_count,
+            "violation_fields": selected_types,
+            "description": (
+                f"Injected {len(selected_types)} simulated PII violation vectors across {record_count} records. "
+                "CFI zero-trust ingestion requires converting these raw fields into type-salted HMAC-SHA256 tokens."
+            ),
+            "hmac_sanitization_preview": preview,
+        }
+
     def generate_pilot_readiness_checklist(
         self, partner_name: str, jurisdiction: str = "EU/TR/US"
     ) -> PilotComplianceChecklist:
         """Generates bank IT security committee readiness audit for federated pilot."""
+        cache_key = (partner_name, jurisdiction)
+        if cache_key in self._checklist_cache:
+            return self._checklist_cache[cache_key]
+
         checklist_items = [
             {
                 "standard": "Zero Raw PII Transmission",
@@ -146,7 +213,7 @@ class DesignPartnerPilotService:
             "enclave_isolation": "Intel SGX / AWS Nitro TEE Hardware Attestation",
         }
 
-        return PilotComplianceChecklist(
+        res = PilotComplianceChecklist(
             partner_name=partner_name,
             jurisdiction=jurisdiction,
             overall_readiness_score=98.5,
@@ -154,6 +221,8 @@ class DesignPartnerPilotService:
             compliance_items=checklist_items,
             cryptographic_guarantees=crypto_guarantees,
         )
+        self._checklist_cache[cache_key] = res
+        return res
 
     def evaluate_reference_benchmark(
         self,
@@ -168,6 +237,10 @@ class DesignPartnerPilotService:
         reference distributions to model institutional performance trade-offs without requiring
         multi-hour offline training runs during interactive API sessions.
         """
+        cache_key = (dataset_name, n_samples, daily_volume)
+        if cache_key in self._benchmark_cache:
+            return self._benchmark_cache[cache_key]
+
         from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
 
         # Load real/mock benchmark
@@ -248,7 +321,7 @@ class DesignPartnerPilotService:
             },
         )
 
-        return {
+        result = {
             "dataset_name": dataset_name,
             "source_type": data.get("source", "real_or_mock"),
             "total_transactions_evaluated": n_total,
@@ -297,4 +370,6 @@ class DesignPartnerPilotService:
                 for p in partitions
             ],
         }
+        self._benchmark_cache[cache_key] = result
+        return result
 

@@ -21,6 +21,8 @@ from app.application.schemas.design_partner import (
     FederatedAdvantageResponse,
     IngestionValidationRequest,
     IngestionValidationResponse,
+    InjectPiiViolationRequest,
+    InjectPiiViolationResponse,
     PiiViolationItem,
     PilotComplianceChecklistResponse,
     PilotLeadRequest,
@@ -59,6 +61,18 @@ _enrolled_leads: list[dict[str, Any]] = [
 
 
 @router.post(
+    "/scan-pii",
+    response_model=IngestionValidationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Scan raw records for PII leakage and provide HMAC-SHA256 sanitization preview",
+)
+@api_router.post(
+    "/scan-pii",
+    response_model=IngestionValidationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Scan raw records for PII leakage and provide HMAC-SHA256 sanitization preview",
+)
+@router.post(
     "/validate-ingest",
     response_model=IngestionValidationResponse,
     status_code=status.HTTP_200_OK,
@@ -86,9 +100,25 @@ async def validate_data_ingestion(request: IngestionValidationRequest) -> Ingest
                 pii_type=v["pii_type"],
                 sample_count=v["sample_count"],
                 remediation=v["remediation"],
+                sanitized_sample=v.get("sanitized_sample"),
             )
             for v in scan_res.violations_detected
         ]
+
+        sanitized_records: list[dict[str, Any]] | None = None
+        if not scan_res.clean:
+            sanitized_records = []
+            violation_cols = {v["column"]: v["pii_type"] for v in scan_res.violations_detected}
+            for rec in request.sample_records:
+                sanitized_rec = dict(rec)
+                for col, pii_type in violation_cols.items():
+                    if col in sanitized_rec and sanitized_rec[col] is not None:
+                        raw_str = str(sanitized_rec[col])
+                        sanitized_rec[col] = (
+                            f"hmac_sha256:{_pilot_service.hash_pii_identifier(raw_str, entity_type=pii_type.upper())}"
+                        )
+                sanitized_records.append(sanitized_rec)
+
         return IngestionValidationResponse(
             partner_name=request.partner_name,
             schema_format=request.schema_format,
@@ -99,13 +129,40 @@ async def validate_data_ingestion(request: IngestionValidationRequest) -> Ingest
             guidance=(
                 "Pass: No raw PII detected. Proceed with local edge client gradient extraction."
                 if scan_res.clean
-                else "Violations detected. Please tokenize identifiers with HMAC-SHA256 before ingestion."
+                else "Violations detected. Please tokenize identifiers with type-salted HMAC-SHA256 before ingestion."
             ),
+            sanitized_records=sanitized_records,
         )
     except HTTPException:
         raise
     except Exception as exc:
         logger.error("Ingestion validation error: %s", exc, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
+
+
+@router.post(
+    "/inject-pii-violation",
+    response_model=InjectPiiViolationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Inject simulated PII violation data for ingestion sandbox testing",
+)
+@api_router.post(
+    "/inject-pii-violation",
+    response_model=InjectPiiViolationResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Inject simulated PII violation data for ingestion sandbox testing",
+)
+async def inject_pii_violation(request: InjectPiiViolationRequest) -> InjectPiiViolationResponse:
+    """Generates synthetic transactions containing intentional raw PII vectors for sandbox testing."""
+    try:
+        data = _pilot_service.inject_simulated_pii_violation(
+            partner_name=request.partner_name,
+            violation_types=request.violation_types,
+            record_count=request.record_count,
+        )
+        return InjectPiiViolationResponse.model_validate(data)
+    except Exception as exc:
+        logger.error("Failed to inject simulated PII violation: %s", exc, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc
 
 

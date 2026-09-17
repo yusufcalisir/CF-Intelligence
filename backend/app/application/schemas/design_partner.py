@@ -30,6 +30,9 @@ class PiiViolationItem(BaseModel):
     pii_type: str
     sample_count: int
     remediation: str
+    sanitized_sample: str | None = Field(
+        None, description="Sample type-salted HMAC-SHA256 replacement demonstrating Zero-Raw-PII"
+    )
 
 
 class IngestionValidationResponse(BaseModel):
@@ -42,6 +45,34 @@ class IngestionValidationResponse(BaseModel):
     violations: list[PiiViolationItem]
     status: str
     guidance: str
+    sanitized_records: list[dict[str, Any]] | None = Field(
+        None, description="Sample of records with all detected PII converted to type-salted HMAC tokens"
+    )
+
+
+class InjectPiiViolationRequest(BaseModel):
+    """Request payload to inject simulated PII violations into sandbox ingestion."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    partner_name: str = Field("Design Partner Bank", min_length=2, max_length=128)
+    violation_types: list[str] | None = Field(
+        None, description="Optional subset: 'credit_card', 'iban', 'email', 'phone', 'ssn_tckn'"
+    )
+    record_count: int = Field(3, ge=1, le=50, description="Number of sample records to generate")
+
+
+class InjectPiiViolationResponse(BaseModel):
+    """Server-generated sample data containing deliberate PII violations for validation testing."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    partner_name: str
+    sample_records: list[dict[str, Any]]
+    injected_violations_count: int
+    violation_fields: list[str]
+    description: str
+    hmac_sanitization_preview: dict[str, str]
 
 
 class CostReportResponse(BaseModel):
