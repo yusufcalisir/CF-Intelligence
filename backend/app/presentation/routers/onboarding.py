@@ -1,18 +1,25 @@
-"""Bank Onboarding API Router — Phase 36.1.
+"""Bank Onboarding API Router — Phase 36.1 / Phase 89.
 
 Admin endpoints for registering new bank nodes, issuing mTLS certificates,
 provisioning tenant schemas, and retrieving onboarding bundles.
+Supports dual-prefix mounting: `/api/v1/onboarding` and `/v1/onboarding`.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: TC002
 
+from app.application.schemas.onboarding import (
+    BankCSRSignRequest,
+    BankCSRSignResponse,
+    BankOnboardingBundleResponse,
+    BankRegisterRequest,
+    BankStatusResponse,
+    CertRotationResponse,
+)
 from app.application.services.bank_onboarding_service import (
     BankAlreadyExistsError,
     BankNotFoundError,
@@ -24,114 +31,25 @@ from app.infrastructure.database import get_async_session
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/onboarding", tags=["Bank Onboarding"])
+# Re-export for backward compatibility
+__all__ = [
+    "BankCSRSignRequest",
+    "BankCSRSignResponse",
+    "BankOnboardingBundleResponse",
+    "BankRegisterRequest",
+    "BankStatusResponse",
+    "CertRotationResponse",
+    "api_router",
+    "router",
+]
 
-
-# ── Request / Response Models ─────────────────────────────────────────────────
-
-
-class BankRegisterRequest(BaseModel):
-    """Payload to register a new bank node."""
-
-    bank_id: str = Field(
-        ...,
-        min_length=3,
-        max_length=64,
-        pattern=r"^[a-zA-Z0-9_\-]+$",
-        description="Unique bank node identifier (e.g. bank_alpha)",
-    )
-    legal_name: str = Field(
-        ...,
-        min_length=2,
-        max_length=256,
-        description="Legal institution name",
-    )
-    jurisdiction: str = Field(
-        ...,
-        min_length=2,
-        max_length=2,
-        pattern=r"^[A-Z]{2}$",
-        description="ISO 3166-1 alpha-2 country code (e.g. TR, US, DE)",
-    )
-    contact_email: str = Field(
-        ...,
-        min_length=5,
-        max_length=254,
-        pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$",
-        description="Primary security contact email (RFC 5322 format)",
-    )
-    data_residency_region: str = Field(
-        ...,
-        min_length=3,
-        max_length=32,
-        pattern=r"^[a-z0-9\-]+$",
-        description="Regulatory cloud region (e.g. eu-west-1)",
-    )
-
-
-class BankOnboardingBundleResponse(BaseModel):
-    """Complete bundle returned to a bank IT team upon registration."""
-
-    bank_id: str
-    status: str
-    legal_name: str
-    jurisdiction: str
-    contact_email: str
-    data_residency_region: str
-    cert_fingerprint: str
-    mtls_cert_pem: str
-    mtls_key_pem: str
-    connector_config_yaml: str
-    coordinator_endpoint: str
-    # Frontend compatibility aliases
-    certificate_pem: str | None = None
-    private_key_pem: str | None = None
-
-
-class BankStatusResponse(BaseModel):
-    """Detailed status of a bank node."""
-
-    bank_id: str
-    legal_name: str
-    jurisdiction: str
-    status: str
-    cert_fingerprint: str | None = None
-    vault_key_path: str | None = None
-    schema_provisioned: bool
-    created_at: str
-    activated_at: str | None = None
-    name: str | None = None
-
-
-class CertRotationResponse(BaseModel):
-    """Response after rotating a bank's mTLS certificate."""
-
-    bank_id: str
-    mtls_cert_pem: str
-    mtls_key_pem: str
-    cert_fingerprint: str
-
-
-class BankCSRSignRequest(BaseModel):
-    """Payload to request consortium CA signing for an institutional CSR."""
-
-    csr_pem: str = Field(..., description="PEM-encoded X.509 Certificate Signing Request")
-    days_valid: int = Field(365, ge=1, le=1825, description="Validity period in days")
-
-
-class BankCSRSignResponse(BaseModel):
-    """Response returned upon signing an institutional CSR."""
-
-    bank_id: str
-    signed_cert_pem: str
-    cert_fingerprint: str
-    expires_at: str
+_base_router = APIRouter(tags=["Bank Onboarding"])
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
-@router.post(
+@_base_router.post(
     "/register",
     response_model=BankOnboardingBundleResponse,
     status_code=status.HTTP_201_CREATED,
@@ -140,7 +58,7 @@ class BankCSRSignResponse(BaseModel):
 async def register_bank(
     payload: BankRegisterRequest,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankOnboardingBundleResponse:
     """Run full automated bank onboarding pipeline:
 
     1. Register bank record (PENDING_VERIFICATION)
@@ -197,7 +115,6 @@ async def register_bank(
             certificate_pem=cert_pem,
             private_key_pem=key_pem,
         )
-
     except BankAlreadyExistsError as exc:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -208,6 +125,8 @@ async def register_bank(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(
             "Bank registration pipeline failure for bank_id=%s: %s",
@@ -221,7 +140,7 @@ async def register_bank(
         ) from exc
 
 
-@router.get(
+@_base_router.get(
     "/bundle/{bank_id}",
     response_model=BankOnboardingBundleResponse,
     summary="Retrieve onboarding bundle and configuration for an onboarded bank node",
@@ -229,7 +148,7 @@ async def register_bank(
 async def get_onboarding_bundle(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankOnboardingBundleResponse:
     """Retrieve existing configuration bundle for a registered bank node."""
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
@@ -259,14 +178,14 @@ async def get_onboarding_bundle(
     )
 
 
-@router.get(
+@_base_router.get(
     "/banks",
     response_model=list[BankStatusResponse],
     summary="List all registered bank nodes",
 )
 async def list_banks(
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> list[BankStatusResponse]:
     """Return all bank node registrations from persistent storage."""
     service = BankOnboardingService(session)
     banks = await service.list_banks()
@@ -287,7 +206,7 @@ async def list_banks(
     ]
 
 
-@router.get(
+@_base_router.get(
     "/banks/{bank_id}/status",
     response_model=BankStatusResponse,
     summary="Get status of a single bank node",
@@ -295,7 +214,7 @@ async def list_banks(
 async def get_bank_status(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankStatusResponse:
     """Return detailed status for a specific bank node."""
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
@@ -319,7 +238,7 @@ async def get_bank_status(
     )
 
 
-@router.post(
+@_base_router.post(
     "/banks/{bank_id}/sign-csr",
     response_model=BankCSRSignResponse,
     summary="Cryptographically sign an institutional CSR via PKI wizard",
@@ -328,7 +247,7 @@ async def sign_bank_csr(
     bank_id: str,
     payload: BankCSRSignRequest,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankCSRSignResponse:
     """Signs an institutional X.509 Certificate Signing Request (CSR) for an onboarded bank node."""
     service = BankOnboardingService(session)
     try:
@@ -353,9 +272,17 @@ async def sign_bank_csr(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("CSR signing failure for bank_id=%s: %s", bank_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"CSR signing failed: {exc}",
+        ) from exc
 
 
-@router.post(
+@_base_router.post(
     "/banks/{bank_id}/verify",
     response_model=BankStatusResponse,
     summary="Record institutional compliance verification",
@@ -363,7 +290,7 @@ async def sign_bank_csr(
 async def verify_bank_node(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankStatusResponse:
     """Record institutional compliance verification for a bank node."""
     service = BankOnboardingService(session)
     try:
@@ -384,9 +311,17 @@ async def verify_bank_node(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InvalidBankStateError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Bank verification failure for bank_id=%s: %s", bank_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bank verification failed: {exc}",
+        ) from exc
 
 
-@router.post(
+@_base_router.post(
     "/banks/{bank_id}/activate",
     response_model=BankStatusResponse,
     summary="Activate bank node",
@@ -394,7 +329,7 @@ async def verify_bank_node(
 async def activate_bank_node(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankStatusResponse:
     """Activate an onboarded bank node."""
     service = BankOnboardingService(session)
     try:
@@ -415,9 +350,17 @@ async def activate_bank_node(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
     except InvalidBankStateError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Bank activation failure for bank_id=%s: %s", bank_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bank activation failed: {exc}",
+        ) from exc
 
 
-@router.post(
+@_base_router.post(
     "/banks/{bank_id}/suspend",
     response_model=BankStatusResponse,
     summary="Suspend an active bank node",
@@ -425,7 +368,7 @@ async def activate_bank_node(
 async def suspend_bank_node(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> BankStatusResponse:
     """Suspend an active bank node."""
     service = BankOnboardingService(session)
     try:
@@ -444,9 +387,17 @@ async def suspend_bank_node(
         )
     except BankNotFoundError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Bank suspension failure for bank_id=%s: %s", bank_id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Bank suspension failed: {exc}",
+        ) from exc
 
 
-@router.post(
+@_base_router.post(
     "/banks/{bank_id}/rotate-cert",
     response_model=CertRotationResponse,
     summary="Rotate mTLS certificate for a bank node",
@@ -454,7 +405,7 @@ async def suspend_bank_node(
 async def rotate_bank_cert(
     bank_id: str,
     session: AsyncSession = Depends(get_async_session),
-) -> Any:
+) -> CertRotationResponse:
     """Rotate mTLS certificate for an active bank node."""
     service = BankOnboardingService(session)
     b = await service.get_bank(bank_id)
@@ -479,3 +430,10 @@ async def rotate_bank_cert(
         cert_fingerprint=updated.cert_fingerprint or "",
     )
 
+
+# ── Multi-Prefix Router Exports ───────────────────────────────────────────────
+router = APIRouter(prefix="/api/v1/onboarding", tags=["Bank Onboarding"])
+api_router = APIRouter(prefix="/v1/onboarding", tags=["Bank Onboarding"])
+
+router.include_router(_base_router)
+api_router.include_router(_base_router)

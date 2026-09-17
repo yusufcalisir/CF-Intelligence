@@ -864,11 +864,28 @@ from app.infrastructure.telemetry import setup_telemetry
 setup_telemetry(app)
 
 # ── Global Core Routers ────────────────────────
-from app.presentation.routers import auth, copilot, datasets, design_partner, feedback, onboarding
+from app.presentation.routers import (
+    admin_console,
+    auth,
+    copilot,
+    datasets,
+    design_partner,
+    feedback,
+    maintenance_cron,
+    onboarding,
+)
 
 app.include_router(auth.router)
 app.include_router(onboarding.router)
+app.include_router(onboarding.api_router)
 app.include_router(design_partner.router)
+app.include_router(design_partner.api_router)
+app.include_router(admin_console.router)
+app.include_router(admin_console.dashboard_router)
+app.include_router(admin_console.admin_router)
+app.include_router(admin_console.admin_v1_router)
+app.include_router(maintenance_cron.router)
+app.include_router(maintenance_cron.api_router)
 app.include_router(diagnostics.router)
 app.include_router(diagnostics.api_router)
 app.include_router(datasets.router)
@@ -961,7 +978,6 @@ else:
     app.include_router(health.router)
     app.include_router(health.api_router)
     app.include_router(health.v1_router)
-    app.include_router(maintenance_cron.router)
     app.include_router(simulation.router)
     app.include_router(simulation.api_router)
     app.include_router(simulation.singular_router)
