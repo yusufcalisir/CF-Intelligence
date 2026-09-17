@@ -1,3 +1,4 @@
+# ruff: noqa: E402, F401
 """Pydantic schemas for Phase 2 API endpoints.
 
 Request/response models for alerts, cases, entities, graph,
@@ -27,56 +28,14 @@ def _strip_control(value: str) -> str:
 
 
 # ── Alerts ────────────────────────────────────
-
-
-class AlertResponse(BaseModel):
-    id: str
-    bank_id: str
-    transaction_id: str
-    risk_score: float
-    severity: str
-    status: str
-    reason_codes: list[str]
-    confidence: float
-    involved_entity_ids: list[str]
-    created_at: str
-    top_features: list[dict] = []
-    risk_factors: list[str] = []
-    model_confidence: float = 0.0
-    triage_priority: str = "p3_medium"
-    triage_action: str = "queue_standard"
-    sla_minutes: int = 1440
-    triage_reasons: list[str] = []
-    dedup_count: int = 1
-    is_duplicate: bool = False
-    dedup_key: str | None = None
-
-
-class AlertStatusUpdateRequest(BaseModel):
-    status: Literal["new", "investigating", "confirmed_fraud", "false_positive", "escalated", "closed"]
-    resolution_notes: str | None = Field(None, max_length=1000)
-
-
-class AlertTriageEvaluateRequest(BaseModel):
-    transaction_amount: float | None = Field(None, ge=0.0)
-    country_code: str | None = Field(None, max_length=3)
-    velocity: float | None = Field(None, ge=0.0)
-
-
-class AlertTriageEvaluateResponse(BaseModel):
-    alert_id: str
-    triage_priority: str
-    triage_action: str
-    sla_minutes: int
-    triage_reasons: list[str]
-
-
-class AlertDeduplicationStatsResponse(BaseModel):
-    total_processed: int
-    duplicates_detected: int
-    deduplication_ratio: float
-    active_sliding_window_keys: int
-    window_seconds: float
+from app.application.schemas.alerts import (
+    AlertDeduplicationStatsResponse,
+    AlertResponse,
+    AlertStandaloneTriageRequest,
+    AlertStatusUpdateRequest,
+    AlertTriageEvaluateRequest,
+    AlertTriageEvaluateResponse,
+)
 
 
 class ExplainabilityResponse(BaseModel):
@@ -876,8 +835,6 @@ from app.application.schemas.rules import (
     BusinessRuleTestResponse,
     BusinessRuleUpdateRequest,
 )
-
-
 
 # ── Advanced Explainability (Counterfactuals, Decision Replay, GNNExplainer) ──
 

@@ -894,6 +894,7 @@ elif service_name == "identity-graph":
 elif service_name == "fraud-alert":
     app.include_router(health.router)
     app.include_router(alerts.router)
+    app.include_router(alerts.api_router)
     app.include_router(cases.router)
     app.include_router(predict.router)
     app.include_router(rules.router)
@@ -922,6 +923,7 @@ else:
     app.include_router(training_ws.router)
     app.include_router(streaming_ws.router)
     app.include_router(alerts.router)
+    app.include_router(alerts.api_router)
     app.include_router(cases.router)
     app.include_router(predict.router)
     app.include_router(rules.router)

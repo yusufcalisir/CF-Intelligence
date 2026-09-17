@@ -328,9 +328,55 @@ export interface Alert {
   confidence: number;
   involved_entity_ids: string[];
   created_at: string;
+  updated_at?: string | null;
   top_features: { feature: string; contribution: number }[];
   risk_factors: string[];
   model_confidence: number;
+  triage_priority?: 'p1_critical' | 'p2_high' | 'p3_medium' | 'p4_low' | string;
+  triage_action?: 'escalate_immediate' | 'investigate_case' | 'queue_standard' | 'auto_monitor' | string;
+  sla_minutes?: number;
+  triage_reasons?: string[];
+  dedup_count?: number;
+  is_duplicate?: boolean;
+  dedup_key?: string | null;
+}
+
+export interface AlertStatusUpdateRequest {
+  status: 'new' | 'investigating' | 'confirmed_fraud' | 'false_positive' | 'escalated' | 'closed';
+  resolution_notes?: string | null;
+}
+
+export interface AlertTriageEvaluateRequest {
+  transaction_amount?: number;
+  country_code?: string;
+  velocity?: number;
+}
+
+export interface AlertStandaloneTriageRequest {
+  transaction_amount?: number;
+  country_code?: string;
+  velocity?: number;
+  risk_score?: number;
+  severity?: 'critical' | 'high' | 'medium' | 'low' | 'info';
+  reason_codes?: string[];
+  entity_overlap_count?: number;
+  dedup_count?: number;
+}
+
+export interface AlertTriageEvaluateResponse {
+  alert_id: string;
+  triage_priority: string;
+  triage_action: string;
+  sla_minutes: number;
+  triage_reasons: string[];
+}
+
+export interface AlertDeduplicationStatsResponse {
+  total_processed: number;
+  duplicates_detected: number;
+  deduplication_ratio: number;
+  active_sliding_window_keys: number;
+  window_seconds: number;
 }
 
 export interface ExplainabilityReport {

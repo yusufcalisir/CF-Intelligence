@@ -2,6 +2,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import type {
   Alert,
+  AlertDeduplicationStatsResponse,
+  AlertStatusUpdateRequest,
+  AlertTriageEvaluateRequest,
+  AlertTriageEvaluateResponse,
   BankDistributions,
   BankInfo,
   Case,
@@ -281,6 +285,56 @@ export function useAlert(id: string | undefined) {
       return data;
     },
     enabled: !!id,
+  });
+}
+
+export function useUpdateAlertStatus() {
+  const queryClient = useQueryClient();
+  return useMutation<Alert, Error, { alertId: string; payload: AlertStatusUpdateRequest }>({
+    mutationFn: async ({ alertId, payload }) => {
+      const { data } = await apiClient.patch(`/api/v1/alerts/${alertId}/status`, payload);
+      return data;
+    },
+    onSuccess: (_, { alertId }) => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
+    },
+  });
+}
+
+export function useEvaluateAlertTriage() {
+  const queryClient = useQueryClient();
+  return useMutation<AlertTriageEvaluateResponse, Error, { alertId: string; payload?: AlertTriageEvaluateRequest }>({
+    mutationFn: async ({ alertId, payload }) => {
+      const { data } = await apiClient.post(`/api/v1/alerts/${alertId}/triage`, payload ?? {});
+      return data;
+    },
+    onSuccess: (_, { alertId }) => {
+      queryClient.invalidateQueries({ queryKey: ['alerts'] });
+      queryClient.invalidateQueries({ queryKey: ['alert', alertId] });
+    },
+  });
+}
+
+export function useAlertDedupStats() {
+  return useQuery<AlertDeduplicationStatsResponse>({
+    queryKey: ['alert-dedup-stats'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/alerts/dedup/stats');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useTransactionExplainability(transactionId: string | undefined) {
+  return useQuery<ExplainabilityReport>({
+    queryKey: ['transaction-explain', transactionId],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/api/v1/explanation/${transactionId}`);
+      return data;
+    },
+    enabled: !!transactionId,
   });
 }
 

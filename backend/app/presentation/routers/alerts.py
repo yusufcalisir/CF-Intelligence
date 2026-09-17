@@ -1,6 +1,7 @@
 """Alert and intelligence API endpoints.
 
-Manages fraud alerts and shared cross-institution intelligence.
+Manages fraud alerts, triage lifecycle, sliding-window deduplication,
+and shared cross-institution intelligence feeds.
 """
 
 from __future__ import annotations
@@ -10,12 +11,15 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from app.application.schemas.phase2 import (
+from app.application.schemas.alerts import (
     AlertDeduplicationStatsResponse,
     AlertResponse,
+    AlertStandaloneTriageRequest,
     AlertStatusUpdateRequest,
     AlertTriageEvaluateRequest,
     AlertTriageEvaluateResponse,
+)
+from app.application.schemas.phase2 import (
     CounterfactualChangeSchema,
     CounterfactualExplanationResponse,
     DecisionReplayResponse,
@@ -28,7 +32,7 @@ from app.application.schemas.phase2 import (
     PolicyRuleEvaluationSchema,
     SharedIntelligenceResponse,
 )
-from app.application.services.alert_service import AlertIntelligenceService
+from app.application.services.alert_service import AlertIntelligenceService, AlertTriageEngine
 from app.application.services.explainability_service import ExplainabilityService
 from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import AlertSeverity, AlertStatus
@@ -38,7 +42,10 @@ if TYPE_CHECKING:
     from app.domain.entities_phase2 import Alert
 
 logger = logging.getLogger(__name__)
+
+# Dual-routing support for both /api/v1 and /v1 prefixes
 router = APIRouter(prefix="/api/v1", tags=["alerts"])
+api_router = APIRouter(prefix="/v1", tags=["alerts"])
 
 # Shared service instances (singleton pattern matching Phase 1)
 _alert_service = AlertIntelligenceService()
@@ -61,6 +68,7 @@ def _to_alert_response(a: Alert) -> AlertResponse:
         confidence=a.confidence,
         involved_entity_ids=a.involved_entity_ids,
         created_at=a.created_at.isoformat(),
+        updated_at=a.updated_at.isoformat() if a.updated_at else None,
         top_features=a.top_features,
         risk_factors=a.risk_factors,
         model_confidence=a.model_confidence,
@@ -75,6 +83,7 @@ def _to_alert_response(a: Alert) -> AlertResponse:
 
 
 @router.get("/alerts", response_model=list[AlertResponse])
+@api_router.get("/alerts", response_model=list[AlertResponse])
 @limiter.limit("120/minute")
 async def list_alerts(
     request: Request,
@@ -116,6 +125,7 @@ async def list_alerts(
 
 
 @router.get("/alerts/dedup/stats", response_model=AlertDeduplicationStatsResponse)
+@api_router.get("/alerts/dedup/stats", response_model=AlertDeduplicationStatsResponse)
 @limiter.limit("120/minute")
 async def get_deduplication_stats(request: Request) -> AlertDeduplicationStatsResponse:
     """Get real-time alert deduplication sliding window statistics."""
@@ -123,7 +133,47 @@ async def get_deduplication_stats(request: Request) -> AlertDeduplicationStatsRe
     return AlertDeduplicationStatsResponse(**stats)
 
 
+@router.post("/alerts/triage/evaluate", response_model=AlertTriageEvaluateResponse)
+@api_router.post("/alerts/triage/evaluate", response_model=AlertTriageEvaluateResponse)
+@limiter.limit("60/minute")
+async def evaluate_standalone_triage(
+    request: Request,
+    payload: AlertStandaloneTriageRequest,
+    caller_tenant: TenantDep = None,
+) -> AlertTriageEvaluateResponse:
+    """Evaluate multi-factor alert triage rules on arbitrary transaction features."""
+    try:
+        sev = AlertSeverity(payload.severity)
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid alert severity: {payload.severity!r}. Valid values: {[e.value for e in AlertSeverity]}",
+        )
+
+    res = AlertTriageEngine.evaluate_triage(
+        txn={
+            "transaction_amount": payload.transaction_amount,
+            "country_code": payload.country_code,
+            "velocity": payload.velocity,
+        },
+        risk_score=payload.risk_score,
+        severity=sev,
+        dedup_count=payload.dedup_count,
+        reason_codes=payload.reason_codes,
+        entity_overlap_count=payload.entity_overlap_count,
+    )
+
+    return AlertTriageEvaluateResponse(
+        alert_id="simulation_eval",
+        triage_priority=res.priority.value,
+        triage_action=res.action.value,
+        sla_minutes=res.sla_minutes,
+        triage_reasons=res.reasons,
+    )
+
+
 @router.get("/alerts/{alert_id}", response_model=AlertResponse)
+@api_router.get("/alerts/{alert_id}", response_model=AlertResponse)
 @limiter.limit("120/minute")
 async def get_alert(
     request: Request,
@@ -142,6 +192,9 @@ async def get_alert(
 
 
 @router.patch("/alerts/{alert_id}/status", response_model=AlertResponse)
+@router.put("/alerts/{alert_id}/status", response_model=AlertResponse)
+@api_router.patch("/alerts/{alert_id}/status", response_model=AlertResponse)
+@api_router.put("/alerts/{alert_id}/status", response_model=AlertResponse)
 @limiter.limit("60/minute")
 async def update_alert_status(
     request: Request,
@@ -177,6 +230,7 @@ async def update_alert_status(
 
 
 @router.post("/alerts/{alert_id}/triage", response_model=AlertTriageEvaluateResponse)
+@api_router.post("/alerts/{alert_id}/triage", response_model=AlertTriageEvaluateResponse)
 @limiter.limit("60/minute")
 async def evaluate_alert_triage(
     request: Request,
@@ -207,6 +261,7 @@ async def evaluate_alert_triage(
 
 
 @router.get("/alerts/{alert_id}/explain", response_model=ExplainabilityResponse)
+@api_router.get("/alerts/{alert_id}/explain", response_model=ExplainabilityResponse)
 @limiter.limit("60/minute")
 async def explain_alert(
     request: Request,
@@ -249,6 +304,7 @@ async def explain_alert(
 
 
 @router.get("/explanation/{transaction_id}", response_model=ExplainabilityResponse)
+@api_router.get("/explanation/{transaction_id}", response_model=ExplainabilityResponse)
 async def explain_transaction(
     transaction_id: str, caller_tenant: TenantDep = None
 ) -> ExplainabilityResponse:
@@ -288,6 +344,7 @@ async def explain_transaction(
 
 
 @router.get("/intelligence", response_model=list[SharedIntelligenceResponse])
+@api_router.get("/intelligence", response_model=list[SharedIntelligenceResponse])
 async def list_intelligence(
     bank_id: str | None = Query(None, description="Filter intelligence NOT from this bank"),
 ) -> list[SharedIntelligenceResponse]:
@@ -314,6 +371,7 @@ async def list_intelligence(
 
 
 @router.get("/intelligence/stats", response_model=IntelligenceStatsResponse)
+@api_router.get("/intelligence/stats", response_model=IntelligenceStatsResponse)
 async def intelligence_stats() -> IntelligenceStatsResponse:
     """Get shared intelligence statistics."""
     stats = _alert_service.get_intelligence_stats()
@@ -321,6 +379,7 @@ async def intelligence_stats() -> IntelligenceStatsResponse:
 
 
 @router.get("/alerts/{alert_id}/counterfactuals", response_model=CounterfactualExplanationResponse)
+@api_router.get("/alerts/{alert_id}/counterfactuals", response_model=CounterfactualExplanationResponse)
 async def get_alert_counterfactuals(
     alert_id: str,
     target_score: float = Query(350.0, ge=50.0, le=800.0),
@@ -355,6 +414,7 @@ async def get_alert_counterfactuals(
 
 
 @router.get("/alerts/{alert_id}/decision-replay", response_model=DecisionReplayResponse)
+@api_router.get("/alerts/{alert_id}/decision-replay", response_model=DecisionReplayResponse)
 async def replay_alert_decision(
     alert_id: str, caller_tenant: TenantDep = None
 ) -> DecisionReplayResponse:
@@ -395,6 +455,7 @@ async def replay_alert_decision(
 
 
 @router.get("/alerts/{alert_id}/gnn-explanation", response_model=GNNExplanationResponse)
+@api_router.get("/alerts/{alert_id}/gnn-explanation", response_model=GNNExplanationResponse)
 async def get_alert_gnn_explanation(
     alert_id: str, caller_tenant: TenantDep = None
 ) -> GNNExplanationResponse:
@@ -431,6 +492,7 @@ async def get_alert_gnn_explanation(
 
 
 @router.get("/alerts/{alert_id}/lime-explanation", response_model=LIMEExplanationResponse)
+@api_router.get("/alerts/{alert_id}/lime-explanation", response_model=LIMEExplanationResponse)
 async def get_alert_lime_explanation(
     alert_id: str,
     kernel_width: float = Query(0.75, ge=0.05, le=5.0),
@@ -472,6 +534,7 @@ async def get_alert_lime_explanation(
 
 
 @router.get("/explanation/{transaction_id}/lime", response_model=LIMEExplanationResponse)
+@api_router.get("/explanation/{transaction_id}/lime", response_model=LIMEExplanationResponse)
 async def get_transaction_lime_explanation(
     transaction_id: str,
     kernel_width: float = Query(0.75, ge=0.05, le=5.0),
@@ -510,4 +573,3 @@ async def get_transaction_lime_explanation(
         ],
         explanation_text=lime_report.explanation_text,
     )
-
