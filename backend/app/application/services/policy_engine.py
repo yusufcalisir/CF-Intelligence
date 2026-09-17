@@ -369,26 +369,28 @@ class PolicyEngineService:
         new_count = 0
         for dr in default_rules:
             if isinstance(dr, dict):
-                dr_id = dr.get("id")
+                raw_id = dr.get("id")
                 name = dr.get("rule_name")
                 cond = dr.get("condition")
                 act = dr.get("action")
                 active = dr.get("is_active", True)
             else:
-                dr_id = getattr(dr, "id", None)
+                raw_id = getattr(dr, "id", None)
                 name = getattr(dr, "rule_name", None)
                 cond = getattr(dr, "condition", None)
                 act = getattr(dr, "action", None)
                 active = getattr(dr, "is_active", True)
 
+            dr_id = str(raw_id).strip() if raw_id else None
+            if dr_id and dr_id not in existing:
                 # Check if a rule with same rule_name already exists to avoid unique constraint violations
                 name_exists = any(r.rule_name == name for r in existing.values())
                 if not name_exists:
                     rule = BusinessRuleModel(
-                        id=str(dr_id),
-                        rule_name=str(name),
+                        id=dr_id,
+                        rule_name=str(name) if name else dr_id,
                         condition=cond if isinstance(cond, dict) else {},
-                        action=str(act).strip().upper(),
+                        action=str(act).strip().upper() if act else "ALLOW",
                         is_active=bool(active),
                         created_at=datetime.now(UTC),
                         updated_at=datetime.now(UTC),
