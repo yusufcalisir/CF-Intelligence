@@ -31,6 +31,9 @@ import type {
   ScenarioInfo,
   ScenarioStartResponse,
   ScenarioStatus,
+  ScenarioStopResponse,
+  ActiveScenarioItem,
+  MerchantRiskItem,
   AttackInjectionRequest,
   AttackInjectionResponse,
   SharedIntelligence,
@@ -814,13 +817,39 @@ export function useInjectAttack() {
   });
 }
 
+export function useStopScenario() {
+  const queryClient = useQueryClient();
+  return useMutation<ScenarioStopResponse, Error, string>({
+    mutationFn: async (scenarioId: string) => {
+      const { data } = await apiClient.post(`/api/v1/scenarios/${scenarioId}/stop`);
+      return data;
+    },
+    onSuccess: (_, scenarioId) => {
+      queryClient.invalidateQueries({ queryKey: ['scenario-status', scenarioId] });
+      queryClient.invalidateQueries({ queryKey: ['active-scenarios'] });
+    },
+  });
+}
+
+export function useActiveScenarios() {
+  return useQuery<ActiveScenarioItem[]>({
+    queryKey: ['active-scenarios'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/scenarios/active/list');
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+}
+
 // ── Phase 2: Dashboard ─────────────────────
 
-export function useDashboardStats() {
+export function useDashboardStats(bankId?: string) {
   return useQuery<DashboardStats>({
-    queryKey: ['dashboard-stats'],
+    queryKey: ['dashboard-stats', bankId],
     queryFn: async () => {
-      const { data } = await apiClient.get('/api/v1/dashboard/stats');
+      const params = bankId ? { bank_id: bankId } : undefined;
+      const { data } = await apiClient.get('/api/v1/dashboard/stats', { params });
       return data;
     },
     refetchInterval: 5000,
@@ -837,11 +866,25 @@ export function useRiskWeights() {
   });
 }
 
-export function useAlertsBySeverity() {
+export function useUpdateRiskWeights() {
+  const queryClient = useQueryClient();
+  return useMutation<RiskWeights, Error, Partial<RiskWeights>>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.put('/api/v1/dashboard/risk-weights', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['risk-weights'] });
+    },
+  });
+}
+
+export function useAlertsBySeverity(bankId?: string) {
   return useQuery<Record<string, number>>({
-    queryKey: ['alerts-by-severity'],
+    queryKey: ['alerts-by-severity', bankId],
     queryFn: async () => {
-      const { data } = await apiClient.get('/api/v1/dashboard/alerts-by-severity');
+      const params = bankId ? { bank_id: bankId } : undefined;
+      const { data } = await apiClient.get('/api/v1/dashboard/alerts-by-severity', { params });
       return data;
     },
     refetchInterval: 10000,
@@ -853,6 +896,31 @@ export function useAlertsByBank() {
     queryKey: ['alerts-by-bank'],
     queryFn: async () => {
       const { data } = await apiClient.get('/api/v1/dashboard/alerts-by-bank');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useEntitiesByRisk(bankId?: string) {
+  return useQuery<Record<string, number>>({
+    queryKey: ['entities-by-risk', bankId],
+    queryFn: async () => {
+      const params = bankId ? { bank_id: bankId } : undefined;
+      const { data } = await apiClient.get('/api/v1/dashboard/entities-by-risk', { params });
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useTopRiskyMerchants(limit = 10, bankId?: string) {
+  return useQuery<MerchantRiskItem[]>({
+    queryKey: ['top-risky-merchants', limit, bankId],
+    queryFn: async () => {
+      const params: Record<string, unknown> = { limit };
+      if (bankId) params.bank_id = bankId;
+      const { data } = await apiClient.get('/api/v1/dashboard/top-risky-merchants', { params });
       return data;
     },
     refetchInterval: 10000,

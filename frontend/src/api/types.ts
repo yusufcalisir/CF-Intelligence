@@ -816,6 +816,20 @@ export interface ScenarioStatus {
   started_at: string;
 }
 
+export interface ScenarioStopResponse {
+  scenario_id: string;
+  status: string;
+}
+
+export interface ActiveScenarioItem {
+  scenario_id: string;
+  status: string;
+  total_events: number;
+  delivered_events: number;
+  speed_multiplier: number;
+  started_at: string;
+}
+
 export interface StreamingEvent {
   event_id: string;
   event_type: string;
@@ -874,6 +888,12 @@ export interface RiskWeights {
   previous_alerts: number;
   chargeback_history: number;
   behavior_anomaly: number;
+  gnn_topological_risk?: number;
+}
+
+export interface MerchantRiskItem {
+  merchant: string;
+  alert_count: number;
 }
 
 export const SEVERITY_COLORS: Record<string, string> = {

@@ -291,6 +291,7 @@ class RiskWeightsResponse(BaseModel):
     previous_alerts: float
     chargeback_history: float
     behavior_anomaly: float
+    gnn_topological_risk: float = 0.0
 
 
 class RiskWeightsUpdateRequest(BaseModel):
@@ -303,6 +304,7 @@ class RiskWeightsUpdateRequest(BaseModel):
     previous_alerts: float = Field(0.08, ge=0.0, le=1.0)
     chargeback_history: float = Field(0.07, ge=0.0, le=1.0)
     behavior_anomaly: float = Field(0.07, ge=0.0, le=1.0)
+    gnn_topological_risk: float = Field(0.0, ge=0.0, le=1.0)
 
     @field_validator(
         "ml_prediction",
@@ -314,6 +316,7 @@ class RiskWeightsUpdateRequest(BaseModel):
         "previous_alerts",
         "chargeback_history",
         "behavior_anomaly",
+        "gnn_topological_risk",
     )
     @classmethod
     def weight_precision(cls, v: float) -> float:
@@ -871,6 +874,25 @@ class AMLEvidencePackageResponse(BaseModel):
     zero_pii_verified: bool
     assembled_at: str
     evidence_digest: str
+
+
+class MerchantRiskItem(BaseModel):
+    merchant: str
+    alert_count: int
+
+
+class ScenarioStopResponse(BaseModel):
+    scenario_id: str
+    status: str = "stopped"
+
+
+class ActiveScenarioItem(BaseModel):
+    scenario_id: str
+    status: str
+    total_events: int
+    delivered_events: int
+    speed_multiplier: float
+    started_at: str
 
 
 

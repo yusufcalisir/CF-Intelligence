@@ -5,17 +5,20 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from datetime import datetime, timezone
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Path, status
 
-from app.application.schemas.phase2 import (
+from app.application.schemas.scenarios import (
+    ActiveScenarioItem,
     AttackInjectionRequest,
     AttackInjectionResponse,
     ScenarioInfoResponse,
     ScenarioStartRequest,
     ScenarioStartResponse,
     ScenarioStatusResponse,
+    ScenarioStopResponse,
 )
 from app.application.services.scenario_service import ScenarioSimulator
 from app.application.services.streaming_engine import StreamingEngine
@@ -36,24 +39,37 @@ def get_streaming_engine() -> StreamingEngine:
     return _streaming_engine
 
 
-@router.get("", response_model=list[ScenarioInfoResponse])
+@router.get(
+    "",
+    response_model=list[ScenarioInfoResponse],
+    status_code=status.HTTP_200_OK,
+    summary="List available scenario types",
+)
 async def list_scenarios() -> list[ScenarioInfoResponse]:
-    """List available scenario types."""
+    """List available cross-bank fraud scenario types with simulation metadata."""
     scenarios = _scenario_simulator.list_available_scenarios()
     return [ScenarioInfoResponse(**s) for s in scenarios]
 
 
-@router.post("/start", response_model=ScenarioStartResponse)
+@router.post(
+    "/start",
+    response_model=ScenarioStartResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Start a scenario replay",
+)
 async def start_scenario(req: ScenarioStartRequest) -> ScenarioStartResponse:
-    """Start a scenario replay."""
+    """Start a scripted fraud scenario event stream replay."""
     try:
         scenario_type = ScenarioType(req.scenario_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"Unknown scenario type: {req.scenario_type}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unknown scenario type: {req.scenario_type}",
+        )
 
     scenario = _scenario_simulator.create_scenario(scenario_type)
 
-    # Start streaming (without Redis for now — events are tracked in-memory)
+    # Start streaming (in-process broadcast queue with fallback)
     await _streaming_engine.start_scenario(
         scenario=scenario,
         speed_multiplier=req.speed_multiplier,
@@ -68,54 +84,84 @@ async def start_scenario(req: ScenarioStartRequest) -> ScenarioStartResponse:
     )
 
 
-@router.get("/{scenario_id}/status", response_model=ScenarioStatusResponse)
-async def scenario_status(scenario_id: str) -> ScenarioStatusResponse:
-    """Get scenario streaming status."""
-    import re
-    from datetime import datetime, timezone
-
-    status = _streaming_engine.get_scenario_status(scenario_id)
-    if not status:
-        # Fallback for valid UUID format scenario IDs (e.g., from prior sessions or completed runs)
-        if re.fullmatch(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-            scenario_id,
-            re.IGNORECASE,
-        ):
+@router.get(
+    "/{scenario_id}/status",
+    response_model=ScenarioStatusResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get scenario streaming status",
+)
+async def scenario_status(
+    scenario_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> ScenarioStatusResponse:
+    """Get real-time streaming progress of an active or historical scenario."""
+    status_data = _streaming_engine.get_scenario_status(scenario_id)
+    if not status_data:
+        # Check if the scenario exists in the scenario simulator repository
+        scenario = _scenario_simulator.get_scenario(scenario_id)
+        if scenario is not None:
             return ScenarioStatusResponse(
                 scenario_id=scenario_id,
                 status="completed",
-                total_events=100,
-                delivered_events=100,
+                total_events=len(scenario.events),
+                delivered_events=len(scenario.events),
                 speed_multiplier=1.0,
-                started_at=datetime.now(timezone.utc).isoformat(),  # noqa: UP017
+                started_at=datetime.now(timezone.utc).isoformat(),
             )
-        raise HTTPException(status_code=404, detail="Scenario not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario '{scenario_id}' not found",
+        )
 
     return ScenarioStatusResponse(
         scenario_id=scenario_id,
-        status=status["status"],
-        total_events=status["total_events"],
-        delivered_events=status["delivered_events"],
-        speed_multiplier=status["speed_multiplier"],
-        started_at=status["started_at"],
+        status=status_data["status"],
+        total_events=status_data["total_events"],
+        delivered_events=status_data["delivered_events"],
+        speed_multiplier=status_data["speed_multiplier"],
+        started_at=status_data["started_at"],
     )
 
 
-@router.post("/{scenario_id}/stop")
-async def stop_scenario(scenario_id: str) -> dict:
-    """Stop a running scenario."""
+@router.post(
+    "/{scenario_id}/stop",
+    response_model=ScenarioStopResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Stop a running scenario",
+)
+async def stop_scenario(
+    scenario_id: str = Path(..., min_length=3, max_length=64, pattern=r"^[a-zA-Z0-9_\-]+$"),
+) -> ScenarioStopResponse:
+    """Halt an active streaming scenario and mark it stopped."""
+    status_data = _streaming_engine.get_scenario_status(scenario_id)
+    scenario = _scenario_simulator.get_scenario(scenario_id)
+    if not status_data and scenario is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Scenario '{scenario_id}' not found",
+        )
+
     await _streaming_engine.stop_scenario(scenario_id)
-    return {"scenario_id": scenario_id, "status": "stopped"}
+    return ScenarioStopResponse(scenario_id=scenario_id, status="stopped")
 
 
-@router.get("/active/list")
-async def active_scenarios() -> list[dict]:
-    """List currently running scenarios."""
-    return _streaming_engine.get_active_scenarios()
+@router.get(
+    "/active/list",
+    response_model=list[ActiveScenarioItem],
+    status_code=status.HTTP_200_OK,
+    summary="List currently running scenarios",
+)
+async def active_scenarios() -> list[ActiveScenarioItem]:
+    """List all currently executing scenario streams."""
+    raw_active = _streaming_engine.get_active_scenarios()
+    return [ActiveScenarioItem(**item) for item in raw_active]
 
 
-@router.post("/inject-attack", response_model=AttackInjectionResponse)
+@router.post(
+    "/inject-attack",
+    response_model=AttackInjectionResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Inject adversarial attack and engage cryptographic shields",
+)
 async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInjectionResponse:
     """Inject a live adversarial attack (e.g. 500 tx/s smurfing burst or Byzantine gradient poisoning)
     and engage cryptographic and statistical defense shields (Krum, Trimmed-Mean, GraphSAGE LSH-PSI).
@@ -229,9 +275,6 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             / (np.linalg.norm(robust_agg) * np.linalg.norm(clean_consensus) + 1e-9)
         )
         # Continuous downstream scoring proxy (Simulated Demo Indicator):
-        # Accounts for cosine alignment and residual adversarial boundary strain for interactive chaos testing.
-        # NOTE: This metric is a live continuous proxy demonstrating defense resilience in dynamic scenarios,
-        # not an offline holdout validation AUC measured on an external benchmark dataset.
         boundary_strain = euclidean_dist / (cutoff * 1200.0)
         auc_protected = round(
             max(0.9100, min(0.9600, 0.9418 - (1.0 - cos_robust) * 1.5 - boundary_strain)),
@@ -248,6 +291,7 @@ async def inject_adversarial_attack(req: AttackInjectionRequest) -> AttackInject
             defense_name,
             req.adversary_bank,
         )
+
         return AttackInjectionResponse(
             attack_id=attack_id,
             attack_type=req.attack_type,
