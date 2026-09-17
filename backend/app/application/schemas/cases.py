@@ -36,6 +36,7 @@ _EVIDENCE_TYPES = Literal[
     "kyc_profile",
     "ledger_proof",
     "TRANSACTION_RECORD",
+    "TRANSACTION_LEDGER",
     "IP_INTELLIGENCE",
     "KYC_DOCUMENT",
 ]

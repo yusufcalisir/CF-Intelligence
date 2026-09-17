@@ -1,7 +1,9 @@
 """Enterprise Security Suite API Endpoints.
 
 Exposes status, ABAC policy testing, HashiCorp Vault secrets metadata,
-mTLS certificate status, and tamper-proof SHA-256 cryptographic audit chain verification.
+mTLS certificate status, tamper-proof SHA-256 cryptographic audit chain verification,
+zk-SNARK proof verification, Post-Quantum Cryptography (PQC), federated unlearning,
+Layer-2 multi-chain settlement bridge, adaptive DP auto-scaler, and KMS key rotation.
 """
 
 from __future__ import annotations
@@ -11,8 +13,35 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
 
+from app.application.schemas.security import (
+    ABACEvalRequest,
+    ABACEvalResponse,
+    AuditChainEntryResponse,
+    AuditChainVerifyResponse,
+    BridgeStatusResponse,
+    CalibrateRDPRequest,
+    CalibrateRDPResponse,
+    CrossChainDisburseRequest,
+    CrossChainDisburseResponse,
+    CrossChainRouteItem,
+    EncapsulatePQCResponse,
+    GeneratePQCKeypairRequest,
+    GeneratePQCKeypairResponse,
+    KMSKeyMetadataResponse,
+    KMSKeyRotateRequest,
+    KMSKeyRotateResponse,
+    PQCStatusResponse,
+    RDPStatusResponse,
+    SecurityStatusResponse,
+    UnlearnBankRequest,
+    UnlearnBankResponse,
+    UnlearningStatusResponse,
+    VaultSealStatusResponse,
+    VerifyZKProofRequest,
+    VerifyZKProofResponse,
+    ZKVerifierStatusResponse,
+)
 from app.application.services.federated_unlearning_engine import FederatedUnlearningEngine
 from app.application.services.privacy_service import PrivacyBudgetExceededError
 from app.config import get_settings
@@ -26,11 +55,15 @@ from app.infrastructure.security.layer2_crosschain_bridge import Layer2CrossChai
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator, UserClaims
 from app.infrastructure.security.pqc_secagg_driver import PQCSecAggDriver
+from app.infrastructure.security.tenant_kms import TenantKMSKeyManager
 from app.infrastructure.security.vault_client import VaultClient
 from app.infrastructure.security.zk_snark_verifier import ZKSNARKProofVerifier
 
 logger = logging.getLogger(__name__)
-router = APIRouter(prefix="/api/v1/security", tags=["security"])
+
+# Legacy and Canonical Routers for dual-prefix support (/v1/security and /api/v1/security)
+router = APIRouter(prefix="/v1/security", tags=["security"])
+api_router = APIRouter(prefix="/api/v1/security", tags=["security"])
 
 settings = get_settings()
 _mtls_mgr = MTLSManager(ca_cn=settings.mtls_ca_cn)
@@ -46,69 +79,16 @@ _vault_client = VaultClient(
     enabled=settings.vault_enabled,
 )
 _audit_chain = ImmutableAuditChain.get_instance()
+_zk_verifier = ZKSNARKProofVerifier()
+_unlearning_engine = FederatedUnlearningEngine()
+_pqc_driver = PQCSecAggDriver()
+_bridge_driver = Layer2CrossChainBridgeDriver()
+_rdp_autoscaler = AdaptiveDPAutoScaler()
 
 
-# ── Schemas ───────────────────────────────────────────────────
+# ── Handler Implementations ───────────────────────────────────
 
 
-class ABACEvalRequest(BaseModel):
-    user_username: str = "analyst_a1"
-    user_bank_id: str = "bank_a"
-    user_roles: list[str] = ["analyst"]
-    user_clearance: int = 2
-    user_shift_hours: str = "08:00-18:00"
-    user_approval_tier: float = 50000.0
-
-    resource_type: str = "alert"
-    resource_id: str = "alt_1001"
-    resource_bank_id: str = "bank_a"
-    resource_amount: float = 12500.0
-    resource_classification: int = 1
-
-    action: str = "read"
-    hour_override: int | None = None
-
-
-class ABACEvalResponse(BaseModel):
-    allowed: bool
-    policy_name: str
-    reason: str
-    evaluated_at: str
-
-
-class AuditChainEntryResponse(BaseModel):
-    index: int
-    event_type: str
-    actor: str
-    target_id: str
-    timestamp: str
-    details: dict[str, Any]
-    prev_hash: str
-    curr_hash: str
-
-
-class AuditChainVerifyResponse(BaseModel):
-    is_valid: bool
-    total_records: int
-    broken_index: int | None = None
-    tamper_reason: str | None = None
-    genesis_hash: str
-    last_hash: str
-    verified_at: str
-
-
-class SecurityStatusResponse(BaseModel):
-    mtls: dict[str, Any]
-    oidc: dict[str, Any]
-    abac: dict[str, Any]
-    vault: dict[str, Any]
-    audit_chain: dict[str, Any]
-
-
-# ── Endpoints ─────────────────────────────────────────────────
-
-
-@router.get("/status", response_model=SecurityStatusResponse)
 async def get_security_status() -> SecurityStatusResponse:
     """Get Enterprise Security Suite status across mTLS, OIDC, ABAC, Vault, and Audit Chain."""
     cert = _mtls_mgr.generate_cert_info("gateway.internal")
@@ -168,22 +148,37 @@ async def get_security_status() -> SecurityStatusResponse:
     )
 
 
-@router.post("/abac/evaluate", response_model=ABACEvalResponse)
 async def evaluate_abac_policy(req: ABACEvalRequest) -> ABACEvalResponse:
     """Test dynamic ABAC policy evaluation for arbitrary user and resource attributes."""
+    username = req.actor if req.actor else req.user_username
+    bank_id = req.bank_id if req.bank_id else req.user_bank_id
+    roles = [req.actor_role] if req.actor_role else req.user_roles
+    clearance = req.user_clearance
+    if req.attributes and "clearance_level" in req.attributes:
+        val = str(req.attributes["clearance_level"]).upper()
+        if "LEVEL_3" in val or "3" in val:
+            clearance = 3
+        elif "LEVEL_4" in val or "4" in val:
+            clearance = 4
+        elif "LEVEL_5" in val or "5" in val:
+            clearance = 5
+
     user = UserClaims(
-        sub=f"usr_{req.user_username}",
-        username=req.user_username,
-        bank_id=req.user_bank_id,
-        roles=req.user_roles,
-        clearance_level=req.user_clearance,
+        sub=f"usr_{username}",
+        username=username,
+        bank_id=bank_id,
+        roles=roles,
+        clearance_level=clearance,
         shift_hours=req.user_shift_hours,
         approval_tier=req.user_approval_tier,
     )
+    res_type = req.resource if req.resource else req.resource_type
+    res_bank = req.bank_id if req.bank_id else req.resource_bank_id
+
     resource = ABACResource(
-        resource_type=req.resource_type,
+        resource_type=res_type,
         resource_id=req.resource_id,
-        bank_id=req.resource_bank_id,
+        bank_id=res_bank,
         amount=req.resource_amount,
         classification_level=req.resource_classification,
     )
@@ -198,7 +193,7 @@ async def evaluate_abac_policy(req: ABACEvalRequest) -> ABACEvalResponse:
     # Log evaluation in cryptographic audit chain
     _audit_chain.append_event(
         event_type="ABAC_EVALUATION",
-        actor=req.user_username,
+        actor=username,
         target_id=f"{req.resource_type}:{req.resource_id}",
         details={
             "action": req.action,
@@ -215,7 +210,6 @@ async def evaluate_abac_policy(req: ABACEvalRequest) -> ABACEvalResponse:
     )
 
 
-@router.get("/audit-chain", response_model=list[AuditChainEntryResponse])
 async def list_audit_chain(limit: int = Query(50, ge=1, le=200)) -> list[AuditChainEntryResponse]:
     """Get entries from the cryptographic SHA-256 audit chain ledger."""
     entries = _audit_chain.chain[-limit:]
@@ -234,7 +228,6 @@ async def list_audit_chain(limit: int = Query(50, ge=1, le=200)) -> list[AuditCh
     ]
 
 
-@router.post("/audit-chain/verify", response_model=AuditChainVerifyResponse)
 async def verify_audit_chain() -> AuditChainVerifyResponse:
     """Execute 1-click retrospective SHA-256 chain verification to detect tampering."""
     rpt = _audit_chain.verify_chain_integrity()
@@ -249,25 +242,7 @@ async def verify_audit_chain() -> AuditChainVerifyResponse:
     )
 
 
-# ── Zero-Knowledge Proof (zk-SNARK) Endpoints ─────────────────────────
-
-_zk_verifier = ZKSNARKProofVerifier()
-
-
-class VerifyZKProofRequest(BaseModel):
-    proof_id: str = "zk_proof_bank_alpha_r1"
-    bank_id: str = "bank_alpha"
-    round_id: int = 1
-    pi_a: list[str] = ["0x1234", "0x5678"]
-    pi_b: list[list[str]] = [["0x1", "0x2"], ["0x3", "0x4"]]
-    pi_c: list[str] = ["0x9abc", "0xdef0"]
-    public_weight_hash: str = "0x0000000000000000000000000000000000000000000000000000000000000001"
-    l2_norm_bound: float = 10.0
-    vector_dimension: int = 128
-
-
-@router.post("/zkp/verify")
-async def verify_zk_proof(req: VerifyZKProofRequest) -> dict[str, Any]:
+async def verify_zk_proof(req: VerifyZKProofRequest) -> VerifyZKProofResponse:
     """Verify Groth16 zk-SNARK model weight attestation proof in O(1) time."""
     proof = ZKSNARKAttestationProof(
         proof_id=req.proof_id,
@@ -282,41 +257,24 @@ async def verify_zk_proof(req: VerifyZKProofRequest) -> dict[str, Any]:
         created_at_timestamp=0.0,
     )
     res = _zk_verifier.verify_attestation_proof(proof)
-    return {
-        "is_valid": res.is_valid,
-        "status_code": res.status_code,
-        "proof_id": res.proof_id,
-        "bank_id": res.bank_id,
-        "verification_time_ms": res.verification_time_ms,
-        "verification_message": res.verification_message,
-        "pairing_check_passed": res.pairing_check_passed,
-        "circuit_metadata": res.circuit_metadata,
-    }
+    return VerifyZKProofResponse(
+        is_valid=res.is_valid,
+        status_code=res.status_code,
+        proof_id=res.proof_id,
+        bank_id=res.bank_id,
+        verification_time_ms=res.verification_time_ms,
+        verification_message=res.verification_message,
+        pairing_check_passed=res.pairing_check_passed,
+        circuit_metadata=res.circuit_metadata,
+    )
 
 
-@router.get("/zkp/status")
-async def get_zkp_status() -> dict[str, Any]:
+async def get_zkp_status() -> ZKVerifierStatusResponse:
     """Get status telemetry for zk-SNARK model weight attestation circuit and verifier."""
-    return _zk_verifier.get_verifier_status()
+    return ZKVerifierStatusResponse.model_validate(_zk_verifier.get_verifier_status())
 
 
-# ── Confidential Federated Unlearning Endpoints ───────────────────────
-
-_unlearning_engine = FederatedUnlearningEngine()
-
-
-class UnlearnBankRequest(BaseModel):
-    target_bank_id: str = "bank_gamma"
-    unlearning_method: str = UnlearningMethod.EXACT_REAGGREGATION.value
-    start_round: int = 1
-    end_round: int = 42
-    ascent_lr: float = 0.01
-    ascent_steps: int = 3
-    projection_radius: float = 0.15
-
-
-@router.post("/unlearn")
-async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
+async def unlearn_bank_contributions(req: UnlearnBankRequest) -> UnlearnBankResponse:
     """Trigger exact federated model weight unlearning or simulated baseline for an evicted bank."""
     method_enum = (
         UnlearningMethod(req.unlearning_method)
@@ -330,95 +288,81 @@ async def unlearn_bank_contributions(req: UnlearnBankRequest) -> dict[str, Any]:
         ascent_steps=req.ascent_steps,
         projection_radius=req.projection_radius,
     )
-    return {
-        "target_bank_id": res.target_bank_id,
-        "unlearning_method": res.unlearning_method,
-        "initial_model_l2_norm": res.initial_model_l2_norm,
-        "unlearned_model_l2_norm": res.unlearned_model_l2_norm,
-        "parameter_drift_delta": res.parameter_drift_delta,
-        "hessian_spectral_radius": res.hessian_spectral_radius,
-        "mia_membership_probability": res.mia_membership_probability,
-        "execution_time_ms": res.execution_time_ms,
-        "erasure_verified": res.erasure_verified,
-        "lineage_hash": res.lineage_hash,
-        "audit_log": res.audit_log,
-        "retained_banks": res.retained_banks,
-    }
+    return UnlearnBankResponse(
+        target_bank_id=res.target_bank_id,
+        unlearning_method=res.unlearning_method,
+        initial_model_l2_norm=res.initial_model_l2_norm,
+        unlearned_model_l2_norm=res.unlearned_model_l2_norm,
+        parameter_drift_delta=res.parameter_drift_delta,
+        hessian_spectral_radius=res.hessian_spectral_radius,
+        mia_membership_probability=res.mia_membership_probability,
+        execution_time_ms=res.execution_time_ms,
+        erasure_verified=res.erasure_verified,
+        lineage_hash=res.lineage_hash,
+        audit_log=res.audit_log,
+        retained_banks=res.retained_banks,
+    )
 
 
-@router.get("/unlearn/status")
-async def get_unlearning_status() -> dict[str, Any]:
+async def get_unlearning_status() -> UnlearningStatusResponse:
     """Get telemetry for federated unlearning engine and MIA risk auditor."""
-    return {
-        "engine_status": "ACTIVE",
-        "supported_methods": [m.value for m in UnlearningMethod],
-        "total_unlearning_runs": _unlearning_engine.unlearning_runs_count,
-        "target_mia_threshold": 0.52,
-        "unlearning_mechanism": "Exact Re-aggregation / Lineage Subtraction / Projected Gradient Ascent",
-    }
+    return UnlearningStatusResponse(
+        engine_status="ACTIVE",
+        supported_methods=[m.value for m in UnlearningMethod],
+        total_unlearning_runs=_unlearning_engine.unlearning_runs_count,
+        target_mia_threshold=0.52,
+        unlearning_mechanism="Exact Re-aggregation / Lineage Subtraction / Projected Gradient Ascent",
+    )
 
 
-# ── Post-Quantum Cryptography (PQC SecAgg & Kyber/Dilithium) Endpoints ───
-
-_pqc_driver = PQCSecAggDriver()
-
-
-class GeneratePQCKeypairRequest(BaseModel):
-    kem_algorithm: str = PQCKemAlgorithm.KYBER_768.value
-    signature_algorithm: str = PQCSignatureAlgorithm.DILITHIUM_3.value
-
-
-@router.post("/pqc/keypair")
-async def generate_pqc_keypair(req: GeneratePQCKeypairRequest) -> dict[str, Any]:
+async def generate_pqc_keypair(req: GeneratePQCKeypairRequest) -> GeneratePQCKeypairResponse:
     """Generate NIST FIPS 203 CRYSTALS-Kyber KEM and FIPS 204 CRYSTALS-Dilithium signature keypairs."""
     kyber_kp = _pqc_driver.generate_kyber_keypair()
     dilithium_kp = _pqc_driver.generate_dilithium_keypair()
 
-    return {
-        "kem_algorithm": kyber_kp.algorithm.value,
-        "kyber_public_key_hex": kyber_kp.public_key_bytes.hex()[:64] + "...",
-        "kyber_pk_len_bytes": len(kyber_kp.public_key_bytes),
-        "kyber_sk_len_bytes": len(kyber_kp.secret_key_bytes),
-        "signature_algorithm": dilithium_kp.algorithm.value,
-        "dilithium_public_key_hex": dilithium_kp.public_key_bytes.hex()[:64] + "...",
-        "dilithium_pk_len_bytes": len(dilithium_kp.public_key_bytes),
-        "dilithium_sk_len_bytes": len(dilithium_kp.secret_key_bytes),
-        "quantum_security_level": "NIST Security Level 3 (256-bit Lattice Security)",
-    }
+    return GeneratePQCKeypairResponse(
+        kem_algorithm=kyber_kp.algorithm.value,
+        kyber_public_key_hex=kyber_kp.public_key_bytes.hex()[:64] + "...",
+        kyber_pk_len_bytes=len(kyber_kp.public_key_bytes),
+        kyber_sk_len_bytes=len(kyber_kp.secret_key_bytes),
+        signature_algorithm=dilithium_kp.algorithm.value,
+        dilithium_public_key_hex=dilithium_kp.public_key_bytes.hex()[:64] + "...",
+        dilithium_pk_len_bytes=len(dilithium_kp.public_key_bytes),
+        dilithium_sk_len_bytes=len(dilithium_kp.secret_key_bytes),
+        quantum_security_level="NIST Security Level 3 (256-bit Lattice Security)",
+    )
 
 
-@router.post("/pqc/encapsulate")
-async def encapsulate_pqc_secret() -> dict[str, Any]:
+async def encapsulate_pqc_secret() -> EncapsulatePQCResponse:
     """Execute NIST FIPS 203 Kyber KEM secret encapsulation and hybrid shared secret derivation."""
     kyber_kp = _pqc_driver.generate_kyber_keypair()
     ct, ss = _pqc_driver.encapsulate_secret(kyber_kp.public_key_bytes)
 
-    return {
-        "kem_algorithm": "Kyber768",
-        "ciphertext_hex": ct.hex()[:64] + "...",
-        "ciphertext_len_bytes": len(ct),
-        "shared_secret_hash": hashlib.sha256(ss).hexdigest(),
-        "shared_secret_len_bytes": len(ss),
-        "encapsulation_status": "COMPLETED",
-        "lattice_security": "M-LWE (Module Learning With Errors)",
-    }
+    return EncapsulatePQCResponse(
+        kem_algorithm="Kyber768",
+        ciphertext_hex=ct.hex()[:64] + "...",
+        ciphertext_len_bytes=len(ct),
+        shared_secret_hash=hashlib.sha256(ss).hexdigest(),
+        shared_secret_len_bytes=len(ss),
+        encapsulation_status="COMPLETED",
+        lattice_security="M-LWE (Module Learning With Errors)",
+    )
 
 
-@router.get("/pqc/status")
-async def get_pqc_status() -> dict[str, Any]:
+async def get_pqc_status() -> PQCStatusResponse:
     """Get status telemetry for Post-Quantum Cryptography suite and NIST standards compliance."""
     state = _pqc_driver.compute_pqc_secagg_round_state(
         round_id=42,
         participating_banks=["bank_alpha", "bank_beta", "bank_gamma", "bank_delta"],
     )
-    return {
-        "status": "ACTIVE",
-        "standard_fips_203": "NIST ML-KEM (CRYSTALS-Kyber-768)",
-        "standard_fips_204": "NIST ML-DSA (CRYSTALS-Dilithium-3)",
-        "quantum_security_level": state.quantum_security_level,
-        "total_encapsulations": _pqc_driver.encapsulations_count,
-        "total_signatures_verified": _pqc_driver.signatures_verified_count,
-        "round_state": {
+    return PQCStatusResponse(
+        status="ACTIVE",
+        standard_fips_203="NIST ML-KEM (CRYSTALS-Kyber-768)",
+        standard_fips_204="NIST ML-DSA (CRYSTALS-Dilithium-3)",
+        quantum_security_level=state.quantum_security_level,
+        total_encapsulations=_pqc_driver.encapsulations_count,
+        total_signatures_verified=_pqc_driver.signatures_verified_count,
+        round_state={
             "round_id": state.round_id,
             "participating_banks": state.participating_banks,
             "hybrid_shared_secrets_derived": state.hybrid_shared_secrets_derived,
@@ -426,23 +370,10 @@ async def get_pqc_status() -> dict[str, Any]:
             "lineage_hash": state.lineage_hash,
             "audit_events": state.audit_events,
         },
-    }
+    )
 
 
-# ── Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge Endpoints ──
-
-_bridge_driver = Layer2CrossChainBridgeDriver()
-
-
-class CrossChainDisburseRequest(BaseModel):
-    epoch_id: int = 42
-    pool_amount: float = 100_000.0
-    currency: str = "wCBDC"
-    allocations: dict[str, float] | None = None
-
-
-@router.post("/bridge/disburse")
-async def disburse_crosschain_incentives(req: CrossChainDisburseRequest) -> dict[str, Any]:
+async def disburse_crosschain_incentives(req: CrossChainDisburseRequest) -> CrossChainDisburseResponse:
     """Execute multi-ledger cross-chain incentive disbursements based on Shapley allocations."""
     allocs = req.allocations or {
         "bank_alpha": 0.38,
@@ -456,68 +387,50 @@ async def disburse_crosschain_incentives(req: CrossChainDisburseRequest) -> dict
         pool_amount=req.pool_amount,
         currency=req.currency,
     )
-    return {
-        "epoch_id": result.epoch_id,
-        "pool_currency": result.pool_currency,
-        "total_pool_amount": result.total_pool_amount,
-        "total_gas_fees_usd": result.total_gas_fees_usd,
-        "routes": [
-            {
-                "bank_id": r.bank_id,
-                "network": r.network.value,
-                "protocol": r.protocol.value,
-                "token_symbol": r.token_symbol,
-                "amount": r.amount,
-                "shapley_share_pct": r.shapley_share_pct,
-                "destination_recipient": r.destination_recipient,
-                "message_id": r.message_id,
-                "gas_fee_usd": r.gas_fee_usd,
-                "status": r.status,
-            }
-            for r in result.routes
-        ],
-        "execution_time_ms": result.execution_time_ms,
-        "bridge_audit_hash": result.bridge_audit_hash,
-        "is_fully_finalized": result.is_fully_finalized,
-        "audit_events": result.audit_events,
-    }
+    routes = [
+        CrossChainRouteItem(
+            bank_id=r.bank_id,
+            network=r.network.value,
+            protocol=r.protocol.value,
+            token_symbol=r.token_symbol,
+            amount=r.amount,
+            shapley_share_pct=r.shapley_share_pct,
+            destination_recipient=r.destination_recipient,
+            message_id=r.message_id,
+            gas_fee_usd=r.gas_fee_usd,
+            status=r.status,
+        )
+        for r in result.routes
+    ]
+    return CrossChainDisburseResponse(
+        epoch_id=result.epoch_id,
+        pool_currency=result.pool_currency,
+        total_pool_amount=result.total_pool_amount,
+        total_gas_fees_usd=result.total_gas_fees_usd,
+        routes=routes,
+        execution_time_ms=result.execution_time_ms,
+        bridge_audit_hash=result.bridge_audit_hash,
+        is_fully_finalized=result.is_fully_finalized,
+        audit_events=result.audit_events,
+    )
 
 
-@router.get("/bridge/status")
-async def get_bridge_status() -> dict[str, Any]:
+async def get_bridge_status() -> BridgeStatusResponse:
     """Get telemetry for Cross-Chain Inter-Bank Settlement & Layer-2 Liquidity Bridge."""
-    return {
-        "bridge_status": "ACTIVE",
-        "primary_protocols": [
+    return BridgeStatusResponse(
+        bridge_status="ACTIVE",
+        primary_protocols=[
             "Chainlink CCIP (Cross-Chain Interoperability)",
             "LayerZero V2",
             "Canton Daml Interop",
         ],
-        "total_disbursements_count": _bridge_driver.total_disbursements_count,
-        "total_volume_settled_usd": _bridge_driver.total_volume_settled_usd,
-        "supported_networks": _bridge_driver.get_network_metrics(),
-    }
+        total_disbursements_count=_bridge_driver.total_disbursements_count,
+        total_volume_settled_usd=_bridge_driver.total_volume_settled_usd,
+        supported_networks=_bridge_driver.get_network_metrics(),
+    )
 
 
-# ── Adaptive Dynamic Differential Privacy Budget Auto-Scaler Endpoints ──
-
-_rdp_autoscaler = AdaptiveDPAutoScaler()
-
-
-class CalibrateRDPRequest(BaseModel):
-    round_id: int = 1
-    current_loss: float = 0.42
-    prev_loss: float = 0.55
-    batch_size: int = 256
-    total_samples: int = 10_000
-    target_epsilon: float = 4.0
-    total_rounds: int = 50
-    node_id: str = "global"
-    enforce_budget_limit: bool = False
-
-
-@router.post("/rdp/calibrate")
-async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> dict[str, Any]:
+async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> CalibrateRDPResponse:
     """Dynamically calibrate per-round noise multiplier sigma_t using Rényi DP and loss velocity."""
     try:
         cal = _rdp_autoscaler.auto_scale_noise_multiplier(
@@ -545,37 +458,257 @@ async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> dict[str, Any]:
     state = _rdp_autoscaler.get_accountant_state(
         node_id=req.node_id, target_epsilon=req.target_epsilon
     )
-    return {
-        "round_id": cal.round_id,
-        "node_id": cal.node_id,
-        "calibrated_sigma": cal.calibrated_sigma,
-        "gradient_clip_c": cal.gradient_clip_c,
-        "instantaneous_epsilon": cal.instantaneous_epsilon,
-        "optimal_alpha": cal.optimal_alpha,
-        "loss_velocity": cal.loss_velocity,
-        "sample_ratio_q": cal.sample_ratio_q,
-        "cumulative_epsilon": state.current_epsilon_at_delta,
-        "target_epsilon": state.target_epsilon,
-        "budget_exhaustion_pct": state.budget_exhaustion_pct,
-        "is_budget_exceeded": state.is_budget_exceeded,
-    }
+    return CalibrateRDPResponse(
+        round_id=cal.round_id,
+        node_id=cal.node_id,
+        calibrated_sigma=cal.calibrated_sigma,
+        gradient_clip_c=cal.gradient_clip_c,
+        instantaneous_epsilon=cal.instantaneous_epsilon,
+        optimal_alpha=cal.optimal_alpha,
+        loss_velocity=cal.loss_velocity,
+        sample_ratio_q=cal.sample_ratio_q,
+        cumulative_epsilon=state.current_epsilon_at_delta,
+        target_epsilon=state.target_epsilon,
+        budget_exhaustion_pct=state.budget_exhaustion_pct,
+        is_budget_exceeded=state.is_budget_exceeded,
+    )
 
 
-@router.get("/rdp/status")
-async def get_rdp_status(node_id: str = Query("global", description="Bank node identifier")) -> dict[str, Any]:
+async def get_rdp_status(node_id: str = Query("global", description="Bank node identifier")) -> RDPStatusResponse:
     """Get real-time telemetry and budget projection for the adaptive DP auto-scaler."""
     telemetry = _rdp_autoscaler.get_telemetry(node_id=node_id)
-    return {
-        "node_id": telemetry.node_id,
-        "active_sigma": telemetry.active_sigma,
-        "active_clip_norm": telemetry.active_clip_norm,
-        "cumulative_epsilon": telemetry.cumulative_epsilon,
-        "target_epsilon": telemetry.target_epsilon,
-        "remaining_budget_pct": telemetry.remaining_budget_pct,
-        "projected_final_epsilon": telemetry.projected_final_epsilon,
-        "snr_signal_to_noise": telemetry.snr_signal_to_noise,
-        "risk_tier": telemetry.risk_tier,
-        "audit_events": telemetry.audit_events,
-        "audit_chain_valid": telemetry.audit_chain_valid,
-        "nodes_summary": _rdp_autoscaler.get_all_nodes_summary(),
-    }
+    return RDPStatusResponse(
+        node_id=telemetry.node_id,
+        active_sigma=telemetry.active_sigma,
+        active_clip_norm=telemetry.active_clip_norm,
+        cumulative_epsilon=telemetry.cumulative_epsilon,
+        target_epsilon=telemetry.target_epsilon,
+        remaining_budget_pct=telemetry.remaining_budget_pct,
+        projected_final_epsilon=telemetry.projected_final_epsilon,
+        snr_signal_to_noise=telemetry.snr_signal_to_noise,
+        risk_tier=telemetry.risk_tier,
+        audit_events=telemetry.audit_events,
+        audit_chain_valid=telemetry.audit_chain_valid,
+        nodes_summary=_rdp_autoscaler.get_all_nodes_summary(),
+    )
+
+
+async def rotate_kms_key(req: KMSKeyRotateRequest) -> KMSKeyRotateResponse:
+    """Rotate tenant encryption key in HashiCorp Vault Transit engine and local KMS."""
+    kms_mgr = TenantKMSKeyManager.get_instance()
+    res = kms_mgr.rotate_key(req.bank_id)
+    return KMSKeyRotateResponse(
+        status=res["status"],
+        bank_id=res["bank_id"],
+        key_name=res["key_name"],
+        previous_version=res["previous_version"],
+        new_version=res["new_version"],
+        rotated_at=res["rotated_at"],
+    )
+
+
+async def get_kms_key_metadata(bank_id: str) -> KMSKeyMetadataResponse:
+    """Retrieve key metadata and active versions for a bank tenant."""
+    kms_mgr = TenantKMSKeyManager.get_instance()
+    if not kms_mgr.has_tenant_key(bank_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active KMS key found for bank '{bank_id}'",
+        )
+    res = kms_mgr.get_key_metadata(bank_id)
+    return KMSKeyMetadataResponse(
+        bank_id=res["bank_id"],
+        key_name=res["key_name"],
+        algorithm=res["algorithm"],
+        latest_version=res["latest_version"],
+        created_at=res["created_at"],
+        last_rotated_at=res["last_rotated_at"],
+        active_versions=res["active_versions"],
+        vault_transit_synced=res["vault_transit_synced"],
+    )
+
+
+async def get_vault_seal_status() -> VaultSealStatusResponse:
+    """Inspect HashiCorp Vault seal status and high availability readiness."""
+    is_healthy = _vault_client.is_healthy()
+    return VaultSealStatusResponse(
+        initialized=True,
+        sealed=not is_healthy if settings.vault_enabled else False,
+        standby=False,
+        vault_url=settings.vault_url,
+        mount_point="secret",
+        ha_enabled=True,
+    )
+
+
+# ── Route Binding to Router Variants ──────────────────────────
+
+for prefix_tag, r in [("v1", router), ("api_v1", api_router)]:
+    r.add_api_route(
+        "/status",
+        get_security_status,
+        methods=["GET"],
+        response_model=SecurityStatusResponse,
+        summary="Get Enterprise Security Suite Status",
+        operation_id=f"{prefix_tag}_get_security_status",
+    )
+    r.add_api_route(
+        "/abac/evaluate",
+        evaluate_abac_policy,
+        methods=["POST"],
+        response_model=ABACEvalResponse,
+        summary="Evaluate Dynamic ABAC Policy",
+        operation_id=f"{prefix_tag}_evaluate_abac_policy",
+    )
+    r.add_api_route(
+        "/audit-chain",
+        list_audit_chain,
+        methods=["GET"],
+        response_model=list[AuditChainEntryResponse],
+        summary="List Cryptographic Audit Chain Entries",
+        operation_id=f"{prefix_tag}_list_audit_chain",
+    )
+    r.add_api_route(
+        "/audit-chain/verify",
+        verify_audit_chain,
+        methods=["POST"],
+        response_model=AuditChainVerifyResponse,
+        summary="Verify Cryptographic Audit Chain Integrity",
+        operation_id=f"{prefix_tag}_verify_audit_chain",
+    )
+    r.add_api_route(
+        "/zkp/verify",
+        verify_zk_proof,
+        methods=["POST"],
+        response_model=VerifyZKProofResponse,
+        summary="Verify Groth16 zk-SNARK Attestation Proof",
+        operation_id=f"{prefix_tag}_verify_zk_proof",
+    )
+    r.add_api_route(
+        "/zk/verify",
+        verify_zk_proof,
+        methods=["POST"],
+        response_model=VerifyZKProofResponse,
+        summary="Verify Groth16 zk-SNARK Attestation Proof (Alias)",
+        operation_id=f"{prefix_tag}_verify_zk_proof_alias",
+    )
+    r.add_api_route(
+        "/zkp/status",
+        get_zkp_status,
+        methods=["GET"],
+        response_model=ZKVerifierStatusResponse,
+        summary="Get zk-SNARK Verifier Status Telemetry",
+        operation_id=f"{prefix_tag}_get_zkp_status",
+    )
+    r.add_api_route(
+        "/zk/status",
+        get_zkp_status,
+        methods=["GET"],
+        response_model=ZKVerifierStatusResponse,
+        summary="Get zk-SNARK Verifier Status Telemetry (Alias)",
+        operation_id=f"{prefix_tag}_get_zk_status_alias",
+    )
+    r.add_api_route(
+        "/unlearn",
+        unlearn_bank_contributions,
+        methods=["POST"],
+        response_model=UnlearnBankResponse,
+        summary="Trigger Exact Federated Model Weight Unlearning",
+        operation_id=f"{prefix_tag}_unlearn_bank_contributions",
+    )
+    r.add_api_route(
+        "/unlearn/status",
+        get_unlearning_status,
+        methods=["GET"],
+        response_model=UnlearningStatusResponse,
+        summary="Get Federated Unlearning Engine Telemetry",
+        operation_id=f"{prefix_tag}_get_unlearning_status",
+    )
+    r.add_api_route(
+        "/unlearning/status",
+        get_unlearning_status,
+        methods=["GET"],
+        response_model=UnlearningStatusResponse,
+        summary="Get Federated Unlearning Engine Telemetry (Alias)",
+        operation_id=f"{prefix_tag}_get_unlearning_status_alias",
+    )
+    r.add_api_route(
+        "/pqc/keypair",
+        generate_pqc_keypair,
+        methods=["POST"],
+        response_model=GeneratePQCKeypairResponse,
+        summary="Generate Quantum-Safe Kyber/Dilithium Keypair",
+        operation_id=f"{prefix_tag}_generate_pqc_keypair",
+    )
+    r.add_api_route(
+        "/pqc/encapsulate",
+        encapsulate_pqc_secret,
+        methods=["POST"],
+        response_model=EncapsulatePQCResponse,
+        summary="Encapsulate Secret via NIST FIPS 203 ML-KEM",
+        operation_id=f"{prefix_tag}_encapsulate_pqc_secret",
+    )
+    r.add_api_route(
+        "/pqc/status",
+        get_pqc_status,
+        methods=["GET"],
+        response_model=PQCStatusResponse,
+        summary="Get Post-Quantum Cryptography Suite Telemetry",
+        operation_id=f"{prefix_tag}_get_pqc_status",
+    )
+    r.add_api_route(
+        "/bridge/disburse",
+        disburse_crosschain_incentives,
+        methods=["POST"],
+        response_model=CrossChainDisburseResponse,
+        summary="Disburse Multi-Chain Cross-Ledger Incentives",
+        operation_id=f"{prefix_tag}_disburse_crosschain_incentives",
+    )
+    r.add_api_route(
+        "/bridge/status",
+        get_bridge_status,
+        methods=["GET"],
+        response_model=BridgeStatusResponse,
+        summary="Get Cross-Chain Liquidity Bridge Telemetry",
+        operation_id=f"{prefix_tag}_get_bridge_status",
+    )
+    r.add_api_route(
+        "/rdp/calibrate",
+        calibrate_rdp_noise,
+        methods=["POST"],
+        response_model=CalibrateRDPResponse,
+        summary="Dynamically Calibrate Rényi Differential Privacy Noise",
+        operation_id=f"{prefix_tag}_calibrate_rdp_noise",
+    )
+    r.add_api_route(
+        "/rdp/status",
+        get_rdp_status,
+        methods=["GET"],
+        response_model=RDPStatusResponse,
+        summary="Get Adaptive DP Auto-Scaler Telemetry",
+        operation_id=f"{prefix_tag}_get_rdp_status",
+    )
+    r.add_api_route(
+        "/kms/rotate",
+        rotate_kms_key,
+        methods=["POST"],
+        response_model=KMSKeyRotateResponse,
+        summary="Rotate Tenant Encryption Key in Vault & KMS",
+        operation_id=f"{prefix_tag}_rotate_kms_key",
+    )
+    r.add_api_route(
+        "/kms/keys/{bank_id}",
+        get_kms_key_metadata,
+        methods=["GET"],
+        response_model=KMSKeyMetadataResponse,
+        summary="Get Tenant KMS Encryption Key Metadata",
+        operation_id=f"{prefix_tag}_get_kms_key_metadata",
+    )
+    r.add_api_route(
+        "/vault/seal-status",
+        get_vault_seal_status,
+        methods=["GET"],
+        response_model=VaultSealStatusResponse,
+        summary="Get HashiCorp Vault Seal and HA Status",
+        operation_id=f"{prefix_tag}_get_vault_seal_status",
+    )

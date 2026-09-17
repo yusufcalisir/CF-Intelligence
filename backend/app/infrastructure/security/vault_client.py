@@ -443,3 +443,7 @@ class VaultClient:
                 serial_number,
             )
             return True
+
+    def is_healthy(self) -> bool:
+        """Check if Vault client circuit breaker is healthy and available."""
+        return self._vault_available and (self._failure_count < self.max_failures)

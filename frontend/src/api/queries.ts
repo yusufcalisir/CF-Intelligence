@@ -83,6 +83,13 @@ import type {
   AuditChainEntry,
 
   AuditChainVerifyResponse,
+  KMSKeyRotateRequest,
+  KMSKeyRotateResponse,
+  KMSKeyMetadataResponse,
+  VaultSealStatusResponse,
+  VerifyZKProofRequest,
+  VerifyZKProofResponse,
+  ZKVerifierStatusResponse,
   DriftAnalysisReport,
   CalibrationReport,
   ActiveAlertItem,
@@ -1346,6 +1353,61 @@ export function useVerifyAuditChain() {
     },
   });
 }
+
+export function useRotateKMSKey() {
+  const queryClient = useQueryClient();
+  return useMutation<KMSKeyRotateResponse, Error, KMSKeyRotateRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<KMSKeyRotateResponse>('/api/v1/security/kms/rotate', payload);
+      return data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['kms-key-metadata', variables.bank_id] });
+    },
+  });
+}
+
+export function useKMSKeyMetadata(bankId: string) {
+  return useQuery<KMSKeyMetadataResponse>({
+    queryKey: ['kms-key-metadata', bankId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<KMSKeyMetadataResponse>(`/api/v1/security/kms/keys/${bankId}`);
+      return data;
+    },
+    enabled: !!bankId,
+  });
+}
+
+export function useVaultSealStatus() {
+  return useQuery<VaultSealStatusResponse>({
+    queryKey: ['vault-seal-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<VaultSealStatusResponse>('/api/v1/security/vault/seal-status');
+      return data;
+    },
+    refetchInterval: 10000,
+  });
+}
+
+export function useVerifyZKProof() {
+  return useMutation<VerifyZKProofResponse, Error, VerifyZKProofRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<VerifyZKProofResponse>('/api/v1/security/zk/verify', payload);
+      return data;
+    },
+  });
+}
+
+export function useZKVerifierStatus() {
+  return useQuery<ZKVerifierStatusResponse>({
+    queryKey: ['zk-verifier-status'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<ZKVerifierStatusResponse>('/api/v1/security/zk/status');
+      return data;
+    },
+  });
+}
+
 
 export function useDriftAnalysis(severeDrift: boolean = false) {
 

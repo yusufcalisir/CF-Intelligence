@@ -16,7 +16,9 @@ from app.application.schemas import (
     observability,
     onboarding,
     optimization,
+    privacy_defense,
     scenarios,
+    security,
     settlement,
     simulation,
 )
@@ -38,7 +40,9 @@ __all__ = [
     "observability",
     "onboarding",
     "optimization",
+    "privacy_defense",
     "scenarios",
+    "security",
     "settlement",
     "simulation",
 ]

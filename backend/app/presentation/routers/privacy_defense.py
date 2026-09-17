@@ -6,89 +6,50 @@ Provides enterprise-grade privacy audit capabilities:
 - Model Inversion Attack audit trigger
 - Deep Leakage from Gradients (DLG) audit trigger
 - Multi-simulation privacy budget log
+- Noise calibration for Gaussian DP mechanisms
+- Rényi Differential Privacy (RDP) composition and optimal dual bounds
 """
 
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+import numpy as np
 
+from app.application.schemas.privacy_defense import (
+    AggregationMethodItem,
+    BudgetLogEntryResponse,
+    CalibrateNoiseRequest,
+    CalibrateNoiseResponse,
+    DLGAuditRequest,
+    DLGAuditResponse,
+    MIAAuditRequest,
+    MIAAuditResponse,
+    ModelInversionAuditRequest,
+    ModelInversionAuditResponse,
+    RDPCompositionRequest,
+    RDPCompositionResponse,
+)
 from app.application.services.privacy_audit_service import PrivacyAuditService
 from app.application.services.privacy_service import PrivacyService
 from app.infrastructure import telemetry
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/privacy-defense", tags=["privacy-defense"])
+# Legacy and Canonical Routers for dual-prefix support (/v1/privacy-defense and /api/v1/privacy-defense)
+router = APIRouter(prefix="/v1/privacy-defense", tags=["privacy-defense"])
+api_router = APIRouter(prefix="/api/v1/privacy-defense", tags=["privacy-defense"])
 
 # Module-level service singletons
 _audit_service = PrivacyAuditService()
 _privacy_service = PrivacyService()
 
 
-# ── Request / Response models ──────────────────────
-
-
-class MIAAuditRequest(BaseModel):
-    train_losses: list[float] = Field(..., description="Loss values on training set members")
-    test_losses: list[float] = Field(..., description="Loss values on non-member test set")
-
-
-class ModelInversionAuditRequest(BaseModel):
-    gradient_norms: list[float] = Field(
-        ..., description="Per-parameter gradient L2 norms from a training round"
-    )
-
-
-class DLGAuditRequest(BaseModel):
-    original_gradients: list[float] = Field(
-        ..., description="Original gradients before secure aggregation"
-    )
-    received_gradients: list[float] = Field(
-        ..., description="Gradients received after aggregation (potential reconstruction vector)"
-    )
-
-
-class CalibrateNoiseRequest(BaseModel):
-    target_epsilon: float = Field(..., gt=0.0, description="Target DP epsilon")
-    target_delta: float = Field(1e-5, gt=0.0, lt=1.0, description="Target DP delta")
-    sensitivity: float = Field(1.0, gt=0.0, description="L2 sensitivity (clipping bound C)")
-    mechanism: str = Field("gaussian", description="Mechanism type ('gaussian')")
-
-
-class CalibrateNoiseResponse(BaseModel):
-    mechanism: str
-    target_epsilon: float
-    target_delta: float
-    sensitivity: float
-    calibrated_sigma: float
-    formula: str
-
-
-class RDPCompositionRequest(BaseModel):
-    sigmas: list[float] = Field(
-        ..., min_length=1, description="Noise multipliers across training rounds"
-    )
-    target_delta: float = Field(1e-5, gt=0.0, lt=1.0, description="Target delta for (eps, delta)-DP")
-    sample_ratio_q: float = Field(1.0, gt=0.0, le=1.0, description="Batch sampling ratio q")
-    orders: list[float] | None = Field(None, description="Optional list of Rényi orders to evaluate")
-
-
-class RDPCompositionResponse(BaseModel):
-    total_rounds: int
-    cumulative_epsilon: float
-    optimal_order_alpha: float
-    naive_sum_epsilon: float
-    privacy_saving_pct: float
-    target_delta: float
-    rdp_map: dict[str, float]
-
-
 # ── Aggregation Method Catalogue ────────────────────
 
-AGGREGATION_METHODS = [
+AGGREGATION_METHODS: list[dict[str, Any]] = [
     {
         "id": "fed_avg",
         "label": "FedAvg (Unweighted)",
@@ -180,14 +141,15 @@ AGGREGATION_METHODS = [
 ]
 
 
-@router.get("/aggregation-methods")
-async def list_aggregation_methods() -> list[dict]:
-    """Return the catalogue of supported aggregation methods including new Byzantine defenses."""
-    return AGGREGATION_METHODS
+# ── Handler Implementations ─────────────────────────
 
 
-@router.post("/audit/mia")
-async def audit_mia(request: MIAAuditRequest) -> dict:
+async def list_aggregation_methods() -> list[AggregationMethodItem]:
+    """Return the catalogue of supported aggregation methods including Byzantine defenses."""
+    return [AggregationMethodItem(**method) for method in AGGREGATION_METHODS]
+
+
+async def audit_mia(request: MIAAuditRequest) -> MIAAuditResponse:
     """Run a Membership Inference Attack (MIA) audit.
 
     Evaluates whether an attacker can determine if a specific customer record
@@ -199,11 +161,10 @@ async def audit_mia(request: MIAAuditRequest) -> dict:
     )
     telemetry.cfi_mia_attack_success_rate.set(result.get("membership_leakage_asr", 0.0))
     logger.info("MIA audit completed: %s", result)
-    return result
+    return MIAAuditResponse(**result)
 
 
-@router.post("/audit/model-inversion")
-async def audit_model_inversion(request: ModelInversionAuditRequest) -> dict:
+async def audit_model_inversion(request: ModelInversionAuditRequest) -> ModelInversionAuditResponse:
     """Run a Model Inversion Attack audit on gradient norms.
 
     Evaluates whether high gradient norm variance exposes individual training
@@ -213,11 +174,10 @@ async def audit_model_inversion(request: ModelInversionAuditRequest) -> dict:
         gradient_norms=request.gradient_norms,
     )
     logger.info("Model Inversion audit completed: %s", result)
-    return result
+    return ModelInversionAuditResponse(**result)
 
 
-@router.post("/audit/dlg")
-async def audit_dlg(request: DLGAuditRequest) -> dict:
+async def audit_dlg(request: DLGAuditRequest) -> DLGAuditResponse:
     """Run a Deep Leakage from Gradients (DLG) audit.
 
     Measures Pearson correlation between original and received gradient vectors.
@@ -229,11 +189,10 @@ async def audit_dlg(request: DLGAuditRequest) -> dict:
     )
     telemetry.cfi_dlg_gradient_leakage_score.set(result.get("dlg_leakage_score", 0.0))
     logger.info("DLG audit completed: %s", result)
-    return result
+    return DLGAuditResponse(**result)
 
 
-@router.get("/budget-log")
-async def get_budget_log(epsilon_limit: float = 8.0) -> list[dict]:
+async def get_budget_log(epsilon_limit: float = 8.0) -> list[BudgetLogEntryResponse]:
     """Return the multi-simulation privacy budget consumption log.
 
     Lists cumulative epsilon expenditure across all tracked federated training sessions.
@@ -242,10 +201,9 @@ async def get_budget_log(epsilon_limit: float = 8.0) -> list[dict]:
     summaries = _privacy_service.get_all_budgets_summary(epsilon_limit=epsilon_limit)
     if summaries:
         telemetry.cfi_privacy_epsilon_consumed.set(summaries[0]["total_epsilon"])
-    return summaries
+    return [BudgetLogEntryResponse(**entry) for entry in summaries]
 
 
-@router.post("/calibrate-noise", response_model=CalibrateNoiseResponse)
 async def calibrate_noise(request: CalibrateNoiseRequest) -> CalibrateNoiseResponse:
     """Calibrate Gaussian mechanism noise scale sigma given target (eps, delta) and L2 sensitivity C."""
     sigma = _privacy_service.calculate_gaussian_noise_scale(
@@ -254,7 +212,7 @@ async def calibrate_noise(request: CalibrateNoiseRequest) -> CalibrateNoiseRespo
         sensitivity=request.sensitivity,
     )
     return CalibrateNoiseResponse(
-        mechanism="gaussian",
+        mechanism=request.mechanism or "gaussian",
         target_epsilon=request.target_epsilon,
         target_delta=request.target_delta,
         sensitivity=request.sensitivity,
@@ -263,11 +221,8 @@ async def calibrate_noise(request: CalibrateNoiseRequest) -> CalibrateNoiseRespo
     )
 
 
-@router.post("/rdp-composition", response_model=RDPCompositionResponse)
 async def compose_rdp(request: RDPCompositionRequest) -> RDPCompositionResponse:
     """Compute exact Rényi Differential Privacy (RDP) composition and convex dual optimal (eps, delta)-DP bound."""
-    import numpy as np
-
     best_eps, best_alpha, rdp_map = _privacy_service.compose_rdp(
         sigmas=request.sigmas,
         delta=request.target_delta,
@@ -294,3 +249,69 @@ async def compose_rdp(request: RDPCompositionRequest) -> RDPCompositionResponse:
         target_delta=request.target_delta,
         rdp_map=str_rdp_map,
     )
+
+
+# ── Route Registrations ──────────────────────────────
+
+
+def _register_privacy_defense_routes(r: APIRouter, prefix_tag: str) -> None:
+    r.add_api_route(
+        "/aggregation-methods",
+        list_aggregation_methods,
+        methods=["GET"],
+        response_model=list[AggregationMethodItem],
+        summary="List Supported Byzantine Robust Aggregation Methods",
+        operation_id=f"{prefix_tag}_list_aggregation_methods",
+    )
+    r.add_api_route(
+        "/audit/mia",
+        audit_mia,
+        methods=["POST"],
+        response_model=MIAAuditResponse,
+        summary="Audit Membership Inference Attack Leakage",
+        operation_id=f"{prefix_tag}_audit_mia",
+    )
+    r.add_api_route(
+        "/audit/model-inversion",
+        audit_model_inversion,
+        methods=["POST"],
+        response_model=ModelInversionAuditResponse,
+        summary="Audit Model Inversion Attack Gradient Reconstruction Risk",
+        operation_id=f"{prefix_tag}_audit_model_inversion",
+    )
+    r.add_api_route(
+        "/audit/dlg",
+        audit_dlg,
+        methods=["POST"],
+        response_model=DLGAuditResponse,
+        summary="Audit Deep Leakage from Gradients Pearson Score",
+        operation_id=f"{prefix_tag}_audit_dlg",
+    )
+    r.add_api_route(
+        "/budget-log",
+        get_budget_log,
+        methods=["GET"],
+        response_model=list[BudgetLogEntryResponse],
+        summary="Get Multi-Simulation DP Privacy Budget Log",
+        operation_id=f"{prefix_tag}_get_budget_log",
+    )
+    r.add_api_route(
+        "/calibrate-noise",
+        calibrate_noise,
+        methods=["POST"],
+        response_model=CalibrateNoiseResponse,
+        summary="Calibrate Gaussian Mechanism Noise Scale Sigma",
+        operation_id=f"{prefix_tag}_calibrate_noise",
+    )
+    r.add_api_route(
+        "/rdp-composition",
+        compose_rdp,
+        methods=["POST"],
+        response_model=RDPCompositionResponse,
+        summary="Compute Rényi DP Composition and Dual Bound",
+        operation_id=f"{prefix_tag}_compose_rdp",
+    )
+
+
+_register_privacy_defense_routes(router, "v1")
+_register_privacy_defense_routes(api_router, "api_v1")

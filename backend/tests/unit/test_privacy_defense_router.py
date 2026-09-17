@@ -5,10 +5,11 @@ from __future__ import annotations
 import fastapi
 from fastapi.testclient import TestClient
 
-from app.presentation.routers.privacy_defense import router
+from app.presentation.routers.privacy_defense import api_router, router
 
 _app = fastapi.FastAPI()
 _app.include_router(router)
+_app.include_router(api_router)
 client = TestClient(_app)
 
 

@@ -1228,6 +1228,62 @@ export interface AuditChainVerifyResponse {
   verified_at: string;
 }
 
+export interface KMSKeyRotateRequest {
+  bank_id: string;
+}
+
+export interface KMSKeyRotateResponse {
+  bank_id: string;
+  key_id: string;
+  version: number;
+  rotated_at: string;
+  status: string;
+}
+
+export interface KMSKeyMetadataResponse {
+  bank_id: string;
+  key_id: string;
+  version: number;
+  created_at: string;
+  algorithm: string;
+  status: string;
+}
+
+export interface VaultSealStatusResponse {
+  sealed: boolean;
+  vault_url: string;
+  ha_enabled: boolean;
+  is_healthy: boolean;
+  cluster_name: string;
+  vault_version: string;
+  inspected_at: string;
+}
+
+export interface VerifyZKProofRequest {
+  proof_id: string;
+  curve: string;
+  proving_scheme: string;
+  public_inputs: number[];
+  proof_data: Record<string, unknown>;
+  prover_id: string;
+}
+
+export interface VerifyZKProofResponse {
+  is_valid: boolean;
+  verified_at: string;
+  prover_id: string;
+  scheme: string;
+  reason?: string | null;
+}
+
+export interface ZKVerifierStatusResponse {
+  zk_snark_enabled: boolean;
+  supported_curves: string[];
+  total_proofs_verified: number;
+  total_proofs_rejected: number;
+  verification_engine: string;
+}
+
 export interface FeatureDriftResult {
 
   feature_name: string;

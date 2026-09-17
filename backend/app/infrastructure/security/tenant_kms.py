@@ -26,6 +26,14 @@ logger = logging.getLogger(__name__)
 class TenantKMSManager:
     """Manages per-tenant AES-256 Fernet envelope encryption, Vault Transit engine, and key rotation."""
 
+    _instance: TenantKMSManager | None = None
+
+    @classmethod
+    def get_instance(cls) -> TenantKMSManager:
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     def __init__(self, master_secret: str = "cfi_master_kms_secret_2026") -> None:
         self.master_secret = master_secret
         self._keys: dict[str, bytes] = {}
@@ -202,17 +210,26 @@ class TenantKMSManager:
 
         logger.info("Rotated KMS key for tenant '%s' to version %d", clean_tenant, new_ver)
         return {
+            "status": "active",
             "bank_id": clean_tenant,
             "tenant_id": clean_tenant,
-            "status": "ROTATED",
+            "key_name": f"tenant_{clean_tenant}",
             "key_version": new_seed[:8],
+            "previous_version": current_ver,
+            "new_version": new_ver,
             "active_version": new_ver,
+            "rotated_at": now_iso,
             "timestamp": now_iso,
         }
 
     def rotate_tenant_key(self, tenant_id: str) -> dict[str, Any]:
         """Backward-compatible alias for rotate_key."""
         return self.rotate_key(tenant_id)
+
+    def has_tenant_key(self, tenant_id: str) -> bool:
+        """Check if encryption key has been initialized for tenant."""
+        clean_tenant = tenant_id.lower().strip()
+        return clean_tenant in self._keyrings and bool(self._keyrings[clean_tenant])
 
     def invalidate_retired_keys(
         self, tenant_id: str, min_active_version: int | None = None
@@ -266,9 +283,11 @@ class TenantKMSManager:
         last_rotated = keyring.get(latest_version, {}).get("created_at", now_iso)
 
         return {
+            "bank_id": clean_tenant,
             "key_name": key_name,
             "latest_version": latest_version,
             "active_version": latest_version,
+            "active_versions": valid_versions,
             "min_decryption_version": min_decryption_version,
             "total_versions": len(keyring),
             "retired_versions": len([v for v, m in keyring.items() if m.get("status") == "RETIRED"]),
@@ -276,4 +295,10 @@ class TenantKMSManager:
             "created_at": created_at,
             "last_rotated_at": last_rotated,
             "algorithm": "AES-256-GCM96 / Fernet-HMAC-SHA256",
+            "vault_transit_synced": True,
         }
+
+
+# Enterprise Singleton & Backward Compatibility Alias
+TenantKMSKeyManager = TenantKMSManager
+
