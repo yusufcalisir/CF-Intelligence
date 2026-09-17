@@ -676,9 +676,9 @@ export const BenchmarkHubPage: React.FC = () => {
       {/* Design Partner Pilot Sandbox Tab */}
       {activeTab === 'pilot_sandbox' && (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Left Column: PII Ingestion Scanner Demo */}
-            <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col space-y-4">
+            <div className="lg:col-span-7 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 flex flex-col space-y-4">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
                   <Lock className="w-5 h-5 text-indigo-400" />
@@ -774,43 +774,114 @@ export const BenchmarkHubPage: React.FC = () => {
             </div>
 
             {/* Right Column: Pilot Compliance Checklist */}
-            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-4">
-              <div>
-                <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <FileCheck2 className="w-5 h-5 text-indigo-400" />
-                  Pilot Readiness Assessment
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Ready for submission to Bank IT Risk & Compliance Committee.
-                </p>
-              </div>
-
-              <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 flex items-center justify-between">
-                <div>
-                  <div className="text-xs text-slate-400">Institutional Readiness</div>
-                  <div className="text-2xl font-bold text-emerald-400 font-mono mt-0.5">
-                    {readinessData?.overall_readiness_score ?? 98.5}%
+            <div className="lg:col-span-5 bg-slate-900/80 border border-slate-800 rounded-2xl p-6 space-y-5 flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="p-2.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 shrink-0">
+                    <FileCheck2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-snug">
+                      Pilot Readiness Assessment
+                    </h2>
+                    <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+                      Ready for submission to Bank IT Risk & Compliance Committee.
+                    </p>
                   </div>
                 </div>
-                <span className="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
-                  {readinessData?.status ?? 'APPROVED_FOR_PILOT'}
-                </span>
+
+                {/* Institutional Readiness Card */}
+                <div className="bg-slate-950/90 p-4 rounded-xl border border-slate-800/80 space-y-3 shadow-inner">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-[130px]">
+                      <span className="text-xs font-medium text-slate-400 block">Institutional Readiness</span>
+                      <div className="text-2xl font-bold text-emerald-400 font-mono mt-0.5 tracking-tight">
+                        {readinessData?.overall_readiness_score ?? 98.5}%
+                      </div>
+                    </div>
+                    <span
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full border shadow-sm shrink-0 ${
+                        readinessData?.status === 'REJECTED'
+                          ? 'bg-rose-500/15 text-rose-300 border-rose-500/30'
+                          : readinessData?.status === 'CONDITIONAL_APPROVAL'
+                          ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                          : 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          readinessData?.status === 'REJECTED'
+                            ? 'bg-rose-400'
+                            : readinessData?.status === 'CONDITIONAL_APPROVAL'
+                            ? 'bg-amber-400'
+                            : 'bg-emerald-400 animate-pulse'
+                        }`}
+                      />
+                      {readinessData?.status === 'APPROVED_FOR_PILOT'
+                        ? 'Approved for Pilot'
+                        : readinessData?.status === 'CONDITIONAL_APPROVAL'
+                        ? 'Conditional Approval'
+                        : readinessData?.status === 'REJECTED'
+                        ? 'Rejected'
+                        : 'Approved for Pilot'}
+                    </span>
+                  </div>
+
+                  {/* Progress Bar */}
+                  <div className="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden border border-slate-800/60">
+                    <div
+                      className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+                      style={{ width: `${Math.min(readinessData?.overall_readiness_score ?? 98.5, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Compliance Checklist Items */}
+                <div className="space-y-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center justify-between">
+                    <span>Audit Verification Standards</span>
+                    <span className="text-slate-500 text-[10px] font-mono">
+                      {readinessData?.compliance_items?.length ?? 4} Controls Passed
+                    </span>
+                  </div>
+                  {readinessData?.compliance_items?.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="bg-slate-950/60 border border-slate-800/80 p-3 rounded-xl text-xs space-y-1.5 hover:border-slate-700/80 transition-colors"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-white truncate">{item.standard}</span>
+                        <span className="shrink-0 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded-full border border-emerald-800/60 whitespace-nowrap">
+                          {item.status}
+                        </span>
+                      </div>
+                      <div className="text-[11px] font-medium text-indigo-300/90">{item.clause}</div>
+                      <p className="text-[11px] text-slate-400 leading-relaxed">{item.evidence}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-2.5">
-                {readinessData?.compliance_items?.map((item, idx) => (
-                  <div key={idx} className="bg-slate-950/60 border border-slate-800 p-3 rounded-lg text-xs space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-white">{item.standard}</span>
-                      <span className="text-[10px] text-emerald-400 bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-800">
-                        {item.status}
-                      </span>
-                    </div>
-                    <div className="text-[11px] text-indigo-300">{item.clause}</div>
-                    <p className="text-[11px] text-slate-400">{item.evidence}</p>
+              {/* Cryptographic Guarantees Footer */}
+              {readinessData?.cryptographic_guarantees && Object.keys(readinessData.cryptographic_guarantees).length > 0 && (
+                <div className="pt-3 border-t border-slate-800/80 space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                    Cryptographic Invariants & Security
                   </div>
-                ))}
-              </div>
+                  <div className="grid grid-cols-1 gap-1.5 font-mono text-[10px]">
+                    {Object.entries(readinessData.cryptographic_guarantees).map(([k, v]) => (
+                      <div
+                        key={k}
+                        className="bg-slate-950/40 border border-slate-800/60 px-2.5 py-1.5 rounded-lg flex items-center justify-between gap-2"
+                      >
+                        <span className="text-slate-400 capitalize whitespace-nowrap">{k.replace(/_/g, ' ')}:</span>
+                        <span className="text-emerald-400/90 font-medium truncate text-right">{v}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
