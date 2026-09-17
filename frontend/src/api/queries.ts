@@ -112,6 +112,15 @@ import type {
   RealtimeInferenceRequest,
   RealtimeInferenceResponse,
   InferenceQuotaResponse,
+  PSD2ConsentRequest,
+  PSD2ConsentResponse,
+  PSD2Account,
+  PSD2Transaction,
+  PaymentInitiationRequest,
+  PaymentInitiationResponse,
+  PaymentStatusResponse,
+  ISO20022ParseRequest,
+  ISO20022ParseResponse,
 } from './types';
 
 
@@ -1722,6 +1731,111 @@ export function useInferenceQuotaQuery(tenantId?: string) {
     refetchInterval: 30000,
   });
 }
+
+// ── Open Banking PSD2 & ISO 20022 Hooks ──────────────────────────────────
+
+export function useCreatePSD2ConsentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PSD2ConsentResponse, Error, PSD2ConsentRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<PSD2ConsentResponse>('/api/v1/psd2/consents', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['psd2-consents'] });
+    },
+  });
+}
+
+export function useGetPSD2ConsentQuery(consentId: string, enabled = true) {
+  return useQuery<PSD2ConsentResponse>({
+    queryKey: ['psd2-consent', consentId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PSD2ConsentResponse>(`/api/v1/psd2/consents/${consentId}`);
+      return data;
+    },
+    enabled: enabled && !!consentId,
+  });
+}
+
+export function useRevokePSD2ConsentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PSD2ConsentResponse, Error, string>({
+    mutationFn: async (consentId) => {
+      const { data } = await apiClient.delete<PSD2ConsentResponse>(`/api/v1/psd2/consents/${consentId}`);
+      return data;
+    },
+    onSuccess: (_, consentId) => {
+      queryClient.invalidateQueries({ queryKey: ['psd2-consent', consentId] });
+      queryClient.invalidateQueries({ queryKey: ['psd2-consents'] });
+    },
+  });
+}
+
+export function useGetPSD2AccountsQuery(consentId: string, enabled = true) {
+  return useQuery<PSD2Account[]>({
+    queryKey: ['psd2-accounts', consentId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PSD2Account[]>('/api/v1/psd2/accounts', {
+        headers: { 'consent-id': consentId },
+      });
+      return data;
+    },
+    enabled: enabled && !!consentId,
+  });
+}
+
+export function useGetPSD2TransactionsQuery(accountId: string, consentId: string, enabled = true) {
+  return useQuery<PSD2Transaction[]>({
+    queryKey: ['psd2-transactions', accountId, consentId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PSD2Transaction[]>(
+        `/api/v1/psd2/accounts/${accountId}/transactions`,
+        { headers: { 'consent-id': consentId } }
+      );
+      return data;
+    },
+    enabled: enabled && !!accountId && !!consentId,
+  });
+}
+
+export function useInitiatePaymentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<PaymentInitiationResponse, Error, PaymentInitiationRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<PaymentInitiationResponse>('/api/v1/psd2/payments', payload);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['psd2-payments'] });
+    },
+  });
+}
+
+export function useGetPaymentStatusQuery(paymentId: string, enabled = true) {
+  return useQuery<PaymentStatusResponse>({
+    queryKey: ['psd2-payment-status', paymentId],
+    queryFn: async () => {
+      const { data } = await apiClient.get<PaymentStatusResponse>(`/api/v1/psd2/payments/${paymentId}`);
+      return data;
+    },
+    enabled: enabled && !!paymentId,
+    refetchInterval: (query) => {
+      const currentStatus = query.state.data?.transaction_status;
+      return currentStatus === 'RCVD' || currentStatus === 'ACTC' || currentStatus === 'ACSP' ? 5000 : false;
+    },
+  });
+}
+
+export function useParseISO20022Mutation() {
+  return useMutation<ISO20022ParseResponse, Error, ISO20022ParseRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<ISO20022ParseResponse>('/api/v1/psd2/iso20022/parse', payload);
+      return data;
+    },
+  });
+}
+
 
 
 

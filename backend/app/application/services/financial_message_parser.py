@@ -12,6 +12,21 @@ import re
 import xml.etree.ElementTree as ET
 from typing import Any
 
+try:
+    import defusedxml.ElementTree as dET
+    from defusedxml.common import (
+        DefusedXmlException,
+        DTDForbidden,
+        EntitiesForbidden,
+        ExternalReferenceForbidden,
+    )
+except ImportError:  # pragma: no cover
+    dET = None
+    DefusedXmlException = Exception
+    DTDForbidden = Exception
+    EntitiesForbidden = Exception
+    ExternalReferenceForbidden = Exception
+
 
 class FinancialMessageParserError(Exception):
     """Raised when parsing fails or input is malformed."""
@@ -19,8 +34,41 @@ class FinancialMessageParserError(Exception):
     pass
 
 
+def _safe_parse_xml(xml_content: str) -> ET.Element:
+    """Parse XML string with strict XXE, external entity, and DTD expansion protections."""
+    if not xml_content or not xml_content.strip():
+        raise FinancialMessageParserError("Empty XML content")
+
+    content = xml_content.strip()
+    if re.search(r"<!(?:DOCTYPE|ENTITY)", content, re.IGNORECASE):
+        raise FinancialMessageParserError(
+            "XML parsing rejected: DTD and external entity declarations are strictly forbidden (XXE protection)"
+        )
+
+    try:
+        if dET is not None:
+            return dET.fromstring(content, forbid_dtd=True, forbid_entities=True, forbid_external=True)
+        return ET.fromstring(content)  # nosec B314
+    except (DefusedXmlException, DTDForbidden, EntitiesForbidden, ExternalReferenceForbidden) as exc:
+        raise FinancialMessageParserError(f"XML security validation failure (disallowed entities): {exc}") from exc
+    except (ET.ParseError, ValueError) as exc:
+        raise FinancialMessageParserError(f"Invalid XML content: {exc}") from exc
+
+
 class FinancialMessageParser:
     """Ingests, parses, and normalizes standard financial transaction messages."""
+
+    @staticmethod
+    def generate_valid_iban(country_code: str, bban: str) -> str:
+        """Generate an ISO 13616 compliant IBAN with computed Mod-97 check digits."""
+        clean_bban = re.sub(r"[^A-Z0-9]", "", bban.upper())
+        clean_cc = country_code.strip().upper()
+        if len(clean_cc) != 2 or not clean_cc.isalpha():
+            raise ValueError(f"Invalid ISO 3166-1 country code: {country_code}")
+        rearranged = clean_bban + clean_cc + "00"
+        digits = "".join(str(ord(c) - 55) if c.isalpha() else c for c in rearranged)
+        check = 98 - (int(digits) % 97)
+        return f"{clean_cc}{check:02d}{clean_bban}"
 
     @staticmethod
     def validate_iban(iban: str) -> bool:
@@ -97,13 +145,7 @@ class FinancialMessageParser:
     @staticmethod
     def parse_iso_20022_pacs008(xml_content: str) -> dict[str, Any]:
         """Parse ISO 20022 Customer Credit Transfer XML message (pacs.008.001.08)."""
-        if not xml_content or not xml_content.strip():
-            raise FinancialMessageParserError("Empty XML content")
-
-        try:
-            root = ET.fromstring(xml_content.strip())  # nosec B314
-        except ET.ParseError as exc:
-            raise FinancialMessageParserError(f"Invalid XML content: {exc}") from exc
+        root = _safe_parse_xml(xml_content)
 
         # Remove namespaces or resolve them dynamically to prevent lookup issues
         ns = ""
@@ -301,10 +343,7 @@ class FinancialMessageParser:
             res["message_type"] = "SEPA_SCT"
             return res
         except FinancialMessageParserError:
-            try:
-                root = ET.fromstring(xml_content.strip())  # nosec B314
-            except ET.ParseError as exc:
-                raise FinancialMessageParserError(f"Invalid SEPA XML: {exc}") from exc
+            root = _safe_parse_xml(xml_content)
 
             ns = ""
             m = re.match(r"({.*})", root.tag)
@@ -371,3 +410,47 @@ class FinancialMessageParser:
                 "receiver_country": cdtr_country,
                 "remittance_info": find_text(tx_info, "RmtInf/Ustrd"),
             }
+
+    @classmethod
+    def parse_message(cls, content: str, message_type: str = "auto") -> dict[str, Any]:
+        """Automatically identify and parse standard financial messages (ISO 20022, SEPA, SWIFT MT103)."""
+        if not content or not content.strip():
+            raise FinancialMessageParserError("Empty financial message payload")
+
+        trimmed = content.strip()
+
+        # Immediate XXE & DTD injection defense for all XML-like financial payloads
+        if re.search(r"<!(?:DOCTYPE|ENTITY)", trimmed, re.IGNORECASE):
+            raise FinancialMessageParserError(
+                "XML parsing rejected: DTD and external entity declarations are strictly forbidden (XXE protection)"
+            )
+
+        msg_type_lower = (message_type or "auto").lower()
+
+        if msg_type_lower in ("mt103", "swift_mt103") or (
+            msg_type_lower == "auto" and (trimmed.startswith("{1:") or ":32A:" in trimmed)
+        ):
+            return cls.parse_swift_mt103(trimmed)
+
+        if msg_type_lower in ("pain.001", "pain001", "sepa", "sepa_sct") or (
+            msg_type_lower == "auto" and ("pain.001" in trimmed or "CstmrCdtTrfInitn" in trimmed)
+        ):
+            return cls.parse_sepa_credit_transfer(trimmed)
+
+        if msg_type_lower in ("pacs.008", "pacs008", "iso20022"):
+            return cls.parse_iso_20022_pacs008(trimmed)
+
+        try:
+            return cls.parse_iso_20022_pacs008(trimmed)
+        except FinancialMessageParserError as exc:
+            if "forbidden" in str(exc).lower() or "disallowed" in str(exc).lower() or "xxe" in str(exc).lower():
+                raise
+            try:
+                return cls.parse_sepa_credit_transfer(trimmed)
+            except FinancialMessageParserError as sepa_exc:
+                if "forbidden" in str(sepa_exc).lower() or "disallowed" in str(sepa_exc).lower() or "xxe" in str(sepa_exc).lower():
+                    raise
+                if ":32A:" in trimmed or trimmed.startswith("{"):
+                    return cls.parse_swift_mt103(trimmed)
+                raise FinancialMessageParserError("Unable to recognize or parse financial message standard") from sepa_exc
+

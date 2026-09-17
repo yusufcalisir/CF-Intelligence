@@ -931,6 +931,7 @@ else:
     app.include_router(scenarios.router)
     app.include_router(dashboard.router)
     app.include_router(psd2.router)
+    app.include_router(psd2.api_router)
     app.include_router(security.router)
     app.include_router(monitoring.router)
     app.include_router(coordinator.router)

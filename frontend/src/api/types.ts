@@ -1991,6 +1991,120 @@ export interface InferenceQuotaResponse {
   reset_date: string;
 }
 
+// ── Open Banking PSD2 & ISO 20022 Schemas ──────────────────────────────────
+
+export interface PSD2ConsentRequest {
+  account_id: string;
+  permissions?: string[];
+  valid_until: number;
+  debtor_iban?: string;
+  tenant_id?: string;
+}
+
+export interface PSD2ConsentResponse {
+  consent_id: string;
+  status: 'valid' | 'expired' | 'revoked';
+  account_id: string;
+  permissions: string[];
+  valid_until: number;
+  debtor_iban?: string;
+  created_at: string;
+  client_id: string;
+  tenant_id: string;
+}
+
+export interface PSD2Account {
+  account_id: string;
+  iban: string;
+  currency: string;
+  balance: number;
+  bank_name: string;
+  status: string;
+}
+
+export interface PSD2Transaction {
+  transaction_id: string;
+  amount: number;
+  currency: string;
+  booking_date: string;
+  debtor_name: string;
+  creditor_name: string;
+  remittance_info: string;
+  status: string;
+}
+
+export interface PaymentInitiationRequest {
+  debtor_account: string;
+  creditor_account: string;
+  instructed_amount: number;
+  currency?: string;
+  creditor_name: string;
+  debtor_name?: string;
+  remittance_information?: string;
+  payment_product?: 'sepa-credit-transfers' | 'instant-sepa-credit-transfers' | 'cross-border-credit-transfers';
+  consent_id?: string;
+  debtor_agent_bic?: string;
+  creditor_agent_bic?: string;
+  tenant_id?: string;
+}
+
+export interface PaymentInitiationResponse {
+  payment_id: string;
+  transaction_status: 'RCVD' | 'ACTC' | 'ACSP' | 'ACCP' | 'RJCT';
+  debtor_account: string;
+  creditor_account: string;
+  instructed_amount: number;
+  currency: string;
+  creditor_name: string;
+  payment_product: string;
+  risk_score: number;
+  is_flagged_for_review: boolean;
+  created_at: string;
+  estimated_settlement: string;
+  tenant_id: string;
+}
+
+export interface PaymentStatusResponse {
+  payment_id: string;
+  transaction_status: 'RCVD' | 'ACTC' | 'ACSP' | 'ACCP' | 'RJCT';
+  debtor_account: string;
+  creditor_account: string;
+  instructed_amount: number;
+  currency: string;
+  created_at: string;
+  last_updated: string;
+  clearing_system_ref?: string;
+  tenant_id: string;
+}
+
+export interface ISO20022ParseRequest {
+  raw_content: string;
+  message_type?: 'auto' | 'pacs.008' | 'pain.001' | 'mt103';
+  anonymize_pii?: boolean;
+  salt?: string;
+}
+
+export interface ISO20022ParseResponse {
+  message_type: string;
+  transaction_id: string;
+  amount: number;
+  currency: string;
+  date: string;
+  sender_name?: string;
+  sender_account: string;
+  sender_bic?: string;
+  sender_country: string;
+  receiver_name?: string;
+  receiver_account: string;
+  receiver_bic?: string;
+  receiver_country: string;
+  remittance_info?: string;
+  is_valid_debtor_iban: boolean;
+  is_valid_creditor_iban: boolean;
+  privacy_features?: Record<string, unknown>;
+}
+
+
 
 
 
