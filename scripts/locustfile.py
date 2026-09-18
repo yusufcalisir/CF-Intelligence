@@ -14,6 +14,15 @@ Usage:
 
 from __future__ import annotations
 
+# gevent monkey-patching: ensure socket and ssl are safely patched before standard networking modules
+# to prevent RecursionError on Python 3.12 under high-concurrency load tests.
+try:
+    import gevent.monkey
+    if not gevent.monkey.is_module_patched("socket"):
+        gevent.monkey.patch_all()
+except (ImportError, Exception):
+    pass
+
 import random
 import uuid
 from typing import Any
@@ -139,3 +148,17 @@ class ComplianceAnalystUser(FastHttpUser):
             "/api/v1/auth/lockout-status?username=investigator_alpha",
             name="GET /api/v1/auth/lockout-status",
         )
+
+
+if __name__ == "__main__":
+    import sys
+    try:
+        from locust import main
+        # Default to this locustfile if -f / --locustfile not explicitly given
+        if "-f" not in sys.argv and "--locustfile" not in sys.argv:
+            sys.argv.insert(1, "-f")
+            sys.argv.insert(2, __file__)
+        main.main()
+    except ImportError:
+        print("[ERROR] Locust is not installed. Run: pip install locust")
+        sys.exit(1)

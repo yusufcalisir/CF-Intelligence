@@ -29,8 +29,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..",
 
 import httpx
 
-from app.main import app  # type: ignore
-
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("load_test")
 
@@ -156,6 +154,7 @@ async def execute_load_test(
     success_count = [0]
     fail_count = [0]
 
+    from app.main import app
     transport = httpx.ASGITransport(app=app)
 
     async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:

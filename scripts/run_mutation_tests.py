@@ -133,4 +133,10 @@ def main() -> int:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Master Mutation Testing & Fault Injection Hardening Runner for CF-Intelligence."
+    )
+    parser.parse_args()
     sys.exit(main())

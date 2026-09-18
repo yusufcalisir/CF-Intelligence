@@ -11,10 +11,10 @@ FRONTEND_DIR = REPO_ROOT / "frontend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.main import app  # noqa: E402
-
 
 def audit():
+    from app.main import app
+
     print("=" * 80)
     print("COMPREHENSIVE BACKEND - FRONTEND API CONTRACT & LINKAGE AUDIT")
     print("=" * 80)
@@ -103,4 +103,10 @@ def audit():
     print("\n" + "=" * 80)
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Cross-reference all FastAPI backend routes against frontend API calls."
+    )
+    parser.parse_args()
     audit()

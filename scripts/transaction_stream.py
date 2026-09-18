@@ -28,8 +28,6 @@ sys.path.insert(0, str(_BACKEND))
 
 import httpx
 
-from app.main import app
-
 BANK_IDS = ["bank_alpha", "bank_beta", "bank_gamma", "bank_delta", "bank_epsilon"]
 MERCHANT_IDS = [
     "merchant_grocery", "merchant_crypto_exchange", "merchant_wire_transfer",
@@ -185,6 +183,8 @@ async def run_stream_pipeline(
         "produced": 0, "scored": 0, "errors": 0,
         "producer_done": False, "pipeline_done": False,
     }
+
+    from app.main import app
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(

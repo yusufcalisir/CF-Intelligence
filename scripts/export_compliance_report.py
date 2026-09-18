@@ -94,14 +94,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--dp-epsilon",
         type=float,
         default=1.0,
-        metavar="ε",
+        metavar="EPS",
         help="Cumulative DP epsilon budget consumed (default: 1.0)",
     )
     parser.add_argument(
         "--dp-delta",
         type=float,
         default=1e-5,
-        metavar="δ",
+        metavar="DELTA",
         help="Differential privacy delta parameter (default: 1e-5)",
     )
     parser.add_argument(
@@ -208,6 +208,9 @@ def main(argv: list[str] | None = None) -> int:
     Returns:
         0 on success, 1 on compliance failure, 2 on argument/IO error.
     """
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
     # Lazy import to allow importability checks in tests
     from app.domain.ai_act_compliance import EUAIActComplianceEngine  # noqa: PLC0415
 

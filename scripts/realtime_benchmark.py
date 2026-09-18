@@ -16,8 +16,6 @@ sys.path.insert(0, str(_BACKEND))
 
 import httpx
 
-from app.main import app  # noqa: E402
-
 BANK_IDS = ["bank_alpha", "bank_beta", "bank_gamma"]
 MERCHANT_IDS = [
     "merchant_grocery",
@@ -66,6 +64,8 @@ async def run_realtime_benchmark(
     concurrency: int = 20,
     sla_ms: float = 100.0,
 ) -> dict:
+    from app.main import app
+
     transport = httpx.ASGITransport(app=app)
     latencies_score: list[float] = []
     latencies_predict: list[float] = []
@@ -243,7 +243,9 @@ def print_report(report: dict) -> None:
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Real load test - no mocks, actual ASGI calls, real measured latency."
+    )
     parser.add_argument("--requests", type=int, default=500)
     parser.add_argument("--concurrency", type=int, default=20)
     parser.add_argument("--sla", type=float, default=100.0)

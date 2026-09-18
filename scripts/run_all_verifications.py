@@ -71,5 +71,11 @@ def run_all_verifications() -> bool:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Master Automated Verification Suite Runner across all 16 verified subsystems."
+    )
+    parser.parse_args()
     success = run_all_verifications()
     sys.exit(0 if success else 1)

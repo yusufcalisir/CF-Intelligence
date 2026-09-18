@@ -62,7 +62,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 1954 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 1970 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:

@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 """Capture the current OpenAPI 3.1.0 schema from a running API instance.
 
 Usage (with server running on port 7860):

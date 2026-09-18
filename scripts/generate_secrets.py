@@ -45,11 +45,37 @@ def generate_env_file(source_path: Path, dest_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    root_dir = Path(__file__).resolve().parent.parent
-    src = root_dir / ".env.example"
-    dst = root_dir / ".env"
+    import argparse
 
-    if dst.exists():
+    parser = argparse.ArgumentParser(
+        description="Enterprise Secrets & Environment Generator for CFI Platform."
+    )
+    parser.add_argument(
+        "--force", "-f",
+        action="store_true",
+        help="Overwrite existing .env without confirmation prompt",
+    )
+    parser.add_argument(
+        "--source",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / ".env.example",
+        help="Path to source .env template (default: .env.example)",
+    )
+    parser.add_argument(
+        "--destination",
+        type=Path,
+        default=Path(__file__).resolve().parent.parent / ".env",
+        help="Path to destination .env file (default: .env)",
+    )
+    args = parser.parse_args()
+
+    src = args.source
+    dst = args.destination
+
+    if dst.exists() and not args.force:
+        if not sys.stdin.isatty():
+            print("[INFO] Destination .env already exists and stdin is non-interactive. Use --force to overwrite.")
+            sys.exit(0)
         confirm = input("[WARNING] .env already exists. Overwrite with new cryptographic secrets? (y/N): ")
         if confirm.strip().lower() != "y":
             print("[ABORTED] Preserved existing .env file.")
