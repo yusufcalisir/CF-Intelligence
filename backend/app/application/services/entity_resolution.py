@@ -395,8 +395,8 @@ class EntityResolutionService:
         if not query_name or not query_name.strip():
             return []
 
-        threshold = max(0.0, min(1.0, float(threshold)))
-        limit = max(1, min(100, int(limit)))
+        threshold = max(0.0, min(1.0, threshold))
+        limit = max(1, min(100, limit))
 
         standardized_query = standardize_input(query_name, entity_type.value)
         query_sig = compute_minhash_signature(
