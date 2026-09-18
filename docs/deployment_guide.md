@@ -45,11 +45,17 @@ This comprehensive guide details the production deployment models for the **Coll
   └───────────────────────────────────────────────┘ └───────────────────────────────────────────────┘
                          │                                                 │
                          └────────────────────────┬────────────────────────┘
-                                                  ▼ (Optional --profile monitoring)
+                                                  ▼ (Optional Enterprise & Monitoring Profiles)
   ┌───────────────────────────┐     ┌───────────────────────────┐     ┌───────────────────────────┐
   │ 6. OpenTelemetry Collector│     │ 7. Prometheus v2.50.1     │     │ 8. Grafana OSS 10.3.3     │
   │    (`cfi-otel-collector`) │ ──► │    (`cfi-prometheus`)     │ ──► │    (`cfi-grafana`)        │
   │    • Ports 4317/4318/8889 │     │    • Port 9090            │     │    • Port 3000            │
+  └───────────────────────────┘     └───────────────────────────┘     └───────────────────────────┘
+  ┌───────────────────────────┐     ┌───────────────────────────┐     ┌───────────────────────────┐
+  │ 9. HashiCorp Vault 1.15   │     │ 10. MinIO Object Storage  │     │ 11. MLflow Registry 2.11  │
+  │    (`cfi-vault`)          │     │     (`cfi-minio`)         │     │     (`cfi-mlflow`)        │
+  │    • --profile enterprise │     │     • --profile storage   │     │     • --profile ml        │
+  │    • Health: sys/health   │     │     • Health: minio/live  │     │     • Health: /health     │
   └───────────────────────────┘     └───────────────────────────┘     └───────────────────────────┘
 ```
 
@@ -68,10 +74,11 @@ Assert zero Compose syntax drift and verify service manifest integrity:
 python scripts/verify_docker_deployment.py
 ```
 The verification script checks:
-- Existence of `docker-compose.yml`, `Dockerfile.frontend`, `Dockerfile.backend`, `nginx.conf`, and `01-init.sql`.
+- Existence of `docker-compose.yml`, `docker-compose.dev.yml`, `docker-compose.multinode.yml`, `Dockerfile.frontend`, `Dockerfile.backend`, and `01-init.sql`.
 - Syntactic validity via `docker compose config`.
-- Required environment variable floors.
+- Required environment variable floors and non-root security.
 - Nginx security headers and long-lived WebSocket keepalive directives.
+- Authenticated health probes across Redis, PostgreSQL, Gateway, Frontend, Backend, Vault, MinIO, and MLflow.
 
 ### Step 3: Launch Enterprise Stack
 Spin up the 5 core production containers:
@@ -82,6 +89,11 @@ docker compose up -d --build
 To include the OpenTelemetry, Prometheus, and Grafana monitoring stack:
 ```bash
 docker compose --profile monitoring up -d --build
+```
+
+To launch with the full enterprise suite (Vault KMS, MinIO S3 storage, MLflow registry, and Monitoring):
+```bash
+docker compose --profile enterprise --profile storage --profile ml --profile monitoring up -d --build
 ```
 
 ### Step 4: Verify Live Service Health
@@ -98,26 +110,26 @@ All containers (`cfi-gateway`, `cfi-frontend`, `cfi-api-server`, `cfi-postgres`,
 ## 2.1 Architecture Overview
 
 ```
-Bank A Private Subnet (cfi-bank-a-private-net)     Bank B Private Subnet (cfi-bank-b-private-net)
-┌────────────────────────────────────────────┐     ┌────────────────────────────────────────────┐
-│  cfi-bank-client-a                         │     │  cfi-bank-client-b                         │
-│  - Isolated DB Volume (bank-a-data)        │     │  - Isolated DB Volume (bank-b-data)        │
-│  - Bank A X.509 Cert (bank-a-pki)          │     │  - Bank B X.509 Cert (bank-b-pki)          │
-└─────────────────────┬──────────────────────┘     └─────────────────────┬──────────────────────┘
-                      │ consortium-net only                              │ consortium-net only
-                      └──────────────────────┐    ┌──────────────────────┘
-                                             ▼    ▼
-                              ┌───────────────────────────────────┐
-                              │  cfi-fl-coordinator               │
-                              │  - Central PKI / CA (coord-pki)   │
-                              │  - Secure Aggregator (FedAvg/Krum)│
-                              │  - gRPC Target: :50051            │
-                              │  - REST API Target: :8000         │
-                              └───────────────────────────────────┘
+Bank A Private Subnet (cfi-bank-a-private-net)     Bank B Private Subnet (cfi-bank-b-private-net)     Bank C Private Subnet (cfi-bank-c-private-net)
+┌────────────────────────────────────────────┐     ┌────────────────────────────────────────────┐     ┌────────────────────────────────────────────┐
+│  cfi-bank-client-a                         │     │  cfi-bank-client-b                         │     │  cfi-bank-client-c                         │
+│  - Isolated DB Volume (bank-a-data)        │     │  - Isolated DB Volume (bank-b-data)        │     │  - Isolated DB Volume (bank-c-data)        │
+│  - Bank A X.509 Cert (bank-a-pki)          │     │  - Bank B X.509 Cert (bank-b-pki)          │     │  - Bank C X.509 Cert (bank-c-pki)          │
+└─────────────────────┬──────────────────────┘     └─────────────────────┬──────────────────────┘     └─────────────────────┬──────────────────────┘
+                      │ consortium-net only                              │ consortium-net only                              │ consortium-net only
+                      └──────────────────────┐    ┌──────────────────────┘    ┌─────────────────────────────────────────────┘
+                                             ▼    ▼                           ▼
+                              ┌───────────────────────────────────────────────────┐
+                              │  cfi-fl-coordinator                               │
+                              │  - Central PKI / CA (coord-pki)                   │
+                              │  - Secure Aggregator (FedAvg/Krum/TrimmedMean)    │
+                              │  - gRPC Target: :50051                            │
+                              │  - REST API Target: :8000                         │
+                              └───────────────────────────────────────────────────┘
 ```
 
 ### Key Isolation Rules
-- **No Direct Inter-Bank Routing**: `cfi-bank-client-a` cannot reach `cfi-bank-client-b` directly. `bank-a-net` and `bank-b-net` are marked `internal: true`.
+- **No Direct Inter-Bank Routing**: `cfi-bank-client-a`, `cfi-bank-client-b`, and `cfi-bank-client-c` cannot reach each other directly. `bank-a-net`, `bank-b-net`, and `bank-c-net` are marked `internal: true`.
 - **Outbound-Only Communication**: Bank client daemons initiate outbound mTLS connections to the central coordinator over `consortium-net` port 50051. Bank nodes expose no inbound listening ports to external entities.
 - **Cryptographic Certificate Isolation**: Each participant container uses a dedicated X.509 mTLS certificate and private key stored in an isolated volume.
 
@@ -136,6 +148,9 @@ python scripts/init_vault_pki.py --node-id bank-a --out-dir pki/bank-a
 
 # Provision Bank B PKI
 python scripts/init_vault_pki.py --node-id bank-b --out-dir pki/bank-b
+
+# Provision Bank C PKI
+python scripts/init_vault_pki.py --node-id bank-c --out-dir pki/bank-c
 ```
 
 Each directory contains:

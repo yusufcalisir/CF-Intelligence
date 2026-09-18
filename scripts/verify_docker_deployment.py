@@ -47,18 +47,26 @@ def main() -> int:
     failures = 0
 
     # 1. Structural File Verification
-    print("\n1. Verifying Core Deployment Manifests:")
+    print("\n1. Verifying Core Deployment Manifests & Dockerfiles:")
     compose_file = root_dir / "docker-compose.yml"
+    dev_compose_file = root_dir / "docker-compose.dev.yml"
+    multinode_compose_file = root_dir / "docker-compose.multinode.yml"
     frontend_dockerfile = root_dir / "docker" / "Dockerfile.frontend"
     backend_dockerfile = root_dir / "docker" / "Dockerfile.backend"
+    backend_root_dockerfile = root_dir / "backend" / "Dockerfile"
+    hf_root_dockerfile = root_dir / "Dockerfile"
     nginx_conf = root_dir / "docker" / "nginx" / "nginx.conf"
     postgres_init = root_dir / "docker" / "postgres" / "01-init.sql"
     env_example = root_dir / ".env.example"
 
     files_to_check = [
         (compose_file, "Master Compose Manifest"),
-        (frontend_dockerfile, "Frontend SPA Dockerfile"),
-        (backend_dockerfile, "Backend API Dockerfile"),
+        (dev_compose_file, "Development Compose Override"),
+        (multinode_compose_file, "Multi-Node Consortium Compose"),
+        (frontend_dockerfile, "Frontend SPA Production Dockerfile"),
+        (backend_dockerfile, "Backend API Production Dockerfile"),
+        (backend_root_dockerfile, "Backend Root Dockerfile"),
+        (hf_root_dockerfile, "Hugging Face Spaces Dockerfile"),
         (nginx_conf, "Enterprise Nginx Gateway Conf"),
         (postgres_init, "PostgreSQL Cold-Start Init SQL"),
         (env_example, "Production Environment Template"),
@@ -72,7 +80,7 @@ def main() -> int:
     print("\n2. Validating Compose Spec & Configuration Syntax:")
     code, stdout, stderr = run_command(["docker", "compose", "config", "--quiet"], root_dir)
     if code == 0:
-        print("  [PASS] docker compose config: Validated with zero syntax errors!")
+        print("  [PASS] docker compose config (master): Validated with zero syntax errors!")
     else:
         # Check if docker daemon is not running on local machine
         if "daemon" in stderr.lower() or "connect" in stderr.lower() or "docker-credential" in stderr.lower():
@@ -87,6 +95,15 @@ def main() -> int:
                 failures += 1
         else:
             print(f"  [FAIL] docker compose config failed: {stderr or stdout}")
+            failures += 1
+
+    # Static check for multinode compose
+    multinode_text = multinode_compose_file.read_text(encoding="utf-8")
+    for svc in ["coordinator:", "bank-a:", "bank-b:", "bank-c:"]:
+        if svc in multinode_text:
+            print(f"  [PASS] Multi-Node Node Service: {svc.strip(':')} verified")
+        else:
+            print(f"  [FAIL] Multi-Node missing service: {svc}")
             failures += 1
 
     # 3. Environment Variable Parity Check
@@ -109,8 +126,54 @@ def main() -> int:
             print(f"  [FAIL] Missing required variable: {key}")
             failures += 1
 
-    # 4. Nginx Gateway Directive Audits
-    print("\n4. Auditing Nginx Security & WebSocket Directives:")
+    # 4. Authenticated Health Check Probes Audit
+    print("\n4. Auditing Authenticated Health Check Probes:")
+    compose_text = compose_file.read_text(encoding="utf-8")
+
+    health_probes = [
+        ("redis-cli", "Redis authenticated healthcheck (redis-cli)"),
+        ("pg_isready", "PostgreSQL healthcheck (pg_isready)"),
+        ("http://127.0.0.1:8000/health", "Backend API liveness healthcheck (/health)"),
+        ("http://127.0.0.1/gateway-health", "Gateway proxy healthcheck (/gateway-health)"),
+        ("http://127.0.0.1/health", "Frontend SPA healthcheck (/health)"),
+        ("sys/health", "Enterprise HashiCorp Vault healthcheck (sys/health)"),
+        ("minio/health/live", "MinIO Object Storage healthcheck (minio/health/live)"),
+        ("5000/health", "MLflow Registry healthcheck (5000/health)"),
+    ]
+    for token, desc in health_probes:
+        if token in compose_text:
+            print(f"  [PASS] Health Probe: {desc} verified")
+        else:
+            print(f"  [FAIL] Missing health probe token '{token}' for {desc}")
+            failures += 1
+
+    # 5. Multi-Stage Dockerfile Hardening & Security Directives
+    print("\n5. Auditing Dockerfile Hardening & Non-Root Security:")
+    for df_path, name in [
+        (backend_dockerfile, "docker/Dockerfile.backend"),
+        (backend_root_dockerfile, "backend/Dockerfile"),
+    ]:
+        df_content = df_path.read_text(encoding="utf-8")
+        if "USER user" in df_content:
+            print(f"  [PASS] {name}: Non-root USER user enforced")
+        else:
+            print(f"  [FAIL] {name}: Missing non-root USER directive")
+            failures += 1
+
+        if "50051" in df_content:
+            print(f"  [PASS] {name}: gRPC Coordinator port 50051 exposed")
+        else:
+            print(f"  [FAIL] {name}: Missing port 50051 exposition")
+            failures += 1
+
+        if "uv" in df_content:
+            print(f"  [PASS] {name}: Fast reproducible package resolution via uv")
+        else:
+            print(f"  [FAIL] {name}: Missing uv package caching")
+            failures += 1
+
+    # 6. Nginx Gateway Directive Audits
+    print("\n6. Auditing Nginx Security & WebSocket Directives:")
     nginx_text = nginx_conf.read_text(encoding="utf-8")
     nginx_checks = [
         ("proxy_pass http://backend_api", "Backend REST upstream routing"),
@@ -128,7 +191,7 @@ def main() -> int:
             print(f"  [FAIL] {desc}: Missing directive '{pattern}'")
             failures += 1
 
-    # 5. Summary & Verdict
+    # 7. Summary & Verdict
     print("\n======================================================================")
     if failures == 0:
         print("  VERDICT: 100% AUDIT PASSED! Production Docker Stack is FLIP-READY.")

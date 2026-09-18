@@ -14,12 +14,16 @@ services:
       - APP_ENV=development
       - APP_DEBUG=true
       - LOG_LEVEL=DEBUG
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - REDIS_HOST=redis
     volumes:
       - ./backend:/app/backend
       - storage-data:/app/storage
       - logs-data:/app/logs
     ports:
       - "8000:8000"
+      - "50051:50051"
 
   frontend:
     build:

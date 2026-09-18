@@ -55,6 +55,11 @@ services:
     depends_on:
       coordinator:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
   bank-b:
     build:
@@ -78,6 +83,39 @@ services:
     depends_on:
       coordinator:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  bank-c:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cfi-bank-client-c
+    environment:
+      - MODE=bank_client
+      - BANK_ID=bank_c
+      - APP_ENV=production
+      - COORDINATOR_URL=coordinator:50051
+      - CA_CERT_PATH=/app/pki/ca.pem
+      - BANK_CERT_PATH=/app/pki/bank-c/cert.pem
+      - BANK_KEY_PATH=/app/pki/bank-c/key.pem
+    volumes:
+      - bank-c-data:/app/data
+      - bank-c-pki:/app/pki
+    networks:
+      - bank-c-net
+      - consortium-net
+    depends_on:
+      coordinator:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
 
 networks:
   consortium-net:
@@ -91,6 +129,10 @@ networks:
     driver: bridge
     internal: true
     name: cfi-bank-b-private-net
+  bank-c-net:
+    driver: bridge
+    internal: true
+    name: cfi-bank-c-private-net
 
 volumes:
   coordinator-data:
@@ -99,3 +141,5 @@ volumes:
   bank-a-pki:
   bank-b-data:
   bank-b-pki:
+  bank-c-data:
+  bank-c-pki:

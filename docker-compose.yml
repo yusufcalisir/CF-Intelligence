@@ -54,12 +54,25 @@ services:
     image: cfi-intelligence/backend:latest
     container_name: cfi-api-server
     restart: unless-stopped
+    ports:
+      - "${CFI_PORT_GRPC:-50051}:50051"
     environment:
       - APP_ENV=production
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - DATABASE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER:-cfi_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cfi_secure_pass_2026}
+      - POSTGRES_DB=${POSTGRES_DB:-cfi_fraud_db}
       - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD:-cfi_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}
       - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-cfi_super_secret_jwt_key_2026_enterprise_floor}
+      - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT:-cfi_salt_consortium_hmac_sha256_floor_token_2026}
+      - CFI_STORAGE_DIR=/app/storage
       - TELEMETRY_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
     depends_on:
@@ -119,7 +132,7 @@ services:
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -174,6 +187,69 @@ services:
     networks:
       - cfi-network
 
+  # ── 9. (Optional) HashiCorp Vault Secrets & KMS ─────────────────────────────
+  vault:
+    image: hashicorp/vault:1.15.6
+    container_name: cfi-vault
+    profiles: ["enterprise"]
+    restart: unless-stopped
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-vault_token_dev_2026}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+    ports:
+      - "${CFI_PORT_VAULT:-8200}:8200"
+    cap_add:
+      - IPC_LOCK
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── 10. (Optional) MinIO S3-Compatible Object Store ─────────────────────────
+  minio:
+    image: minio/minio:RELEASE.2024-03-05T04-48-44Z
+    container_name: cfi-minio
+    profiles: ["storage"]
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-cfi_minio_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-cfi_minio_secret_pass_2026}
+    ports:
+      - "${CFI_PORT_MINIO:-9000}:9000"
+      - "${CFI_PORT_MINIO_CONSOLE:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:9000/minio/health/live || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # ── 11. (Optional) MLflow Experiment & Artifact Tracking ────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.11.1
+    container_name: cfi-mlflow
+    profiles: ["ml"]
+    restart: unless-stopped
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////mlflow/mlflow.db --default-artifact-root /mlflow/artifacts
+    ports:
+      - "${CFI_PORT_MLFLOW:-5000}:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    networks:
+      - cfi-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:5000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
 networks:
   cfi-network:
     driver: bridge
@@ -185,3 +261,5 @@ volumes:
   logs-data:
   prometheus-data:
   grafana-data:
+  minio-data:
+  mlflow-data:

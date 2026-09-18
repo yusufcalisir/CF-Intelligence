@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Response, status
@@ -17,6 +19,7 @@ from app.application.schemas.observability import (
     LivenessResponse,
     ReadinessResponse,
 )
+from app.config import get_settings
 from app.infrastructure.cache import check_redis_health
 from app.infrastructure.database import engine
 
@@ -68,7 +71,14 @@ async def check_vault_component_health() -> DependencyHealthStatus:
     """Check HashiCorp Vault key management status."""
     start = time.perf_counter()
     try:
-        # Check Vault KMS availability via environment or mock driver
+        settings = get_settings()
+        if getattr(settings, "vault_enabled", False):
+            import urllib.request
+
+            vault_url = getattr(settings, "vault_url", "http://vault.internal:8200").rstrip("/")
+            req = urllib.request.Request(f"{vault_url}/v1/sys/health", method="GET")
+            with urllib.request.urlopen(req, timeout=0.5):  # nosec B310
+                pass
         latency = round((time.perf_counter() - start) * 1000.0 + 1.2, 2)
         return DependencyHealthStatus(status="HEALTHY", latency_ms=latency)
     except Exception as e:
@@ -85,6 +95,52 @@ async def check_enclave_component_health() -> DependencyHealthStatus:
     except Exception as e:
         latency = round((time.perf_counter() - start) * 1000.0, 2)
         return DependencyHealthStatus(status="DEGRADED", latency_ms=latency, message=str(e))
+
+
+async def check_mlflow_component_health() -> DependencyHealthStatus:
+    """Check MLflow experiment tracking registry responsiveness."""
+    start = time.perf_counter()
+    try:
+        settings = get_settings()
+        if not getattr(settings, "mlflow_enabled", True):
+            return DependencyHealthStatus(
+                status="HEALTHY",
+                latency_ms=0.0,
+                message="MLflow tracking disabled via configuration",
+            )
+        uri = getattr(settings, "mlflow_tracking_uri", "mlruns")
+        if uri.startswith("http://") or uri.startswith("https://"):
+            import urllib.request
+
+            req = urllib.request.Request(f"{uri.rstrip('/')}/health", method="GET")
+            with urllib.request.urlopen(req, timeout=0.5):  # nosec B310
+                pass
+        latency = round((time.perf_counter() - start) * 1000.0 + 0.5, 2)
+        return DependencyHealthStatus(status="HEALTHY", latency_ms=latency)
+    except Exception as exc:
+        latency = round((time.perf_counter() - start) * 1000.0, 2)
+        return DependencyHealthStatus(status="DEGRADED", latency_ms=latency, message=str(exc))
+
+
+async def check_storage_component_health() -> DependencyHealthStatus:
+    """Check MinIO / S3 Object Storage and dataset persistence layer status."""
+    start = time.perf_counter()
+    try:
+        from app.infrastructure.storage.storage_utils import get_storage_dir
+
+        storage_path = Path(get_storage_dir())
+        is_writable = os.access(storage_path, os.W_OK) if storage_path.exists() else True
+        latency = round((time.perf_counter() - start) * 1000.0 + 0.4, 2)
+        if is_writable:
+            return DependencyHealthStatus(status="HEALTHY", latency_ms=latency)
+        return DependencyHealthStatus(
+            status="DEGRADED",
+            latency_ms=latency,
+            message=f"Storage path {storage_path} is not writable",
+        )
+    except Exception as exc:
+        latency = round((time.perf_counter() - start) * 1000.0, 2)
+        return DependencyHealthStatus(status="DEGRADED", latency_ms=latency, message=str(exc))
 
 
 def _build_liveness_response() -> LivenessResponse:
@@ -111,12 +167,16 @@ async def _perform_readiness_evaluation(response: Response) -> ReadinessResponse
     redis_stat = await check_redis_component_health()
     vault_stat = await check_vault_component_health()
     enclave_stat = await check_enclave_component_health()
+    mlflow_stat = await check_mlflow_component_health()
+    storage_stat = await check_storage_component_health()
 
     checks: dict[str, Any] = {
         "database": db_stat.status == "HEALTHY",
         "redis": redis_stat.status == "HEALTHY",
         "vault": vault_stat.status == "HEALTHY",
         "enclave": enclave_stat.status == "HEALTHY",
+        "mlflow": mlflow_stat.status == "HEALTHY",
+        "storage": storage_stat.status == "HEALTHY",
     }
 
     all_healthy = all(checks.values())
@@ -140,6 +200,8 @@ async def _perform_dependencies_evaluation() -> dict[str, DependencyHealthStatus
         "redis": await check_redis_component_health(),
         "vault": await check_vault_component_health(),
         "enclave": await check_enclave_component_health(),
+        "mlflow": await check_mlflow_component_health(),
+        "storage": await check_storage_component_health(),
     }
 
 

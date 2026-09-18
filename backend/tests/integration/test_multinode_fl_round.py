@@ -32,24 +32,36 @@ def test_bank_nodes_isolated_network_configuration() -> None:
     assert "coordinator" in services
     assert "bank-a" in services
     assert "bank-b" in services
+    assert "bank-c" in services
 
     # Verify bank private network boundaries
     assert "bank-a-net" in networks
     assert "bank-b-net" in networks
+    assert "bank-c-net" in networks
     assert networks["bank-a-net"].get("internal") is True
     assert networks["bank-b-net"].get("internal") is True
+    assert networks["bank-c-net"].get("internal") is True
 
     # Bank A must be on bank-a-net and consortium-net
     bank_a_nets = services["bank-a"]["networks"]
     assert "bank-a-net" in bank_a_nets
     assert "consortium-net" in bank_a_nets
     assert "bank-b-net" not in bank_a_nets
+    assert "bank-c-net" not in bank_a_nets
 
     # Bank B must be on bank-b-net and consortium-net
     bank_b_nets = services["bank-b"]["networks"]
     assert "bank-b-net" in bank_b_nets
     assert "consortium-net" in bank_b_nets
     assert "bank-a-net" not in bank_b_nets
+    assert "bank-c-net" not in bank_b_nets
+
+    # Bank C must be on bank-c-net and consortium-net
+    bank_c_nets = services["bank-c"]["networks"]
+    assert "bank-c-net" in bank_c_nets
+    assert "consortium-net" in bank_c_nets
+    assert "bank-a-net" not in bank_c_nets
+    assert "bank-b-net" not in bank_c_nets
 
 
 def test_grpc_mtls_handshake_coordinator_bank() -> None:

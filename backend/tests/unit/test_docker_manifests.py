@@ -51,3 +51,51 @@ def test_nginx_gateway_websocket_and_security_headers() -> None:
     assert "X-Content-Type-Options" in content
     assert "proxy_pass http://backend_api;" in content
     assert "proxy_pass http://frontend_spa;" in content
+
+
+def test_docker_compose_enterprise_profiles_and_healthchecks() -> None:
+    """Verify enterprise profiles, authenticated healthchecks, and environment floor in docker-compose.yml."""
+    compose_path = root_dir / "docker-compose.yml"
+    assert compose_path.exists()
+    content = compose_path.read_text(encoding="utf-8")
+
+    # Enterprise profile services
+    assert "vault:" in content
+    assert "minio:" in content
+    assert "mlflow:" in content
+    assert "50051" in content
+
+    # Backend environment parity
+    assert "DATABASE_TYPE=postgres" in content
+    assert "POSTGRES_HOST=postgres" in content
+    assert "CONSORTIUM_HMAC_SALT=" in content
+
+    # Authenticated Redis probe
+    assert "--no-auth-warning" in content
+    assert "redis-cli" in content
+    assert "pg_isready" in content
+
+
+def test_dockerfiles_security_and_grpc_port_parity() -> None:
+    """Verify multi-stage Dockerfiles enforce non-root user and expose gRPC port 50051."""
+    for df_path in [
+        root_dir / "docker" / "Dockerfile.backend",
+        root_dir / "backend" / "Dockerfile",
+    ]:
+        assert df_path.exists()
+        content = df_path.read_text(encoding="utf-8")
+        assert "USER user" in content
+        assert "50051" in content
+        assert "uv" in content
+
+
+def test_dev_compose_parity() -> None:
+    """Verify docker-compose.dev.yml includes gRPC debug port and postgres environment override."""
+    dev_path = root_dir / "docker-compose.dev.yml"
+    assert dev_path.exists()
+    content = dev_path.read_text(encoding="utf-8")
+    assert "50051:50051" in content
+    assert "DATABASE_TYPE=postgres" in content
+    assert "POSTGRES_HOST=postgres" in content
+    assert "REDIS_HOST=redis" in content
+
