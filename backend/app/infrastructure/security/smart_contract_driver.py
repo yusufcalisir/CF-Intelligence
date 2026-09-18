@@ -11,6 +11,7 @@ import logging
 import os
 import threading
 import urllib.error
+import urllib.parse
 import urllib.request
 from datetime import UTC, datetime
 from pathlib import Path
@@ -332,6 +333,11 @@ class SmartContractSettlementDriver:
     def _probe_rpc(self, rpc_url: str) -> dict[str, Any] | None:
         """Probes a remote or local JSON-RPC provider via eth_blockNumber & eth_chainId."""
         try:
+            parsed = urllib.parse.urlparse(rpc_url)
+            if parsed.scheme not in ("http", "https"):
+                logger.warning("Rejected non-HTTP/HTTPS RPC URL scheme: %s", parsed.scheme)
+                return None
+
             req_data = json.dumps({
                 "jsonrpc": "2.0",
                 "method": "eth_blockNumber",
@@ -343,7 +349,7 @@ class SmartContractSettlementDriver:
                 data=req_data,
                 headers={"Content-Type": "application/json", "User-Agent": "CFI-SmartContractDriver/1.0"},
             )
-            with urllib.request.urlopen(req, timeout=2.0) as resp:
+            with urllib.request.urlopen(req, timeout=2.0) as resp:  # nosec B310
                 data = json.loads(resp.read().decode("utf-8"))
                 block_hex = data.get("result")
                 if not block_hex:
@@ -362,7 +368,7 @@ class SmartContractSettlementDriver:
                 data=req_chain,
                 headers={"Content-Type": "application/json", "User-Agent": "CFI-SmartContractDriver/1.0"},
             )
-            with urllib.request.urlopen(req2, timeout=2.0) as resp2:
+            with urllib.request.urlopen(req2, timeout=2.0) as resp2:  # nosec B310
                 data2 = json.loads(resp2.read().decode("utf-8"))
                 chain_hex = data2.get("result", "0xaa36a7")
                 chain_id = int(chain_hex, 16) if chain_hex else 11155111

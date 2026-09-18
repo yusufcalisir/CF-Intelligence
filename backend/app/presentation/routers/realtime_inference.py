@@ -82,7 +82,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                     buffer = io.BytesIO(cached_bytes)
                     _cached_scripted_model = torch.jit.load(buffer)
                 except Exception:
-                    _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301 fallback
+                    _cached_scripted_model = pickle.loads(cached_bytes)  # nosec B301
                 _cached_from_redis = True
                 logger.info(
                     "Loaded champion TorchScript model from Redis cache (cfi:champion_model)."
@@ -153,7 +153,7 @@ def get_scripted_model() -> tuple[Any, bool]:
                 torch.jit.save(scripted, buffer)
                 redis_client.set("cfi:champion_model", buffer.getvalue(), ex=3600)
             except Exception:
-                redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301 fallback
+                redis_client.set("cfi:champion_model", pickle.dumps(scripted), ex=3600)  # nosec B301
     except Exception as exc:
         logger.debug("Failed to store champion model in Redis: %s", exc)
 
