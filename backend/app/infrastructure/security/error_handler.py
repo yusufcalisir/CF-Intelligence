@@ -34,7 +34,7 @@ PII_PATTERNS: dict[str, re.Pattern[str]] = {
     "email": re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"),
     "credit_card": re.compile(r"\b(?:\d{4}[ -]?){3}\d{4}\b"),
     "iban": re.compile(r"\b[A-Z]{2}\d{2}[A-Z0-9]{12,30}\b"),
-    "phone": re.compile(r"(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b"),
+    "phone": re.compile(r"(?<![\w])(?:\+\d{1,3}[- ]?)?\(?\d{3}\)?[- ]?\d{3}[- ]?\d{4}\b"),
     "ssn_tckn": re.compile(r"\b\d{3}-\d{2}-\d{4}\b|\b\d{11}\b"),
 }
 

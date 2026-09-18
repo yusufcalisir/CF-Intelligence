@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import re
 import threading
 import time
 from typing import Any
@@ -25,8 +26,15 @@ def _contains_raw_pii(text: str) -> bool:
     """Checks whether text contains unmasked raw PII matching known patterns."""
     if not text:
         return False
+    # Strip formal UUIDs (case/alert IDs) and cryptographic hashes before running PII regex checks
+    sanitized = re.sub(
+        r"\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b",
+        " ",
+        text,
+    )
+    sanitized = re.sub(r"\b[0-9a-fA-F]{32,64}\b", " ", sanitized)
     for pii_type, pattern in PII_PATTERNS.items():
-        matches = pattern.findall(text)
+        matches = pattern.findall(sanitized)
         # Verify match is not an already masked token [MASKED_PII:...]
         for m in matches:
             if isinstance(m, tuple):
