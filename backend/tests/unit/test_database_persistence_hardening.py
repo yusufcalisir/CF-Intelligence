@@ -1,4 +1,4 @@
-"""Hardening and resilience tests for Database Persistence, Alembic Migrations & Concurrency Locking (Phase 67).
+"""Hardening and resilience tests for Database Persistence, Alembic Migrations & Concurrency Locking.
 
 Validates:
   1. AlertModel full schema persistence with triage and deduplication fields.
@@ -13,6 +13,9 @@ Validates:
   10. TenantContextMiddleware contextvar propagation and cleanup.
   11. Multi-tenant database URL resolution for central and bank-isolated databases.
   12. Retryable DB error heuristic accuracy across database engines.
+  13. SQLAlchemy connection pooling configuration and SQLite busy timeout connect_args.
+  14. PyTorch memory cleanup safeguards across FL and GNN training loops.
+  15. Enterprise stress test latency percentiles (p50, p95, p99) reporting.
 """
 
 from __future__ import annotations
@@ -400,3 +403,94 @@ def test_database_url_resolution() -> None:
     # Sanitization check
     sanitized = sanitize_bank_id("BANK_GAMMA_01")
     assert sanitized == "bank_gamma_01"
+
+
+# ── 7. Connection Pooling & Memory Cleanup Hardening ──────────────────────────
+
+
+def test_database_connection_pooling_kwargs_and_sqlite_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verifies connection pool configuration for PostgreSQL/CockroachDB and SQLite busy timeout."""
+    from app.config import get_settings
+    from app.infrastructure.database import _make_engine_kwargs
+
+    current_settings = get_settings()
+
+    # Test SQLite branch
+    monkeypatch.setattr(current_settings, "database_type", "sqlite")
+    sqlite_kwargs = _make_engine_kwargs("bank_alpha")
+    assert "connect_args" in sqlite_kwargs
+    assert sqlite_kwargs["connect_args"]["timeout"] == 30.0
+    assert sqlite_kwargs["connect_args"]["check_same_thread"] is False
+
+    # Test PostgreSQL branch
+    monkeypatch.setattr(current_settings, "database_type", "postgres")
+    monkeypatch.setattr(current_settings, "database_pool_size", 25)
+    monkeypatch.setattr(current_settings, "database_max_overflow", 15)
+    monkeypatch.setattr(current_settings, "database_pool_timeout", 45.0)
+    monkeypatch.setattr(current_settings, "database_pool_recycle", 1800)
+
+    pg_kwargs = _make_engine_kwargs("bank_alpha")
+    assert pg_kwargs["pool_size"] == 25
+    assert pg_kwargs["max_overflow"] == 15
+    assert pg_kwargs["pool_timeout"] == 45.0
+    assert pg_kwargs["pool_recycle"] == 1800
+    assert pg_kwargs["pool_pre_ping"] is True
+
+
+def test_pytorch_memory_cleanup_safeguards() -> None:
+    """Verifies that PyTorch GPU/CPU memory cleanup helpers run cleanly without exception."""
+    from app.application.services.flower_engine import _cleanup_pytorch_memory as flower_cleanup
+    from app.application.services.graph_embedding_service import (
+        _cleanup_pytorch_memory as gnn_cleanup,
+    )
+    from app.application.services.simulation_service import _cleanup_pytorch_memory as sim_cleanup
+
+    # All three cleanup functions must run safely regardless of CUDA availability
+    flower_cleanup()
+    gnn_cleanup()
+    sim_cleanup()
+
+
+def test_enterprise_stress_test_percentiles_calculation() -> None:
+    """Verifies that EnterpriseStressTestRunner records and reports p50, p95, and p99 percentiles."""
+    import sys
+    from pathlib import Path
+
+    root_dir = Path(__file__).resolve().parent.parent.parent.parent
+    if str(root_dir) not in sys.path:
+        sys.path.insert(0, str(root_dir))
+
+    from scripts.run_enterprise_stress_test import (
+        EnterpriseStressTestRunner,
+        StressTestConfig,
+        StressTestResult,
+    )
+
+    config = StressTestConfig(
+        num_banks=3,
+        transactions_per_second_target=2000,
+        duration_seconds=1,
+        batch_size=20,
+    )
+    runner = EnterpriseStressTestRunner(config)
+    runner.prepare()
+    result = runner.run()
+
+    assert isinstance(result, StressTestResult)
+    assert result.total_transactions > 0
+    assert result.peak_tps > 0.0
+    assert result.p50_latency_ms >= 0.0
+    assert result.p95_latency_ms >= 0.0
+    assert result.p99_latency_ms >= 0.0
+    assert result.p99_latency_ms >= result.p50_latency_ms
+
+    report_md = runner.report(result)
+    assert "p50 (Median)" in report_md
+    assert "p95" in report_md
+    assert "p99" in report_md
+    assert "Conformance Verdict" in report_md
+
+    as_dict = result.to_dict()
+    assert "p50_latency_ms" in as_dict
+    assert "p95_latency_ms" in as_dict
+    assert "p99_latency_ms" in as_dict

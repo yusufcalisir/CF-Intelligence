@@ -157,6 +157,7 @@ class StressTestResult:
     peak_tps: float = 0.0
     mean_latency_ms: float = 0.0
     p50_latency_ms: float = 0.0
+    p95_latency_ms: float = 0.0
     p99_latency_ms: float = 0.0
     error_count: int = 0
     error_rate_pct: float = 0.0
@@ -174,6 +175,7 @@ class StressTestResult:
             "peak_tps": round(self.peak_tps, 2),
             "mean_latency_ms": round(self.mean_latency_ms, 3),
             "p50_latency_ms": round(self.p50_latency_ms, 3),
+            "p95_latency_ms": round(self.p95_latency_ms, 3),
             "p99_latency_ms": round(self.p99_latency_ms, 3),
             "error_count": self.error_count,
             "error_rate_pct": round(self.error_rate_pct, 4),
@@ -277,6 +279,8 @@ class EnterpriseStressTestRunner:
 
         sorted_latencies = sorted(latencies)
         p50 = statistics.median(sorted_latencies) if sorted_latencies else 0.0
+        p95_idx = max(0, int(len(sorted_latencies) * 0.95) - 1)
+        p95 = sorted_latencies[p95_idx] if sorted_latencies else 0.0
         p99_idx = max(0, int(len(sorted_latencies) * 0.99) - 1)
         p99 = sorted_latencies[p99_idx] if sorted_latencies else 0.0
         mean_lat = statistics.mean(sorted_latencies) if sorted_latencies else 0.0
@@ -294,6 +298,7 @@ class EnterpriseStressTestRunner:
             peak_tps=peak_tps,
             mean_latency_ms=mean_lat,
             p50_latency_ms=p50,
+            p95_latency_ms=p95,
             p99_latency_ms=p99,
             error_count=error_count,
             error_rate_pct=error_rate,
@@ -341,6 +346,7 @@ class EnterpriseStressTestRunner:
             "|---|---|",
             f"| Mean | {result.mean_latency_ms:.3f} ms |",
             f"| p50 (Median) | {result.p50_latency_ms:.3f} ms |",
+            f"| p95 | {result.p95_latency_ms:.3f} ms |",
             f"| p99 | {result.p99_latency_ms:.3f} ms |",
             "",
             "## Per-Bank Throughput",
@@ -417,6 +423,7 @@ def main() -> None:
     logger.info("Total Transactions : %s", f"{result.total_transactions:,}")
     logger.info("Peak TPS           : %s tx/sec", f"{result.peak_tps:,.2f}")
     logger.info("p50 Latency        : %.3f ms", result.p50_latency_ms)
+    logger.info("p95 Latency        : %.3f ms", result.p95_latency_ms)
     logger.info("p99 Latency        : %.3f ms", result.p99_latency_ms)
     logger.info("Error Rate         : %.4f%%", result.error_rate_pct)
     logger.info("─" * 60)

@@ -19,6 +19,7 @@ the database.
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import time
 from collections.abc import Callable
@@ -51,6 +52,25 @@ logger = logging.getLogger(__name__)
 
 # Type for progress callback: (simulation_id, event_type, data)
 ProgressCallback = Callable[[str, str, dict[str, Any]], None] | None
+
+
+def _cleanup_pytorch_memory() -> None:
+    """Explicitly trigger garbage collection and release PyTorch CUDA/MPS cache to prevent memory bloat."""
+    import gc
+
+    gc.collect()
+    with contextlib.suppress(Exception):
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif (
+            hasattr(torch, "mps")
+            and hasattr(torch.mps, "empty_cache")
+            and hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
+            torch.mps.empty_cache()
 
 
 class InvalidPipelineConfigurationError(Exception):
@@ -410,9 +430,7 @@ class SimulationService:
 
                 # Free memory immediately
                 del model
-                import gc
-
-                gc.collect()
+                _cleanup_pytorch_memory()
 
             # Phase 3: Federated training
             simulation.status = SimulationStatus.TRAINING_FEDERATED
@@ -1114,6 +1132,8 @@ class SimulationService:
                         else 0.0,
                     )
 
+                    _cleanup_pytorch_memory()
+
             # Phase 3b: Federated Graph Embedding (FedGNN)
             enable_gnn = getattr(config, "enable_graph_embedding", False)
             if enable_gnn:
@@ -1210,6 +1230,7 @@ class SimulationService:
                             "stats": gnn_service.get_embedding_stats(),
                         },
                     )
+                    _cleanup_pytorch_memory()
                 # Perform active Privacy Audit (LRA & MIA) for GNN
                 try:
                     from app.application.services.privacy_audit_service import PrivacyAuditService

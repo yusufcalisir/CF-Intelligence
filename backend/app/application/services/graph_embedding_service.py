@@ -16,6 +16,7 @@ This service integrates with the existing FL pipeline:
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import threading
 from collections import defaultdict
@@ -36,6 +37,23 @@ if TYPE_CHECKING:
     from app.domain.value_objects import ModelWeights
 
 logger = logging.getLogger(__name__)
+
+
+def _cleanup_pytorch_memory() -> None:
+    """Explicitly garbage-collect and flush PyTorch CUDA/MPS cache to prevent GPU/RAM memory bloat."""
+    import gc
+
+    gc.collect()
+    with contextlib.suppress(Exception):
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif (
+            hasattr(torch, "mps")
+            and hasattr(torch.mps, "empty_cache")
+            and hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
+            torch.mps.empty_cache()
 
 
 class GraphEmbeddingService:
@@ -279,7 +297,9 @@ class GraphEmbeddingService:
             metrics["num_edges"],
         )
 
-        return model.to_model_weights(include_classifier=False), metrics
+        weights = model.to_model_weights(include_classifier=False)
+        _cleanup_pytorch_memory()
+        return weights, metrics
 
     def get_model_weights(self) -> ModelWeights | None:
         """Get current model weights for federated aggregation."""

@@ -107,13 +107,17 @@ def _resolve_database_url(tenant: str | None) -> str:
 def _make_engine_kwargs(tenant: str | None) -> dict[str, Any]:
     """Build engine keyword arguments with production connection pooling."""
     if settings.database_type == "sqlite":
-        return {"echo": settings.app_debug}
+        return {
+            "echo": settings.app_debug,
+            "connect_args": {"timeout": 30.0, "check_same_thread": False},
+        }
 
     kwargs: dict[str, Any] = {
         "echo": settings.app_debug,
-        "pool_size": 20,
-        "max_overflow": 10,
-        "pool_recycle": 3600,
+        "pool_size": getattr(settings, "database_pool_size", 20),
+        "max_overflow": getattr(settings, "database_max_overflow", 10),
+        "pool_timeout": getattr(settings, "database_pool_timeout", 30.0),
+        "pool_recycle": getattr(settings, "database_pool_recycle", 3600),
         "pool_pre_ping": True,
     }
     if settings.database_type == "cockroachdb":

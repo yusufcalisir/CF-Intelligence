@@ -63,6 +63,25 @@ def _ndarrays_to_model(
     return model
 
 
+def _cleanup_pytorch_memory() -> None:
+    """Explicitly garbage-collect and flush PyTorch CUDA/MPS cache to prevent GPU/RAM memory bloat."""
+    import gc
+
+    gc.collect()
+    with contextlib.suppress(Exception):
+        import torch
+
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        elif (
+            hasattr(torch, "mps")
+            and hasattr(torch.mps, "empty_cache")
+            and hasattr(torch.backends, "mps")
+            and torch.backends.mps.is_available()
+        ):
+            torch.mps.empty_cache()
+
+
 class FraudFlowerClient(fl.client.NumPyClient):
     """Flower NumPyClient wrapping our ModelService — defined at top-level for Ray serialization."""
 
@@ -124,6 +143,7 @@ class FraudFlowerClient(fl.client.NumPyClient):
             }
 
         updated_params = _weights_to_ndarrays(self.model_service, self.model)
+        _cleanup_pytorch_memory()
         return updated_params, n_samples, metrics
 
     def evaluate(
@@ -139,6 +159,7 @@ class FraudFlowerClient(fl.client.NumPyClient):
         )
         n_samples = len(self.data["X_test"])
         loss = float(eval_result["loss"])
+        _cleanup_pytorch_memory()
         return (
             loss,
             n_samples,
@@ -240,6 +261,7 @@ class CallbackFedAvg(fl.server.strategy.FedAvg):
             round_duration,
         )
 
+        _cleanup_pytorch_memory()
         return aggregated
 
 
@@ -654,6 +676,9 @@ class FlowerFLEngine:
                     },
                 )
 
+            _cleanup_pytorch_memory()
+
+        _cleanup_pytorch_memory()
         return {
             "rounds": fallback_rounds,
             "history": None,

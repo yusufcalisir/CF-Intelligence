@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     postgres_db: str = "fraud_intelligence"
     postgres_user: str = "fraud_user"
     postgres_password: str = "change_me_in_production"
+    database_pool_size: int = 20
+    database_max_overflow: int = 10
+    database_pool_timeout: float = 30.0
+    database_pool_recycle: int = 3600
 
     # ── Redis ─────────────────────────────────
     # Leave redis_host empty to disable Redis and use in-memory storage silently.
