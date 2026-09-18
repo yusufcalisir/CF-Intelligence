@@ -102,7 +102,7 @@ def main() -> None:
         if args.max_rows and len(df) > args.max_rows:
             df = df.iloc[: args.max_rows]
 
-        processed = etl.preprocess_dataset(df, dataset_name=args.dataset, anonymize_pii=True)
+        processed = etl.preprocess_dataset(df=df, dataset_name=args.dataset, anonymize_pii=True)
         label_col = "is_fraud" if "is_fraud" in processed.columns else processed.columns[-1]
         feature_names = [c for c in processed.columns if c != label_col and pd.api.types.is_numeric_dtype(processed[c])]
         X = processed[feature_names].fillna(0).values.astype(np.float32)
@@ -118,7 +118,9 @@ def main() -> None:
         y = ds["y"]
         feature_names = ds.get("feature_names")
 
-    logger.info("Dataset shape: X=%s, y=%s (Fraud Ratio: %.4f)", X.shape, y.shape, float(np.mean(y)))
+    y_arr = np.asarray(y, dtype=np.float64)
+    fraud_ratio = float(np.mean(y_arr)) if len(y_arr) > 0 else 0.0
+    logger.info("Dataset shape: X=%s, y=%s (Fraud Ratio: %.4f)", X.shape, y.shape, fraud_ratio)
 
     # Dirichlet Non-IID Partitioning
     partitions = etl.partition_dirichlet(X, y, num_banks=args.num_banks, alpha=args.dirichlet_alpha)
@@ -128,12 +130,13 @@ def main() -> None:
         b_name = bank_names[i] if i < len(bank_names) else f"bank_{i+1}"
         file_path = output_dir / f"bank_{b_name}.parquet"
         etl.export_partition_parquet(p, file_path, feature_names=feature_names)
+        p_y = np.asarray(p["y"], dtype=np.float64)
         logger.info(
             "  Bank '%s': %d samples (Fraud count: %d, Fraud ratio: %.4f)",
             b_name,
             len(p["y"]),
-            int(np.sum(p["y"])),
-            float(np.mean(p["y"])) if len(p["y"]) > 0 else 0.0,
+            int(np.sum(p_y)),
+            float(np.mean(p_y)) if len(p_y) > 0 else 0.0,
         )
 
     # Export dataset manifest

@@ -73,15 +73,19 @@ class RealWorldETLPipeline:
 
     def preprocess_dataset(
         self,
-        dataset_or_df: str | pd.DataFrame,
+        dataset_or_df: str | pd.DataFrame | None = None,
         df_or_dataset: pd.DataFrame | str | None = None,
         anonymize_pii: bool = True,
+        *,
+        dataset_name: str | None = None,
+        df: pd.DataFrame | None = None,
     ) -> pd.DataFrame:
         """Preprocesses raw fraud dataset into clean DataFrame with normalized 'is_fraud' label.
 
-        Supports both calling conventions:
+        Supports both positional and keyword calling conventions:
         - `preprocess_dataset(dataset_name, df)`
         - `preprocess_dataset(df, dataset_name)`
+        - `preprocess_dataset(df=df, dataset_name=dataset_name)`
 
         Handles:
         1. HMAC-SHA256 identity anonymization for PII columns.
@@ -89,15 +93,26 @@ class RealWorldETLPipeline:
         3. String/identifier column filtering and null imputation.
         4. Normalized binary target column 'is_fraud'.
         """
-        if isinstance(dataset_or_df, str):
-            dataset_name = dataset_or_df
-            df = df_or_dataset if isinstance(df_or_dataset, pd.DataFrame) else pd.DataFrame()
-        else:
-            df = dataset_or_df
-            dataset_name = df_or_dataset if isinstance(df_or_dataset, str) else "paysim"
+        resolved_name: str = "paysim"
+        resolved_df: pd.DataFrame = pd.DataFrame()
 
-        clean_name = dataset_name.lower().replace("-", "_").strip()
-        df_work = self.anonymize_dataframe(df) if anonymize_pii else df.copy()
+        if dataset_name is not None:
+            resolved_name = dataset_name
+        if df is not None:
+            resolved_df = df
+
+        if dataset_or_df is not None:
+            if isinstance(dataset_or_df, str):
+                resolved_name = dataset_or_df
+                if df_or_dataset is not None and isinstance(df_or_dataset, pd.DataFrame):
+                    resolved_df = df_or_dataset
+            elif isinstance(dataset_or_df, pd.DataFrame):
+                resolved_df = dataset_or_df
+                if df_or_dataset is not None and isinstance(df_or_dataset, str):
+                    resolved_name = df_or_dataset
+
+        clean_name = resolved_name.lower().replace("-", "_").strip()
+        df_work = self.anonymize_dataframe(resolved_df) if anonymize_pii else resolved_df.copy()
 
         if clean_name == "paysim":
             if "isFraud" in df_work.columns:
