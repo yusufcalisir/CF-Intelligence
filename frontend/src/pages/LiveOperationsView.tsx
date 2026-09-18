@@ -5,7 +5,7 @@ import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, CartesianGrid, Legend,
 } from 'recharts';
-import { Settings2, FlaskConical, Zap, FileUp, AlertTriangle } from 'lucide-react';
+import { Settings2, FlaskConical, Zap, FileUp, AlertTriangle, RefreshCw } from 'lucide-react';
 import ModelRegistryPanel from '../components/dashboard/ModelRegistryPanel';
 import FederatedTrainingAnimation from '../components/dashboard/FederatedTrainingAnimation';
 import ComplianceReportPanel from '../components/dashboard/ComplianceReportPanel';
@@ -77,8 +77,16 @@ export default function LiveOperationsView() {
   const [roundHistory, setRoundHistory] = useState<RoundData[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [isOfflineDemoMode, setIsOfflineDemoMode] = useState(false);
+  const [wsRetryCount, setWsRetryCount] = useState(0);
+  const [isRetryingWs, setIsRetryingWs] = useState(false);
   const offlineDemoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRetryLiveStream = () => {
+    setIsRetryingWs(true);
+    setWsRetryCount((prev) => prev + 1);
+    setTimeout(() => setIsRetryingWs(false), 1000);
+  };
 
   // ── Real Backend Query Hooks ───────────────────────────────────────────────
   const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
@@ -235,7 +243,7 @@ export default function LiveOperationsView() {
       }
       if (offlineDemoIntervalRef.current) clearInterval(offlineDemoIntervalRef.current);
     };
-  }, []);
+  }, [wsRetryCount]);
 
   // Poll bank node heartbeats every 30s
   useEffect(() => {
@@ -532,11 +540,22 @@ export default function LiveOperationsView() {
 
       {/* Offline Fallback Banner */}
       {isOfflineDemoMode && (
-        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium">
-          <AlertTriangle size={15} className="text-amber-400 shrink-0" />
-          <span>
-            <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker — this data is illustrative and not live production telemetry.
-          </span>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-medium shadow-sm">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+            <span className="leading-relaxed">
+              <strong>Simulated Telemetry (Offline Demo Mode):</strong> Live WebSocket connection to coordinator is disconnected. Displaying local synthetic ticker — this data is illustrative and not live production telemetry.
+            </span>
+          </div>
+          <button
+            type="button"
+            id="retry-live-stream-btn"
+            onClick={handleRetryLiveStream}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-xs font-semibold whitespace-nowrap self-start sm:self-auto cursor-pointer transition-all active:scale-95 shrink-0"
+          >
+            <RefreshCw size={13} className={isRetryingWs ? 'animate-spin' : ''} />
+            <span>Retry Live Stream</span>
+          </button>
         </div>
       )}
 
@@ -605,13 +624,32 @@ export default function LiveOperationsView() {
           </div>
 
           {roundHistory.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-6 sm:py-0">
-              <span className="text-4xl opacity-40">📊</span>
-              <p className="text-sm text-[var(--color-text-muted)]">
-                {trainingPhase === 'pending'
-                  ? 'Press "Start Federated Training" to begin the simulation'
-                  : 'Preparing training rounds…'}
-              </p>
+            <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
+              <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+                <span className="text-3xl">📊</span>
+              </div>
+              <div className="max-w-xs space-y-1">
+                <p className="text-sm font-semibold text-[var(--color-text-primary)]">
+                  {trainingPhase === 'pending'
+                    ? 'No Telemetry Rounds Recorded'
+                    : 'Initializing Training Pipeline…'}
+                </p>
+                <p className="text-xs text-[var(--color-text-muted)]">
+                  {trainingPhase === 'pending'
+                    ? 'Launch federated training to stream per-round model convergence and cross-bank AUC progression.'
+                    : 'Synthesizing edge shards and dispatching local gradient tasks…'}
+                </p>
+              </div>
+              {trainingPhase === 'pending' && (
+                <button
+                  type="button"
+                  onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
+                  className="mt-1 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md shadow-indigo-600/20 transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <FlaskConical size={14} />
+                  <span>Start Training Run ({selectedProfile.label})</span>
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex-1 min-h-0 h-56 min-w-0">

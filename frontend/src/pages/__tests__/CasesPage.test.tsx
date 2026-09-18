@@ -102,4 +102,54 @@ describe('CasesPage Integration Test Suite', () => {
     await user.selectOptions(statusSelect, 'open');
     expect(statusSelect).toHaveValue('open');
   });
+
+  it('renders authentic empty state when no cases exist in the database', () => {
+    vi.spyOn(queries, 'useCases').mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/No cases yet/i)).toBeInTheDocument();
+    expect(screen.getByText(/Create a case to start tracking/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /\+ Create First Case/i })).toBeInTheDocument();
+  });
+
+  it('renders dedicated filter empty state with Clear Status Filter button', async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(queries, 'useCases').mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const statusSelect = screen.getByRole('combobox');
+    await user.selectOptions(statusSelect, 'closed_false_positive');
+
+    expect(screen.getByText(/No cases matching filter/i)).toBeInTheDocument();
+    const clearBtn = screen.getByRole('button', { name: /Clear Status Filter/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    await user.click(clearBtn);
+    expect(statusSelect).toHaveValue('');
+  });
 });

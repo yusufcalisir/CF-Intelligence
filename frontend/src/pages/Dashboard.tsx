@@ -110,9 +110,14 @@ export default function Dashboard() {
               <div key={i} className="glass-card p-4 h-36 animate-pulse" />
             ))}
           </div>
+        ) : !banks || banks.length === 0 ? (
+          <div className="glass-card p-6 text-center text-[var(--color-text-muted)] border border-dashed border-slate-800 rounded-xl">
+            <p className="text-xs font-semibold text-slate-300">No Bank Nodes Registered</p>
+            <p className="text-[11px] text-slate-400 mt-1">Register bank nodes via the Consortium Coordinator or Onboarding suite.</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {banks?.map((bank, idx) => (
+            {banks.map((bank, idx) => (
               <BankCard key={bank.id} bank={bank} index={idx} />
             ))}
           </div>

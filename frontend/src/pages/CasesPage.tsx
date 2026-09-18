@@ -82,9 +82,41 @@ export default function CasesPage() {
           ))}
         </div>
       ) : !cases || cases.length === 0 ? (
-        <div className="glass-card p-12 text-center text-[var(--color-text-muted)]">
-          <p className="text-lg font-semibold mb-1">No cases yet</p>
-          <p className="text-xs">Create a case to start tracking investigations.</p>
+        <div className="glass-card p-12 text-center text-[var(--color-text-muted)] space-y-3">
+          <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 inline-block">
+            <span className="text-3xl">📁</span>
+          </div>
+          {statusFilter ? (
+            <div>
+              <p className="text-base font-semibold text-slate-200 mb-1">
+                No cases matching filter &ldquo;{CASE_STATUS_LABELS[statusFilter] || statusFilter}&rdquo;
+              </p>
+              <p className="text-xs text-slate-400 mb-4">
+                No investigation cases currently match the selected status filter.
+              </p>
+              <button
+                type="button"
+                id="clear-case-status-filter-btn"
+                onClick={() => setStatusFilter('')}
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 border border-white/10 transition-all cursor-pointer"
+              >
+                Clear Status Filter
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className="text-base font-semibold text-slate-200 mb-1">No cases yet</p>
+              <p className="text-xs text-slate-400 mb-4">Create a case to start tracking investigations.</p>
+              <button
+                type="button"
+                id="create-first-case-btn"
+                onClick={() => setShowCreateModal(true)}
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                + Create First Case
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
