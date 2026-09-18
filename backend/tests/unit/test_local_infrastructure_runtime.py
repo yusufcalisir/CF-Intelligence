@@ -22,9 +22,9 @@ def test_settings_redis_url_construction() -> None:
         redis_host="localhost",
         redis_port=6379,
         redis_db=0,
-        redis_password="cfi_redis_secure_pass_2026",
+        redis_password="cfi_test_redis_pass",
     )
-    assert s2.redis_url == "redis://:cfi_redis_secure_pass_2026@localhost:6379/0"
+    assert s2.redis_url == "redis://:cfi_test_redis_pass@localhost:6379/0"
 
     # 3. Empty host returns None
     s3 = Settings(redis_host="")

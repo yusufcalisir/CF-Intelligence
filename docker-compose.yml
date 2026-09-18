@@ -63,13 +63,13 @@ services:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER:-cfi_admin}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cfi_secure_pass_2026}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}
       - POSTGRES_DB=${POSTGRES_DB:-cfi_fraud_db}
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD:-cfi_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-cfi_admin}:${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}@postgres:5432/${POSTGRES_DB:-cfi_fraud_db}
       - REDIS_HOST=redis
       - REDIS_PORT=6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}@redis:6379/0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-cfi_super_secret_jwt_key_2026_enterprise_floor}
       - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT:-cfi_salt_consortium_hmac_sha256_floor_token_2026}
       - CFI_STORAGE_DIR=/app/storage
@@ -99,7 +99,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cfi_admin}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cfi_secure_pass_2026}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cfi_secure_pass_2026_change_in_production}
       POSTGRES_DB: ${POSTGRES_DB:-cfi_fraud_db}
     ports:
       - "${CFI_PORT_PG:-5432}:5432"
@@ -121,7 +121,7 @@ services:
     restart: unless-stopped
     command: >
       redis-server
-      --requirepass ${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}
+      --requirepass ${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}
       --appendonly yes
       --maxmemory 512mb
       --maxmemory-policy volatile-lru
@@ -132,7 +132,7 @@ services:
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026}", "ping"]
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 3
