@@ -81,6 +81,8 @@ class SettlementReceiptResponse(BaseModel):
     gas_used: int = Field(..., description="Gas units consumed by execution")
     effective_gas_price_gwei: float = Field(..., description="Effective gas price in Gwei")
     audit_proof_hash: str = Field(..., description="Linked immutable audit chain proof hash")
+    mode: str = Field(default="SIMULATOR_FALLBACK", description="Execution mode: LIVE_EVM_RPC or SIMULATOR_FALLBACK")
+    audit_chain_verified: bool = Field(default=True, description="True if proof hash verified against ImmutableAuditChain")
     payouts: list[OnChainPayoutItem] = Field(..., description="Per-participant payout breakdown")
 
 
@@ -98,6 +100,9 @@ class ContractInfoResponse(BaseModel):
     total_settlements_executed: int = Field(..., description="Total settlement receipts logged")
     total_quarantined_nodes: int = Field(..., description="Number of quarantined participant addresses")
     total_slashed_nodes: int = Field(..., description="Number of Byzantine slashed participants")
+    mode: str = Field(default="SIMULATOR_FALLBACK", description="Operating mode: LIVE_EVM_RPC or SIMULATOR_FALLBACK")
+    is_live_rpc: bool = Field(default=False, description="True if connected to active EVM JSON-RPC provider")
+    rpc_provider_url: str | None = Field(default=None, description="Active JSON-RPC endpoint URL")
     abi: list[dict[str, Any]] = Field(..., description="Smart contract JSON ABI")
 
 

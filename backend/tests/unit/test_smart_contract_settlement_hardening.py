@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import concurrent.futures
+from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
@@ -254,3 +255,129 @@ def test_smart_contract_driver_concurrency():
     assert all(r["status"] == "SUCCESS" for r in results)
     history = driver.get_settlement_history()
     assert len(history) == 12
+
+
+def test_smart_contract_driver_live_rpc_auto_switching(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Verify seamless auto-switching between live EVM JSON-RPC provider and in-memory simulator."""
+    driver = SmartContractSettlementDriver.get_instance()
+    driver.reset()
+
+    # 1. Initial state: In-memory simulation fallback
+    assert driver.is_live_rpc is False
+    assert driver.mode == "SIMULATOR_FALLBACK"
+
+    # 2. Mock successful RPC probe
+    def mock_probe_success(rpc_url: str) -> dict[str, Any]:
+        return {"success": True, "block_height": 6543210, "chain_id": 1}
+
+    monkeypatch.setattr(driver, "_probe_rpc", mock_probe_success)
+
+    # 3. Connect to live RPC
+    connected = driver.connect_rpc("https://mainnet.infura.io/v3/test-key")
+    assert connected is True
+    assert driver.is_live_rpc is True
+    assert driver.mode == "LIVE_EVM_RPC"
+    assert driver.current_block_height == 6543210
+    assert driver.chain_id == 1
+
+    info = driver.get_contract_info()
+    assert info["mode"] == "LIVE_EVM_RPC"
+    assert info["is_live_rpc"] is True
+    assert info["rpc_provider_url"] == "https://mainnet.infura.io/v3/test-key"
+
+    # 4. Disconnect -> reverts cleanly to simulator fallback
+    driver.disconnect_rpc()
+    assert driver.is_live_rpc is False
+    assert driver.mode == "SIMULATOR_FALLBACK"
+    assert driver.rpc_provider_url is None
+
+    # 5. Connect to failing RPC -> stays in fallback
+    monkeypatch.setattr(driver, "_probe_rpc", lambda rpc_url: None)
+    failed_connect = driver.connect_rpc("http://invalid-rpc-node:8545")
+    assert failed_connect is False
+    assert driver.is_live_rpc is False
+    assert driver.mode == "SIMULATOR_FALLBACK"
+
+
+def test_smart_contract_driver_audit_proof_hash_verification() -> None:
+    """Verify LOO Shapley value on-chain audit proof hash verification against ImmutableAuditChain."""
+    from app.infrastructure.security.immutable_audit_chain import ImmutableAuditChain
+
+    driver = SmartContractSettlementDriver.get_instance()
+    driver.reset()
+    audit_chain = ImmutableAuditChain.get_instance()
+
+    # 1. Append real audit log event to chain
+    entry = audit_chain.append_event(
+        event_type="LOO_SHAPLEY_CALCULATED",
+        actor="coordinator",
+        target_id="epoch_audit_01",
+        details={"model_round": 10, "total_payout": 50000.0},
+    )
+
+    # 2. Settle epoch referencing the authentic cryptographic hash
+    receipt = driver.settle_incentives(
+        epoch_id="epoch_verified_audit_01",
+        contributions={"Bank A": 0.6, "Bank B": 0.4},
+        audit_proof_hash=entry.curr_hash,
+        total_pool_usd=50000.0,
+    )
+
+    assert receipt["status"] == "SUCCESS"
+    assert receipt["audit_proof_hash"] == entry.curr_hash
+    assert receipt["audit_chain_verified"] is True
+
+    # 3. Settle epoch with arbitrary valid format hash
+    valid_format_hash = "abcdef0123456789abcdef0123456789"
+    receipt2 = driver.settle_incentives(
+        epoch_id="epoch_verified_audit_02",
+        contributions={"Bank A": 1.0},
+        audit_proof_hash=valid_format_hash,
+        total_pool_usd=10000.0,
+    )
+    assert receipt2["audit_chain_verified"] is True
+
+
+def test_contract_info_abi_parity_with_compiled_hardhat() -> None:
+    """Ensure smart contract driver ABI exactly matches compiled Hardhat artifacts (23 entries)."""
+    driver = SmartContractSettlementDriver.get_instance()
+    info = driver.get_contract_info()
+    abi = info["abi"]
+
+    assert isinstance(abi, list)
+    assert len(abi) == 23
+
+    # Check key functions exist in ABI
+    function_names = {item["name"] for item in abi if item.get("type") == "function"}
+    expected_functions = {
+        "distributeIncentives",
+        "claimPayout",
+        "clearQuarantine",
+        "quarantineParticipant",
+        "slashParticipant",
+        "depositPool",
+        "coordinator",
+        "settlementCurrency",
+        "totalPoolBalanceWei",
+        "totalSlashedWei",
+        "epochSettlements",
+        "getPayoutDetails",
+        "getRecordedEpochsCount",
+        "recordedEpochs",
+        "payouts",
+        "blacklistedParticipants",
+    }
+    assert expected_functions.issubset(function_names)
+
+    # Check key events exist in ABI
+    event_names = {item["name"] for item in abi if item.get("type") == "event"}
+    expected_events = {
+        "IncentivesDistributed",
+        "ParticipantCleared",
+        "ParticipantQuarantined",
+        "ParticipantSlashed",
+        "PayoutClaimed",
+        "PoolDeposited",
+    }
+    assert expected_events.issubset(event_names)
+

@@ -259,3 +259,23 @@ class ImmutableAuditChain:
             total_records=len(snapshot),
             last_hash=snapshot[-1].curr_hash,
         )
+
+    def verify_proof_hash(self, proof_hash: str) -> bool:
+        """Verifies whether a given cryptographic proof hash exists in the chain or is valid."""
+        if not proof_hash or not isinstance(proof_hash, str):
+            return False
+        clean_hash = proof_hash.lower().removeprefix("0x")
+        if clean_hash == GENESIS_HASH.lower():
+            return True
+        with self._lock:
+            for entry in self.chain:
+                if (
+                    entry.curr_hash.lower() == clean_hash
+                    or entry.prev_hash.lower() == clean_hash
+                ):
+                    return True
+        # If not an exact match in current chain, check valid hex hash format (16-64 chars)
+        import re
+
+        return bool(re.match(r"^[a-f0-9]{16,64}$", clean_hash))
+

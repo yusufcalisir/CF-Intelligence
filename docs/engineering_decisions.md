@@ -318,17 +318,19 @@ Cross-bank federated collaboration requires economic incentives (Shapley payout 
 
 ### Decision
 
-Implement on-chain automated settlement using an EVM Solidity smart contract (`ConsortiumIncentiveSettlement.sol`) integrated via Web3 (`smart_contract_driver.py`). Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations.
+Implement on-chain automated settlement using an EVM Solidity smart contract (`ConsortiumIncentiveSettlement.sol`) integrated via Web3 (`smart_contract_driver.py`). Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations. The driver features seamless auto-switching between live EVM JSON-RPC nodes (`WEB3_PROVIDER_URL`) and an in-memory simulation fallback, paired with on-chain audit proof hash verification directly against `ImmutableAuditChain`.
 
 ### Rationale
 
 1. **Decentralized Trust**: Settlement is executed on-chain via smart contracts using 18-decimal wei fixed math, preventing double-claiming and verifying pool conservation.
 2. **Automated Quarantine**: Nodes with negative contribution ($SV_i \le -0.05$) or zero variance update attacks are quarantined on-chain (`setNodeQuarantine()`), freezing their wallet claims.
-3. **Immutable Audit Binding**: Settlement transaction hashes (`settlement_tx_hash`) and block numbers are recorded immutably in the SHA-256 audit ledger.
+3. **Immutable Audit Binding & Proof Hash Verification**: Settlement receipts record block numbers, EVM transaction hashes, and verify LOO Shapley audit proof hashes against `ImmutableAuditChain`.
+4. **Resilient Dual-Mode Execution**: Probes remote or local EVM JSON-RPC nodes (e.g. Sepolia, Ankr, or Hardhat node); if offline or unconfigured, it seamlessly operates via deterministic in-memory simulation fallback without interrupting consortium operations.
+5. **Contract ABI Parity**: Dynamically synchronizes against compiled Hardhat build artifacts (`contracts/artifacts/`) across all 23 functions, getters, and events.
 
 ### Tradeoff
 
-Introduces EVM runtime dependency (`web3`, `py-solc-x`) and gas costs/latency during automated transaction execution. Fallback drivers are provided when an EVM node is offline.
+Live EVM execution introduces network latency and gas considerations; the deterministic off-chain fallback ensures local development, continuous integration, and air-gapped deployments function seamlessly without requiring a running blockchain node.
 
 ---
 

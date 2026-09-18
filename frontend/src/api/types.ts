@@ -3014,6 +3014,9 @@ export interface SettlementContractInfo {
   total_settlements_executed: number;
   total_quarantined_nodes: number;
   total_slashed_nodes: number;
+  mode?: string;
+  is_live_rpc?: boolean;
+  rpc_provider_url?: string | null;
   abi: any[];
 }
 
@@ -3032,6 +3035,8 @@ export interface SettlementReceipt {
   gas_used: number;
   effective_gas_price_gwei: number;
   audit_proof_hash: string;
+  mode?: string;
+  audit_chain_verified?: boolean;
   payouts: OnChainPayout[];
 }
 

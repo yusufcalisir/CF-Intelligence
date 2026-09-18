@@ -74,8 +74,10 @@ def _format_receipt(receipt: dict[str, Any]) -> SettlementReceiptResponse:
         total_distributed_usd=receipt["total_distributed_usd"],
         total_distributed_wei=str(receipt["total_distributed_wei"]),
         gas_used=receipt.get("gas_used", 142850),
-        effective_gas_price_gwei=receipt.get("effective_gas_price_gwei", 15.5),
+        effective_gas_price_gwei=float(receipt.get("effective_gas_price_gwei", 15.5)),
         audit_proof_hash=receipt["audit_proof_hash"],
+        mode=receipt.get("mode", "SIMULATOR_FALLBACK"),
+        audit_chain_verified=receipt.get("audit_chain_verified", True),
         payouts=payouts,
     )
 
@@ -97,6 +99,9 @@ async def get_contract_info() -> ContractInfoResponse:
         total_settlements_executed=info["total_settlements_executed"],
         total_quarantined_nodes=info["total_quarantined_nodes"],
         total_slashed_nodes=info["total_slashed_nodes"],
+        mode=info.get("mode", "SIMULATOR_FALLBACK"),
+        is_live_rpc=info.get("is_live_rpc", False),
+        rpc_provider_url=info.get("rpc_provider_url"),
         abi=info["abi"],
     )
 
