@@ -28,6 +28,60 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Storage paths (relative to get_storage_dir() or local repository storage)
 # ---------------------------------------------------------------------------
+def resolve_dataset_dir(dataset_name: str, explicit_path: Path | str | None = None) -> Path:
+    """Resolve storage directory for a target dataset across candidate locations.
+
+    Checks candidates in order:
+    1. Explicit path if passed and non-empty.
+    2. Candidate paths containing actual dataset files (*.csv, *.parquet):
+       - Path(get_storage_dir()) / "datasets" / clean_name
+       - project_root / "storage" / "datasets" / clean_name
+       - project_root / "backend" / "storage" / "datasets" / clean_name
+       - cwd / "storage" / "datasets" / clean_name
+       - cwd / "backend" / "storage" / "datasets" / clean_name
+    3. First existing candidate directory, or fallback to default candidate.
+    """
+    if explicit_path is not None and str(explicit_path).strip():
+        return Path(explicit_path)
+
+    clean_name = dataset_name.lower().replace("-", "_").strip()
+    candidates: list[Path] = []
+
+    # Storage dir from centralized utility
+    candidates.append(Path(get_storage_dir()) / "datasets" / clean_name)
+
+    # Walk up to locate project root from this source file
+    here = Path(__file__).resolve()
+    curr = here
+    for _ in range(5):
+        curr = curr.parent
+        candidates.append(curr / "storage" / "datasets" / clean_name)
+        candidates.append(curr / "backend" / "storage" / "datasets" / clean_name)
+
+    # Current working directory candidates
+    cwd = Path.cwd().resolve()
+    candidates.append(cwd / "storage" / "datasets" / clean_name)
+    candidates.append(cwd / "backend" / "storage" / "datasets" / clean_name)
+
+    # Return first candidate with actual data files
+    for c in candidates:
+        if c.is_dir():
+            has_data = (
+                any(c.glob("*.csv"))
+                or any(c.glob("*.parquet"))
+                or any(c.glob("*.txt"))
+            )
+            if has_data:
+                return c
+
+    # Return first candidate directory that exists
+    for c in candidates:
+        if c.is_dir():
+            return c
+
+    return candidates[0]
+
+
 def _get_datasets_root() -> Path:
     storage_root = Path(get_storage_dir()) / "datasets"
     if storage_root.exists():
@@ -71,11 +125,24 @@ def load_elliptic(
         ``source`` : str — "real" | "mock"
     """
     rng = rng or np.random.default_rng(42)
-    root = path or (_DATASETS_ROOT / "elliptic")
+    root = resolve_dataset_dir("elliptic", path)
 
     features_csv = root / "elliptic_txs_features.csv"
     classes_csv = root / "elliptic_txs_classes.csv"
     edges_csv = root / "elliptic_txs_edgelist.csv"
+
+    if not features_csv.exists():
+        cand_feat = list(root.glob("*features*.csv"))
+        if cand_feat:
+            features_csv = cand_feat[0]
+    if not classes_csv.exists():
+        cand_cls = list(root.glob("*classes*.csv"))
+        if cand_cls:
+            classes_csv = cand_cls[0]
+    if not edges_csv.exists():
+        cand_edges = list(root.glob("*edgelist*.csv"))
+        if cand_edges:
+            edges_csv = cand_edges[0]
 
     if features_csv.exists() and classes_csv.exists():
         logger.info("[Elliptic] Loading real dataset from %s", root)
@@ -92,6 +159,8 @@ def load_elliptic(
 
         # Merge strictly on txId to guarantee row alignment
         merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
+        if kwargs.get("nrows"):
+            merged_df = merged_df.iloc[: kwargs["nrows"]]
 
         y = merged_df["label"].values.astype(int)
         feature_cols = [c for c in merged_df.columns if c not in ("txId", "class", "label")]
@@ -175,16 +244,20 @@ def load_amlsim(
         ``source`` : str
     """
     rng = rng or np.random.default_rng(42)
-    root = path or (_DATASETS_ROOT / "amlsim")
-    csv_path = root / "transactions.csv"
+    root = resolve_dataset_dir("amlsim", path)
+    csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
 
-    if csv_path.exists():
-        logger.info("[AMLSim] Loading real dataset from %s", csv_path)
-        df = pd.read_csv(csv_path)
-        X = df[AMLSIM_FEATURE_COLS].fillna(0).values.astype(np.float32)
-        y = df["isFraud"].values.astype(int)
-        logger.info("[AMLSim] Loaded %d transactions", len(y))
-        return {"X": X, "y": y, "source": "real"}
+    for csv_path in csv_candidates:
+        if csv_path.exists():
+            logger.info("[AMLSim] Loading real dataset from %s", csv_path)
+            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
+            available_cols = [c for c in AMLSIM_FEATURE_COLS if c in df.columns]
+            if not available_cols:
+                available_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud") and pd.api.types.is_numeric_dtype(df[c])]
+            X = df[available_cols].fillna(0).values.astype(np.float32)
+            y = df["isFraud"].values.astype(int) if "isFraud" in df.columns else df["is_fraud"].values.astype(int)
+            logger.info("[AMLSim] Loaded %d transactions", len(y))
+            return {"X": X, "y": y, "feature_names": available_cols, "source": "real"}
 
     # ---- Mock generation ----
     logger.info(
@@ -240,7 +313,7 @@ def load_paysim(
 ) -> dict[str, Any]:
     """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
     rng = rng or np.random.default_rng(42)
-    root = path or (_DATASETS_ROOT / "paysim")
+    root = resolve_dataset_dir("paysim", path)
 
     # Check possible filenames for PaySim
     possible_csvs = [
@@ -254,9 +327,18 @@ def load_paysim(
         logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
         dfs = [pd.read_parquet(f) for f in parquet_files]
         full_df = pd.concat(dfs, ignore_index=True)
+        if kwargs.get("nrows"):
+            full_df = full_df.iloc[: kwargs["nrows"]]
         return _process_paysim_dataframe(full_df, source="real_parquet")
 
     for csv_file in possible_csvs:
+        if csv_file.exists():
+            logger.info("[PaySim] Loading real dataset from %s", csv_file)
+            df = pd.read_csv(csv_file, nrows=kwargs.get("nrows"))
+            return _process_paysim_dataframe(df, source="real_csv")
+
+    all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
+    for csv_file in all_csvs:
         if csv_file.exists():
             logger.info("[PaySim] Loading real dataset from %s", csv_file)
             df = pd.read_csv(csv_file, nrows=kwargs.get("nrows"))
@@ -344,6 +426,20 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
     else:
         y = np.zeros(len(df), dtype=int)
 
+    # Check if this is already an engineered/partitioned feature dataframe without raw PaySim columns
+    has_raw_signals = any(c in df.columns for c in ("amount", "step", "oldbalanceOrg", "type"))
+    if not has_raw_signals:
+        drop_set = {"isFraud", "is_fraud", "isFlaggedFraud", "nameOrig", "nameDest", "type"}
+        available_cols = [c for c in df.columns if c not in drop_set and pd.api.types.is_numeric_dtype(df[c])]
+        X = df[available_cols].fillna(0).values.astype(np.float32)
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": available_cols,
+            "source": source,
+            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
+        }
+
     # One-hot encode type if present
     if "type" in df.columns:
         for t in ["TRANSFER", "CASH_OUT", "PAYMENT", "DEBIT", "CASH_IN"]:
@@ -359,15 +455,20 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         and "oldbalanceOrg" in df.columns
         and "newbalanceOrig" in df.columns
     ):
-        df["errorBalanceOrig"] = df["newbalanceOrig"] + df["amount"] - df["oldbalanceOrg"]
+        amt = df["amount"] if "amount" in df.columns else 0.0
+        df["errorBalanceOrig"] = df["newbalanceOrig"] + amt - df["oldbalanceOrg"]
     if (
         "errorBalanceDest" not in df.columns
         and "oldbalanceDest" in df.columns
         and "newbalanceDest" in df.columns
     ):
-        df["errorBalanceDest"] = df["oldbalanceDest"] + df["amount"] - df["newbalanceDest"]
+        amt = df["amount"] if "amount" in df.columns else 0.0
+        df["errorBalanceDest"] = df["oldbalanceDest"] + amt - df["newbalanceDest"]
 
     available_cols = [c for c in PAYSIM_FEATURE_COLS if c in df.columns]
+    if not available_cols:
+        drop_set = {"isFraud", "is_fraud", "isFlaggedFraud", "nameOrig", "nameDest", "type"}
+        available_cols = [c for c in df.columns if c not in drop_set and pd.api.types.is_numeric_dtype(df[c])]
     X = df[available_cols].fillna(0).values.astype(np.float32)
 
     return {
@@ -375,7 +476,7 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         "y": y,
         "feature_names": available_cols,
         "source": source,
-        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
     }
 
 
@@ -401,16 +502,18 @@ def load_ieee_cis(
 ) -> dict[str, Any]:
     """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset."""
     rng = rng or np.random.default_rng(42)
-    root = path or (_DATASETS_ROOT / "ieee_cis")
+    root = resolve_dataset_dir("ieee_cis", path)
 
-    txn_csv = root / "train_transaction.csv"
-    parquet_file = root / "ieee_cis_processed.parquet"
-
-    if parquet_file.exists():
-        logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", parquet_file)
-        df = pd.read_parquet(parquet_file)
-        y = df["isFraud"].values.astype(int)
-        feature_cols = [c for c in df.columns if c not in ("isFraud", "TransactionID")]
+    parquet_files = sorted(list(root.glob("*.parquet")))
+    if parquet_files:
+        chosen_parquet = parquet_files[0]
+        logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
+        df = pd.read_parquet(chosen_parquet)
+        if kwargs.get("nrows"):
+            df = df.iloc[: kwargs["nrows"]]
+        label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
+        y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
+        feature_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud", "TransactionID") and pd.api.types.is_numeric_dtype(df[c])]
         X = df[feature_cols].fillna(0).values.astype(np.float32)
         return {
             "X": X,
@@ -420,22 +523,24 @@ def load_ieee_cis(
             "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
         }
 
-    if txn_csv.exists():
-        logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
-        nrows = kwargs.get("nrows", 20_000)
-        df = pd.read_csv(txn_csv, nrows=nrows)
-        y = df["isFraud"].values.astype(int)
-        # Select key numerical features
-        num_cols = df.select_dtypes(include="number").columns.tolist()
-        num_cols = [c for c in num_cols if c not in ("isFraud", "TransactionID")]
-        X = df[num_cols].fillna(0).values.astype(np.float32)
-        return {
-            "X": X,
-            "y": y,
-            "feature_names": num_cols,
-            "source": "real_csv",
-            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-        }
+    txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+    for txn_csv in txn_csv_candidates:
+        if txn_csv.exists():
+            logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
+            nrows = kwargs.get("nrows", 20_000)
+            df = pd.read_csv(txn_csv, nrows=nrows)
+            label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
+            y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
+            num_cols = df.select_dtypes(include="number").columns.tolist()
+            num_cols = [c for c in num_cols if c not in ("isFraud", "is_fraud", "TransactionID")]
+            X = df[num_cols].fillna(0).values.astype(np.float32)
+            return {
+                "X": X,
+                "y": y,
+                "feature_names": num_cols,
+                "source": "real_csv",
+                "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+            }
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
     logger.info(
@@ -491,22 +596,41 @@ def load_creditcard_fraud(
 ) -> dict[str, Any]:
     """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA)."""
     rng = rng or np.random.default_rng(42)
-    root = path or (_DATASETS_ROOT / "creditcard")
-    csv_path = root / "creditcard.csv"
+    root = resolve_dataset_dir("creditcard", path)
 
-    if csv_path.exists():
-        logger.info("[CreditCard] Loading real dataset from %s", csv_path)
-        df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
-        feature_cols = [c for c in df.columns if c not in ("Time", "Class")]
-        X = df[feature_cols].values.astype(np.float32)
-        y = df["Class"].values.astype(int)
+    parquet_files = sorted(list(root.glob("*.parquet")))
+    if parquet_files:
+        chosen_parquet = parquet_files[0]
+        logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
+        df = pd.read_parquet(chosen_parquet)
+        if kwargs.get("nrows"):
+            df = df.iloc[: kwargs["nrows"]]
+        y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
+        feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
+        X = df[feature_cols].fillna(0).values.astype(np.float32)
         return {
             "X": X,
             "y": y,
             "feature_names": feature_cols,
-            "source": "real_csv",
+            "source": "real_parquet",
             "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
         }
+
+    csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+    for csv_path in csv_candidates:
+        if csv_path.exists():
+            logger.info("[CreditCard] Loading real dataset from %s", csv_path)
+            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
+            feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
+            X = df[feature_cols].fillna(0).values.astype(np.float32)
+            y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
+            return {
+                "X": X,
+                "y": y,
+                "feature_names": feature_cols,
+                "source": "real_csv",
+                "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+            }
 
     # Mock generation
     logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)

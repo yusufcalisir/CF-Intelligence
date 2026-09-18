@@ -25,27 +25,44 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+DEFAULT_PII_COLUMNS: tuple[str, ...] = (
+    "account_id",
+    "counterparty_account_id",
+    "ip_address",
+    "device_id",
+    "nameOrig",
+    "nameDest",
+    "customer_id",
+    "merchant_id",
+    "email",
+    "phone",
+    "DeviceInfo",
+    "P_emaildomain",
+    "R_emaildomain",
+    "card1",
+    "card2",
+)
+
+
 class RealWorldETLPipeline:
     """ETL Pipeline for ingesting, anonymizing, and Non-IID Dirichlet partitioning financial datasets."""
 
     def __init__(self, salt: str = "cfi_network_master_salt_2026") -> None:
         self.salt = salt.encode("utf-8")
 
-    def anonymize_identifier(self, identifier: str) -> str:
+    def anonymize_identifier(self, identifier: Any) -> str:
         """Computes HMAC-SHA256 hash for sensitive PII identity attributes."""
-        if not identifier or pd.isna(identifier):
+        if identifier is None or pd.isna(identifier) or identifier == "":
             return ""
-        return hmac.new(self.salt, identifier.encode("utf-8"), hashlib.sha256).hexdigest()
+        ident_str = str(identifier).strip()
+        if not ident_str:
+            return ""
+        return hmac.new(self.salt, ident_str.encode("utf-8"), hashlib.sha256).hexdigest()
 
     def anonymize_dataframe(
         self,
         df: pd.DataFrame,
-        pii_columns: Sequence[str] = (
-            "account_id",
-            "counterparty_account_id",
-            "ip_address",
-            "device_id",
-        ),
+        pii_columns: Sequence[str] = DEFAULT_PII_COLUMNS,
     ) -> pd.DataFrame:
         """Anonymizes specified PII columns in a pandas DataFrame."""
         df_anon = df.copy()
@@ -54,16 +71,141 @@ class RealWorldETLPipeline:
                 df_anon[col] = df_anon[col].apply(self.anonymize_identifier)
         return df_anon
 
+    def preprocess_dataset(
+        self,
+        dataset_or_df: str | pd.DataFrame,
+        df_or_dataset: pd.DataFrame | str | None = None,
+        anonymize_pii: bool = True,
+    ) -> pd.DataFrame:
+        """Preprocesses raw fraud dataset into clean DataFrame with normalized 'is_fraud' label.
+
+        Supports both calling conventions:
+        - `preprocess_dataset(dataset_name, df)`
+        - `preprocess_dataset(df, dataset_name)`
+
+        Handles:
+        1. HMAC-SHA256 identity anonymization for PII columns.
+        2. Schema-specific categorical encoding and feature engineering.
+        3. String/identifier column filtering and null imputation.
+        4. Normalized binary target column 'is_fraud'.
+        """
+        if isinstance(dataset_or_df, str):
+            dataset_name = dataset_or_df
+            df = df_or_dataset if isinstance(df_or_dataset, pd.DataFrame) else pd.DataFrame()
+        else:
+            df = dataset_or_df
+            dataset_name = df_or_dataset if isinstance(df_or_dataset, str) else "paysim"
+
+        clean_name = dataset_name.lower().replace("-", "_").strip()
+        df_work = self.anonymize_dataframe(df) if anonymize_pii else df.copy()
+
+        if clean_name == "paysim":
+            if "isFraud" in df_work.columns:
+                df_work["is_fraud"] = df_work["isFraud"].astype(int)
+                df_work.drop(columns=["isFraud"], inplace=True)
+            elif "is_fraud" not in df_work.columns:
+                df_work["is_fraud"] = 0
+
+            if "isFlaggedFraud" in df_work.columns:
+                df_work.drop(columns=["isFlaggedFraud"], inplace=True)
+
+            if "type" in df_work.columns:
+                for t in ["TRANSFER", "CASH_OUT", "PAYMENT", "DEBIT", "CASH_IN"]:
+                    df_work[f"type_{t}"] = (df_work["type"] == t).astype(np.float32)
+                df_work.drop(columns=["type"], inplace=True)
+            else:
+                for t in ["TRANSFER", "CASH_OUT", "PAYMENT", "DEBIT", "CASH_IN"]:
+                    if f"type_{t}" not in df_work.columns:
+                        df_work[f"type_{t}"] = 0.0
+
+            if (
+                "errorBalanceOrig" not in df_work.columns
+                and "oldbalanceOrg" in df_work.columns
+                and "newbalanceOrig" in df_work.columns
+                and "amount" in df_work.columns
+            ):
+                df_work["errorBalanceOrig"] = df_work["newbalanceOrig"] + df_work["amount"] - df_work["oldbalanceOrg"]
+            if (
+                "errorBalanceDest" not in df_work.columns
+                and "oldbalanceDest" in df_work.columns
+                and "newbalanceDest" in df_work.columns
+                and "amount" in df_work.columns
+            ):
+                df_work["errorBalanceDest"] = df_work["oldbalanceDest"] + df_work["amount"] - df_work["newbalanceDest"]
+
+            for col in ["nameOrig", "nameDest"]:
+                if col in df_work.columns:
+                    df_work.drop(columns=[col], inplace=True)
+
+            return df_work
+
+        elif clean_name == "ieee_cis":
+            if "isFraud" in df_work.columns:
+                df_work["is_fraud"] = df_work["isFraud"].astype(int)
+                df_work.drop(columns=["isFraud"], inplace=True)
+            elif "label" in df_work.columns:
+                df_work["is_fraud"] = df_work["label"].astype(int)
+                df_work.drop(columns=["label"], inplace=True)
+            elif "is_fraud" not in df_work.columns:
+                df_work["is_fraud"] = 0
+
+            for col in ["TransactionID", "DeviceInfo", "DeviceType"]:
+                if col in df_work.columns:
+                    df_work.drop(columns=[col], inplace=True)
+
+            for email_col in ["P_emaildomain", "R_emaildomain"]:
+                if email_col in df_work.columns:
+                    df_work[email_col] = df_work[email_col].apply(
+                        lambda v: self.anonymize_identifier(str(v)) if v and not pd.isna(v) else ""
+                    )
+
+            return df_work
+
+        elif clean_name in ("creditcard", "creditcard_fraud"):
+            if "Class" in df_work.columns:
+                df_work["is_fraud"] = df_work["Class"].astype(int)
+                df_work.drop(columns=["Class"], inplace=True)
+            elif "is_fraud" not in df_work.columns:
+                df_work["is_fraud"] = 0
+
+            return df_work
+
+        elif clean_name == "elliptic":
+            if "class" in df_work.columns:
+                df_work = df_work[df_work["class"].astype(str).isin(["1", "2"])].copy()
+                df_work["is_fraud"] = (df_work["class"].astype(str) == "1").astype(int)
+                df_work.drop(columns=["class"], inplace=True)
+            elif "is_fraud" not in df_work.columns:
+                df_work["is_fraud"] = 0
+
+            for col in ["txId", "tx_id"]:
+                if col in df_work.columns:
+                    df_work.drop(columns=[col], inplace=True)
+
+            return df_work
+
+        else:
+            if "isFraud" in df_work.columns:
+                df_work["is_fraud"] = df_work["isFraud"].astype(int)
+                df_work.drop(columns=["isFraud"], inplace=True)
+            elif "Class" in df_work.columns:
+                df_work["is_fraud"] = df_work["Class"].astype(int)
+                df_work.drop(columns=["Class"], inplace=True)
+            elif "is_fraud" not in df_work.columns:
+                df_work["is_fraud"] = 0
+
+            return df_work
+
     def partition_dirichlet(
         self,
         X: Any,
         y: Any,
         num_banks: int = 3,
         alpha: float = 0.5,
-        seed: int = 42,
+        rng: np.random.Generator | None = None,
     ) -> list[dict[str, Any]]:
-        """Partitions feature matrix X and labels y across K banks using Dirichlet Non-IID distribution."""
-        rng = np.random.default_rng(seed)
+        """Partitions feature matrix X and labels y across num_banks using a Dirichlet distribution."""
+        rng = rng or np.random.default_rng(42)
         classes = np.unique(y)
 
         client_indices: list[list[int]] = [[] for _ in range(num_banks)]
@@ -72,21 +214,25 @@ class RealWorldETLPipeline:
             idx_c = np.where(y == c)[0]
             rng.shuffle(idx_c)
 
-            # Draw proportions from Dirichlet distribution
             proportions = rng.dirichlet(np.repeat(alpha, num_banks))
-            # Normalize and convert to split counts
             proportions = proportions / proportions.sum()
-            split_points = (np.cumsum(proportions) * len(idx_c)).astype(int)[:-1]
+            splits = np.split(idx_c, (np.cumsum(proportions)[:-1] * len(idx_c)).astype(int))
 
-            splits = np.split(idx_c, split_points)
             for i, split in enumerate(splits):
                 client_indices[i].extend(split.tolist())
 
-        partitions: list[dict[str, np.ndarray]] = []
+        partitions: list[dict[str, Any]] = []
         for i in range(num_banks):
             indices = np.array(client_indices[i], dtype=int)
             rng.shuffle(indices)
-            partitions.append({"X": X[indices], "y": y[indices], "indices": indices})
+            partitions.append(
+                {
+                    "bank_id": f"bank_{chr(ord('a') + i)}",
+                    "X": X[indices],
+                    "y": y[indices],
+                    "indices": indices,
+                }
+            )
 
         return partitions
 
@@ -118,3 +264,104 @@ class RealWorldETLPipeline:
 
         logger.info("Exported %d partition samples to %s", len(df), out_path)
         return out_path
+
+    def export_dataset_manifest(
+        self,
+        output_dir: Path | str | None = None,
+        dataset_name: str = "paysim",
+        partitions: list[dict[str, Any]] | None = None,
+        partitions_info: list[dict[str, Any]] | None = None,
+        feature_names: Sequence[str] | None = None,
+        dirichlet_alpha: float = 0.5,
+        alpha: float | None = None,
+        **kwargs: Any,
+    ) -> Path:
+        """Generates institutional dataset_manifest.json with integrity hashes and partition metadata."""
+        import datetime
+        import json
+
+        raw_out = output_dir or kwargs.get("output_dir")
+        if raw_out is None and "dataset_name" in kwargs:
+            raw_out = kwargs.get("output_dir", ".")
+        target_dir = Path(raw_out or ".")
+        target_dir.mkdir(parents=True, exist_ok=True)
+
+        manifest_path = target_dir / "dataset_manifest.json"
+        partition_summaries = []
+        effective_alpha = alpha if alpha is not None else dirichlet_alpha
+
+        if partitions_info:
+            for p in partitions_info:
+                bank_id = p.get("bank_id", "unknown")
+                fpath = Path(p.get("file_path", target_dir / f"{bank_id}.parquet"))
+                file_hash = ""
+                file_size_bytes = 0
+                if fpath.exists():
+                    file_size_bytes = fpath.stat().st_size
+                    with open(fpath, "rb") as f:
+                        file_hash = hashlib.sha256(f.read()).hexdigest()
+                sample_count = p.get("sample_count", 0)
+                fraud_count = p.get("fraud_count", 0)
+                partition_summaries.append(
+                    {
+                        "bank_id": bank_id,
+                        "file_name": fpath.name,
+                        "sample_count": sample_count,
+                        "fraud_count": fraud_count,
+                        "fraud_ratio": float(fraud_count / sample_count) if sample_count > 0 else 0.0,
+                        "sha256": file_hash,
+                        "sha256_hash": file_hash,
+                        "file_size_bytes": file_size_bytes,
+                    }
+                )
+        elif partitions:
+            for i, p in enumerate(partitions):
+                bank_id = p.get("bank_id", f"bank_{chr(ord('a') + i)}")
+                file_name = f"{bank_id}.parquet"
+                file_path = target_dir / file_name
+                file_hash = ""
+                file_size_bytes = 0
+                if file_path.exists():
+                    file_size_bytes = file_path.stat().st_size
+                    with open(file_path, "rb") as f:
+                        file_hash = hashlib.sha256(f.read()).hexdigest()
+
+                y_arr = p["y"]
+                sample_count = len(y_arr)
+                fraud_count = int(np.sum(y_arr == 1))
+                partition_summaries.append(
+                    {
+                        "bank_id": bank_id,
+                        "file_name": file_name,
+                        "sample_count": sample_count,
+                        "fraud_count": fraud_count,
+                        "fraud_ratio": float(fraud_count / sample_count) if sample_count > 0 else 0.0,
+                        "sha256": file_hash,
+                        "sha256_hash": file_hash,
+                        "file_size_bytes": file_size_bytes,
+                    }
+                )
+
+        feats = list(feature_names) if feature_names else []
+        salt_fingerprint = hashlib.sha256(self.salt).hexdigest()[:16]
+        manifest_data = {
+            "schema_version": "2.0.0",
+            "dataset_name": dataset_name,
+            "generated_at": datetime.datetime.now(datetime.UTC).isoformat(),
+            "num_banks": len(partition_summaries),
+            "dirichlet_alpha": effective_alpha,
+            "alpha": effective_alpha,
+            "salt_fingerprint": salt_fingerprint,
+            "feature_dim": len(feats),
+            "feature_count": len(feats),
+            "feature_names": feats,
+            "total_samples": sum(p["sample_count"] for p in partition_summaries),
+            "total_frauds": sum(p["fraud_count"] for p in partition_summaries),
+            "partitions": partition_summaries,
+        }
+
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest_data, f, indent=2)
+
+        logger.info("Generated dataset manifest at %s", manifest_path)
+        return manifest_path

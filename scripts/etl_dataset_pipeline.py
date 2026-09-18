@@ -31,14 +31,14 @@ def main() -> None:
         "--dataset",
         type=str,
         default="paysim",
-        choices=["paysim", "amlsim", "elliptic"],
-        help="Target dataset to process",
+        choices=["paysim", "amlsim", "elliptic", "ieee_cis", "creditcard"],
+        help="Target dataset to process (default: paysim)",
     )
     parser.add_argument(
         "--input-file",
         type=str,
         default="",
-        help="Optional input CSV/Parquet path (uses dataloader synthetic mock if omitted)",
+        help="Optional input CSV/Parquet path (uses dataloader synthetic mock or local directory if omitted)",
     )
     parser.add_argument(
         "--output-dir",
@@ -57,6 +57,12 @@ def main() -> None:
         type=float,
         default=0.5,
         help="Dirichlet Non-IID concentration parameter alpha (default: 0.5)",
+    )
+    parser.add_argument(
+        "--max-rows",
+        type=int,
+        default=None,
+        help="Optional row limit for large datasets during processing",
     )
     parser.add_argument(
         "--salt",
@@ -84,27 +90,35 @@ def main() -> None:
     logger.info("==================================================================")
 
     etl = RealWorldETLPipeline(salt=args.salt)
+    feature_names: list[str] | None = None
 
     if args.input_file and Path(args.input_file).exists():
         logger.info("Loading input dataset from %s", args.input_file)
         if args.input_file.endswith(".parquet"):
             df = pd.read_parquet(args.input_file)
         else:
-            df = pd.read_csv(args.input_file)
+            df = pd.read_csv(args.input_file, nrows=args.max_rows)
 
-        df_anon = etl.anonymize_dataframe(df)
-        label_col = "is_fraud" if "is_fraud" in df_anon.columns else ("Class" if "Class" in df_anon.columns else df_anon.columns[-1])
-        feature_cols = [c for c in df_anon.columns if c != label_col]
+        if args.max_rows and len(df) > args.max_rows:
+            df = df.iloc[: args.max_rows]
 
-        X = df_anon[feature_cols].values.astype(np.float32)
-        y = df_anon[label_col].values.astype(int)
+        processed = etl.preprocess_dataset(df, dataset_name=args.dataset, anonymize_pii=True)
+        label_col = "is_fraud" if "is_fraud" in processed.columns else processed.columns[-1]
+        feature_names = [c for c in processed.columns if c != label_col and pd.api.types.is_numeric_dtype(processed[c])]
+        X = processed[feature_names].fillna(0).values.astype(np.float32)
+        y = processed[label_col].values.astype(int)
     else:
-        logger.info("No raw input file specified — loading dataset via dataloader (synthetic mock fallback enabled)")
-        ds = load_dataset(args.dataset, n_mock_txns=6000 if args.dataset != "elliptic" else 2000)
+        logger.info("No raw input file specified — loading dataset via dataloader")
+        ds = load_dataset(
+            args.dataset,
+            n_mock_txns=args.max_rows or (6000 if args.dataset != "elliptic" else 2000),
+            nrows=args.max_rows,
+        )
         X = ds["X"]
         y = ds["y"]
+        feature_names = ds.get("feature_names")
 
-    logger.info("Dataset shape: X=%s, y=%s (Fraud Ratio: %.4f)", X.shape, y.shape, np.mean(y))
+    logger.info("Dataset shape: X=%s, y=%s (Fraud Ratio: %.4f)", X.shape, y.shape, float(np.mean(y)))
 
     # Dirichlet Non-IID Partitioning
     partitions = etl.partition_dirichlet(X, y, num_banks=args.num_banks, alpha=args.dirichlet_alpha)
@@ -113,15 +127,24 @@ def main() -> None:
     for i, p in enumerate(partitions):
         b_name = bank_names[i] if i < len(bank_names) else f"bank_{i+1}"
         file_path = output_dir / f"bank_{b_name}.parquet"
-        etl.export_partition_parquet(p, file_path)
+        etl.export_partition_parquet(p, file_path, feature_names=feature_names)
         logger.info(
             "  Bank '%s': %d samples (Fraud count: %d, Fraud ratio: %.4f)",
             b_name,
             len(p["y"]),
-            np.sum(p["y"]),
-            np.mean(p["y"]) if len(p["y"]) > 0 else 0.0,
+            int(np.sum(p["y"])),
+            float(np.mean(p["y"])) if len(p["y"]) > 0 else 0.0,
         )
 
+    # Export dataset manifest
+    manifest_path = etl.export_dataset_manifest(
+        output_dir,
+        dataset_name=args.dataset,
+        partitions=partitions,
+        feature_names=feature_names,
+        dirichlet_alpha=args.dirichlet_alpha,
+    )
+    logger.info("Dataset manifest exported to: %s", manifest_path)
     logger.info("✅ ETL Pipeline execution completed successfully!")
 
 
