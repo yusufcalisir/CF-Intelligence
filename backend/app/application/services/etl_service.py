@@ -218,9 +218,13 @@ class RealWorldETLPipeline:
         num_banks: int = 3,
         alpha: float = 0.5,
         rng: np.random.Generator | None = None,
+        seed: int | None = None,
+        **kwargs: Any,
     ) -> list[dict[str, Any]]:
         """Partitions feature matrix X and labels y across num_banks using a Dirichlet distribution."""
-        rng = rng or np.random.default_rng(42)
+        if rng is None:
+            effective_seed = seed if seed is not None else kwargs.get("seed", 42)
+            rng = np.random.default_rng(effective_seed)
         classes = np.unique(y)
 
         client_indices: list[list[int]] = [[] for _ in range(num_banks)]
