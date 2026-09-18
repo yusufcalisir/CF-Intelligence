@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
 from pathlib import Path
 
@@ -9,7 +10,8 @@ root_dir = Path(__file__).resolve().parents[3]
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from scripts.generate_secrets import generate_env_file  # noqa: E402, I001 # pyright: ignore[reportMissingImports]
+_generate_secrets = importlib.import_module("scripts.generate_secrets")
+generate_env_file = _generate_secrets.generate_env_file
 
 
 def test_generate_secrets_creates_valid_env(tmp_path: Path) -> None:

@@ -19,6 +19,13 @@ ignore = ["E501", "N803", "N806", "B905", "B007", "B904", "B008", "TC001", "TC00
 [tool.ruff.lint.isort]
 known-first-party = ["app"]
 
+[tool.pyright]
+extraPaths = [
+    "..",
+    "../sdk/python",
+    "."
+]
+
 [tool.mypy]
 python_version = "3.12"
 strict = false

@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
+import importlib
 import sys
+import tempfile
 from pathlib import Path
+
+import yaml
+
+from app.infrastructure.client_daemon.config import ClientDaemonConfig
 
 # Add project root to sys.path for scripts module import
 project_root = str(Path(__file__).resolve().parents[3])
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# ruff: noqa: E402, I001
-import tempfile
-import yaml
-
-from app.infrastructure.client_daemon.config import ClientDaemonConfig
-from scripts.init_vault_pki import generate_dev_fallback_certs  # pyright: ignore[reportMissingImports]
+_init_vault_pki = importlib.import_module("scripts.init_vault_pki")
+generate_dev_fallback_certs = _init_vault_pki.generate_dev_fallback_certs
 
 
 def test_bank_nodes_isolated_network_configuration() -> None:
