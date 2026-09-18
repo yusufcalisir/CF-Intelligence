@@ -33,10 +33,10 @@ class RedisStore:
     _shared_fallback_stores: dict[str, dict] = {}
 
     def __init__(self, prefix: str):
-        self.prefix = prefix
+        self.prefix: str = prefix
         self.settings = get_settings()
-        self._redis_client = None
-        self._redis_failed = False
+        self._redis_client: Any = None
+        self._redis_failed: bool = False
 
     @property
     def _fallback_store(self) -> dict:
@@ -45,7 +45,7 @@ class RedisStore:
         return RedisStore._shared_fallback_stores[self.prefix]
 
     @property
-    def client(self):
+    def client(self) -> Any:
         if self._redis_failed or RedisStore._global_redis_unavailable:
             return None
         if self._redis_client is None:
@@ -56,14 +56,15 @@ class RedisStore:
                 RedisStore._global_redis_unavailable = True
                 return None
             try:
-                self._redis_client = redis.Redis.from_url(
+                r_client: redis.Redis = redis.Redis.from_url(
                     url,
                     decode_responses=True,
                     socket_connect_timeout=0.5,
                     socket_timeout=0.5,
                 )
                 # Test connection
-                self._redis_client.ping()
+                r_client.ping()
+                self._redis_client = r_client
                 self._redis_failed = False
             except Exception as e:
                 logger.warning(
