@@ -15,7 +15,7 @@ import tempfile
 import yaml
 
 from app.infrastructure.client_daemon.config import ClientDaemonConfig
-from scripts.init_vault_pki import generate_dev_fallback_certs
+from scripts.init_vault_pki import generate_dev_fallback_certs  # pyright: ignore[reportMissingImports]
 
 
 def test_bank_nodes_isolated_network_configuration() -> None:

@@ -9,7 +9,7 @@ root_dir = Path(__file__).resolve().parents[3]
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-from scripts.generate_secrets import generate_env_file  # noqa: E402
+from scripts.generate_secrets import generate_env_file  # noqa: E402, I001 # pyright: ignore[reportMissingImports]
 
 
 def test_generate_secrets_creates_valid_env(tmp_path: Path) -> None:

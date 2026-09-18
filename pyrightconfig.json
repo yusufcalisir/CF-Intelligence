@@ -4,6 +4,7 @@
   "venvPath": "backend",
   "venv": ".venv",
   "extraPaths": [
+    ".",
     "backend",
     "sdk/python"
   ]
