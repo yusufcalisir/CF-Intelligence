@@ -256,13 +256,13 @@ class GraphEmbeddingService:
 
             # Compute weighted loss
             if fraud_count > 0 and legit_count > 0:
-                weights = torch.where(
+                sample_weights = torch.where(
                     label_tensor == 1.0,
                     torch.tensor(legit_count / fraud_count),
                     torch.tensor(1.0),
                 )
                 per_sample_loss = criterion(predictions, label_tensor)
-                loss = (per_sample_loss * weights).mean()
+                loss = (per_sample_loss * sample_weights).mean()
             else:
                 loss = nn.functional.binary_cross_entropy(predictions, label_tensor)
 
@@ -297,9 +297,9 @@ class GraphEmbeddingService:
             metrics["num_edges"],
         )
 
-        weights = model.to_model_weights(include_classifier=False)
+        trained_weights: ModelWeights = model.to_model_weights(include_classifier=False)
         _cleanup_pytorch_memory()
-        return weights, metrics
+        return trained_weights, metrics
 
     def get_model_weights(self) -> ModelWeights | None:
         """Get current model weights for federated aggregation."""
