@@ -1179,17 +1179,19 @@ All benchmark measurements and verification suites can be directly reproduced vi
 
 ## 16. Platform Comparison & Architectural Positioning
 
-The table below contrasts the architectural paradigms implemented in CF-Intelligence against traditional fraud prevention approaches:
+The table below contrasts the architectural paradigms implemented in CF-Intelligence against collaborative RegTech networks, traditional vendor SaaS, and legacy rule systems:
 
-| Architectural Dimension | **CF-Intelligence Architecture** | **Traditional Vendor SaaS** | **Legacy On-Premises Rules** | **Research FL Toolkits (e.g., Flower/PySyft)** |
+| Architectural Dimension | **CF-Intelligence Architecture** | **Collaborative RegTech (e.g., Salv Bridge)** | **Traditional Vendor SaaS** | **Legacy On-Premises Rules** |
 | :--- | :---: | :---: | :---: | :---: |
-| **Data Sharing Paradigm** | **Federated Learning (Zero Raw PII)** | Centralized Cloud Pooling | Isolated Bank Silos | Generic Distributed Primitives |
-| **Multi-Institution Graph Analysis** | **GraphSAGE + Fuzzy PSI** | Single-Tenant Graph / Watchlists | Isolated Rule Engines | Manual Graph Scaffolding |
-| **Privacy Guarantees** | **Opacus DP + Curve25519 SecAgg** | Vendor Trust Agreement | Network Firewalls Only | Custom PET Integrations |
-| **Inference Latency (p99)** | **< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)** | ~30 - 50 ms | > 100 ms | Framework Dependent |
-| **Non-IID Heterogeneity Handling** | **Dirichlet ($\alpha=0.5$) + FedProx** | N/A (Centralized Data) | N/A (Single Institution) | Basic Weight Averaging |
-| **Explainability & Compliance** | **SHAP + SAR XML + Four-Eyes WB** | Vendor Black Box / Basic UI | Manual Case Review | Bare Model Outputs |
-| **Deployment Model** | **Docker / Kubernetes / gRPC Edge** | Multi-Tenant Cloud SaaS | Heavy On-Premises Monolith | Python Library / CLI |
+| **Data Sharing Paradigm** | **Federated Learning (Zero Raw PII)** | Encrypted Case / Ticket Messaging | Centralized Cloud Pooling | Isolated Bank Silos |
+| **Collaborative ML / AI** | **FedGNN / GraphSAGE (Decentralized)** | Rule-based / Single-tenant scoring | Proprietary Central Model | No Shared Intelligence |
+| **Multi-Institution Graph Analysis** | **GraphSAGE + Fuzzy PSI + UBO** | Manual / Semi-automated IBAN lookups | Single-Tenant Graph / Watchlists | Isolated Rule Engines |
+| **Privacy Guarantees** | **Opacus DP + Curve25519 SecAgg** | E2EE Messaging / Legal Trust | Vendor Trust Agreement | Network Firewalls Only |
+| **Payment Rails & Recall** | **ISO 20022 `pacs.008` & `camt.056` Recall** | SEPA Instant / TIPS Case Tracing | Batch File / Proprietary APIs | Batch Overnight Clearing |
+| **Inference Latency (p99)** | **< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)** | Async Human-in-the-Loop Messaging | ~30 - 50 ms | > 100 ms |
+| **Non-IID Heterogeneity Handling** | **Dirichlet ($\alpha=0.5$) + FedProx** | N/A (Rules / Manual Review) | N/A (Centralized Data) | N/A (Single Institution) |
+| **Explainability & Compliance** | **SHAP + FinCEN / UNODC goAML + 4-Eyes** | Structured FININT Case Notes | Vendor Black Box / Basic UI | Manual Case Review |
+| **Deployment Model** | **Docker / Kubernetes / gRPC Edge / OpenAPI** | Multi-Tenant Cloud SaaS | Multi-Tenant Cloud SaaS | Heavy On-Premises Monolith |
 
 ---
 
@@ -1200,14 +1202,18 @@ The technical architecture of CF-Intelligence explores how system design pattern
 1. **Data Minimization & Sovereign Privacy (GDPR Art. 6 & 17, CCPA):**  
    Cross-border banking secrecy and data protection statutes prohibit pooling raw customer records across institutions. The platform addresses this through federated learning: raw transactions remain within the local banking node, and only differentially private gradients ($\epsilon = 1.0, \delta = 10^{-5}$) and zero-sum masked vectors are transmitted.
 
-2. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
+2. **Cross-Bank Information Exchange (Estonian RahaPTS § 47-48 & EU AMLA Single Rulebook):**  
+   Under European banking frameworks (pioneered by Estonia's *Raha- ja terrorismi tõkestamise seadus* and the EU Anti-Money Laundering Authority - AMLA), obliged entities can exchange operational fraud and mule intelligence based on GDPR Article 6(1)(f) legitimate interest. CF-Intelligence models this via Curve25519 encrypted inter-bank FININT case messaging and ISO 20022 `camt.056` SEPA Instant payment recall automation.
+
+3. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
    High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases.
 
-3. **Suspicious Activity Electronic Reporting (Bank Secrecy Act / FinCEN):**  
-   Anti-money laundering statutes require standardized electronic filings for suspicious transactions. The platform provides automated compilation of normalized transactions and typology risk factors into compliant FinCEN BSA Suspicious Activity Report (SAR) XML schema documents.
+4. **Suspicious Activity Electronic Reporting (Bank Secrecy Act & UNODC goAML):**  
+   Anti-money laundering statutes require standardized electronic filings for suspicious transactions. The platform provides automated compilation of normalized transactions and typology risk factors into both US FinCEN BSA SAR XML schema and European/UNODC goAML 4.0 XML standards.
 
-4. **Access Control & Audit Trail Exploration:**  
+5. **Access Control & Audit Trail Exploration:**  
    The architecture models Attribute-Based Access Control (ABAC) and append-only audit event logging to explore security controls for managing multi-institution consortium lifecycles and model promotion gates.
+
 
 ---
 
