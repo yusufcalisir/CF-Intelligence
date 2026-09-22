@@ -33,26 +33,26 @@ Financial institutions currently evaluate five primary architectural paradigms:
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
 │                        ENTERPRISE FRAUD PARADIGM SPECTRUM                              │
 ├──────────────────────┬─────────────────────────┬───────────────────────────────────────┤
-│ PARADIGM             │ REPRESENTATIVE SYSTEMS  │ PRIMARY ARCHITECTURAL VULNERABILITY   │
+│ PARADIGM             │ ARCHITECTURAL ARCHETYPE │ PRIMARY ARCHITECTURAL VULNERABILITY   │
 ├──────────────────────┼─────────────────────────┼───────────────────────────────────────┤
-│ 1. Legacy Monoliths  │ FICO Falcon, SAS AML    │ 95%+ False Positive Rates; Siloed     │
-│ 2. Centralized SaaS  │ Feedzai, Featurespace   │ Sovereign Privacy & GDPR Violation    │
-│ 3. Data Clean Rooms  │ Snowflake DCR, InfoSum  │ No Edge ML Training; Query-Only Joins │
-│ 4. Academic FL Kits  │ Flower, PySyft, NVFlare │ Generic Primitives; No Banking Domain │
+│ 1. Legacy Monoliths  │ Relational Rule Engines │ 95%+ False Positive Rates; Siloed     │
+│ 2. Centralized SaaS  │ Multi-Tenant Cloud ML   │ Sovereign Privacy & GDPR Violation    │
+│ 3. Data Clean Rooms  │ Multi-Party SQL Joins   │ No Edge ML Training; Query-Only Joins │
+│ 4. Academic FL Kits  │ Generic FL Frameworks   │ Generic Primitives; No Banking Domain │
 │ 5. CF-Intelligence   │ CFI Enterprise Platform │ Domain-Native Zero-Raw-PII FedGNN     │
 └──────────────────────┴─────────────────────────┴───────────────────────────────────────┘
 ```
 
 ### 2.1. Paradigm 1: Legacy On-Premises Monoliths & Relational Rule Engines
-* **Representative Systems:** FICO Falcon (Legacy On-Prem), SAS AML, NICE Actimize (On-Prem), Mantas, BAE NetReveal.
-* **Architecture:** Monolithic relational database (Oracle, DB2) executing scheduled SQL queries and static deterministic rules (e.g., `amount > $10,000 AND country != US`).
+* **Architectural Archetype:** Traditional on-premises relational databases (Oracle, DB2) executing scheduled SQL queries and static deterministic rules (e.g., `amount > $10,000 AND country != US`).
+* **Architecture:** Monolithic relational database executing scheduled batch jobs and heuristic threshold filters.
 * **Critical Limitations:**
   * **Zero Cross-Bank Intelligence:** Completely isolated behind each bank's firewall. Zero visibility into multi-hop layering or syndicate accounts operating simultaneously across peer banks.
   * **Extreme False Positive Alert Fatigue:** False positive rates consistently exceed $90\% - 98\%$, generating thousands of low-yield alerts that overwhelm compliance analysts and inflate operational overhead.
   * **Batch/Near-Real-Time Latency:** High rule execution latency (>100ms to overnight batch jobs), missing modern instant payment authorization windows.
 
 ### 2.2. Paradigm 2: Centralized Multi-Tenant Cloud Vendor SaaS
-* **Representative Systems:** Feedzai Cloud, Featurespace ARIC Cloud, NICE Actimize Cloud, LexisNexis ThreatMetrix.
+* **Architectural Archetype:** Centralized multi-tenant vendor-hosted cloud pools and proprietary black-box ML scoring engines.
 * **Architecture:** Banks stream raw payment transaction payloads, cardholder metadata, and device fingerprints via cloud gateways into a vendor-hosted multi-tenant data lake for centralized machine learning scoring.
 * **Critical Limitations:**
   * **Regulatory Breach & Sovereign Data Leakage:** Storing unmasked or pseudonymized financial ledgers on multi-tenant vendor infrastructure exposes institutions to regulatory enforcement under GDPR, KVKK, and national bank secrecy statutes.
@@ -60,14 +60,14 @@ Financial institutions currently evaluate five primary architectural paradigms:
   * **WAN Latency Overhead:** Transmitting transaction payloads over external internet gateways to vendor data centers adds $35 - 65\text{ ms}$ round-trip latency, risking timeout failures against sub-50ms payment switch SLAs.
 
 ### 2.3. Paradigm 3: Data Clean Rooms & Federated SQL Warehouses
-* **Representative Systems:** Snowflake Data Clean Rooms, InfoSum, Databricks Clean Rooms.
+* **Architectural Archetype:** Multi-party cryptographic clean rooms and federated SQL query environments.
 * **Architecture:** Cryptographically governed relational environments that allow two or more parties to run joint SQL queries without exposing row-level data.
 * **Critical Limitations:**
   * **Analytical Only (No Edge Machine Learning):** Clean rooms are optimized for aggregate SQL queries (e.g., overlapping customer counts for marketing), not for iterative gradient backpropagation, stochastic gradient descent, or graph neural network embedding aggregation.
   * **Zero Real-Time Inline Scoring:** Query latency is measured in seconds or minutes, making clean rooms completely unusable for synchronous inline payment authorization (`pacs.008`).
 
 ### 2.4. Paradigm 4: Generic / Academic Federated Learning Frameworks
-* **Representative Systems:** Flower (`flwr`), PySyft (OpenMined), NVFlare (NVIDIA), FATE (WeBank).
+* **Architectural Archetype:** General-purpose open-source distributed machine learning libraries and abstract RPC communication frameworks.
 * **Architecture:** General-purpose distributed orchestration libraries providing abstract RPC communication primitives for federated model averaging.
 * **Critical Limitations:**
   * **Absence of Financial Domain Integration:** Lack native ISO 20022 financial message parsers (`pacs.008`, `pacs.002`, `camt.053`), zero-raw-PII cryptographic ingestion gateways, and AML transaction typology generators.

@@ -1266,7 +1266,6 @@ export default function LandingPage() {
                   </div>
                   {[
                     { label: 'Empirical Benchmarks', desc: 'PaySim, IEEE-CIS & Elliptic', target: 'benchmarks' },
-                    { label: 'Competitor Matrix',    desc: 'CFI vs Feedzai & Actimize',   target: 'comparison' },
                     { label: 'Banking Solutions',    desc: 'Tier-1, 2 & FinTech Profiles', target: 'solutions' },
                   ].map(sub => (
                     <a
@@ -2130,7 +2129,7 @@ export default function LandingPage() {
         </section>
 
         {/* ══════════════════════════════════════════════════════════
-            SECTION 7.6 — TARGET CUSTOMER PROFILES & COMPETITIVE POSITIONING (#solutions, #comparison)
+            SECTION 7.6 — TARGET CUSTOMER PROFILES (#solutions)
         ══════════════════════════════════════════════════════════ */}
         <section id="solutions" className="py-12 sm:py-24 px-3.5 sm:px-6 max-w-7xl mx-auto border-t border-white/6 [content-visibility:auto] [contain-intrinsic-size:1px_600px] w-full min-w-0">
           <FadeSection>
@@ -2212,106 +2211,6 @@ export default function LandingPage() {
                   </div>
                 </div>
               ))}
-            </div>
-
-            {/* Part 2: Real Enterprise Competitor Comparison Table */}
-            <div id="comparison" className="w-full min-w-0">
-              <div className="max-w-3xl mb-6 sm:mb-8 min-w-0">
-                <div className="text-[10px] sm:text-[11px] font-mono font-semibold text-purple-400 uppercase tracking-widest mb-2">
-                  Market Architecture Benchmark
-                </div>
-                <h3 className="text-xl sm:text-3xl font-bold text-slate-100 tracking-tight">
-                  Enterprise Fraud & AML Platform Comparison
-                </h3>
-                <p className="text-slate-400 text-xs sm:text-sm mt-1.5 leading-relaxed">
-                  How CF-Intelligence compares directly against established Tier-1 fraud prevention and AML surveillance platforms:
-                </p>
-              </div>
-
-              {/* Desktop Table View (>= md screens) */}
-              <div className="hidden md:block rounded-2xl bg-[#060614] border border-white/8 overflow-hidden shadow-2xl">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-white/8 bg-white/3 text-[11px] text-slate-400">
-                      <th className="p-4 font-semibold">Capability / Architecture</th>
-                      <th className="p-4 font-bold text-emerald-400 bg-emerald-950/20">CF-Intelligence</th>
-                      <th className="p-4 font-semibold text-slate-300">Feedzai</th>
-                      <th className="p-4 font-semibold text-slate-300">ComplyAdvantage</th>
-                      <th className="p-4 font-semibold text-slate-300">NICE Actimize</th>
-                      <th className="p-4 font-semibold text-slate-300">Hawk AI</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5 text-[11px]">
-                    {[
-                      { cap: 'Cross-Bank Federated Learning', cfi: 'YES (Zero Raw PII)', fz: 'NO (Isolated Silo)', ca: 'NO (Cloud Silo)', na: 'NO (Legacy Silo)', ha: 'NO (Isolated)' },
-                      { cap: 'Multi-Bank Mule & Smurfing GNN', cfi: 'YES (FedGNN Graph)', fz: 'Partial (Single Bank)', ca: 'NO (Watchlists Only)', na: 'Partial (On-Prem)', ha: 'NO (Single Bank)' },
-                      { cap: 'Perimeter Isolation (Zero PII Out)', cfi: 'YES (Edge Cont. + DP)', fz: 'Partial (On-Prem)', ca: 'NO (Vendor Cloud SaaS)', na: 'YES (Heavy Monolith)', ha: 'NO (Cloud SaaS)' },
-                      { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
-                      { cap: 'False Positive Alert Reduction', cfi: '-64.7% (Measured)', fz: '-40% (Reported)', ca: '-30% (Reported)', na: 'Baseline Legacy', ha: '-35% (Reported)' },
-                      { cap: 'Automated FinCEN SAR Generation', cfi: 'YES (Native XML Schema)', fz: 'Partial (Case Tool)', ca: 'Partial (Case Tool)', na: 'Manual Workflow', ha: 'AI Copilot Only' },
-                      { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
-                    ].map((row, idx) => (
-                      <tr key={row.cap} className={idx % 2 === 0 ? 'bg-transparent' : 'bg-white/1'}>
-                        <td className="p-4 font-sans font-medium text-slate-200">{row.cap}</td>
-                        <td className="p-4 font-bold text-emerald-400 bg-emerald-950/15">{row.cfi}</td>
-                        <td className="p-4 text-slate-400">{row.fz}</td>
-                        <td className="p-4 text-slate-400">{row.ca}</td>
-                        <td className="p-4 text-slate-400">{row.na}</td>
-                        <td className="p-4 text-slate-400">{row.ha}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Mobile Adaptive Cards View (< md screens, zero horizontal scroll, 100% complete data) */}
-              <div className="md:hidden space-y-3.5">
-                {[
-                  { cap: 'Cross-Bank Federated Learning', cfi: 'YES (Zero Raw PII)', fz: 'NO (Isolated Silo)', ca: 'NO (Cloud Silo)', na: 'NO (Legacy Silo)', ha: 'NO (Isolated)' },
-                  { cap: 'Multi-Bank Mule & Smurfing GNN', cfi: 'YES (FedGNN Graph)', fz: 'Partial (Single Bank)', ca: 'NO (Watchlists Only)', na: 'Partial (On-Prem)', ha: 'NO (Single Bank)' },
-                  { cap: 'Perimeter Isolation (Zero PII Out)', cfi: 'YES (Edge Cont. + DP)', fz: 'Partial (On-Prem)', ca: 'NO (Vendor Cloud SaaS)', na: 'YES (Heavy Monolith)', ha: 'NO (Cloud SaaS)' },
-                  { cap: 'Real-Time Scoring Latency (p99)', cfi: '< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)', fz: '~25 ms', ca: '~50 ms', na: '> 100 ms (Legacy)', ha: '~30 ms' },
-                  { cap: 'False Positive Alert Reduction', cfi: '-64.7% (Measured)', fz: '-40% (Reported)', ca: '-30% (Reported)', na: 'Baseline Legacy', ha: '-35% (Reported)' },
-                  { cap: 'Automated FinCEN SAR Generation', cfi: 'YES (Native XML Schema)', fz: 'Partial (Case Tool)', ca: 'Partial (Case Tool)', na: 'Manual Workflow', ha: 'AI Copilot Only' },
-                  { cap: 'Deployment Footprint', cfi: 'Docker / K8s / gRPC', fz: 'Heavy On-Premises', ca: 'Multi-Tenant Cloud', na: 'Heavy Legacy Stack', ha: 'Cloud SaaS' },
-                ].map((row) => (
-                  <div key={row.cap} className="p-4 rounded-2xl bg-[#060614] border border-white/8 shadow-lg space-y-2.5">
-                    {/* Capability Title */}
-                    <div className="text-xs font-bold text-slate-100">
-                      {row.cap}
-                    </div>
-
-                    {/* CF-Intelligence Advantage Box */}
-                    <div className="p-2.5 rounded-xl bg-emerald-950/30 border border-emerald-500/30 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        <span className="text-[11px] font-bold text-emerald-300">CF-Intelligence</span>
-                      </div>
-                      <span className="text-xs font-mono font-bold text-emerald-400 text-right">{row.cfi}</span>
-                    </div>
-
-                    {/* Competitor Benchmarks (2x2 Responsive Grid) */}
-                    <div className="grid grid-cols-2 gap-2 pt-0.5">
-                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
-                        <div className="text-[10px] font-medium text-slate-400">Feedzai</div>
-                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.fz}</div>
-                      </div>
-                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
-                        <div className="text-[10px] font-medium text-slate-400">ComplyAdvantage</div>
-                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.ca}</div>
-                      </div>
-                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
-                        <div className="text-[10px] font-medium text-slate-400">NICE Actimize</div>
-                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.na}</div>
-                      </div>
-                      <div className="p-2 rounded-lg bg-white/3 border border-white/5 space-y-0.5 min-w-0">
-                        <div className="text-[10px] font-medium text-slate-400">Hawk AI</div>
-                        <div className="text-[10.5px] font-mono text-slate-300 truncate">{row.ha}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </FadeSection>
         </section>

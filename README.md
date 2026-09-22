@@ -22,13 +22,13 @@
 
 | Core Production Architecture | Engineering Rationale & Validation | Research & Operations |
 |:---|:---|:---|
-| [1. Executive Summary](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [20. Research & Exploratory Modules](#20-research--exploratory-modules) |
-| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [21. Prerequisites & System Requirements](#21-prerequisites-and-system-requirements) |
-| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [22. Quick Start Guide](#22-step-by-step-operator-quick-start) |
-| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Platform Comparison](#16-platform-comparison--architectural-positioning) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
-| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Regulatory Concepts Explored](#17-regulatory-concepts-explored) | [24. Related Work & References](#24-related-work-and-references) |
-| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. Subsystem Self-Verification](#18-subsystem-self-verification-reports-verification) | [25. Citation](#25-academic-citation-and-reference-format) |
-| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [19. API Blueprints](#19-api-endpoint-blueprints--json-schemas) | [26. Author & Maintenance](#26-author-and-maintenance) |
+| [1. Executive Summary](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Research & Exploratory Modules](#19-research--exploratory-modules) |
+| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Prerequisites & System Requirements](#20-prerequisites-and-system-requirements) |
+| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Quick Start Guide](#21-step-by-step-operator-quick-start) |
+| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. AI Collaboration Methodology](#22-development-methodology--ai-collaboration) |
+| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Subsystem Self-Verification](#17-subsystem-self-verification-reports-verification) | [23. Related Work & References](#23-related-work-and-references) |
+| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--json-schemas) | [24. Citation](#24-academic-citation-and-reference-format) |
+| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | | [25. Author & Maintenance](#25-author-and-maintenance) |
 | [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | | |
 | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | | |
 | [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | | |
@@ -83,7 +83,7 @@ The core production path focuses on eight defensible engineering components:
 - **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Security Middleware (Node.js) $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
 - **Explainability & Governance:** Real-time SHAP feature attributions and a 6-stage case management workbench with automated FinCEN BSA SAR XML compilation.
 
-*Note: Exploratory cryptographic research modules (zk-SNARK attestation, TenSEAL CKKS FHE, Post-Quantum Kyber-768, Hardware TEE drivers, EVM incentive contracts, and Cross-Chain bridges) are isolated in the [Research & Exploratory Modules](#20-research--exploratory-modules) section.*
+*Note: Exploratory cryptographic research modules (zk-SNARK attestation, TenSEAL CKKS FHE, Post-Quantum Kyber-768, Hardware TEE drivers, EVM incentive contracts, and Cross-Chain bridges) are isolated in the [Research & Exploratory Modules](#19-research--exploratory-modules) section.*
 
 ---
 
@@ -1218,25 +1218,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 
 ---
 
-## 16. Platform Comparison & Architectural Positioning
-
-The table below contrasts the architectural paradigms implemented in CF-Intelligence against collaborative RegTech networks, traditional vendor SaaS, and legacy rule systems:
-
-| Architectural Dimension | **CF-Intelligence Architecture** | **Collaborative FININT Networks** | **Traditional Vendor SaaS** | **Legacy On-Premises Rules** |
-| :--- | :---: | :---: | :---: | :---: |
-| **Data Sharing Paradigm** | **Federated Learning (Zero Raw PII)** | Encrypted Case / Ticket Messaging | Centralized Cloud Pooling | Isolated Bank Silos |
-| **Collaborative ML / AI** | **FedGNN / GraphSAGE (Decentralized)** | Rule-based / Single-tenant scoring | Proprietary Central Model | No Shared Intelligence |
-| **Multi-Institution Graph Analysis** | **GraphSAGE + Fuzzy PSI + UBO** | Manual / Semi-automated IBAN lookups | Single-Tenant Graph / Watchlists | Isolated Rule Engines |
-| **Privacy Guarantees** | **Opacus DP + Curve25519 SecAgg** | E2EE Messaging / Legal Trust | Vendor Trust Agreement | Network Firewalls Only |
-| **Payment Rails & Recall** | **ISO 20022 `pacs.008` & `camt.056` Recall** | SEPA Instant / TIPS Case Tracing | Batch File / Proprietary APIs | Batch Overnight Clearing |
-| **Inference Latency (p99)** | **< 14.2 ms (Fast-Path) / ~308 ms (Ensemble)** | Async Human-in-the-Loop Messaging | ~30 - 50 ms | > 100 ms |
-| **Non-IID Heterogeneity Handling** | **Dirichlet ($\alpha=0.5$) + FedProx** | N/A (Rules / Manual Review) | N/A (Centralized Data) | N/A (Single Institution) |
-| **Explainability & Compliance** | **SHAP + FinCEN / UNODC goAML + 4-Eyes** | Structured FININT Case Notes | Vendor Black Box / Basic UI | Manual Case Review |
-| **Deployment Model** | **Docker / Kubernetes / gRPC Edge / OpenAPI** | Multi-Tenant Cloud SaaS | Multi-Tenant Cloud SaaS | Heavy On-Premises Monolith |
-
----
-
-## 17. Regulatory Concepts Explored
+## 16. Regulatory Concepts Explored
 
 The technical architecture of CF-Intelligence explores how system design patterns can be structured around real-world regulatory and compliance principles across European and international jurisdictions (detailed in [`docs/european_finint_and_regtech_spec.md`](docs/european_finint_and_regtech_spec.md)):
 
@@ -1258,7 +1240,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ---
 
-## 18. Subsystem Self-Verification Reports (`verification/`)
+## 17. Subsystem Self-Verification Reports (`verification/`)
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -1285,9 +1267,9 @@ The reports below document the internal scientific verification suites validatin
 
 ---
 
-## 19. API Endpoint Blueprints & JSON Schemas
+## 18. API Endpoint Blueprints & JSON Schemas
 
-### 19.1 Real-Time Transaction Risk Scoring
+### 18.1 Real-Time Transaction Risk Scoring
 
 **Normalized Transaction Scoring Request (`POST /api/v1/score-transaction`):**
 ```json
@@ -1372,7 +1354,7 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
-### 19.2 Enterprise Authentication & Session Management
+### 18.2 Enterprise Authentication & Session Management
 
 **Login Request (`POST /api/v1/auth/login`):**
 ```json
@@ -1416,7 +1398,7 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
-### 19.3 Enterprise Connector Diagnostics & Live Probes
+### 18.3 Enterprise Connector Diagnostics & Live Probes
 
 **List Connector Health Status (`GET /api/v1/diagnostics/connectors`):**
 ```json
@@ -1472,7 +1454,7 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
-### 19.4 Real-Time WebSocket Telemetry Stream
+### 18.4 Real-Time WebSocket Telemetry Stream
 
 **Connection Endpoint:** `ws://localhost:8000/ws/telemetry` (or `wss://...` in production)
 
@@ -1499,13 +1481,13 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
-### 19.5 Interactive Developer Portal & Scalar API Gateway
+### 18.5 Interactive Developer Portal & Scalar API Gateway
 
 - **Dark-Themed Scalar Gateway:** `GET /scalar` (Renders modern `@scalar/api-reference` targeting `/openapi.json`).
 - **Interactive Multi-Language SDK Portal:** Route `/developer` and `/api-docs` provides client generator for **cURL**, **Python (httpx)**, **Node.js (axios)**, **Java (OkHttp)**, and **Go (net/http)** with live in-browser execution runner.
 - **OpenAPI 3.1 JSON Specification:** Available via `GET /openapi.json` or exported directly via the Developer Portal UI.
 
-### 19.6 Interactive Chaos & Adversarial Attack Simulation (`POST /api/v1/scenarios/inject-attack`)
+### 18.6 Interactive Chaos & Adversarial Attack Simulation (`POST /api/v1/scenarios/inject-attack`)
 
 **Attack Injection Request:**
 ```json
@@ -1537,7 +1519,7 @@ The reports below document the internal scientific verification suites validatin
 ```
 *Note: `auc_protected` and `auc_compromised_baseline` in this endpoint represent continuous simulated demo proxy metrics for live operator HUD feedback and are explicitly tagged as simulated in the schema and console UI.*
 
-### 19.7 Real Dataset Ingestion & Great Expectations Contract Gating
+### 18.7 Real Dataset Ingestion & Great Expectations Contract Gating
 
 **1. Validate Preview & Schema Auto-Detection (`POST /api/v1/datasets/validate-preview`):**
 ```json
@@ -1608,7 +1590,7 @@ The reports below document the internal scientific verification suites validatin
 }
 ```
 
-### 19.8 24-Hour Consortium Transaction Scoring Volume (`GET /api/v1/banks/scoring-volume`)
+### 18.8 24-Hour Consortium Transaction Scoring Volume (`GET /api/v1/banks/scoring-volume`)
 
 Aggregates empirical hourly transaction velocity and volume across all onboarded consortium institutions for operational throughput monitoring:
 
@@ -1632,7 +1614,7 @@ Authorization: Bearer <jwt_token>
 ]
 ```
 
-### 19.9 Federated Training Convergence & Real-Time Event Streaming
+### 18.9 Federated Training Convergence & Real-Time Event Streaming
 
 **1. Query Training Round Convergence (`GET /api/v1/training/rounds/{simulation_id}`):**
 ```json
@@ -1676,7 +1658,7 @@ Publishes real-time training iteration progress broadcast via internal Redis Pub
 }
 ```
 
-### 19.10 Regulatory SAR Export & Key Rotation Cron Endpoints
+### 18.10 Regulatory SAR Export & Key Rotation Cron Endpoints
 
 **1. Case SAR FinCEN XML Export (`POST /api/v1/cases/export/fincen-xml`):**
 Exports confirmed fraud cases directly into official FinCEN BSA XML Schema 2.0 electronic filings:
@@ -1727,7 +1709,7 @@ Content-Type: application/json
 }
 ```
 
-### 19.11 Continuous Human-in-the-Loop Feedback & Retraining Ground-Truth Store
+### 18.11 Continuous Human-in-the-Loop Feedback & Retraining Ground-Truth Store
 
 Connects investigator case determinations directly back to tenant-isolated retraining buffers for continuous federated model fine-tuning:
 
@@ -1802,7 +1784,7 @@ Connects investigator case determinations directly back to tenant-isolated retra
 }
 ```
 
-### 19.12 Inter-Bank Encrypted FININT Messaging API (`/api/v1/bridge/*`)
+### 18.12 Inter-Bank Encrypted FININT Messaging API (`/api/v1/bridge/*`)
 
 Enables compliance officers to exchange end-to-end encrypted FININT case tickets and evidentiary payloads across consortium institutions:
 
@@ -1848,7 +1830,7 @@ Enables compliance officers to exchange end-to-end encrypted FININT case tickets
 }
 ```
 
-### 19.13 Real-Time SEPA Instant Payment Recall API (`/api/v1/recalls/*`)
+### 18.13 Real-Time SEPA Instant Payment Recall API (`/api/v1/recalls/*`)
 
 Automates European Payments Council (EPC) SEPA Instant Credit Transfer payment recall workflows (`camt.056` / `camt.029`):
 
@@ -1891,7 +1873,7 @@ Automates European Payments Council (EPC) SEPA Instant Credit Transfer payment r
 }
 ```
 
-### 19.14 Real-Time Multi-List Sanctions & PEP Screening API (`/api/v1/screening/*`)
+### 18.14 Real-Time Multi-List Sanctions & PEP Screening API (`/api/v1/screening/*`)
 
 Executes sub-10ms fuzzy matching across UN, EU CFSP, OFAC SDN, and PEP registries:
 
@@ -1928,7 +1910,7 @@ Executes sub-10ms fuzzy matching across UN, EU CFSP, OFAC SDN, and PEP registrie
 }
 ```
 
-### 19.15 European FIU & UNODC goAML 4.0 / EU AMLA Regulatory Exporter API (`/api/v1/regulatory/*`)
+### 18.15 European FIU & UNODC goAML 4.0 / EU AMLA Regulatory Exporter API (`/api/v1/regulatory/*`)
 
 Compiles confirmed AML cases into standardized electronic filing packages:
 
@@ -1954,7 +1936,7 @@ Compiles confirmed AML cases into standardized electronic filing packages:
 }
 ```
 
-### 19.16 Enterprise AML OpenAPI Drop-in Adapter & Webhook Gateway (`/api/v2/*`, `/api/v1/*`)
+### 18.16 Enterprise AML OpenAPI Drop-in Adapter & Webhook Gateway (`/api/v2/*`, `/api/v1/*`)
 
 Provides backward-compatible drop-in endpoints matching industry-standard AML and transaction monitoring OpenAPI schemas, enabling member institutions to integrate existing core banking systems without bespoke integration middleware:
 
@@ -2030,7 +2012,7 @@ Provides backward-compatible drop-in endpoints matching industry-standard AML an
 }
 ```
 
-### 19.17 Cross-Border Corporate UBO & Heterogeneous Graph Intelligence API (`/api/v1/ubo/*`)
+### 18.17 Cross-Border Corporate UBO & Heterogeneous Graph Intelligence API (`/api/v1/ubo/*`)
 
 Provides consortium-wide graph intelligence for multi-tier Ultimate Beneficial Owner (UBO) calculation, circular ownership loop identification, nominee director syndicate detection, and offshore shell company clustering:
 
@@ -2105,7 +2087,7 @@ Provides consortium-wide graph intelligence for multi-tier Ultimate Beneficial O
 }
 ```
 
-### 19.18 European AML Monitoring Scenario Library & Hybrid Deterministic Rule Engine API (`/api/v1/scenarios/european-aml/*`)
+### 18.18 European AML Monitoring Scenario Library & Hybrid Deterministic Rule Engine API (`/api/v1/scenarios/european-aml/*`)
 
 Provides 16 pre-configured statutory European AML monitoring rules and a hybrid scoring synthesizer that blends deterministic compliance rule penalties with Federated GNN risk embeddings into an explainable composite decision:
 
@@ -2178,7 +2160,7 @@ Provides 16 pre-configured statutory European AML monitoring rules and a hybrid 
 
 ---
 
-## 20. Research & Exploratory Modules
+## 19. Research & Exploratory Modules
 
 > **Research & Exploration Note:**  
 > The modules in this section were built to explore adjacent cryptographic, hardware-assisted, and decentralized coordination primitives. They are maintained as standalone prototypes and are **not required dependencies** of the core federated fraud detection pipeline.
@@ -2199,27 +2181,27 @@ flowchart TD
     end
 ```
 
-### 20.1 Groth16 zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
+### 19.1 Groth16 zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
 Prototyped zero-knowledge proof circuits using Circom and Groth16 over the BN254 curve to verify that local bank updates satisfy $L_2$ norm clip bounds and match Poseidon hash commitments without revealing raw weight vectors.
 
-### 20.2 Post-Quantum Cryptography (PQC SecAgg) (`pqc_secagg_driver.py`)
+### 19.2 Post-Quantum Cryptography (PQC SecAgg) (`pqc_secagg_driver.py`)
 Exploratory hybrid SecAgg driver integrating CRYSTALS-Kyber-768 (NIST FIPS 203) Key Encapsulation Mechanism and CRYSTALS-Dilithium-3 (NIST FIPS 204) signatures to evaluate quantum-resistant key exchange overhead in distributed federations.
 
-### 20.3 TenSEAL CKKS Homomorphic Encryption (`fhe_driver.py`)
+### 19.3 TenSEAL CKKS Homomorphic Encryption (`fhe_driver.py`)
 Prototyped Fully Homomorphic Encryption driver using Microsoft SEAL CKKS polynomial rings ($N=8192$) for evaluating encrypted vector additions on untrusted aggregation servers without pairwise client coordination.
 
-### 20.4 Hardware Trusted Execution Environment (TEE) Driver (`tee_driver.py`)
+### 19.4 Hardware Trusted Execution Environment (TEE) Driver (`tee_driver.py`)
 Confidential Computing enclave driver modeling Intel SGX / AWS Nitro Enclave remote attestation structures (`MRENCLAVE` validation) and memory sealing patterns. For cloud environments and CI/CD pipelines without bare-metal enclave access, the `SoftwareEmulatedTEEDriver` executes full cryptographic attestation and data sealing in memory.
 
-### 20.5 Consortium Smart Contracts & Gnosis Safe Multi-Sig (`contracts/`)
+### 19.5 Consortium Smart Contracts & Gnosis Safe Multi-Sig (`contracts/`)
 Solidity 0.8.20 smart contracts (`ConsortiumIncentiveSettlement.sol`, `GnosisSafeMultiSigCoordinator.sol`) exploring automated reward settlement and 2-of-3 multi-signature governance across consortium participants. Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py` via `ConsortiumSettlementLedgerSimulator`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations.
 
-### 20.6 Cross-Chain Settlement Bridge (`layer2_crosschain_bridge.py`)
+### 19.6 Cross-Chain Settlement Bridge (`layer2_crosschain_bridge.py`)
 Exploratory token routing connector modeling Chainlink CCIP `EVM2AnyMessage` payloads across Ethereum Layer-2 rollups (Arbitrum, Optimism) and enterprise ledgers (Hyperledger Fabric, Canton).
 
 ---
 
-## 21. Prerequisites and System Requirements
+## 20. Prerequisites and System Requirements
 
 | Dependency | Minimum Version | Purpose |
 | :--- | :---: | :--- |
@@ -2234,7 +2216,7 @@ Exploratory token routing connector modeling Chainlink CCIP `EVM2AnyMessage` pay
 
 ---
 
-## 22. Step-by-Step Operator Quick Start
+## 21. Step-by-Step Operator Quick Start
 
 ### Step 1: Clone Repository and One-Click Enterprise Launch
 ```bash
@@ -2306,7 +2288,7 @@ python scripts/run_all_verifications.py
 
 ---
 
-## 23. Development Methodology & AI Collaboration
+## 22. Development Methodology & AI Collaboration
 
 This platform was engineered using a human-directed pair-programming workflow leveraging modern AI coding tools as productivity accelerators:
 
@@ -2323,7 +2305,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 24. Related Work and References
+## 23. Related Work and References
 
 1. McMahan, B., et al. (2017). *Communication-Efficient Learning of Deep Networks from Decentralized Data.* AISTATS.
 2. Bonawitz, K., et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS.
@@ -2336,7 +2318,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 25. Academic Citation and Reference Format
+## 24. Academic Citation and Reference Format
 
 ```bibtex
 @software{calisir2026cfintelligence,
@@ -2352,7 +2334,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 26. Author and Maintenance
+## 25. Author and Maintenance
 
 Designed, developed, and maintained by **Yusuf Çalışır**.
 
