@@ -28,7 +28,6 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Header, HTTPException, Query
-from fastapi.responses import JSONResponse
 
 from app.application.schemas.bridge_messaging import (
     AttachEvidenceRequest,

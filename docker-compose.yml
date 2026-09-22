@@ -72,6 +72,7 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD:-cfi_redis_secure_pass_2026_change_in_production}@redis:6379/0
       - SECRET_KEY=${SECRET_KEY:-cfi_super_secret_jwt_key_2026_enterprise_floor}
       - CONSORTIUM_HMAC_SALT=${CONSORTIUM_HMAC_SALT:-cfi_salt_consortium_hmac_sha256_floor_token_2026}
+      - CFI_REGULATORY_ENVELOPE_SECRET=${CFI_REGULATORY_ENVELOPE_SECRET:-cfi_regulatory_envelope_hmac_secret_2026_enterprise}
       - CFI_STORAGE_DIR=/app/storage
       - TELEMETRY_ENABLED=true
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317

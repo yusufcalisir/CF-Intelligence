@@ -25,8 +25,10 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import logging
 import threading
+import urllib.request
 import uuid
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -484,9 +486,7 @@ class PaymentRecallService:
 
             if webhook_url:
                 try:
-                    import urllib.request
-                    import json as _json
-                    payload = _json.dumps({
+                    payload = json.dumps({
                         "recall_case_id": case_id,
                         "recall_reason": case.recall_reason,
                         "amount_eur": case.amount_eur,

@@ -113,9 +113,8 @@ class CreateTicketRequest(BaseModel):
             raw = base64.urlsafe_b64decode(v + "==")
         except Exception as exc:
             raise ValueError("recipient_public_key_b64 is not valid base64url") from exc
-        if len(raw) not in (32, 56, 57):  # Curve25519 raw = 32 bytes
-            if len(raw) < 16:
-                raise ValueError("Curve25519 public key must be at least 16 bytes.")
+        if len(raw) not in (32, 56, 57) and len(raw) < 16:  # Curve25519 raw = 32 bytes
+            raise ValueError("Curve25519 public key must be at least 16 bytes.")
         return v
 
 

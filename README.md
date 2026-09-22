@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2627%2F2627_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-2855%2F2855_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -288,7 +288,7 @@ CF-Intelligence/
 │   │   │   └── web_console.py                       # Web console telemetry & audit logging contracts
 │   │   │
 │   │   ├── application/
-│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (31 Modules)
+│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (35 Modules)
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
 │   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
 │   │   │       ├── flower_engine.py                 # Flower FL simulation bridge (Ray runtime & zero-mock native fallback)
@@ -310,6 +310,10 @@ CF-Intelligence/
 │   │   │       ├── coordinator_service.py           # Federation round coordinator & consensus orchestrator
 │   │   │       ├── case_service.py                  # Core case investigation lifecycle state machine
 │   │   │       ├── case_workbench.py                # 6-Stage case management workbench & supervisor signatures
+│   │   │       ├── bridge_case_service.py           # Inter-bank encrypted FININT messaging & case information exchange
+│   │   │       ├── payment_recall_service.py        # Real-time SEPA Instant payment recall (camt.056 / camt.029) & recovery ledger
+│   │   │       ├── screening_service.py             # Real-time sanctions (UN/EU/OFAC) and PEP fuzzy screening engine
+│   │   │       ├── fiu_regulatory_service.py        # European FIU & UNODC goAML 4.0 XML / AMLA regulatory exporter
 │   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
 │   │   │       ├── auto_rollback.py                 # Champion auto-rollback on drift or accuracy degradation
 │   │   │       ├── automated_retraining.py          # Continuous automated retraining trigger pipeline
@@ -449,12 +453,16 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 34 Modular FastAPI Routers
+│   │       ├── routers/                             # 38 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
 │   │       │   ├── alerts.py                        # Real-time fraud alert triage & disposition API
 │   │       │   ├── cases.py                         # 6-Stage case management & Four-Eyes supervisor approval API
+│   │       │   ├── bridge_messaging.py              # Inter-Bank Encrypted FININT Case Messaging & Information Request Protocol
+│   │       │   ├── payment_recall.py                # Real-Time SEPA Instant Payment Recall Engine (camt.056/camt.029)
+│   │       │   ├── screening.py                     # Real-Time Multi-List Sanctions & PEP Fuzzy Screening Engine
+│   │       │   ├── regulatory.py                    # European FIU & UNODC goAML 4.0 XML / AMLA Regulatory Exporter
 │   │       │   ├── banks.py                         # Consortium member management & data upload endpoints
 │   │       │   ├── bank_client.py                   # Distributed bank client local training & evaluation daemon
 │   │       │   ├── coordinator.py                   # Federation round orchestration & model sync API
@@ -489,7 +497,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (1,943 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,249 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1031,10 +1039,37 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 
 ---
 
-## 11. Human-in-the-Loop Workbench & Regulatory Reporting
+## 11. Human-in-the-Loop Workbench, European FININT & Regulatory RegTech
 
-- **6-Stage Case Workbench (`case_workbench.py`):** Manages alert review lifecycles (`NEW` $\to$ `ASSIGNED` $\to$ `UNDER_INVESTIGATION` $\to$ `PENDING_SECOND_SIGNATURE` $\to$ `RESOLVED_CONFIRMED_FRAUD` / `RESOLVED_FALSE_POSITIVE`, with optional `ESCALATED`) enforcing Four-Eyes dual supervisor signature authorization. Resolving a case strictly requires two distinct supervisor identities (`SIG_SUPERVISOR_<ID1>`, `SIG_SUPERVISOR_<ID2>`); single signatures and duplicate signers are cryptographically rejected.
+### 11.1 Case Management & 6-Stage Human-in-the-Loop Workbench (`case_workbench.py`)
+- **6-Stage Case Workbench:** Manages alert review lifecycles (`NEW` $\to$ `ASSIGNED` $\to$ `UNDER_INVESTIGATION` $\to$ `PENDING_SECOND_SIGNATURE` $\to$ `RESOLVED_CONFIRMED_FRAUD` / `RESOLVED_FALSE_POSITIVE`, with optional `ESCALATED`) enforcing Four-Eyes dual supervisor signature authorization. Resolving a case strictly requires two distinct supervisor identities (`SIG_SUPERVISOR_<ID1>`, `SIG_SUPERVISOR_<ID2>`); single signatures and duplicate signers are cryptographically rejected.
 - **FinCEN BSA SAR XML Compiler (`regulatory_reporter.py`):** Generates compliant Suspicious Activity Report (SAR) XML documents validated against the official FinCEN BSA XML Schema 2.0 (`backend/schemas/FinCEN_SAR_2.0.xsd`) using `lxml.etree.XMLSchema`.
+
+### 11.2 Inter-Bank Encrypted FININT Messaging Protocol (`bridge_case_service.py` & `bridge_messaging.py`)
+- **End-to-End Encrypted Case Exchange:** Enables compliance officers across consortium institutions to exchange sensitive evidentiary case payloads protected by Curve25519 Elliptic Curve Diffie-Hellman (X25519 ECDH), HKDF-SHA256 key derivation, and authenticated AES-256-GCM envelope encryption.
+- **Cryptographic Evidence Commitment:** Case payloads include a verifiable SHA-256 hexadecimal hash commitment of the unencrypted evidence, automatically verified by the recipient node upon decryption to detect tampering in transit.
+- **Tamper-Evident SHA-256 Hash-Chained Audit Trail:** Every status transition (`SUBMITTED`, `ACKNOWLEDGED`, `IN_REVIEW`, `RESPONDED`, `CLOSED`) is permanently recorded in a SHA-256 append-only hash chain linking the prior block digest, ticket ID, status, and timestamp.
+- **SLA Countdown Timers & Dual Control:** Inter-bank tickets enforce urgency SLAs (`URGENT` < 4h, `STANDARD` 24h, `EXTENDED` 72h) and Four-Eyes supervisor authorization before dispatching cross-border regulatory intelligence.
+
+### 11.3 Real-Time SEPA Instant Payment Recall Automation (`payment_recall_service.py` & `payment_recall.py`)
+- **ISO 20022 `camt.056` & `camt.029` Schemes:** Full automation of European Payments Council (EPC) SEPA Instant Credit Transfer Recall rulebooks, processing payment cancellation requests (`camt.056`) citing standardized reason codes (`FRAD` fraud, `TECH` technical error, `DUPL` duplicate, `CUST` customer request).
+- **Automated Account Freeze:** When a recall is registered with reason `FRAD`, the engine automatically verifies destination account status and triggers an immediate account freeze hold on the recipient bank node to prevent mule cash-outs.
+- **10-Day Regulatory SLA Boundary:** Enforces the strict EPC 10-calendar-day window; recall attempts submitted after 10 days are deterministically rejected with `SLA_BREACH_RECALL_EXPIRED`.
+- **Four-Eyes Resolution & Fund Recovery Ledger:** Resolutions (`camt.029`: `ACCEPTED` / `REJECTED` / `PENDING`) require supervisor verification and update a dedicated immutable recovery ledger tracking credited/debited balances.
+
+### 11.4 Real-Time Multi-List Sanctions & PEP Screening Engine (`screening_service.py` & `screening.py`)
+- **Multi-List Global Registry:** Real-time screening against UN Consolidated List, EU Common Foreign and Security Policy (CFSP) List, US OFAC Specially Designated Nationals (SDN) List, and Politically Exposed Persons (PEP) registries.
+- **Dual-Algorithm Fuzzy String Matching:** Combines the Jaro-Winkler prefix-weighted metric ($p=0.10$) and normalized Levenshtein edit distance:
+  $$S_{\mathrm{composite}} = 0.60 \cdot S_{\mathrm{jw}} + 0.40 \cdot S_{\mathrm{lev}}$$
+- **Secondary Demographic Disambiguation:** Candidates with $S_{\mathrm{composite}} \ge 0.70$ undergo secondary validation against Date of Birth (DOB) and ISO 3166-1 alpha-2 Nationality, boosting confidence by $+0.15$ for matched attributes.
+- **Audited Whitelist Bypass:** Compliance officers can register verified false positives in an institution-isolated whitelist with audit notes and dual sign-off, bypassing repetitive operational halts.
+
+### 11.5 European FIU & UNODC goAML 4.0 / EU AMLA Regulatory Exporter (`fiu_regulatory_service.py` & `regulatory.py`)
+- **UNODC goAML 4.0 XML Standardization:** Generates compliant electronic Suspicious Transaction Reports (STR) and Suspicious Activity Reports (SAR) formatted to the UNODC goAML XML 4.0 schema for national Financial Intelligence Units (FIUs).
+- **EU AMLA Standardized JSON Format:** Compiles structured incident files adhering to the emerging EU Anti-Money Laundering Authority (AMLA) Single Rulebook format, detailing consortium velocity, mule accounts, and typologies.
+- **Encrypted Transmission Envelope:** Wraps exported reports in an encrypted HMAC-SHA256 signed envelope (`CFI_REGULATORY_ENVELOPE_SECRET`) with submission tracking and mandatory Four-Eyes supervisor sign-off before transmission.
+
+### 11.6 Data Retention, Erasure & PII Redaction
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
 - **Support Diagnostics & PII Redaction (`support_diagnostics.py`):** Generates sanitized diagnostics bundles from multi-line log sources (strings, files, lists) prior to support export. Redacts international IBANs (generic format matching 2-letter country code + 2 check digits + alphanumeric account string), payment card numbers (validated via ISO/IEC 7812 Luhn MOD-10 checksum algorithm), Turkish/Generic National IDs (11-digit algorithmic validation), raw account numbers, phone numbers (international and domestic formats), and contextual customer names (`Customer Name: [REDACTED]`). *Scope Note:* Name redaction uses deterministic keyword-prefixed heuristic regex patterns (e.g. `Customer Name:`, `Account Holder:`, `Client Name:`), not true Named Entity Recognition (NER) ML models.
 
@@ -1135,7 +1170,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,287 / 2,287 passing (2,594 total incl. verification)** | 100% | 1,986 Backend Pytest + 268 Frontend Vitest + 33 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,548 / 2,548 passing (2,855 total incl. verification)** | 100% | 2,249 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1197,23 +1232,22 @@ The table below contrasts the architectural paradigms implemented in CF-Intellig
 
 ## 17. Regulatory Concepts Explored
 
-The technical architecture of CF-Intelligence explores how system design patterns can be structured around real-world regulatory and compliance principles:
+The technical architecture of CF-Intelligence explores how system design patterns can be structured around real-world regulatory and compliance principles across European and international jurisdictions (detailed in [`docs/european_finint_and_regtech_spec.md`](docs/european_finint_and_regtech_spec.md)):
 
 1. **Data Minimization & Sovereign Privacy (GDPR Art. 6 & 17, CCPA):**  
    Cross-border banking secrecy and data protection statutes prohibit pooling raw customer records across institutions. The platform addresses this through federated learning: raw transactions remain within the local banking node, and only differentially private gradients ($\epsilon = 1.0, \delta = 10^{-5}$) and zero-sum masked vectors are transmitted.
-
-2. **Cross-Bank Information Exchange (EU AMLA Single Rulebook & AMLD6):**  
-   Under modern European banking frameworks and the EU Anti-Money Laundering Authority (AMLA) Single Rulebook, obliged entities can exchange operational fraud and mule intelligence based on GDPR Article 6(1)(f) legitimate interest. CF-Intelligence models this via Curve25519 encrypted inter-bank FININT case messaging and ISO 20022 `camt.056` SEPA Instant payment recall automation.
-
-
-3. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
-   High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases.
-
-4. **Suspicious Activity Electronic Reporting (Bank Secrecy Act & UNODC goAML):**  
-   Anti-money laundering statutes require standardized electronic filings for suspicious transactions. The platform provides automated compilation of normalized transactions and typology risk factors into both US FinCEN BSA SAR XML schema and European/UNODC goAML 4.0 XML standards.
-
-5. **Access Control & Audit Trail Exploration:**  
-   The architecture models Attribute-Based Access Control (ABAC) and append-only audit event logging to explore security controls for managing multi-institution consortium lifecycles and model promotion gates.
+2. **Cross-Bank FININT Case Messaging (EU AMLA Single Rulebook & AMLD6):**  
+   Under the EU Anti-Money Laundering Authority (AMLA) Single Rulebook and AMLD6, obliged credit institutions are mandated to exchange operational fraud intelligence and mule indicators without violating GDPR data sovereignty. CF-Intelligence implements this via Curve25519 Elliptic Curve Diffie-Hellman (X25519 ECDH), HKDF-SHA256 key derivation, AES-256-GCM authenticated encryption, SHA-256 evidence integrity hashing, SLA timers, and immutable SHA-256 hash-chained audit trails.
+3. **SEPA Instant Payment Recall Automation (EPC SCT Inst Rulebook):**  
+   Governs the automated processing of inter-bank payment recall requests (`camt.056`) citing standardized EPC reason codes (`FRAD`, `TECH`, `DUPL`, `CUST`) and investigation resolutions (`camt.029`). The engine enforces the strict EPC 10-calendar-day regulatory window, triggers automated account freeze holds on destination bank nodes upon fraudulent payment detection, and maintains an immutable fund recovery ledger.
+4. **Real-Time Multi-List Sanctions & PEP Compliance (UN, EU CFSP, OFAC SDN):**  
+   Continuous pre-clearing and batch transaction screening against consolidated global sanction registries and Politically Exposed Persons (PEP) lists. The engine executes dual-algorithm fuzzy matching (Jaro-Winkler prefix-weighted metric combined with normalized Levenshtein distance), secondary demographic disambiguation (DOB, ISO nationality), and an audited false-positive whitelist bypass.
+5. **Electronic Suspicious Activity Reporting (FinCEN BSA & UNODC goAML 4.0 / EU AMLA):**  
+   Statutory anti-money laundering frameworks mandate standardized electronic filings for suspicious transactions. The platform provides automated compilation of confirmed investigation cases into US FinCEN BSA XML 2.0 schemas, UNODC goAML 4.0 XML reports for national Financial Intelligence Units (FIUs), and standardized EU AMLA JSON dossiers wrapped in HMAC-SHA256 encrypted envelopes with mandatory Four-Eyes supervisor sign-off.
+6. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
+   High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases or submitting regulatory filings.
+7. **Zero-Trust Access Control & Cryptographic Audit Trails:**  
+   The architecture models Attribute-Based Access Control (ABAC) and append-only cryptographic audit chains (`block_hash` linking) to explore security controls for managing multi-institution consortium lifecycles and model promotion gates.
 
 
 ---
@@ -1759,6 +1793,158 @@ Connects investigator case determinations directly back to tenant-isolated retra
   "epsilon": 1.0,
   "delta": 1e-05,
   "sigma": 4.84379
+}
+```
+
+### 19.12 Inter-Bank Encrypted FININT Messaging API (`/api/v1/bridge/*`)
+
+Enables compliance officers to exchange end-to-end encrypted FININT case tickets and evidentiary payloads across consortium institutions:
+
+**1. Create Encrypted Inter-Bank Ticket (`POST /api/v1/bridge/cases`):**
+```json
+{
+  "originating_bank_id": "bank_alpha",
+  "recipient_bank_id": "bank_beta",
+  "case_id": "CASE-EU-2026-0841",
+  "request_type": "MULE_ACCOUNT_INQUIRY",
+  "urgency": "URGENT",
+  "subject_identifier": "DE89370400440532013000",
+  "evidence_payload": "Confirmed rapid layering across 4 intermediary accounts within 180 seconds. Total outbound: EUR 145,000.",
+  "recipient_public_key_hex": "5a4b3c2d1e0f9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b9c8d7e6f5a4b"
+}
+```
+
+*Response (HTTP 201 Created):*
+```json
+{
+  "ticket_id": "FININT-2026-A1B2C3D4",
+  "status": "SUBMITTED",
+  "originating_bank_id": "bank_alpha",
+  "recipient_bank_id": "bank_beta",
+  "encrypted_payload_b64": "v1:G4k9...:AQID...:ZGF0YQ==",
+  "evidence_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "sla_deadline_iso": "2026-09-22T20:00:00Z",
+  "audit_chain_block_hash": "8f3b2a1c0d9e...f7a6b"
+}
+```
+
+**2. Verify Immutable Audit Chain (`GET /api/v1/bridge/cases/{ticket_id}/audit-trail`):**
+```json
+{
+  "ticket_id": "FININT-2026-A1B2C3D4",
+  "chain_valid": true,
+  "block_count": 3,
+  "blocks": [
+    {"index": 0, "event": "TICKET_CREATED", "status": "SUBMITTED", "block_hash": "8f3b2a..."},
+    {"index": 1, "event": "STATUS_TRANSITION", "status": "IN_REVIEW", "block_hash": "c4d5e6..."},
+    {"index": 2, "event": "RESPONSE_ATTACHED", "status": "RESPONDED", "block_hash": "1a2b3c..."}
+  ]
+}
+```
+
+### 19.13 Real-Time SEPA Instant Payment Recall API (`/api/v1/recalls/*`)
+
+Automates European Payments Council (EPC) SEPA Instant Credit Transfer payment recall workflows (`camt.056` / `camt.029`):
+
+**1. Initiate Fraud Recall (`POST /api/v1/recalls/initiate`):**
+```json
+{
+  "original_transaction_id": "TX-SEPA-2026-8819",
+  "original_end_to_end_id": "E2E-SEPA-2026-8819-A",
+  "originating_bank_id": "bank_alpha",
+  "destination_bank_id": "bank_beta",
+  "debtor_iban": "DE89370400440532013000",
+  "creditor_iban": "FR7630006000011234567890189",
+  "amount": 49500.0,
+  "currency": "EUR",
+  "reason_code": "FRAD",
+  "reason_narrative": "Authorized Push Payment fraud detected via impersonation syndicate."
+}
+```
+
+*Response (HTTP 201 Created):*
+```json
+{
+  "recall_id": "REC-2026-991204",
+  "status": "INITIATED",
+  "reason_code": "FRAD",
+  "destination_account_frozen": true,
+  "sla_deadline_iso": "2026-10-02T12:00:00Z",
+  "days_remaining": 10,
+  "recovery_transaction_id": "REC-HOLD-8819"
+}
+```
+
+**2. Resolve Recall Investigation with Dual Control (`POST /api/v1/recalls/{recall_id}/resolve`):**
+```json
+{
+  "resolution_code": "ACCEPTED",
+  "supervisor_id": "SIG_SUPERVISOR_FINCRIME_44",
+  "returned_amount": 49500.0,
+  "resolution_notes": "Funds successfully quarantined on beneficiary mule account and queued for repatriation."
+}
+```
+
+### 19.14 Real-Time Multi-List Sanctions & PEP Screening API (`/api/v1/screening/*`)
+
+Executes sub-10ms fuzzy matching across UN, EU CFSP, OFAC SDN, and PEP registries:
+
+**1. Screen Entity / Transaction Subject (`POST /api/v1/screening/screen`):**
+```json
+{
+  "entity_name": "Vladimir Petrovich Ivanov",
+  "date_of_birth": "1974-05-12",
+  "nationality": "RU",
+  "threshold": 0.80
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "query_name": "Vladimir Petrovich Ivanov",
+  "decision": "MATCH",
+  "highest_score": 0.932,
+  "matches": [
+    {
+      "list_source": "EU_CFSP",
+      "target_name": "Vladimir Petrovitch Ivanov",
+      "composite_score": 0.932,
+      "jw_score": 0.941,
+      "lev_score": 0.918,
+      "dob_match": true,
+      "nationality_match": true,
+      "sanction_program": "EU_UKRAINE_RESTRICTIONS_2026"
+    }
+  ],
+  "whitelist_bypassed": false,
+  "latency_ms": 3.4
+}
+```
+
+### 19.15 European FIU & UNODC goAML 4.0 / EU AMLA Regulatory Exporter API (`/api/v1/regulatory/*`)
+
+Compiles confirmed AML cases into standardized electronic filing packages:
+
+**1. Export UNODC goAML 4.0 XML (`POST /api/v1/regulatory/export/goaml-xml`):**
+```json
+{
+  "case_id": "CASE-2026-9941",
+  "report_code": "STR",
+  "fiu_destination": "FIU_GERMANY_ZFIU",
+  "supervisor_id": "SIG_SUPERVISOR_AML_01"
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "status": "GENERATED",
+  "submission_id": "GOAML-STR-2026-9941-F12A",
+  "schema_version": "goAML 4.0 XML",
+  "xml_payload": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<report report_code=\"STR\">\n  <reporting_entity>BANK_ALPHA_DE</reporting_entity>\n  <reason>Cross-Bank Mule Structuring</reason>\n</report>",
+  "envelope_digest": "4a7b9c...e2f1",
+  "created_at": "2026-09-22T21:40:00Z"
 }
 ```
 

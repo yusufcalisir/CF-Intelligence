@@ -23,7 +23,6 @@ from app.domain.enums import (
     RecallReasonCode,
     RecallStatus,
     RelationshipType,
-    ResolutionCode,
     RiskLevel,
     ScenarioType,
     TriageAction,
