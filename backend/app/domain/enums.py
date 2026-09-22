@@ -439,3 +439,41 @@ class RegulatorySubmissionFormat(StrEnum):
     AMLA_JSON_SCHEMA = "AMLA_JSON_SCHEMA"        # EU AMLA Single Rulebook Interchange JSON
     FIU_ENCRYPTED_ARCHIVE = "FIU_ENCRYPTED_ARCHIVE"  # Encrypted Digital Envelope Archive
 
+
+# ── Cross-Border Corporate UBO & Heterogeneous Graph Modeling Enums ───────────
+
+class UBONodeType(StrEnum):
+    """Heterogeneous node types in cross-border corporate ownership networks."""
+
+    NATURAL_PERSON = "NATURAL_PERSON"
+    LEGAL_ENTITY = "LEGAL_ENTITY"
+    HOLDING_COMPANY = "HOLDING_COMPANY"
+    OFFSHORE_SHELL = "OFFSHORE_SHELL"
+    TRUST_FOUNDATION = "TRUST_FOUNDATION"
+    BANK_ACCOUNT = "BANK_ACCOUNT"
+
+
+class UBORelationType(StrEnum):
+    """Directed edge types connecting corporate ownership and financial accounts."""
+
+    DIRECT_OWNERSHIP = "DIRECT_OWNERSHIP"
+    INDIRECT_OWNERSHIP = "INDIRECT_OWNERSHIP"
+    SUBSIDIARY_OF = "SUBSIDIARY_OF"
+    DIRECTOR_OF = "DIRECTOR_OF"
+    NOMINEE_DIRECTOR = "NOMINEE_DIRECTOR"
+    OPERATES_ACCOUNT = "OPERATES_ACCOUNT"
+    TRUSTEE_OF = "TRUSTEE_OF"
+    BENEFICIAL_OWNER_OF = "BENEFICIAL_OWNER_OF"
+
+
+class UBOAnomalyType(StrEnum):
+    """Typology classification for corporate structure anomalies."""
+
+    CIRCULAR_OWNERSHIP = "CIRCULAR_OWNERSHIP"
+    NOMINEE_DIRECTOR_SYNDICATE = "NOMINEE_DIRECTOR_SYNDICATE"
+    HIGH_RISK_OFFSHORE_CONCENTRATION = "HIGH_RISK_OFFSHORE_CONCENTRATION"
+    SHELL_COMPANY_CLUSTER = "SHELL_COMPANY_CLUSTER"
+    PEP_SANCTIONED_BENEFICIARY = "PEP_SANCTIONED_BENEFICIARY"
+    OPAQUE_MULTI_TIER_LAYERING = "OPAQUE_MULTI_TIER_LAYERING"
+
+

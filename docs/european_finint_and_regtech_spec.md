@@ -162,14 +162,31 @@ The adapter evaluates transactions against key European compliance topologies:
 4. `SCN_PEP_BENEFICIAL_OWNERSHIP`: Triggers enhanced due diligence review when corporate ownership structures include Politically Exposed Persons.
 
 ### 7.3 Cryptographic Webhook Ingestion Gateway
-- Institutional clients register webhooks via `POST /api/v1/aml-adapter/webhooks/subscriptions`.
+- Institutional clients register webhooks via `POST /api/v1/webhook-subscriptions`.
 - Outbound events (`ALERT_CREATED`, `SCREENING_ALERT_CREATED`, `FINAL_RISK_UPDATED`) are signed using HMAC-SHA256 over canonical JSON payloads, providing non-repudiation and replay protection.
 
 ---
 
-## 8. Verification & Automated Test Coverage
+## 8. Cross-Border Corporate UBO & Heterogeneous Graph Modeling
 
-The European RegTech engines are validated by **287 dedicated automated tests** (all 100% passing):
+The corporate ownership intelligence engine (`ubo_graph_service.py`) analyzes multi-tiered corporate structures, resolves indirect beneficial ownership across cross-border holding chains, and detects financial crime topologies designed to obscure ultimate control:
+
+### 8.1 Multi-Tiered Ownership & Compounded Calculation
+Under EU AMLD4/AMLD5/AMLD6, obliged entities must identify all natural persons holding $\ge 25\%$ direct or indirect beneficial ownership. The engine executes depth-first traversal along directed ownership edges:
+$$\text{Compounded Ownership}(P \to E) = \sum_{\pi \in \mathcal{P}(P \to E)} \prod_{(u, v) \in \pi} \frac{\text{Percentage}(u, v)}{100.0} \times 100.0$$
+It combines direct equity and parallel indirect holding paths into a consolidated total effective percentage, automatically tagging individuals exceeding statutory thresholds.
+
+### 8.2 Corporate Topology Anomaly Detection
+1. **Circular Ownership Cycles**: Detects directed loops where legal entities mutually own each other ($A \to B \to C \to A$) using Tarjan / Johnson simple cycle algorithms. Such loops are heavily utilized to obscure beneficial ownership and evade asset freezing.
+2. **Nominee Director Syndicates**: Identifies individuals registered as directors across $\ge 5$ corporate entities, flagging potential nominee directors or corporate administration service providers masking true controllers.
+3. **High-Risk Offshore Shell Clusters**: Identifies entities incorporated in non-cooperative offshore tax havens (e.g. VG, KY, PA, BZ) with nominal share capital $< €1,000$ or lack of operational substance.
+4. **Sanctioned / PEP Beneficial Owner Escalation**: Propagates sanctions and PEP risk flags up and down the ownership hierarchy, penalizing the structural risk score (0 to 1000).
+
+---
+
+## 9. Verification & Automated Test Coverage
+
+The European RegTech engines are validated by **303 dedicated automated tests** (all 100% passing):
 
 | Test Suite File | Component Scope | Test Count | Status |
 |:---|:---|:---:|:---:|
@@ -178,11 +195,12 @@ The European RegTech engines are validated by **287 dedicated automated tests** 
 | `backend/tests/unit/test_screening_service.py` | UN/EU/OFAC lists, Jaro-Winkler + Levenshtein, DOB/Nationality, Whitelist | 88 | `PASSED` |
 | `backend/tests/unit/test_fiu_regulatory_service.py` | UNODC goAML 4.0 XML, EU AMLA JSON, HMAC envelope, 4-Eyes sign-off | 33 | `PASSED` |
 | `backend/tests/unit/test_open_aml_adapter.py` | OpenAPI Drop-in Adapter, Scenarios, Watchlist search, Signed Webhooks | 24 | `PASSED` |
-| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **287** | **100% PASS** |
+| `backend/tests/unit/test_ubo_graph_service.py` | Multi-tier UBO compounding, Cycle detection, Nominees, Shell clusters | 16 | `PASSED` |
+| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **303** | **100% PASS** |
 
 ---
 
-## 9. REST API Endpoints Reference
+## 10. REST API Endpoints Reference
 
 | Endpoint | Method | Description | Auth / Security |
 |:---|:---:|:---|:---|
@@ -205,7 +223,17 @@ The European RegTech engines are validated by **287 dedicated automated tests** 
 | `/api/v1/transactions/{transaction_id}/monitoring-checks` | `POST` | Real-time online/offline AML transaction monitoring check | Bearer JWT / X-Tenant-ID |
 | `/api/v1/persons/{person_id}/screening-checks` | `POST` | Screen registered person against watchlists | Bearer JWT / X-Tenant-ID |
 | `/api/v2/screening-searches` | `POST` | Ad-hoc multi-watchlist fuzzy screening query | Bearer JWT / X-Tenant-ID |
-| `/api/v1/aml-adapter/webhooks/subscriptions` | `POST` | Register client webhook endpoint with secret | Bearer JWT / X-Tenant-ID |
-| `/api/v1/aml-adapter/webhooks/events` | `GET` | Audit recent HMAC-SHA256 signed webhook events | Bearer JWT / X-Tenant-ID |
-| `/api/v1/aml-adapter/metrics` | `GET` | Telemetry metrics for drop-in AML adapter | Bearer JWT / X-Tenant-ID |
+| `/api/v1/webhook-subscriptions` | `POST` | Register client webhook endpoint with secret | Bearer JWT / X-Tenant-ID |
+| `/api/v1/webhook-events` | `GET` | Audit recent HMAC-SHA256 signed webhook events | Bearer JWT / X-Tenant-ID |
+| `/api/v1/metrics` | `GET` | Telemetry metrics for drop-in AML adapter | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/nodes` | `POST` | Register corporate node (person, entity, shell) | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/relations` | `POST` | Create directed ownership or control edge | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/batch` | `POST` | Batch ingest corporate ownership networks | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/entities/{id}/beneficial-owners` | `GET` | Calculate compounded direct and indirect UBOs | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/entities/{id}/anomalies` | `GET` | Audit entity for cycles, nominees & shell clusters | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/entities/{id}/subgraph` | `GET` | Extract ego-network subgraph for React Flow UI | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/anomalies/circular-ownership` | `GET` | Consortium-wide circular ownership scan | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/anomalies/nominee-directors` | `GET` | Consortium-wide nominee director scan | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/anomalies/shell-clusters` | `GET` | Consortium-wide offshore shell cluster scan | Bearer JWT / X-Tenant-ID |
+| `/api/v1/ubo/metrics` | `GET` | Telemetry metrics for corporate UBO registry | Bearer JWT / X-Tenant-ID |
 

@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2879%2F2879_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-2895%2F2895_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -288,7 +288,7 @@ CF-Intelligence/
 │   │   │   └── web_console.py                       # Web console telemetry & audit logging contracts
 │   │   │
 │   │   ├── application/
-│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (36 Modules)
+│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (37 Modules)
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
 │   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
 │   │   │       ├── flower_engine.py                 # Flower FL simulation bridge (Ray runtime & zero-mock native fallback)
@@ -315,6 +315,7 @@ CF-Intelligence/
 │   │   │       ├── screening_service.py             # Real-time sanctions (UN/EU/OFAC) and PEP fuzzy screening engine
 │   │   │       ├── fiu_regulatory_service.py        # European FIU & UNODC goAML 4.0 XML / AMLA regulatory exporter
 │   │   │       ├── open_aml_service.py              # Drop-in Enterprise AML OpenAPI adapter & signed webhook gateway
+│   │   │       ├── ubo_graph_service.py             # Corporate UBO intelligence, circular ownership & nominee detection
 │   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
 │   │   │       ├── auto_rollback.py                 # Champion auto-rollback on drift or accuracy degradation
 │   │   │       ├── automated_retraining.py          # Continuous automated retraining trigger pipeline
@@ -454,7 +455,7 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 39 Modular FastAPI Routers
+│   │       ├── routers/                             # 40 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
@@ -465,6 +466,7 @@ CF-Intelligence/
 │   │       │   ├── screening.py                     # Real-Time Multi-List Sanctions & PEP Fuzzy Screening Engine
 │   │       │   ├── regulatory.py                    # European FIU & UNODC goAML 4.0 XML / AMLA Regulatory Exporter
 │   │       │   ├── open_aml_adapter.py              # Drop-in Enterprise AML OpenAPI & Webhook Ingestion Gateway
+│   │       │   ├── ubo_graph.py                     # Corporate UBO Graph, Cycle Detection & Nominee Syndicates API
 │   │       │   ├── banks.py                         # Consortium member management & data upload endpoints
 │   │       │   ├── bank_client.py                   # Distributed bank client local training & evaluation daemon
 │   │       │   ├── coordinator.py                   # Federation round orchestration & model sync API
@@ -499,7 +501,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,273 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,289 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1172,7 +1174,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,572 / 2,572 passing (2,879 total incl. verification)** | 100% | 2,273 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,588 / 2,588 passing (2,895 total incl. verification)** | 100% | 2,289 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2023,6 +2025,81 @@ Provides backward-compatible drop-in endpoints matching industry-standard AML an
   "status": "ACTIVE",
   "signing_secret": "whsec_7f9a...3b2c",
   "subscribed_events": ["ALERT_CREATED", "SCREENING_ALERT_CREATED"]
+}
+```
+
+### 19.17 Cross-Border Corporate UBO & Heterogeneous Graph Intelligence API (`/api/v1/ubo/*`)
+
+Provides consortium-wide graph intelligence for multi-tier Ultimate Beneficial Owner (UBO) calculation, circular ownership loop identification, nominee director syndicate detection, and offshore shell company clustering:
+
+**1. Calculate Multi-Tier Compounded Beneficial Ownership (`GET /api/v1/ubo/entities/{entity_id}/beneficial-owners?threshold=25.0&max_depth=8`):**
+*Response (HTTP 200 OK):*
+```json
+{
+  "entity_id": "ORG-LUX-HOLDING",
+  "statutory_threshold": 25.0,
+  "beneficial_owners": [
+    {
+      "node_id": "PER-UBO-ALICE",
+      "name": "Alice Vance",
+      "node_type": "NATURAL_PERSON",
+      "jurisdiction": "DE",
+      "direct_percentage": 15.0,
+      "indirect_percentage": 12.5,
+      "effective_percentage": 27.5,
+      "reaches_statutory_threshold": true,
+      "is_pep": false,
+      "is_sanctioned": false,
+      "shortest_hop_distance": 1,
+      "control_paths": [
+        ["PER-UBO-ALICE", "ORG-LUX-HOLDING"],
+        ["PER-UBO-ALICE", "ORG-NL-BV", "ORG-LUX-HOLDING"]
+      ]
+    }
+  ],
+  "total_beneficial_owners_identified": 1,
+  "depth_analyzed": 2,
+  "calculated_at": "2026-09-22T21:50:00Z"
+}
+```
+
+**2. Audit Entity for Structural Corporate Anomalies (`GET /api/v1/ubo/entities/{entity_id}/anomalies`):**
+*Response (HTTP 200 OK):*
+```json
+{
+  "target_entity_id": "ORG-SHELL-CYPRUS",
+  "anomalies_detected": [
+    {
+      "anomaly_type": "CIRCULAR_OWNERSHIP",
+      "severity": "CRITICAL",
+      "description": "Directed circular ownership loop detected across 3 entities.",
+      "involved_entities": ["ORG-SHELL-CYPRUS", "ORG-BVI-HOLDINGS", "ORG-MALTA-CORP"],
+      "confidence_score": 1.0,
+      "detected_at": "2026-09-22T21:50:05Z"
+    }
+  ],
+  "has_circular_ownership": true,
+  "has_nominee_directors": false,
+  "has_high_risk_offshore": true,
+  "has_pep_or_sanctions_exposure": false,
+  "composite_structural_risk_score": 85.0
+}
+```
+
+**3. Export Directed Ego-Subgraph for Interactive Visualizer (`GET /api/v1/ubo/entities/{entity_id}/subgraph?max_hops=3`):**
+*Response (HTTP 200 OK):*
+```json
+{
+  "root_id": "ORG-LUX-HOLDING",
+  "nodes": [
+    {"node_id": "ORG-LUX-HOLDING", "name": "Luxembourg Holdings S.A.", "node_type": "LEGAL_ENTITY", "jurisdiction": "LU"},
+    {"node_id": "PER-UBO-ALICE", "name": "Alice Vance", "node_type": "NATURAL_PERSON", "jurisdiction": "DE"}
+  ],
+  "edges": [
+    {"source_id": "PER-UBO-ALICE", "target_id": "ORG-LUX-HOLDING", "relation_type": "DIRECT_OWNERSHIP", "percentage": 15.0}
+  ],
+  "total_nodes": 2,
+  "total_edges": 1
 }
 ```
 

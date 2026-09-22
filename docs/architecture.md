@@ -62,6 +62,8 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 * [`services/payment_recall_service.py`](../backend/app/application/services/payment_recall_service.py): Real-Time SEPA Instant Payment Recall Engine handling EPC camt.056 recall requests, camt.029 resolutions, 10-day regulatory SLA tracking, automated account freeze triggers, and recovery ledgers.
 * [`services/screening_service.py`](../backend/app/application/services/screening_service.py): Real-Time Multi-List Sanctions & PEP Screening Engine matching against UN, EU CFSP, and OFAC SDN lists with Jaro-Winkler + Levenshtein fuzzy matching and secondary disambiguation.
 * [`services/fiu_regulatory_service.py`](../backend/app/application/services/fiu_regulatory_service.py): European FIU & UNODC goAML 4.0 XML and EU AMLA standardized regulatory reporting engine with HMAC-SHA256 encrypted envelopes and 4-Eyes dual supervisor sign-off.
+* [`services/open_aml_service.py`](../backend/app/application/services/open_aml_service.py): Drop-in European AML OpenAPI compatibility adapter and HMAC-SHA256 signed webhook gateway.
+* [`services/ubo_graph_service.py`](../backend/app/application/services/ubo_graph_service.py): Cross-Border Corporate UBO & Heterogeneous Graph Modeling service resolving multi-tier beneficial ownership, detecting circular ownership loops, nominee director syndicates, and offshore shell clusters.
 * [`services/model_registry.py`](../backend/app/application/services/model_registry.py): Manifest-backed model repository managing versioning, active symlinks, Canary Gates, and atomic disk writes (`tempfile.NamedTemporaryFile` + `os.replace`) to prevent partial read corruption.
 * [`services/connector_diagnostics_service.py`](../backend/app/application/services/connector_diagnostics_service.py): Enterprise connector health evaluation and active TCP/TLS handshake ping engine for Kafka, Vault, KMS, Splunk, Redis, PostgreSQL, and ISO 20022 parser.
 * [`services/design_partner_service.py`](../backend/app/application/services/design_partner_service.py): Design partner cohort tracking and early-access pilot metrics.
@@ -616,15 +618,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,273 Automated Pytest Suites)
+     └── 6. pytest-security-and-compliance-suites (2,289 Automated Pytest Suites)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,273 automated tests** across unit, integration, and property-based suites:
+The entire codebase is validated by **2,289 automated tests** across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,273 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,289 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -634,7 +636,8 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,273 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,289 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, and DR Failover |
+
 
 
 

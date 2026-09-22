@@ -68,6 +68,7 @@ from app.presentation.routers import (
     settlement,
     simulation,
     training,
+    ubo_graph,
     webhook_gateway,
 )
 from app.presentation.websockets import streaming_ws, training_ws
@@ -1072,6 +1073,8 @@ else:
     app.include_router(regulatory.api_router)
     app.include_router(open_aml_adapter.router)
     app.include_router(open_aml_adapter.api_router)
+    app.include_router(ubo_graph.router)
+    app.include_router(ubo_graph.api_router)
 
 
 @app.get("/", tags=["root"])
