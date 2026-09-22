@@ -226,13 +226,20 @@ CF-Intelligence/
 ├── SECURITY.md                                      # Enterprise vulnerability disclosure, PGP keys & security SLAs
 │
 ├── docker/                                          # Production Enterprise Container Manifests
+│   ├── README.md                                    # Container topology, multi-stage builds, reverse proxy & monitoring spec
 │   ├── Dockerfile.frontend                          # Multi-stage Node 20 builder & Alpine Nginx SPA container
 │   ├── Dockerfile.backend                           # Hardened Python 3.12 slim non-root API & ML container
 │   ├── nginx/
 │   │   ├── nginx.conf                               # Gateway reverse proxy, HTTP/2, TLS 1.3 & WebSocket upstream
 │   │   └── frontend-nginx.conf                      # Internal SPA routing fallback & caching configuration
-│   └── postgres/
-│       └── 01-init.sql                              # Cold-boot idempotent schema, tables & consortium seed script
+│   ├── postgres/
+│   │   └── 01-init.sql                              # Cold-boot idempotent schema, tables & consortium seed script
+│   ├── otel/
+│   │   └── otel-collector-config.yaml               # OpenTelemetry Collector OTLP pipeline & Prometheus exporter
+│   ├── prometheus/
+│   │   └── prometheus.yml                           # Prometheus scrape configs for API metrics & OTel bridge
+│   └── grafana/
+│       └── provisioning/                            # Auto-provisioned Prometheus datasource & platform dashboards
 │
 ├── backend/                                         # Clean Architecture Python 3.12 Backend
 │   ├── alembic.ini                                  # Alembic DB migration configuration
