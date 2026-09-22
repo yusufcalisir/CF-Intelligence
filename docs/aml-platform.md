@@ -329,4 +329,23 @@ All collaborative AML intelligence components are validated through targeted uni
 | [test_graph_embedding.py](../backend/tests/unit/test_graph_embedding.py) | `graph_embedding_service.py` | 12-dim node features, GraphSAGE forward pass, FedAvg GNN aggregation | 21 | ✅ 100% Pass |
 | [test_neo4j_graph.py](../backend/tests/unit/test_neo4j_graph.py) | `graph_engine.py` | Neo4j Bolt driver initialization, Cypher merges, Redis fallback | 8 | ✅ 100% Pass |
 | [test_regional_governance_ai_act.py](../backend/tests/unit/test_regional_governance_ai_act.py) | `regional_governance.py`, `ai_act_compliance.py` | Regional rings, cross-border DP filters, Articles 10–15 certificate | 4 | ✅ 100% Pass |
-| **Total Verified** | **11 Dedicated Suites** | **Collaborative AML Intelligence Platform** | **61 Tests** | **100% Pass** |
+| **Total Verified (Core AML Intelligence)** | **11 Dedicated Suites** | **Collaborative AML Intelligence Platform** | **61 Tests** | **100% Pass** |
+
+---
+
+## European FININT, SEPA Recalls & Extended RegTech Architecture
+
+The platform integrates dedicated European Anti-Money Laundering RegTech capabilities designed around EU AMLA, AMLD6, EPC SCT Inst, and UNODC goAML mandates. For complete mathematical formulations, sequence diagrams, and REST API contracts, consult the dedicated specification in [`docs/european_finint_and_regtech_spec.md`](european_finint_and_regtech_spec.md).
+
+### RegTech Subsystems Summary
+
+| Subsystem | Service Module | Primary Regulatory Driver | Verified Capabilities | Test Suite |
+| :--- | :--- | :--- | :--- | :--- |
+| **Inter-Bank Encrypted FININT Messaging** | [`bridge_case_service.py`](../backend/app/application/services/bridge_case_service.py) | EU AMLA Single Rulebook & AMLD6 | Curve25519 ECDH + AES-256-GCM envelope encryption, SHA-256 evidence integrity hashing, SLA countdown timers, and tamper-evident append-only hash chains. | `test_bridge_messaging.py` (53 Tests) |
+| **Real-Time SEPA Instant Payment Recall** | [`payment_recall_service.py`](../backend/app/application/services/payment_recall_service.py) | EPC SCT Inst Rulebook | Automated ISO 20022 `camt.056` recall processing (`FRAD`, `TECH`, `DUPL`), 10-day regulatory boundary enforcement, automated destination account freeze holds, and `camt.029` Four-Eyes fund recovery ledger. | `test_payment_recall.py` (89 Tests) |
+| **Multi-List Sanctions & PEP Screening** | [`screening_service.py`](../backend/app/application/services/screening_service.py) | UN / EU CFSP / OFAC SDN Lists | Real-time pre-transaction and batch fuzzy matching combining Jaro-Winkler ($p=0.10$) and Levenshtein distance ($S_{\mathrm{composite}} = 0.60 S_{\mathrm{jw}} + 0.40 S_{\mathrm{lev}}$), secondary demographic disambiguation, and audited whitelist bypass. | `test_screening_service.py` (88 Tests) |
+| **European FIU & UNODC goAML 4.0 Exporter** | [`fiu_regulatory_service.py`](../backend/app/application/services/fiu_regulatory_service.py) | UNODC goAML 4.0 XML & EU AMLA | Automated compilation of confirmed cases into standardized goAML 4.0 XML schemas and EU AMLA JSON dossiers wrapped in HMAC-SHA256 encrypted envelopes with Four-Eyes supervisor authorization. | `test_fiu_regulatory_service.py` (33 Tests) |
+| **Enterprise AML OpenAPI Drop-In Adapter** | [`open_aml_service.py`](../backend/app/application/services/open_aml_service.py) | Enterprise AML Integration | Drop-in `/api/v2/*` endpoints for corporate person ingestion, real-time transaction monitoring, ad-hoc watchlist searches, and HMAC-SHA256 signed webhook delivery (`X-CF-Signature`). | `test_open_aml_adapter.py` (24 Tests) |
+| **Corporate UBO & Graph Intelligence** | [`ubo_graph_service.py`](../backend/app/application/services/ubo_graph_service.py) | EU AMLD6 / 4AMLD 25% Threshold | Multi-tier beneficial ownership graph decomposition, compounded indirect shareholding calculation ($\sum \prod \text{share}$), Tarjan DFS circular ownership loop detection, and nominee shell clustering. | `test_ubo_graph_service.py` (16 Tests) |
+| **16 European AML Typology Scenarios** | [`european_scenario_library.py`](../backend/app/application/services/european_scenario_library.py) | EBA & FATF Standards | 16 pre-configured production typologies (sub-€10k structuring, rapid pass-through mules, round amount velocity, dormant awakening) synthesized dynamically with federated ML anomaly scores ($S_{\mathrm{hybrid}} = \alpha S_{\mathrm{rules}} + (1 - \alpha) S_{\mathrm{ml}}$). | `test_european_scenarios.py` (25 Tests) |
+| **Total European RegTech Suite** | **7 Dedicated Suites** | **Comprehensive European Compliance Verification** | **328 Tests** | **100% Pass** |
