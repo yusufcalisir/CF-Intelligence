@@ -101,7 +101,7 @@ Each claim is evaluated against theoretical distributed systems standards (FLP i
 #### Scientific Assessment: PARTIALLY SUPPORTED
 1. **Implementation Reality:** In `aggregate_and_deploy`, if a test override `mock_auc` is provided, quality gate logic evaluates correctly. However:
    - **Simulated Production AUC Decay:** In production mode without `mock_auc`, the AUC score is calculated using a hardcoded formula:
-     $$\text{auc\_score} = 0.88 - (0.01 \times \text{round\_id})$$
+     $$\mathrm{auc}_{\mathrm{score}} = 0.88 - (0.01 \times \mathrm{round}_{\mathrm{id}})$$
      It does not evaluate the aggregated model on an actual holdout dataset. Beyond round 18 ($0.88 - 0.18 = 0.70$), every subsequent valid model is artificially rejected (`AUC < 0.70`), blocking model promotion regardless of actual model accuracy.
 
 #### Recommended Wording

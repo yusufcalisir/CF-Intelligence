@@ -42,7 +42,7 @@ This document provides a formal security review evaluating 7 primary threat vect
 
 ### 2.6 Replay & Cross-Round Differencing Attacks
 * **Analysis:** Using static mask seeds across sequential training rounds allows an attacker to subtract consecutive masked updates to recover plaintext parameter deltas $\Delta w_i = w_i^{(t+1)} - w_i^{(t)}$.
-* **Limitation Classification:** **Fully Resolved.** `KMSService.derive_round_mask_seed` implements **HKDF-SHA256** per-round key derivation ($K_t = \text{HKDF}(\text{master\_seed}, t)$), ensuring round key independence.
+* **Limitation Classification:** **Fully Resolved.** `KMSService.derive_round_mask_seed` implements **HKDF-SHA256** per-round key derivation ($K_t = \text{HKDF}(\mathrm{master}_{\mathrm{seed}}, t)$), ensuring round key independence.
 
 ### 2.7 Parameter Information Leakage (Input vs. Output Privacy)
 * **Analysis:** SecAgg guarantees **input privacy** (individual updates $w_i$ are never revealed to server or peers). However, the global aggregate $\bar{w} = \frac{1}{n} \sum w_i$ is revealed in plaintext, which may leak training sample details if the model overfits.

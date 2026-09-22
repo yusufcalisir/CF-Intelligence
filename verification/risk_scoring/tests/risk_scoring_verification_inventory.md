@@ -67,7 +67,7 @@ This inventory documents every algorithm, mathematical operation, signal normali
 * **Purpose:** Blends specific merchant risk score $m_{\text{score}}$ with merchant Category Code (MCC) risk $c_{\text{risk}}$.
 * **Mathematical Formulation:**
   $$s_{\text{merch}} = \max\left(0.0, \min\left(1.0, 0.6 \cdot m_{\text{score}} + 0.4 \cdot c_{\text{risk}}\right)\right)$$
-  $$\text{where } c_{\text{risk}} = \text{MERCHANT\_RISK.get}(\text{category}, 0.10)$$
+  $$\text{where } c_{\text{risk}} = \mathrm{MERCHANT}_{\mathrm{RISK.get}}(\text{category}, 0.10)$$
 * **Risk Scoring Claim:** Blends merchant-level historical chargeback risk ($60\%$) with domain MCC risk ($40\%$).
 * **Expected Invariant:** $0.0 \le s_{\text{merch}} \le 1.0$; unrated merchants default to $0.10$ category risk.
 * **Possible Implementation Risks:** Missing merchant category defaulting to $0.0$ or un-clamped negative merchant risk scores.
@@ -81,7 +81,7 @@ This inventory documents every algorithm, mathematical operation, signal normali
 * **Component:** `RiskScoringEngine._eval_country_risk` & `COUNTRY_RISK`
 * **Purpose:** Maps ISO 3166-1 alpha-2 country codes to FATF-aligned AML jurisdictional risk scores $s_{\text{country}}$.
 * **Mathematical Formulation:**
-  $$s_{\text{country}} = \text{COUNTRY\_RISK.get}(\text{str}(\text{code}).\text{upper}(), 0.15)$$
+  $$s_{\text{country}} = \mathrm{COUNTRY}_{\mathrm{RISK.get}}(\text{str}(\text{code}).\text{upper}(), 0.15)$$
 * **Risk Scoring Claim:** FATF blacklisted jurisdictions (North Korea $1.00$, Iran $0.95$) and grey-listed jurisdictions (Nigeria $0.85$, Russia $0.80$) assign high sanctions risk.
 * **Expected Invariant:** Case-insensitive lookup; non-sanctioned unknown countries default to low-risk $0.15$.
 * **Possible Implementation Risks:** Case-sensitivity bug allowing lowercase `"kp"` to evade sanctions lookup and default to $0.15$.
@@ -95,8 +95,8 @@ This inventory documents every algorithm, mathematical operation, signal normali
 * **Component:** `RiskScoringEngine._eval_device_anomaly`
 * **Purpose:** Maps transaction channel/device type to static discrete risk scores $s_{\text{device}}$.
 * **Mathematical Formulation:**
-  $$s_{\text{device}} = \text{DEVICE\_SCORES.get}(\text{device}, 0.20)$$
-  $$\text{where } \text{DEVICE\_SCORES} = \{\text{pos}: 0.05, \text{mobile}: 0.10, \text{web}: 0.15, \text{atm}: 0.35, \text{phone}: 0.40\}$$
+  $$s_{\text{device}} = \mathrm{DEVICE}_{\mathrm{SCORES.get}}(\text{device}, 0.20)$$
+  $$\text{where } \mathrm{DEVICE}_{\mathrm{SCORES}} = \{\text{pos}: 0.05, \text{mobile}: 0.10, \text{web}: 0.15, \text{atm}: 0.35, \text{phone}: 0.40\}$$
 * **Risk Scoring Claim:** Unattended or phone-banking channels carry higher inherent fraud vulnerability than chip-and-pin POS terminals.
 * **Expected Invariant:** Fully deterministic discrete mapping; unknown devices default to $0.20$.
 * **Possible Implementation Risks:** Unhandled new device channels.
@@ -110,7 +110,7 @@ This inventory documents every algorithm, mathematical operation, signal normali
 * **Component:** `RiskScoringEngine._eval_customer_history`
 * **Purpose:** Evaluates customer historical trust score $h \in [0, 1]$ and applies a new account tenure penalty ($< 30$ days).
 * **Mathematical Formulation:**
-  $$s_{\text{hist}} = \min\left(1.0, \max\left(0.0, (1.0 - \min(1.0, h)) + \begin{cases} 0.30 & \text{if } \text{age\_days} < 30 \\ 0.0 & \text{otherwise} \end{cases}\right)\right)$$
+  $$s_{\text{hist}} = \min\left(1.0, \max\left(0.0, (1.0 - \min(1.0, h)) + \begin{cases} 0.30 & \text{if } \mathrm{age}_{\mathrm{days}} < 30 \\ 0.0 & \text{otherwise} \end{cases}\right)\right)$$
 * **Risk Scoring Claim:** Low trust score $h \to 0$ and account age $< 30$ days independently elevate risk.
 * **Expected Invariant:** Discontinuity cliff of $-0.30$ risk when account age transitions from Day 29 to Day 30; $s_{\text{hist}} \le 1.0$.
 * **Possible Implementation Risks:** Negative trust scores $h < 0$ driving un-clamped signal values $> 1.0$.

@@ -65,7 +65,7 @@ $$\text{Effective Batch Size} = B_{\text{negotiated}} \times A_{\text{negotiated
 ### 3.3 Round Lifecycle & Quorum Aggregation State Machine
 
 **Specification Rule:**
-$$\text{State}: \text{IDLE} \xrightarrow{\text{start\_round}} \text{COLLECTING\_GRADIENTS} \xrightarrow{|S| \ge k_{\text{min}}} \text{AGGREGATING} \xrightarrow{\text{deploy}} \text{COMPLETED}$$
+$$\text{State}: \text{IDLE} \xrightarrow{\mathrm{start}_{\mathrm{round}}} \mathrm{COLLECTING}_{\mathrm{GRADIENTS}} \xrightarrow{|S| \ge k_{\text{min}}} \text{AGGREGATING} \xrightarrow{\text{deploy}} \text{COMPLETED}$$
 
 **Verification Results:**
 - Round 1 initialization: Transits to `COLLECTING_GRADIENTS` ✅
@@ -77,7 +77,7 @@ $$\text{State}: \text{IDLE} \xrightarrow{\text{start\_round}} \text{COLLECTING\_
 ### 3.4 Quality Gate Model Promotion Branching
 
 **Specification Rule:**
-$$\text{ModelStatus} = \begin{cases} \text{CHAMPION} & \text{if } \text{AUC} \ge \tau_{\text{AUC}} (0.70) \\ \text{REJECTED\_LOW\_AUC} & \text{otherwise} \end{cases}$$
+$$\text{ModelStatus} = \begin{cases} \text{CHAMPION} & \text{if } \text{AUC} \ge \tau_{\text{AUC}} (0.70) \\ \mathrm{REJECTED}_{\mathrm{LOW},\,\mathrm{AUC}} & \text{otherwise} \end{cases}$$
 
 **Verification Results:**
 - Model with $\text{AUC} = 0.85$: Promoted to `CHAMPION` ✅

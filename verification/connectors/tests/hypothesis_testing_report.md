@@ -40,7 +40,7 @@ Invariant 6: Factory Production Policy Guard Enforcement                ✅ PASS
 | **P1** | Schema Validation Bounds | `NormalizedTransaction` | Valid inputs yield `amount > 0`; invalid `amount <= 0` raises exception | 100 | ✅ **PASS** |
 | **P2** | ISO 20022 & SWIFT Non-Crash | `ISO20022MessagingConnector` | Arbitrary string input either parses cleanly or raises `ValueError` cleanly | 100 | ✅ **PASS** |
 | **P3** | HMAC Signature Determinism | `RESTBankConnector` | $\text{Sign}(P) = \text{Sign}(P)$; payload/timestamp mutation alters signature | 100 | ✅ **PASS** |
-| **P4** | Jittered Backoff Boundedness | `ExponentialBackoffReconnector` | $d \in [0.5 \times C, 1.0 \times C]$ where $C = \text{min}(\text{max\_delay}, \text{initial} \cdot 2^{attempt})$ | 100 | ✅ **PASS** |
+| **P4** | Jittered Backoff Boundedness | `ExponentialBackoffReconnector` | $d \in [0.5 \times C, 1.0 \times C]$ where $C = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot 2^{attempt})$ | 100 | ✅ **PASS** |
 | **P5** | Open Banking PSD2 Parsing | `OpenBankingConnector` | PSD2 JSON arrays map to `NormalizedTransaction` objects without exception | 100 | ✅ **PASS** |
 | **P6** | Factory Production Guard | `BankConnectorFactory` | `APP_ENV=production` guard unconditionally raises `ValueError` on mock/unapproved types | 100 | ✅ **PASS** |
 
@@ -75,7 +75,7 @@ Invariant 6: Factory Production Policy Guard Enforcement                ✅ PASS
 
 ### Property 4: Full-Jitter Exponential Backoff Delay Boundedness
 - **Technical Statement:**
-  $$\forall a \in [0, 10], \quad d(a) \in [0.5 \times C(a), 1.0 \times C(a)], \quad C(a) = \text{min}(\text{max\_delay}, \text{initial} \cdot 2^a)$$
+  $$\forall a \in [0, 10], \quad d(a) \in [0.5 \times C(a), 1.0 \times C(a)], \quad C(a) = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot 2^a)$$
 - **Randomized Inputs:** Reconnection attempts $a \in [0, 10]$, initial delays $I \in [0.5, 5.0]\,\text{s}$, max delays $M \in [10.0, 120.0]\,\text{s}$.
 - **Hypothesis Result:** **PASS (100 trials)**. All computed delays fell strictly inside the theoretical $[0.5 \times C, 1.0 \times C]$ interval without underflow or overflow.
 
@@ -83,7 +83,7 @@ Invariant 6: Factory Production Policy Guard Enforcement                ✅ PASS
 
 ### Property 5: Open Banking PSD2 JSON Parsing Invariance
 - **Technical Statement:**
-  $$\forall \text{JSON}_{\text{PSD2}}, \quad |\text{parse\_psd2\_payload}(\text{JSON}_{\text{PSD2}})| = |\text{booked}| + |\text{pending}|$$
+  $$\forall \text{JSON}_{\text{PSD2}}, \quad |\mathrm{parse}_{\mathrm{psd2},\,\mathrm{payload}}(\text{JSON}_{\text{PSD2}})| = |\text{booked}| + |\text{pending}|$$
 - **Randomized Inputs:** Randomized transaction ID strings, positive amount strings (`"100.00"`, `"250.50"`, `"15.00"`), ISO currency codes.
 - **Hypothesis Result:** **PASS (100 trials)**. Nested PSD2 JSON dictionaries mapped cleanly to `NormalizedTransaction` objects, defaulting missing optional fields without exception.
 
@@ -91,7 +91,7 @@ Invariant 6: Factory Production Policy Guard Enforcement                ✅ PASS
 
 ### Property 6: Factory Production Policy Guard Invariant
 - **Technical Statement:**
-  $$\text{APP\_ENV} = \text{"production"} \land T \notin \text{APPROVED\_PRODUCTION\_CONNECTORS} \implies \text{get\_connector}(T) \uparrow \text{ValueError}$$
+  $$\mathrm{APP}_{\mathrm{ENV}} = \text{"production"} \land T \notin \mathrm{APPROVED}_{\mathrm{PRODUCTION},\,\mathrm{CONNECTORS}} \implies \mathrm{get}_{\mathrm{connector}}(T) \uparrow \text{ValueError}$$
 - **Randomized Inputs:** Unapproved connector strings (`"mock"`, `"mq_skeleton"`, `"invalid_custom_type"`, `"test_stub"`).
 - **Hypothesis Result:** **PASS (100 trials)**. The production policy guard in `BankConnectorFactory` unconditionally raised `ValueError` across 100% of trial iterations when `APP_ENV=production`.
 

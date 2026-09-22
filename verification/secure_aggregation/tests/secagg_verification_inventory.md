@@ -60,7 +60,7 @@ This document presents a complete scientific audit and verification inventory of
 ### Component 4: KMS HKDF-SHA256 Per-Round Key Derivation Function
 * **Purpose:** Derives unique round-specific mask keys $K_t$ from the tenant master seed using HKDF-SHA256 (RFC 5869), eliminating cross-round update differencing attacks.
 * **Mathematical Formulation:**
-  $$K_t = \text{HKDF-SHA256}(\text{master\_seed}, \text{info} = \text{"secagg\_round\_"} \parallel t, \text{length} = 32)$$
+  $$K_t = \text{HKDF-SHA256}(\mathrm{master}_{\mathrm{seed}}, \text{info} = \mathrm{secagg}_{\mathrm{round}} \parallel t, \text{length} = 32)$$
 * **Security Claim:** Cryptographically isolates round keys ($K_{t_1} \neq K_{t_2}$ for $t_1 \neq t_2$), ensuring static key storage in `keys.json` cannot be exploited to subtract masks across sequential training rounds.
 * **Expected Invariant:** $K_{t_1} \neq K_{t_2}$ for any $t_1 \neq t_2$; $K_t$ is deterministic for identical $(K_{\text{master}}, t)$.
 * **Possible Implementation Risks:** Hardcoded salt or info parameter truncation.

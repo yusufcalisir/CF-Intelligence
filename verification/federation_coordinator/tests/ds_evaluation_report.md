@@ -27,7 +27,7 @@ The evaluation confirms that the coordinator provides **high deterministic execu
 
 ### 2.2 Orchestration Logic & State Machine Determinism
 
-* **State Progression:** $\text{IDLE} \xrightarrow{\text{start\_round}} \text{COLLECTING\_GRADIENTS} \xrightarrow{k \ge k_{\text{min}}} \text{AGGREGATING} \xrightarrow{\text{Quality Gate}} \text{COMPLETED}$.
+* **State Progression:** $\text{IDLE} \xrightarrow{\mathrm{start}_{\mathrm{round}}} \mathrm{COLLECTING}_{\mathrm{GRADIENTS}} \xrightarrow{k \ge k_{\text{min}}} \text{AGGREGATING} \xrightarrow{\text{Quality Gate}} \text{COMPLETED}$.
 * **Determinism Assessment:** Empirically verified across 100 consecutive round state transitions (`federation_coordinator_ds_evaluation.py`). Under single-master execution, the state machine produces **100% deterministic round ID increments and status transitions**.
 
 ---
@@ -35,7 +35,7 @@ The evaluation confirms that the coordinator provides **high deterministic execu
 ### 2.3 Client Lifecycle & Liveness Management
 
 * **Handshake & Eviction:** Handshakes register bank profiles into `self.registry`. Heartbeats update `last_heartbeat = time.time()`.
-* **Eviction Semantics:** Passive liveness monitoring evicts nodes to `"OFFLINE"` when $t_{\text{now}} - t_{\text{last\_heartbeat}} > 15.0\,\text{s}$.
+* **Eviction Semantics:** Passive liveness monitoring evicts nodes to `"OFFLINE"` when $t_{\text{now}} - t_{\mathrm{last}_{\mathrm{heartbeat}}} > 15.0\,\text{s}$.
 * **Consistency:** Prevents dead or disconnected bank nodes from inflating quorum calculation or being assigned training tasks.
 
 ---

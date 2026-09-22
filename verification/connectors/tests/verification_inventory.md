@@ -275,7 +275,7 @@ A total of **20 distinct connector abstractions, transport protocol adapters, da
 - **Architectural Role:** Resiliency Pattern / Fault Handling Decorator.
 - **Interface Contract:**
   - `@retry_connector(max_attempts: int = 3, backoff_seconds: float = 2.0, exceptions: tuple = (ConnectionError, TimeoutError, OSError))`
-- **Expected Invariant:** Retries operation up to `max_attempts` times with exponential delay $t = \text{backoff\_seconds} \times 2^{(\text{attempt}-1)}$; re-raises last exception if all attempts fail.
+- **Expected Invariant:** Retries operation up to `max_attempts` times with exponential delay $t = \mathrm{backoff}_{\mathrm{seconds}} \times 2^{(\text{attempt}-1)}$; re-raises last exception if all attempts fail.
 - **Possible Implementation Risks:** Synchronous `time.sleep` inside async methods blocking the asyncio event loop thread.
 - **Edge Cases:** Non-transient exceptions (e.g. `ValueError`, `KeyError`) bypassing retry logic and raising immediately; `max_attempts = 1`.
 - **Engineering Claim Being Made:** Provides automatic fault recovery against transient network hiccups during protocol parsing and I/O.
@@ -310,7 +310,7 @@ A total of **20 distinct connector abstractions, transport protocol adapters, da
   - `compute_next_delay() -> float`
   - `reset() -> None`
   - `execute_with_retry(action: Callable, on_error_callback: Callable | None) -> T`
-- **Expected Invariant:** Delay MUST scale exponentially $d = \text{initial\_delay} \times \text{backoff\_factor}^{\text{attempt}}$, capped at `max_delay`, and randomized by full jitter multiplier in $[0.5, 1.0]$; successful execution MUST reset attempt counter to 0.
+- **Expected Invariant:** Delay MUST scale exponentially $d = \mathrm{initial}_{\mathrm{delay}} \times \mathrm{backoff}_{\mathrm{factor}}^{\text{attempt}}$, capped at `max_delay`, and randomized by full jitter multiplier in $[0.5, 1.0]$; successful execution MUST reset attempt counter to 0.
 - **Possible Implementation Risks:** Async `asyncio.sleep(delay)` during long outage causing daemon to stall if shutdown signal arrives while sleeping.
 - **Edge Cases:** `current_attempt` exceeding `max_retries` raising the underlying exception; zero initial delay.
 - **Engineering Claim Being Made:** Prevents thundering herd problems on coordinator reconnection via randomized full-jitter exponential backoff.

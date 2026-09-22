@@ -69,7 +69,7 @@ Evaluated feature weights $w_i \in [0.02, 0.20]$ and normalized feature values i
 ### 3.3 GNN Edge Contribution Normalization
 
 **Production Formula (`explainability_service.py` L600–L611):**
-$$\text{pct}_i = \text{round}\left( \frac{\text{contribution\_percentage}_i}{\sum_j \text{contribution\_percentage}_j} \times 100.0, 1 \right)$$
+$$\text{pct}_i = \text{round}\left( \frac{\mathrm{contribution}_{\mathrm{percentage}}_i}{\sum_j \mathrm{contribution}_{\mathrm{percentage}}_j} \times 100.0, 1 \right)$$
 
 **Independent Reference Implementation:**
 Summed normalized edge contribution percentages across 50 GNN graph attribution reports:

@@ -31,7 +31,7 @@ This document provides a formal cryptographic engineering evaluation of the **Se
 * **Vulnerability Identified:** Static mask seed persistence in `keys.json` without per-round diversification permits multi-round update differencing attacks:
   $$\tilde{w}_i^{(t+1)} - \tilde{w}_i^{(t)} = (w_i^{(t+1)} + m_i) - (w_i^{(t)} + m_i) = w_i^{(t+1)} - w_i^{(t)}$$
 * **Resolution Implemented:** `KMSService.derive_round_mask_seed` implements **HKDF-SHA256** (RFC 5869):
-  $$K_t = \text{HKDF-SHA256}(\text{master\_seed}, \text{info} = \text{"secagg\_round\_"} \parallel t, \text{length} = 32)$$
+  $$K_t = \text{HKDF-SHA256}(\mathrm{master}_{\mathrm{seed}}, \text{info} = \mathrm{secagg}_{\mathrm{round}} \parallel t, \text{length} = 32)$$
 * **Assessment:** Ensures $K_{t_1} \neq K_{t_2}$ for $t_1 \neq t_2$, eliminating cross-round mask cancellation.
 
 ### 2.3 Storage Data Sealing (TEE Subsystem)

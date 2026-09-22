@@ -34,8 +34,8 @@ The reference model evaluates 9 pure signal normalizations, weighted convex comb
 | `ml_prediction` | $\max(0.0, \min(1.0, p_{\text{ml}}))$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
 | `velocity_rules` | $\min(1.0, \max(0.0, (v - 2) / 8))$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
 | `merchant_reputation` | $\max(0.0, \min(1.0, 0.6 m + 0.4 c))$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
-| `country_risk` | $\text{COUNTRY\_RISK}[code.\text{upper}()]$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
-| `device_anomaly` | $\text{DEVICE\_SCORES}[device]$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
+| `country_risk` | $\mathrm{COUNTRY}_{\mathrm{RISK}}[code.\text{upper}()]$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
+| `device_anomaly` | $\mathrm{DEVICE}_{\mathrm{SCORES}}[device]$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
 | `customer_history` | $\max(0.0, 1 - \min(1.0, h)) + 0.30 \mathbb{I}(\text{age}<30)$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
 | `previous_alerts` | $\min(1.0, cnt / 5)$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |
 | `chargeback_history` | $\min(1.0, rate \cdot 10)$ | $0.00\text{e}+00$ | 🟢 **PASS** ✓ |

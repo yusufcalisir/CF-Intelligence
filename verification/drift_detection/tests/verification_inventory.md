@@ -252,7 +252,7 @@ This document provides an exhaustive, element-by-element scientific audit and ve
   \text{HEALTHY}, & \text{otherwise}
   \end{cases}$$
   
-  $$\text{auto\_retrain\_triggered} = (\text{Status} == \text{CRITICAL})$$
+  $$\mathrm{auto}_{\mathrm{retrain},\,\mathrm{triggered}} = (\text{Status} == \text{CRITICAL})$$
 
 - **Statistical Claim:**
   Provides a conservative, worst-case bound on system-wide model degradation by triggering critical alerts whenever *any single feature* or *concept prediction score* breaches the critical PSI threshold ($0.20$).
@@ -326,9 +326,9 @@ This document provides an exhaustive, element-by-element scientific audit and ve
 - **Mathematical Formulation:**
   Priority evaluation ladder:
   $$\text{Cause} = \begin{cases}
-  \text{PSI\_DRIFT\_EXCEEDED}, & \text{if } \text{PSI} \ge 0.20 \\
-  \text{CONCEPT\_DRIFT\_DETECTED}, & \text{else if } \text{ConceptScore} \ge 0.15 \\
-  \text{ACCURACY\_DEGRADATION}, & \text{else if } \text{AUC} < 0.70 \\
+  \mathrm{PSI}_{\mathrm{DRIFT},\,\mathrm{EXCEEDED}}, & \text{if } \text{PSI} \ge 0.20 \\
+  \mathrm{CONCEPT}_{\mathrm{DRIFT},\,\mathrm{DETECTED}}, & \text{else if } \text{ConceptScore} \ge 0.15 \\
+  \mathrm{ACCURACY}_{\mathrm{DEGRADATION}}, & \text{else if } \text{AUC} < 0.70 \\
   \text{None}, & \text{otherwise}
   \end{cases}$$
 
@@ -370,9 +370,9 @@ This document provides an exhaustive, element-by-element scientific audit and ve
   
   Priority Cause Determination:
   $$\text{Cause} = \begin{cases}
-  \text{AUC\_DROP\_CRITICAL}, & \text{if } C_{\text{AUC}} = 1 \\
-  \text{LATENCY\_SLA\_VIOLATION}, & \text{else if } C_{\text{latency}} = 1 \\
-  \text{FPR\_SPIKE}, & \text{else if } C_{\text{FPR}} = 1 \\
+  \mathrm{AUC}_{\mathrm{DROP},\,\mathrm{CRITICAL}}, & \text{if } C_{\text{AUC}} = 1 \\
+  \mathrm{LATENCY}_{\mathrm{SLA},\,\mathrm{VIOLATION}}, & \text{else if } C_{\text{latency}} = 1 \\
+  \mathrm{FPR}_{\mathrm{SPIKE}}, & \text{else if } C_{\text{FPR}} = 1 \\
   \text{None}, & \text{otherwise}
   \end{cases}$$
   

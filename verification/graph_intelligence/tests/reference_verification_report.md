@@ -19,7 +19,7 @@ Production PyTorch GraphSAGE forward passes and GNN parameter aggregations match
 
 ### 1. Single GraphSAGE Layer Numerical Precision (10 Synthetic Graphs)
 - **Methodology:** 10 synthetic graphs ($N = 30$ nodes each, 12 feature dimensions) were evaluated through both PyTorch `GraphSAGELayer` and pure NumPy reference formulation:
-  $$\mathbf{h}_v = \text{Normalize\_L2}\left( \text{ReLU}\left( \mathbf{W}_{\text{self}} \mathbf{x}_v + \mathbf{W}_{\text{neigh}} \text{AGG}(\mathcal{N}(v)) + \mathbf{b} \right) \right)$$
+  $$\mathbf{h}_v = \mathrm{Normalize}_{\mathrm{L2}}\left( \text{ReLU}\left( \mathbf{W}_{\text{self}} \mathbf{x}_v + \mathbf{W}_{\text{neigh}} \text{AGG}(\mathcal{N}(v)) + \mathbf{b} \right) \right)$$
 - **Observed Metrics:**
   - **Maximum Absolute Error:** **$8.94\text{e}-08$**
   - **Maximum Relative Error:** **$9.93\text{e}-04$**

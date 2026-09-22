@@ -63,7 +63,7 @@ All **twelve robustness tests passed with 100% success**, confirming graceful fa
 |------|----------|--------|-------------|
 | GCEX9 | Primary coordinator heartbeat timeout ($20\,\text{s} > 15\,\text{s}$) | **PASS** | Automatic failover triggered; standby promoted to `FAILOVER_PROMOTED`; audit event logged |
 | GCEX10 | Coordinator in-memory reset / restart | **PASS** | State resets cleanly; registry and round maps cleared |
-| GCEX11 | High round ID simulated AUC decay ($\text{round\_id}=25$) | **PASS** | AUC $0.63 < 0.70$ threshold; model correctly marked `REJECTED_LOW_AUC` |
+| GCEX11 | High round ID simulated AUC decay ($\mathrm{round}_{\mathrm{id}}=25$) | **PASS** | AUC $0.63 < 0.70$ threshold; model correctly marked `REJECTED_LOW_AUC` |
 | GCEX12 | Round startup with zero active clients | **PASS** | Round initializes with empty participating banks list without crashing |
 
 ---

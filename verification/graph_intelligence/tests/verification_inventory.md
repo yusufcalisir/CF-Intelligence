@@ -41,7 +41,7 @@
   $$\mathbf{Z}^{(k)} = \mathbf{H}^{(k-1)} \mathbf{W}_{\text{self}}^T + \mathbf{H}_{\text{neigh}} \mathbf{W}_{\text{neigh}}^T + \mathbf{b}$$
   $$\mathbf{H}^{(k)} = \text{ReLU}(\mathbf{Z}^{(k)})$$
   $$\hat{\mathbf{h}}_v^{(k)} = \frac{\mathbf{h}_v^{(k)}}{\max\left(\|\mathbf{h}_v^{(k)}\|_2, 10^{-12}\right)}$$
-* **Graph Learning Claim:** Message passing is permutation-invariant to neighbor ordering ($\text{AGG}(\pi(\mathcal{N}(v))) \equiv \text{AGG}(\mathcal{N}(v))$) and sub-linear in memory via uniform neighborhood sampling $|\mathcal{N}_{\text{sample}}(v)| \le \text{num\_sample}$.
+* **Graph Learning Claim:** Message passing is permutation-invariant to neighbor ordering ($\text{AGG}(\pi(\mathcal{N}(v))) \equiv \text{AGG}(\mathcal{N}(v))$) and sub-linear in memory via uniform neighborhood sampling $|\mathcal{N}_{\text{sample}}(v)| \le \mathrm{num}_{\mathrm{sample}}$.
 * **Expected Invariants:**
   1. L2 Unit Sphere Invariant: $\|\hat{\mathbf{h}}_v^{(k)}\|_2 = 1.000000$ for all active nodes.
   2. Permutation Invariance: Reordering indices in `adjacency_lists[v]` yields identical output tensor up to floating-point machine precision ($\epsilon_{\text{mach}} < 10^{-7}$).
@@ -69,7 +69,7 @@
 * **Expected Invariants:**
   1. Representation Output Shape: $(N, 64)$ for embeddings, $(N,)$ for predictions.
   2. Weight Separation Invariant: `num_params(include_classifier=False)` $<$ `num_params(include_classifier=True)`.
-  3. Serialization Bijection: $\text{load\_model\_weights}(\text{to\_model\_weights}(\mathbf{M})) \equiv \mathbf{M}$.
+  3. Serialization Bijection: $\mathrm{load}_{\mathrm{model},\,\mathrm{weights}}(\mathrm{to}_{\mathrm{model},\,\mathrm{weights}}(\mathbf{M})) \equiv \mathbf{M}$.
 * **Possible Implementation Risks:**
   - If `include_classifier=True` were accidentally passed during FL aggregation, local label distributions would leak via binary classifier gradients.
   - Dropout layer ($p=0.3$) in classifier head must be disabled during `model.eval()` for deterministic embedding extraction.
@@ -172,7 +172,7 @@
 * **Component:** `GraphSAGEModel.to_model_weights` / `load_model_weights` in `graph_embedding_model.py`
 * **Purpose:** Flattens GNN layer parameters into `ModelWeights(layer_shapes, flat_weights)` for FL serialization and reconstructs PyTorch tensors upon receiving global weights.
 * **Mathematical Formulation:**
-  $$\text{flat\_weights} = \text{Concat}\left( \text{vec}(\mathbf{W}_{\text{self}}^{(1)}), \text{vec}(\mathbf{W}_{\text{neigh}}^{(1)}), \mathbf{b}^{(1)}, \dots \right)$$
+  $$\mathrm{flat}_{\mathrm{weights}} = \text{Concat}\left( \text{vec}(\mathbf{W}_{\text{self}}^{(1)}), \text{vec}(\mathbf{W}_{\text{neigh}}^{(1)}), \mathbf{b}^{(1)}, \dots \right)$$
 * **Graph Learning Claim:** Provides a bijective, lossless parameter transformation format compatible with generic FedAvg and Byzantine-robust FL aggregators (Krum, Bulyan, Median).
 * **Expected Invariants:**
   1. Lossless Round-Trip: $\text{load}(\text{to}(\mathbf{M})) \equiv \mathbf{M}$ with zero maximum absolute parameter error ($E_{\text{max}} = 0.00e+00$).

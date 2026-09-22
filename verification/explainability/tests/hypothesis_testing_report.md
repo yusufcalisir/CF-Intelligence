@@ -59,21 +59,21 @@ Invariant 6: Decision Replay Evaluates 9 Policy Rules            ✅ PASSED (100
 ---
 
 ### Invariant 4: GNN Edge Contribution Percentage Sum
-* **Mathematical Statement:** $\sum_{i=1}^{|E|} \text{contribution\_percentage}_i = 100.0\% \pm 0.5\%$.
+* **Mathematical Statement:** $\sum_{i=1}^{|E|} \mathrm{contribution}_{\mathrm{percentage}}_i = 100.0\% \pm 0.5\%$.
 * **Randomized Scenarios:** Random entity node IDs (`entity_node_1` to `entity_node_10000`), active graph and synthetic fallback paths.
 * **Hypothesis Result:** **PASS (50 trials)**. Subgraph edge contribution percentages sum to $100.0\%$ on all iterations.
 
 ---
 
 ### Invariant 5: Real-Time Feature Attribution Bounds & Valid Directions
-* **Mathematical Statement:** Attribution directions $\in \{\text{"INCREASES\_RISK"}, \text{"DECREASES\_RISK"}\}$ and contribution scores $\in [0.0, 1.0]$.
+* **Mathematical Statement:** Attribution directions $\in \{\mathrm{INCREASES}_{\mathrm{RISK}}, \mathrm{DECREASES}_{\mathrm{RISK}}\}$ and contribution scores $\in [0.0, 1.0]$.
 * **Randomized Scenarios:** Amounts $[0, 10^6]$, velocities $[0, 100]$, randomized merchant category strings (`crypto_exchange`, `retail`, `p2p_cash`, empty string, arbitrary text).
 * **Hypothesis Result:** **PASS (100 trials)**. Real-time attribution engine handles arbitrary text strings and extreme amounts without invalid directions or out-of-bounds scores.
 
 ---
 
 ### Invariant 6: Decision Replay Policy Rule Integrity
-* **Mathematical Statement:** Exactly 9 policy rules evaluated; each rule contribution $c_i = w_i \times \text{norm\_val}_i$.
+* **Mathematical Statement:** Exactly 9 policy rules evaluated; each rule contribution $c_i = w_i \times \mathrm{norm}_{\mathrm{val}}_i$.
 * **Randomized Scenarios:** Risk scores $[50, 950]$, randomized reason code combinations.
 * **Hypothesis Result:** **PASS (100 trials)**. Policy rule evaluation list length is invariant at 9 items, and rule contributions match weight multiplication.
 

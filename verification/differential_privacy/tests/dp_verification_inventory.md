@@ -248,7 +248,7 @@ This document presents a complete scientific audit and verification inventory of
 ### Component 18: DP Simulation Configuration Dataclass Container
 * **Purpose:** Encapsulates and validates all Differential Privacy simulation parameters.
 * **Mathematical Formulation:**
-  $$\mathcal{C}_{\text{DP}} = \{ \epsilon \in (0, \infty), \, \delta \in (0, 1), \, C \in (0, \infty), \, \text{noise\_type} \in \{\text{Gaussian}, \text{Laplace}\} \}$$
+  $$\mathcal{C}_{\text{DP}} = \{ \epsilon \in (0, \infty), \, \delta \in (0, 1), \, C \in (0, \infty), \, \mathrm{noise}_{\mathrm{type}} \in \{\text{Gaussian}, \text{Laplace}\} \}$$
 * **Privacy Claim:** Structurally validated parameter container for DP execution.
 * **Expected Invariant:** Range bounds $\epsilon > 0$, $0 < \delta < 1$, $C > 0$ strictly enforced.
 * **Possible Implementation Risks:** Mutable default arguments in dataclass fields.

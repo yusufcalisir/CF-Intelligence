@@ -31,7 +31,7 @@ Rather than verifying fixed hand-coded examples, Hypothesis generated randomized
 ## 3. Invariant Property Descriptions & Formulations
 
 ### P1: Score Boundedness Invariant
-$$\forall \text{payloads}, \quad 0.0 \le \text{RiskScoringEngine.score\_transaction}(\text{payload}) \le 1000.0$$
+$$\forall \text{payloads}, \quad 0.0 \le \mathrm{RiskScoringEngine.score}_{\mathrm{transaction}}(\text{payload}) \le 1000.0$$
 *Verified:* 100 randomized transaction runs generated scores bounded strictly within $[0.0, 1000.0]$.
 
 ### P2: Weight Uniform Scale Invariance
@@ -47,7 +47,7 @@ $$\bigcup_{i \in \{\text{minimal, low, medium, high, critical}\}} \text{Tier}_i 
 *Verified:* Disjoint partitioning across all 100 generated score values.
 
 ### P5: Top Signals Explainability Ranking
-$$\text{top\_signals}[i].\text{weighted\_score} \ge \text{top\_signals}[i+1].\text{weighted\_score} - 10^{-12}$$
+$$\mathrm{top}_{\mathrm{signals}}[i].\mathrm{weighted}_{\mathrm{score}} \ge \mathrm{top}_{\mathrm{signals}}[i+1].\mathrm{weighted}_{\mathrm{score}} - 10^{-12}$$
 *Verified:* Explainability attributions maintain strict descending order.
 
 ### P6: Missing Field Payload Robustness

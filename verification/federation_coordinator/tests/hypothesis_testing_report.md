@@ -52,7 +52,7 @@ Invariant 6: Quality Gate Model Status Promotion Branching       ✅ PASSED (100
 ---
 
 ### Invariant 3: Liveness Eviction Threshold Invariant
-* **Mathematical Statement:** No client with heartbeat age $t_{\text{now}} - t_{\text{last\_heartbeat}} > 15.0\,\text{s}$ is included in `get_active_clients()`.
+* **Mathematical Statement:** No client with heartbeat age $t_{\text{now}} - t_{\mathrm{last}_{\mathrm{heartbeat}}} > 15.0\,\text{s}$ is included in `get_active_clients()`.
 * **Randomized Scenarios:** Time deltas $[0.0, 60.0]\,\text{s}$, client counts $[1, 20]$, random simulated heartbeat delays.
 * **Hypothesis Result:** **PASS (100 trials)**. All nodes with heartbeat age $> 15.0\,\text{s}$ are correctly marked `"OFFLINE"` and excluded from active member lists.
 
@@ -73,7 +73,7 @@ Invariant 6: Quality Gate Model Status Promotion Branching       ✅ PASSED (100
 ---
 
 ### Invariant 6: Quality Gate Model Status Promotion Branching
-* **Mathematical Statement:** `is_champion == True` and `model_status == "CHAMPION"` if and only if $\text{auc\_score} \ge \text{threshold}$.
+* **Mathematical Statement:** `is_champion == True` and `model_status == "CHAMPION"` if and only if $\mathrm{auc}_{\mathrm{score}} \ge \text{threshold}$.
 * **Randomized Scenarios:** Quality gate thresholds $[0.50, 0.95]$, AUC scores $[0.00, 1.00]$.
 * **Hypothesis Result:** **PASS (100 trials)**. Quality gate decision branching strictly obeys threshold logic.
 

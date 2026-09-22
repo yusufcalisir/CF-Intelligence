@@ -45,7 +45,7 @@ The Explainability module provides multi-layered explanations for fraud alerts, 
 * **Purpose:** Generates a comprehensive explainability report for a fraud alert combining feature importance, 9 business rule risk signals, historical evidence, confidence, and natural language text.
 * **Mathematical Formulation:**
   - Risk Signal Map ($M$): 9 signals ($s_1, \dots, s_9$) with fixed weights $w_i \in [0.07, 0.25]$, $\sum_{i=1}^9 w_i = 1.0$.
-  - Normalized Base Score: $B = \text{alert.risk\_score} / 1000.0$.
+  - Normalized Base Score: $B = \mathrm{alert.risk}_{\mathrm{score}} / 1000.0$.
   - Raw Signal Score: $v_i = B \cdot c_i$, where $c_i = 1.0$ if reason code triggered, else $c_i \in [0.10, 0.40]$.
   - Scale Factor: $\gamma = \frac{B}{\sum_{i=1}^9 w_i v_i}$ (if $\sum w_i v_i > 0$, else $1.0$).
   - Normalized Score: $\tilde{v}_i = \min(1.0, v_i \cdot \gamma)$.
@@ -116,7 +116,7 @@ The Explainability module provides multi-layered explanations for fraud alerts, 
 * **Purpose:** Executes deterministic decision replay for regulatory inference audits by evaluating 9 policy rules and reconstructing risk scores.
 * **Mathematical Formulation:**
   - Rule evaluation snapshot: 9 rules ($R_1, \dots, R_9$) with weights $w_i$.
-  - Rule contribution: $c_i = w_i \times \text{norm\_val}_i$.
+  - Rule contribution: $c_i = w_i \times \mathrm{norm}_{\mathrm{val}}_i$.
   - Reconstructed score: Set equal to `alert.risk_score`.
   - Audit Match Criterion: `abs(reconstructed_score - alert.risk_score) < 1.0`.
 * **Explainability Claim:** Deterministic, reproducible decision replay audit trail for regulatory compliance.
@@ -136,12 +136,12 @@ The Explainability module provides multi-layered explanations for fraud alerts, 
 * **Mathematical Formulation:**
   - Queries `GraphEngine` for 2-hop neighborhood.
   - Edge Weight Assignment:
-    $$w_i = \begin{cases} 0.85 - 0.08i & \text{if } \text{rel} \in \{\text{shares\_device}, \text{linked\_alert}\} \\ 0.45 - 0.05i & \text{otherwise} \end{cases}$$
+    $$w_i = \begin{cases} 0.85 - 0.08i & \text{if } \text{rel} \in \{\mathrm{shares}_{\mathrm{device}}, \mathrm{linked}_{\mathrm{alert}}\} \\ 0.45 - 0.05i & \text{otherwise} \end{cases}$$
   - Normalized Contribution Percentage:
     $$\text{pct}_i = \frac{w_i}{\sum_j w_j} \times 100\%$$
 * **Explainability Claim:** GNNExplainer graph attribution identifying top edge drivers of GNN risk embeddings.
 * **Expected Invariant:**
-  1. $\sum_{i} \text{contribution\_percentage}_i = 100.0\%$.
+  1. $\sum_{i} \mathrm{contribution}_{\mathrm{percentage}}_i = 100.0\%$.
   2. Edge contributions ordered by weight descending.
 * **Possible Implementation Risks:**
   - **Heuristic Ranking vs True GNNExplainer:** Uses linear positional edge weighting ($0.85 - 0.08i$), NOT PyTorch Geometric's `GNNExplainer` mutual information optimization:
@@ -164,7 +164,7 @@ The Explainability module provides multi-layered explanations for fraud alerts, 
     - Amount $\ge 20000 \implies +0.40$ `INCREASES_RISK`; $< 500 \implies +0.15$ `DECREASES_RISK`.
 * **Explainability Claim:** Fast, sub-millisecond online attribution vectors indicating contribution score and directional impact.
 * **Expected Invariant:**
-  1. Direction $\in \{\text{"INCREASES\_RISK"}, \text{"DECREASES\_RISK"}\}$.
+  1. Direction $\in \{\mathrm{INCREASES}_{\mathrm{RISK}}, \mathrm{DECREASES}_{\mathrm{RISK}}\}$.
   2. Contribution scores $\in [0.0, 1.0]$.
 * **Possible Implementation Risks:**
   - **Incomplete Feature Coverage:** Evaluates only 3 hardcoded features (`merchant_category`, `velocity_1h`, `amount`). Ignores all other model input features.

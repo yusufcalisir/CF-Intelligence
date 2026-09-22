@@ -113,7 +113,7 @@ This document establishes a rigorous scientific verification roadmap for the **E
 
 3. **Property-Based Invariant Testing:**
    - **Method:** Verify edge percentage sum invariant across 500 graph neighborhoods:
-     $$\sum_{i=1}^{|E_{\text{top}}|} \text{contribution\_percentage}_i = 100.0\%$$
+     $$\sum_{i=1}^{|E_{\text{top}}|} \mathrm{contribution}_{\mathrm{percentage}}_i = 100.0\%$$
    - **Rationale:** Guarantees proper normalization of subgraph edge driver reports.
 
 ---

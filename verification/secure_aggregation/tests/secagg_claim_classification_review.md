@@ -12,7 +12,7 @@ This document presents a rigorous scientific review of all cryptographic, mathem
 | **C2** | Weighted Zero-Sum Mask Cancellation | 🟢 **SUPPORTED** | $\sum_{i=1}^n p_i m_i = \mathbf{0}$ holds to double-precision floating-point machine precision ($MAE \le 10^{-15}$). |
 | **C3** | Single-Round Parameter Obscuration | 🟢 **SUPPORTED** | Individual client parameters $w_i$ are obscured by zero-mean Gaussian noise vectors $\|m_i\|_2 > 0$ in single-round transmissions. |
 | **C4** | KMS 256-Bit Master Seed CSPRNG | 🟢 **SUPPORTED** | Master mask seeds are generated via 256-bit OS entropy pools (`secrets.token_hex(32)`). |
-| **C5** | KMS HKDF-SHA256 Key Derivation | 🟢 **SUPPORTED** | Round keys $K_t = \text{HKDF-SHA256}(\text{master\_seed}, t)$ eliminate cross-round update differencing vulnerabilities. |
+| **C5** | KMS HKDF-SHA256 Key Derivation | 🟢 **SUPPORTED** | Round keys $K_t = \text{HKDF-SHA256}(\mathrm{master}_{\mathrm{seed}}, t)$ eliminate cross-round update differencing vulnerabilities. |
 | **C6** | KMS Tenant Master Seed Rotation | 🟢 **SUPPORTED** | Key vault rotation generates distinct replacement seeds ($k_{\text{new}} \neq k_{\text{old}}$) supporting key lifecycle management. |
 | **C7** | TEE Hardware Enclave Measurement | 🔴 **UNSUPPORTED** | **Claim too strong.** `TEEDriver` is a simulation mock relying on Python `time.sleep()` without hardware Intel SGX / AWS Nitro SDK bindings. |
 | **C8** | TEE Remote Attestation Report Generator | 🔴 **UNSUPPORTED** | **Claim too strong.** Attestation signatures use local SHA-256 string hashing rather than hardware enclave ECDSA attestation keys. |

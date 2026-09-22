@@ -152,7 +152,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
   - W3C Format: `00-{trace_id}-{span_id}-01` (Version 00, Sampled flag `01`).
 - **Monitoring Claim:** Complies with W3C Trace Context specification for end-to-end distributed transaction tracing.
 - **Expected Invariant:**
-  - $\text{len}(\text{trace\_id}) = 32$ and $\text{len}(\text{span\_id}) = 16$.
+  - $\text{len}(\mathrm{trace}_{\mathrm{id}}) = 32$ and $\text{len}(\mathrm{span}_{\mathrm{id}}) = 16$.
   - Extracted trace ID matches injected trace ID across network boundaries: $T_{\text{extracted}} = T_{\text{injected}}$.
 - **Possible Implementation Risks:**
   - Generates random IDs using `random.getrandbits()` instead of cryptographically secure `secrets` or standard OTel ID generators, creating a potential trace ID collision risk at high volume.
@@ -169,7 +169,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 - **Mathematical / Statistical Formulation:**
   - Span Duration: $D = (t_{\text{exit}} - t_{\text{entry}}) \times 1000.0\,\text{ms}$
 - **Monitoring Claim:** Captures granular stage-by-stage latency breakdowns across the entire federated learning execution lifecycle.
-- **Expected Invariant:** Total trace duration satisfies $D_{\text{total}} \ge \sum D_{\text{sequential\_stages}}$.
+- **Expected Invariant:** Total trace duration satisfies $D_{\text{total}} \ge \sum D_{\mathrm{sequential}_{\mathrm{stages}}}$.
 - **Possible Implementation Risks:**
   - `ingest_transaction_span` and helper methods immediately yield the result of a context manager block rather than returning an active context manager to be used via `with` statement by callers, causing spans to close prematurely.
 - **Edge Cases:** Exception raised within nested span; multi-threaded stage execution.
@@ -184,7 +184,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 - **Mathematical / Statistical Formulation:**
   - Timestamp formatting: ISO 8601 UTC string `YYYY-MM-DD HH:MM:SSZ`.
 - **Monitoring Claim:** Standardizes system resource utilization and training progress metrics for observability backends.
-- **Expected Invariant:** $0.0 \le \text{cpu\_percent} \le 100.0$, $\text{ram\_mb} \ge 0.0$, $\text{dp\_epsilon} \ge 0.0$.
+- **Expected Invariant:** $0.0 \le \mathrm{cpu}_{\mathrm{percent}} \le 100.0$, $\mathrm{ram}_{\mathrm{mb}} \ge 0.0$, $\mathrm{dp}_{\mathrm{epsilon}} \ge 0.0$.
 - **Possible Implementation Risks:**
   - Does not directly query OS kernel APIs (`psutil` or `pynvml`); relies on caller passing accurate float values.
 - **Edge Cases:** Systems without GPU (returns default `0.0` GPU memory); negative loss values.
@@ -258,12 +258,12 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 - **Purpose:** Tracks real-time tenant resource consumption (daily inferences, monthly FL rounds, storage MB), resets daily metrics at UTC midnight, and enforces resource quota bounds.
 - **Mathematical / Statistical Formulation:**
   - Daily Usage Reset Predicate:
-    $$\text{Reset}(t) = \mathbb{I}\left(\text{date}_{\text{UTC}}(t) \neq \text{last\_reset\_date}\right)$$
+    $$\text{Reset}(t) = \mathbb{I}\left(\text{date}_{\text{UTC}}(t) \neq \mathrm{last}_{\mathrm{reset},\,\mathrm{date}}\right)$$
   - Quota Violation Condition:
     $$\text{Violation}(u, L) = (u_{\text{inf}} \ge L_{\text{inf}}) \lor (u_{\text{fl}} \ge L_{\text{fl}}) \lor (u_{\text{store}} \ge L_{\text{store}})$$
 - **Monitoring Claim:** Accurately enforces multi-tenant resource boundary isolation and daily usage resets.
 - **Expected Invariant:**
-  - Usage metrics reset to 0 at UTC midnight: $\text{daily\_inferences} = 0$ when date rolls over.
+  - Usage metrics reset to 0 at UTC midnight: $\mathrm{daily}_{\mathrm{inferences}} = 0$ when date rolls over.
   - Quota checks return `False` if usage $\ge$ configured limit.
 - **Possible Implementation Risks:**
   - In-memory usage storage (`self._usage`) is not persisted to PostgreSQL or Redis. Restarting the backend process resets all daily tenant usage counters to zero, allowing tenants to bypass daily quotas.
@@ -309,7 +309,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 - **Module:** `app/application/services/alert_service.py`
 - **Purpose:** Converts internal fraud alerts into anonymized shared intelligence items using privacy-preserving hashes (HMAC-SHA256) for cross-bank correlation without PII leakage.
 - **Mathematical / Statistical Formulation:**
-  - Privacy Hash: $H = \text{HMAC-SHA256}(K, \text{tx\_id} \mathbin{\Vert} \text{"transaction"})$
+  - Privacy Hash: $H = \text{HMAC-SHA256}(K, \mathrm{tx}_{\mathrm{id}} \mathbin{\Vert} \text{"transaction"})$
   - Risk Indicator: $I = \frac{R}{1000} \in [0.0, 1.0]$
 - **Monitoring Claim:** Publishes cross-institutional risk signals while mathematically guaranteeing zero PII exposure.
 - **Expected Invariant:**
@@ -473,7 +473,7 @@ Across all audited modules, **24 distinct telemetry mechanisms** were identified
 - **Mathematical / Statistical Formulation:**
   - Total Alerts: $N_{\text{alerts}} = |\text{AlertStore}|$
   - Critical Alerts: $N_{\text{crit}} = \sum_{a \in \text{Alerts}} \mathbb{I}(a.\text{severity} = \text{CRITICAL})$
-  - Open Cases: $N_{\text{cases}} = \sum_{c \in \text{Cases}} \mathbb{I}(c.\text{is\_open} = \text{True})$
+  - Open Cases: $N_{\text{cases}} = \sum_{c \in \text{Cases}} \mathbb{I}(c.\mathrm{is}_{\mathrm{open}} = \text{True})$
 - **Monitoring Claim:** Provides unified single-pane-of-glass operational metric aggregation across all subsystem data stores.
 - **Expected Invariant:** $N_{\text{crit}} \le N_{\text{alerts}}$ and sum of alerts by severity equals total alerts: $\sum_{s} N_{\text{severity}(s)} = N_{\text{alerts}}$.
 - **Possible Implementation Risks:**

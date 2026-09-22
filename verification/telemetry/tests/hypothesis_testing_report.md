@@ -77,7 +77,7 @@ Invariant 6: Diagnostic Bundle SHA-256 Checksum Integrity              ✅ PASSE
 
 ### Property 4: Tenant Quota Boundary & Daily Reset Invariant
 - **Mathematical Statement:**
-  $$\text{check\_quota}(U, L) = \begin{cases} (\text{False}, \text{"quota exceeded..."}) & U \ge L \\ (\text{True}, \text{"OK"}) & U < L \end{cases}$$
+  $$\mathrm{check}_{\mathrm{quota}}(U, L) = \begin{cases} (\text{False}, \text{"quota exceeded..."}) & U \ge L \\ (\text{True}, \text{"OK"}) & U < L \end{cases}$$
 - **Randomized Inputs:** Inferences $U \in [0, 15000]$, quota limits $L \in [100, 10000]$, randomized tenant ID strings.
 - **Hypothesis Result:** **PASS (100 trials)**. Quota boundary evaluation strictly obeyed step-function threshold logic without off-by-one errors.
 
@@ -85,7 +85,7 @@ Invariant 6: Diagnostic Bundle SHA-256 Checksum Integrity              ✅ PASSE
 
 ### Property 5: PII Redaction Completeness Invariant
 - **Mathematical Statement:**
-  $$\forall S_{\text{raw}}, \quad \text{MatchCount}\left(\text{redact\_pii}(S_{\text{raw}}), \text{Pattern}_{\text{IBAN}}\right) = 0$$
+  $$\forall S_{\text{raw}}, \quad \text{MatchCount}\left(\mathrm{redact}_{\mathrm{pii}}(S_{\text{raw}}), \text{Pattern}_{\text{IBAN}}\right) = 0$$
 - **Randomized Inputs:** Generated text noise containing embedded Turkish IBANs (`TR\d{24}`), emails, and arbitrary string bytes.
 - **Hypothesis Result:** **PASS (100 trials)**. All instances of IBANs and email patterns were replaced with `[REDACTED]`, leaving 0 unmasked PII elements in sanitized outputs.
 

@@ -59,7 +59,7 @@ A total of **350 randomized scenarios** were evaluated across 6 distinct propert
 
 ### Property 4: Model Weight Serialization Round-Trip Bijection
 - **Mathematical Formulation:**
-  $$\forall \mathbf{M} \in \text{GraphSAGEModel}, \quad \text{load\_model\_weights}(\text{to\_model\_weights}(\mathbf{M})) \equiv \mathbf{M}$$
+  $$\forall \mathbf{M} \in \text{GraphSAGEModel}, \quad \mathrm{load}_{\mathrm{model},\,\mathrm{weights}}(\mathrm{to}_{\mathrm{model},\,\mathrm{weights}}(\mathbf{M})) \equiv \mathbf{M}$$
 - **Hypothesis Configuration:**
   - GNN architectures generated with varying input dims $[4, 32]$, hidden dims $\{16, 32, 64\}$, embedding dims $\{8, 16, 32\}$, and layer depth $[1, 3]$
   - 50 randomized test cases

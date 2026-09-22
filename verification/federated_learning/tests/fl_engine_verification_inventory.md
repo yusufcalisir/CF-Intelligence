@@ -119,7 +119,7 @@ This document provides a comprehensive scientific audit and verification invento
 * **Purpose:** Combines Krum selection with Trimmed Mean to defeat colluding Byzantine attackers (El Mhamdi et al., 2018).
 * **Mathematical Definition:**
   Step 1: Select $\theta = N - 2f$ clients with lowest Krum scores.
-  Step 2: Apply Trimmed Mean with $\text{trim\_f} = \max(0, (\theta - 1) // 4)$ on selected subset.
+  Step 2: Apply Trimmed Mean with $\mathrm{trim}_{\mathrm{f}} = \max(0, (\theta - 1) // 4)$ on selected subset.
 * **Expected Invariant:** Colluding attackers crafting close updates cannot bias the output vector.
 * **Implementation Risks:** High execution time for $N \ge 100$.
 * **Edge Cases:** $N < 7$ falling back to Krum subset selection.
@@ -274,7 +274,7 @@ This document provides a comprehensive scientific audit and verification invento
 ### Component 22: ModelWeights Immutable Value Object
 * **Purpose:** Immutable container encapsulating parameter layer shapes and flattened weight arrays.
 * **Mathematical Definition:**
-  $$\text{flat\_weights} \in \mathbb{R}^d \quad \text{where } d = \prod_{l} \text{shape}(l)$$
+  $$\mathrm{flat}_{\mathrm{weights}} \in \mathbb{R}^d \quad \text{where } d = \prod_{l} \text{shape}(l)$$
 * **Expected Invariant:** Product of layer dimensions equals total flat weight length $d$. Immutable upon initialization.
 * **Implementation Risks:** Mismatch between `layer_shapes` product and `flat_weights` length.
 * **Edge Cases:** 1D vectors, zero-dimensional scalar parameters.

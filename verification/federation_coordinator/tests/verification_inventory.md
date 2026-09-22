@@ -110,12 +110,12 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
 * **Purpose:** Monitors node heartbeats and evicts unresponsive nodes (`status = "OFFLINE"`) after a configurable timeout threshold (default 15.0 seconds).
 * **System Behavior:**
   - `record_heartbeat`: Updates `last_heartbeat = time.time()` and sets `status = "ONLINE"`. Returns `False` if node is unregistered.
-  - `get_active_clients`: Iterates registered clients. If $t_{\text{now}} - t_{\text{last\_heartbeat}} > \Delta t_{\text{timeout}}$ and `status == "ONLINE"`, transitions status to `"OFFLINE"`. Returns list of active online nodes.
+  - `get_active_clients`: Iterates registered clients. If $t_{\text{now}} - t_{\mathrm{last}_{\mathrm{heartbeat}}} > \Delta t_{\text{timeout}}$ and `status == "ONLINE"`, transitions status to `"OFFLINE"`. Returns list of active online nodes.
 * **Mathematical Formulation:**
   $$\text{NodeStatus}(i, t) = \begin{cases} \text{"ONLINE"} & \text{if } t - t_{\text{heartbeat}}(i) \le \Delta t_{\text{timeout}} \\ \text{"OFFLINE"} & \text{otherwise} \end{cases}$$
 * **Coordination Claim:** Prevents stragglers and offline nodes from blocking round progression or participating in aggregation.
 * **Expected Invariant:**
-  1. No client with $t_{\text{now}} - t_{\text{last\_heartbeat}} > 15.0\,\text{s}$ is returned in `get_active_clients()`.
+  1. No client with $t_{\text{now}} - t_{\mathrm{last}_{\mathrm{heartbeat}}} > 15.0\,\text{s}$ is returned in `get_active_clients()`.
   2. Transition from `"ONLINE"` to `"OFFLINE"` is monotonic unless a new heartbeat is received.
 * **Possible Implementation Risks:**
   - **Clock Skew Sensitivity:** Relies on local server time `time.time()`. If coordinator system clock fluctuates or adjusts backwards, active clients may be prematurely evicted or dead nodes retained.
@@ -136,7 +136,7 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
   - Clears gradient submission buffer `self.gradient_submissions[round_id] = {}`.
   - Appends `StartRoundRequest` notification dicts to `self.grpc_notifications` for each active bank.
 * **State Transition:**
-  $$\text{RoundState}: \text{IDLE} \xrightarrow{\text{start\_round}} \text{COLLECTING\_GRADIENTS}$$
+  $$\text{RoundState}: \text{IDLE} \xrightarrow{\mathrm{start}_{\mathrm{round}}} \mathrm{COLLECTING}_{\mathrm{GRADIENTS}}$$
 * **Coordination Claim:** Guarantees atomic round initialization and consistent notification dispatch to all currently online cluster members.
 * **Expected Invariant:**
   1. `current_round_id` increases strictly monotonically by 1.
@@ -161,7 +161,7 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
     - Transition round status to `"AGGREGATING"`.
     - Automatically execute `self.aggregate_and_deploy(round_id)`.
 * **State Transition Formulation:**
-  $$\text{RoundState}(r) = \begin{cases} \text{AGGREGATING} & \text{if } |S_r| \ge k_{\text{min}} \land \text{State} = \text{COLLECTING\_GRADIENTS} \\ \text{COLLECTING\_GRADIENTS} & \text{otherwise} \end{cases}$$
+  $$\text{RoundState}(r) = \begin{cases} \text{AGGREGATING} & \text{if } |S_r| \ge k_{\text{min}} \land \text{State} = \mathrm{COLLECTING}_{\mathrm{GRADIENTS}} \\ \mathrm{COLLECTING}_{\mathrm{GRADIENTS}} & \text{otherwise} \end{cases}$$
 * **Coordination Claim:** Prevents partial aggregation below minimum client quorum ($k_{\text{min}}$) and guarantees atomic transition to aggregation phase.
 * **Expected Invariant:**
   1. Aggregation is triggered if and only if `submitted_count >= min_clients`.
@@ -180,7 +180,7 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
 * **Purpose:** Unmasks SecAgg gradients, computes FedAvg model aggregation, evaluates holdout AUC against a quality gate threshold (`min_auc_threshold = 0.70`), promotes champion models, and emits SIEM audit events.
 * **System Behavior:**
   - Retrieves gradient submissions for `round_id`.
-  - Simulates/calculates model evaluation AUC score ($0.88 - 0.01 \times \text{round\_id}$ or test mock override).
+  - Simulates/calculates model evaluation AUC score ($0.88 - 0.01 \times \mathrm{round}_{\mathrm{id}}$ or test mock override).
   - Evaluates Quality Gate: `is_champion = auc_score >= min_auc_threshold`.
   - Assigns `model_status = "CHAMPION"` if passed, else `"REJECTED_LOW_AUC"`.
   - Updates round state: `status = "COMPLETED"`, records timestamp and AUC.
@@ -261,7 +261,7 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
   5. Computes SHA256 gradient hash.
   6. Persists submission metadata to database (`GradientSubmissionModel`).
   7. Logs append-only event to `ImmutableAuditChain`.
-  8. Evaluates Quorum: Target = $\max(1, \text{participant\_count})$. If `current_count >= quorum_target`, initiates aggregation.
+  8. Evaluates Quorum: Target = $\max(1, \mathrm{participant}_{\mathrm{count}})$. If `current_count >= quorum_target`, initiates aggregation.
 * **Security & Privacy Formulation:**
   $$\text{Valid}(\Delta) = \text{VerifySig}(\sigma, m) \land (\epsilon \le 10.0) \land \text{Decompress}(z) \neq \bot$$
 * **Coordination Claim:** Enforces non-repudiable digital signatures, Differential Privacy budget caps ($\epsilon \le 10.0$), and immutable audit chain logging on all submitted gradients.
@@ -337,7 +337,7 @@ The Federation Coordinator orchestrates distributed cross-bank training rounds, 
     - Promote standby node role to `FAILOVER_PROMOTED`.
     - Log `FailoverAuditEvent` recording `rto_seconds` and `rpo_loss_records = 0`.
 * **Failover Protocol:**
-  $$\text{FailoverTrigger} = \mathbb{I}\left(t_{\text{now}} - t_{\text{primary\_heartbeat}} > 15.0\,\text{s}\right)$$
+  $$\text{FailoverTrigger} = \mathbb{I}\left(t_{\text{now}} - t_{\mathrm{primary}_{\mathrm{heartbeat}}} > 15.0\,\text{s}\right)$$
 * **Coordination Claim:** Guarantees automatic cross-region coordinator failover with Recovery Time Objective $\text{RTO} < 30\,\text{s}$ and Recovery Point Objective $\text{RPO} = 0$ data loss.
 * **Expected Invariant:**
   1. Failover is triggered if and only if primary heartbeat age exceeds 15.0 seconds.

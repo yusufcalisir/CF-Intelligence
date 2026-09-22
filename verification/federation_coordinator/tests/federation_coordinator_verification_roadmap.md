@@ -89,7 +89,7 @@ This document establishes a rigorous scientific verification roadmap for the **F
 
 1. **State Machine Invariant Verification:**
    - **Method:** Formally verify state machine transitions across round lifecycles:
-     $$\text{IDLE} \xrightarrow{\text{start\_round}} \text{COLLECTING\_GRADIENTS} \xrightarrow{\text{quorum}} \text{AGGREGATING} \xrightarrow{\text{deploy}} \text{COMPLETED}$$
+     $$\text{IDLE} \xrightarrow{\mathrm{start}_{\mathrm{round}}} \mathrm{COLLECTING}_{\mathrm{GRADIENTS}} \xrightarrow{\text{quorum}} \text{AGGREGATING} \xrightarrow{\text{deploy}} \text{COMPLETED}$$
    - **Rationale:** Guarantees no illegal state transitions (e.g. `IDLE` $\to$ `AGGREGATING` directly) can occur.
 
 2. **Concurrency Stress Testing (Parallel Thread Contention):**

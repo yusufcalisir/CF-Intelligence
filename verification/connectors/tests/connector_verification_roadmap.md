@@ -64,7 +64,7 @@ Phase 7: End-to-End Daemon Integration Testing                   (3 Lifecycle Wo
 - **Verification Method:** First-Principles Mathematical Verification.
 - **Objectives:**
   1. Compare `retry_connector` backoff delay outputs against theoretical geometric progression formula $t_n = b \cdot 2^{n-1}$.
-  2. Verify `ExponentialBackoffReconnector.compute_next_delay()` delay calculation $d = \text{min}(\text{max\_delay}, \text{initial} \cdot \text{factor}^{\text{attempt}}) \times \text{jitter}$ with jitter bounded in $[0.5, 1.0]$.
+  2. Verify `ExponentialBackoffReconnector.compute_next_delay()` delay calculation $d = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot \text{factor}^{\text{attempt}}) \times \text{jitter}$ with jitter bounded in $[0.5, 1.0]$.
   3. Verify HMAC-SHA256 signature calculations in `RESTBankConnector._sign_payload()` against standard Python `hmac` reference.
   4. Verify ISO 8601 UTC timestamp conversions in `NormalizedTransaction` for zero timezone drift.
 - **Justification:** Mathematical formulas for exponential backoff, jitter distributions, and cryptographic HMAC digests must be validated against pure reference models to guarantee predictability under network instability.
@@ -92,7 +92,7 @@ Phase 7: End-to-End Daemon Integration Testing                   (3 Lifecycle Wo
   - **Property 2:** ISO 20022 XML & SWIFT MT103 Parsing Non-Crash Invariant — arbitrary string inputs either parse to valid transactions or raise `ValueError` without unhandled panics.
   - **Property 3:** Open Banking OAuth2 Token Refresh Boundary Invariant — token is refreshed if and only if $\text{TTL} < 300\text{s}$.
   - **Property 4:** HMAC-SHA256 Payload Signature Determinism & Tamper Sensitivity — identical payloads yield identical signatures; single-byte payload alterations invalidate signatures.
-  - **Property 5:** Full-Jitter Exponential Backoff Boundedness — delay $d$ is strictly bounded in $[0.5 \times c, 1.0 \times c]$ where $c = \text{min}(\text{max\_delay}, \text{initial} \cdot 2^{\text{attempt}})$.
+  - **Property 5:** Full-Jitter Exponential Backoff Boundedness — delay $d$ is strictly bounded in $[0.5 \times c, 1.0 \times c]$ where $c = \text{min}(\mathrm{max}_{\mathrm{delay}}, \text{initial} \cdot 2^{\text{attempt}})$.
   - **Property 6:** `BankConnectorFactory` Production Guard Invariant — requesting unapproved or mock connectors when `APP_ENV=production` unconditionally raises `ValueError` or `ImportError`.
 - **Justification:** Property-based testing generates hundreds of randomized input combinations, uncovering edge cases and unexpected state transitions that fixed example tests miss.
 

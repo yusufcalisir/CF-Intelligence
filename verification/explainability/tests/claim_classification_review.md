@@ -62,7 +62,7 @@ Each claim is rigorously evaluated against established XAI theoretical standards
    - **No Mutual Information Mask Optimization:** True GNNExplainer (Ying et al., NeurIPS 2019) optimizes an edge mask $M$ and feature mask $F$ to maximize mutual information:
      $$\max_{G_s, M} \text{MI}(Y, G_s) = H(Y) - H(Y \mid G_s, M)$$
    - **Positional Linear Weight Assignment:** The codebase assigns edge weights based on positional index in `subgraph.edges`:
-     $$w_i = \begin{cases} 0.85 - 0.08i & \text{if rel} \in \{\text{shares\_device}, \text{linked\_alert}\} \\ 0.45 - 0.05i & \text{otherwise} \end{cases}$$
+     $$w_i = \begin{cases} 0.85 - 0.08i & \text{if rel} \in \{\mathrm{shares}_{\mathrm{device}}, \mathrm{linked}_{\mathrm{alert}}\} \\ 0.45 - 0.05i & \text{otherwise} \end{cases}$$
      This measures edge position in an arbitrary query list, NOT graph structural contribution to the GNN embedding.
    - **Hardcoded Fallback Entities:** If the entity has no graph edges, the function returns hardcoded synthetic nodes: `mule_account_8912` (54.6%), `suspicious_ip_192.168.4.12` (30.0%), `linked_alert_alt_401` (15.4%).
 
