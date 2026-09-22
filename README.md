@@ -658,6 +658,8 @@ CF-Intelligence/
 │   └── cfi-platform/                                # Unified application chart (Deployment, Service, HPA, Ingress)
 │
 ├── monitoring/                                      # Production Observability & Telemetry Stacks
+│   ├── README.md                                    # Telemetry architecture, metric dictionaries & SLA alerts
+│   ├── prometheus.yml                               # Prometheus server configuration & scrape targets
 │   ├── prometheus/                                  # Prometheus server configuration & SLA alert rules
 │   ├── grafana/                                     # Provisioned Grafana dashboard JSON models
 │   ├── alertmanager/                                # Alertmanager routing, Slack/PagerDuty notification rules
