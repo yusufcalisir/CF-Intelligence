@@ -389,3 +389,53 @@ class MatchDisposition(StrEnum):
     CONFIRMED_MATCH = "CONFIRMED_MATCH"    # True positive — transaction blocked
     FALSE_POSITIVE = "FALSE_POSITIVE"      # Goodlisted — suppressed in future screens
     ESCALATED = "ESCALATED"               # Referred to senior compliance / FIU
+
+
+# ── European FIU & UNODC goAML / AMLA Regulatory Reporting Enums ──────────────
+
+class RegulatoryReportType(StrEnum):
+    """European FIU & UNODC goAML regulatory report types."""
+
+    STR = "STR"  # Suspicious Transaction Report
+    SAR = "SAR"  # Suspicious Activity Report
+    TTR = "TTR"  # Threshold Transaction Report (e.g. Cash >= €10,000)
+    AIF = "AIF"  # Additional Information File / Follow-up report
+
+
+class RegulatoryReportStatus(StrEnum):
+    """Lifecycle status of a regulatory report undergoing supervisory approval and filing."""
+
+    DRAFT = "DRAFT"
+    PENDING_SUPERVISORY_APPROVAL = "PENDING_SUPERVISORY_APPROVAL"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+    TRANSMITTED = "TRANSMITTED"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+
+
+class LegalBasisType(StrEnum):
+    """European AML & GDPR legal basis justifying cross-border financial intelligence filing."""
+
+    AMLD6_ART_33 = "AMLD6_ART_33"                # Directive (EU) 2018/1673 & 2015/849 Art 33 Mandatory FIU Filing
+    AMLA_RULEBOOK_ART_51 = "AMLA_RULEBOOK_ART_51"  # EU AMLA Single Rulebook Harmonised Reporting Obligation
+    GDPR_ART_6_1_F = "GDPR_ART_6_1_F"            # GDPR Art. 6(1)(f) Legitimate Interest for Crime Detection
+    GDPR_ART_9_2_G = "GDPR_ART_9_2_G"            # GDPR Art. 9(2)(g) Substantial Public Interest
+    FATF_REC_20 = "FATF_REC_20"                  # FATF Recommendation 20 Suspicious Transaction Reporting
+
+
+class ReportingEntityRole(StrEnum):
+    """Financial institution role submitting regulatory filings to European FIUs."""
+
+    CREDIT_INSTITUTION = "CREDIT_INSTITUTION"
+    PAYMENT_INSTITUTION = "PAYMENT_INSTITUTION"
+    ELECTRONIC_MONEY_INSTITUTION = "ELECTRONIC_MONEY_INSTITUTION"
+    VIRTUAL_ASSET_SERVICE_PROVIDER = "VIRTUAL_ASSET_SERVICE_PROVIDER"
+
+
+class RegulatorySubmissionFormat(StrEnum):
+    """Standardized transmission format for regulatory submission."""
+
+    GOAML_XML_4_0 = "GOAML_XML_4_0"              # UNODC goAML v4.0 XML Standard
+    AMLA_JSON_SCHEMA = "AMLA_JSON_SCHEMA"        # EU AMLA Single Rulebook Interchange JSON
+    FIU_ENCRYPTED_ARCHIVE = "FIU_ENCRYPTED_ARCHIVE"  # Encrypted Digital Envelope Archive
+

@@ -77,9 +77,9 @@ const STAGES: StageInfo[] = [
   },
   {
     id: 6,
-    label: 'Inter-Bank FININT E2EE Channel Activated',
-    subtext: 'Curve25519 ECDH key agreement · AES-256-GCM encrypted FININT bridge ready',
-    tag: 'EU AMLA · <8ms p99',
+    label: 'Inter-Bank FININT & UNODC goAML Active',
+    subtext: 'Curve25519 ECDH bridge · UNODC goAML 4.0 XML & EU AMLA Single Rulebook ready',
+    tag: 'UNODC · EU AMLA',
     icon: ShieldCheck,
     color: '#f59e0b',
     glow: 'rgba(245, 158, 11, 0.4)',

@@ -59,6 +59,7 @@ from app.presentation.routers import (
     privacy_defense,
     psd2,
     realtime_inference,
+    regulatory,
     rules,
     scenarios,
     screening,
@@ -1066,6 +1067,8 @@ else:
     app.include_router(payment_recall.api_router)
     app.include_router(screening.router)
     app.include_router(screening.api_router)
+    app.include_router(regulatory.router)
+    app.include_router(regulatory.api_router)
 
 
 @app.get("/", tags=["root"])

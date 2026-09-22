@@ -47,6 +47,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
   { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation — with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
   { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms — Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration — with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
+  { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -246,6 +247,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open Screening Workbench',
     tensorSample: 'score(q,c) = max(JaroWinkler(q,c), LevenshteinSim(q,c), PhoneticMatch(q,c), TokenOverlap(q,c)) × 100 → alert if score ≥ θ',
     statusBadge: 'EU · UN · OFAC · HMT',
+  },
+  'fiu-goaml': {
+    sla: '< 12 ms XML export & canonical envelope sealing (p99)',
+    security: 'Dual-control sign-off enforcement | Canonical XML SHA-256 digest | HMAC-SHA256 digital envelope',
+    compliance: 'UNODC goAML 4.0 | EU AMLA Single Rulebook Art. 51 | AMLD6 Art. 33 | GDPR Art. 6(1)(f) & 9(2)(g)',
+    actionRoute: '/cases',
+    actionLabel: 'Open Regulatory Filing Hub',
+    tensorSample: 'Envelope: HMAC-SHA256(K, SHA256(canonical(XML)) || report_id || status || ts) → Sealed XML Filing',
+    statusBadge: 'UNODC goAML · EU AMLA',
   },
 };
 
@@ -1951,11 +1961,12 @@ export default function LandingPage() {
                 {activePrivacyTab === 'compliance' && (
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5 w-full min-w-0">
                     {[
-                      {standard:'GDPR Article 25',        status:'Privacy by Design',  detail:'DP guarantees built into tensor aggregation. Zero customer PII ever exits bank boundary.'},
-                      {standard:'FinCEN SAR Regulation',  status:'Schema Automated',   detail:'Automated SAR XML filing generation with cryptographic evidence sign-off.'},
+                      {standard:'GDPR Article 25 & 6(1)(f)', status:'Privacy by Design',  detail:'DP guarantees built into tensor aggregation. Zero customer PII ever exits bank boundary. Legitimate interest basis for FIU reporting.'},
+                      {standard:'UNODC goAML & SAR',      status:'goAML 4.0 Standard', detail:'Automated UNODC goAML 4.0 XML and EU AMLA Single Rulebook regulatory report exporter with dual-control supervisory sign-off.'},
+                      {standard:'EU AMLA Single Rulebook', status:'Rulebook Aligned',   detail:'AMLD6 Art. 33 and EU AMLA Art. 51 harmonised reporting obligation with GDPR Art. 6(1)(f) legitimate interest justification.'},
                       {standard:'EU AI Act (Art 10/15)',  status:'Controls Aligned',   detail:'Differential privacy robustness, data governance, and explainability risk controls.'},
                       {standard:'NIST SP 800-188 & 207',  status:'Aligned',            detail:'Strict de-identification via Rényi DP and Zero-Trust mTLS 1.3 architecture.'},
-                      {standard:'ISO 20022',              status:'Native Schema XSD',  detail:'Parses pacs.008 and camt.053 XML messages natively in the bank data plane.'},
+                      {standard:'ISO 20022 SCT Inst',     status:'Native Schema XSD',  detail:'Parses pacs.008, camt.056, pacs.004, and camt.029 XML messages natively with sub-second hold triggers.'},
                       {standard:'SOC 2 Type II',          status:'Audit-Ready',        detail:'Automated SHA-256 tamper-evident audit trail logging and evidence export pipeline.'},
                     ].map(row => (
                       <div key={row.standard} className="p-4 sm:p-5 rounded-2xl bg-white/2 border border-white/8 space-y-2 min-w-0">
