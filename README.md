@@ -672,6 +672,7 @@ CF-Intelligence/
 │   └── test/                                        # Hardhat Mocha/Chai contract unit tests & gas audits (31 Tests)
 │
 └── scripts/                                         # Developer Automation, Benchmarks, Load Testing & CLI Tooling
+    ├── README.md                                    # CLI reference, benchmark workflows & validation guides
     ├── generate_sbom.py                             # Automated SPDX / CycloneDX SBOM generator & pip-audit runner
     ├── generate_secrets.py                          # One-click cryptographic 256-bit secret generator for .env
     ├── verify_docker_deployment.py                  # Automated Docker Compose pre-flight and runtime smoke test
@@ -691,6 +692,7 @@ CF-Intelligence/
     ├── run_all_tests.py                             # Unified cross-stack test runner (Backend pytest + Frontend vitest)
     ├── run_all_verifications.py                     # Master scientific verification runner (18 modules)
     ├── audit_api_contracts.py                       # REST endpoint, schema & TypeScript contract auditor
+    ├── codebase_integrity_scanner.py                # Autonomous 22-vector zero-mock and dead-code scanner
     ├── cfi_cli.py                                   # Master platform operator & consortium management CLI
     ├── export_compliance_report.py                  # Automated EU AI Act & SOC 2 compliance report exporter
     ├── setup_cloudflare_waf.py                      # Automated Cloudflare WAF rule & rate limiter provisioner
