@@ -618,15 +618,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,289 Automated Pytest Suites)
+     └── 6. pytest-security-and-compliance-suites (2,314 Automated Pytest Suites)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,289 automated tests** across unit, integration, and property-based suites:
+The entire codebase is validated by **2,314 automated tests** across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,289 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,314 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -636,7 +636,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,289 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,314 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, and DR Failover |
 
 
 

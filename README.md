@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2895%2F2895_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-2920%2F2920_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -288,7 +288,7 @@ CF-Intelligence/
 │   │   │   └── web_console.py                       # Web console telemetry & audit logging contracts
 │   │   │
 │   │   ├── application/
-│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (37 Modules)
+│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (38 Modules)
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
 │   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
 │   │   │       ├── flower_engine.py                 # Flower FL simulation bridge (Ray runtime & zero-mock native fallback)
@@ -316,6 +316,7 @@ CF-Intelligence/
 │   │   │       ├── fiu_regulatory_service.py        # European FIU & UNODC goAML 4.0 XML / AMLA regulatory exporter
 │   │   │       ├── open_aml_service.py              # Drop-in Enterprise AML OpenAPI adapter & signed webhook gateway
 │   │   │       ├── ubo_graph_service.py             # Corporate UBO intelligence, circular ownership & nominee detection
+│   │   │       ├── european_scenario_library.py     # 16 European banking AML scenarios & hybrid deterministic rule engine
 │   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
 │   │   │       ├── auto_rollback.py                 # Champion auto-rollback on drift or accuracy degradation
 │   │   │       ├── automated_retraining.py          # Continuous automated retraining trigger pipeline
@@ -455,7 +456,7 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 40 Modular FastAPI Routers
+│   │       ├── routers/                             # 41 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
@@ -467,6 +468,7 @@ CF-Intelligence/
 │   │       │   ├── regulatory.py                    # European FIU & UNODC goAML 4.0 XML / AMLA Regulatory Exporter
 │   │       │   ├── open_aml_adapter.py              # Drop-in Enterprise AML OpenAPI & Webhook Ingestion Gateway
 │   │       │   ├── ubo_graph.py                     # Corporate UBO Graph, Cycle Detection & Nominee Syndicates API
+│   │       │   ├── european_scenarios.py            # European AML Monitoring Scenarios & Hybrid Deterministic Rule Engine API
 │   │       │   ├── banks.py                         # Consortium member management & data upload endpoints
 │   │       │   ├── bank_client.py                   # Distributed bank client local training & evaluation daemon
 │   │       │   ├── coordinator.py                   # Federation round orchestration & model sync API
@@ -501,7 +503,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,289 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,314 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1174,7 +1176,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,588 / 2,588 passing (2,895 total incl. verification)** | 100% | 2,289 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,613 / 2,613 passing (2,920 total incl. verification)** | 100% | 2,314 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2100,6 +2102,77 @@ Provides consortium-wide graph intelligence for multi-tier Ultimate Beneficial O
   ],
   "total_nodes": 2,
   "total_edges": 1
+}
+```
+
+### 19.18 European AML Monitoring Scenario Library & Hybrid Deterministic Rule Engine API (`/api/v1/scenarios/european-aml/*`)
+
+Provides 16 pre-configured statutory European AML monitoring rules and a hybrid scoring synthesizer that blends deterministic compliance rule penalties with Federated GNN risk embeddings into an explainable composite decision:
+
+**1. Real-Time Hybrid AML Risk Evaluation (`POST /api/v1/scenarios/european-aml/evaluate`):**
+```json
+{
+  "transaction": {
+    "transaction_id": "TX-EUR-90218",
+    "amount": 9500.0,
+    "currency": "EUR",
+    "originator_id": "CUST-ALICE-100",
+    "beneficiary_id": "CUST-BOB-200",
+    "origin_country": "DE",
+    "destination_country": "FR",
+    "payment_rail": "SEPA_INSTANT",
+    "recent_distinct_counterparties_24h": 1,
+    "funds_retention_ratio": 1.0
+  },
+  "ml_risk_score": 0.35,
+  "strict_regulatory_override": true
+}
+```
+
+*Response (HTTP 200 OK):*
+```json
+{
+  "transaction_id": "TX-EUR-90218",
+  "action": "MANUAL_REVIEW",
+  "composite_risk_score": 533.5,
+  "rule_penalty_score": 320.0,
+  "ml_risk_score": 0.35,
+  "ml_penalty_equivalent": 350.0,
+  "regulatory_override_applied": false,
+  "triggered_scenarios": [
+    {
+      "scenario_code": "SCN_EUR_STRUCTURING_SUB_10K",
+      "scenario_name": "Sub-€10,000 Threshold Structuring (Smurfing)",
+      "category": "STRUCTURING",
+      "severity": "HIGH",
+      "penalty_score": 320.0,
+      "regulatory_citation": "EU AMLD6 Art. 33 & FATF Recommendation 10",
+      "trigger_rationale": "Transfer of €9,500.00 positioned just below the €10,000 statutory reporting threshold."
+    }
+  ],
+  "total_scenarios_evaluated": 16,
+  "total_scenarios_triggered": 1,
+  "explainability_narrative": "Action 'MANUAL_REVIEW' decided with composite risk 533.5/1000. Triggered 1 European AML scenario(s): [SCN_EUR_STRUCTURING_SUB_10K].",
+  "evaluated_at": "2026-09-23T00:05:00Z"
+}
+```
+
+**2. Query European AML Scenario Library Catalog (`GET /api/v1/scenarios/european-aml/library`):**
+*Response (HTTP 200 OK):*
+```json
+{
+  "total_scenarios": 16,
+  "scenarios": [
+    {
+      "scenario_code": "SCN_EUR_STRUCTURING_SUB_10K",
+      "name": "Sub-€10,000 Threshold Structuring (Smurfing)",
+      "category": "STRUCTURING",
+      "severity": "HIGH",
+      "base_penalty": 320.0,
+      "regulatory_basis": "EU AMLD6 Art. 33 & FATF Recommendation 10",
+      "description": "Transaction structured immediately below the €10,000 European statutory reporting threshold."
+    }
+  ]
 }
 ```
 

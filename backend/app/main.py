@@ -46,6 +46,7 @@ from app.presentation.routers import (
     design_partner,
     diagnostics,
     entities,
+    european_scenarios,
     gateway,
     graph,
     health,
@@ -1075,6 +1076,8 @@ else:
     app.include_router(open_aml_adapter.api_router)
     app.include_router(ubo_graph.router)
     app.include_router(ubo_graph.api_router)
+    app.include_router(european_scenarios.router)
+    app.include_router(european_scenarios.api_router)
 
 
 @app.get("/", tags=["root"])

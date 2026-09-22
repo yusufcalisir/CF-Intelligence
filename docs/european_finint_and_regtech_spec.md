@@ -184,9 +184,42 @@ It combines direct equity and parallel indirect holding paths into a consolidate
 
 ---
 
-## 9. Verification & Automated Test Coverage
+---
 
-The European RegTech engines are validated by **303 dedicated automated tests** (all 100% passing):
+## 9. European AML Monitoring Scenario Library & Hybrid Deterministic Rule Engine
+
+The European AML Scenario Library (`european_scenario_library.py`) provides 16 pre-configured, statutory rule-based detection scenarios combined with a hybrid scoring synthesizer that blends deterministic compliance penalties with Federated GNN risk embeddings:
+
+### 9.1 Pre-Configured European Banking AML Scenarios
+1. `SCN_EUR_STRUCTURING_SUB_10K`: Smurfing / structuring immediately below the €10,000 European reporting threshold (€8,000 - €9,999.99).
+2. `SCN_DORMANT_BURST_VELOCITY`: Sudden high-value or high-velocity activity on an account dormant for $> 90$ days.
+3. `SCN_RAPID_PASSTHROUGH_MULE`: Funds rapidly liquidated with $< 10\%$ retention ratio within 1 hour.
+4. `SCN_HIGH_RISK_FATF_CORRIDOR`: Cross-border flow routed to or from FATF high-risk jurisdictions (Call for Action black-list / grey-list).
+5. `SCN_ROUND_AMOUNT_LAYERING`: Repetitive round-amount transfers (multiples of €1,000 / €5,000) indicating artificial placement.
+6. `SCN_RAPID_FAN_OUT_DISPERSAL`: Single inbound credit followed by rapid dispersal to $\ge 4$ distinct counterparties within 24 hours.
+7. `SCN_RAPID_FAN_IN_AGGREGATION`: Inbound aggregation from $\ge 4$ distinct sources pooled together for immediate outward transfer.
+8. `SCN_OFFSHORE_SHELL_ROUNDTRIP`: High-value transfer ($\ge €15,000$) interfacing with non-cooperative offshore secrecy havens.
+9. `SCN_PEP_SANCTION_EXPOSURE`: Counterparty matching Politically Exposed Person (PEP) or UN/EU/OFAC Sanctions List.
+10. `SCN_CIRCULAR_MULE_RING`: Directed cyclic transaction loop ($\ge 2$ hops) cycling back to originating institution.
+11. `SCN_CRYPTO_ON_OFF_RAMP_BURST`: High-velocity fiat inflow/outflow interacting with Crypto Asset Service Providers (CASPs) under the EU Travel Rule.
+12. `SCN_NEW_ACCOUNT_HIGH_VALUE_DRAIN`: Account age $< 14$ days executing high-value inflow followed by complete drainage.
+13. `SCN_HIGH_VELOCITY_NIGHTTIME`: High-frequency transfers executed during nocturnal non-business hours (01:00 - 05:00).
+14. `SCN_TRADE_OVER_UNDER_INVOICING`: Trade unit price deviating $> 300\%$ or $< 33\%$ from fair market value benchmark.
+15. `SCN_CASINO_GAMBLING_BURST`: High-stakes deposit burst into gambling/casino merchants without gameplay velocity.
+16. `SCN_LARGE_CASH_OR_INSTANT_SURGE`: Single SEPA Instant transfer exceeding €50,000 or single transfer $> 10\times$ daily account baseline.
+
+### 9.2 Hybrid Scoring Synthesizer
+The hybrid synthesizer fuses deterministic rule compliance with probabilistic Federated Machine Learning:
+$$S_{\text{hybrid}} = \alpha \cdot S_{\text{rule}} + (1 - \alpha) \cdot S_{\text{ML}} + \min(150.0, \|\mathbf{z}_{\text{GNN}}\|_2 \times 30.0)$$
+where $\alpha = 0.55$ ensures regulatory explainability.
+
+**Strict Regulatory Override Gate**: When a critical scenario fires (e.g. Sanctioned entity match or FATF Call for Action corridor), the system bypasses probabilistic ML thresholds, enforcing an immediate `BLOCK` action and setting $S_{\text{hybrid}} \ge 950.0$.
+
+---
+
+## 10. Verification & Automated Test Coverage
+
+The European RegTech engines are validated by **328 dedicated automated tests** (all 100% passing):
 
 | Test Suite File | Component Scope | Test Count | Status |
 |:---|:---|:---:|:---:|
@@ -196,11 +229,12 @@ The European RegTech engines are validated by **303 dedicated automated tests** 
 | `backend/tests/unit/test_fiu_regulatory_service.py` | UNODC goAML 4.0 XML, EU AMLA JSON, HMAC envelope, 4-Eyes sign-off | 33 | `PASSED` |
 | `backend/tests/unit/test_open_aml_adapter.py` | OpenAPI Drop-in Adapter, Scenarios, Watchlist search, Signed Webhooks | 24 | `PASSED` |
 | `backend/tests/unit/test_ubo_graph_service.py` | Multi-tier UBO compounding, Cycle detection, Nominees, Shell clusters | 16 | `PASSED` |
-| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **303** | **100% PASS** |
+| `backend/tests/unit/test_european_scenarios.py` | 16 European AML scenarios, Hybrid synthesizer, GNN boost, Override gate | 25 | `PASSED` |
+| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **328** | **100% PASS** |
 
 ---
 
-## 10. REST API Endpoints Reference
+## 11. REST API Endpoints Reference
 
 | Endpoint | Method | Description | Auth / Security |
 |:---|:---:|:---|:---|
@@ -236,4 +270,10 @@ The European RegTech engines are validated by **303 dedicated automated tests** 
 | `/api/v1/ubo/anomalies/nominee-directors` | `GET` | Consortium-wide nominee director scan | Bearer JWT / X-Tenant-ID |
 | `/api/v1/ubo/anomalies/shell-clusters` | `GET` | Consortium-wide offshore shell cluster scan | Bearer JWT / X-Tenant-ID |
 | `/api/v1/ubo/metrics` | `GET` | Telemetry metrics for corporate UBO registry | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/library` | `GET` | List all 16 pre-configured European AML scenarios | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/library/{code}` | `GET` | Get scenario operational thresholds & regulatory basis | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/evaluate` | `POST` | Evaluate transaction with hybrid deterministic & ML engine | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/evaluate-batch` | `POST` | High-throughput batch evaluation of up to 100 transactions | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/library/{code}/test` | `POST` | Test synthetic scenario vector trigger condition | Bearer JWT / X-Tenant-ID |
+| `/api/v1/scenarios/european-aml/metrics` | `GET` | Operational telemetry and scenario trigger distributions | Bearer JWT / X-Tenant-ID |
 
