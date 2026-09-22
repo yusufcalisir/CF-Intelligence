@@ -144,9 +144,32 @@ Before external dispatch to FIU web services:
 
 ---
 
-## 7. Verification & Automated Test Coverage
+## 7. Enterprise AML OpenAPI Compatibility Adapter & Webhook Gateway
 
-The European RegTech engines are validated by **263 dedicated automated tests** (all 100% passing):
+The platform provides a drop-in European / International AML OpenAPI standard adapter router (`backend/app/presentation/routers/open_aml_adapter.py`), allowing core banking systems, payment processors, and existing RegTech software stacks to integrate without bespoke connector code.
+
+### 7.1 OpenAPI Specification Compliance
+- **Customer & Entity Ingestion**: `POST /api/v2/persons` and `POST /api/v1/persons` supporting natural persons and corporate legal entities with nested multi-tier UBO hierarchies, identification documents (passports, national IDs, company registry certificates), and FATF jurisdiction classifications.
+- **Transaction Ingestion**: `POST /api/v1/persons/{person_id}/transactions` associating financial ledger movements directly with registered risk profiles.
+- **Real-Time Monitoring Evaluation**: `POST /api/v1/transactions/{transaction_id}/monitoring-checks` offering sub-50ms synchronous blocking decisions (`ALLOW`, `REVIEW`, `BLOCK`) powered by the 9-signal composite risk scoring pipeline and deterministic European rule scenarios.
+- **Integrated Sanctions Screening**: `POST /api/v1/persons/{person_id}/screening-checks` and `POST /api/v2/screening-searches` performing real-time fuzzy matching across EU Consolidated, OFAC SDN, UN SC, and PEP watchlists.
+
+### 7.2 Deterministic Scenario Triggers
+The adapter evaluates transactions against key European compliance topologies:
+1. `SCN_EUR_STRUCTURING_SUB_10K`: Flags transactions between €8,000 and €9,999 structured just below the mandatory €10,000 reporting threshold.
+2. `SCN_FATF_SANCTIONED_CORRIDOR`: Enforces mandatory blocks on corridors linked to FATF black-listed jurisdictions (KP, IR, SY, MM).
+3. `SCN_BURST_VELOCITY_SURGE`: Detects rapid pass-through or smurfing bursts exceeding velocity thresholds within active observation windows.
+4. `SCN_PEP_BENEFICIAL_OWNERSHIP`: Triggers enhanced due diligence review when corporate ownership structures include Politically Exposed Persons.
+
+### 7.3 Cryptographic Webhook Ingestion Gateway
+- Institutional clients register webhooks via `POST /api/v1/aml-adapter/webhooks/subscriptions`.
+- Outbound events (`ALERT_CREATED`, `SCREENING_ALERT_CREATED`, `FINAL_RISK_UPDATED`) are signed using HMAC-SHA256 over canonical JSON payloads, providing non-repudiation and replay protection.
+
+---
+
+## 8. Verification & Automated Test Coverage
+
+The European RegTech engines are validated by **287 dedicated automated tests** (all 100% passing):
 
 | Test Suite File | Component Scope | Test Count | Status |
 |:---|:---|:---:|:---:|
@@ -154,11 +177,12 @@ The European RegTech engines are validated by **263 dedicated automated tests** 
 | `backend/tests/unit/test_payment_recall.py` | ISO 20022 camt.056 / camt.029, 10d SLA, Account freeze, Recovery ledger | 89 | `PASSED` |
 | `backend/tests/unit/test_screening_service.py` | UN/EU/OFAC lists, Jaro-Winkler + Levenshtein, DOB/Nationality, Whitelist | 88 | `PASSED` |
 | `backend/tests/unit/test_fiu_regulatory_service.py` | UNODC goAML 4.0 XML, EU AMLA JSON, HMAC envelope, 4-Eyes sign-off | 33 | `PASSED` |
-| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **263** | **100% PASS** |
+| `backend/tests/unit/test_open_aml_adapter.py` | OpenAPI Drop-in Adapter, Scenarios, Watchlist search, Signed Webhooks | 24 | `PASSED` |
+| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **287** | **100% PASS** |
 
 ---
 
-## 8. REST API Endpoints Reference
+## 9. REST API Endpoints Reference
 
 | Endpoint | Method | Description | Auth / Security |
 |:---|:---:|:---|:---|
@@ -175,3 +199,13 @@ The European RegTech engines are validated by **263 dedicated automated tests** 
 | `/api/v1/regulatory/export/goaml-xml` | `POST` | Export case to UNODC goAML 4.0 XML report | Bearer JWT + 4-Eyes Sign-off |
 | `/api/v1/regulatory/export/amla-json` | `POST` | Export case to EU AMLA standardized JSON format | Bearer JWT + 4-Eyes Sign-off |
 | `/api/v1/regulatory/envelope` | `POST` | Wrap and sign regulatory filing in HMAC envelope | Bearer JWT + Envelope Secret |
+| `/api/v2/persons` | `POST` | Register individual or legal entity with UBO structure | Bearer JWT / X-Tenant-ID |
+| `/api/v2/persons/{person_id}` | `GET` | Lookup registered customer profile | Bearer JWT / X-Tenant-ID |
+| `/api/v1/persons/{person_id}/transactions` | `POST` | Ingest transaction linked to customer profile | Bearer JWT / X-Tenant-ID |
+| `/api/v1/transactions/{transaction_id}/monitoring-checks` | `POST` | Real-time online/offline AML transaction monitoring check | Bearer JWT / X-Tenant-ID |
+| `/api/v1/persons/{person_id}/screening-checks` | `POST` | Screen registered person against watchlists | Bearer JWT / X-Tenant-ID |
+| `/api/v2/screening-searches` | `POST` | Ad-hoc multi-watchlist fuzzy screening query | Bearer JWT / X-Tenant-ID |
+| `/api/v1/aml-adapter/webhooks/subscriptions` | `POST` | Register client webhook endpoint with secret | Bearer JWT / X-Tenant-ID |
+| `/api/v1/aml-adapter/webhooks/events` | `GET` | Audit recent HMAC-SHA256 signed webhook events | Bearer JWT / X-Tenant-ID |
+| `/api/v1/aml-adapter/metrics` | `GET` | Telemetry metrics for drop-in AML adapter | Bearer JWT / X-Tenant-ID |
+

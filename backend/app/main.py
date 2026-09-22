@@ -53,6 +53,7 @@ from app.presentation.routers import (
     model_registry,
     monitoring,
     onboarding,
+    open_aml_adapter,
     optimization,
     payment_recall,
     predict,
@@ -1069,6 +1070,8 @@ else:
     app.include_router(screening.api_router)
     app.include_router(regulatory.router)
     app.include_router(regulatory.api_router)
+    app.include_router(open_aml_adapter.router)
+    app.include_router(open_aml_adapter.api_router)
 
 
 @app.get("/", tags=["root"])
