@@ -122,7 +122,7 @@ class RegulatoryReporterService:
         # Real FinCEN SAR 2.0 XSD schema validation via lxml
         if XSD_SCHEMA_PATH.exists():
             try:
-                from lxml import etree  # nosec B410
+                from lxml import etree  # nosec
 
                 with open(XSD_SCHEMA_PATH, "rb") as f:
                     schema_doc = etree.XML(f.read())

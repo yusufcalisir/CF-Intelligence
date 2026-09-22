@@ -20,12 +20,14 @@ import os
 import re
 import threading
 import uuid
-import xml.dom.minidom
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import Decimal
 from typing import Any
+
+import defusedxml.ElementTree as DefusedET
+import defusedxml.minidom
 
 from app.application.schemas.regulatory_schemas import (
     AuditTrailEntryResponse,
@@ -457,7 +459,7 @@ class FIURegulatoryService:
 
             # Formatting
             raw_xml = ET.tostring(root, encoding="utf-8")
-            parsed = xml.dom.minidom.parseString(raw_xml)
+            parsed = defusedxml.minidom.parseString(raw_xml)
             return parsed.toprettyxml(indent="  ", encoding="utf-8").decode("utf-8")
 
     def generate_amla_json(self, report_id: str) -> dict[str, Any]:
@@ -509,8 +511,8 @@ class FIURegulatoryService:
         errors: list[SchemaValidationError] = []
 
         try:
-            root = ET.fromstring(xml_content.encode("utf-8"))
-        except ET.ParseError as exc:
+            root = DefusedET.fromstring(xml_content.encode("utf-8"))
+        except (ET.ParseError, Exception) as exc:
             return SchemaValidationResponse(
                 is_valid=False,
                 schema_name=schema_name,

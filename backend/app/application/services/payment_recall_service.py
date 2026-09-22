@@ -28,6 +28,7 @@ import hmac
 import json
 import logging
 import threading
+import urllib.parse
 import urllib.request
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -494,13 +495,16 @@ class PaymentRecallService:
                         "action": "PROVISIONAL_HOLD",
                         "timestamp": datetime.now(UTC).isoformat(),
                     }).encode("utf-8")
+                    parsed_url = urllib.parse.urlparse(webhook_url)
+                    if parsed_url.scheme not in ("http", "https"):
+                        raise ValueError(f"Invalid webhook URL scheme: {parsed_url.scheme}")
                     req = urllib.request.Request(
                         webhook_url,
                         data=payload,
                         headers={"Content-Type": "application/json"},
                         method="POST",
                     )
-                    with urllib.request.urlopen(req, timeout=3) as resp:
+                    with urllib.request.urlopen(req, timeout=3) as resp:  # nosec B310
                         response_status = resp.status
                 except Exception as exc:
                     logger.warning("Provisional hold webhook failed for %s: %s", case_id, exc)
