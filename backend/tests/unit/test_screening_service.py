@@ -525,7 +525,7 @@ class TestSchemaValidation:
         from pydantic import ValidationError
         from app.application.schemas.screening_schemas import ScreenEntityRequest
         with pytest.raises(ValidationError):
-            ScreenEntityRequest(query_name="Test", alert_threshold=101)
+            ScreenEntityRequest.model_validate({"query_name": "Test", "alert_threshold": 101})
 
     def test_valid_watchlist_entry(self):
         from app.application.schemas.screening_schemas import WatchlistEntryRequest
