@@ -1181,7 +1181,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 
 The table below contrasts the architectural paradigms implemented in CF-Intelligence against collaborative RegTech networks, traditional vendor SaaS, and legacy rule systems:
 
-| Architectural Dimension | **CF-Intelligence Architecture** | **Collaborative RegTech (e.g., Salv Bridge)** | **Traditional Vendor SaaS** | **Legacy On-Premises Rules** |
+| Architectural Dimension | **CF-Intelligence Architecture** | **Collaborative FININT Networks** | **Traditional Vendor SaaS** | **Legacy On-Premises Rules** |
 | :--- | :---: | :---: | :---: | :---: |
 | **Data Sharing Paradigm** | **Federated Learning (Zero Raw PII)** | Encrypted Case / Ticket Messaging | Centralized Cloud Pooling | Isolated Bank Silos |
 | **Collaborative ML / AI** | **FedGNN / GraphSAGE (Decentralized)** | Rule-based / Single-tenant scoring | Proprietary Central Model | No Shared Intelligence |
@@ -1202,8 +1202,9 @@ The technical architecture of CF-Intelligence explores how system design pattern
 1. **Data Minimization & Sovereign Privacy (GDPR Art. 6 & 17, CCPA):**  
    Cross-border banking secrecy and data protection statutes prohibit pooling raw customer records across institutions. The platform addresses this through federated learning: raw transactions remain within the local banking node, and only differentially private gradients ($\epsilon = 1.0, \delta = 10^{-5}$) and zero-sum masked vectors are transmitted.
 
-2. **Cross-Bank Information Exchange (Estonian RahaPTS § 47-48 & EU AMLA Single Rulebook):**  
-   Under European banking frameworks (pioneered by Estonia's *Raha- ja terrorismi tõkestamise seadus* and the EU Anti-Money Laundering Authority - AMLA), obliged entities can exchange operational fraud and mule intelligence based on GDPR Article 6(1)(f) legitimate interest. CF-Intelligence models this via Curve25519 encrypted inter-bank FININT case messaging and ISO 20022 `camt.056` SEPA Instant payment recall automation.
+2. **Cross-Bank Information Exchange (EU AMLA Single Rulebook & AMLD6):**  
+   Under modern European banking frameworks and the EU Anti-Money Laundering Authority (AMLA) Single Rulebook, obliged entities can exchange operational fraud and mule intelligence based on GDPR Article 6(1)(f) legitimate interest. CF-Intelligence models this via Curve25519 encrypted inter-bank FININT case messaging and ISO 20022 `camt.056` SEPA Instant payment recall automation.
+
 
 3. **Model Transparency & Meaningful Human Oversight (EU AI Act & SR 11-7):**  
    High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases.
