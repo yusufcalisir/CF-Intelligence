@@ -253,6 +253,7 @@ class Evidence:
     uploaded_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
 
+
 @dataclass
 class InvestigatorAuditLog:
     """An audit log entry for investigator query operations."""
@@ -264,3 +265,62 @@ class InvestigatorAuditLog:
     timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     session_duration_sec: float | None = None
     metadata: dict = field(default_factory=dict)
+
+
+# ── Phase 106: Inter-Bank Encrypted FININT Bridge Ticket ──────────────────────
+
+
+@dataclass
+class FinintTicketAuditEntry:
+    """Immutable audit trail entry for a FININT bridge ticket lifecycle event.
+
+    Each entry is hash-chained to its predecessor using SHA-256 to ensure
+    tamper-evident chronological ordering of all compliance officer actions.
+    """
+
+    seq: int = 0
+    actor: str = ""  # anonymised officer identifier (HMAC-SHA256 of staff ID)
+    action: str = ""  # state transition or evidence action
+    previous_status: str = ""
+    new_status: str = ""
+    event_hash: str = ""  # SHA-256(prev_hash || seq || actor || action || ts)
+    previous_hash: str = ""
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class FinintBridgeTicket:
+    """Encrypted inter-bank FININT case ticket for cross-institution intelligence exchange.
+
+    Implements the European Collaborative FININT information-sharing protocol:
+    - Payload is AES-GCM encrypted with an ephemeral key derived via Curve25519 ECDH.
+    - Evidence attachments are verified by SHA-256 content hashes.
+    - Lifecycle transitions are audit-logged with SHA-256 hash-chaining.
+    - Zero raw PII is transmitted; all entity identifiers are HMAC-SHA256 hashes.
+    """
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+    ticket_type: str = ""  # FinintTicketType value
+    status: str = "OPEN"  # FinintTicketStatus value
+    originating_bank_id: str = ""  # HMAC-SHA256 identifier of requesting institution
+    recipient_bank_id: str = ""  # HMAC-SHA256 identifier of receiving institution
+
+    # Encrypted payload (AES-GCM / Curve25519)
+    encrypted_payload: str = ""  # base64url-encoded ciphertext
+    payload_nonce: str = ""  # base64url-encoded 96-bit GCM nonce
+    ephemeral_public_key: str = ""  # base64url-encoded Curve25519 public key
+
+    # Evidence attachments — never raw files, only hashes
+    evidence_hashes: list[str] = field(default_factory=list)  # SHA-256 of each attachment
+
+    # Lifecycle
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    closed_at: datetime | None = None
+    sla_hours: int = 4  # Maximum response SLA for URGENT_FREEZE_REQUEST = 4h per EPC SEPA
+
+    # Audit chain
+    audit_trail: list[FinintTicketAuditEntry] = field(default_factory=list)
+    head_hash: str = ""  # current tip of the hash chain
+

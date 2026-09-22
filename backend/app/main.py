@@ -38,6 +38,7 @@ from app.presentation.routers import (
     auth,
     bank_client,
     banks,
+    bridge_messaging,
     cases,
     compliance,
     coordinator,
@@ -1057,6 +1058,8 @@ else:
     app.include_router(webhook_gateway.router)
     app.include_router(webhook_gateway.api_router)
     app.include_router(gateway.api_router)
+    app.include_router(bridge_messaging.router)
+    app.include_router(bridge_messaging.api_router)
 
 
 @app.get("/", tags=["root"])

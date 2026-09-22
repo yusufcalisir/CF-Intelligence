@@ -42,6 +42,9 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'zk-snark-verifier', name: 'Zero-Knowledge Proof Attestation', category: 'Frontier R&D Lab', purpose: 'Explores O(1) constant-time succinct non-interactive proofs of gradient norm bounds over BN254 elliptic curves without unmasking.', algorithm: 'Groth16 & PlonK Bilinear Pairing', inputs: 'Poseidon commitment hash & encrypted gradient vector', outputs: 'O(1) Constant-time verification proof (<5ms)', tech: 'Circom 2.1, SnarkJS, BN254 Curve' },
   { id: 'unlearning-engine', name: 'Confidential Federated Unlearning', category: 'Frontier R&D Lab', purpose: 'Implements selective gradient footprint erasure for departing or revoked bank nodes via exact re-aggregation across retained participants.', algorithm: 'Exact Re-Aggregation & Lineage Subtraction', inputs: 'Evicted bank historical updates & current checkpoint', outputs: 'Unlearned global model weights (Structural Exclusion)', tech: 'Lineage Subtraction, Retained Participant FedAvg' },
   { id: 'crosschain-bridge', name: 'Cross-Chain Settlement Bridge', category: 'Frontier R&D Lab', purpose: 'Prototyping multi-ledger liquidity routing for Shapley incentive distribution across EVM rollups and institutional CBDC networks.', algorithm: 'Chainlink CCIP EVM2AnyMessage & LayerZero V2', inputs: 'Shapley utility scores & institutional CBDC wallets', outputs: 'Multi-ledger atomic transaction receipts (<1s SLA)', tech: 'Chainlink CCIP, LayerZero, Daml Interop' },
+
+  // ── EUROPEAN REGTECH & COLLABORATIVE FININT ─────────────────────────────────
+  { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -215,7 +218,17 @@ const MODULE_SPECS_EXTRA: Record<string, {
     tensorSample: 'Shapley Settlement: φ_i → EVM2AnyMessage(dest: Arbitrum/Optimism, token: wCBDC, amount: φ_i * R)',
     statusBadge: 'FRONTIER R&D LAB',
   },
+  'finint-bridge': {
+    sla: '< 8 ms E2EE ticket creation (p99)',
+    security: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 | Zero Raw PII',
+    compliance: 'European Collaborative FININT | GDPR Art.6(1)(f) | EU AMLA Single Rulebook',
+    actionRoute: '/cases',
+    actionLabel: 'Open FININT Case Workbench',
+    tensorSample: 'E2EE: (ephem_priv, recip_pub) → ECDH → HKDF(32B key) → AES-256-GCM(payload) | SHA-256 Hash-Chain: H_n = SHA-256(H_{n-1} || seq || actor || action || ts)',
+    statusBadge: 'EUROPEAN REGTECH',
+  },
 };
+
 
 
 const ARCH_NODES: ArchNode[] = [

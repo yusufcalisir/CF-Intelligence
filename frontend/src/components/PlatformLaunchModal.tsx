@@ -33,7 +33,7 @@ const STAGES: StageInfo[] = [
   {
     id: 1,
     label: 'mTLS 1.3 & Vault PKI Handshake',
-    subtext: 'Authenticating JPM, HSBC & DBK on-premises node certificates',
+    subtext: 'Authenticating consortium bank node on-premises certificates',
     tag: 'FIPS 140-3 · 1.2ms',
     icon: Lock,
     color: '#6366f1',
@@ -75,7 +75,17 @@ const STAGES: StageInfo[] = [
     color: '#38bdf8',
     glow: 'rgba(56, 189, 248, 0.4)',
   },
+  {
+    id: 6,
+    label: 'Inter-Bank FININT E2EE Channel Activated',
+    subtext: 'Curve25519 ECDH key agreement · AES-256-GCM encrypted FININT bridge ready',
+    tag: 'EU AMLA · <8ms p99',
+    icon: ShieldCheck,
+    color: '#f59e0b',
+    glow: 'rgba(245, 158, 11, 0.4)',
+  },
 ];
+
 
 const BANK_NODES = [
   { id: 'JPM', name: 'JPMorgan', role: 'Bank Alpha', x: 20, y: 75, color: '#6366f1' },
@@ -116,12 +126,13 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
     const s2 = setTimeout(() => setCurrentStageIdx(2), 1000);
     const s3 = setTimeout(() => setCurrentStageIdx(3), 1550);
     const s4 = setTimeout(() => setCurrentStageIdx(4), 2100);
+    const s5 = setTimeout(() => setCurrentStageIdx(5), 2650);
 
     const completion = setTimeout(() => {
       setTimeout(() => {
         onComplete();
       }, 300);
-    }, 2750);
+    }, 3400);
 
     return () => {
       clearInterval(progressInterval);
@@ -129,6 +140,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
       clearTimeout(s2);
       clearTimeout(s3);
       clearTimeout(s4);
+      clearTimeout(s5);
       clearTimeout(completion);
     };
   }, [isOpen, onComplete]);
@@ -280,7 +292,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-                      STAGE 0{currentStage.id}/05
+                      STAGE 0{currentStage.id}/06
                     </span>
                   </div>
                   <h4 className="text-xs sm:text-[13px] font-bold text-slate-100 tracking-tight truncate mt-0.5">
@@ -298,7 +310,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             </div>
 
             {/* ── 3. FIVE-STAGE STEP TRACKER (Visual Breadcrumb) ── */}
-            <div className="grid grid-cols-5 gap-1.5">
+            <div className="grid grid-cols-6 gap-1.5">
               {STAGES.map((s, idx) => {
                 const isDone = idx < currentStageIdx;
                 const isCurrent = idx === currentStageIdx;

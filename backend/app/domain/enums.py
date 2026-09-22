@@ -239,3 +239,34 @@ class BankStatus(StrEnum):
     ACTIVE = "active"
     SUSPENDED = "suspended"
     OFFBOARDED = "offboarded"
+
+
+# ── Phase 106: Inter-Bank FININT Case Messaging ────────────────────────────────
+
+
+class FinintTicketType(StrEnum):
+    """Structured cross-institution FININT request type.
+
+    Each type maps to a distinct compliance workflow and escalation path
+    per European Collaborative FININT interchange standards.
+    """
+
+    URGENT_FREEZE_REQUEST = "URGENT_FREEZE_REQUEST"
+    MULE_ACCOUNT_ALERT = "MULE_ACCOUNT_ALERT"
+    INFORMATION_REQUEST = "INFORMATION_REQUEST"
+    TRANSACTION_DISPUTE_TRACE = "TRANSACTION_DISPUTE_TRACE"
+
+
+class FinintTicketStatus(StrEnum):
+    """Immutable lifecycle states of an inter-bank FININT ticket.
+
+    Transitions are strictly ordered and cannot regress:
+    OPEN → ACKNOWLEDGED → FUNDS_FROZEN / INFORMATION_ATTACHED / DECLINED → CLOSED
+    """
+
+    OPEN = "OPEN"
+    ACKNOWLEDGED = "ACKNOWLEDGED"
+    FUNDS_FROZEN = "FUNDS_FROZEN"
+    INFORMATION_ATTACHED = "INFORMATION_ATTACHED"
+    DECLINED = "DECLINED"
+    CLOSED = "CLOSED"
