@@ -329,3 +329,63 @@ class ResolutionCode(StrEnum):
     LEGL = "LEGL"   # Legal proceedings initiated — funds frozen by court
     CUST = "CUST"   # Beneficiary customer disputed the recall
     AGNT = "AGNT"   # Agent-level technical reason (routing error)
+
+
+# ── Phase 108: Real-Time Sanctions & PEP Screening ────────────────────────────
+
+
+class WatchlistSource(StrEnum):
+    """Multi-jurisdiction sanctions and PEP watchlist sources.
+
+    Sources are loaded at screening time. Real production deployments connect
+    to live OFAC SDN, EU Consolidated, and UN Security Council feeds.
+    """
+
+    EU_CONSOLIDATED = "EU_CONSOLIDATED"   # EU Council Consolidated Sanctions List
+    UN_SECURITY_COUNCIL = "UN_SECURITY_COUNCIL"  # UN SC Consolidated List (1267/1989)
+    OFAC_SDN = "OFAC_SDN"                 # US OFAC Specially Designated Nationals
+    HM_TREASURY = "HM_TREASURY"           # UK HMT Financial Sanctions
+    PEP_GLOBAL = "PEP_GLOBAL"             # Politically Exposed Persons — global aggregated
+    INTERNAL_GOODLIST = "INTERNAL_GOODLIST"  # Institution-level false-positive suppression list
+
+
+class MatchAlgorithm(StrEnum):
+    """Algorithms used for name matching during sanctions/PEP screening."""
+
+    EXACT = "EXACT"                    # Exact string equality (after normalisation)
+    LEVENSHTEIN = "LEVENSHTEIN"        # Edit distance — catches typos, transpositions
+    JARO_WINKLER = "JARO_WINKLER"      # Similarity weighted for common prefixes
+    DOUBLE_METAPHONE = "DOUBLE_METAPHONE"  # Phonetic — cross-language sound equivalence
+    TRANSLITERATION = "TRANSLITERATION"   # Cyrillic / Arabic / Chinese → Latin script
+
+
+class ScreeningEntityType(StrEnum):
+    """Type of entity being screened."""
+
+    INDIVIDUAL = "INDIVIDUAL"
+    LEGAL_ENTITY = "LEGAL_ENTITY"
+    VESSEL = "VESSEL"
+    AIRCRAFT = "AIRCRAFT"
+
+
+class ScreeningStatus(StrEnum):
+    """Lifecycle status of a screening request."""
+
+    PENDING = "PENDING"
+    IN_PROGRESS = "IN_PROGRESS"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+
+
+class MatchDisposition(StrEnum):
+    """Compliance officer disposition for a screening hit.
+
+    True positive → block / escalate.
+    False positive → goodlist the entity.
+    Pending → awaiting analyst review.
+    """
+
+    PENDING_REVIEW = "PENDING_REVIEW"
+    CONFIRMED_MATCH = "CONFIRMED_MATCH"    # True positive — transaction blocked
+    FALSE_POSITIVE = "FALSE_POSITIVE"      # Goodlisted — suppressed in future screens
+    ESCALATED = "ESCALATED"               # Referred to senior compliance / FIU

@@ -61,6 +61,7 @@ from app.presentation.routers import (
     realtime_inference,
     rules,
     scenarios,
+    screening,
     security,
     settlement,
     simulation,
@@ -1063,6 +1064,8 @@ else:
     app.include_router(bridge_messaging.api_router)
     app.include_router(payment_recall.router)
     app.include_router(payment_recall.api_router)
+    app.include_router(screening.router)
+    app.include_router(screening.api_router)
 
 
 @app.get("/", tags=["root"])

@@ -46,6 +46,7 @@ const PLATFORM_MODULES: Module[] = [
   // ── EUROPEAN REGTECH & COLLABORATIVE FININT ─────────────────────────────────
   { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
   { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation — with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
+  { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms — Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration — with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -236,6 +237,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open Recall Workbench',
     tensorSample: 'camt.056: FIToFIPaymentCancellationRequest(Rsn: FRAD) → pacs.004: PaymentReturn(RtrdAmt) | camt.029: ResolutionOfInvestigation(Conf: NOAS/NOOR/LEGL)',
     statusBadge: 'ISO 20022 · EPC SCT INST',
+  },
+  'sanctions-screening': {
+    sla: '< 50 ms per entity screen (p99, 5-source, 10k entries) | Portfolio bulk rescreen: async',
+    security: 'Zero raw PII — SHA-256 entity key hashing | Goodlist false-positive suppression | No watchlist data persisted externally',
+    compliance: 'EU Council Consolidated Sanctions | UN SC 1267/1989 | OFAC SDN | HM Treasury | EU AMLA Art. 15 | FATF Rec. 10',
+    actionRoute: '/cases',
+    actionLabel: 'Open Screening Workbench',
+    tensorSample: 'score(q,c) = max(JaroWinkler(q,c), LevenshteinSim(q,c), PhoneticMatch(q,c), TokenOverlap(q,c)) × 100 → alert if score ≥ θ',
+    statusBadge: 'EU · UN · OFAC · HMT',
   },
 };
 
