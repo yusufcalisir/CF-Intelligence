@@ -32,7 +32,7 @@
 | [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | | |
 | [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | | |
 | [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | | |
-| [11. Case Management & SAR](#11-human-in-the-loop-workbench--regulatory-reporting) | | |
+| [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |
 | [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
 
 </div>
@@ -871,6 +871,14 @@ Trains inductive GraphSAGE models on local banking transaction graphs to produce
 ### 8.2 Fuzzy Private Set Intersection (PSI) (`fuzzy_psi.py` & `entity_resolution.py`)
 Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer entities across institutions without sharing plain customer identifiers or raw database records.
 
+### 8.3 Cross-Border Corporate UBO & Heterogeneous Graph Intelligence (`ubo_graph_service.py` & `ubo_graph.py`)
+- **Multi-Tier Beneficial Ownership Graph Traversal:** Ingests complex corporate ownership structures as directed property graphs, tracing shareholding pathways from target legal entities (`ORG_*`) to ultimate natural persons (`PER_*`).
+- **Compounded Indirect Shareholding Calculation:** Automatically compounds indirect equity stakes along directed paths across arbitrarily nested holding and nominee structures:
+  $$\mathrm{Ownership}_{\mathrm{eff}}(u, e) = \sum_{p \in \mathcal{P}(u, e)} \prod_{(v, w) \in p} \mathrm{share}(v, w)$$
+- **EU AMLD6 / 4AMLD 25% Statutory Threshold Gate:** Automatically flags natural persons whose cumulative direct and indirect effective equity or voting rights reach or exceed $\ge 25.0\%$ as primary Ultimate Beneficial Owners (UBOs).
+- **Tarjan DFS Circular Ownership Loop Detection:** Applies depth-first cycle search algorithms to identify circular corporate layering rings ($\mathrm{Entity}_A \to \mathrm{Entity}_B \to \mathrm{Entity}_C \to \mathrm{Entity}_A$) engineered to obscure true controlling entities.
+- **Shell Company & Nominee Syndicate Risk Clustering:** Evaluates corporate structures for asset-shielding indicators, including high-risk FATF secrecy jurisdictions, single-director nominee saturation across unrelated corporations, and opaque multi-jurisdictional shell cascades.
+
 ---
 
 ## 9. 9-Signal Composite Risk Engine & Model Explainability
@@ -1002,7 +1010,7 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 
 ### 10.6 Real-Time Scoring Gateway, Tenant Quotas & SLA Monitoring
 
-- **REST Inference Endpoints (`POST /api/v1/predict` & `POST /api/v1/score-transaction`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700) with sub-15ms fast-path raw neural latency (<14.2ms) and ~258.9ms p50 / ~308.2ms p99 latency under concurrent 9-signal feature store enrichment (well within the 350ms multi-model SLA budget).
+- **REST Inference Endpoints (`POST /api/v1/predict`, `POST /api/v1/predict/fast` & `POST /api/v2/transactions/evaluate`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700). High-throughput payment rails (SEPA Instant, TARGET Instant Payment Settlement - TIPS) utilize the fast-path endpoint with sub-5ms raw neural latency (<14.2ms worst-case), while the enterprise OpenAPI v2 adapter (`/api/v2/transactions/evaluate`) enables drop-in integration with legacy AML pipelines without payload transformation. Full concurrent 9-signal feature store enrichment achieves ~258.9ms p50 / ~308.2ms p99 latency (well within the 350ms multi-model SLA budget).
 - **Tenant Quota Enforcement (`TenantMeteringService` & `dependencies.py`):** The `enforce_tenant_quota` dependency actively intercepts requests to `/api/v1/predict` and `/api/v1/score-transaction`, tracking monthly quota consumption per tenant tier (e.g., 100,000 monthly calls) via atomic `acquire_quota()` and recording usage metrics (`record_inference`). When an institution breaches its quota ceiling, the gateway rejects the request with `HTTP 429 Too Many Requests` (`detail: "Tenant API quota limit exceeded"`). *Scope Note:* Metering is actively wired and enforced at the high-throughput inference gateway endpoints, rather than universally wrapping every internal admin or diagnostic probe.
 - **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
 
@@ -1075,7 +1083,13 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 - **EU AMLA Standardized JSON Format:** Compiles structured incident files adhering to the emerging EU Anti-Money Laundering Authority (AMLA) Single Rulebook format, detailing consortium velocity, mule accounts, and typologies.
 - **Encrypted Transmission Envelope:** Wraps exported reports in an encrypted HMAC-SHA256 signed envelope (`CFI_REGULATORY_ENVELOPE_SECRET`) with submission tracking and mandatory Four-Eyes supervisor sign-off before transmission.
 
-### 11.6 Data Retention, Erasure & PII Redaction
+### 11.6 European AML Monitoring Scenario Library & Hybrid Rule Engine (`european_scenario_library.py` & `european_scenarios.py`)
+- **16 Pre-Configured European Banking AML Typologies:** Codifies 16 production scenarios aligned with European Banking Authority (EBA) mandates and FATF typologies, including Sub-€10,000 Structuring/Smurfing (`SCN_EUR_STRUCTURING_SUB_10K`), Rapid Pass-Through Mule Accounts (`SCN_EUR_PASS_THROUGH_MULE`), High-Risk Non-Cooperative Jurisdiction Flows (`SCN_EUR_HIGH_RISK_JURISDICTION`), Round Amount Velocity Layering (`SCN_EUR_ROUND_AMOUNT_LAYERING`), Dormant Account Sudden Awakening (`SCN_EUR_DORMANT_SUDDEN_ACTIVITY`), Fan-Out Disbursement (`SCN_EUR_FAN_OUT_DISBURSEMENT`), and Terrorist Financing Indicators.
+- **Hybrid Scoring Synthesis Engine:** Synthesizes deterministic regulatory rule breaches with federated machine learning anomaly scores to produce an authoritative composite risk score:
+  $$S_{\mathrm{hybrid}} = \alpha \cdot S_{\mathrm{rules}} + (1 - \alpha) \cdot S_{\mathrm{ml}} \quad (\text{default } \alpha = 0.50)$$
+- **Explainability Narrative Compiler:** Automatically compiles human-readable investigative narratives summarizing exact rule trigger conditions, threshold deviations, and recommended statutory actions (`ALLOW`, `MANUAL_REVIEW`, `SAR_ESCALATION`, `IMMEDIATE_BLOCK`) to accelerate compliance officer triage.
+
+### 11.7 Data Retention, Erasure & PII Redaction
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
 - **Support Diagnostics & PII Redaction (`support_diagnostics.py`):** Generates sanitized diagnostics bundles from multi-line log sources (strings, files, lists) prior to support export. Redacts international IBANs (generic format matching 2-letter country code + 2 check digits + alphanumeric account string), payment card numbers (validated via ISO/IEC 7812 Luhn MOD-10 checksum algorithm), Turkish/Generic National IDs (11-digit algorithmic validation), raw account numbers, phone numbers (international and domestic formats), and contextual customer names (`Customer Name: [REDACTED]`). *Scope Note:* Name redaction uses deterministic keyword-prefixed heuristic regex patterns (e.g. `Customer Name:`, `Account Holder:`, `Client Name:`), not true Named Entity Recognition (NER) ML models.
 
@@ -1236,6 +1250,10 @@ The technical architecture of CF-Intelligence explores how system design pattern
    High-risk financial AI governance mandates require explainability and human supervisory control. The architecture integrates real-time KernelExplainer SHAP feature attributions into scoring responses and implements a "Four-Eyes Principle" workflow requiring dual supervisor authorization before closing investigation cases or submitting regulatory filings.
 7. **Zero-Trust Access Control & Cryptographic Audit Trails:**  
    The architecture models Attribute-Based Access Control (ABAC) and append-only cryptographic audit chains (`block_hash` linking) to explore security controls for managing multi-institution consortium lifecycles and model promotion gates.
+8. **Beneficial Ownership Transparency & Circular Layering (EU AMLD6 & 4AMLD 25% Threshold):**  
+   Statutory corporate transparency mandates (EU 4th/5th/6th AML Directives) require financial institutions to identify Ultimate Beneficial Owners (UBOs) holding $\ge 25.0\%$ cumulative ownership or voting rights. CF-Intelligence implements multi-tier directed graph traversal, automated compounding of indirect shareholdings, Tarjan-based circular ownership loop detection, and high-risk jurisdiction shell company clustering.
+9. **Standardized Typology Detection & Hybrid Rule Blending (FATF Recommendations & EBA Guidelines):**  
+   European Banking Authority (EBA) and FATF standards mandate continuous automated monitoring across established typologies. The platform deploys 16 pre-configured statutory scenarios (sub-€10k structuring/smurfing, rapid pass-through mule movement, round amount layering, fan-out disbursement, dormant account awakening) synthesized dynamically with federated ML anomaly scores ($S_{\mathrm{hybrid}} = \alpha S_{\mathrm{rules}} + (1 - \alpha) S_{\mathrm{ml}}$).
 
 
 ---
