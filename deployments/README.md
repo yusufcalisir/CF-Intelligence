@@ -68,5 +68,5 @@ All deployment artifacts are verified by automated testing pipelines:
 2. **Kubernetes Helm Manifest Dry-Run Audit**:
    ```bash
    python scripts/validate_k8s_manifests.py --all
-   # Result: 38/38 Kubernetes resources rendered and validated cleanly via kubectl apply --dry-run=client
+   # Result: 39/39 Kubernetes resources rendered and validated cleanly via kubectl apply --dry-run=client
    ```

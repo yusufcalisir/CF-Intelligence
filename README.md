@@ -653,6 +653,10 @@ CF-Intelligence/
 │   ├── argocd/                                      # GitOps continuous delivery Application manifests
 │   └── docker/                                      # Container specifications for API, client daemons & workers
 │
+├── helm/                                            # Standalone Unified Kubernetes Helm Chart
+│   ├── README.md                                    # Architecture, values reference & verification guide
+│   └── cfi-platform/                                # Unified application chart (Deployment, Service, HPA, Ingress)
+│
 ├── monitoring/                                      # Production Observability & Telemetry Stacks
 │   ├── prometheus/                                  # Prometheus server configuration & SLA alert rules
 │   ├── grafana/                                     # Provisioned Grafana dashboard JSON models
@@ -1233,7 +1237,7 @@ All benchmark measurements and verification suites can be directly reproduced vi
 | **EU AI Act & Governance Export** | `python scripts/export_compliance_report.py` | Generates standardized multi-page markdown compliance audit reports covering bias, explainability, and model governance. |
 | **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 29 dynamic Python AST mutants & 12 TypeScript invariants across frontend & backend with 86.2% backend AST kill rate (90.2% composite score). |
 | **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch` with strict 75% regression gate (`--cov-fail-under=75`). |
-| **Kubernetes Manifest Dry-Run Audit** | `python scripts/validate_k8s_manifests.py --all` | Renders Helm charts and executes authentic `kubectl apply --dry-run=client` against all 38 production resources with zero template errors. |
+| **Kubernetes Manifest Dry-Run Audit** | `python scripts/validate_k8s_manifests.py --all` | Renders Helm charts and executes authentic `kubectl apply --dry-run=client` against all 39 production resources with zero template errors. |
 | **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
 | **Dynamic CycloneDX 1.5 SBOM** | `python scripts/generate_sbom.py --format cyclonedx` | Generates automated, dependency-verified CycloneDX 1.5 JSON SBOM capturing 330 components across Python and npm runtimes with license and hash tracking. Outputs to `storage/sbom_cyclonedx.json`. |
 
