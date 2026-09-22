@@ -601,10 +601,12 @@ CF-Intelligence/
 │   └── tests/                                       # Vitest & React Testing Library Suite (268 Tests across 81 Files)
 │
 ├── sdk/                                             # Official Consortium Client SDK
+│   ├── README.md                                    # Top-level SDK overview & quick-start guide
+│   ├── examples/                                    # Core banking integration & streaming transaction examples
+│   │   └── reference_bank_connector.py              # End-to-end reference bank adapter implementation
 │   └── python/                                      # Python 3.10+ Integration SDK (`cfi-connector-sdk`)
-│       ├── cfi_connector_sdk/                       # SDK core package (Client, Core Banking Connectors, Local Model Runner)
-│       ├── examples/                                # Core banking integration & streaming transaction examples
-│       ├── tests/                                   # SDK unit & integration test suite
+│       ├── cfi_connector_sdk/                       # SDK core package (Adapters, Client, Health Monitor)
+│       ├── tests/                                   # SDK unit & integration test suite (11 Tests)
 │       └── pyproject.toml                           # SDK packaging configuration
 │
 ├── docs/                                            # Complete Technical Specifications & Architecture (38+ Docs)
