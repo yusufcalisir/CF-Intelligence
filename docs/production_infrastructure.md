@@ -56,7 +56,7 @@ deployments/terraform/
   * **AWS Aurora Multi-AZ PostgreSQL**: Multi-tenant database engine enforcing strict schema isolation (`tenant_<id>.*`) and read replicas.
   * **AWS ElastiCache Redis**: Redis Sentinel HA with TLS encryption in transit and per-tenant key namespacing (`cfi:tenant:<bank_id>:*`).
 * **Cryptographic Keys**: Dedicated AWS KMS customer-managed keys (`aws_kms_key.cfi`) for EKS secrets envelope encryption.
-* **Verification Suite**: `python -m pytest backend/tests/unit/test_terraform_templates.py` (27/27 unit tests pass).
+* **Verification Suite**: `python -m pytest backend/tests/unit/test_terraform_templates.py` (66/66 unit tests pass).
 
 ### 2.2. Microsoft Azure Terraform Blueprint (`deployments/terraform/azure/`)
 * **VNet & Security Perimeter**: Dedicated Virtual Network (`10.0.0.0/16`) with subnet segregation and Network Security Groups (`azurerm_network_security_group.cfi`) blocking inter-bank lateral movement.
