@@ -47,14 +47,18 @@ test-unit: ## Run unit tests only
 test-integration: ## Run integration tests only
 	cd backend && python -m pytest tests/integration/ -v
 
-lint: ## Run linters
+lint: ## Run linters (matching CI pipeline)
 	cd backend && ruff check app/ tests/
-	cd backend && ruff format --check app/ tests/
-	cd backend && mypy app/
+	cd backend && mypy app/ --ignore-missing-imports
 
 lint-fix: ## Auto-fix lint issues
 	cd backend && ruff check --fix app/ tests/
+
+format: ## Format backend code with ruff
 	cd backend && ruff format app/ tests/
+
+format-check: ## Check formatting with ruff
+	cd backend && ruff format --check app/ tests/
 
 # ──────────────────────────────────────────────
 # Frontend
