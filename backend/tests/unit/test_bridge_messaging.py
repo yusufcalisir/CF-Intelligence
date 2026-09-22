@@ -21,7 +21,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 # ── Service-layer imports ───────────────────────────────────────────────────────
-
 from app.application.services.bridge_case_service import (
     BridgeCaseService,
     InvalidTicketTransitionError,
@@ -30,7 +29,6 @@ from app.application.services.bridge_case_service import (
     decrypt_payload,
     encrypt_payload,
     generate_bank_keypair,
-    get_bridge_service,
 )
 from app.domain.enums import FinintTicketStatus, FinintTicketType
 
@@ -344,7 +342,7 @@ class TestAuditChainIntegrity:
             svc.verify_audit_chain("no-such-ticket")
 
     def test_event_hash_computation_is_deterministic(self):
-        from datetime import datetime, UTC
+        from datetime import UTC, datetime
         ts = datetime(2026, 9, 22, 18, 0, 0, tzinfo=UTC)
         h1 = _compute_event_hash("prev", 0, "actor", "action", ts)
         h2 = _compute_event_hash("prev", 0, "actor", "action", ts)

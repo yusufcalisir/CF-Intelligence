@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 import os
-import re
 from datetime import UTC, datetime
 from decimal import Decimal
 from xml.etree import ElementTree as ET
@@ -26,16 +25,15 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.application.services.payment_recall_service import (
-    PaymentRecallService,
+    InvalidAmountError,
     InvalidRecallTransitionError,
+    PaymentRecallService,
     RecallCaseNotFoundError,
     _compute_recall_event_hash,
     _mask_iban,
     _validate_amount,
-    generate_camt056_xml,
     generate_camt029_xml,
     generate_pacs004_xml,
-    get_recall_service,
 )
 from app.domain.enums import RecallReasonCode, RecallStatus, ResolutionCode
 
@@ -352,7 +350,7 @@ class TestPositiveResolution:
 
     def test_invalid_amount_raises(self, svc, initiated_case):
         self._advance_to_sent(svc, initiated_case)
-        with pytest.raises(Exception):
+        with pytest.raises(InvalidAmountError):
             svc.resolve_positive(initiated_case.id, CREDITOR_BIC, INSTRUCTING_BIC, "-100.00")
 
 
@@ -431,7 +429,6 @@ class TestAuditChain:
 class TestHelpers:
 
     def test_validate_amount_positive(self):
-        from decimal import Decimal
         assert _validate_amount("100.00") == Decimal("100.00")
 
     def test_validate_amount_rejects_negative(self):
@@ -484,6 +481,7 @@ class TestSchemaValidation:
 
     def test_invalid_bic_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.recall_schemas import InitiateRecallRequest
         with pytest.raises(ValidationError, match="BIC"):
             InitiateRecallRequest(
@@ -497,6 +495,7 @@ class TestSchemaValidation:
 
     def test_negative_amount_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.recall_schemas import InitiateRecallRequest
         with pytest.raises(ValidationError):
             InitiateRecallRequest(
@@ -508,6 +507,7 @@ class TestSchemaValidation:
 
     def test_invalid_uetr_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.recall_schemas import InitiateRecallRequest
         with pytest.raises(ValidationError, match="UUIDv4"):
             InitiateRecallRequest(

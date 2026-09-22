@@ -27,7 +27,6 @@ from fastapi.testclient import TestClient
 from app.application.services.screening_service import (
     ScreeningService,
     WatchlistEntry,
-    _entity_hash,
     _jaro_winkler,
     _levenshtein,
     _levenshtein_similarity,
@@ -174,6 +173,7 @@ class TestJaroWinkler:
         score_prefix = _jaro_winkler("johnson", "johnston")
         score_suffix = _jaro_winkler("johnsen", "johnson")
         assert score_prefix >= 0.9
+        assert score_suffix >= 0.9
 
     def test_score_between_0_and_1(self):
         s = _jaro_winkler("petrov", "petrova")
@@ -517,12 +517,14 @@ class TestSchemaValidation:
 
     def test_empty_name_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.screening_schemas import ScreenEntityRequest
         with pytest.raises(ValidationError):
             ScreenEntityRequest(query_name="")
 
     def test_threshold_out_of_range_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.screening_schemas import ScreenEntityRequest
         with pytest.raises(ValidationError):
             ScreenEntityRequest.model_validate({"query_name": "Test", "alert_threshold": 101})
@@ -538,6 +540,7 @@ class TestSchemaValidation:
 
     def test_too_many_aliases_rejected(self):
         from pydantic import ValidationError
+
         from app.application.schemas.screening_schemas import WatchlistEntryRequest
         with pytest.raises(ValidationError, match="Maximum 50 aliases"):
             WatchlistEntryRequest(
