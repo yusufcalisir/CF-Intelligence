@@ -45,6 +45,7 @@ const PLATFORM_MODULES: Module[] = [
 
   // ── EUROPEAN REGTECH & COLLABORATIVE FININT ─────────────────────────────────
   { id: 'finint-bridge', name: 'Inter-Bank Encrypted FININT Messaging', category: 'European RegTech & Collaborative FININT', purpose: 'Enables compliance officers to exchange encrypted cross-institution FININT case tickets using Curve25519 ECDH + AES-256-GCM E2EE, SHA-256 evidence hash verification, and SHA-256 hash-chained immutable audit logging across consortium banks.', algorithm: 'Curve25519 ECDH + AES-256-GCM + HKDF-SHA256 + SHA-256 Hash-Chain Audit', inputs: 'Structured FININT request payload + Curve25519 public key of recipient institution', outputs: 'Encrypted FININT ticket + tamper-evident audit trail + SLA timer', tech: 'cryptography (X25519, AESGCM, HKDF), FastAPI, Pydantic v2, Python 3.12' },
+  { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation — with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -226,6 +227,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open FININT Case Workbench',
     tensorSample: 'E2EE: (ephem_priv, recip_pub) → ECDH → HKDF(32B key) → AES-256-GCM(payload) | SHA-256 Hash-Chain: H_n = SHA-256(H_{n-1} || seq || actor || action || ts)',
     statusBadge: 'EUROPEAN REGTECH',
+  },
+  'sepa-recall': {
+    sla: 'FRAD: 4h · TECH/DUPL/CUST/UPAY/COVR: 10 business days (EPC SCT Inst Rulebook v1.1)',
+    security: 'SHA-256 BIC hash storage | Zero cleartext IBAN persistence | Hash-chained audit',
+    compliance: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 | EPC SCT Inst | EU AMLA',
+    actionRoute: '/cases',
+    actionLabel: 'Open Recall Workbench',
+    tensorSample: 'camt.056: FIToFIPaymentCancellationRequest(Rsn: FRAD) → pacs.004: PaymentReturn(RtrdAmt) | camt.029: ResolutionOfInvestigation(Conf: NOAS/NOOR/LEGL)',
+    statusBadge: 'ISO 20022 · EPC SCT INST',
   },
 };
 

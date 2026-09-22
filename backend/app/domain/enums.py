@@ -270,3 +270,62 @@ class FinintTicketStatus(StrEnum):
     INFORMATION_ATTACHED = "INFORMATION_ATTACHED"
     DECLINED = "DECLINED"
     CLOSED = "CLOSED"
+
+
+# ── Phase 107: SEPA Instant Payment Recall (ISO 20022) ────────────────────────
+
+
+class RecallReasonCode(StrEnum):
+    """ISO 20022 payment cancellation reason codes used in camt.056 messages.
+
+    Codes defined by the EPC SEPA Instant Credit Transfer (SCT Inst) rulebook
+    and the ISO 20022 External Code Sets (ExternalCancellationReason1Code).
+    """
+
+    FRAD = "FRAD"   # Fraudulent Origination — highest priority, 4h SLA
+    TECH = "TECH"   # Technical Problem (duplicate, encoding error)
+    DUPL = "DUPL"   # Duplicate Transfer — accidental re-submission
+    CUST = "CUST"   # Requested by Originating Customer
+    UPAY = "UPAY"   # Undue Payment — erroneous beneficiary / amount
+    COVR = "COVR"   # Cover Payment recall
+
+
+class RecallMessageType(StrEnum):
+    """ISO 20022 message types involved in the SEPA recall workflow."""
+
+    CAMT_056 = "camt.056.001.08"   # FIToFIPaymentCancellationRequest
+    PACS_004 = "pacs.004.001.09"   # PaymentReturn (positive recall)
+    CAMT_029 = "camt.029.001.09"   # ResolutionOfInvestigation (negative/partial)
+    PACS_008 = "pacs.008.001.08"   # Original credit transfer (source)
+
+
+class RecallStatus(StrEnum):
+    """Lifecycle states of a SEPA payment recall case.
+
+    State machine:
+    INITIATED → SENT → ACKNOWLEDGED_BY_CREDITOR_AGENT →
+        FUNDS_RETURNED (pacs.004) | UNABLE_TO_RECALL (camt.029 - NOAS/NOOR)
+    Also: PROVISIONAL_HOLD_ACTIVE during pending resolution.
+    """
+
+    INITIATED = "INITIATED"
+    SENT = "SENT"
+    ACKNOWLEDGED_BY_CREDITOR_AGENT = "ACKNOWLEDGED_BY_CREDITOR_AGENT"
+    PROVISIONAL_HOLD_ACTIVE = "PROVISIONAL_HOLD_ACTIVE"
+    FUNDS_RETURNED = "FUNDS_RETURNED"
+    UNABLE_TO_RECALL = "UNABLE_TO_RECALL"
+    PARTIALLY_RETURNED = "PARTIALLY_RETURNED"
+    CANCELLED = "CANCELLED"
+
+
+class ResolutionCode(StrEnum):
+    """camt.029 ResolutionOfInvestigation reason codes (negative recall outcomes).
+
+    Source: ISO 20022 ExternalInvestigationExecutionConfirmation1Code.
+    """
+
+    NOAS = "NOAS"   # No Answer from beneficiary / account frozen
+    NOOR = "NOOR"   # No Original Transaction Received (unrecognised)
+    LEGL = "LEGL"   # Legal proceedings initiated — funds frozen by court
+    CUST = "CUST"   # Beneficiary customer disputed the recall
+    AGNT = "AGNT"   # Agent-level technical reason (routing error)

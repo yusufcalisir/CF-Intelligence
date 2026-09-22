@@ -54,6 +54,7 @@ from app.presentation.routers import (
     monitoring,
     onboarding,
     optimization,
+    payment_recall,
     predict,
     privacy_defense,
     psd2,
@@ -1060,6 +1061,8 @@ else:
     app.include_router(gateway.api_router)
     app.include_router(bridge_messaging.router)
     app.include_router(bridge_messaging.api_router)
+    app.include_router(payment_recall.router)
+    app.include_router(payment_recall.api_router)
 
 
 @app.get("/", tags=["root"])

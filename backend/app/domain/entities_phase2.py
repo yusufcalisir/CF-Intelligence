@@ -19,7 +19,11 @@ from app.domain.enums import (
     CaseStatus,
     EntityType,
     IntelligenceType,
+    RecallMessageType,
+    RecallReasonCode,
+    RecallStatus,
     RelationshipType,
+    ResolutionCode,
     RiskLevel,
     ScenarioType,
     TriageAction,
@@ -324,3 +328,94 @@ class FinintBridgeTicket:
     audit_trail: list[FinintTicketAuditEntry] = field(default_factory=list)
     head_hash: str = ""  # current tip of the hash chain
 
+
+# ── Phase 107: SEPA Instant Payment Recall entities ───────────────────────────
+
+
+@dataclass
+class RecallAuditEntry:
+    """Immutable SHA-256 hash-chained audit record for a recall case lifecycle event.
+
+    Each entry records who did what, when, and chains cryptographically to the
+    previous entry, providing a tamper-evident compliance audit trail.
+    """
+
+    seq: int
+    actor: str                   # anonymised officer / system identifier
+    action: str                  # e.g. "RECALL_INITIATED", "HOLD_TRIGGERED"
+    previous_status: str
+    new_status: str
+    message_type: str            # ISO 20022 message that triggered this event
+    event_hash: str              # SHA-256(prev_hash || seq || actor || action || ts)
+    previous_hash: str
+    timestamp: datetime
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class RecallCase:
+    """SEPA Instant Payment Recall case (ISO 20022 camt.056 / pacs.004 / camt.029).
+
+    Manages the full lifecycle of a cross-bank payment cancellation request
+    under the EPC SCT Inst rulebook, including:
+
+    - camt.056.001.08 generation: FIToFIPaymentCancellationRequest XML.
+    - pacs.004.001.09 handling: PaymentReturn (positive outcome).
+    - camt.029.001.09 handling: ResolutionOfInvestigation (negative / partial).
+    - Provisional hold webhook: sub-second notification to core banking rails.
+    - SHA-256 hash-chained immutable audit trail.
+
+    Privacy invariants:
+    - Original account identifiers stored as HMAC-SHA256 hashes.
+    - No cleartext IBAN or BIC persisted beyond the XML blobs generated on demand.
+    """
+
+    id: str = field(default_factory=lambda: str(uuid.uuid4()))
+
+    # ISO 20022 transaction references
+    original_msg_id: str = ""          # MsgId from original pacs.008
+    original_instr_id: str = ""        # InstrId from original pacs.008
+    original_end_to_end_id: str = ""   # EndToEndId from original pacs.008
+    original_uetr: str = ""            # Unique End-to-end Transaction Reference (UUIDv4)
+
+    # Recall metadata
+    recall_reason: str = RecallReasonCode.FRAD
+    originating_bank_bic_hash: str = ""    # SHA-256(BIC) of instructing agent
+    creditor_agent_bic_hash: str = ""      # SHA-256(BIC) of creditor agent
+
+    # Amount (EPC SCT Inst: EUR, 2 decimal places)
+    amount_eur: str = "0.00"           # string to avoid floating-point drift
+    currency: str = "EUR"
+
+    # Status
+    status: str = RecallStatus.INITIATED
+    message_type: str = RecallMessageType.CAMT_056
+
+    # Generated XML blobs (produced on demand — never hardcoded)
+    camt056_xml: str = ""              # Generated camt.056 XML
+    pacs004_xml: str = ""              # Generated pacs.004 XML (if returned)
+    camt029_xml: str = ""              # Generated camt.029 XML (if unable)
+
+    # Resolution details
+    resolution_code: str | None = None     # ResolutionCode value if camt.029
+    returned_amount_eur: str | None = None # Actual amount returned (partial return)
+    resolution_narrative: str = ""
+
+    # Provisional hold
+    provisional_hold_triggered: bool = False
+    provisional_hold_triggered_at: datetime | None = None
+    provisional_hold_webhook_url: str = ""   # target core banking webhook endpoint
+    provisional_hold_response_status: int | None = None
+
+    # SLA tracking (EPC SCT Inst rulebook SLAs)
+    sla_hours: int = 4              # FRAD = 4h, others = 10 business days
+    sla_deadline: datetime | None = None
+
+    # Lifecycle timestamps
+    created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+    resolved_at: datetime | None = None
+
+    # Audit chain
+    audit_trail: list[RecallAuditEntry] = field(default_factory=list)
+    head_hash: str = ""
