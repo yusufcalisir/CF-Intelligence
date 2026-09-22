@@ -116,7 +116,8 @@ def _validate_amount(amount_str: str) -> Decimal:
         raise InvalidAmountError(f"Invalid amount: {amount_str!r}") from exc
     if d <= 0:
         raise InvalidAmountError(f"Amount must be positive, got {amount_str!r}")
-    if d.as_tuple().exponent < -2:
+    exp = d.as_tuple().exponent
+    if not isinstance(exp, int) or exp < -2:
         raise InvalidAmountError(f"Amount exceeds 2 decimal places: {amount_str!r}")
     return d
 
