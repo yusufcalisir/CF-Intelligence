@@ -86,7 +86,8 @@ desktop.ini
 *.sqlite3
 *.sqlite
 data/
-storage/
+storage/*
+!storage/README.md
 backend/storage/
 backend/app/storage/
 !backend/app/infrastructure/storage/

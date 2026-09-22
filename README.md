@@ -668,6 +668,14 @@ CF-Intelligence/
 │   ├── loki/                                        # Loki centralized log aggregation configuration
 │   └── promtail/                                    # Promtail log shipping agent configuration
 │
+├── storage/                                         # Persistent Data Target & Partitioned Artifacts
+│   ├── README.md                                    # Storage layout, volume mounting & retention guide
+│   ├── datasets/                                    # Parquet feature sets for federated learning (PaySim, etc.)
+│   ├── regulatory_filings/                          # Generated SAR XML filings (FIU transmission payloads)
+│   ├── retention_ledger/                            # GDPR Article 17 append-only erasure ledgers
+│   ├── label_feedback/                              # Incremental active-learning feedback partitions
+│   └── benchmarks/                                  # Pre-computed evaluation metrics and scenario results
+│
 ├── contracts/                                       # Hardhat EVM Smart Contracts [Research]
 │   ├── contracts/                                   # ConsortiumIncentiveSettlement.sol, GnosisSafeMultiSigCoordinator.sol
 │   ├── stubs/                                       # Zero-dependency signing-key stub (vulnerability mitigation)
