@@ -281,7 +281,7 @@ class OpenAMLService:
                     "timestamp": datetime.now(UTC).isoformat(),
                 }
 
-            person_id = txn.get("person_id", "unknown_subject")
+            person_id = str(txn.get("person_id") or "unknown_subject")
             person = self._persons.get(tenant_id, {}).get(person_id)
 
             triggered_rules: list[str] = []
@@ -445,11 +445,11 @@ class OpenAMLService:
             for h in raw_screen.hits:
                 hits.append(
                     ScreeningHit(
-                        watchlist_source=str(h.source),
+                        watchlist_source=h.source,
                         matched_name=h.matched_name,
                         composite_score=round(h.score / 100.0, 3),
-                        algorithm=str(h.algorithm),
-                        entity_type=str(h.entity_type),
+                        algorithm=h.algorithm,
+                        entity_type=h.entity_type,
                         date_of_birth_matched=bool(date_of_birth and date_of_birth in h.matched_name),
                         nationality_matched=bool(nationality and nationality in h.matched_name),
                         sanctions_program=h.listed_by or "RESTRICTIVE_MEASURES",

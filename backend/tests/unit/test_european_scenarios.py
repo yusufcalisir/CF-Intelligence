@@ -12,6 +12,8 @@ Validates:
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
@@ -42,37 +44,38 @@ def client() -> TestClient:
     return TestClient(app)
 
 
-def _create_base_context(**kwargs) -> TransactionContext:
+def _create_base_context(**kwargs: Any) -> TransactionContext:
     """Helper to create a standard benign transaction context."""
-    defaults = {
-        "transaction_id": "TX-BASE-001",
-        "amount": 250.0,
-        "currency": "EUR",
-        "originator_id": "CUST-ALICE-100",
-        "beneficiary_id": "CUST-BOB-200",
-        "origin_country": "DE",
-        "destination_country": "FR",
-        "payment_rail": "SEPA_INSTANT",
-        "originator_account_age_days": 180,
-        "originator_is_pep": False,
-        "originator_is_sanctioned": False,
-        "beneficiary_is_pep": False,
-        "beneficiary_is_sanctioned": False,
-        "is_dormant_account": False,
-        "account_average_daily_volume": 500.0,
-        "inbound_credits_last_1h": 250.0,
-        "outbound_debits_last_1h": 0.0,
-        "transaction_count_last_1h": 1,
-        "recent_distinct_counterparties_24h": 1,
-        "funds_retention_ratio": 1.0,
-        "merchant_category": "retail_groceries",
-        "is_nighttime_execution": False,
-        "is_crypto_service_provider": False,
-        "unit_price_deviation_ratio": None,
-        "cyclic_mule_hops": None,
-    }
-    defaults.update(kwargs)
-    return TransactionContext(**defaults)
+    base = TransactionContext(
+        transaction_id="TX-BASE-001",
+        amount=250.0,
+        currency="EUR",
+        originator_id="CUST-ALICE-100",
+        beneficiary_id="CUST-BOB-200",
+        origin_country="DE",
+        destination_country="FR",
+        payment_rail="SEPA_INSTANT",
+        originator_account_age_days=180,
+        originator_is_pep=False,
+        originator_is_sanctioned=False,
+        beneficiary_is_pep=False,
+        beneficiary_is_sanctioned=False,
+        is_dormant_account=False,
+        account_average_daily_volume=500.0,
+        inbound_credits_last_1h=250.0,
+        outbound_debits_last_1h=0.0,
+        transaction_count_last_1h=1,
+        recent_distinct_counterparties_24h=1,
+        funds_retention_ratio=1.0,
+        merchant_category="retail_groceries",
+        is_nighttime_execution=False,
+        is_crypto_service_provider=False,
+        unit_price_deviation_ratio=None,
+        cyclic_mule_hops=None,
+    )
+    if kwargs:
+        return base.model_copy(update=kwargs)
+    return base
 
 
 class TestEuropeanScenarioLibrary:

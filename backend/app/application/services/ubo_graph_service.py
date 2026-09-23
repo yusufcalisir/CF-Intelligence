@@ -336,7 +336,8 @@ class UBOGraphService:
             closed_cycles: list[list[str]] = []
             for c in raw_cycles:
                 if len(c) >= 2:
-                    closed_cycles.append(c + [c[0]])
+                    cycle_nodes = [str(node) for node in c]
+                    closed_cycles.append(cycle_nodes + [cycle_nodes[0]])
 
             return closed_cycles
 
@@ -477,8 +478,8 @@ class UBOGraphService:
                                 f"Director {n.get('name')} ({n.get('director_id')}) administers "
                                 f"{n.get('directorship_count')} corporate entities across the consortium."
                             ),
-                            involved_node_ids=[n.get("director_id")]
-                            + n.get("managed_entities", [])[:5],
+                            involved_node_ids=[str(n.get("director_id") or "")]
+                            + [str(e) for e in n.get("managed_entities", [])[:5]],
                             risk_score_impact=200.0,
                         )
                     )
@@ -502,7 +503,7 @@ class UBOGraphService:
                                 f"Entity {s.get('name')} registered in {s.get('jurisdiction')} "
                                 f"exhibits shell attributes (low capital: {s.get('low_nominal_capital')})."
                             ),
-                            involved_node_ids=[s.get("entity_id")],
+                            involved_node_ids=[str(s.get("entity_id") or "")],
                             risk_score_impact=250.0,
                         )
                     )
