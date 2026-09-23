@@ -132,10 +132,20 @@ export default function CaseDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['case-evidence', caseId] });
   };
 
+  const isFincenEligible = ['closed_confirmed', 'sar_filed'].includes(caseData?.status || '');
+
   const handleExportFinCENXml = async () => {
     if (!caseId) return;
     setStatusError(null);
     setXmlExportSuccess(null);
+
+    if (!isFincenEligible) {
+      setStatusError(
+        `⚠️ FinCEN SAR XML filing requires resolving the case first. Please provide a Supervisor Signature and transition to 'Closed (Confirmed)' under Four-Eyes dual control.`
+      );
+      return;
+    }
+
     setIsExportingXml(true);
     try {
       const res = await exportFinCEN.mutateAsync({
@@ -226,76 +236,107 @@ export default function CaseDetailPage() {
           ))}
         </div>
 
-        {/* Status Actions */}
-        {caseData.is_open && (
-          <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-[var(--color-border)] items-center w-full">
-            <span className="text-xs text-[var(--color-text-muted)] self-center mr-2">Change status:</span>
-            {(() => {
-              const VALID_TRANSITIONS: Record<string, string[]> = {
-                open: ['assigned', 'investigating', 'closed_false_positive'],
-                assigned: ['investigating', 'open'],
-                investigating: ['pending_review', 'escalated', 'closed_confirmed', 'closed_false_positive'],
-                pending_review: ['investigating', 'escalated', 'closed_confirmed', 'closed_false_positive'],
-                escalated: ['investigating', 'closed_confirmed', 'sar_filed'],
-                sar_filed: ['closed_confirmed'],
-              };
-              return (VALID_TRANSITIONS[caseData.status] || []).map((value) => (
-                <button
-                  key={value}
-                  onClick={() => handleStatusChange(value)}
-                  disabled={updateStatus.isPending}
-                  className="px-2 py-1 text-xs rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)] transition-colors disabled:opacity-50"
-                >
-                  {CASE_STATUS_LABELS[value] || value}
-                </button>
-              ));
-            })()}
-            {caseData.status === 'sar_filed' && (
-              <a
-                href={`/api/v1/cases/${caseData.id}/sar-report`}
-                download={`sar_report_${caseData.id.slice(0, 8)}.xml`}
-                target="_blank"
-                rel="noreferrer"
-                className="ml-auto px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold flex items-center gap-1 transition-colors"
-              >
-                📥 Download SAR XML
-              </a>
-            )}
-            <button
-              onClick={handleExportFinCENXml}
-              disabled={isExportingXml}
-              className="px-2.5 py-1 text-xs rounded font-semibold bg-amber-600/80 hover:bg-amber-600 text-white transition-colors disabled:opacity-50 flex items-center gap-1 shrink-0"
-              title="Compile validated FinCEN BSA SAR XML"
+        {/* Status Actions & Compliance Workbench */}
+        <div className="flex flex-wrap gap-2 mt-4 pt-3 border-t border-[var(--color-border)] items-center w-full">
+          {caseData.is_open ? (
+            <>
+              <span className="text-xs text-[var(--color-text-muted)] self-center mr-2">Change status:</span>
+              {(() => {
+                const VALID_TRANSITIONS: Record<string, string[]> = {
+                  open: ['assigned', 'investigating', 'closed_false_positive'],
+                  assigned: ['investigating', 'open'],
+                  investigating: ['pending_review', 'escalated', 'closed_confirmed', 'closed_false_positive'],
+                  pending_review: ['investigating', 'escalated', 'closed_confirmed', 'closed_false_positive'],
+                  escalated: ['investigating', 'closed_confirmed', 'sar_filed'],
+                  sar_filed: ['closed_confirmed'],
+                };
+                return (VALID_TRANSITIONS[caseData.status] || []).map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => handleStatusChange(value)}
+                    disabled={updateStatus.isPending}
+                    className="px-2 py-1 text-xs rounded border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)] transition-colors disabled:opacity-50"
+                  >
+                    {CASE_STATUS_LABELS[value] || value}
+                  </button>
+                ));
+              })()}
+            </>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              <span className="text-[var(--color-text-muted)]">Case Resolution:</span>
+              <span className="px-2.5 py-0.5 rounded font-bold text-xs bg-slate-800 text-slate-200 border border-slate-700">
+                {CASE_STATUS_LABELS[caseData.status] || caseData.status}
+              </span>
+              {caseData.closed_at && (
+                <span className="text-[11px] text-[var(--color-text-muted)]">
+                  Closed: {new Date(caseData.closed_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+          )}
+
+          {caseData.status === 'sar_filed' && (
+            <a
+              href={`/api/v1/cases/${caseData.id}/sar-report`}
+              download={`sar_report_${caseData.id.slice(0, 8)}.xml`}
+              target="_blank"
+              rel="noreferrer"
+              className="ml-auto px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-xs font-semibold flex items-center gap-1 transition-colors"
             >
-              {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
-            </button>
-            {/* Supervisor Signature for Case Closure */}
-            {['investigating', 'pending_review', 'escalated', 'sar_filed'].includes(caseData.status) && (
-              <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 sm:items-center w-full max-w-full sm:max-w-md mt-3 p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg min-w-0">
-                <span className="text-[10px] text-yellow-500 font-bold uppercase whitespace-nowrap shrink-0">Supervisor Signature:</span>
-                <input
-                  type="text"
-                  value={supervisorSig}
-                  onChange={(e) => { setSupervisorSig(e.target.value); setStatusError(null); }}
-                  placeholder="Secondary authorization key..."
-                  className="w-full sm:flex-1 min-w-0 px-2 py-1 text-xs rounded bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-[var(--color-text-primary)] focus:outline-none focus:border-yellow-500/50"
-                />
-              </div>
+              📥 Download SAR XML
+            </a>
+          )}
+          <button
+            onClick={handleExportFinCENXml}
+            disabled={isExportingXml}
+            className={`px-2.5 py-1 text-xs rounded font-semibold transition-colors flex items-center gap-1 shrink-0 ${
+              isFincenEligible
+                ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_12px_rgba(217,119,6,0.35)]'
+                : 'bg-amber-700/40 hover:bg-amber-700/60 text-amber-200/80 border border-amber-500/30'
+            } disabled:opacity-50 ${!caseData.is_open && caseData.status === 'closed_confirmed' ? 'ml-auto' : ''}`}
+            title={
+              isFincenEligible
+                ? 'Compile and download validated FinCEN BSA SAR 2.0 XML'
+                : "Regulatory SAR XML requires 'Closed (Confirmed)' status under Four-Eyes dual control"
+            }
+          >
+            {isExportingXml ? 'Compiling XML...' : '📤 Export FinCEN XML'}
+            {!isFincenEligible && (
+              <span className="text-[9px] px-1 py-0.2 bg-amber-900/60 text-amber-300 rounded border border-amber-600/40 ml-1">
+                4-Eyes Reqd
+              </span>
             )}
-            {/* Status Error Toast */}
-            {statusError && (
-              <div className="w-full mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium animate-in fade-in">
-                {statusError}
-              </div>
-            )}
-            {/* XML Export Success Toast */}
-            {xmlExportSuccess && (
-              <div className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium animate-in fade-in">
-                {xmlExportSuccess}
-              </div>
-            )}
-          </div>
-        )}
+          </button>
+
+          {/* Supervisor Signature for Case Closure */}
+          {caseData.is_open && ['investigating', 'pending_review', 'escalated', 'sar_filed'].includes(caseData.status) && (
+            <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2 sm:items-center w-full max-w-full sm:max-w-md mt-3 p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-lg min-w-0">
+              <span className="text-[10px] text-yellow-500 font-bold uppercase whitespace-nowrap shrink-0">Supervisor Signature:</span>
+              <input
+                type="text"
+                value={supervisorSig}
+                onChange={(e) => { setSupervisorSig(e.target.value); setStatusError(null); }}
+                placeholder="Secondary authorization key..."
+                className="w-full sm:flex-1 min-w-0 px-2 py-1 text-xs rounded bg-[var(--color-bg-primary)] border border-[var(--color-border)] text-[var(--color-text-primary)] focus:outline-none focus:border-yellow-500/50"
+              />
+            </div>
+          )}
+
+          {/* Status Error Toast */}
+          {statusError && (
+            <div className="w-full mt-2 px-3 py-2 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium animate-in fade-in">
+              {statusError}
+            </div>
+          )}
+
+          {/* XML Export Success Toast */}
+          {xmlExportSuccess && (
+            <div className="w-full mt-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-medium animate-in fade-in">
+              {xmlExportSuccess}
+            </div>
+          )}
+        </div>
       </motion.div>
 
       {/* Agentic AML Copilot & RAG Narrative Section */}
