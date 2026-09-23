@@ -230,10 +230,10 @@ export default function SecurityPage() {
   const [droppedNodeIds, setDroppedNodeIds] = useState<string[]>(['bank_delta']);
 
   const secaggNodes: SecAggNode[] = [
-    { id: 'bank_alpha', label: 'Alpha Intl.', x: 160, y: 60,  broadcast: !droppedNodeIds.includes('bank_alpha'), pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
-    { id: 'bank_beta',  label: 'Beta Corp.',  x: 300, y: 160, broadcast: !droppedNodeIds.includes('bank_beta'),  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
-    { id: 'bank_gamma', label: 'Gamma Trust', x: 160, y: 260, broadcast: !droppedNodeIds.includes('bank_gamma'), pkHex: '7e23ff..10b4', hmacHex: '1e55aa..77c9' },
-    { id: 'bank_delta', label: 'Delta Bank', x: 20,  y: 160, broadcast: !droppedNodeIds.includes('bank_delta'), pkHex: '99d4e1..f400', hmacHex: '44a1b0..9912' },
+    { id: 'bank_alpha', label: 'Alpha Intl.', x: 120, y: 25,  broadcast: !droppedNodeIds.includes('bank_alpha'), pkHex: 'a3f8c2..e14d', hmacHex: '9b72dd..3f01' },
+    { id: 'bank_beta',  label: 'Beta Corp.',  x: 215, y: 120, broadcast: !droppedNodeIds.includes('bank_beta'),  pkHex: '5c19ab..8e72', hmacHex: 'cc40fa..d8b3' },
+    { id: 'bank_gamma', label: 'Gamma Trust', x: 120, y: 215, broadcast: !droppedNodeIds.includes('bank_gamma'), pkHex: '7e23ff..10b4', hmacHex: '1e55aa..77c9' },
+    { id: 'bank_delta', label: 'Delta Bank', x: 25,  y: 120, broadcast: !droppedNodeIds.includes('bank_delta'), pkHex: '99d4e1..f400', hmacHex: '44a1b0..9912' },
   ];
   const broadcastCount = secaggNodes.filter(n => n.broadcast).length;
   const quorumReady = broadcastCount >= shamirThreshold;
@@ -810,8 +810,23 @@ export default function SecurityPage() {
                 </div>
 
                 {/* SVG Mesh Diagram */}
-                <div className="bg-[var(--color-surface-alt)] rounded-xl p-2 flex items-center justify-center">
-                  <svg viewBox="0 0 320 320" width="100%" style={{ maxWidth: 320, maxHeight: 320 }}>
+                <div className="bg-[var(--color-surface-alt)] rounded-xl p-3 flex items-center justify-center overflow-hidden">
+                  <svg
+                    viewBox="0 0 320 320"
+                    width="100%"
+                    className="w-full max-w-[320px] max-h-[320px] select-none"
+                  >
+                    {/* Central coordinator relay pulse */}
+                    <circle
+                      cx="160" cy="160" r="18"
+                      fill="rgba(99,102,241,0.06)"
+                      stroke="rgba(99,102,241,0.3)"
+                      strokeWidth="1"
+                      strokeDasharray="3 3"
+                    />
+                    <text x="160" y="164" textAnchor="middle" fontSize="11" fill="#818cf8" opacity="0.7">⚡</text>
+                    <text x="160" y="186" textAnchor="middle" fontSize="7.5" fill="#64748b" fontWeight="bold">COORDINATOR</text>
+
                     {/* ECDH edges between broadcast nodes */}
                     {meshEdges.map((e, i) => (
                       <line
@@ -823,13 +838,20 @@ export default function SecurityPage() {
                       />
                     ))}
                     {secaggNodes.map((node) => (
-                      <g key={node.id} transform={`translate(${node.x}, ${node.y})`}>
+                      <g
+                        key={node.id}
+                        transform={`translate(${node.x}, ${node.y})`}
+                        onClick={() => toggleDropout(node.id)}
+                        className="cursor-pointer group"
+                      >
+                        <title>{`${node.label} (${node.broadcast ? 'Active' : 'Dropped'}) — Click to toggle dropout`}</title>
                         {/* Node circle */}
                         <circle
                           cx="40" cy="40" r="32"
                           fill={node.broadcast ? 'rgba(99,102,241,0.15)' : 'rgba(100,116,139,0.10)'}
                           stroke={node.broadcast ? '#6366f1' : '#475569'}
                           strokeWidth={node.broadcast ? '2' : '1.5'}
+                          className="transition-colors group-hover:stroke-indigo-400"
                         />
                         {/* Key icon */}
                         <text x="40" y="37" textAnchor="middle" fontSize="18">
