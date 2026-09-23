@@ -321,27 +321,28 @@ def load_paysim(
         root / "PS_20174392719_1491204439457_log.csv",
         root / "paysim1.csv",
     ]
+    target_nrows = kwargs.get("nrows") or n_mock_txns
     parquet_files = sorted(list(root.glob("*.parquet")))
 
     if parquet_files:
         logger.info("[PaySim] Loading %d Parquet partition files from %s", len(parquet_files), root)
         dfs = [pd.read_parquet(f) for f in parquet_files]
         full_df = pd.concat(dfs, ignore_index=True)
-        if kwargs.get("nrows"):
-            full_df = full_df.iloc[: kwargs["nrows"]]
+        if target_nrows:
+            full_df = full_df.iloc[:target_nrows]
         return _process_paysim_dataframe(full_df, source="real_parquet")
 
     for csv_file in possible_csvs:
         if csv_file.exists():
-            logger.info("[PaySim] Loading real dataset from %s", csv_file)
-            df = pd.read_csv(csv_file, nrows=kwargs.get("nrows"))
+            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+            df = pd.read_csv(csv_file, nrows=target_nrows)
             return _process_paysim_dataframe(df, source="real_csv")
 
     all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
     for csv_file in all_csvs:
         if csv_file.exists():
-            logger.info("[PaySim] Loading real dataset from %s", csv_file)
-            df = pd.read_csv(csv_file, nrows=kwargs.get("nrows"))
+            logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
+            df = pd.read_csv(csv_file, nrows=target_nrows)
             return _process_paysim_dataframe(df, source="real_csv")
 
     # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
@@ -505,12 +506,13 @@ def load_ieee_cis(
     root = resolve_dataset_dir("ieee_cis", path)
 
     parquet_files = sorted(list(root.glob("*.parquet")))
+    target_nrows = kwargs.get("nrows") or n_mock_txns
     if parquet_files:
         chosen_parquet = parquet_files[0]
         logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
         df = pd.read_parquet(chosen_parquet)
-        if kwargs.get("nrows"):
-            df = df.iloc[: kwargs["nrows"]]
+        if target_nrows:
+            df = df.iloc[:target_nrows]
         label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
         y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
         feature_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud", "TransactionID") and pd.api.types.is_numeric_dtype(df[c])]
@@ -527,7 +529,7 @@ def load_ieee_cis(
     for txn_csv in txn_csv_candidates:
         if txn_csv.exists():
             logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
-            nrows = kwargs.get("nrows", 20_000)
+            nrows = target_nrows or 20_000
             df = pd.read_csv(txn_csv, nrows=nrows)
             label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
             y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
@@ -599,12 +601,13 @@ def load_creditcard_fraud(
     root = resolve_dataset_dir("creditcard", path)
 
     parquet_files = sorted(list(root.glob("*.parquet")))
+    target_nrows = kwargs.get("nrows") or n_mock_txns
     if parquet_files:
         chosen_parquet = parquet_files[0]
         logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
         df = pd.read_parquet(chosen_parquet)
-        if kwargs.get("nrows"):
-            df = df.iloc[: kwargs["nrows"]]
+        if target_nrows:
+            df = df.iloc[:target_nrows]
         y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
         feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
         X = df[feature_cols].fillna(0).values.astype(np.float32)
@@ -620,7 +623,7 @@ def load_creditcard_fraud(
     for csv_path in csv_candidates:
         if csv_path.exists():
             logger.info("[CreditCard] Loading real dataset from %s", csv_path)
-            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
+            df = pd.read_csv(csv_path, nrows=target_nrows)
             feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
             X = df[feature_cols].fillna(0).values.astype(np.float32)
             y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)

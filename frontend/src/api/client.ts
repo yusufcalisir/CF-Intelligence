@@ -25,7 +25,11 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (axios.isCancel(error) || error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+    if (axios.isCancel(error)) {
+      // Normal React / TanStack Query query cancellation on unmount or re-render
+      return Promise.reject(error);
+    }
+    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
       console.warn('[API Warning] Request timed out, using cached/fallback state:', error.config?.url);
     } else {
       console.warn('[API Warning]', error.response?.data ?? error.message);

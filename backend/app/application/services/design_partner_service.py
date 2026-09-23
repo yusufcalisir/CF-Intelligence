@@ -243,9 +243,12 @@ class DesignPartnerPilotService:
 
         from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
 
-        # Load real/mock benchmark
-        data = load_dataset(dataset_name, n_mock_txns=n_samples)
+        # Load real/mock benchmark with requested sample cap for sub-second interactive response
+        data = load_dataset(dataset_name, n_mock_txns=n_samples, nrows=n_samples)
         X, y = data["X"], data["y"]
+        if len(y) > n_samples:
+            X = X[:n_samples]
+            y = y[:n_samples]
 
         # Run non-IID partition for 3 banks
         partitions = partition_dataset_non_iid(X, y, num_banks=3, alpha=0.5)
