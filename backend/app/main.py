@@ -1448,7 +1448,7 @@ async def redoc_html() -> HTMLResponse:
 </head>
 <body>
   {topbar}
-  <redoc spec-url="/openapi.json"></redoc>
+  <div id="redoc-container"></div>
   <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"></script>
   <script>
     Redoc.init('/openapi.json', {{
@@ -1488,8 +1488,9 @@ async def redoc_html() -> HTMLResponse:
           }}
         }}
       }}
-    }}, document.querySelector('redoc'));
+    }}, document.getElementById('redoc-container'));
   </script>
+
 </body>
 </html>"""
     return HTMLResponse(

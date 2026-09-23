@@ -65,6 +65,15 @@ async def test_docs_and_scalar_permissive_csp_for_swagger_cdn():
         assert "https://cdn.jsdelivr.net" in csp_docs
         assert "'unsafe-inline'" in csp_docs
 
+        # Test /redoc endpoint and worker-src / blob: CSP support for ReDoc Web Workers
+        resp_redoc = await client.get("/redoc")
+        assert resp_redoc.status_code == 200
+        assert "redoc-container" in resp_redoc.text
+        csp_redoc = resp_redoc.headers.get("Content-Security-Policy", "")
+        assert "worker-src" in csp_redoc
+        assert "blob:" in csp_redoc
+
+
 
 # ── Perimeter WAF Header Inspection & Memory Pruning Tests ────────────────────
 
