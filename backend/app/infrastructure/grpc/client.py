@@ -12,7 +12,8 @@ import hashlib
 import logging
 import os
 import random
-from typing import TYPE_CHECKING
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 import grpc
 import grpc.aio
@@ -136,7 +137,12 @@ class GRPCBankClient:
 
     # ── Retry decorator ───────────────────────────────────────────────────────
 
-    async def _with_retry(self, coro_fn, *args, **kwargs):
+    async def _with_retry(
+        self,
+        coro_fn: Callable[..., Any],
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         """Execute ``coro_fn(*args, **kwargs)`` with retry on transient gRPC errors using Exponential Backoff with Full Jitter."""
         last_exc: Exception | None = None
         for attempt in range(1, _MAX_RETRIES + 1):

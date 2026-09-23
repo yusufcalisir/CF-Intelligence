@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 class BatchEODFileConnector(BaseBankConnector):
     """Connector for validating and ingesting EOD batch CSV and Parquet transaction dumps."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
         self._batch_queue: deque[NormalizedTransaction] = deque()
 
