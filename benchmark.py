@@ -32,10 +32,7 @@ from app.application.services.design_partner_service import DesignPartnerPilotSe
 from app.application.services.european_scenario_library import (
     EuropeanScenarioLibraryService,
 )
-from app.application.services.multi_bank_simulator import (
-    MultiBankSimulator,
-    get_multi_bank_simulator,
-)
+from app.application.services.multi_bank_simulator import get_multi_bank_simulator
 from app.domain.metrics_service import compute_scientific_benchmark
 
 
