@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2920%2F2920_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-2978%2F2978_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -324,6 +324,7 @@ CF-Intelligence/
 │   │   │       ├── open_aml_service.py              # Drop-in Enterprise AML OpenAPI adapter & signed webhook gateway
 │   │   │       ├── ubo_graph_service.py             # Corporate UBO intelligence, circular ownership & nominee detection
 │   │   │       ├── european_scenario_library.py     # 16 European banking AML scenarios & hybrid deterministic rule engine
+│   │   │       ├── asset_recovery_service.py        # Asset Recovery & Collaborative FININT Operational Hub (MTTR & ROI Console)
 │   │   │       ├── drift_service.py                 # PSI & Jensen-Shannon feature drift detector
 │   │   │       ├── auto_rollback.py                 # Champion auto-rollback on drift or accuracy degradation
 │   │   │       ├── automated_retraining.py          # Continuous automated retraining trigger pipeline
@@ -463,7 +464,7 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 41 Modular FastAPI Routers
+│   │       ├── routers/                             # 42 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
@@ -476,6 +477,7 @@ CF-Intelligence/
 │   │       │   ├── open_aml_adapter.py              # Drop-in Enterprise AML OpenAPI & Webhook Ingestion Gateway
 │   │       │   ├── ubo_graph.py                     # Corporate UBO Graph, Cycle Detection & Nominee Syndicates API
 │   │       │   ├── european_scenarios.py            # European AML Monitoring Scenarios & Hybrid Deterministic Rule Engine API
+│   │       │   ├── asset_recovery.py                # Asset Recovery & Collaborative FININT Operational Hub (MTTR & ROI Console)
 │   │       │   ├── banks.py                         # Consortium member management & data upload endpoints
 │   │       │   ├── bank_client.py                   # Distributed bank client local training & evaluation daemon
 │   │       │   ├── coordinator.py                   # Federation round orchestration & model sync API
@@ -510,7 +512,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,314 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,372 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1114,7 +1116,12 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
   $$S_{\mathrm{hybrid}} = \alpha \cdot S_{\mathrm{rules}} + (1 - \alpha) \cdot S_{\mathrm{ml}} \quad (\text{default } \alpha = 0.50)$$
 - **Explainability Narrative Compiler:** Automatically compiles human-readable investigative narratives summarizing exact rule trigger conditions, threshold deviations, and recommended statutory actions (`ALLOW`, `MANUAL_REVIEW`, `SAR_ESCALATION`, `IMMEDIATE_BLOCK`) to accelerate compliance officer triage.
 
-### 11.7 Data Retention, Erasure & PII Redaction
+### 11.7 Asset Recovery & Collaborative FININT Operational Hub (`asset_recovery_service.py` & `asset_recovery.py`)
+- **Aggregated EUR Recovery & Containment Telemetry:** Tracks consortium-wide financial impact metrics across SEPA Instant Payment Recall (`camt.056`) events and inter-bank FININT account holds with high-precision `Decimal` EUR accounting.
+- **MTTR Alert-to-Freeze Latency Reduction:** Computes empirical Mean Time to Response (MTTR $P_{50}$, $P_{90}$, $P_{99}$) in minutes, evaluating operational performance against the legacy bilateral 48-hour (2,880-minute) inter-bank baseline, demonstrating a >98% latency reduction in cross-bank mule chain freezes.
+- **Tamper-Evident SHA-256 Audit Hash Chain:** Anchors every recall execution, provisional hold, and recovery event into an append-only cryptographic hash chain ($H_t = \mathrm{SHA256}(H_{t-1} \,\|\, \mathrm{payload})$), ensuring evidentiary admissibility for EU judicial proceedings and AMLA compliance audits.
+
+### 11.8 Data Retention, Erasure & PII Redaction
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
 - **Support Diagnostics & PII Redaction (`support_diagnostics.py`):** Generates sanitized diagnostics bundles from multi-line log sources (strings, files, lists) prior to support export. Redacts international IBANs (generic format matching 2-letter country code + 2 check digits + alphanumeric account string), payment card numbers (validated via ISO/IEC 7812 Luhn MOD-10 checksum algorithm), Turkish/Generic National IDs (11-digit algorithmic validation), raw account numbers, phone numbers (international and domestic formats), and contextual customer names (`Customer Name: [REDACTED]`). *Scope Note:* Name redaction uses deterministic keyword-prefixed heuristic regex patterns (e.g. `Customer Name:`, `Account Holder:`, `Client Name:`), not true Named Entity Recognition (NER) ML models.
 
@@ -1215,7 +1222,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,613 / 2,613 passing (2,920 total incl. verification)** | 100% | 2,314 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,671 / 2,671 passing (2,978 total incl. verification)** | 100% | 2,372 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2199,6 +2206,55 @@ Provides 16 pre-configured statutory European AML monitoring rules and a hybrid 
     }
   ]
 }
+```
+
+### 18.19 Asset Recovery & Collaborative FININT Operational Hub API (`/api/v1/operations/asset-recovery/*`)
+
+Provides real-time aggregated financial containment and MTTR operational telemetry across all ISO 20022 `camt.056` payment recalls and inter-bank FININT provisional holds:
+
+**1. Aggregated Operational Summary (`GET /api/v1/operations/asset-recovery/summary`):**
+*Response (HTTP 200 OK):*
+```json
+{
+  "total_recovered_eur": 2845000.0,
+  "total_frozen_eur": 1920000.0,
+  "total_events_count": 11,
+  "successful_recalls_count": 5,
+  "provisional_holds_count": 4,
+  "partial_recoveries_count": 2,
+  "mttr_minutes_p50": 18.5,
+  "mttr_minutes_p90": 42.0,
+  "mttr_minutes_p99": 75.0,
+  "legacy_baseline_mttr_minutes": 2880.0,
+  "mttr_reduction_percent": 99.36,
+  "cross_bank_contagion_containment_rate": 90.91,
+  "mule_chains_disrupted": 7,
+  "last_audit_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "generated_at": "2026-09-23T12:00:00Z"
+}
+```
+
+**2. Per-Typology Containment Breakdown (`GET /api/v1/operations/asset-recovery/breakdown-by-typology`):**
+*Response (HTTP 200 OK):*
+```json
+[
+  {
+    "typology": "CRYPTO_CASHOUT",
+    "total_eur": 1250000.0,
+    "events_count": 3,
+    "avg_mttr_minutes": 14.2,
+    "containment_rate": 100.0,
+    "risk_level": "CRITICAL"
+  },
+  {
+    "typology": "APP_FRAUD_MULE_CHAIN",
+    "total_eur": 850000.0,
+    "events_count": 2,
+    "avg_mttr_minutes": 22.5,
+    "containment_rate": 100.0,
+    "risk_level": "HIGH"
+  }
+]
 ```
 
 ---

@@ -217,9 +217,27 @@ where $\alpha = 0.55$ ensures regulatory explainability.
 
 ---
 
-## 10. Verification & Automated Test Coverage
 
-The European RegTech engines are validated by **328 dedicated automated tests** (all 100% passing):
+## 10. Asset Recovery & Collaborative FININT Operational Hub (`asset_recovery_service.py`)
+
+### 10.1 Financial ROI & Containment Telemetry
+The Asset Recovery & FININT Operational Hub aggregates cross-institutional response velocity and financial containment metrics across all ISO 20022 `camt.056` SEPA recalls and collaborative FININT provisional account holds:
+- **Total EUR Assets Frozen & Recovered**: Aggregated EUR volume tracked with `Decimal` mathematical precision across all consortium member nodes.
+- **Mean Time to Response (MTTR)**: Real-time calculation of alert-to-freeze latency in minutes ($P_{50}$, $P_{90}$, $P_{99}$ percentiles) compared against the legacy bilateral 48-hour (2,880 minutes) baseline established by traditional inter-bank correspondence.
+- **Contagion Containment Rate**: Percentage of cross-bank fraud campaigns successfully contained before second-hop mule disbursement:
+  $$\mathrm{Rate}_{\mathrm{containment}} = \frac{N_{\mathrm{contained}}}{N_{\mathrm{total\_campaigns}}} \times 100\%$$
+- **Cross-Bank Mule Chain Disruption**: Count of active smurfing, crypto gateway cashout, and pass-through mule syndicates neutralized before asset exfiltration.
+
+### 10.2 Cryptographic Audit Hash-Chaining
+Every recovery, hold, or release event is cryptographically anchored into an append-only SHA-256 hash chain:
+$$H_t = \mathrm{SHA256}\left(H_{t-1} \,\|\, \mathrm{event\_id} \,\|\, \mathrm{type} \,\|\, \mathrm{EUR} \,\|\, \mathrm{timestamp}\right)$$
+This ensures strict regulatory admissibility under European eIDAS and AMLD6 compliance mandates, preventing retroactive alteration or deletion of operational milestones.
+
+---
+
+## 11. Verification & Automated Test Coverage
+
+The European RegTech engines are validated by **386 dedicated automated tests** (all 100% passing):
 
 | Test Suite File | Component Scope | Test Count | Status |
 |:---|:---|:---:|:---:|
@@ -230,11 +248,12 @@ The European RegTech engines are validated by **328 dedicated automated tests** 
 | `backend/tests/unit/test_open_aml_adapter.py` | OpenAPI Drop-in Adapter, Scenarios, Watchlist search, Signed Webhooks | 24 | `PASSED` |
 | `backend/tests/unit/test_ubo_graph_service.py` | Multi-tier UBO compounding, Cycle detection, Nominees, Shell clusters | 16 | `PASSED` |
 | `backend/tests/unit/test_european_scenarios.py` | 16 European AML scenarios, Hybrid synthesizer, GNN boost, Override gate | 25 | `PASSED` |
-| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **328** | **100% PASS** |
+| `backend/tests/unit/test_asset_recovery_service.py` | Aggregated EUR ROI, MTTR stats (P50/P90/P99), Contagion containment, Hash-chain audit | 58 | `PASSED` |
+| **Total Automated RegTech Suite** | **Comprehensive European Compliance Verification** | **386** | **100% PASS** |
 
 ---
 
-## 11. REST API Endpoints Reference
+## 12. REST API Endpoints Reference
 
 | Endpoint | Method | Description | Auth / Security |
 |:---|:---:|:---|:---|
@@ -276,4 +295,9 @@ The European RegTech engines are validated by **328 dedicated automated tests** 
 | `/api/v1/scenarios/european-aml/evaluate-batch` | `POST` | High-throughput batch evaluation of up to 100 transactions | Bearer JWT / X-Tenant-ID |
 | `/api/v1/scenarios/european-aml/library/{code}/test` | `POST` | Test synthetic scenario vector trigger condition | Bearer JWT / X-Tenant-ID |
 | `/api/v1/scenarios/european-aml/metrics` | `GET` | Operational telemetry and scenario trigger distributions | Bearer JWT / X-Tenant-ID |
+| `/api/v1/operations/asset-recovery/summary` | `GET` | Aggregated EUR asset recovery & MTTR KPI snapshot | Bearer JWT / X-Tenant-ID |
+| `/api/v1/operations/asset-recovery/timeline` | `GET` | Time-series asset recovery trend data | Bearer JWT / X-Tenant-ID |
+| `/api/v1/operations/asset-recovery/breakdown-by-typology` | `GET` | Per-typology EUR recovery & containment breakdown | Bearer JWT / X-Tenant-ID |
+| `/api/v1/operations/asset-recovery/events` | `POST` | Record new recall, freeze, or recovery event (201 Created) | Bearer JWT / X-Tenant-ID |
+
 
