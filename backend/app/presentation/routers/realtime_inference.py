@@ -110,7 +110,7 @@ def get_scripted_model() -> tuple[Any, bool]:
     global_path = os.path.join(registry.storage_dir, "global_model.pt")
     if os.path.exists(global_path):
         try:
-            state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
+            state_dict = torch.load(global_path, map_location="cpu", weights_only=True)
             # Only load keys that match the GroupNorm architecture
             compatible = {
                 k: v

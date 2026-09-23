@@ -53,7 +53,7 @@ class ModelRegistry:
                     os.remove(test_file)
                     self.storage_dir = default_dir
                 except OSError:
-                    self.storage_dir = os.path.join(tempfile.gettempdir(), "cfi_storage")  # nosec B108
+                    self.storage_dir = os.path.join(tempfile.gettempdir(), "cfi_storage")
                     logger.info(
                         "Default storage path not writable; using fallback: %s",
                         self.storage_dir,
@@ -198,7 +198,7 @@ class ModelRegistry:
                 raise FileNotFoundError(f"Model file {filepath} not found on disk")
 
             try:
-                return torch.load(filepath, map_location="cpu", weights_only=True)  # nosec B614
+                return torch.load(filepath, map_location="cpu", weights_only=True)
             except Exception as e:
                 logger.error("Failed to load model file: %s", e)
                 raise

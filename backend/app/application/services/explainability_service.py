@@ -309,7 +309,7 @@ class ExplainabilityService:
 
                 state_dict = torch.load(
                     model_path, map_location=torch.device("cpu"), weights_only=True
-                )  # nosec B614
+                )
                 input_dim = NUM_FEATURES
                 for weight_key in ("network.0.weight", "module.network.0.weight"):
                     if (

@@ -147,7 +147,7 @@ def _setup_tenant_logging() -> None:
             pass
         os.remove(test_file)
     except OSError:
-        logs_dir = os.path.join(tempfile.gettempdir(), "cfi_storage", "logs")  # nosec B108
+        logs_dir = os.path.join(tempfile.gettempdir(), "cfi_storage", "logs")
         os.makedirs(logs_dir, exist_ok=True)
 
     class TenantLogFilter(logging.Filter):

@@ -161,7 +161,7 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     current_mtime = os.path.getmtime(global_path)
     if _cached_serving_model is None or current_mtime > _cached_serving_model_mtime:
-        state_dict = torch.load(global_path, map_location="cpu", weights_only=True)  # nosec B614
+        state_dict = torch.load(global_path, map_location="cpu", weights_only=True)
         dp_compatible = True
         for key in state_dict:
             if "running_mean" in key or "running_var" in key:

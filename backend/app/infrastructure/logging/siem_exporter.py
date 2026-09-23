@@ -32,7 +32,7 @@ def get_siem_retry_file() -> Path:
         test_file.unlink(missing_ok=True)
         return base_dir / "siem_retry_queue.jsonl"
     except OSError:
-        tmp_dir = Path(tempfile.gettempdir()) / "cfi_storage"  # nosec B108
+        tmp_dir = Path(tempfile.gettempdir()) / "cfi_storage"
         tmp_dir.mkdir(parents=True, exist_ok=True)
         return tmp_dir / "siem_retry_queue.jsonl"
 
