@@ -89,14 +89,14 @@ settings = get_settings()
 # Uses python-json-logger for machine-parseable log output compatible with
 # ELK / Datadog / Cloud Logging ingestion pipelines without regex parsing.
 try:
+    import importlib
+
     try:
-        from pythonjsonlogger.json import (
-            JsonFormatter as _JsonFormatter,  # type: ignore[import-untyped]
-        )
+        _json_module = importlib.import_module("pythonjsonlogger.json")
     except ImportError:
-        from pythonjsonlogger.jsonlogger import (
-            JsonFormatter as _JsonFormatter,  # type: ignore[import-untyped]
-        )
+        _json_module = importlib.import_module("pythonjsonlogger.jsonlogger")
+
+    _JsonFormatter = _json_module.JsonFormatter
 
     _json_handler = logging.StreamHandler()
     _json_formatter = _JsonFormatter(
@@ -107,7 +107,7 @@ try:
     _json_handler.setFormatter(_json_formatter)
     logging.root.setLevel(getattr(logging, settings.app_log_level.upper(), logging.INFO))
     logging.root.handlers = [_json_handler]
-except ImportError:
+except (ImportError, AttributeError):
     # Graceful fallback if python-json-logger is not yet installed
     logging.basicConfig(
         level=getattr(logging, settings.app_log_level.upper(), logging.INFO),
