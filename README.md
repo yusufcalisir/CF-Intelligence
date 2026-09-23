@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2978%2F2978_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-2999%2F2999_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -295,7 +295,7 @@ CF-Intelligence/
 │   │   │   └── web_console.py                       # Web console telemetry & audit logging contracts
 │   │   │
 │   │   ├── application/
-│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (38 Modules)
+│   │   │   ├── schemas/                             # Clean Architecture Pydantic v2 Contract Envelopes & DTOs (39 Modules)
 │   │   │   └── services/                            # Application Use Cases & Core Orchestration Services
 │   │   │       ├── fl_engine.py                     # Server-side FL parameter aggregation (FedAvg, SCAFFOLD, Byzantine defenses)
 │   │   │       ├── flower_engine.py                 # Flower FL simulation bridge (Ray runtime & zero-mock native fallback)
@@ -419,7 +419,8 @@ CF-Intelligence/
 │   │   │   │   ├── redis_connector.py               # Redis Streams / PubSub message ingest adapter
 │   │   │   │   ├── parquet_connector.py             # High-throughput columnar Parquet batch reader
 │   │   │   │   ├── batch_connector.py               # Batch CSV/JSON file ingestion pipeline
-│   │   │   │   └── streaming_connector.py           # Real-time WebSocket / TCP stream ingestion adapter
+│   │   │   │   ├── streaming_connector.py           # Real-time WebSocket / TCP stream ingestion adapter
+│   │   │   │   └── kafka_streaming_connector.py     # CNCF CloudEvents 1.0 & Apache Kafka event bus connector (DLQ & idempotency)
 │   │   │   │
 │   │   │   ├── feature_store/                       # Low-Latency Online/Offline Feature Store
 │   │   │   │   ├── store.py                         # Unified online feature store interface
@@ -512,7 +513,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,372 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,393 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1222,7 +1223,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,671 / 2,671 passing (2,978 total incl. verification)** | 100% | 2,372 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,692 / 2,692 passing (2,999 total incl. verification)** | 100% | 2,393 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2362,10 +2363,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (2,287 Tests Core / 2,594 Total)
+### Step 5: Master Test Suites Execution (2,692 Tests Core / 2,999 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (1,986 tests)
+# 1. Run full backend pytest suite (2,393 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (268 tests across 81 test files)

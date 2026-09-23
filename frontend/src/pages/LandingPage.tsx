@@ -49,6 +49,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms — Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration — with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
   { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
   { id: 'asset-recovery-hub', name: 'Asset Recovery & Collaborative FININT Operational Hub', category: 'European RegTech & Collaborative FININT', purpose: 'Aggregates real-time EUR asset frozen/recovered KPIs across ISO 20022 camt.056 payment recalls and cross-bank FININT provisional holds. Tracks Mean Time to Response (MTTR) reduction vs. the legacy 48-hour bilateral baseline, cross-bank contagion containment rate, and per-typology ROI breakdown across smurfing, APP fraud mule chains, dormant-burst velocity, and crypto gateway cashout scenarios.', algorithm: 'SHA-256 hash-chained audit trail + MTTR P50/P90/P99 percentile aggregation + contagion containment rate + typology ROI breakdown', inputs: 'camt.056 recall confirmations + cross-bank FININT case ticket closures + provisional hold webhook callbacks', outputs: 'EUR frozen/recovered KPIs + MTTR reduction % vs. 48h baseline + mule chain disruption count + typology risk classification', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, ISO 20022 camt.056 / EPC SCT Inst Rulebook' },
+  { id: 'kafka-streaming', name: 'Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus', category: 'European RegTech & Collaborative FININT', purpose: 'Standardises asynchronous transaction and FININT alert streaming using CNCF CloudEvents 1.0 specifications with at-least-once delivery, distributed idempotency deduplication, and automated Dead Letter Queue (DLQ) quarantine for sub-millisecond fraud propagation across European bank nodes.', algorithm: 'CNCF CloudEvents 1.0 + SHA-256 Idempotency Hashing + Monotonic Kafka Offset Commit + DLQ Error Quarantine', inputs: 'Normalized transaction events + cross-bank FININT alerts + camt.056 recalls + bank idempotency tokens', outputs: 'Validated CloudEvent envelopes (specversion 1.0) + partition offset receipts + DLQ isolation records', tech: 'aiokafka, pure asyncio fallback, CloudEvents 1.0, FastAPI, Python 3.12, Apache Kafka 3.7.0' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -266,6 +267,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open Operational Hub',
     tensorSample: 'MTTR: t_freeze − t_alert (min) | Reduction: (2880 − MTTR_mean) / 2880 × 100% | Containment: |{MTTR < 60min}| / |events|',
     statusBadge: 'ISO 20022 · EU AMLA · EPC',
+  },
+  'kafka-streaming': {
+    sla: '< 1.5 ms event ingestion & dispatch (p99) | At-least-once streaming guarantee',
+    security: 'CNCF CloudEvents 1.0 Envelopes | Type-Salted SHA-256 Idempotency Deduplication | Zero Raw PII',
+    compliance: 'CNCF CloudEvents 1.0 | Apache Kafka KRaft | ISO 20022 Event Streaming | EPC SCT Inst',
+    actionRoute: '/operations',
+    actionLabel: 'Open Event Streaming Hub',
+    tensorSample: 'CloudEvent: {specversion: "1.0", type: "org.cfi.finint.transactions.v1", id: "evt_...", source: "/banks/bank_a", data: {tx_id: "...", amount: 4850.0}}',
+    statusBadge: 'CLOUDEVENTS 1.0 · KAFKA',
   },
 };
 

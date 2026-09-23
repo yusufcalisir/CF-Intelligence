@@ -191,3 +191,37 @@ export interface RecordRecoveryEventResponse {
   audit_hash: string;
   recorded_at: string;
 }
+
+// ── Enterprise CloudEvents 1.0 & Apache Kafka Streaming Connector ─────────────
+
+export interface CloudEventHeader {
+  specversion: string;
+  type: string;
+  source: string;
+  id: string;
+  time: string;
+  datacontenttype?: string;
+  dataschema?: string;
+  subject?: string;
+  bank_id?: string;
+  idempotency_key?: string;
+}
+
+export interface KafkaStreamingHealthResponse {
+  connector_type: string;
+  mode: string;
+  bootstrap_servers: string;
+  health: {
+    connected: boolean;
+    cluster_alive: boolean;
+    error: string | null;
+  };
+  metrics: {
+    events_published: number;
+    events_consumed: number;
+    dlq_quarantined: number;
+    idempotent_deduplications: number;
+    active_consumers: number;
+  };
+}
+

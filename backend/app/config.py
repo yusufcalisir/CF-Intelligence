@@ -140,10 +140,17 @@ class Settings(BaseSettings):
     rabbitmq_user: str = "guest"
     rabbitmq_password: str = "guest"
 
-    # ── Distributed Streaming & DBs ───────────
+    # ── Distributed Streaming & Kafka CloudEvents ───────────
     database_type: str = "sqlite"  # "sqlite", "postgres", "cockroachdb"
     use_kafka: bool = False
     kafka_bootstrap_servers: str = "localhost:9092"
+    kafka_group_id: str = "cfi-fraud-detection-group"
+    kafka_transaction_topic: str = "org.cfi.finint.transactions.v1"
+    kafka_alert_topic: str = "org.cfi.finint.alerts.v1"
+    kafka_dlq_topic: str = "org.cfi.finint.dlq.v1"
+    kafka_recall_topic: str = "org.cfi.finint.recalls.v1"
+    kafka_ticket_topic: str = "org.cfi.finint.tickets.v1"
+    kafka_enabled: bool = False
 
     # ── Graph Database Configuration ──────────
     graph_db_type: str = "redis"  # "redis", "neo4j", "memgraph"

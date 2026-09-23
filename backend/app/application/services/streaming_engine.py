@@ -19,6 +19,16 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from app.domain.entities_phase2 import Scenario
 
+from app.application.schemas.event_schemas import (
+    EVENT_TYPE_ALERT,
+    EVENT_TYPE_TRANSACTION,
+    CloudEvent,
+    PublishReceipt,
+)
+from app.infrastructure.connectors.kafka_streaming_connector import (
+    KafkaStreamingConnector,
+)
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,16 +36,13 @@ class StreamingEngine:
     """Manages streaming event delivery for scenario replay.
 
     The engine takes a Scenario (list of timed events) and replays
-    them at configurable speed via Redis pub/sub. Frontend consumers
-    receive events through WebSocket connections.
-
-    This is designed for demonstration purposes — it simulates what
-    a real-time transaction monitoring system would look like without
-    requiring actual Kafka/Kinesis infrastructure.
+    them at configurable speed via Redis pub/sub and Apache Kafka topics
+    using CloudEvents 1.0 specification.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, kafka_connector: KafkaStreamingConnector | None = None) -> None:
         self._active_scenarios: dict[str, dict] = {}
+        self._kafka_connector = kafka_connector or KafkaStreamingConnector()
 
     async def start_scenario(
         self,
@@ -142,6 +149,22 @@ class StreamingEngine:
                 streaming_ws_manager.broadcast_to_room_sync(room_name, event_data)
             except Exception as broadcast_err:
                 logger.debug("Failed to dispatch in-process streaming event: %s", broadcast_err)
+
+            # Publish to Apache Kafka via CloudEvents 1.0 specification
+            try:
+                ce = CloudEvent(
+                    id=event.id,
+                    source=f"urn:cfi:bank:{event.bank_id}",
+                    type=EVENT_TYPE_ALERT if "alert" in event.event_type.lower() else EVENT_TYPE_TRANSACTION,
+                    time=event.timestamp,
+                    data=event_data,
+                    bank_id=event.bank_id,
+                    correlation_id=scenario.id,
+                    idempotency_key=f"scenario:{scenario.id}:{event.id}",
+                )
+                await self._kafka_connector.publish(ce)
+            except Exception as kafka_err:
+                logger.debug("Failed to stream event to Kafka: %s", kafka_err)
 
             # Process the event locally to populate in-memory stores
             try:
@@ -424,3 +447,16 @@ class StreamingEngine:
                         )
                     )
                     case_svc._cases.set(case.id, _case_to_dict(case))
+
+    @property
+    def kafka_connector(self) -> KafkaStreamingConnector:
+        """Return the underlying Kafka streaming connector."""
+        return self._kafka_connector
+
+    async def stream_cloudevent(
+        self,
+        event: CloudEvent | dict[str, Any],
+        topic: str | None = None,
+    ) -> PublishReceipt:
+        """Publish a standalone CloudEvent to the Kafka streaming bus."""
+        return await self._kafka_connector.publish(event, topic=topic)

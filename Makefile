@@ -34,6 +34,12 @@ docker-logs: ## Tail logs from all services
 docker-clean: ## Remove all containers, volumes, and images
 	docker compose down -v --rmi all
 
+kafka-up: ## Start Kafka and Redis streaming services
+	docker compose up -d kafka redis
+
+kafka-topics: ## List Kafka event topics
+	docker compose exec kafka /opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list
+
 # ──────────────────────────────────────────────
 # Backend
 # ──────────────────────────────────────────────

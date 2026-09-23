@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
 from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector
 from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
+from app.infrastructure.connectors.kafka_streaming_connector import KafkaStreamingConnector
 from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
 from app.infrastructure.connectors.parquet_connector import ParquetConnector
 from app.infrastructure.connectors.rabbitmq_connector import RabbitMQBankConnector
@@ -29,6 +30,8 @@ APPROVED_PRODUCTION_CONNECTORS = {
     "open_banking",
     "psd2",
     "kafka",
+    "kafka_streaming",
+    "cloudevents",
     "rabbitmq",
     "parquet",
     "rest",
@@ -47,6 +50,8 @@ CONNECTOR_REGISTRY: dict[str, type] = {
     "psd2": OpenBankingConnector,
     "rabbitmq": RabbitMQBankConnector,
     "kafka": KafkaBankConnector,
+    "kafka_streaming": KafkaStreamingConnector,
+    "cloudevents": KafkaStreamingConnector,
     "parquet": ParquetConnector,
     "rest": RESTBankConnector,
 }
