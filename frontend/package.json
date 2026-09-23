@@ -17,7 +17,6 @@
     "test:e2e:workflows": "playwright test e2e-workflows --project=desktop-1440-chromium",
     "test:e2e:workflows:firefox": "playwright test e2e-workflows --project=laptop-1280-firefox",
     "test:e2e:workflows:all": "playwright test e2e-workflows",
-
     "test:visual": "vite build && playwright test e2e-visual --project=desktop-standard",
     "test:visual:update": "vite build && playwright test e2e-visual --project=desktop-standard --update-snapshots",
     "test:a11y": "vite build && playwright test e2e-a11y --project=desktop-1440-chromium",
@@ -28,7 +27,6 @@
   "dependencies": {
     "@tanstack/react-query": "^5.102.8",
     "@testing-library/react": "^16.3.3",
-    "@types/cytoscape": "^3.31.0",
     "@types/three": "^0.185.4",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.3",
