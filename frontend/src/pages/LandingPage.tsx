@@ -50,6 +50,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
   { id: 'asset-recovery-hub', name: 'Asset Recovery & Collaborative FININT Operational Hub', category: 'European RegTech & Collaborative FININT', purpose: 'Aggregates real-time EUR asset frozen/recovered KPIs across ISO 20022 camt.056 payment recalls and cross-bank FININT provisional holds. Tracks Mean Time to Response (MTTR) reduction vs. the legacy 48-hour bilateral baseline, cross-bank contagion containment rate, and per-typology ROI breakdown across smurfing, APP fraud mule chains, dormant-burst velocity, and crypto gateway cashout scenarios.', algorithm: 'SHA-256 hash-chained audit trail + MTTR P50/P90/P99 percentile aggregation + contagion containment rate + typology ROI breakdown', inputs: 'camt.056 recall confirmations + cross-bank FININT case ticket closures + provisional hold webhook callbacks', outputs: 'EUR frozen/recovered KPIs + MTTR reduction % vs. 48h baseline + mule chain disruption count + typology risk classification', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, ISO 20022 camt.056 / EPC SCT Inst Rulebook' },
   { id: 'kafka-streaming', name: 'Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus', category: 'European RegTech & Collaborative FININT', purpose: 'Standardises asynchronous transaction and FININT alert streaming using CNCF CloudEvents 1.0 specifications with at-least-once delivery, distributed idempotency deduplication, and automated Dead Letter Queue (DLQ) quarantine for sub-millisecond fraud propagation across European bank nodes.', algorithm: 'CNCF CloudEvents 1.0 + SHA-256 Idempotency Hashing + Monotonic Kafka Offset Commit + DLQ Error Quarantine', inputs: 'Normalized transaction events + cross-bank FININT alerts + camt.056 recalls + bank idempotency tokens', outputs: 'Validated CloudEvent envelopes (specversion 1.0) + partition offset receipts + DLQ isolation records', tech: 'aiokafka, pure asyncio fallback, CloudEvents 1.0, FastAPI, Python 3.12, Apache Kafka 3.7.0' },
+  { id: 'core-banking-gateway', name: 'Cloud Core Banking Gateway (Mambu & Thought Machine)', category: 'European RegTech & Collaborative FININT', purpose: 'Native bidirectional connector gateway bridging cloud core banking engines (Mambu v2 & Thought Machine Vault Core) into the CFI fraud detection fabric with HMAC-authenticated webhooks, Zero-Raw-PII customer pseudonymization, and sub-second outbound provisional account hold dispatching.', algorithm: 'HMAC-SHA256 Webhook Verification + Type-Salted PII Hashing + ISO 20022 PIB Normalization + Idempotency Engine', inputs: 'Mambu deposit-transaction/client webhooks + Thought Machine posting instruction batches (PIBs) + provisional hold triggers', outputs: 'Normalized ISO 20022 transactions + Zero-Raw-PII profiles + cryptographic hold/restriction receipts', tech: 'Pure Python stdlib, httpx, FastAPI, Pydantic v2, Python 3.12, Mambu v2, Thought Machine Vault Core' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -276,6 +277,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open Event Streaming Hub',
     tensorSample: 'CloudEvent: {specversion: "1.0", type: "org.cfi.finint.transactions.v1", id: "evt_...", source: "/banks/bank_a", data: {tx_id: "...", amount: 4850.0}}',
     statusBadge: 'CLOUDEVENTS 1.0 · KAFKA',
+  },
+  'core-banking-gateway': {
+    sla: '< 8.5 ms webhook normalization (p99) | < 120 ms outbound hold execution',
+    security: 'HMAC-SHA256 Payload Signatures | Type-Salted PII Pseudonymization | Zero Cleartext Storage',
+    compliance: 'Mambu Cloud Banking v2 | Thought Machine Vault Core | EPC SCT Inst Provisional Hold | GDPR Art. 6',
+    actionRoute: '/operations',
+    actionLabel: 'Open Core Banking Console',
+    tensorSample: 'Vault Core PIB: {id: "PIB_...", instructions: [{custom_instruction: {postings: [{acc: "DE_...", amt: 1500, credit: false}]}}]} → pacs.008',
+    statusBadge: 'MAMBU · VAULT CORE',
   },
 };
 

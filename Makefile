@@ -53,6 +53,9 @@ test-unit: ## Run unit tests only
 test-integration: ## Run integration tests only
 	cd backend && python -m pytest tests/integration/ -v
 
+test-core-banking: ## Run Cloud Core Banking gateway tests (Mambu & Thought Machine)
+	cd backend && python -m pytest tests/unit/test_core_banking_gateway.py -v
+
 lint: ## Run linters (matching CI pipeline)
 	cd backend && ruff check app/ tests/
 	cd backend && mypy app/ --ignore-missing-imports

@@ -43,6 +43,7 @@ from app.presentation.routers import (
     cases,
     compliance,
     coordinator,
+    core_banking_gateway,
     dashboard,
     design_partner,
     diagnostics,
@@ -1081,6 +1082,8 @@ else:
     app.include_router(european_scenarios.api_router)
     app.include_router(asset_recovery.router)
     app.include_router(asset_recovery.api_router)
+    app.include_router(core_banking_gateway.router)
+    app.include_router(core_banking_gateway.api_router)
 
 
 @app.get("/", tags=["root"])

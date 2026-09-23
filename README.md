@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-2999%2F2999_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3026%2F3026_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -420,7 +420,9 @@ CF-Intelligence/
 │   │   │   │   ├── parquet_connector.py             # High-throughput columnar Parquet batch reader
 │   │   │   │   ├── batch_connector.py               # Batch CSV/JSON file ingestion pipeline
 │   │   │   │   ├── streaming_connector.py           # Real-time WebSocket / TCP stream ingestion adapter
-│   │   │   │   └── kafka_streaming_connector.py     # CNCF CloudEvents 1.0 & Apache Kafka event bus connector (DLQ & idempotency)
+│   │   │   │   ├── kafka_streaming_connector.py     # CNCF CloudEvents 1.0 & Apache Kafka event bus connector (DLQ & idempotency)
+│   │   │   │   ├── mambu_connector.py               # Mambu cloud core banking v2 REST/webhook connector
+│   │   │   │   └── thought_machine_connector.py     # Thought Machine Vault Core posting instruction batch streaming connector
 │   │   │   │
 │   │   │   ├── feature_store/                       # Low-Latency Online/Offline Feature Store
 │   │   │   │   ├── store.py                         # Unified online feature store interface
@@ -465,7 +467,7 @@ CF-Intelligence/
 │   │   │   └── tenant_provisioner.py                # Tenant database migration & schema isolation provisioner
 │   │   │
 │   │   └── presentation/                            # API Gateway, REST Endpoints & WebSockets
-│   │       ├── routers/                             # 42 Modular FastAPI Routers
+│   │       ├── routers/                             # 43 Modular FastAPI Routers
 │   │       │   ├── auth.py                          # Bcrypt authentication, short-lived JWT (15m), refresh rotation & lockout
 │   │       │   ├── predict.py                       # Real-time transaction scoring & composite risk inference (<100ms)
 │   │       │   ├── realtime_inference.py            # High-throughput batch & streaming inference endpoints
@@ -479,6 +481,7 @@ CF-Intelligence/
 │   │       │   ├── ubo_graph.py                     # Corporate UBO Graph, Cycle Detection & Nominee Syndicates API
 │   │       │   ├── european_scenarios.py            # European AML Monitoring Scenarios & Hybrid Deterministic Rule Engine API
 │   │       │   ├── asset_recovery.py                # Asset Recovery & Collaborative FININT Operational Hub (MTTR & ROI Console)
+│   │       │   ├── core_banking_gateway.py          # Cloud Core Banking Gateway (Mambu v2 & Thought Machine Vault Core)
 │   │       │   ├── banks.py                         # Consortium member management & data upload endpoints
 │   │       │   ├── bank_client.py                   # Distributed bank client local training & evaluation daemon
 │   │       │   ├── coordinator.py                   # Federation round orchestration & model sync API
@@ -513,7 +516,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,393 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,420 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1223,7 +1226,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,692 / 2,692 passing (2,999 total incl. verification)** | 100% | 2,393 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,719 / 2,719 passing (3,026 total incl. verification)** | 100% | 2,420 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2363,10 +2366,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (2,692 Tests Core / 2,999 Total)
+### Step 5: Master Test Suites Execution (2,719 Tests Core / 3,026 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (2,393 tests)
+# 1. Run full backend pytest suite (2,420 tests)
 pytest backend/tests/ -v
 
 # 2. Run full frontend vitest suite (268 tests across 81 test files)

@@ -10,12 +10,14 @@ from app.infrastructure.connectors.batch_connector import BatchEODFileConnector
 from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector
 from app.infrastructure.connectors.kafka_connector import KafkaBankConnector
 from app.infrastructure.connectors.kafka_streaming_connector import KafkaStreamingConnector
+from app.infrastructure.connectors.mambu_connector import MambuConnector
 from app.infrastructure.connectors.open_banking_connector import OpenBankingConnector
 from app.infrastructure.connectors.parquet_connector import ParquetConnector
 from app.infrastructure.connectors.rabbitmq_connector import RabbitMQBankConnector
 from app.infrastructure.connectors.redis_connector import RedisBankConnector
 from app.infrastructure.connectors.rest_connector import RESTBankConnector
 from app.infrastructure.connectors.streaming_connector import StreamingPaymentConnector
+from app.infrastructure.connectors.thought_machine_connector import ThoughtMachineConnector
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -32,6 +34,9 @@ APPROVED_PRODUCTION_CONNECTORS = {
     "kafka",
     "kafka_streaming",
     "cloudevents",
+    "mambu",
+    "thought_machine",
+    "thoughtmachine",
     "rabbitmq",
     "parquet",
     "rest",
@@ -52,6 +57,9 @@ CONNECTOR_REGISTRY: dict[str, type] = {
     "kafka": KafkaBankConnector,
     "kafka_streaming": KafkaStreamingConnector,
     "cloudevents": KafkaStreamingConnector,
+    "mambu": MambuConnector,
+    "thought_machine": ThoughtMachineConnector,
+    "thoughtmachine": ThoughtMachineConnector,
     "parquet": ParquetConnector,
     "rest": RESTBankConnector,
 }
