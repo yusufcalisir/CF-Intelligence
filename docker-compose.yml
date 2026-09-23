@@ -194,25 +194,28 @@ services:
     networks:
       - cfi-network
 
-  # ── 9. (Optional) HashiCorp Vault Secrets & KMS ─────────────────────────────
+  # ── 9. (Optional) HashiCorp Vault KMS / PKI / Transit Engine ────────────────
   vault:
-    image: hashicorp/vault:1.15.6
+    image: hashicorp/vault:1.16.2
     container_name: cfi-vault
     profiles: ["enterprise"]
     restart: unless-stopped
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-vault_token_dev_2026}
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
     ports:
       - "${CFI_PORT_VAULT:-8200}:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-token}
+      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
+      VAULT_ADDR: "http://0.0.0.0:8200"
     cap_add:
       - IPC_LOCK
+    volumes:
+      - vault-data:/vault/file
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health || exit 1"]
+      test: ["CMD", "vault", "status"]
       interval: 10s
-      timeout: 3s
+      timeout: 5s
       retries: 3
 
   # ── 10. (Optional) MinIO S3-Compatible Object Store ─────────────────────────
@@ -286,29 +289,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-  # ── 13. HashiCorp Vault KMS / PKI / Transit Engine ──────────────────────────
-  vault:
-    image: hashicorp/vault:1.16.2
-    container_name: cfi-vault
-    restart: unless-stopped
-    ports:
-      - "${CFI_PORT_VAULT:-8200}:8200"
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-token}
-      VAULT_DEV_LISTEN_ADDRESS: "0.0.0.0:8200"
-      VAULT_ADDR: "http://0.0.0.0:8200"
-    cap_add:
-      - IPC_LOCK
-    volumes:
-      - vault-data:/vault/file
-    networks:
-      - cfi-network
-    healthcheck:
-      test: ["CMD", "vault", "status"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
 
 networks:
   cfi-network:
