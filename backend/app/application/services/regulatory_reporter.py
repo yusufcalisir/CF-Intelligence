@@ -122,7 +122,7 @@ class RegulatoryReporterService:
         # Real FinCEN SAR 2.0 XSD schema validation via lxml
         if XSD_SCHEMA_PATH.exists():
             try:
-                from lxml import etree  # nosec
+                from lxml import etree  # type: ignore[import-not-found,import-untyped] # nosec
 
                 with open(XSD_SCHEMA_PATH, "rb") as f:
                     schema_doc = etree.XML(f.read())
@@ -229,7 +229,7 @@ class RegulatoryReporterService:
 
         for eh in sorted(list(entity_hashes)):
             subject = ET.SubElement(subjects, "Subject")
-            ET.SubElement(subject, "EntityPrivacyHash").text = str(eh)
+            ET.SubElement(subject, "EntityPrivacyHash").text = eh
 
         details = ET.SubElement(activity, "SuspiciousActivityDetails")
         risk_score = float(getattr(case, "total_risk_score", 0.0) or 0.0)
