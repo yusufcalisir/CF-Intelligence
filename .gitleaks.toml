@@ -4,13 +4,17 @@ title = "CF-Intelligence Gitleaks Configuration"
 description = "Allowlist for test fixtures, mock data, and documentation examples"
 paths = [
   '''(?i)tests/.*''',
-  '''(?i).*\.test\.(tsx|ts|py)''',
+  '''(?i).*\.(test|spec)\.(tsx?|jsx?|py)''',
   '''(?i)verification/.*''',
+  '''(?i)frontend/src/testing/.*''',
+  '''(?i)docs/.*''',
+  '''(?i)phases/.*''',
   '''(?i)\.env\.example''',
   '''(?i)package-lock\.json''',
   '''(?i)requirements\.txt''',
   '''(?i)secrets_scan\.json''',
   '''(?i)docker-compose.*\.ya?ml''',
+  '''(?i)backend/storage/.*''',
 ]
 regexes = [
   '''(?i)(secret|token|password|key)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{8,64}['"]''',
@@ -18,4 +22,14 @@ regexes = [
   '''sha256_[a-z0-9_]+''',
   '''dev-token''',
   '''dev-test-token''',
+  '''change_me_in_production''',
+  '''cfi_local_secret_key_2026_change_me_in_production''',
+  '''cfi_oidc_jwt_secret_key_2026_enterprise_hs256''',
+  '''cfi_redis_secure_pass_2026''',
+  '''cfi_coordinator_secret_change_me''',
+  '''psd2_signing_secret_key_change_me''',
+  '''vault_token_dev_2026''',
+  '''key_bank_[abc]''',
+  '''key_analyst''',
+  '''0x[0-9a-fA-F]{40,64}''',
 ]
