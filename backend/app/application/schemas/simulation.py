@@ -404,6 +404,23 @@ class AIActReportResponse(BaseModel):
     compliance_certification: dict[str, Any] = Field(default_factory=dict)
 
 
+class POCReplayRequest(BaseModel):
+    """Request payload to execute an interactive POC sandbox replay."""
+
+    preset_id: str = Field(default="poc-enterprise-standard", description="Preset ID for replay scenario")
+    seed: int = Field(default=42, ge=0, description="Deterministic random seed")
+    async_mode: bool = Field(default=False, description="Whether to run asynchronously or return completed session")
+
+
+class POCPresetsResponse(BaseModel):
+    """Available POC presets and participating bank nodes."""
+
+    presets: list[dict[str, Any]]
+    participating_banks: list[dict[str, Any]]
+    default_preset_id: str = "poc-enterprise-standard"
+
+
 # Rebuild models to resolve forward references
 SimulationDetailResponse.model_rebuild()
+
 

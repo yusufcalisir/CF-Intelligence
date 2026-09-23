@@ -22,6 +22,8 @@ from app.application.schemas.simulation import (
     ComparisonResponse,
     DataProfileResponse,
     MetricsResponse,
+    POCPresetsResponse,
+    POCReplayRequest,
     SimulationConfigRequest,
     SimulationCreateResponse,
     SimulationDetailResponse,
@@ -31,6 +33,7 @@ from app.application.schemas.simulation import (
     SimulationSummaryResponse,
     TrainingRoundResponse,
 )
+from app.application.services.multi_bank_simulator import get_multi_bank_simulator
 from app.domain.enums import PrivacyMechanism, SimulationStatus
 from app.infrastructure.redis_store import RedisStore
 from app.infrastructure.security.rate_limiter import limiter
@@ -823,3 +826,113 @@ async def get_ai_act_report(
             "audit_sign_off_status": "APPROVED_BY_SYSTEM",
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Interactive POC Sandbox Replay Endpoints
+# ---------------------------------------------------------------------------
+
+
+@router.get(
+    "/poc/presets",
+    response_model=POCPresetsResponse,
+    summary="List available POC sandbox presets and participating banks",
+)
+@api_router.get(
+    "/poc/presets",
+    response_model=POCPresetsResponse,
+    summary="List available POC sandbox presets and participating banks",
+)
+@singular_router.get(
+    "/poc/presets",
+    response_model=POCPresetsResponse,
+    summary="List available POC sandbox presets and participating banks",
+)
+@singular_api_router.get(
+    "/poc/presets",
+    response_model=POCPresetsResponse,
+    summary="List available POC sandbox presets and participating banks",
+)
+def get_poc_presets() -> POCPresetsResponse:
+    sim = get_multi_bank_simulator()
+    return POCPresetsResponse(
+        presets=sim.get_presets(),
+        participating_banks=sim.get_participating_banks(),
+    )
+
+
+@router.post(
+    "/poc/replay",
+    summary="Execute deterministic POC multi-bank simulation replay",
+)
+@api_router.post(
+    "/poc/replay",
+    summary="Execute deterministic POC multi-bank simulation replay",
+)
+@singular_router.post(
+    "/poc/replay",
+    summary="Execute deterministic POC multi-bank simulation replay",
+)
+@singular_api_router.post(
+    "/poc/replay",
+    summary="Execute deterministic POC multi-bank simulation replay",
+)
+def execute_poc_replay(req: POCReplayRequest) -> dict[str, Any]:
+    sim = get_multi_bank_simulator()
+    summary = sim.execute_poc_replay(preset_id=req.preset_id, random_seed=req.seed)
+    return summary.to_dict()
+
+
+@router.get(
+    "/poc/status/{session_id}",
+    summary="Get POC replay status and telemetry",
+)
+@api_router.get(
+    "/poc/status/{session_id}",
+    summary="Get POC replay status and telemetry",
+)
+@singular_router.get(
+    "/poc/status/{session_id}",
+    summary="Get POC replay status and telemetry",
+)
+@singular_api_router.get(
+    "/poc/status/{session_id}",
+    summary="Get POC replay status and telemetry",
+)
+def get_poc_status(session_id: str = Path(..., description="POC session identifier")) -> dict[str, Any]:
+    sim = get_multi_bank_simulator()
+    status_data = sim.get_session_status(session_id)
+    if not status_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"POC session '{session_id}' not found",
+        )
+    return status_data
+
+
+@router.get(
+    "/poc/summary/{session_id}",
+    summary="Get final executive POC evaluation report",
+)
+@api_router.get(
+    "/poc/summary/{session_id}",
+    summary="Get final executive POC evaluation report",
+)
+@singular_router.get(
+    "/poc/summary/{session_id}",
+    summary="Get final executive POC evaluation report",
+)
+@singular_api_router.get(
+    "/poc/summary/{session_id}",
+    summary="Get final executive POC evaluation report",
+)
+def get_poc_summary(session_id: str = Path(..., description="POC session identifier")) -> dict[str, Any]:
+    sim = get_multi_bank_simulator()
+    status_data = sim.get_session_status(session_id)
+    if not status_data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"POC session '{session_id}' not found",
+        )
+    return status_data
+

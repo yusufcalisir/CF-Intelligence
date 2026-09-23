@@ -65,6 +65,9 @@ test-iso20022: ## Run Extended ISO 20022 Financial Rails tests (camt.053, pacs.0
 test-regulatory-dossier: ## Run EU AI Act & SR 11-7 Regulatory Dossier generator tests
 	cd backend && python -m pytest tests/unit/test_regulatory_dossier_generator.py -v
 
+test-poc-simulator: ## Run Interactive POC Sandbox Replay & Multi-Bank Simulator tests
+	cd backend && python -m pytest tests/unit/test_multi_bank_simulator.py -v
+
 lint: ## Run linters (matching CI pipeline)
 	cd backend && ruff check app/ tests/
 	cd backend && mypy app/ --ignore-missing-imports

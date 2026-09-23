@@ -32,6 +32,10 @@ from app.application.services.design_partner_service import DesignPartnerPilotSe
 from app.application.services.european_scenario_library import (
     EuropeanScenarioLibraryService,
 )
+from app.application.services.multi_bank_simulator import (
+    MultiBankSimulator,
+    get_multi_bank_simulator,
+)
 from app.domain.metrics_service import compute_scientific_benchmark
 
 
@@ -380,6 +384,61 @@ def run_european_scenario_benchmark() -> dict[str, Any]:
     }
 
 
+def run_poc_replay_cli(
+    preset_id: str = "poc-enterprise-standard",
+    seed: int = 42,
+    output_path: str | None = None,
+) -> dict[str, Any]:
+    """Executes the Interactive POC Sandbox Replay CLI demonstration."""
+    simulator = get_multi_bank_simulator()
+    preset = simulator.get_preset(preset_id)
+
+    print("\n" + "=" * 95)
+    print(" CFI PLATFORM - INTERACTIVE POC SANDBOX REPLAY & MULTI-BANK SIMULATION ENGINE ")
+    print("=" * 95)
+    print(f"Preset Scenario: {preset.name} ({preset.preset_id})")
+    print(f"Description:     {preset.description}")
+    print(f"Rounds:          {preset.rounds} | Aggregation: {preset.aggregation_strategy} | DP Epsilon: {preset.dp_epsilon}")
+    print(f"Fraud Injection: {preset.fraud_injection.value}")
+    print(f"Participating:   {', '.join(preset.participating_banks)}")
+    print("-" * 95)
+    print(f"{'Round':<7} | {'Global Loss':<12} | {'Global PR-AUC':<14} | {'Global ROC-AUC':<14} | {'DP Consumed':<12} | {'Quarantined'}")
+    print("-" * 95)
+
+    summary = simulator.execute_poc_replay(preset_id=preset_id, random_seed=seed)
+
+    for r in summary.rounds_telemetry:
+        q_nodes = ", ".join(r["byzantine_nodes_quarantined"]) if r["byzantine_nodes_quarantined"] else "None (Clean)"
+        print(
+            f"R-{r['round_num']:<5} | {r['global_loss']:<12.4f} | {r['global_pr_auc']:<14.4f} | "
+            f"{r['global_roc_auc']:<14.4f} | {r['dp_budget_consumed']:<12.3f} | {q_nodes}"
+        )
+
+    print("-" * 95)
+    comp = summary.local_vs_federated
+    siloed_pr = comp["siloed_local_models"]["average_pr_auc"]
+    fed_pr = comp["collaborative_fedgnn"]["final_global_pr_auc"]
+    gain_pct = comp["collaborative_fedgnn"]["pr_auc_gain_pct"]
+
+    print("\n[+] Executive Collaborative Advantage Summary:")
+    print(f"  * Siloed Local Models PR-AUC (Average): {siloed_pr:.4f}")
+    print(f"  * Collaborative FedGNN PR-AUC (Global): {fed_pr:.4f} (+{gain_pct:.1f}% Relative Gain)")
+    print(f"  * Mule Ring Containment Rate:           {summary.mule_ring_containment_rate_pct:.1f}%")
+    print(f"  * Mean Time to Response (MTTR):         {summary.mttr_minutes:.1f} minutes (vs 48h baseline)")
+    print(f"  * Total LOO Shapley Incentives:         EUR {summary.total_shapley_incentives_eur:,.2f}")
+    print(f"  * Cryptographic Audit Hash (SHA-256):   {summary.cryptographic_audit_hash}")
+    print("=" * 95 + "\n")
+
+    result_dict = summary.to_dict()
+    if output_path:
+        os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as f:
+            json.dump(result_dict, f, indent=2)
+        print(f"[+] Replay session summary exported to: {output_path}")
+
+    return result_dict
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="CFI Platform - Scientific Benchmark Suite & Distribution Fidelity Protocol CLI"
@@ -413,12 +472,22 @@ if __name__ == "__main__":
         action="store_true",
         help="Skip European AML scenario library & hybrid rule engine evaluations",
     )
+    parser.add_argument(
+        "--poc-replay",
+        nargs="?",
+        const="poc-enterprise-standard",
+        default=None,
+        help="Execute interactive POC Sandbox Replay (default: poc-enterprise-standard)",
+    )
     args = parser.parse_args()
 
-    run_benchmark_suite(
-        sample_size=args.samples,
-        n_real_samples=args.real_samples,
-        output_path=args.output,
-        include_real=not args.only_synthetic,
-        include_scenarios=not args.skip_scenarios,
-    )
+    if args.poc_replay is not None:
+        run_poc_replay_cli(preset_id=args.poc_replay, output_path=args.output)
+    else:
+        run_benchmark_suite(
+            sample_size=args.samples,
+            n_real_samples=args.real_samples,
+            output_path=args.output,
+            include_real=not args.only_synthetic,
+            include_scenarios=not args.skip_scenarios,
+        )
