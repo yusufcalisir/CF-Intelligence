@@ -62,4 +62,5 @@ filterwarnings = [
     "ignore::DeprecationWarning:click.*:",
     "ignore::DeprecationWarning:typer.*:",
     "ignore:.*pythonjsonlogger.*:DeprecationWarning:",
+    "ignore:.*Valid config keys have changed in V2.*:UserWarning:",
 ]
