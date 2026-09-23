@@ -14,6 +14,7 @@ import {
   Radio,
   FileText,
   ChevronDown,
+  AlertTriangle,
 } from 'lucide-react';
 import { DatasetIngestionStudioModal } from '../components/ingestion/DatasetIngestionStudioModal';
 
@@ -67,13 +68,21 @@ export default function BankOnboardingPage() {
   const [nodeStatus, setNodeStatus] = useState<'PENDING' | 'ACTIVE'>('PENDING');
   const [isCliCopied, setIsCliCopied] = useState(false);
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [isConflict, setIsConflict] = useState(false);
 
   const handleInputChange = (field: keyof OnboardingFormData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    if (errorMessage) {
+      setErrorMessage(null);
+      setIsConflict(false);
+    }
   };
 
   const handleRegisterSubmit = async () => {
     setIsSubmitting(true);
+    setErrorMessage(null);
+    setIsConflict(false);
     try {
       const res = await fetch('/api/v1/onboarding/register', {
         method: 'POST',
@@ -81,42 +90,68 @@ export default function BankOnboardingPage() {
         body: JSON.stringify(formData),
       });
 
-      let certPem = `-----BEGIN CERTIFICATE-----\nMIIDXTCCAkWgAwIBAgIU${formData.bank_id.toUpperCase()}...\n-----END CERTIFICATE-----`;
-      let keyPem = `-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC...\n-----END PRIVATE KEY-----`;
-
       if (res.ok) {
         const data = await res.json();
-        if (data.certificate_pem) certPem = data.certificate_pem;
-        if (data.private_key_pem) keyPem = data.private_key_pem;
+        setGeneratedCert(data.certificate_pem || data.mtls_cert_pem || '');
+        setGeneratedKey(data.private_key_pem || data.mtls_key_pem || '');
+        setGeneratedYaml(data.connector_config_yaml || '');
+        setStep(3);
+        return;
       }
 
-      setGeneratedCert(certPem);
-      setGeneratedKey(keyPem);
+      const errorData = await res.json().catch(() => ({}));
+      const detail = errorData.detail || `Registration failed (HTTP ${res.status})`;
 
-      const yamlContent = `version: "2.0"
-bank_id: "${formData.bank_id}"
-legal_name: "${formData.legal_name}"
-jurisdiction: "${formData.jurisdiction}"
-data_residency_region: "${formData.data_residency_region}"
-
-coordinator:
-  endpoint: "grpcs://coordinator.cfi-platform.org:50051"
-  tls_enabled: true
-  mtls_cert_path: "/etc/cfi/certs/${formData.bank_id}.crt"
-  mtls_key_path: "/etc/cfi/certs/${formData.bank_id}.key"
-
-differential_privacy:
-  epsilon_max_budget: 8.0
-  clip_norm: 1.0
-`;
-      setGeneratedYaml(yamlContent);
-      setStep(3);
-    } catch {
-      // Fallback to step 3 on network error
-      setStep(3);
+      if (res.status === 409) {
+        setIsConflict(true);
+        setErrorMessage(
+          `Bank ID "${formData.bank_id}" is already registered in the consortium database. Re-registration is blocked to preserve cryptographic identity and certificate invariants.`
+        );
+      } else {
+        setErrorMessage(detail);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Network error communicating with coordinator onboarding service.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleLoadExistingBundle = async () => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetch(`/api/v1/onboarding/bundle/${encodeURIComponent(formData.bank_id)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setGeneratedCert(data.mtls_cert_pem || '/* Existing X.509 certificate active on node */');
+        setGeneratedKey(data.mtls_key_pem || '/* Existing private key stored in secure hardware vault */');
+        setGeneratedYaml(data.connector_config_yaml || '');
+        setIsConflict(false);
+        setStep(3);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        setErrorMessage(errorData.detail || 'Failed to retrieve existing bundle.');
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to connect to coordinator.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGenerateUniqueBankId = () => {
+    const randomSuffix = Math.random().toString(36).substring(2, 6);
+    const newId = `bank_${randomSuffix}`;
+    setFormData((prev) => ({
+      ...prev,
+      bank_id: newId,
+      legal_name: `${newId.toUpperCase()} Commercial Banking Corp.`,
+      contact_email: `secops@${newId}.eu`,
+    }));
+    setErrorMessage(null);
+    setIsConflict(false);
+    setStep(1);
   };
 
   const downloadFile = (filename: string, content: string) => {
@@ -310,9 +345,18 @@ differential_privacy:
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block mb-1.5">
-                Bank Identifier (ID)
-              </label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs text-slate-300 font-semibold uppercase tracking-wider block">
+                  Bank Identifier (ID)
+                </label>
+                <button
+                  type="button"
+                  onClick={handleGenerateUniqueBankId}
+                  className="text-[10px] font-mono text-indigo-400 hover:text-indigo-300 transition cursor-pointer flex items-center gap-1"
+                >
+                  <span>🎲 Generate Unique ID</span>
+                </button>
+              </div>
               <input
                 type="text"
                 value={formData.bank_id}
@@ -482,6 +526,39 @@ differential_privacy:
               <span className="font-mono text-indigo-300">{formData.data_residency_region}</span>
             </div>
           </div>
+
+          {errorMessage && (
+            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm flex flex-col gap-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="font-bold text-amber-200">
+                    {isConflict ? 'Registration Conflict (HTTP 409)' : 'Registration Error'}
+                  </div>
+                  <div className="mt-0.5 text-amber-300/90 leading-relaxed">{errorMessage}</div>
+                </div>
+              </div>
+              {isConflict && (
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-amber-500/20">
+                  <button
+                    type="button"
+                    onClick={handleLoadExistingBundle}
+                    disabled={isSubmitting}
+                    className="px-3.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>📥 Retrieve Existing Node Configuration</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleGenerateUniqueBankId}
+                    className="px-3.5 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+                  >
+                    <span>🔄 Generate New Unique Bank ID</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-white/10">
             <button
