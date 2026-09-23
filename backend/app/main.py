@@ -49,6 +49,7 @@ from app.presentation.routers import (
     diagnostics,
     entities,
     european_scenarios,
+    financial_messages,
     gateway,
     graph,
     health,
@@ -1084,6 +1085,8 @@ else:
     app.include_router(asset_recovery.api_router)
     app.include_router(core_banking_gateway.router)
     app.include_router(core_banking_gateway.api_router)
+    app.include_router(financial_messages.router)
+    app.include_router(financial_messages.api_router)
 
 
 @app.get("/", tags=["root"])

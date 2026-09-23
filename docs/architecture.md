@@ -110,7 +110,7 @@ Contains concrete implementations of adapters, persistence engines, cryptographi
 Interactions with clients, compliance officers, investigators, and consortium banking nodes.
 
 * [`main.py`](../backend/app/main.py): Houses global `TenantAccessControlMiddleware` (BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware`, `SecurityHeadersMiddleware`, `ProductionErrorHandler`, and the dark-themed `@scalar/api-reference` gateway at `GET /scalar`.
-* **42 Modular REST Routers** in [`routers/`](../backend/app/presentation/routers): Verifies request formats via Pydantic schemas, enforcing `@limiter.limit(...)`, `enforce_tenant_isolation(...)`, and specialized RegTech engines (`bridge_messaging.py`, `payment_recall.py`, `screening.py`, `regulatory.py`, `onboarding.py`, `cases.py`, `alerts.py`, `banks.py`, `gateway.py`, `predict.py`, `diagnostics.py`, `open_aml_adapter.py`, `ubo_graph.py`, `european_scenarios.py`, `asset_recovery.py`, etc.).
+* **43 Modular REST Routers** in [`routers/`](../backend/app/presentation/routers): Verifies request formats via Pydantic schemas, enforcing `@limiter.limit(...)`, `enforce_tenant_isolation(...)`, and specialized RegTech engines (`financial_messages.py`, `bridge_messaging.py`, `payment_recall.py`, `screening.py`, `regulatory.py`, `onboarding.py`, `cases.py`, `alerts.py`, `banks.py`, `gateway.py`, `predict.py`, `diagnostics.py`, `open_aml_adapter.py`, `ubo_graph.py`, `european_scenarios.py`, `asset_recovery.py`, `core_banking_gateway.py`, etc.).
 * **WebSockets**: [`websockets/streaming_ws.py`](../backend/app/presentation/websockets/streaming_ws.py) & [`training_ws.py`](../backend/app/presentation/websockets/training_ws.py): Persistent WebSocket channels broadcasting real-time high-risk fraud alerts (`/ws/telemetry`), telemetry ticks, and live federated training weight updates.
 * **Unified Web UI Frontend Architecture** ([`frontend/`](../frontend)): React 19, TypeScript, Vite, TanStack Query, Tailwind CSS, Lucide icons, and Framer Motion delivering 12 integrated enterprise views:
   - `LandingPage` & `PlatformLaunchModal`: Direct role-based routing and live consortium telemetry.
@@ -620,15 +620,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,444 Automated Pytest Suites)
+     └── 6. pytest-security-and-compliance-suites (2,474 Automated Pytest Suites)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,444 automated tests** across unit, integration, and property-based suites:
+The entire codebase is validated by **2,474 automated tests** across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,444 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,474 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -638,7 +638,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,444 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,474 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), and DR Failover |
 
 
 

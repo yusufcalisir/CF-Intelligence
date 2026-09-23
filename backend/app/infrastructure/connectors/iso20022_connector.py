@@ -164,6 +164,12 @@ class ISO20022MessagingConnector(BaseBankConnector):
             )
             raise ValueError("ISO 20022 XML validation failed against pacs.002 XSD schema")
 
+        if "pacs.003" in schema_name and "FIToFICstmrDrctDbt" not in tags and "DrctDbtTxInf" not in tags:
+            self._log_siem_parse_failure(
+                schema_name, "Missing FIToFICstmrDrctDbt element for pacs.003"
+            )
+            raise ValueError("ISO 20022 XML validation failed against pacs.003 XSD schema")
+
     @retry_connector()
     def parse_pacs008_xml(self, xml_content: str) -> NormalizedTransaction:
         """Parses an ISO 20022 pacs.008.001.08 Financial Institution Customer Credit Transfer XML string."""
@@ -482,6 +488,26 @@ class ISO20022MessagingConnector(BaseBankConnector):
         self._parsed_queue.append(tx)
         return tx
 
+    @retry_connector()
+    def parse_pacs003_xml(self, xml_content: str) -> NormalizedTransaction:
+        """Parses an ISO 20022 pacs.003.001.08 Direct Debit XML string into NormalizedTransaction."""
+        self.validate_xml_schema(xml_content, "pacs.003.001.08.xsd")
+        parsed = FinancialMessageParser.parse_iso_20022_pacs003(xml_content)
+        tx = NormalizedTransaction(
+            transaction_id=parsed["transaction_id"],
+            account_id=parsed["sender_account"],
+            counterparty_account_id=parsed["receiver_account"],
+            amount=parsed["amount"],
+            currency=parsed["currency"],
+            timestamp=datetime.now(UTC),
+            merchant_category_code="6012",
+            origin_country=parsed["sender_country"],
+            destination_country=parsed["receiver_country"],
+            channel_type="ISO20022_PACS003",
+        )
+        self._parsed_queue.append(tx)
+        return tx
+
     def consume_stream(self) -> Generator[NormalizedTransaction, None, None]:
         """Yields transactions from parsed message queue."""
         while self._parsed_queue:
@@ -500,6 +526,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
                             results.append(self.parse_pain001_xml(item))
                         elif "pacs.002" in item or "FIToFIPmtStsRpt" in item:
                             results.append(self.parse_pacs002_xml(item))
+                        elif "pacs.003" in item or "FIToFICstmrDrctDbt" in item:
+                            results.append(self.parse_pacs003_xml(item))
                         elif "pacs.008" in item or "FIToFICstmrCdtTrf" in item or "<Document" in item:
                             results.append(self.parse_pacs008_xml(item))
                         elif ":20:" in item or ":32A:" in item:
@@ -520,6 +548,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
                     return [self.parse_pain001_xml(payload)]
                 elif "pacs.002" in payload or "FIToFIPmtStsRpt" in payload:
                     return [self.parse_pacs002_xml(payload)]
+                elif "pacs.003" in payload or "FIToFICstmrDrctDbt" in payload:
+                    return [self.parse_pacs003_xml(payload)]
                 elif "pacs.008" in payload or "FIToFICstmrCdtTrf" in payload or "<Document" in payload:
                     return [self.parse_pacs008_xml(payload)]
                 elif ":20:" in payload or ":32A:" in payload:

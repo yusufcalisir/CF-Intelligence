@@ -59,6 +59,9 @@ test-core-banking: ## Run Cloud Core Banking gateway tests (Mambu & Thought Mach
 test-hsm: ## Run Hardware Security Module (HSM) PKCS#11 & Vault Transit tests
 	cd backend && python -m pytest tests/unit/test_hsm_key_service.py -v
 
+test-iso20022: ## Run Extended ISO 20022 Financial Rails tests (camt.053, pacs.002, pacs.003)
+	cd backend && python -m pytest tests/unit/test_extended_iso20022_parser.py tests/unit/test_financial_message_parser_hardening.py -v
+
 lint: ## Run linters (matching CI pipeline)
 	cd backend && ruff check app/ tests/
 	cd backend && mypy app/ --ignore-missing-imports
