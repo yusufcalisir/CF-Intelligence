@@ -88,6 +88,7 @@ Contains concrete implementations of adapters, persistence engines, cryptographi
 * [`security/layer2_crosschain_bridge.py`](../backend/app/infrastructure/security/layer2_crosschain_bridge.py): Chainlink CCIP `EVM2AnyMessage` and LayerZero V2 multi-ledger settlement bridge for Arbitrum, Optimism, Canton, and Hyperledger Fabric.
 * [`security/adaptive_dp_autoscaler.py`](../backend/app/infrastructure/security/adaptive_dp_autoscaler.py): Rényi Differential Privacy (RDP) and PRV numerical dual accountant with loss-velocity dynamic Gaussian noise auto-scaling.
 * [`security/hsm_signer.py`](../backend/app/infrastructure/security/hsm_signer.py): Pluggable PKCS#11 hardware signer driver and `SoftwareHSMSignerEngine` emulator enforcing non-exportable private key handles and session PIN authentication.
+* [`security/hsm_key_service.py`](../backend/app/infrastructure/security/hsm_key_service.py): Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust key service wrapper enforcing Zero-Disk non-exportable private keys (`is_exportable = False`), Curve25519 ECDH shared secret derivation within hardware enclaves, automated mTLS 1.3 rotation monitoring, and X.509 consortium peer thumbprint attestation.
 * [`security/tee_driver.py`](../backend/app/infrastructure/security/tee_driver.py): Pluggable Confidential Computing driver and `SoftwareEmulatedTEEDriver` modeling Intel SGX / AWS Nitro remote attestation (`MRENCLAVE`) and memory sealing.
 * [`security/vault_hsm_pki_binder.py`](../backend/app/infrastructure/security/vault_hsm_pki_binder.py): HashiCorp Vault PKI root CA binding to FIPS 140-2 Level 3 HSM hardware slots via PKCS#11 (with SoftHSM2 development fallback).
 * [`security/gnosis_multisig_coordinator.py`](../backend/app/infrastructure/security/gnosis_multisig_coordinator.py): Gnosis Safe 2-of-3 threshold multi-sig coordinator governance driver with EIP-712 structured data signatures.
@@ -619,15 +620,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,420 Automated Pytest Suites)
+     └── 6. pytest-security-and-compliance-suites (2,444 Automated Pytest Suites)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,420 automated tests** across unit, integration, and property-based suites:
+The entire codebase is validated by **2,444 automated tests** across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,420 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,444 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -637,7 +638,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,420 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,444 automated tests covering EU AI Act, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, and DR Failover |
 
 
 

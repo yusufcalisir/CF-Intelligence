@@ -158,6 +158,35 @@ def decrypt_payload(
         )
 
 
+def decrypt_payload_with_hsm(
+    ciphertext_b64: str,
+    nonce_b64: str,
+    ephemeral_pubkey_b64: str,
+    hsm_key_service: Any,
+    key_label: str = "cfi_node_identity_key",
+) -> bytes:
+    """Decrypt AES-GCM ciphertext using Curve25519 shared secret derived directly inside HSM.
+
+    Zero-Process-Memory Private Key Exposure: The recipient private scalar never enters Python
+    process memory; the shared secret is derived within the HSM / Vault Transit enclave boundary.
+    """
+    ciphertext = base64.urlsafe_b64decode(ciphertext_b64 + "==")
+    nonce = base64.urlsafe_b64decode(nonce_b64 + "==")
+    ephem_pub_bytes = base64.urlsafe_b64decode(ephemeral_pubkey_b64 + "==")
+
+    shared_secret = hsm_key_service.derive_shared_secret(ephem_pub_bytes, key_label=key_label)
+    aes_key = _hkdf_derive(shared_secret, salt=ephem_pub_bytes)
+
+    if _CRYPTO_AVAILABLE:
+        aesgcm = AESGCM(aes_key)
+        return aesgcm.decrypt(nonce, ciphertext, None)
+    else:
+        import itertools
+
+        raw = ciphertext[:-16]
+        return bytes(a ^ b for a, b in zip(raw, itertools.cycle(aes_key + nonce)))
+
+
 def generate_bank_keypair() -> tuple[str, str]:
     """Generate a Curve25519 keypair for a bank node (private_b64, public_b64).
 
@@ -538,6 +567,73 @@ class BridgeCaseService:
             running_hash = entry.event_hash
 
         return True
+
+    # ── Hardware-Anchored HSM Ticket Attestation ──────────────────────────────
+
+    def sign_ticket_with_hsm(
+        self,
+        ticket_id: str,
+        hsm_key_service: Any,
+        actor: str = "HSM_OPERATOR",
+        key_label: str = "cfi_node_identity_key",
+    ) -> str:
+        """Sign the ticket's immutable audit chain head with an HSM hardware key.
+
+        Enforces non-repudiation across institutional boundaries without exposing
+        the bank node's private signing key in process memory.
+
+        Returns:
+            URL-safe Base64-encoded hardware digital signature.
+        """
+        with self._lock:
+            ticket = self._tickets.get(ticket_id)
+            if ticket is None:
+                raise TicketNotFoundError(ticket_id)
+
+            head_str = ticket.head_hash
+            sig_bytes = hsm_key_service.sign_payload(head_str.encode("utf-8"), key_label=key_label)
+            sig_b64 = base64.urlsafe_b64encode(sig_bytes).decode().rstrip("=")
+
+            _append_audit_entry(
+                ticket,
+                actor=actor,
+                action="TICKET_SIGNED_HSM",
+                new_status=ticket.status,
+                metadata={
+                    "hsm_key_label": key_label,
+                    "signature": sig_b64,
+                    "signed_head_hash": head_str,
+                    "provider": getattr(hsm_key_service, "provider", "PKCS11"),
+                },
+            )
+            return sig_b64
+
+    def verify_ticket_hsm_signature(
+        self,
+        ticket_id: str,
+        signature_b64: str,
+        hsm_key_service: Any,
+        key_label: str = "cfi_node_identity_key",
+    ) -> bool:
+        """Verify that a ticket's audit chain was attested by the specified HSM key."""
+        with self._lock:
+            ticket = self._tickets.get(ticket_id)
+            if ticket is None:
+                raise TicketNotFoundError(ticket_id)
+
+            # Find the audit entry containing this HSM signature
+            target_hash = ticket.head_hash
+            for entry in reversed(ticket.audit_trail):
+                if entry.action == "TICKET_SIGNED_HSM" and entry.metadata.get("signature") == signature_b64:
+                    target_hash = entry.metadata.get("signed_head_hash", entry.previous_hash)
+                    break
+
+        sig_bytes = base64.urlsafe_b64decode(signature_b64 + "==")
+        return hsm_key_service.verify_signature(
+            hashlib.sha256(target_hash.encode("utf-8")).digest(),
+            sig_bytes,
+            key_label=key_label,
+        )
 
     # ── Metrics ───────────────────────────────────────────────────────────────
 

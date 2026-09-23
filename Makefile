@@ -56,6 +56,9 @@ test-integration: ## Run integration tests only
 test-core-banking: ## Run Cloud Core Banking gateway tests (Mambu & Thought Machine)
 	cd backend && python -m pytest tests/unit/test_core_banking_gateway.py -v
 
+test-hsm: ## Run Hardware Security Module (HSM) PKCS#11 & Vault Transit tests
+	cd backend && python -m pytest tests/unit/test_hsm_key_service.py -v
+
 lint: ## Run linters (matching CI pipeline)
 	cd backend && ruff check app/ tests/
 	cd backend && mypy app/ --ignore-missing-imports

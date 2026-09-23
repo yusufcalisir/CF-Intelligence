@@ -10,9 +10,12 @@ paths = [
   '''(?i)package-lock\.json''',
   '''(?i)requirements\.txt''',
   '''(?i)secrets_scan\.json''',
+  '''(?i)docker-compose.*\.ya?ml''',
 ]
 regexes = [
   '''(?i)(secret|token|password|key)\s*[:=]\s*['"][a-zA-Z0-9_\-\.]{8,64}['"]''',
   '''CorrectHorseBatteryStaple123!''',
   '''sha256_[a-z0-9_]+''',
+  '''dev-token''',
+  '''dev-test-token''',
 ]

@@ -12,8 +12,7 @@ Tests cover:
 
 from __future__ import annotations
 
-import hashlib
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import pytest
@@ -22,11 +21,9 @@ from fastapi.testclient import TestClient
 
 from app.application.services.asset_recovery_service import (
     AssetRecoveryService,
-    RecoveryEvent,
     get_asset_recovery_service,
 )
 from app.presentation.routers.asset_recovery import api_router, router
-
 
 # ── Fixtures ───────────────────────────────────────────────────────────────────
 

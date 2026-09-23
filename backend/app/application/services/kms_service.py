@@ -45,6 +45,7 @@ class KMSService:
 
     def __init__(self, storage_root: str | None = None) -> None:
         self._storage_root = storage_root or _STORAGE_ROOT
+        self._hsm_services: dict[str, Any] = {}
 
     # ── Vault path helpers ────────────────────
 
@@ -308,6 +309,38 @@ class KMSService:
             if os.path.isdir(kms_dir):
                 tenants.append(entry)
         return sorted(tenants)
+
+    # ── Hardware Security Module (HSM) Integration ───────────────────────
+
+    def get_hsm_key_service(self, bank_id: str) -> Any:
+        """Return the tenant-scoped HSM Key Service for hardware-anchored operations."""
+        if bank_id not in self._hsm_services:
+            from app.infrastructure.security.hsm_key_service import HSMKeyService
+
+            self._hsm_services[bank_id] = HSMKeyService()
+        return self._hsm_services[bank_id]
+
+    def sign_tenant_digest_with_hsm(
+        self,
+        bank_id: str,
+        digest: bytes,
+        key_label: str = "tenant_signing_key",
+    ) -> bytes:
+        """Sign a digest using tenant's hardware-anchored HSM key (Zero-Disk Key)."""
+        hsm = self.get_hsm_key_service(bank_id)
+        scoped_label = f"{bank_id}_{key_label}"
+        return hsm.sign_digest(digest, key_label=scoped_label)
+
+    def derive_tenant_shared_secret(
+        self,
+        bank_id: str,
+        peer_public_key: bytes,
+        key_label: str = "tenant_dh_key",
+    ) -> bytes:
+        """Derive Curve25519 shared secret inside the tenant's HSM enclave boundary."""
+        hsm = self.get_hsm_key_service(bank_id)
+        scoped_label = f"{bank_id}_{key_label}"
+        return hsm.derive_shared_secret(peer_public_key, key_label=scoped_label)
 
 
 # Module-level singleton for convenience

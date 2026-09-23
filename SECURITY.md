@@ -44,6 +44,10 @@ The platform enforces non-negotiable security and privacy guarantees across all 
    - Backdoor signatures and Kolmogorov-Smirnov statistical tests continuously detect model extraction and IP theft attempts.
 8. **Perimeter WAF & Defense-in-Depth Gateway**:
    - Edge traffic passes through [`PerimeterWAFGuard`](backend/app/infrastructure/security/perimeter_waf.py) enforcing SQL injection rejection, XSS blocking, sensitive path filtering (`/.env`, `/admin`, `/.git`), brute-force IP lockout (5 failures / 300s window), and strict CORS domain whitelisting.
+9. **Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper**:
+   - Hardware-anchored cryptographic protection enforcing the Zero-Disk and Zero-Process-Memory Private Key Invariant (`is_exportable = False`).
+   - Digital signatures (RSA-PSS, ECDSA-P256, Ed25519) and Curve25519 / X25519 ECDH shared secret derivation are executed strictly within physical FIPS 140-2 Level 3 HSM enclaves (PKCS#11 / AWS CloudHSM) or HashiCorp Vault Transit engine boundaries.
+   - Continuous automated mTLS 1.3 consortium certificate rotation monitoring (30-day proactive threshold) and X.509 SHA-256 peer thumbprint attestation ensure authentic institutional node identity across all inter-bank messaging channels.
 
 ---
 
