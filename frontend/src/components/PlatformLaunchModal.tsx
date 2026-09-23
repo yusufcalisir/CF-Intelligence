@@ -84,6 +84,15 @@ const STAGES: StageInfo[] = [
     color: '#f59e0b',
     glow: 'rgba(245, 158, 11, 0.4)',
   },
+  {
+    id: 7,
+    label: 'Asset Recovery & FININT Operational Hub',
+    subtext: 'EUR recall KPIs · MTTR analytics · mule chain containment live',
+    tag: 'ISO 20022 · EPC SCT',
+    icon: Radio,
+    color: '#10b981',
+    glow: 'rgba(16, 185, 129, 0.4)',
+  },
 ];
 
 

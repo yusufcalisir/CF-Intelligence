@@ -48,6 +48,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'sepa-recall', name: 'SEPA Instant Payment Recall Automation', category: 'European RegTech & Collaborative FININT', purpose: 'Automates cross-bank EPC SCT Inst payment cancellation requests via ISO 20022 message generation: camt.056 FIToFIPaymentCancellationRequest, pacs.004 PaymentReturn, and camt.029 ResolutionOfInvestigation — with sub-second provisional account hold webhook triggering on fraud confirmation.', algorithm: 'ISO 20022 camt.056.001.08 + pacs.004.001.09 + camt.029.001.09 XML generation · SHA-256 hash-chain audit', inputs: 'Original pacs.008 transaction references (MsgId, UETR) + recall reason code (FRAD/TECH/DUPL) + amount', outputs: 'camt.056 XML recall request + pacs.004/camt.029 resolution + provisional hold webhook callback', tech: 'xml.etree.ElementTree, FastAPI, Pydantic v2, Python 3.12, EPC SCT Inst Rulebook v1.1' },
   { id: 'sanctions-screening', name: 'Real-Time Sanctions & PEP Screening Engine', category: 'European RegTech & Collaborative FININT', purpose: 'Screens individual and legal entity names against 5 multi-jurisdiction watchlists (EU Consolidated, UN Security Council, OFAC SDN, HM Treasury, PEP Global) using 5 matching algorithms — Exact, Levenshtein, Jaro-Winkler, Double Metaphone, and Cyrillic/Greek transliteration — with goodlist false-positive suppression and portfolio bulk re-screening on watchlist refresh cycles.', algorithm: 'Jaro-Winkler + Levenshtein + Double Metaphone phonetic + Cyrillic/Greek transliteration + token-level exact', inputs: 'Entity name (individual or legal) + entity type + optional DOB + nationalities', outputs: 'Scored watchlist hits (0–100) + alert flag + goodlist suppression + compliance audit trail', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, EU Consolidated / UN SC / OFAC SDN watchlists' },
   { id: 'fiu-goaml', name: 'European FIU & UNODC goAML / AMLA Exporter', category: 'European RegTech & Collaborative FININT', purpose: 'Generates UNODC goAML 4.0 XML filings (STR, SAR, TTR, AIF) and EU AMLA Single Rulebook interchange schemas with dual-control supervisory sign-off, GDPR Article 6(1)(f) legitimate interest legal basis, and cryptographic digital envelope sealing.', algorithm: 'UNODC goAML 4.0 XML + EU AMLA JSON Schema + Canonical SHA-256 Digest + Dual-Control Sign-Off', inputs: 'Suspicious transaction schedules + entity references + grounds for suspicion narrative + GDPR justification', outputs: 'Validated UNODC goAML 4.0 XML + cryptographic transmission receipt + tamper-evident audit chain', tech: 'Pure Python stdlib, xml.etree, FastAPI, Pydantic v2, Python 3.12, UNODC goAML v4.0 / EU AMLA' },
+  { id: 'asset-recovery-hub', name: 'Asset Recovery & Collaborative FININT Operational Hub', category: 'European RegTech & Collaborative FININT', purpose: 'Aggregates real-time EUR asset frozen/recovered KPIs across ISO 20022 camt.056 payment recalls and cross-bank FININT provisional holds. Tracks Mean Time to Response (MTTR) reduction vs. the legacy 48-hour bilateral baseline, cross-bank contagion containment rate, and per-typology ROI breakdown across smurfing, APP fraud mule chains, dormant-burst velocity, and crypto gateway cashout scenarios.', algorithm: 'SHA-256 hash-chained audit trail + MTTR P50/P90/P99 percentile aggregation + contagion containment rate + typology ROI breakdown', inputs: 'camt.056 recall confirmations + cross-bank FININT case ticket closures + provisional hold webhook callbacks', outputs: 'EUR frozen/recovered KPIs + MTTR reduction % vs. 48h baseline + mule chain disruption count + typology risk classification', tech: 'Pure Python stdlib, FastAPI, Pydantic v2, Python 3.12, ISO 20022 camt.056 / EPC SCT Inst Rulebook' },
 ];
 
 const MODULE_SPECS_EXTRA: Record<string, {
@@ -256,6 +257,15 @@ const MODULE_SPECS_EXTRA: Record<string, {
     actionLabel: 'Open Regulatory Filing Hub',
     tensorSample: 'Envelope: HMAC-SHA256(K, SHA256(canonical(XML)) || report_id || status || ts) → Sealed XML Filing',
     statusBadge: 'UNODC goAML · EU AMLA',
+  },
+  'asset-recovery-hub': {
+    sla: '< 5 ms KPI snapshot aggregation (p99) | Real-time 30s auto-refresh',
+    security: 'SHA-256 hash-chained immutable audit trail | Zero raw PII | Amount-only EUR aggregations',
+    compliance: 'ISO 20022 camt.056.001.08 EPC SCT Inst Recall | EU AMLA Art. 20 Provisional Hold | FATF Rec. 1 & 3 Risk-Based Approach',
+    actionRoute: '/operations',
+    actionLabel: 'Open Operational Hub',
+    tensorSample: 'MTTR: t_freeze − t_alert (min) | Reduction: (2880 − MTTR_mean) / 2880 × 100% | Containment: |{MTTR < 60min}| / |events|',
+    statusBadge: 'ISO 20022 · EU AMLA · EPC',
   },
 };
 

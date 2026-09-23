@@ -225,6 +225,9 @@ import type {
   SlashPenaltyPayload,
   SlashPenaltyReceipt,
   SlashedNodesCatalog,
+  AssetRecoverySummaryResponse,
+  TimelineDataPointResponse,
+  TypologyBreakdownResponse,
 } from './types';
 
 
@@ -3144,13 +3147,43 @@ export function useSarFilingDetailQuery(filingId: string) {
   });
 }
 
+// ── Asset Recovery & Collaborative FININT Operational Hub ─────────────────────
 
+export function useAssetRecoverySummary() {
+  return useQuery<AssetRecoverySummaryResponse>({
+    queryKey: ['asset-recovery-summary'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<AssetRecoverySummaryResponse>(
+        '/api/v1/operations/asset-recovery/summary',
+      );
+      return data;
+    },
+    refetchInterval: 30_000,
+  });
+}
 
+export function useAssetRecoveryTimeline(windowHours = 720) {
+  return useQuery<TimelineDataPointResponse[]>({
+    queryKey: ['asset-recovery-timeline', windowHours],
+    queryFn: async () => {
+      const { data } = await apiClient.get<TimelineDataPointResponse[]>(
+        `/api/v1/operations/asset-recovery/timeline?window_hours=${windowHours}`,
+      );
+      return data;
+    },
+    refetchInterval: 60_000,
+  });
+}
 
-
-
-
-
-
-
-
+export function useAssetRecoveryBreakdown() {
+  return useQuery<TypologyBreakdownResponse[]>({
+    queryKey: ['asset-recovery-breakdown'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<TypologyBreakdownResponse[]>(
+        '/api/v1/operations/asset-recovery/breakdown-by-typology',
+      );
+      return data;
+    },
+    refetchInterval: 60_000,
+  });
+}

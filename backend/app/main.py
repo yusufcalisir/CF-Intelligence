@@ -35,6 +35,7 @@ from app.infrastructure.security.security_headers import SecurityHeadersMiddlewa
 from app.presentation.routers import (
     admin_console,
     alerts,
+    asset_recovery,
     auth,
     bank_client,
     banks,
@@ -1078,6 +1079,8 @@ else:
     app.include_router(ubo_graph.api_router)
     app.include_router(european_scenarios.router)
     app.include_router(european_scenarios.api_router)
+    app.include_router(asset_recovery.router)
+    app.include_router(asset_recovery.api_router)
 
 
 @app.get("/", tags=["root"])

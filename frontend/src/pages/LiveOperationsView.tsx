@@ -27,6 +27,7 @@ import {
   useSimulation,
   useSimulations,
   useTrainingRounds,
+  useAssetRecoverySummary,
 } from '../api/queries';
 
 
@@ -94,6 +95,7 @@ export default function LiveOperationsView() {
   const activeSimId = id || simulations?.[0]?.id || 'sim_fed_01';
   const { data: currentSim } = useSimulation(activeSimId);
   const { data: trainingRounds } = useTrainingRounds(activeSimId);
+  const { data: arSummary } = useAssetRecoverySummary();
 
   const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
   const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
@@ -906,6 +908,62 @@ export default function LiveOperationsView() {
           </div>
         )}
       </div>
+
+      {/* Asset Recovery & Collaborative FININT Operational Hub — Live Telemetry Card */}
+      {arSummary && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mt-6 rounded-2xl border border-emerald-500/20 bg-gradient-to-br from-emerald-950/30 via-slate-900/60 to-cyan-950/20 p-5 shadow-[0_0_40px_rgba(16,185,129,0.08)]"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-xs font-mono font-bold text-emerald-300 uppercase tracking-widest">
+                Asset Recovery &amp; FININT Operational Hub
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded">
+              LIVE · {arSummary.total_events} events
+            </span>
+          </div>
+
+          {/* KPI Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="rounded-xl bg-emerald-950/40 border border-emerald-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Frozen</p>
+              <p className="text-xl font-bold text-emerald-300 font-mono">€{(arSummary.total_eur_frozen / 1_000_000).toFixed(2)}M</p>
+              <p className="text-[9px] text-slate-500 mt-0.5">via camt.056 recalls</p>
+            </div>
+            <div className="rounded-xl bg-cyan-950/40 border border-cyan-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">EUR Recovered</p>
+              <p className="text-xl font-bold text-cyan-300 font-mono">€{(arSummary.total_eur_recovered / 1_000_000).toFixed(2)}M</p>
+              <p className="text-[9px] text-slate-500 mt-0.5">successful recalls</p>
+            </div>
+            <div className="rounded-xl bg-indigo-950/40 border border-indigo-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">MTTR Reduction</p>
+              <p className="text-xl font-bold text-indigo-300 font-mono">{arSummary.mttr_reduction_pct.toFixed(1)}%</p>
+              <p className="text-[9px] text-slate-500 mt-0.5">vs. 48h baseline</p>
+            </div>
+            <div className="rounded-xl bg-purple-950/40 border border-purple-500/15 p-3 text-center">
+              <p className="text-[10px] font-mono text-slate-400 mb-1">Containment Rate</p>
+              <p className="text-xl font-bold text-purple-300 font-mono">{(arSummary.contagion_containment_rate * 100).toFixed(0)}%</p>
+              <p className="text-[9px] text-slate-500 mt-0.5">&lt;60min freezes</p>
+            </div>
+          </div>
+
+          {/* Sub-metrics bar */}
+          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-mono text-slate-400">
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P50 {arSummary.mttr_p50_minutes.toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">MTTR P90 {arSummary.mttr_p90_minutes.toFixed(1)}min</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.mule_chains_disrupted} mule chains disrupted</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.active_provisional_holds} active holds</span>
+            <span className="px-2 py-0.5 rounded bg-white/5 border border-white/10">{arSummary.consortium_banks_active} consortium nodes</span>
+          </div>
+        </motion.div>
+      )}
 
       {/* Deep Operational Panels */}
       <ModelRegistryPanel simulationId="live_prod_v2" />

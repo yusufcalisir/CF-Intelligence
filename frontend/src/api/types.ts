@@ -3327,3 +3327,58 @@ export interface TrainingRoundProgressPayload {
   per_bank_auc?: Record<string, number>;
 }
 
+// ── Asset Recovery & Collaborative FININT Operational Hub ─────────────────────
+
+export interface AssetRecoverySummaryResponse {
+  snapshot_at: string;
+  total_events: number;
+  total_eur_frozen: number;
+  total_eur_recovered: number;
+  contagion_containment_rate: number;
+  mttr_mean_minutes: number;
+  mttr_p50_minutes: number;
+  mttr_p90_minutes: number;
+  mttr_p99_minutes: number;
+  legacy_baseline_minutes: number;
+  mttr_reduction_pct: number;
+  mule_chains_disrupted: number;
+  consortium_banks_active: number;
+  active_provisional_holds: number;
+}
+
+export interface TimelineDataPointResponse {
+  period_start: string;
+  eur_frozen: number;
+  eur_recovered: number;
+  event_count: number;
+  avg_mttr_minutes: number;
+}
+
+export interface TypologyBreakdownResponse {
+  typology: string;
+  event_count: number;
+  total_eur: number;
+  avg_mttr_minutes: number;
+  containment_rate: number;
+  risk_label: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+}
+
+export interface RecordRecoveryEventRequest {
+  event_type: 'RECALL_SUCCESS' | 'PROVISIONAL_HOLD' | 'PARTIAL_RECOVERY';
+  amount_eur: string;
+  typology: string;
+  originating_bank_id: string;
+  receiving_bank_id: string;
+  recall_message_id?: string;
+  finint_ticket_id?: string;
+}
+
+export interface RecordRecoveryEventResponse {
+  event_id: string;
+  event_type: string;
+  amount_eur: number;
+  typology: string;
+  mttr_minutes: number | null;
+  audit_hash: string;
+  recorded_at: string;
+}
