@@ -45,15 +45,15 @@ class TransactionEventData(BaseModel):
 
     transaction_id: str = Field(..., description="Unique transaction identifier")
     amount: Decimal = Field(..., description="Transaction amount (EUR/ISO currency)", ge=Decimal("0.01"))
-    currency: str = Field("EUR", description="ISO 4217 3-letter currency code")
+    currency: str = Field(default="EUR", description="ISO 4217 3-letter currency code")
     originator_iban_hash: str = Field(..., description="HMAC-SHA256 salted hash of originator account")
     beneficiary_iban_hash: str = Field(..., description="HMAC-SHA256 salted hash of beneficiary account")
-    origin_country: str = Field("DE", description="ISO 3166-1 alpha-2 origin country code")
-    destination_country: str = Field("FR", description="ISO 3166-1 alpha-2 destination country code")
-    payment_rail: str = Field("SEPA_INSTANT", description="Payment rail standard")
-    risk_score: float | None = Field(None, description="Composite risk score 0-1000", ge=0.0, le=1000.0)
-    merchant_category: str = Field("wire_transfer", description="MCC or business classification")
-    direction: Literal["INBOUND", "OUTBOUND", "INTERNAL"] = Field("OUTBOUND", description="Flow direction")
+    origin_country: str = Field(default="DE", description="ISO 3166-1 alpha-2 origin country code")
+    destination_country: str = Field(default="FR", description="ISO 3166-1 alpha-2 destination country code")
+    payment_rail: str = Field(default="SEPA_INSTANT", description="Payment rail standard")
+    risk_score: float | None = Field(default=None, description="Composite risk score 0-1000", ge=0.0, le=1000.0)
+    merchant_category: str = Field(default="wire_transfer", description="MCC or business classification")
+    direction: Literal["INBOUND", "OUTBOUND", "INTERNAL"] = Field(default="OUTBOUND", description="Flow direction")
 
     @field_validator("currency")
     @classmethod
@@ -72,11 +72,11 @@ class AlertEventData(BaseModel):
     alert_id: str = Field(..., description="Unique alert identifier")
     transaction_id: str = Field(..., description="Associated transaction ID")
     bank_id: str = Field(..., description="Originating or observing bank node ID")
-    severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = Field("HIGH", description="Alert severity")
+    severity: Literal["LOW", "MEDIUM", "HIGH", "CRITICAL"] = Field(default="HIGH", description="Alert severity")
     composite_risk_score: float = Field(..., description="Normalized composite risk score", ge=0.0, le=1000.0)
     triggered_rules: list[str] = Field(default_factory=list, description="Identifiers of triggered rules")
     action_recommended: Literal["ALLOW", "MANUAL_REVIEW", "SAR_ESCALATION", "IMMEDIATE_BLOCK"] = Field(
-        "MANUAL_REVIEW", description="Statutory action recommended"
+        default="MANUAL_REVIEW", description="Statutory action recommended"
     )
 
 
@@ -90,10 +90,10 @@ class RecallEventData(BaseModel):
     original_instruction_id: str = Field(..., description="Original transaction instruction ID")
     amount_eur: Decimal = Field(..., description="Amount recalled in EUR", ge=Decimal("0.01"))
     reason_code: Literal["FRAD", "TECH", "DUPL", "CUST", "UPAY", "COVR"] = Field(
-        "FRAD", description="SEPA SCT Inst recall reason code"
+        default="FRAD", description="SEPA SCT Inst recall reason code"
     )
     status: Literal["INITIATED", "SENT", "ACKNOWLEDGED", "PROVISIONAL_HOLD_ACTIVE", "FUNDS_RETURNED", "REJECTED"] = (
-        Field("INITIATED", description="Lifecycle status")
+        Field(default="INITIATED", description="Lifecycle status")
     )
     originating_bank: str = Field(..., description="Recalling bank node ID")
     target_bank: str = Field(..., description="Receiving bank node ID")
@@ -107,8 +107,8 @@ class FININTTicketEventData(BaseModel):
     ticket_id: str = Field(..., description="FININT case ticket ID")
     originating_bank: str = Field(..., description="Requesting bank ID")
     target_bank: str = Field(..., description="Recipient bank ID")
-    case_type: str = Field("MULE_NETWORK_INVESTIGATION", description="Investigation typology")
-    priority: Literal["ROUTINE", "URGENT", "IMMEDIATE"] = Field("URGENT", description="Priority level")
+    case_type: str = Field(default="MULE_NETWORK_INVESTIGATION", description="Investigation typology")
+    priority: Literal["ROUTINE", "URGENT", "IMMEDIATE"] = Field(default="URGENT", description="Priority level")
     evidence_hash: str = Field(..., description="SHA-256 hash of unencrypted evidence commitment")
 
 
@@ -127,7 +127,7 @@ class CloudEvent(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
     # Mandatory CloudEvents 1.0 Attributes
-    specversion: Literal["1.0"] = Field("1.0", description="CloudEvents specification version")
+    specversion: Literal["1.0"] = Field(default="1.0", description="CloudEvents specification version")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="Unique event identifier")
     source: str = Field(..., description="URI-reference identifying event context (e.g. urn:cfi:bank:ALPHA)")
     type: str = Field(..., description="Event type identifier (e.g. org.cfi.finint.transaction.v1)")
@@ -137,19 +137,19 @@ class CloudEvent(BaseModel):
         default_factory=lambda: datetime.now(UTC),
         description="Timestamp in UTC format RFC 3339",
     )
-    datacontenttype: str = Field("application/json", description="Content type of data payload")
-    dataschema: str | None = Field(None, description="URI identifying data schema")
-    subject: str | None = Field(None, description="Subject of the event in source context")
+    datacontenttype: str = Field(default="application/json", description="Content type of data payload")
+    dataschema: str | None = Field(default=None, description="URI identifying data schema")
+    subject: str | None = Field(default=None, description="Subject of the event in source context")
 
     # Domain Payload Data
     data: dict[str, Any] | BaseModel = Field(default_factory=dict, description="Event domain payload")
 
     # Banking & FININT Extension Attributes (ce-*)
-    ce_bank_id: str | None = Field(None, description="Bank node identifier", alias="bank_id")
-    ce_correlation_id: str | None = Field(None, description="Distributed correlation trace ID", alias="correlation_id")
-    ce_tenant_id: str | None = Field(None, description="Multi-tenant schema partition key", alias="tenant_id")
-    ce_idempotency_key: str | None = Field(None, description="Deduplication key for idempotency", alias="idempotency_key")
-    ce_signature: str | None = Field(None, description="HMAC-SHA256 signature over event data", alias="signature")
+    ce_bank_id: str | None = Field(default=None, description="Bank node identifier", alias="bank_id")
+    ce_correlation_id: str | None = Field(default=None, description="Distributed correlation trace ID", alias="correlation_id")
+    ce_tenant_id: str | None = Field(default=None, description="Multi-tenant schema partition key", alias="tenant_id")
+    ce_idempotency_key: str | None = Field(default=None, description="Deduplication key for idempotency", alias="idempotency_key")
+    ce_signature: str | None = Field(default=None, description="HMAC-SHA256 signature over event data", alias="signature")
 
     @field_validator("id")
     @classmethod
@@ -231,14 +231,14 @@ class DLQEnvelope(BaseModel):
 
     dead_letter_id: str = Field(default_factory=lambda: str(uuid.uuid4()), description="DLQ incident reference")
     original_topic: str = Field(..., description="Source topic where message was consumed")
-    dlq_topic: str = Field("cfi.dlq.unparseable", description="Destination DLQ topic")
+    dlq_topic: str = Field(default="cfi.dlq.unparseable", description="Destination DLQ topic")
     raw_payload: str = Field(..., description="Raw message payload string")
     error_type: str = Field(..., description="Exception class name")
     error_message: str = Field(..., description="Human-readable reason for quarantine")
     failed_at: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Failure timestamp UTC")
-    retry_count: int = Field(0, description="Number of delivery attempts made", ge=0)
-    can_retry: bool = Field(True, description="Whether message can be retried or requires manual disposition")
-    originating_bank_id: str | None = Field(None, description="Identified bank node if extractable")
+    retry_count: int = Field(default=0, description="Number of delivery attempts made", ge=0)
+    can_retry: bool = Field(default=True, description="Whether message can be retried or requires manual disposition")
+    originating_bank_id: str | None = Field(default=None, description="Identified bank node if extractable")
 
 
 # ── Kafka Delivery Receipt ───────────────────────────────────────────────────
@@ -250,11 +250,11 @@ class PublishReceipt(BaseModel):
 
     event_id: str = Field(..., description="CloudEvent ID published")
     topic: str = Field(..., description="Kafka topic committed to")
-    partition: int = Field(0, description="Assigned broker partition", ge=0)
-    offset: int = Field(0, description="Committed log offset", ge=0)
+    partition: int = Field(default=0, description="Assigned broker partition", ge=0)
+    offset: int = Field(default=0, description="Committed log offset", ge=0)
     timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC), description="Broker timestamp UTC")
     status: Literal["COMMITTED", "DUPLICATE_IGNORED", "DLQ_ROUTED", "FAILED"] = Field(
-        "COMMITTED", description="Publish status"
+        default="COMMITTED", description="Publish status"
     )
-    idempotent_duplicate: bool = Field(False, description="True if skipped due to distributed deduplication")
-    latency_ms: float = Field(0.0, description="Publish latency in milliseconds", ge=0.0)
+    idempotent_duplicate: bool = Field(default=False, description="True if skipped due to distributed deduplication")
+    latency_ms: float = Field(default=0.0, description="Publish latency in milliseconds", ge=0.0)

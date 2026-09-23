@@ -337,6 +337,7 @@ class KafkaStreamingConnector:
                 failed_at=datetime.now(UTC),
                 retry_count=0,
                 can_retry=False,
+                originating_bank_id=None,
             )
             await self._broker.publish(self.dlq_topic, json.dumps(envelope.model_dump(mode="json")).encode("utf-8"))
             self._total_dlq += 1
@@ -368,6 +369,7 @@ class KafkaStreamingConnector:
             failed_at=datetime.now(UTC),
             retry_count=0,
             can_retry=False,
+            originating_bank_id=None,
         )
         dlq_bytes = json.dumps(envelope.model_dump(mode="json")).encode("utf-8")
         partition, offset = await self._broker.publish(self.dlq_topic, dlq_bytes)

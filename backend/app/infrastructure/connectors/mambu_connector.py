@@ -54,7 +54,8 @@ class MambuConnector(BaseBankConnector):
         max_buffer_size: int = 1000,
     ) -> None:
         super().__init__()
-        self.base_url = (base_url or os.getenv("MAMBU_BASE_URL", "https://api.mambu.com")).rstrip("/")
+        resolved_url = base_url if base_url is not None else os.getenv("MAMBU_BASE_URL", "https://api.mambu.com")
+        self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("MAMBU_API_KEY", "")
         self.webhook_secret = webhook_secret or os.getenv("MAMBU_WEBHOOK_SECRET", "mambu_consortium_secret_key_2026")
         self.tenant_id = tenant_id
@@ -282,7 +283,20 @@ class MambuConnector(BaseBankConnector):
     def initialize(self, bank_id: str, num_transactions: int, seed: int = 42) -> dict[str, Any]:
         return {"bank_id": bank_id, "status": "initialized", "provider": "MAMBU", "num_transactions": num_transactions}
 
-    def train(self, bank_id: str, weights: ModelWeights, **kwargs: Any) -> dict[str, Any]:
+    def train(
+        self,
+        bank_id: str,
+        weights: ModelWeights,
+        learning_rate: float = 0.001,
+        batch_size: int = 32,
+        epochs: int = 5,
+        enable_dp: bool = False,
+        dp_epsilon: float = 1.0,
+        dp_delta: float = 1e-5,
+        dp_max_grad_norm: float = 1.0,
+        correlation_id: str = "",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         return {"bank_id": bank_id, "status": "completed", "provider": "MAMBU", "weights": weights}
 
     def evaluate(self, bank_id: str, weights: ModelWeights, correlation_id: str) -> dict[str, Any]:

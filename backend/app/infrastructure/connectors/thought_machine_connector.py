@@ -53,7 +53,8 @@ class ThoughtMachineConnector(BaseBankConnector):
         max_buffer_size: int = 1000,
     ) -> None:
         super().__init__()
-        self.base_url = (base_url or os.getenv("VAULT_CORE_BASE_URL", "https://vault-core.internal:8080")).rstrip("/")
+        resolved_url = base_url if base_url is not None else os.getenv("VAULT_CORE_BASE_URL", "https://vault-core.internal:8080")
+        self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("VAULT_CORE_API_KEY", "")
         self.webhook_secret = webhook_secret or os.getenv("VAULT_CORE_WEBHOOK_SECRET", "thought_machine_consortium_2026")
         self._buffer: deque[NormalizedTransaction] = deque(maxlen=max_buffer_size)
@@ -286,7 +287,20 @@ class ThoughtMachineConnector(BaseBankConnector):
     def initialize(self, bank_id: str, num_transactions: int, seed: int = 42) -> dict[str, Any]:
         return {"bank_id": bank_id, "status": "initialized", "provider": "THOUGHT_MACHINE", "num_transactions": num_transactions}
 
-    def train(self, bank_id: str, weights: ModelWeights, **kwargs: Any) -> dict[str, Any]:
+    def train(
+        self,
+        bank_id: str,
+        weights: ModelWeights,
+        learning_rate: float = 0.001,
+        batch_size: int = 32,
+        epochs: int = 5,
+        enable_dp: bool = False,
+        dp_epsilon: float = 1.0,
+        dp_delta: float = 1e-5,
+        dp_max_grad_norm: float = 1.0,
+        correlation_id: str = "",
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         return {"bank_id": bank_id, "status": "completed", "provider": "THOUGHT_MACHINE", "weights": weights}
 
     def evaluate(self, bank_id: str, weights: ModelWeights, correlation_id: str) -> dict[str, Any]:

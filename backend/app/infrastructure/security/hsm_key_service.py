@@ -134,14 +134,19 @@ class HSMKeyService:
         vault_token: str | None = None,
         transit_mount: str = "transit",
     ) -> None:
-        raw_provider = provider or os.getenv("HSM_PROVIDER", HSMProvider.PKCS11.value)
-        if isinstance(raw_provider, str):
+        if isinstance(provider, HSMProvider):
+            self.provider = provider
+        elif isinstance(provider, str):
             try:
-                self.provider = HSMProvider(raw_provider.upper())
+                self.provider = HSMProvider(provider.upper())
             except ValueError:
                 self.provider = HSMProvider.LOCAL_EMULATED
         else:
-            self.provider = raw_provider
+            env_provider = os.getenv("HSM_PROVIDER", HSMProvider.PKCS11.value)
+            try:
+                self.provider = HSMProvider(env_provider.upper())
+            except ValueError:
+                self.provider = HSMProvider.LOCAL_EMULATED
 
         self._session_config = session_config or HSMSessionConfig(
             slot_id=int(os.getenv("HSM_SLOT_ID", "0")),
@@ -151,9 +156,10 @@ class HSMKeyService:
         )
 
         self.hsm_signer = hsm_signer or HSMSignerEngine(config=self._session_config)
-        self.vault_url = (vault_url or os.getenv("VAULT_ADDR", "http://vault.internal:8200")).rstrip("/")
-        self.vault_token = vault_token or os.getenv("VAULT_TOKEN", "dev-token")
-        self.transit_mount = transit_mount or os.getenv("VAULT_TRANSIT_MOUNT", "transit")
+        resolved_vault_url = vault_url if vault_url is not None else os.getenv("VAULT_ADDR", "http://vault.internal:8200")
+        self.vault_url: str = resolved_vault_url.rstrip("/")
+        self.vault_token: str = vault_token if vault_token is not None else os.getenv("VAULT_TOKEN", "dev-token")
+        self.transit_mount: str = transit_mount or os.getenv("VAULT_TRANSIT_MOUNT", "transit")
 
         self._keys: dict[str, HSMKeyMetadata] = {}
         self._ecdh_enclaves: dict[str, Any] = {}  # internal non-exported X25519 handles

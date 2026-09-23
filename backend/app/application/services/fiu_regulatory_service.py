@@ -796,7 +796,7 @@ class FIURegulatoryService:
         return report
 
     def _build_summary_response(self, r: InternalReport) -> RegulatoryReportSummaryResponse:
-        total_amt = sum(t.amount_local for t in r.transactions) if r.transactions else Decimal("0.00")
+        total_amt: Decimal = sum((t.amount_local for t in r.transactions), Decimal("0.00"))
         envelope_hash = r.digital_envelope.digital_envelope_token if r.digital_envelope else None
         return RegulatoryReportSummaryResponse(
             report_id=r.report_id,

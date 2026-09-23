@@ -24,6 +24,7 @@ from typing import Any
 from fastapi import APIRouter, Header, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
+from app.infrastructure.connectors.base_connector import NormalizedTransaction
 from app.infrastructure.connectors.mambu_connector import (
     MambuConnector,
     MambuWebhookSignatureError,
@@ -154,7 +155,7 @@ async def _handle_mambu_webhook(
             detail=str(sig_err),
         ) from sig_err
 
-    if hasattr(result, "transaction_id"):
+    if isinstance(result, NormalizedTransaction):
         return MambuWebhookResponse(
             status="ACCEPTED",
             event_type="TRANSACTION",
