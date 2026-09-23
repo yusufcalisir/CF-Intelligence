@@ -1016,4 +1016,35 @@ coupled with independent Membership Inference Attack (MIA) verification audits e
 
 * Requires the coordinator to securely archive per-round client contribution weight vectors in protected storage.
 
+---
+
+## ED-041: EU AI Act High-Risk AI & SR 11-7 Regulatory Model Validation Dossier Generation
+
+**Date**: 2026-09-23  
+**Status**: Accepted
+
+### Context
+
+Under the EU AI Act (Regulation (EU) 2024/1689 Annex III Item 5(b)), AI models evaluating creditworthiness or fraud risk are designated as High-Risk AI Systems, requiring strict conformity with Articles 9 through 15 (Risk Management, Data Governance, Technical Documentation, Record-Keeping, Transparency, Human Oversight, and Robustness). In parallel, US and UK banking regulators enforce Federal Reserve SR 11-7 / OCC 2011-12 and PRA SS1/23 Model Risk Management standards. Preparing periodic or ad-hoc technical dossiers manually takes weeks of engineering effort and introduces documentation drift.
+
+### Decision
+
+Implement [`RegulatoryDossierGenerator`](../backend/app/application/services/regulatory_dossier_generator.py) and dedicated REST presentation endpoints (`GET /api/v1/regulatory/dossier/summary`, `GET /api/v1/regulatory/dossier/export`, `GET /api/v1/regulatory/dossier/eu-ai-act`, `GET /api/v1/regulatory/dossier/sr11-7`):
+1. **Automated Dossier Compilation**: Generates standardized, regulator-ready technical dossiers in Markdown and structured JSON compiling:
+   - FedGNN architectural specifications, non-IID Dirichlet distribution ($\alpha = 0.50$), and Opacus Rényi Differential Privacy proofs ($\varepsilon = 1.0, \delta = 10^{-5}$).
+   - SR 11-7 3-Pillars audit coverage: Conceptual Soundness, Independent Model Validation (3 Lines of Defense), and Continuous Monitoring (KS test $p < 0.01$, PSI $\ge 0.25$ auto-retrain trigger, $<5\text{s}$ rollback SLA).
+   - EU AI Act Articles 9–15 compliance matrix including Byzantine adversarial attack tolerance metrics ($33.3\%$ Bulyan/Krum tolerance) and algorithmic fairness ($0.80 \le \mathrm{DI} \le 1.25$ under EEOC 80% rule).
+   - Classical baseline benchmark comparison (FedGNN vs XGBoost, Random Forest, MLP, Logistic Regression).
+2. **Dual-Control Cryptographic Sign-Off**: Enables certified officers (CRO, MRM Validators, Compliance Directors) to cryptographically sign off on dossier checkpoints, producing SHA-256 attestation seals.
+
+### Rationale
+
+1. **Continuous Regulatory Readiness**: Eliminates manual reporting friction and ensures documentation is always synchronous with active champion model weights and telemetry.
+2. **Audit Non-Repudiation**: Checkpoints are sealed with cryptographic SHA-256 attestation hashes and integrated into the platform's immutable audit chain.
+3. **Automated Verification**: Fully validated by `backend/tests/unit/test_regulatory_dossier_generator.py` (21 passed).
+
+### Tradeoff
+
+* Generates extensive documentation artifacts that require periodic caching to avoid redundant serialization overhead during high-frequency regulatory queries.
+
 

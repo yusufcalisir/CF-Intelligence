@@ -32,12 +32,13 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`ISO20022-MSG`** | ISO 20022 / SWIFT | XML XSD schema validation, XXE defense, ISO 13616 IBAN Mod-97, salted zero-PII hashing | `FinancialMessageParser`, `ISO20022MessagingConnector` | `test_extended_iso20022_parser.py`, `test_financial_message_parser_hardening.py`, `test_bank_connectors.py` | `PASS` |
 | **`ACID-CONCURRENCY`**| SOC 2 / PCI-DSS | Zero-drift Alembic schema parity, SQLSTATE Class 40 transaction retries & Redis distributed token locking | `run_cockroach_transaction`, `CacheService.distributed_lock`, `AlertModel` | `test_alembic_migrations.py`, `test_database_persistence_hardening.py`, `test_concurrency_safety.py` | `PASS` |
 | **`HSM-PKCS11-VAULT`** | FIPS 140-2 Level 3 / eIDAS | Hardware-anchored Zero-Disk key management, Curve25519 ECDH in enclave, automated mTLS 1.3 cert rotation | `HSMKeyService`, `VaultHSMPKIBinder` | `test_hsm_key_service.py`, `test_vault_hsm_pki_binder.py`, `test_hsm_signer.py` | `PASS` |
+| **`EU-AI-ACT-DOSSIER`** | EU AI Act / SR 11-7 | High-Risk AI Articles 9–15 compliance matrix, FedGNN proofs, dual-control cryptographic sign-offs | `RegulatoryDossierGenerator`, `regulatory_dossier.py` | `test_regulatory_dossier_generator.py` | `PASS` |
 
 ---
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **2,773 automated tests** (2,474 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 3,080 total).
+All controls listed above are automatically verified by the continuous testing pipeline across **2,794 automated tests** (2,495 Backend Pytest + 268 Frontend Vitest + 31 Smart Contracts) and 18 scientific verification audit modules (307 verification tests; 3,101 total).
 
 
 

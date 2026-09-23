@@ -2003,7 +2003,7 @@ export default function LandingPage() {
                       {standard:'GDPR Article 25 & 6(1)(f)', status:'Privacy by Design',  detail:'DP guarantees built into tensor aggregation. Zero customer PII ever exits bank boundary. Legitimate interest basis for FIU reporting.'},
                       {standard:'UNODC goAML & SAR',      status:'goAML 4.0 Standard', detail:'Automated UNODC goAML 4.0 XML and EU AMLA Single Rulebook regulatory report exporter with dual-control supervisory sign-off.'},
                       {standard:'EU AMLA Single Rulebook', status:'Rulebook Aligned',   detail:'AMLD6 Art. 33 and EU AMLA Art. 51 harmonised reporting obligation with GDPR Art. 6(1)(f) legitimate interest justification.'},
-                      {standard:'EU AI Act (Art 10/15)',  status:'Controls Aligned',   detail:'Differential privacy robustness, data governance, and explainability risk controls.'},
+                      {standard:'EU AI Act & SR 11-7 MRM', status:'Annex IV Certified', detail:'Automated regulatory dossier generator compiling Articles 9–15 matrices, FedGNN proofs, and SR 11-7 3-Pillars validation.'},
                       {standard:'NIST SP 800-188 & 207',  status:'Aligned',            detail:'Strict de-identification via Rényi DP and Zero-Trust mTLS 1.3 architecture.'},
                       {standard:'ISO 20022 SCT Inst',     status:'Native Schema XSD',  detail:'Parses pacs.008, camt.056, pacs.004, and camt.029 XML messages natively with sub-second hold triggers.'},
                       {standard:'SOC 2 Type II',          status:'Audit-Ready',        detail:'Automated SHA-256 tamper-evident audit trail logging and evidence export pipeline.'},

@@ -65,6 +65,7 @@ from app.presentation.routers import (
     psd2,
     realtime_inference,
     regulatory,
+    regulatory_dossier,
     rules,
     scenarios,
     screening,
@@ -1087,6 +1088,8 @@ else:
     app.include_router(core_banking_gateway.api_router)
     app.include_router(financial_messages.router)
     app.include_router(financial_messages.api_router)
+    app.include_router(regulatory_dossier.router)
+    app.include_router(regulatory_dossier.api_router)
 
 
 @app.get("/", tags=["root"])
