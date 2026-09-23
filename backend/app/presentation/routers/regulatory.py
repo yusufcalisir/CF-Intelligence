@@ -68,7 +68,7 @@ def _register_routes(r: APIRouter) -> None:
         try:
             return _svc().create_report(req)
         except RegulatoryValidationError as exc:
-            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)) from exc
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=str(exc)) from exc
         except Exception as exc:
             logger.exception("Unexpected error creating regulatory report")
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc)) from exc

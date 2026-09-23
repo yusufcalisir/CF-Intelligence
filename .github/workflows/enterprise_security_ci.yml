@@ -9,6 +9,9 @@ name: Enterprise Security & Vulnerability Audit Pipeline
     # Run nightly security audit at 02:00 UTC
     - cron: '0 2 * * *'
 
+env:
+  NODE_OPTIONS: "--no-deprecation"
+
 jobs:
   sast-static-analysis:
     name: SAST Static Analysis (Ruff, Mypy, Bandit)

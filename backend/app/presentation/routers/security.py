@@ -449,7 +449,7 @@ async def calibrate_rdp_noise(req: CalibrateRDPRequest) -> CalibrateRDPResponse:
         ) from e
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail=str(e),
         ) from e
 

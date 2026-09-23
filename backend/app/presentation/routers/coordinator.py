@@ -206,7 +206,7 @@ async def submit_async_update(req: AsyncUpdateRequest) -> AsyncUpdateResponse:
                 arr = arr.reshape(req.layer_shapes[layer])
             except ValueError as e:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=f"Shape mismatch reshaping layer '{layer}': {e}",
                 ) from e
         numpy_weights[layer] = arr

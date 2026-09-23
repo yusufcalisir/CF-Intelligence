@@ -257,7 +257,7 @@ async def run_fuzzy_resolve(
     query_text = req.query_name or req.raw_identifier or ""
     if not query_text:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="query_name (or raw_identifier) must not be empty.",
         )
 

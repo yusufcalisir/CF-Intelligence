@@ -89,10 +89,17 @@ settings = get_settings()
 # Uses python-json-logger for machine-parseable log output compatible with
 # ELK / Datadog / Cloud Logging ingestion pipelines without regex parsing.
 try:
-    from pythonjsonlogger import jsonlogger  # type: ignore[import-untyped]
+    try:
+        from pythonjsonlogger.json import (
+            JsonFormatter as _JsonFormatter,  # type: ignore[import-untyped]
+        )
+    except ImportError:
+        from pythonjsonlogger.jsonlogger import (
+            JsonFormatter as _JsonFormatter,  # type: ignore[import-untyped]
+        )
 
     _json_handler = logging.StreamHandler()
-    _json_formatter = jsonlogger.JsonFormatter(
+    _json_formatter = _JsonFormatter(
         fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S",
         rename_fields={"asctime": "timestamp", "levelname": "level"},

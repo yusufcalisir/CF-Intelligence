@@ -266,7 +266,7 @@ async def screening_search(
     """Execute an ad-hoc fuzzy screening query against UN, EU CFSP, OFAC SDN, and PEP lists."""
     if not request.target_name and not request.person_id:
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="Either 'target_name' or 'person_id' must be specified for screening search.",
         )
 

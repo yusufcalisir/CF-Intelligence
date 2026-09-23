@@ -392,7 +392,7 @@ async def promote_model_version(
         # 1. Performance Gate: Holdout AUC validation
         if auc_val < payload.min_auc:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=(
                     f"SR 11-7 Quality Gate Rejection: Model AUC-ROC ({auc_val:.4f}) is below "
                     f"the required production threshold ({payload.min_auc:.4f})."
@@ -405,7 +405,7 @@ async def promote_model_version(
             fairness = float(so.get("fairness_score", 1.0))
             if fairness < payload.min_fairness_score:
                 raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                     detail=(
                         f"SR 11-7 Quality Gate Rejection: Disparate impact ratio ({fairness:.4f}) "
                         f"violates the EEOC four-fifths rule ({payload.min_fairness_score:.4f})."
