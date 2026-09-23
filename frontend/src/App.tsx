@@ -1,5 +1,5 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import ErrorBoundary from './components/common/ErrorBoundary';
 import Layout from './components/layout/Layout';
@@ -32,6 +32,15 @@ const PageFallback = () => (
     </div>
   </div>
 );
+
+const ExternalDocRedirect = ({ target }: { target: string }) => {
+  useEffect(() => {
+    const apiBase = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
+    window.location.href = apiBase ? `${apiBase}${target}` : target;
+  }, [target]);
+
+  return <PageFallback />;
+};
 
 // Ensure QueryClient is always available even if main.tsx wrapping is lost during builds
 const queryClient = new QueryClient({
@@ -224,6 +233,13 @@ export default function App() {
               />
             </Route>
 
+            {/* External Documentation Gateways Fallback */}
+            <Route path="/scalar" element={<ExternalDocRedirect target="/scalar" />} />
+            <Route path="/docs" element={<ExternalDocRedirect target="/docs" />} />
+            <Route path="/redoc" element={<ExternalDocRedirect target="/redoc" />} />
+
+            {/* Catch-all Fallback */}
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </ErrorBoundary>
       </BrowserRouter>
