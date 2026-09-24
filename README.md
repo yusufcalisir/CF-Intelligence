@@ -2381,17 +2381,17 @@ python benchmark.py --poc-replay
 # 3. Run full frontend vitest suite (268 tests across 81 test files)
 npm --prefix frontend test
 
-# 3. Run Playwright real-browser multi-device E2E suite (10 browser tests)
+# 4. Run Playwright real-browser multi-device E2E suite (10 browser tests)
 npm --prefix frontend run test:e2e:workflows
 # or from frontend directory: npx playwright test e2e-workflows --project=desktop-1440-chromium
 
-# 4. Run Playwright strict visual regression testing suite (3 baseline comparisons)
+# 5. Run Playwright strict visual regression testing suite (3 baseline comparisons)
 npm --prefix frontend run test:visual
 
-# 5. Run Kubernetes manifest dry-run validation suite (38 rendered resources)
+# 6. Run Kubernetes manifest dry-run validation suite (39 rendered resources)
 python scripts/validate_k8s_manifests.py --all
 
-# 6. Run master scientific invariant verification suite (18 modules, 307 tests)
+# 7. Run master scientific invariant verification suite (18 modules, 307 tests)
 python scripts/run_all_verifications.py
 ```
 
