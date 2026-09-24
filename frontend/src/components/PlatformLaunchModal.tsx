@@ -104,7 +104,7 @@ const BANK_NODES = [
 
 export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: PlatformLaunchModalProps) {
   const [currentStageIdx, setCurrentStageIdx] = useState(0);
-  const [progress, setProgress] = useState(8);
+  const [progress, setProgress] = useState(0);
 
   const { containerRef } = useModalA11y<HTMLDivElement>({
     isOpen,
@@ -117,40 +117,39 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
   useEffect(() => {
     if (!isOpen) {
       setCurrentStageIdx(0);
-      setProgress(8);
+      setProgress(0);
       return;
     }
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 2.0;
-      });
-    }, 45);
+    const TOTAL_DURATION_MS = 3500;
+    const UPDATE_INTERVAL_MS = 25;
+    const startTime = Date.now();
+    let completionTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const s1 = setTimeout(() => setCurrentStageIdx(1), 500);
-    const s2 = setTimeout(() => setCurrentStageIdx(2), 1000);
-    const s3 = setTimeout(() => setCurrentStageIdx(3), 1550);
-    const s4 = setTimeout(() => setCurrentStageIdx(4), 2100);
-    const s5 = setTimeout(() => setCurrentStageIdx(5), 2650);
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const rawPct = Math.min(100, (elapsed / TOTAL_DURATION_MS) * 100);
+      setProgress(rawPct);
 
-    const completion = setTimeout(() => {
-      setTimeout(() => {
-        onComplete();
-      }, 300);
-    }, 3400);
+      const computedIdx = Math.min(
+        STAGES.length - 1,
+        Math.floor((rawPct / 100) * STAGES.length)
+      );
+      setCurrentStageIdx(computedIdx);
+
+      if (rawPct >= 100) {
+        clearInterval(timer);
+        completionTimeout = setTimeout(() => {
+          onComplete();
+        }, 350);
+      }
+    }, UPDATE_INTERVAL_MS);
 
     return () => {
-      clearInterval(progressInterval);
-      clearTimeout(s1);
-      clearTimeout(s2);
-      clearTimeout(s3);
-      clearTimeout(s4);
-      clearTimeout(s5);
-      clearTimeout(completion);
+      clearInterval(timer);
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+      }
     };
   }, [isOpen, onComplete]);
 
@@ -301,7 +300,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shrink-0">
-                      STAGE 0{currentStage.id}/06
+                      STAGE 0{currentStage.id}/0{STAGES.length}
                     </span>
                   </div>
                   <h4 className="text-xs sm:text-[13px] font-bold text-slate-100 tracking-tight truncate mt-0.5">
@@ -318,23 +317,45 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               </span>
             </div>
 
-            {/* ── 3. FIVE-STAGE STEP TRACKER (Visual Breadcrumb) ── */}
-            <div className="grid grid-cols-6 gap-1.5">
+            {/* ── 3. SYNCHRONIZED MULTI-STAGE STEP TRACKER (Dynamic Visual Breadcrumb) ── */}
+            <div
+              className="grid gap-1.5"
+              style={{ gridTemplateColumns: `repeat(${STAGES.length}, minmax(0, 1fr))` }}
+            >
               {STAGES.map((s, idx) => {
-                const isDone = idx < currentStageIdx;
-                const isCurrent = idx === currentStageIdx;
+                const stageStartPct = (idx / STAGES.length) * 100;
+                const stageEndPct = ((idx + 1) / STAGES.length) * 100;
+                const isDone = progress >= stageEndPct;
+                const isCurrent = progress >= stageStartPct && progress < stageEndPct;
+
+                let segmentFill = 0;
+                if (isDone) {
+                  segmentFill = 100;
+                } else if (isCurrent) {
+                  segmentFill = Math.min(
+                    100,
+                    Math.max(0, ((progress - stageStartPct) / (stageEndPct - stageStartPct)) * 100)
+                  );
+                }
 
                 return (
                   <div
                     key={s.id}
-                    className={`h-1.5 rounded-full transition-all duration-300 ${
-                      isDone
-                        ? 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]'
-                        : isCurrent
-                        ? 'bg-indigo-400 animate-pulse shadow-[0_0_8px_rgba(129,140,248,0.8)]'
-                        : 'bg-white/10'
-                    }`}
-                  />
+                    className="h-1.5 rounded-full bg-white/10 overflow-hidden relative"
+                  >
+                    <div
+                      className="h-full rounded-full transition-[width] duration-75 ease-linear"
+                      style={{
+                        width: `${segmentFill}%`,
+                        backgroundColor: isDone ? '#34d399' : s.color,
+                        boxShadow: isDone
+                          ? '0 0 8px rgba(52, 211, 153, 0.8)'
+                          : isCurrent
+                          ? `0 0 8px ${s.glow}`
+                          : 'none',
+                      }}
+                    />
+                  </div>
                 );
               })}
             </div>
@@ -347,7 +368,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               </div>
               <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 shrink-0" />
-                <span className="truncate">ε=0.50 DP Bound</span>
+                <span className="truncate">ε=1.0 DP Bound</span>
               </div>
               <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 flex items-center justify-center gap-1 text-slate-300">
                 <span className="w-1.5 h-1.5 rounded-full bg-purple-400 shrink-0" />
@@ -361,15 +382,18 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
             <div className="flex items-center justify-between text-[10.5px] sm:text-xs font-mono">
               <span className="text-slate-300 flex items-center gap-1.5 truncate">
                 <Sparkles className="w-3 h-3 text-indigo-400 shrink-0" />
-                <span className="truncate">Synchronizing Consortium Data Plane...</span>
+                <span className="truncate">
+                  {progress >= 100
+                    ? 'Consortium Handshake Complete · Launching...'
+                    : 'Synchronizing Consortium Data Plane...'}
+                </span>
               </span>
               <span className="text-cyan-400 font-bold ml-2 shrink-0">{Math.min(100, Math.round(progress))}%</span>
             </div>
             <div className="relative w-full h-1.5 sm:h-2 bg-slate-900 rounded-full overflow-hidden border border-white/10 p-0.5">
-              <motion.div
-                className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.8)]"
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.8)] transition-[width] duration-75 ease-linear"
                 style={{ width: `${Math.min(100, progress)}%` }}
-                transition={{ ease: 'linear' }}
               />
             </div>
           </div>
