@@ -88,6 +88,16 @@ describe('ModelRegistryPanel Component (User Interaction)', () => {
     vi.spyOn(queries, 'useSubmitFeedback').mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ success: true }),
     } as any);
+
+    vi.spyOn(queries, 'useScoreSampleTransaction').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        transaction_id: 'TXN-TEST-1234',
+        fraud_probability: 0.85,
+        risk_level: 'critical',
+        risk_score: 85,
+      }),
+      isPending: false,
+    } as any);
   });
 
   it('renders model versions, active champion badge, and tab navigation', () => {
@@ -115,5 +125,30 @@ describe('ModelRegistryPanel Component (User Interaction)', () => {
     await user.click(canaryTab);
 
     expect(screen.getByText(/Canary Gate Rule/i)).toBeInTheDocument();
+  });
+
+  it('allows scoring sample transaction and submitting ground truth feedback in Shadow tab', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <ModelRegistryPanel simulationId="sim_test" />
+      </QueryClientProvider>
+    );
+
+    const shadowTab = screen.getByRole('button', { name: /Shadow Deployment/i });
+    await user.click(shadowTab);
+
+    expect(screen.getByText(/Compliance Feedback & Shadow Testing/i)).toBeInTheDocument();
+    const scoreSampleBtn = screen.getByRole('button', { name: /Score Sample Tx/i });
+    expect(scoreSampleBtn).toBeInTheDocument();
+
+    await user.click(scoreSampleBtn);
+    expect(screen.getByDisplayValue('TXN-TEST-1234')).toBeInTheDocument();
+
+    const submitOutcomeBtn = screen.getByRole('button', { name: /Submit outcome/i });
+    await user.click(submitOutcomeBtn);
+
+    expect(screen.getByText(/Ground truth outcome/i)).toBeInTheDocument();
   });
 });

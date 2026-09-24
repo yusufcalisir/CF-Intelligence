@@ -1149,6 +1149,35 @@ export function useSubmitFeedback() {
   });
 }
 
+export function useScoreSampleTransaction() {
+  return useMutation<
+    { transaction_id: string; fraud_probability: number; risk_level: string; risk_score: number },
+    Error,
+    { simulationId?: string; transaction_id?: string; amount?: number }
+  >({
+    mutationFn: async (payload) => {
+      const simId = payload.simulationId || 'live_prod_v2';
+      const txId = payload.transaction_id || `TXN-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+      const { data } = await apiClient.post('/api/v1/predict', {
+        transaction_id: txId,
+        transaction_amount: payload.amount ?? 2450.0,
+        merchant_category: 'ecommerce',
+        country_code: 'US',
+        device_type: 'web_browser',
+        velocity: 1.8,
+        hour_of_day: 14,
+        simulation_id: simId,
+      });
+      return {
+        transaction_id: data.transaction_id || txId,
+        fraud_probability: data.fraud_probability ?? 0.0,
+        risk_level: data.risk_level ?? 'low',
+        risk_score: data.risk_score ?? 0,
+      };
+    },
+  });
+}
+
 export function useRules() {
   return useQuery<BusinessRule[]>({
     queryKey: ['business-rules'],

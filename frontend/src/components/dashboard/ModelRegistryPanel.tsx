@@ -7,6 +7,7 @@ import {
   useSignOffModel,
   useShadowMetrics,
   useSubmitFeedback,
+  useScoreSampleTransaction,
 } from '../../api/queries';
 
 interface ModelRegistryPanelProps {
@@ -19,6 +20,7 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
   const rollbackMutation = useRollbackModel();
   const signoffMutation = useSignOffModel();
   const feedbackMutation = useSubmitFeedback();
+  const scoreSampleMutation = useScoreSampleTransaction();
   const { data: shadowMetrics, refetch: refetchShadow } = useShadowMetrics(simulationId);
 
   const [activeTab, setActiveTab] = useState<'registry' | 'canary' | 'shadow'>('registry');
@@ -36,6 +38,10 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
   // Feedback states
   const [feedbackTxId, setFeedbackTxId] = useState('');
   const [feedbackLabel, setFeedbackLabel] = useState('0');
+  const [feedbackMessage, setFeedbackMessage] = useState<{
+    type: 'success' | 'error' | 'info';
+    text: string;
+  } | null>(null);
 
   const activeVersion = versions?.find((v) => v.is_active);
 
@@ -78,16 +84,50 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
   const handleFeedbackSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!feedbackTxId.trim()) return;
+    setFeedbackMessage(null);
     try {
       await feedbackMutation.mutateAsync({
         simulationId,
         transaction_id: feedbackTxId,
         actual_label: parseInt(feedbackLabel),
       });
+      setFeedbackMessage({
+        type: 'success',
+        text: `Ground truth outcome (${feedbackLabel === '1' ? 'Confirmed Fraud' : 'Legitimate'}) recorded for transaction '${feedbackTxId}'. Shadow metrics updated.`,
+      });
       setFeedbackTxId('');
       refetchShadow();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Feedback failed:', err);
+      const detail = err.response?.data?.detail || err.message || 'Feedback submission failed';
+      const isUnscored =
+        typeof detail === 'string' &&
+        (detail.includes('not found in evaluation store') ||
+          detail.includes('Cannot log feedback for unscored'));
+      setFeedbackMessage({
+        type: 'error',
+        text: isUnscored
+          ? `Transaction '${feedbackTxId}' has not been scored yet by the model (Zero-Mock Invariant). Click '⚡ Score Sample Tx' to generate and evaluate a valid transaction first!`
+          : String(detail),
+      });
+    }
+  };
+
+  const handleScoreSample = async () => {
+    setFeedbackMessage(null);
+    try {
+      const res = await scoreSampleMutation.mutateAsync({ simulationId });
+      setFeedbackTxId(res.transaction_id);
+      setFeedbackMessage({
+        type: 'info',
+        text: `Scored ${res.transaction_id} (Fraud Risk: ${(res.fraud_probability * 100).toFixed(1)}%, Action: ${res.risk_level.toUpperCase()}). Ready to submit outcome below!`,
+      });
+    } catch (err: any) {
+      const detail = err.response?.data?.detail || err.message || 'Failed to score sample transaction';
+      setFeedbackMessage({
+        type: 'error',
+        text: `Failed to score sample transaction: ${String(detail)}`,
+      });
     }
   };
 
@@ -520,12 +560,47 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
 
           {/* Interactive Mock Feedback Simulation Panel */}
           <div className="p-4 bg-[var(--color-bg-elevated)]/30 rounded-xl border border-[var(--color-border-subtle)] space-y-3">
-            <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
-              🧪 Compliance Feedback & Shadow Testing
-            </h4>
-            <p className="text-[10px] text-[var(--color-text-muted)]">
-              Simulate real-time ingestion of ground truth fraud outcomes to test the automated Champion promotion or performance rollbacks.
-            </p>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <div>
+                <h4 className="text-xs font-bold text-[var(--color-text-primary)]">
+                  🧪 Compliance Feedback & Shadow Testing
+                </h4>
+                <p className="text-[10px] text-[var(--color-text-muted)]">
+                  Simulate real-time ingestion of ground truth fraud outcomes to test the automated Champion promotion or performance rollbacks.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleScoreSample}
+                disabled={scoreSampleMutation.isPending}
+                className="px-3 py-1.5 bg-[var(--color-bg-card)] hover:bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] text-[11px] font-semibold text-[var(--color-accent-teal)] rounded transition-all active:scale-95 flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
+                title="Score a real transaction on the inference model to allow valid ground truth feedback"
+              >
+                {scoreSampleMutation.isPending ? 'Scoring...' : '⚡ Score Sample Tx'}
+              </button>
+            </div>
+
+            {feedbackMessage && (
+              <div
+                className={`p-2.5 rounded-lg border text-xs flex items-center justify-between transition-all ${
+                  feedbackMessage.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                    : feedbackMessage.type === 'info'
+                    ? 'bg-blue-500/10 border-blue-500/30 text-blue-300'
+                    : 'bg-rose-500/10 border-rose-500/30 text-rose-300'
+                }`}
+              >
+                <span>{feedbackMessage.text}</span>
+                <button
+                  type="button"
+                  onClick={() => setFeedbackMessage(null)}
+                  className="ml-2 text-xs opacity-70 hover:opacity-100 font-bold"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleFeedbackSubmit} className="flex flex-col sm:flex-row gap-3 items-end">
               <div className="flex-1 space-y-1">
                 <label className="text-[9px] text-[var(--color-text-muted)] uppercase font-semibold">
@@ -534,7 +609,7 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
                 <input
                   type="text"
                   required
-                  placeholder="e.g. txn_12345"
+                  placeholder="e.g. TXN-998822"
                   value={feedbackTxId}
                   onChange={(e) => setFeedbackTxId(e.target.value)}
                   className="w-full bg-[var(--color-bg-card)] border border-[var(--color-border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none focus:border-[var(--color-accent-teal)] font-mono"
