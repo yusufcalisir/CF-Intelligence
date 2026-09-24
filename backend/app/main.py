@@ -7,7 +7,12 @@ import pathlib
 import tempfile
 import time
 import uuid
+import warnings
 from threading import Lock
+
+# Suppress third-party legacy Pydantic v1 config deprecation warnings (e.g. Great Expectations / MLflow)
+warnings.filterwarnings("ignore", message=r".*Valid config keys have changed in V2.*", category=UserWarning)
+warnings.filterwarnings("ignore", message=r".*schema_extra.*", category=UserWarning)
 
 # Configure CPU threading limits to 2 cores for maximum performance
 os.environ["OMP_NUM_THREADS"] = "2"

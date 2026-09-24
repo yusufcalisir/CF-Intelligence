@@ -21,9 +21,14 @@ if TYPE_CHECKING:
     HAS_PANDERA = True
 else:
     try:
-        import great_expectations as ge
-        import great_expectations.expectations as gxe
-        from great_expectations import ExpectationSuite, ValidationDefinition
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module=r"pydantic.*")
+            warnings.filterwarnings("ignore", message=r".*Valid config keys have changed in V2.*")
+            import great_expectations as ge
+            import great_expectations.expectations as gxe
+            from great_expectations import ExpectationSuite, ValidationDefinition
 
         HAS_GREAT_EXPECTATIONS = True
     except ImportError:
