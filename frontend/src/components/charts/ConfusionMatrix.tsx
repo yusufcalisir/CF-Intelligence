@@ -70,7 +70,7 @@ export default function ConfusionMatrix({
   ];
 
   return (
-    <div className="glass-card p-5">
+    <div className="glass-card p-5 h-full min-h-[360px] flex flex-col justify-between">
       <div className="flex items-center justify-between mb-1">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">
           {heading}

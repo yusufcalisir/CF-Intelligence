@@ -54,9 +54,11 @@ export default function ROCCurve({ banks, modelType }: ROCCurveProps) {
   const title = modelType === 'local' ? 'ROC Curve - Local Models' : 'ROC Curve - Federated Model';
 
   return (
-    <div className="glass-card p-5">
-      <h3 className="text-sm font-semibold text-[var(--color-text-primary)] mb-4">{title}</h3>
-      <div className="h-64">
+    <div className="glass-card p-5 min-h-[420px] lg:h-[430px] flex flex-col">
+      <div className="flex items-center justify-between mb-4 min-h-[22px]">
+        <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
+      </div>
+      <div className="h-64 relative flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, bottom: 20, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" />
@@ -108,7 +110,7 @@ export default function ROCCurve({ banks, modelType }: ROCCurveProps) {
           </LineChart>
         </ResponsiveContainer>
       </div>
-      <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 mt-4 pt-3 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-muted)]">
+      <div className="flex flex-wrap justify-center items-center gap-x-4 gap-y-2 mt-2 pt-2 border-t border-[var(--color-border-subtle)] text-[11px] text-[var(--color-text-muted)]">
         <div className="flex items-center gap-2">
           <span className="w-3 border-b border-dashed border-[var(--color-text-muted)]"></span>
           <span>Random Guess</span>

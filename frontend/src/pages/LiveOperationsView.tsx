@@ -878,12 +878,12 @@ export default function LiveOperationsView() {
         {/* Charts Grid */}
         {simBanks.length > 0 ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
               <ROCCurve banks={simBanks} modelType={rocModelType} />
               <LossChart rounds={simRounds} totalRounds={TOTAL_ROUNDS} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
               {activeBank && (
                 <ConfusionMatrix
                   bank={activeBank}
