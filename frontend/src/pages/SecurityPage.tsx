@@ -595,11 +595,22 @@ export default function SecurityPage() {
                 </div>
 
                 <button
+                  type="button"
                   onClick={handleTestABAC}
                   disabled={evaluateABAC.isPending}
-                  className="w-full py-2 font-bold text-xs rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-all"
+                  className="w-full h-11 min-h-[44px] px-4 font-bold text-xs rounded-xl bg-gradient-to-r from-indigo-600 via-indigo-500 to-blue-600 hover:from-indigo-500 hover:to-blue-500 text-white shadow-lg shadow-indigo-600/30 hover:shadow-indigo-500/50 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 hover:scale-[1.01] active:scale-[0.99] shrink-0"
                 >
-                  {evaluateABAC.isPending ? 'Evaluating Policy...' : 'Execute ABAC Policy Check'}
+                  {evaluateABAC.isPending ? (
+                    <>
+                      <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                      <span>Evaluating Policy...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-sm">🛡️</span>
+                      <span>Execute ABAC Policy Check</span>
+                    </>
+                  )}
                 </button>
 
                 {evaluateABAC.data && (
