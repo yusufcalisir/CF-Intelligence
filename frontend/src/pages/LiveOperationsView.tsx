@@ -404,130 +404,147 @@ export default function LiveOperationsView() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 glass-card p-4 sm:p-6 border-l-4 min-w-0"
+        className="glass-card p-4 sm:p-5 border-l-4 flex flex-col gap-3.5 min-w-0"
         style={{ borderLeftColor: selectedProfile.color }}
       >
-        <div className="space-y-1.5 min-w-0 flex-1">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 min-w-0">
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-xl sm:text-2xl shrink-0">📡</span>
-              <h1 className="text-lg sm:text-2xl md:text-3xl font-extrabold text-[var(--color-text-primary)] tracking-tight truncate">
+        {/* Primary Row: Title & Connectivity on Left | Champion Metric & Controls on Right */}
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3.5 min-w-0">
+          {/* Title & Live Status */}
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="text-xl sm:text-2xl shrink-0 p-2 rounded-xl bg-white/5 border border-white/10 shadow-xs">
+              📡
+            </span>
+            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+              <h1 className="text-lg sm:text-2xl font-extrabold text-[var(--color-text-primary)] tracking-tight whitespace-nowrap">
                 Live Operations Dashboard
               </h1>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
               <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 self-start sm:self-auto ${
+                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
                   wsStatus === 'CONNECTED' && !isOfflineDemoMode
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
                 }`}
               >
-                ● {isOfflineDemoMode ? 'OFFLINE' : wsStatus}
+                <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === 'CONNECTED' && !isOfflineDemoMode ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                {isOfflineDemoMode ? 'OFFLINE' : wsStatus}
               </span>
               {isOfflineDemoMode && (
                 <span
                   id="offline-demo-mode-badge"
-                  className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
+                  className="px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm animate-pulse"
                 >
                   <AlertTriangle size={12} className="text-amber-400 shrink-0" />
                   <span>Offline Demo Mode (Connection Lost — Simulated)</span>
                 </span>
               )}
-              {/* Dataset + mode badges */}
-              <span
-                className="px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 border"
-                style={{ color: selectedProfile.color, borderColor: `${selectedProfile.color}50`, backgroundColor: `${selectedProfile.color}14` }}
-              >
-                {selectedProfile.icon} {selectedProfile.label}
-              </span>
-              <span
-                className={`px-2.5 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1 border ${
-                  trainingMode === 'mock'
-                    ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
-                    : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
-                }`}
-              >
-                {trainingMode === 'mock' ? (
-                  <>
-                    <FlaskConical size={10} />
-                    <span>Simulated Sandbox (Demo Mode)</span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={10} />
-                    <span>Live Backend Orchestration</span>
-                  </>
-                )}
-              </span>
             </div>
           </div>
-          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-normal">
-            Real-time Consortium Federated Learning Telemetry & Transaction Scoring Stream
-          </p>
+
+          {/* Key Metric & Action Controls */}
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 shrink-0">
+            {/* Active Champion AUC Card */}
+            <div className="h-10 inline-flex items-center gap-2.5 px-3.5 rounded-xl border border-[var(--color-border-subtle)] bg-[var(--color-surface-subtle)] shadow-xs shrink-0">
+              <span className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">
+                Active Champion AUC
+              </span>
+              <span className="text-base sm:text-lg font-bold font-mono" style={{ color: selectedProfile.color }}>
+                {championAuc.toFixed(4)}
+              </span>
+            </div>
+
+            {/* Training control buttons */}
+            {!isTraining && trainingPhase !== 'completed' ? (
+              <div className="flex items-center gap-2">
+                {/* Import Custom Dataset button */}
+                <button
+                  id="import-custom-dataset-btn"
+                  onClick={() => setIsIngestModalOpen(true)}
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-xs"
+                >
+                  <FileUp size={14} className="text-indigo-400" />
+                  <span>Import Dataset</span>
+                </button>
+                {/* Configure Dataset button */}
+                <button
+                  id="configure-dataset-btn"
+                  onClick={() => setIsConfigOpen((v) => !v)}
+                  className="h-10 inline-flex items-center gap-1.5 px-3 sm:px-3.5 rounded-xl font-semibold text-xs sm:text-sm border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-white/5 transition-all active:scale-95 whitespace-nowrap shrink-0"
+                >
+                  <Settings2 size={14} />
+                  <span className="hidden sm:inline">Configure</span>
+                </button>
+                {/* Quick-launch with current profile */}
+                <motion.button
+                  id="start-federated-training-btn"
+                  whileTap={{ scale: 0.96 }}
+                  onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
+                  className="h-10 inline-flex items-center gap-1.5 px-3.5 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0"
+                  style={{
+                    background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
+                    boxShadow: `0 4px 16px ${selectedProfile.color}35`,
+                  }}
+                >
+                  {trainingMode === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
+                  {trainingMode === 'mock' ? 'Start Simulation' : 'Start Real Training'}
+                </motion.button>
+              </div>
+            ) : trainingPhase === 'completed' ? (
+              <button
+                id="reset-simulation-btn"
+                onClick={resetTraining}
+                className="h-10 inline-flex items-center px-4 sm:px-5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-md active:scale-95 whitespace-nowrap shrink-0"
+              >
+                🔄 Reset Simulation
+              </button>
+            ) : (
+              <div
+                className="h-10 inline-flex items-center gap-2 px-3.5 sm:px-4 rounded-xl border shrink-0"
+                style={{ borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}10` }}
+              >
+                <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>●</span>
+                <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">
+                  {trainingMode === 'real' ? '⚡ Real Training…' : '🧪 Simulating…'}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between xl:justify-end gap-3 sm:gap-4 pt-3 xl:pt-0 border-t border-[var(--color-border-subtle)] xl:border-t-0 shrink-0">
-          <div className="text-left sm:text-right shrink-0">
-            <p className="text-[10px] sm:text-xs text-[var(--color-text-muted)] uppercase tracking-wider font-semibold">Active Champion AUC</p>
-            <p className="text-lg sm:text-2xl font-bold font-mono" style={{ color: selectedProfile.color }}>
-              {championAuc.toFixed(4)}
-            </p>
+        {/* Sub-Bar: Subtitle on Left | Dataset & Mode Tags on Right */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5 pt-3 border-t border-[var(--color-border-subtle)] text-xs text-[var(--color-text-muted)]">
+          <p className="text-xs sm:text-sm text-[var(--color-text-muted)] leading-relaxed">
+            Real-time Consortium Federated Learning Telemetry &amp; Transaction Scoring Stream
+          </p>
+          <div className="flex items-center gap-2 flex-wrap shrink-0">
+            {/* Dataset Profile Tag */}
+            <span
+              className="px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs"
+              style={{ color: selectedProfile.color, borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}12` }}
+            >
+              <span>{selectedProfile.icon}</span>
+              <span>{selectedProfile.label}</span>
+            </span>
+            {/* Training Mode Tag */}
+            <span
+              className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${
+                trainingMode === 'mock'
+                  ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
+                  : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
+              }`}
+            >
+              {trainingMode === 'mock' ? (
+                <>
+                  <FlaskConical size={11} className="text-indigo-400" />
+                  <span>Simulated Sandbox (Demo Mode)</span>
+                </>
+              ) : (
+                <>
+                  <Zap size={11} className="text-amber-400" />
+                  <span>Live Backend Orchestration</span>
+                </>
+              )}
+            </span>
           </div>
-          {/* Training control buttons */}
-          {!isTraining && trainingPhase !== 'completed' ? (
-            <div className="flex items-center gap-2">
-              {/* Import Custom Dataset button */}
-              <button
-                id="import-custom-dataset-btn"
-                onClick={() => setIsIngestModalOpen(true)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm border border-indigo-500/40 hover:border-indigo-500 text-indigo-300 hover:text-white bg-indigo-500/10 hover:bg-indigo-500/20 transition-all active:scale-95 whitespace-nowrap shrink-0 shadow-sm"
-              >
-                <FileUp size={14} className="text-indigo-400" />
-                <span>Import Dataset</span>
-              </button>
-              {/* Configure Dataset button */}
-              <button
-                id="configure-dataset-btn"
-                onClick={() => setIsConfigOpen((v) => !v)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl font-semibold text-xs sm:text-sm border border-[var(--color-border)] hover:border-[var(--color-border-hover)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] bg-transparent hover:bg-white/5 transition-all active:scale-95 whitespace-nowrap shrink-0"
-              >
-                <Settings2 size={14} />
-                <span className="hidden sm:inline">Configure</span>
-              </button>
-              {/* Quick-launch with current profile */}
-              <motion.button
-                id="start-federated-training-btn"
-                whileTap={{ scale: 0.96 }}
-                onClick={() => handleLaunchTraining(selectedProfile, trainingMode)}
-                className="flex items-center gap-1.5 px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white transition-all shadow-lg active:scale-95 whitespace-nowrap shrink-0"
-                style={{
-                  background: `linear-gradient(135deg, ${selectedProfile.color}, #6366f1)`,
-                  boxShadow: `0 4px 20px ${selectedProfile.color}35`,
-                }}
-              >
-                {trainingMode === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
-                {trainingMode === 'mock' ? 'Start Simulation' : 'Start Real Training'}
-              </motion.button>
-            </div>
-          ) : trainingPhase === 'completed' ? (
-            <button
-              id="reset-simulation-btn"
-              onClick={resetTraining}
-              className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl font-semibold text-xs sm:text-sm text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:opacity-90 transition-all shadow-lg active:scale-95 whitespace-nowrap shrink-0"
-            >
-              🔄 Reset Simulation
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 px-3.5 sm:px-4 py-2 rounded-xl border shrink-0"
-              style={{ borderColor: `${selectedProfile.color}40`, backgroundColor: `${selectedProfile.color}10` }}
-            >
-              <span className="animate-pulse font-bold text-xs sm:text-sm" style={{ color: selectedProfile.color }}>●</span>
-              <span className="text-xs sm:text-sm text-[var(--color-text-secondary)] font-medium">
-                {trainingMode === 'real' ? '⚡ Real Training…' : '🧪 Simulating…'}
-              </span>
-            </div>
-          )}
         </div>
       </motion.div>
 
