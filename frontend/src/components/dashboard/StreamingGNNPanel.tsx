@@ -93,20 +93,25 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
       </div>
 
       {/* Main Charts Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* Left Side: GNN Loss History */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Online Training Loss Curve
-            </h4>
-            {chartData.length > 0 && (
-              <span className="text-xs font-mono text-[var(--color-accent-teal)]">
-                Latest: {chartData[chartData.length - 1]?.loss ?? 0}
-              </span>
-            )}
+        <div className="flex flex-col h-full">
+          <div className="min-h-[58px] mb-3 flex flex-col justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+              <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                Online Training Loss Curve
+              </h4>
+              {chartData.length > 0 && (
+                <span className="text-xs font-mono text-[var(--color-accent-teal)] px-2 py-0.5 rounded bg-teal-500/10 border border-teal-500/20 whitespace-nowrap w-fit">
+                  Latest: {chartData[chartData.length - 1]?.loss ?? 0}
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+              Real-time loss convergence and optimization trajectory across streaming graph mini-batch rounds.
+            </p>
           </div>
-          <div className="h-64 bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4">
+          <div className="h-[280px] bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 flex flex-col">
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
@@ -146,26 +151,28 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
         </div>
 
         {/* Right Side: GAT Attention Weights */}
-        <div className="space-y-3">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
-            <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
-              Representative Attention Pattern (Illustrative)
-            </h4>
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap w-fit">
-              REPRESENTATIVE TOPOLOGY (ILLUSTRATIVE)
-            </span>
+        <div className="flex flex-col h-full">
+          <div className="min-h-[58px] mb-3 flex flex-col justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
+              <h4 className="text-sm font-semibold text-[var(--color-text-secondary)] uppercase tracking-wider">
+                Representative Attention Pattern (Illustrative)
+              </h4>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap w-fit">
+                REPRESENTATIVE TOPOLOGY (ILLUSTRATIVE)
+              </span>
+            </div>
+            <p className="text-[11px] text-[var(--color-text-muted)] mt-1">
+              Structural reference attention weights across heterogeneous graph relation types showing layer gating.
+            </p>
           </div>
-          <p className="text-[11px] text-[var(--color-text-muted)]">
-            Structural reference attention weights across heterogeneous graph relation types (Customer, Device, IP, Merchant) showing representative layer gating.
-          </p>
           <div
             tabIndex={0}
             role="region"
             aria-label="Graph Attention Network edge coefficients list"
-            className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 h-64 overflow-y-auto space-y-3.5 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 h-[280px] overflow-y-auto space-y-3 focus:outline-none focus:ring-1 focus:ring-indigo-400"
           >
             {attentionWeights.map((att, idx) => (
-              <div key={idx} className="space-y-1.5">
+              <div key={idx} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
                     <span className="font-semibold text-[var(--color-text-primary)]">{att.source}</span>
@@ -189,7 +196,7 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
                 </div>
               </div>
             ))}
-            <div className="text-[10px] text-[var(--color-text-muted)] text-center pt-2">
+            <div className="text-[10px] text-[var(--color-text-muted)] text-center pt-1.5">
               Weights reflect multi-head self-attention coefficients calculated dynamically over the topological neighborhoods.
             </div>
           </div>
