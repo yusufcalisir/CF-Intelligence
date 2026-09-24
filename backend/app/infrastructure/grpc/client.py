@@ -293,7 +293,7 @@ class GRPCBankClient:
         )
 
         req = SubmitGradientRequest(
-            round_id=str(round_id),
+            round_id=round_id,
             bank_id=bank_id,
             compressed_masked_gradient=compressed,
             dp_epsilon_used=dp_epsilon_used,

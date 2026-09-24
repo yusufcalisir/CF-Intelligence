@@ -15,6 +15,7 @@ import uuid
 import pytest
 from fastapi.testclient import TestClient
 
+from app.infrastructure.connectors.base_connector import NormalizedTransaction
 from app.infrastructure.connectors.factory import (
     APPROVED_PRODUCTION_CONNECTORS,
     CONNECTOR_REGISTRY,
@@ -73,6 +74,7 @@ class TestMambuConnector:
             "mcc": "6012",
         }
         normalized = mambu_connector.parse_webhook_event(payload)
+        assert isinstance(normalized, NormalizedTransaction)
         assert normalized.transaction_id == "TX_MAMBU_98231"
         assert normalized.account_id == "ACC_DE_881920"
         assert normalized.counterparty_account_id == "ACC_FR_119283"
@@ -122,6 +124,7 @@ class TestMambuConnector:
             signature_header=f"sha256={sig}",
             raw_body=raw_body,
         )
+        assert isinstance(norm, NormalizedTransaction)
         assert norm.amount == 150.0
 
     def test_mambu_webhook_signature_verification_failure(self, mambu_connector: MambuConnector) -> None:

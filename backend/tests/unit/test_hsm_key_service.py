@@ -111,6 +111,7 @@ class TestHSMSharedSecretDerivation:
         # Bank A uses HSM
         hsm_bank_a = HSMKeyService(provider=HSMProvider.PKCS11)
         meta_a = hsm_bank_a.generate_key("bank_a_ecdh", algorithm=KeyAlgorithm.CURVE25519)
+        assert meta_a.public_key_b64 is not None
         pub_a_bytes = base64.urlsafe_b64decode(meta_a.public_key_b64 + "==")
 
         # Bank B generates peer keypair
@@ -321,6 +322,7 @@ class TestBridgeCaseServiceHSMIntegration:
     def test_decrypt_payload_with_hsm(self) -> None:
         hsm_service = HSMKeyService(provider=HSMProvider.PKCS11)
         meta = hsm_service.generate_key("recipient_bank_hsm", algorithm=KeyAlgorithm.CURVE25519)
+        assert meta.public_key_b64 is not None
 
         # Sender encrypts for recipient
         plaintext = b"URGENT_AML_ALERT: Laundering ring detected at account NL91ABNA0417164300"
@@ -340,6 +342,7 @@ class TestBridgeCaseServiceHSMIntegration:
         bridge = BridgeCaseService()
         hsm = HSMKeyService(provider=HSMProvider.PKCS11)
         meta = hsm.generate_key("recipient_pub_key", algorithm=KeyAlgorithm.CURVE25519)
+        assert meta.public_key_b64 is not None
 
         ticket = bridge.create_ticket(
             ticket_type=FinintTicketType.URGENT_FREEZE_REQUEST.value,

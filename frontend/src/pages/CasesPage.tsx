@@ -67,7 +67,7 @@ export default function CasesPage() {
           </span>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity flex items-center gap-1.5"
+            className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all flex items-center gap-1.5"
           >
             + New Case
           </button>
@@ -111,7 +111,7 @@ export default function CasesPage() {
                 type="button"
                 id="create-first-case-btn"
                 onClick={() => setShowCreateModal(true)}
-                className="px-4 py-2 text-xs font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 transition-opacity cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all cursor-pointer"
               >
                 + Create First Case
               </button>
@@ -249,7 +249,7 @@ function CreateCaseModal({
             type="button"
             onClick={() => title && onCreate(title, priority)}
             disabled={!title || isLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
           >
             {isLoading ? 'Creating...' : 'Create Case'}
           </button>

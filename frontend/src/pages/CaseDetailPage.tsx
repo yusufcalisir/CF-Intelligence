@@ -524,7 +524,7 @@ export default function CaseDetailPage() {
             <button
               onClick={handleAddNote}
               disabled={!noteContent.trim() || addNote.isPending}
-              className="mt-2 px-4 py-1.5 text-xs font-semibold rounded-lg bg-[var(--color-primary)] text-white hover:opacity-90 disabled:opacity-50"
+              className="mt-2 px-4 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50"
             >
               {addNote.isPending ? 'Adding...' : 'Add Note'}
             </button>
@@ -674,7 +674,7 @@ export default function CaseDetailPage() {
             <button
               type="submit"
               disabled={addEvidence.isPending}
-              className="w-full py-2 px-4 bg-[var(--color-primary)] text-white text-xs font-bold rounded-lg hover:opacity-90 disabled:opacity-50 whitespace-nowrap transition-all shadow-md shadow-indigo-500/20"
+              className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg disabled:opacity-50 whitespace-nowrap transition-all shadow-md shadow-indigo-600/20"
             >
               {addEvidence.isPending ? 'Registering...' : '+ Register Evidence'}
             </button>
