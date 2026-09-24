@@ -169,34 +169,36 @@ export default function StreamingGNNPanel({ simulation }: StreamingGNNPanelProps
             tabIndex={0}
             role="region"
             aria-label="Graph Attention Network edge coefficients list"
-            className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-4 h-[280px] overflow-y-auto space-y-3 focus:outline-none focus:ring-1 focus:ring-indigo-400"
+            className="bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded-lg p-3.5 sm:p-4 h-[280px] overflow-y-auto flex flex-col justify-between focus:outline-none focus:ring-1 focus:ring-indigo-400"
           >
-            {attentionWeights.map((att, idx) => (
-              <div key={idx} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-semibold text-[var(--color-text-primary)]">{att.source}</span>
-                    <span className="text-[var(--color-text-muted)]">➔</span>
-                    <span className="font-semibold text-[var(--color-text-primary)]">{att.target}</span>
+            <div className="space-y-2 sm:space-y-2.5">
+              {attentionWeights.map((att, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-[var(--color-text-primary)]">{att.source}</span>
+                      <span className="text-[var(--color-text-muted)]">➔</span>
+                      <span className="font-semibold text-[var(--color-text-primary)]">{att.target}</span>
+                    </div>
+                    <span className="font-mono font-bold text-[var(--color-accent-indigo)]">
+                      {(att.weight * 100).toFixed(0)}% attention
+                    </span>
                   </div>
-                  <span className="font-mono font-bold text-[var(--color-accent-indigo)]">
-                    {(att.weight * 100).toFixed(0)}% attention
-                  </span>
+                  <div className="w-full h-1.5 bg-black bg-opacity-20 rounded-full overflow-hidden">
+                    <motion.div
+                      initial={{ width: 0 }}
+                      animate={{ width: `${att.weight * 100}%` }}
+                      transition={{ duration: 0.8, delay: idx * 0.1 }}
+                      className="h-full rounded-full"
+                      style={{
+                        background: 'linear-gradient(90deg, var(--color-accent-indigo), var(--color-accent-teal))',
+                      }}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-2 bg-black bg-opacity-20 rounded-full overflow-hidden">
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: `${att.weight * 100}%` }}
-                    transition={{ duration: 0.8, delay: idx * 0.1 }}
-                    className="h-full rounded-full"
-                    style={{
-                      background: 'linear-gradient(90deg, var(--color-accent-indigo), var(--color-accent-teal))',
-                    }}
-                  />
-                </div>
-              </div>
-            ))}
-            <div className="text-[10px] text-[var(--color-text-muted)] text-center pt-1.5">
+              ))}
+            </div>
+            <div className="text-[10px] text-[var(--color-text-muted)] text-center pt-1 shrink-0">
               Weights reflect multi-head self-attention coefficients calculated dynamically over the topological neighborhoods.
             </div>
           </div>
