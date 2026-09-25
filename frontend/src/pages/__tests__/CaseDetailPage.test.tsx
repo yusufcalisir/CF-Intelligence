@@ -165,9 +165,19 @@ describe('CaseDetailPage', () => {
     );
     expect(hasEvidence3Hop).toBe(true);
 
-    // Verify Evidence table has 2-Hop Graph link
+    // Verify Evidence table has 2-Hop Graph and PSI links
     const tableGraphLinks = screen.getAllByRole('link', { name: /2-Hop Graph/i });
     expect(tableGraphLinks[0]).toHaveAttribute('href', '/graph?entity_id=dev_fraud_442&depth=2');
+
+    const tablePsiLinks = screen.getAllByRole('link', { name: /Check PSI/i });
+    expect(
+      tablePsiLinks.some((l) => l.getAttribute('href') === '/psi?entity_id=dev_fraud_442&auto_match=true')
+    ).toBe(true);
+
+    const hubPsiLinks = screen.getAllByRole('link', { name: /🔍 PSI/i });
+    expect(
+      hubPsiLinks.some((l) => l.getAttribute('href') === '/psi?entity_id=dev_fraud_442&auto_match=true')
+    ).toBe(true);
 
     // Click on Alert ALT_101 to select alert and verify alert's involved entity ids join the hub
     const alertBtn = screen.getByRole('button', { name: /ALT_101/i });
@@ -184,6 +194,11 @@ describe('CaseDetailPage', () => {
       (link) => link.getAttribute('href') === '/graph?entity_id=cust_linked_99&depth=2'
     );
     expect(hasAlertEntity2Hop).toBe(true);
+
+    const updatedHubPsiLinks = screen.getAllByRole('link', { name: /🔍 PSI/i });
+    expect(
+      updatedHubPsiLinks.some((l) => l.getAttribute('href') === '/psi?entity_id=cust_linked_99&auto_match=true')
+    ).toBe(true);
   });
 
   it('restores generated Copilot SAR narrative from sessionStorage (cfi_copilot_case_${caseId}) across component mounts', async () => {

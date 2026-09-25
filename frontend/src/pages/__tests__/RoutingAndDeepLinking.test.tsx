@@ -356,6 +356,15 @@ describe('Routing, Deep Linking & Parameter Resolution Suite', () => {
       });
     });
 
+    it('deep links directly to Private Set Intersection with entity parameter ("/psi?entity_id=ent_acc_smurf_90&auto_match=true")', async () => {
+      renderAppWithRoute('/psi?entity_id=ent_acc_smurf_90&auto_match=true');
+      await waitFor(() => {
+        expect(screen.getByText(/Private Set Intersection \(PSI\)/i)).toBeInTheDocument();
+        expect(screen.getByText(/Deep-Linked Entity Investigation Active/i)).toBeInTheDocument();
+        expect(screen.getByText('ent_acc_smurf_90')).toBeInTheDocument();
+      });
+    });
+
     it('deep links directly to Bank Consortium Onboarding ("/onboarding")', async () => {
       renderAppWithRoute('/onboarding');
       await waitFor(() => {

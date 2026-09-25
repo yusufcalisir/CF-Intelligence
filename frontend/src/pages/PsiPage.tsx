@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useRunPSI, useFuzzyResolve } from '../api/queries';
 import { BANK_NAMES, BANK_COLORS, FuzzyMatchResponse } from '../api/types';
 
@@ -80,18 +81,57 @@ function localComputeMinHash(text: string, numHashes = 16): number[] {
   return sigs;
 }
 
+// Infer entity type from raw identifier string or card hash
+function inferEntityType(target: string, cardHash: string, explicitType: string): string {
+  if (explicitType) {
+    const clean = explicitType.toLowerCase();
+    if (['customer', 'merchant', 'device', 'card', 'email', 'phone', 'ip_address'].includes(clean)) {
+      return clean;
+    }
+  }
+  if (cardHash) return 'card';
+  const lower = target.toLowerCase();
+  if (lower.startsWith('card_') || lower.includes('card') || lower.includes('pan')) return 'card';
+  if (lower.startsWith('dev_') || lower.includes('device') || lower.includes('fingerprint')) return 'device';
+  if (lower.startsWith('ip_') || /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(lower)) return 'ip_address';
+  if (lower.includes('@')) return 'email';
+  if (lower.startsWith('+') || /^\d{10,15}$/.test(lower)) return 'phone';
+  if (lower.startsWith('merch_') || lower.includes('merchant')) return 'merchant';
+  return 'customer';
+}
+
 export default function PsiPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read URL query parameters (?entity_id=...&card_hash=...&auto_match=true)
+  const entityIdParam = searchParams.get('entity_id') || searchParams.get('entity') || '';
+  const cardHashParam = searchParams.get('card_hash') || searchParams.get('card') || '';
+  const rawIdParam = searchParams.get('raw_identifier') || '';
+  const deepLinkTarget = entityIdParam || cardHashParam || rawIdParam;
+
+  const autoMatchParam = searchParams.get('auto_match');
+  const shouldAutoMatch = autoMatchParam === 'true' || autoMatchParam === '1';
+
+  const bankAParam = searchParams.get('bank_a') || '';
+  const bankBParam = searchParams.get('bank_b') || '';
+  const typeParam = searchParams.get('type') || searchParams.get('entity_type') || '';
+  const thresholdParam = searchParams.get('threshold');
+  const parsedThreshold = thresholdParam ? parseFloat(thresholdParam) : 0.5;
+
+  const initialTarget = deepLinkTarget || '';
+  const initialType = inferEntityType(initialTarget, cardHashParam, typeParam);
+
   // Local similarity playground state
-  const [name1, setName1] = useState('Yusuf Çalışır');
-  const [name2, setName2] = useState('Yusuf Calisir');
+  const [name1, setName1] = useState(() => initialTarget || 'Yusuf Çalışır');
+  const [name2, setName2] = useState(() => initialTarget ? `${initialTarget}_replica` : 'Yusuf Calisir');
   const [simScore, setSimScore] = useState<number>(0);
   const [sig1, setSig1] = useState<number[]>([]);
   const [sig2, setSig2] = useState<number[]>([]);
 
   // PSI Execution panel state
-  const [bankA, setBankA] = useState('bank_a');
-  const [bankB, setBankB] = useState('bank_b');
-  const [entityType, setEntityType] = useState('customer');
+  const [bankA, setBankA] = useState(() => bankAParam || 'bank_a');
+  const [bankB, setBankB] = useState(() => bankBParam || 'bank_b');
+  const [entityType, setEntityType] = useState(() => initialType || 'customer');
   const [enableFuzzy, setEnableFuzzy] = useState(true);
   const [fuzzyThreshold, setFuzzyThreshold] = useState(3);
   const [enableTee, setEnableTee] = useState(true);
@@ -99,12 +139,63 @@ export default function PsiPage() {
   const [logsRunning, setLogsRunning] = useState(false);
 
   // Search central LSH registry state
-  const [searchQuery, setSearchQuery] = useState('Yusuf Calisir');
-  const [searchType, setSearchType] = useState('customer');
-  const [searchThreshold, setSearchThreshold] = useState(0.5);
+  const [searchQuery, setSearchQuery] = useState(() => initialTarget || 'Yusuf Calisir');
+  const [searchType, setSearchType] = useState(() => initialType || 'customer');
+  const [searchThreshold, setSearchThreshold] = useState(() =>
+    !isNaN(parsedThreshold) && parsedThreshold > 0 && parsedThreshold <= 1 ? parsedThreshold : 0.5
+  );
 
   const runPSIMutation = useRunPSI();
   const fuzzyResolveMutation = useFuzzyResolve();
+  const autoMatchedKeyRef = useRef<string | null>(null);
+
+  // Sync state whenever deep link parameters in URL change
+  useEffect(() => {
+    if (deepLinkTarget) {
+      const detectedType = inferEntityType(deepLinkTarget, cardHashParam, typeParam);
+      setSearchQuery(deepLinkTarget);
+      setSearchType(detectedType);
+      setEntityType(detectedType);
+      setName1(deepLinkTarget);
+      setName2(`${deepLinkTarget}_replica`);
+      if (bankAParam) setBankA(bankAParam);
+      if (bankBParam) setBankB(bankBParam);
+      if (!isNaN(parsedThreshold) && parsedThreshold > 0 && parsedThreshold <= 1) {
+        setSearchThreshold(parsedThreshold);
+      }
+    }
+  }, [deepLinkTarget, cardHashParam, typeParam, bankAParam, bankBParam, parsedThreshold]);
+
+  // Automatically execute fuzzy resolution across consortium banks when auto_match=true
+  useEffect(() => {
+    if (deepLinkTarget && shouldAutoMatch) {
+      const runKey = `${deepLinkTarget}::${searchType}::${searchThreshold}`;
+      if (autoMatchedKeyRef.current !== runKey) {
+        autoMatchedKeyRef.current = runKey;
+        fuzzyResolveMutation.mutate({
+          query_name: deepLinkTarget,
+          raw_identifier: deepLinkTarget,
+          entity_type: searchType,
+          threshold: searchThreshold,
+          similarity_threshold: searchThreshold,
+          limit: 10,
+        });
+      }
+    }
+  }, [deepLinkTarget, shouldAutoMatch, searchType, searchThreshold, fuzzyResolveMutation]);
+
+  // Clear deep-linked entity filter and reset URL search params
+  const handleClearDeepLink = () => {
+    setSearchParams({});
+    autoMatchedKeyRef.current = null;
+    setSearchQuery('Yusuf Calisir');
+    setSearchType('customer');
+    setEntityType('customer');
+    setName1('Yusuf Çalışır');
+    setName2('Yusuf Calisir');
+    setBankA('bank_a');
+    setBankB('bank_b');
+  };
 
   // Run local similarity comparison when names change
   useEffect(() => {
@@ -175,8 +266,8 @@ export default function PsiPage() {
     );
   };
 
-  const handleFuzzyResolve = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFuzzyResolve = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     fuzzyResolveMutation.mutate({
       query_name: searchQuery,
       raw_identifier: searchQuery,
@@ -207,6 +298,67 @@ export default function PsiPage() {
           Intel SGX Enclave Active
         </div>
       </div>
+
+      {/* Deep-Linked Entity Context Banner */}
+      {deepLinkTarget && (
+        <div className="glass-card p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-emerald-950/40 via-indigo-950/40 to-slate-900/60 border border-emerald-500/30 shadow-xl space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5">
+              <span className="p-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-lg">
+                🔍
+              </span>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-bold text-slate-100 uppercase tracking-wider">
+                    Deep-Linked Entity Investigation Active
+                  </h3>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                    {searchType}
+                  </span>
+                  {shouldAutoMatch && (
+                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping"></span>
+                      Auto-Matched
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  Blind intersection query loaded across consortium institutions under zero-raw-PII guarantee.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+              <Link
+                to={`/graph?entity_id=${encodeURIComponent(deepLinkTarget)}&depth=2`}
+                className="px-3 py-1.5 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 text-xs font-mono font-bold transition flex items-center gap-1.5"
+                title={`Explore 2-hop ego network for ${deepLinkTarget}`}
+              >
+                <span>🕸️ Ego Graph</span>
+                <span className="text-[10px]">➔</span>
+              </Link>
+              <button
+                onClick={handleClearDeepLink}
+                className="px-3 py-1.5 rounded-xl bg-slate-800/80 hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/30 text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer"
+                title="Clear URL deep link parameters and restore default playground"
+              >
+                <span>✕</span>
+                <span>Clear Deep Link</span>
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 p-2.5 rounded-xl bg-black/40 border border-slate-800/80 font-mono text-xs flex-wrap">
+            <span className="text-slate-400 text-[11px] uppercase font-bold">Target Identifier:</span>
+            <span className="text-emerald-300 font-bold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/20 truncate max-w-full sm:max-w-md">
+              {deepLinkTarget}
+            </span>
+            <span className="text-slate-500 text-[11px]">•</span>
+            <span className="text-slate-400 text-[11px]">Consortium Mode:</span>
+            <span className="text-indigo-300 text-[11px] font-semibold">MinHash LSH & ECDH Blind Matching</span>
+          </div>
+        </div>
+      )}
 
       {/* Grid Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
@@ -525,8 +677,13 @@ export default function PsiPage() {
               onChange={(e) => setSearchType(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 opacity-90"
             >
-              <option value="customer">Customer Only</option>
-              <option value="merchant">Merchant Only</option>
+              <option value="customer">Customer / Account</option>
+              <option value="card">Card Hash / PAN</option>
+              <option value="device">Device Fingerprint</option>
+              <option value="merchant">Merchant</option>
+              <option value="email">Email</option>
+              <option value="phone">Phone</option>
+              <option value="ip_address">IP Address</option>
             </select>
           </div>
           <div>
@@ -574,12 +731,13 @@ export default function PsiPage() {
                   <th className="p-3">Jaccard Match</th>
                   <th className="p-3">Standardized Stored</th>
                   <th className="p-3">Private Hash ID</th>
+                  <th className="p-3 text-right">Ego Graph</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 bg-slate-900/30">
                 {fuzzyResolveMutation.data.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-4 text-center text-slate-500 italic">
+                    <td colSpan={7} className="p-4 text-center text-slate-500 italic">
                       No matching entities found in LSH database above {Math.round(searchThreshold * 100)}% similarity.
                     </td>
                   </tr>
@@ -617,6 +775,16 @@ export default function PsiPage() {
                       </td>
                       <td className="p-3 font-mono text-slate-400">{match.standardized_stored}</td>
                       <td className="p-3 font-mono text-slate-500 text-[10px]">{match.privacy_id}</td>
+                      <td className="p-3 text-right">
+                        <Link
+                          to={`/graph?entity_id=${encodeURIComponent(match.entity_id || match.privacy_id)}&depth=2`}
+                          className="px-2 py-1 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors inline-flex items-center gap-1"
+                          title={`Inspect ego network for ${match.display_label}`}
+                        >
+                          <span>🕸️ Graph</span>
+                          <span className="text-[9px]">➔</span>
+                        </Link>
+                      </td>
                     </tr>
                   ))
                 )}

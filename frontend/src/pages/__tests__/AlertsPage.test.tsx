@@ -275,10 +275,13 @@ describe('AlertsPage Integration Test Suite', () => {
       </QueryClientProvider>
     );
 
-    // Verify entity badge link in AlertCard
+    // Verify entity badge link and PSI link in AlertCard
     const entityLink = screen.getByText('ent_901').closest('a');
     expect(entityLink).toBeInTheDocument();
     expect(entityLink).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=2');
+
+    const cardPsiLink = screen.getAllByRole('link', { name: /PSI/i })[0];
+    expect(cardPsiLink).toHaveAttribute('href', '/psi?entity_id=ent_901&auto_match=true');
 
     // Click on alert to open ExplainabilityPanel
     const alertCard = screen.getByText('VELOCITY_BURST');
@@ -290,6 +293,9 @@ describe('AlertsPage Integration Test Suite', () => {
     expect(hop2Link).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=2');
     const hop3Link = screen.getAllByRole('link', { name: /3-Hop/i })[0];
     expect(hop3Link).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=3');
+
+    const panelPsiLink = screen.getAllByRole('link', { name: /Check PSI/i })[0];
+    expect(panelPsiLink).toHaveAttribute('href', '/psi?entity_id=ent_901&auto_match=true');
   });
 });
 

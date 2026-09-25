@@ -731,7 +731,7 @@ export default function CaseDetailPage() {
                   </div>
                   <div className="text-[10px] text-slate-400">Suspect Entity Node</div>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=2`}
                     className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition flex items-center gap-1"
@@ -746,6 +746,14 @@ export default function CaseDetailPage() {
                     title={`Trace 3-hop ring network for ${entId}`}
                   >
                     <span>3-Hop</span>
+                    <span className="text-[10px]">➔</span>
+                  </Link>
+                  <Link
+                    to={`/psi?entity_id=${encodeURIComponent(entId)}&auto_match=true`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/30 transition flex items-center gap-1"
+                    title={`Check PSI Consortium Intersection for ${entId}`}
+                  >
+                    <span>🔍 PSI</span>
                     <span className="text-[10px]">➔</span>
                   </Link>
                 </div>
@@ -935,14 +943,22 @@ export default function CaseDetailPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-800/50">
                     <span className="text-slate-400">By: <span className="text-slate-200">{ev.uploaded_by}</span></span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
                       <span className="text-slate-500 mr-1">{new Date(ev.uploaded_at).toLocaleDateString()}</span>
                       <Link
                         to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
                         className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition flex items-center gap-1"
                         title="Inspect entity ego network in Graph Workbench"
                       >
-                        <span>🕸️ Ego Graph</span>
+                        <span>🕸️ Graph</span>
+                        <span className="text-[9px]">➔</span>
+                      </Link>
+                      <Link
+                        to={`/psi?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&auto_match=true`}
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/30 transition flex items-center gap-1"
+                        title="Check PSI consortium intersection for evidence entity"
+                      >
+                        <span>🔍 PSI</span>
                         <span className="text-[9px]">➔</span>
                       </Link>
                     </div>
@@ -964,7 +980,7 @@ export default function CaseDetailPage() {
                 <th className="py-3 px-3 whitespace-nowrap font-mono">Cryptographic Hash (SHA-256)</th>
                 <th className="py-3 px-3 whitespace-nowrap">Registered By</th>
                 <th className="py-3 px-3 whitespace-nowrap text-right">Date</th>
-                <th className="py-3 px-3 whitespace-nowrap text-right font-mono">Graph Deep Link</th>
+                <th className="py-3 px-3 whitespace-nowrap text-right font-mono">Cross-Bank Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -986,14 +1002,24 @@ export default function CaseDetailPage() {
                       {new Date(ev.uploaded_at).toLocaleString()}
                     </td>
                     <td className="py-3 px-3 text-right whitespace-nowrap">
-                      <Link
-                        to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
-                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 transition"
-                        title={`Trace 2-hop ego network for ${getEvidenceEntityId(ev)}`}
-                      >
-                        <span>🕸️ 2-Hop Graph</span>
-                        <span className="text-[9px]">➔</span>
-                      </Link>
+                      <div className="inline-flex items-center gap-1.5 justify-end">
+                        <Link
+                          to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 transition"
+                          title={`Trace 2-hop ego network for ${getEvidenceEntityId(ev)}`}
+                        >
+                          <span>🕸️ 2-Hop Graph</span>
+                          <span className="text-[9px]">➔</span>
+                        </Link>
+                        <Link
+                          to={`/psi?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&auto_match=true`}
+                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-emerald-600/25 hover:bg-emerald-600/40 text-emerald-300 hover:text-white border border-emerald-500/30 transition"
+                          title={`Check PSI Consortium Intersection for ${getEvidenceEntityId(ev)}`}
+                        >
+                          <span>🔍 Check PSI</span>
+                          <span className="text-[9px]">➔</span>
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))

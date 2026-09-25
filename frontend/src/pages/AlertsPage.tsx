@@ -369,17 +369,26 @@ function AlertCard({
             <span>🕸️</span> Suspect Nodes:
           </span>
           {alert.involved_entity_ids.map((entityId) => (
-            <Link
-              key={entityId}
-              to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
-              onClick={(e) => e.stopPropagation()}
-              className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all flex items-center gap-1 group/ent"
-              title={`Trace 2-hop ego network for ${entityId}`}
-            >
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover/ent:scale-125 transition-transform" />
-              <span className="truncate max-w-[120px]">{entityId}</span>
-              <span className="text-[9px] text-indigo-400 opacity-70 group-hover/ent:opacity-100">➔</span>
-            </Link>
+            <div key={entityId} className="flex items-center gap-1">
+              <Link
+                to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
+                onClick={(e) => e.stopPropagation()}
+                className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all flex items-center gap-1 group/ent"
+                title={`Trace 2-hop ego network for ${entityId}`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover/ent:scale-125 transition-transform" />
+                <span className="truncate max-w-[120px]">{entityId}</span>
+                <span className="text-[9px] text-indigo-400 opacity-70 group-hover/ent:opacity-100">➔</span>
+              </Link>
+              <Link
+                to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
+                onClick={(e) => e.stopPropagation()}
+                className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 hover:text-emerald-100 border border-emerald-500/30 transition-all flex items-center gap-0.5"
+                title={`Check PSI Consortium Intersection for ${entityId}`}
+              >
+                <span>🔍 PSI</span>
+              </Link>
+            </div>
           ))}
         </div>
       )}
@@ -445,7 +454,7 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
                 <span className="font-mono text-xs text-indigo-200 truncate font-semibold" title={entityId}>
                   {entityId}
                 </span>
-                <div className="flex items-center gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
                   <Link
                     to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
                     className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors flex items-center gap-1"
@@ -460,6 +469,14 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
                     title={`Explore 3-hop ring network for ${entityId}`}
                   >
                     <span>3-Hop</span>
+                    <span className="text-[9px]">➔</span>
+                  </Link>
+                  <Link
+                    to={`/psi?entity_id=${encodeURIComponent(entityId)}&auto_match=true`}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 border border-emerald-500/40 transition-colors flex items-center gap-1"
+                    title={`Check PSI Consortium Intersection for ${entityId}`}
+                  >
+                    <span>🔍 Check PSI</span>
                     <span className="text-[9px]">➔</span>
                   </Link>
                 </div>
