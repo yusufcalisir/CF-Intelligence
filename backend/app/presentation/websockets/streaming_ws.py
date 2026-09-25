@@ -76,6 +76,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
             pubsub = r.pubsub()
             channel = f"streaming:{scenario_id}"
             await pubsub.subscribe(channel)
+            last_heartbeat = time.time()
 
             while True:
                 # Check for inbound frames (pings, heartbeats, validation)
@@ -94,6 +95,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                         await websocket.send_text(
                             json.dumps({"event_type": "PONG", "scenario_id": scenario_id, "timestamp": time.time()})
                         )
+                        streaming_ws_manager.record_client_activity(websocket)
                 except TimeoutError:
                     pass
 
@@ -106,6 +108,20 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                     if isinstance(data, str):
                         await websocket.send_text(data)
                         streaming_ws_manager.record_client_activity(websocket)
+
+                now = time.time()
+                if now - last_heartbeat >= 5.0:
+                    last_heartbeat = now
+                    await websocket.send_text(
+                        json.dumps(
+                            {
+                                "event_type": "HEARTBEAT",
+                                "scenario_id": scenario_id,
+                                "timestamp": now,
+                            }
+                        )
+                    )
+                    streaming_ws_manager.record_client_activity(websocket)
 
                 await asyncio.sleep(0.05)
 
@@ -129,6 +145,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
             engine = get_streaming_engine()
             last_count = 0
             last_heartbeat = time.time()
+            scenario_complete_sent = False
 
             while True:
                 # Check for inbound frames (ping/pong, rate limit, frame size)
@@ -147,6 +164,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                         await websocket.send_text(
                             json.dumps({"event_type": "PONG", "scenario_id": scenario_id, "timestamp": time.time()})
                         )
+                        streaming_ws_manager.record_client_activity(websocket)
                 except TimeoutError:
                     pass
 
@@ -169,7 +187,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                         streaming_ws_manager.record_client_activity(websocket)
                         last_count = current_count
 
-                    if status.get("status") in ("completed", "stopped"):
+                    if status.get("status") in ("completed", "stopped") and not scenario_complete_sent:
                         await websocket.send_text(
                             json.dumps(
                                 {
@@ -179,9 +197,9 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                             )
                         )
                         streaming_ws_manager.record_client_activity(websocket)
-                        break
+                        scenario_complete_sent = True
 
-                # Periodic heartbeat every 5s if idle
+                # Periodic heartbeat every 5s if idle to maintain connection without dropping
                 now = time.time()
                 if now - last_heartbeat >= 5.0:
                     last_heartbeat = now
@@ -194,6 +212,7 @@ async def _handle_scenario_stream(websocket: WebSocket, scenario_id: str) -> Non
                             }
                         )
                     )
+                    streaming_ws_manager.record_client_activity(websocket)
 
                 await asyncio.sleep(0.5)
 
