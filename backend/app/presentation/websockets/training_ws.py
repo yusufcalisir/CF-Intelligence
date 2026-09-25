@@ -140,9 +140,10 @@ async def _stream_via_redis(
 
                 try:
                     event = json.loads(data)
-                    if isinstance(event, dict) and event.get("event_type") in (
-                        "completed",
-                        "error",
+                    if (
+                        isinstance(event, dict)
+                        and event.get("event_type") in ("completed", "error")
+                        and simulation_id not in ("live_prod_v2", "default", "simulation_live")
                     ):
                         logger.info(
                             "Simulation %s ended, closing WebSocket (Redis path)",
@@ -224,19 +225,20 @@ async def _stream_via_inprocess(
         now = time.time()
         if now - last_heartbeat >= heartbeat_interval:
             last_heartbeat = now
-            # Scan recent history for terminal events to self-close cleanly
-            recent = training_ws_manager.get_room_history(room_name)
-            for raw in reversed(recent[-10:]):
-                try:
-                    evt = json.loads(raw)
-                    if isinstance(evt, dict) and evt.get("event_type") in ("completed", "error"):
-                        logger.info(
-                            "Simulation %s ended, closing WebSocket (in-process path)",
-                            simulation_id,
-                        )
-                        return
-                except (json.JSONDecodeError, TypeError):
-                    pass
+            # Do NOT close persistent streams (e.g. live_prod_v2 default operations dashboard feed)
+            if simulation_id not in ("live_prod_v2", "default", "simulation_live"):
+                recent = training_ws_manager.get_room_history(room_name)
+                for raw in reversed(recent[-10:]):
+                    try:
+                        evt = json.loads(raw)
+                        if isinstance(evt, dict) and evt.get("event_type") in ("completed", "error"):
+                            logger.info(
+                                "Simulation %s ended, closing WebSocket (in-process path)",
+                                simulation_id,
+                            )
+                            return
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
             await websocket.send_text(
                 json.dumps({

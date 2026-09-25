@@ -64,24 +64,51 @@ const DEFAULT_BANKS: BankNode[] = [
 
 const TOTAL_ROUNDS = 10;
 
+const SESSION_STORAGE_KEY = 'cfi_live_operations_session_v1';
+
+interface StoredLiveOpsState {
+  currentRound: number;
+  championAuc: number;
+  trainingPhase: TrainingPhase;
+  roundHistory: RoundData[];
+  gradientSubmissions: number;
+  selectedProfileKey?: string;
+}
+
+const loadStoredSession = (): StoredLiveOpsState | null => {
+  try {
+    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+};
+
 export default function LiveOperationsView() {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
+  const storedSession = useRef(loadStoredSession()).current;
+
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
-  const [currentRound, setCurrentRound] = useState(0);
-  const [championAuc, setChampionAuc] = useState(0.72);
+  const [currentRound, setCurrentRound] = useState<number>(storedSession?.currentRound ?? 0);
+  const [championAuc, setChampionAuc] = useState<number>(storedSession?.championAuc ?? 0.72);
   const championAucRef = useRef(championAuc);
   championAucRef.current = championAuc;
-  const [gradientSubmissions, setGradientSubmissions] = useState(0);
+  const [gradientSubmissions, setGradientSubmissions] = useState<number>(storedSession?.gradientSubmissions ?? 0);
   const [wsStatus, setWsStatus] = useState<'CONNECTED' | 'RECONNECTING'>('CONNECTED');
-  const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>('pending');
-  const [roundHistory, setRoundHistory] = useState<RoundData[]>([]);
+  const [trainingPhase, setTrainingPhase] = useState<TrainingPhase>(storedSession?.trainingPhase ?? 'pending');
+  const [roundHistory, setRoundHistory] = useState<RoundData[]>(storedSession?.roundHistory ?? []);
   const [isTraining, setIsTraining] = useState(false);
   const [isOfflineDemoMode, setIsOfflineDemoMode] = useState(false);
   const [wsRetryCount, setWsRetryCount] = useState(0);
   const [isRetryingWs, setIsRetryingWs] = useState(false);
   const offlineDemoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const isTrainingRef = useRef(isTraining);
+  isTrainingRef.current = isTraining;
 
   const handleRetryLiveStream = () => {
     setIsRetryingWs(true);
@@ -105,11 +132,33 @@ export default function LiveOperationsView() {
   const activeBank = simBanks.find((b) => b.id === selectedBankId) || simBanks[0] || null;
 
   // ── Dataset-aware training state ──────────────────────────────────────────
-  const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(DATASET_PROFILES.paysim);
+  const initialProfile = (storedSession?.selectedProfileKey && DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES])
+    ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
+    : DATASET_PROFILES.paysim;
+  const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(initialProfile);
   const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
+  const trainingModeRef = useRef(trainingMode);
+  trainingModeRef.current = trainingMode;
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
   const createSimulation = useCreateSimulation();
+
+  // Persist session state so navigating away and returning preserves completed simulation results
+  useEffect(() => {
+    try {
+      if (trainingPhase !== 'pending' || roundHistory.length > 0) {
+        const payload: StoredLiveOpsState = {
+          currentRound,
+          championAuc,
+          trainingPhase,
+          roundHistory,
+          gradientSubmissions,
+          selectedProfileKey: selectedProfile.id,
+        };
+        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
+      }
+    } catch { /* ignore storage errors */ }
+  }, [currentRound, championAuc, trainingPhase, roundHistory, gradientSubmissions, selectedProfile]);
 
   const handleQuarantineChange = (bankId: string | null) => {
     setBankNodes((prev) =>
@@ -175,10 +224,22 @@ export default function LiveOperationsView() {
           const eventType = raw.event || raw.event_type;
           const data = raw.data || raw;
 
+          if (eventType === 'heartbeat' || eventType === 'connected' || eventType === 'pong') {
+            setWsStatus('CONNECTED');
+            setIsOfflineDemoMode(false);
+            return;
+          }
+
+          // If local simulated (mock) training is actively running, ignore background WS round events
+          if (isTrainingRef.current && trainingModeRef.current === 'mock') {
+            return;
+          }
+
           if (eventType === 'round_started' || eventType === 'round_start') {
             setCurrentRound(data.round || data.round_number || 1);
             setGradientSubmissions(0);
             setTrainingPhase('training_federated');
+            setIsTraining(true);
           } else if (eventType === 'gradient_received') {
             setGradientSubmissions((prev) => prev + 1);
           } else if (eventType === 'round_complete' || eventType === 'round_completed') {
@@ -223,6 +284,11 @@ export default function LiveOperationsView() {
                 },
               ];
             });
+          } else if (eventType === 'evaluating') {
+            setTrainingPhase('evaluating');
+          } else if (eventType === 'completed' || eventType === 'training_completed') {
+            setTrainingPhase('completed');
+            setIsTraining(false);
           }
         } catch { /* ignore non-json frames */ }
       };
@@ -232,13 +298,22 @@ export default function LiveOperationsView() {
         }
         if (!isCleanedUp) generateOfflineDemoTicker();
       };
-      ws.onclose = () => { if (!isCleanedUp) generateOfflineDemoTicker(); };
+      ws.onclose = () => {
+        if (!isCleanedUp) {
+          generateOfflineDemoTicker();
+          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+          reconnectTimerRef.current = setTimeout(() => {
+            if (!isCleanedUp) setWsRetryCount((c) => c + 1);
+          }, 3000);
+        }
+      };
     } catch {
       generateOfflineDemoTicker();
     }
 
     return () => {
       isCleanedUp = true;
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
       if (ws) {
         ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null;
         try { ws.close(); } catch { /* ignore */ }
@@ -367,6 +442,9 @@ export default function LiveOperationsView() {
 
   const resetTraining = () => {
     if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
+    try {
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
+    } catch { /* ignore */ }
     setIsTraining(false);
     setTrainingPhase('pending');
     setRoundHistory([]);
