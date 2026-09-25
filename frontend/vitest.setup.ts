@@ -101,3 +101,49 @@ const createMockWebGLContext = () => ({
 HTMLCanvasElement.prototype.getContext = vi.fn().mockImplementation((_type: string) => {
   return createMockWebGLContext();
 }) as any;
+
+// Mock WebSocket for headless jsdom test runner to prevent Node 22 Undici / jsdom Event dispatch conflict
+class GlobalMockWebSocket {
+  static readonly CONNECTING = 0;
+  static readonly OPEN = 1;
+  static readonly CLOSING = 2;
+  static readonly CLOSED = 3;
+
+  readonly CONNECTING = 0;
+  readonly OPEN = 1;
+  readonly CLOSING = 2;
+  readonly CLOSED = 3;
+
+  url: string;
+  readyState: number = 1; // Default to OPEN in generic component tests
+  onopen: ((ev: any) => void) | null = null;
+  onclose: ((ev: any) => void) | null = null;
+  onmessage: ((ev: any) => void) | null = null;
+  onerror: ((ev: any) => void) | null = null;
+
+  constructor(url: string) {
+    this.url = url;
+  }
+
+  send(_data: string) {}
+  close(_code?: number, _reason?: string) {
+    this.readyState = 3;
+    if (this.onclose) {
+      try {
+        this.onclose({ code: 1000, reason: 'Normal Closure', wasClean: true });
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  addEventListener() {}
+  removeEventListener() {}
+  dispatchEvent() {
+    return true;
+  }
+}
+
+globalThis.WebSocket = GlobalMockWebSocket as any;
+window.WebSocket = GlobalMockWebSocket as any;
+

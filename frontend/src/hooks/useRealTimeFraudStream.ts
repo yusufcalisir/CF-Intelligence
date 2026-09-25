@@ -27,10 +27,10 @@ function getWebSocketUrl(): string {
   return 'wss://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/ws/telemetry';
 }
 
-
 /**
  * Global Real-Time WebSocket Hook for Platform Telemetry and Fraud Alert Streaming.
- * Handles automatic reconnect with exponential backoff and seamless mock fallback.
+ * Implements non-abandoning exponential backoff reconnection, dynamic RTT latency measurement,
+ * and seamless fallback transition without permanent dead-ends.
  */
 export function useRealTimeFraudStream() {
   const {
@@ -47,17 +47,25 @@ export function useRealTimeFraudStream() {
   } = useLiveAlertStore();
 
   const wsRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const mockIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
+  const lastPingTimestampRef = useRef<number>(0);
 
   useEffect(() => {
     let isMounted = true;
 
+    function stopMockFallback() {
+      if (mockIntervalRef.current) {
+        clearInterval(mockIntervalRef.current);
+        mockIntervalRef.current = null;
+      }
+    }
+
     function startMockFallbackStream() {
-      if (mockIntervalRef.current) clearInterval(mockIntervalRef.current);
+      if (mockIntervalRef.current) return;
       setStatus('mock_active');
-      setLatencyMs(1.8);
 
       const banks = ['bank_alpha', 'bank_beta', 'bank_gamma'];
       const typologies = [
@@ -85,14 +93,67 @@ export function useRealTimeFraudStream() {
         };
         pushStreamEvent(txn);
       }, 5000);
+    }
 
+    function scheduleReconnect() {
+      if (!isMounted) return;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+      reconnectAttemptsRef.current += 1;
+
+      // Exponential backoff with jitter: 1.5s, 2.25s, 3.4s, 5.0s ... capped at 15s
+      const baseDelay = Math.min(1000 * Math.pow(1.5, reconnectAttemptsRef.current), 15000);
+      const jitter = Math.random() * 500;
+      const delay = Math.round(baseDelay + jitter);
+
+      if (reconnectAttemptsRef.current > 2) {
+        startMockFallbackStream();
+      } else {
+        setStatus('disconnected');
+      }
+
+      // CRITICAL: NEVER abandon reconnection! Always schedule retry even when mock_active
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (isMounted) {
+          connect();
+        }
+      }, delay);
+    }
+
+    function sendPing(ws: WebSocket) {
+      if (ws.readyState === 1 || (typeof WebSocket !== 'undefined' && ws.readyState === WebSocket.OPEN)) {
+        lastPingTimestampRef.current = performance.now();
+        try {
+          ws.send(JSON.stringify({ type: 'ping', timestamp: Date.now() }));
+        } catch {
+          // Socket might have closed concurrently
+        }
+      }
     }
 
     function connect() {
       if (!isMounted) return;
+
+      // Clean up previous socket if still lingering
+      if (wsRef.current) {
+        try {
+          wsRef.current.onopen = null;
+          wsRef.current.onmessage = null;
+          wsRef.current.onerror = null;
+          wsRef.current.onclose = null;
+          if (wsRef.current.readyState === WebSocket.OPEN || wsRef.current.readyState === WebSocket.CONNECTING) {
+            wsRef.current.close(1000, 'Reconnecting');
+          }
+        } catch {
+          // Ignore
+        }
+        wsRef.current = null;
+      }
+
       const url = getWebSocketUrl();
       if (!url) {
-        startMockFallbackStream();
+        scheduleReconnect();
         return;
       }
 
@@ -106,18 +167,47 @@ export function useRealTimeFraudStream() {
           if (!isMounted) return;
           reconnectAttemptsRef.current = 0;
           setStatus('connected');
-          setLatencyMs(2.4);
-          if (mockIntervalRef.current) {
-            clearInterval(mockIntervalRef.current);
-            mockIntervalRef.current = null;
-          }
+
+          // Immediately terminate offline simulated stream if it was running
+          stopMockFallback();
+
+          // Real round-trip latency probe
+          sendPing(ws);
+
+          // Periodic heartbeat ping every 10 seconds to maintain real dynamic latency telemetry
+          if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+          pingIntervalRef.current = setInterval(() => {
+            if (isMounted && wsRef.current) {
+              sendPing(wsRef.current);
+            }
+          }, 10000);
         };
 
         ws.onmessage = (event) => {
           if (!isMounted) return;
           try {
             const data = JSON.parse(event.data);
-            if (data.payload && (data.event_type === 'ALERT_TRIGGERED' || data.event_type === 'TRANSACTION_SCORED')) {
+            const eventType = (data.event_type || data.event || '').toUpperCase();
+
+            // Calculate real round-trip latency on PONG response from backend
+            if (eventType === 'PONG') {
+              if (lastPingTimestampRef.current > 0) {
+                const elapsed = performance.now() - lastPingTimestampRef.current;
+                if (elapsed > 0 && elapsed < 30000) {
+                  setLatencyMs(Math.max(0.5, Math.round(elapsed * 10) / 10));
+                }
+              }
+              return;
+            }
+
+            if (eventType === 'CONNECTED') {
+              setStatus('connected');
+              stopMockFallback();
+              sendPing(ws);
+              return;
+            }
+
+            if (data.payload && (eventType === 'ALERT_TRIGGERED' || eventType === 'TRANSACTION_SCORED')) {
               pushStreamEvent(data.payload as LiveStreamTransaction);
             }
           } catch (e) {
@@ -138,19 +228,14 @@ export function useRealTimeFraudStream() {
 
         ws.onclose = () => {
           if (!isMounted) return;
-          setStatus('disconnected');
-          reconnectAttemptsRef.current += 1;
-
-          if (reconnectAttemptsRef.current > 2) {
-            // Switch to graceful simulated mock stream
-            startMockFallbackStream();
-          } else {
-            const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 8000);
-            reconnectTimeoutRef.current = setTimeout(connect, delay);
+          if (pingIntervalRef.current) {
+            clearInterval(pingIntervalRef.current);
+            pingIntervalRef.current = null;
           }
+          scheduleReconnect();
         };
       } catch {
-        startMockFallbackStream();
+        scheduleReconnect();
       }
     }
 
@@ -158,17 +243,25 @@ export function useRealTimeFraudStream() {
 
     return () => {
       isMounted = false;
+      stopMockFallback();
+      if (pingIntervalRef.current) {
+        clearInterval(pingIntervalRef.current);
+        pingIntervalRef.current = null;
+      }
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+        reconnectTimeoutRef.current = null;
+      }
       if (wsRef.current) {
         const socket = wsRef.current;
-        // Detach listeners immediately to eliminate React StrictMode unmount warnings
         socket.onopen = null;
         socket.onmessage = null;
         socket.onerror = null;
         socket.onclose = null;
         try {
-          if (socket.readyState === WebSocket.OPEN) {
+          if (socket.readyState === 1 || (typeof WebSocket !== 'undefined' && socket.readyState === WebSocket.OPEN)) {
             socket.close(1000, 'Component unmounted');
-          } else if (socket.readyState === WebSocket.CONNECTING) {
+          } else if (socket.readyState === 0 || (typeof WebSocket !== 'undefined' && socket.readyState === WebSocket.CONNECTING)) {
             socket.onopen = () => {
               try {
                 socket.close(1000, 'Unmounted while connecting');
@@ -181,14 +274,6 @@ export function useRealTimeFraudStream() {
           // Socket already closed or terminating
         }
         wsRef.current = null;
-      }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-      if (mockIntervalRef.current) {
-        clearInterval(mockIntervalRef.current);
-        mockIntervalRef.current = null;
       }
     };
   }, [pushStreamEvent, setLatencyMs, setStatus]);
