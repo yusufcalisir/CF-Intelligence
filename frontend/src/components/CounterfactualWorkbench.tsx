@@ -252,8 +252,13 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
       {/* Active Alert Context Information Card */}
       {isAlertLoading ? (
-        <div className="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-xs font-mono text-slate-400 animate-pulse">
-          Loading alert details and telemetry for {selectedAlertId}...
+        <div
+          role="status"
+          aria-live="polite"
+          className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200 flex items-center gap-2.5 shadow-sm"
+        >
+          <span className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
+          <span>Loading alert details and telemetry for {selectedAlertId}...</span>
         </div>
       ) : activeAlert ? (
         <div className="p-4 rounded-xl bg-slate-900/70 border border-indigo-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
@@ -338,7 +343,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 className="p-2 rounded-lg bg-rose-950/30 border border-rose-500/30 hover:border-rose-500 text-left text-[11px] text-rose-200 transition-all cursor-pointer"
               >
                 <div className="font-bold">Smurfing Burst</div>
-                <div className="text-[10px] text-rose-400/80 font-mono">$25K • 35 tx/h</div>
+                <div className="text-[10px] text-rose-300 font-mono">$25K • 35 tx/h</div>
               </button>
               <button
                 type="button"
@@ -350,7 +355,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 className="p-2 rounded-lg bg-amber-950/30 border border-amber-500/30 hover:border-amber-500 text-left text-[11px] text-amber-200 transition-all cursor-pointer"
               >
                 <div className="font-bold">Wire Outlier</div>
-                <div className="text-[10px] text-amber-400/80 font-mono">$12K • 18 tx/h</div>
+                <div className="text-[10px] text-amber-300 font-mono">$12K • 18 tx/h</div>
               </button>
               <button
                 type="button"
@@ -362,7 +367,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 className="p-2 rounded-lg bg-emerald-950/30 border border-emerald-500/30 hover:border-emerald-500 text-left text-[11px] text-emerald-200 transition-all cursor-pointer"
               >
                 <div className="font-bold">Low-Risk Retail</div>
-                <div className="text-[10px] text-emerald-400/80 font-mono">$1.2K • 4 tx/h</div>
+                <div className="text-[10px] text-emerald-300 font-mono">$1.2K • 4 tx/h</div>
               </button>
             </div>
           </div>
@@ -387,7 +392,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Transaction Amount Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
               <span>$100</span>
               <span>$25,000 (Structuring Limit)</span>
               <span>$50,000</span>
@@ -414,7 +419,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Hourly Velocity Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
               <span>1 txn/h</span>
               <span>20 txns/h (Burst Cap)</span>
               <span>40 txns/h</span>
@@ -441,7 +446,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-400"
               aria-label="Merchant Risk Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
               <span>5% (Low Risk Groceries)</span>
               <span>50%</span>
               <span>99% (Crypto / High Risk MSB)</span>
@@ -468,7 +473,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
               className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-purple-400"
               aria-label="Remediation Target Score Slider"
             />
-            <div className="flex justify-between text-[10px] text-slate-500 font-mono">
+            <div className="flex justify-between text-[10px] text-slate-400 font-mono">
               <span>100 (Ultra Strict)</span>
               <span>350 (Standard Clearing)</span>
               <span>600 (Threshold)</span>
