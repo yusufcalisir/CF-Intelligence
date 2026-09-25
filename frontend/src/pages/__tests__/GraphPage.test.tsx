@@ -107,4 +107,82 @@ describe('GraphPage (Entity Graph Visualization) Test Suite', () => {
     expect(searchInput).toHaveValue('Device');
     expect(screen.getAllByText(/Device FP-9912/i).length).toBeGreaterThan(0);
   });
+
+  it('reads entity_id and depth from URL parameters and displays deep-linked focus banner', () => {
+    const { MemoryRouter } = require('react-router-dom');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/graph?entity_id=ent_01&depth=3']}>
+          <GraphPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/Deep-Linked Ego Focus:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/ent_01/i).length).toBeGreaterThan(0);
+    expect(screen.getByText(/3-Hop Ego Network/i)).toBeInTheDocument();
+    expect(queries.useGraph).toHaveBeenCalledWith('ent_01', 3);
+  });
+
+  it('allows changing traversal depth hops and updates graph query', async () => {
+    const user = userEvent.setup();
+    const { MemoryRouter } = require('react-router-dom');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/graph?entity_id=ent_01&depth=2']}>
+          <GraphPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/2-Hop Ego Network/i)).toBeInTheDocument();
+
+    const hop4Button = screen.getByRole('button', { name: /4 Hops/i });
+    await user.click(hop4Button);
+
+    expect(screen.getByText(/4-Hop Ego Network/i)).toBeInTheDocument();
+    expect(queries.useGraph).toHaveBeenCalledWith('ent_01', 4);
+  });
+
+  it('allows resetting focus to clear entity selection', async () => {
+    const user = userEvent.setup();
+    const { MemoryRouter } = require('react-router-dom');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/graph?entity_id=ent_01&depth=2']}>
+          <GraphPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getByText(/Deep-Linked Ego Focus:/i)).toBeInTheDocument();
+
+    const resetBtn = screen.getByRole('button', { name: /Reset Focus/i });
+    await user.click(resetBtn);
+
+    expect(screen.queryByText(/Deep-Linked Ego Focus:/i)).not.toBeInTheDocument();
+  });
+
+  it('selects an entity from directory pills and activates ego network', async () => {
+    const user = userEvent.setup();
+    const { MemoryRouter } = require('react-router-dom');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/graph']}>
+          <GraphPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const devicePill = screen.getAllByRole('button', { name: /Device FP-9912/i })[0];
+    expect(devicePill).toBeDefined();
+    await user.click(devicePill!);
+
+    expect(screen.getByText(/Deep-Linked Ego Focus:/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/ent_02/i).length).toBeGreaterThan(0);
+  });
 });

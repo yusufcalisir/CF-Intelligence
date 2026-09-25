@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useAlerts,
@@ -361,6 +361,28 @@ function AlertCard({
           </span>
         ))}
       </div>
+
+      {/* Deep Link to Graph for Involved Entities */}
+      {alert.involved_entity_ids && alert.involved_entity_ids.length > 0 && (
+        <div className="flex items-center gap-1.5 flex-wrap pt-2 mt-2 border-t border-[var(--color-border)]/40">
+          <span className="text-[10px] uppercase font-mono text-[var(--color-text-muted)] flex items-center gap-1">
+            <span>🕸️</span> Suspect Nodes:
+          </span>
+          {alert.involved_entity_ids.map((entityId) => (
+            <Link
+              key={entityId}
+              to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
+              onClick={(e) => e.stopPropagation()}
+              className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 hover:text-white border border-indigo-500/30 transition-all flex items-center gap-1 group/ent"
+              title={`Trace 2-hop ego network for ${entityId}`}
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 group-hover/ent:scale-125 transition-transform" />
+              <span className="truncate max-w-[120px]">{entityId}</span>
+              <span className="text-[9px] text-indigo-400 opacity-70 group-hover/ent:opacity-100">➔</span>
+            </Link>
+          ))}
+        </div>
+      )}
     </motion.div>
   );
 }
@@ -402,6 +424,50 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
           )}
         </div>
       </div>
+
+      {/* Suspect Graph Entities & Deep-Link Jump Bar */}
+      {alert.involved_entity_ids && alert.involved_entity_ids.length > 0 && (
+        <div className="p-3 bg-slate-900/90 rounded-xl border border-indigo-500/25 space-y-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 uppercase tracking-wider">
+            <span className="flex items-center gap-1.5 text-indigo-300">
+              <span>🕸️</span> Suspect Graph Entities
+            </span>
+            <span className="text-[10px] font-mono text-indigo-400">
+              {alert.involved_entity_ids.length} linked
+            </span>
+          </div>
+          <div className="space-y-1.5">
+            {alert.involved_entity_ids.map((entityId) => (
+              <div
+                key={entityId}
+                className="flex items-center justify-between p-2 rounded-lg bg-slate-950/70 border border-slate-800/80 gap-2"
+              >
+                <span className="font-mono text-xs text-indigo-200 truncate font-semibold" title={entityId}>
+                  {entityId}
+                </span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link
+                    to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=2`}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-colors flex items-center gap-1"
+                    title={`Explore 2-hop ego network for ${entityId}`}
+                  >
+                    <span>2-Hop</span>
+                    <span className="text-[9px]">➔</span>
+                  </Link>
+                  <Link
+                    to={`/graph?entity_id=${encodeURIComponent(entityId)}&depth=3`}
+                    className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/40 transition-colors flex items-center gap-1"
+                    title={`Explore 3-hop ring network for ${entityId}`}
+                  >
+                    <span>3-Hop</span>
+                    <span className="text-[9px]">➔</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 p-1.5 bg-slate-900/90 border border-slate-800 rounded-xl text-center text-xs font-bold">
@@ -653,9 +719,20 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
           ) : (
             <>
               <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 space-y-1.5">
-                <div className="flex justify-between font-bold">
+                <div className="flex justify-between items-center font-bold">
                   <span className="text-slate-300">Target Node ID</span>
-                  <span className="font-mono text-cyan-400">{gnnReport.node_id?.slice(0, 14) ?? 'N/A'}</span>
+                  {gnnReport.node_id ? (
+                    <Link
+                      to={`/graph?entity_id=${encodeURIComponent(gnnReport.node_id)}&depth=2`}
+                      className="font-mono text-cyan-400 hover:text-cyan-200 underline decoration-cyan-500/40 hover:decoration-cyan-300 transition-colors flex items-center gap-1"
+                      title="Inspect 2-hop ego network in Graph Workbench"
+                    >
+                      <span>{gnnReport.node_id.slice(0, 16)}</span>
+                      <span className="text-[10px]">🕸️</span>
+                    </Link>
+                  ) : (
+                    <span className="font-mono text-slate-400">N/A</span>
+                  )}
                 </div>
                 <div className="flex justify-between text-slate-400">
                   <span>2-Hop Subgraph</span>
@@ -667,8 +744,9 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
               </div>
 
               <div>
-                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider">
-                  Top Graph Edge Contributors
+                <h4 className="text-[11px] font-bold text-slate-300 mb-2 uppercase tracking-wider flex items-center justify-between">
+                  <span>Top Graph Edge Contributors</span>
+                  <span className="text-[9px] font-mono text-slate-400">Click node to inspect ego graph</span>
                 </h4>
                 <div className="space-y-2">
                   {(gnnReport.top_contributing_edges ?? []).map((edge, i) => (
@@ -680,9 +758,21 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
                         </span>
                       </div>
                       <div className="flex items-center justify-between text-[10px] font-mono text-slate-400">
-                        <span className="truncate max-w-[110px]" title={edge.source}>{edge.source}</span>
+                        <Link
+                          to={`/graph?entity_id=${encodeURIComponent(edge.source)}&depth=2`}
+                          className="truncate max-w-[110px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          title={`Trace graph for ${edge.source}`}
+                        >
+                          {edge.source}
+                        </Link>
                         <span className="text-slate-500">➔</span>
-                        <span className="truncate max-w-[110px]" title={edge.target}>{edge.target}</span>
+                        <Link
+                          to={`/graph?entity_id=${encodeURIComponent(edge.target)}&depth=2`}
+                          className="truncate max-w-[110px] text-cyan-400 hover:text-cyan-200 hover:underline"
+                          title={`Trace graph for ${edge.target}`}
+                        >
+                          {edge.target}
+                        </Link>
                       </div>
                     </div>
                   ))}

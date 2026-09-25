@@ -104,4 +104,86 @@ describe('CaseDetailPage', () => {
     fireEvent.change(titleInput, { target: { value: 'KYC Passport Verification' } });
     expect(titleInput).toHaveValue('KYC Passport Verification');
   });
+
+  it('renders Suspect Entities & Graph Topology Hub with 2-Hop/3-Hop graph deep links for evidence and selected alert', async () => {
+    const mockEvidenceItem = {
+      id: 'evi_99',
+      case_id: 'case_001',
+      evidence_type: 'device_fingerprint',
+      title: 'Mule Device IMEI Cluster',
+      file_path: 'dev_fraud_442',
+      content_hash: 'sha256_mock_hash_xyz',
+      uploaded_by: 'investigator_bob',
+      uploaded_at: '2026-08-14T09:00:00Z',
+    };
+
+    const mockAlertDetail = {
+      id: 'ALT_101',
+      bank_id: 'bank_alpha',
+      account_id: 'ent_acc_smurf_9981',
+      device_id: 'dev_fraud_442',
+      involved_entity_ids: ['cust_linked_99', 'dev_pos_441'],
+      risk_score: 910,
+      severity: 'critical',
+      status: 'new',
+      created_at: '2026-08-14T07:15:00Z',
+      reason_codes: ['HIGH-VELOCITY', 'STRUCTURING'],
+      top_features: [{ feature: 'velocity_burst', contribution: 0.65 }],
+      risk_factors: ['High burst rate'],
+      model_confidence: 0.94,
+    };
+
+    vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
+      if (url.includes('/evidence')) {
+        return { data: [mockEvidenceItem] };
+      }
+      if (url.includes('/alerts/ALT_101')) {
+        return { data: mockAlertDetail };
+      }
+      return { data: mockCase };
+    });
+
+    render(<CaseDetailPage />, { wrapper: createWrapper() });
+
+    // Verify Suspect Entities & Graph Topology Hub appears with evidence entity
+    await waitFor(() => {
+      expect(screen.getByText(/Suspect Entities & Graph Topology Hub/i)).toBeInTheDocument();
+    });
+    expect(screen.getAllByText('dev_fraud_442').length).toBeGreaterThanOrEqual(1);
+
+    // Verify 2-Hop and 3-Hop links for evidence entity
+    const twoHopLinks = screen.getAllByRole('link', { name: /2-Hop/i });
+    const hasEvidence2Hop = twoHopLinks.some(
+      (link) => link.getAttribute('href') === '/graph?entity_id=dev_fraud_442&depth=2'
+    );
+    expect(hasEvidence2Hop).toBe(true);
+
+    const threeHopLinks = screen.getAllByRole('link', { name: /3-Hop/i });
+    const hasEvidence3Hop = threeHopLinks.some(
+      (link) => link.getAttribute('href') === '/graph?entity_id=dev_fraud_442&depth=3'
+    );
+    expect(hasEvidence3Hop).toBe(true);
+
+    // Verify Evidence table has 2-Hop Graph link
+    const tableGraphLinks = screen.getAllByRole('link', { name: /2-Hop Graph/i });
+    expect(tableGraphLinks[0]).toHaveAttribute('href', '/graph?entity_id=dev_fraud_442&depth=2');
+
+    // Click on Alert ALT_101 to select alert and verify alert's involved entity ids join the hub
+    const alertBtn = screen.getByRole('button', { name: /ALT_101/i });
+    fireEvent.click(alertBtn);
+
+    await waitFor(() => {
+      expect(screen.getAllByText('cust_linked_99').length).toBeGreaterThanOrEqual(1);
+    });
+    expect(screen.getAllByText('dev_pos_441').length).toBeGreaterThanOrEqual(1);
+
+    // Verify 2-Hop link exists for cust_linked_99
+    const updatedTwoHopLinks = screen.getAllByRole('link', { name: /2-Hop/i });
+    const hasAlertEntity2Hop = updatedTwoHopLinks.some(
+      (link) => link.getAttribute('href') === '/graph?entity_id=cust_linked_99&depth=2'
+    );
+    expect(hasAlertEntity2Hop).toBe(true);
+  });
 });
+
+

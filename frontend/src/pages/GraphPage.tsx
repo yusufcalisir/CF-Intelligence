@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ReactFlow,
@@ -15,13 +16,85 @@ import { useEntities, useGraph, useGraphStats } from '../api/queries';
 import { ENTITY_TYPE_COLORS, BANK_NAMES } from '../api/types';
 
 export default function GraphPage() {
-  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>();
-  const [depth, setDepth] = useState(2);
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Read URL search parameters (?entity_id=...&depth=...)
+  const urlEntityId = searchParams.get('entity_id') || searchParams.get('entityId') || undefined;
+  const rawDepth = searchParams.get('depth');
+  const parsedDepth = rawDepth ? parseInt(rawDepth, 10) : 2;
+  const initialDepth = Number.isFinite(parsedDepth) && parsedDepth >= 1 && parsedDepth <= 4 ? parsedDepth : 2;
+
+  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>(urlEntityId);
+  const [depth, setDepth] = useState<number>(initialDepth);
   const [searchQuery, setSearchQuery] = useState('');
   const [hoveredStat, setHoveredStat] = useState<string | null>(null);
   const { data: entities } = useEntities();
   const { data: graphData } = useGraph(selectedEntityId, depth);
   const { data: graphStats } = useGraphStats();
+
+  // Synchronize state when URL parameters change externally
+  useEffect(() => {
+    const currentUrlEntityId = searchParams.get('entity_id') || searchParams.get('entityId') || undefined;
+    if (currentUrlEntityId !== selectedEntityId) {
+      setSelectedEntityId(currentUrlEntityId);
+    }
+    const currentRawDepth = searchParams.get('depth');
+    if (currentRawDepth) {
+      const d = parseInt(currentRawDepth, 10);
+      if (Number.isFinite(d) && d >= 1 && d <= 4 && d !== depth) {
+        setDepth(d);
+      }
+    }
+  }, [searchParams]);
+
+  // Method to update selection and synchronize with URL search parameters
+  const updateSelection = useCallback(
+    (newEntityId: string | undefined, newDepth?: number) => {
+      const effectiveDepth = newDepth ?? depth;
+      setSelectedEntityId(newEntityId);
+      if (newDepth !== undefined) {
+        setDepth(newDepth);
+      }
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (newEntityId) {
+            next.set('entity_id', newEntityId);
+          } else {
+            next.delete('entity_id');
+            next.delete('entityId');
+          }
+          next.set('depth', String(effectiveDepth));
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [depth, setSearchParams]
+  );
+
+  const handleDepthChange = useCallback(
+    (hop: number) => {
+      setDepth(hop);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set('depth', String(hop));
+          if (selectedEntityId) {
+            next.set('entity_id', selectedEntityId);
+          }
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [selectedEntityId, setSearchParams]
+  );
+
+  const focusedEntity = useMemo(() => {
+    if (!selectedEntityId || !entities) return null;
+    return entities.find((e) => e.id === selectedEntityId || e.privacy_id === selectedEntityId);
+  }, [selectedEntityId, entities]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -46,9 +119,12 @@ export default function GraphPage() {
       .slice(0, 25);
   }, [entities, searchQuery]);
 
-  const onNodeClick = useCallback((_: unknown, node: Node) => {
-    setSelectedEntityId(node.id);
-  }, []);
+  const onNodeClick = useCallback(
+    (_: unknown, node: Node) => {
+      updateSelection(node.id);
+    },
+    [updateSelection]
+  );
 
   const statsData = graphStats
     ? [
@@ -95,6 +171,67 @@ export default function GraphPage() {
           </div>
         )}
       </motion.div>
+
+      {/* ── DEEP LINK FOCUS NODE BANNER ────────────────────── */}
+      {selectedEntityId && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="p-4 sm:p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 backdrop-blur-xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+        >
+          <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-500/40 flex items-center justify-center text-base text-indigo-300 shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.25)]">
+              🎯
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">
+                  Deep-Linked Ego Focus:
+                </span>
+                <span className="text-xs font-mono font-bold text-white bg-indigo-600/40 px-2.5 py-0.5 rounded-lg border border-indigo-400/40">
+                  {selectedEntityId}
+                </span>
+                {focusedEntity && (
+                  <span className="text-xs font-medium text-slate-300">
+                    ({focusedEntity.display_label} • {BANK_NAMES[focusedEntity.bank_id] || focusedEntity.bank_id})
+                  </span>
+                )}
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  {depth}-Hop Ego Network
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                Visualizing multi-bank transaction paths, shared device fingerprints, and suspicious cluster boundaries centered on this node.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1 gap-1">
+              {[1, 2, 3, 4].map((hop) => (
+                <button
+                  key={hop}
+                  onClick={() => handleDepthChange(hop)}
+                  className={`px-2 py-1 rounded-lg text-xs font-mono font-bold transition cursor-pointer ${
+                    depth === hop
+                      ? 'bg-indigo-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                  title={`Traverse ${hop} hops`}
+                >
+                  {hop}H
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => updateSelection(undefined)}
+              className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition cursor-pointer"
+            >
+              Reset Focus
+            </button>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── STATS ROW ─────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
@@ -160,7 +297,7 @@ export default function GraphPage() {
             {[1, 2, 3, 4].map((hop) => (
               <button
                 key={hop}
-                onClick={() => setDepth(hop)}
+                onClick={() => handleDepthChange(hop)}
                 className={`py-2.5 px-3 rounded-xl text-xs font-mono font-bold transition-all cursor-pointer flex flex-col items-center justify-center gap-1 active:scale-95 ${
                   depth === hop
                     ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)] border border-indigo-400/40'
@@ -217,7 +354,7 @@ export default function GraphPage() {
               return (
                 <button
                   key={entity.id}
-                  onClick={() => setSelectedEntityId(entity.id)}
+                  onClick={() => updateSelection(entity.id)}
                   className={`px-3 py-1.5 rounded-xl text-xs flex items-center gap-2 transition-all cursor-pointer border ${
                     isSelected
                       ? 'bg-indigo-600/30 border-indigo-500/60 text-white shadow-[0_0_12px_rgba(99,102,241,0.3)]'
@@ -331,7 +468,7 @@ export default function GraphPage() {
                     {entities.slice(0, 3).map((e) => (
                       <button
                         key={e.id}
-                        onClick={() => setSelectedEntityId(e.id)}
+                        onClick={() => updateSelection(e.id)}
                         className="px-3 py-1 rounded-xl text-xs font-mono font-semibold bg-white/5 hover:bg-white/10 border border-white/10 text-indigo-300 hover:text-white transition-all cursor-pointer active:scale-95"
                       >
                         {e.display_label}
@@ -356,7 +493,7 @@ export default function GraphPage() {
                   This entity has no cross-bank connections within {depth} hops. Try increasing traversal hops to 3 or 4.
                 </p>
                 <button
-                  onClick={() => setDepth((d) => Math.min(4, d + 1))}
+                  onClick={() => handleDepthChange(Math.min(4, depth + 1))}
                   className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 transition-all cursor-pointer"
                 >
                   Increase to {Math.min(4, depth + 1)} Hops

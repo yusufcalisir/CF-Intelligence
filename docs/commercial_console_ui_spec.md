@@ -150,11 +150,16 @@ The application shell provides access to 16 distinct production views organized 
   * One-click generation of fully compliant FinCEN SAR XML documents.
   * Embedded XML schema validator against official XSD definitions with copy-to-clipboard and `.xml` download triggers.
 
-### 5.5. Entity Graph Explorer (`/graph`)
+### 5.5. Entity Graph Explorer & Deep Linking (`/graph`)
 * **Component**: [`GraphPage.tsx`](../frontend/src/pages/GraphPage.tsx)
 * **Capabilities**:
   * Interactive 2D/3D WebGL graph rendering multi-hop circular smurfing syndicates across Bank A, Bank B, and Bank C.
   * Node inspection panel displaying anonymized 512-dim GraphSAGE embedding vectors and edge transaction attributes.
+  * **Entity Graph Deep Linking & Bi-Directional State Synchronization**:
+    * URL Query Parameters: `?entity_id=<entId>&depth=2|3` (clamped $1 \le \mathrm{depth} \le 4$).
+    * Direct deep links from **Alerts Page** ([`AlertsPage.tsx`](../frontend/src/pages/AlertsPage.tsx)): Quick jump from alert cards and Explainability Panel (Attribution and GNN Explainer node/edge endpoints) to the suspect entity's 2-hop or 3-hop ego network.
+    * Direct deep links from **AML Case Workbench** ([`CaseDetailPage.tsx`](../frontend/src/pages/CaseDetailPage.tsx)): Dedicated **Suspect Entities & Graph Topology Hub** and clickable deep links in the Case Evidence Registry table.
+    * **Deep-Linked Ego Focus Banner**: Highlights active entity identifier, matched entity metadata (label, bank node), depth indicator pill, and one-click "Reset Focus & Clear URL" control.
 
 ### 5.6. Dataset Ingestion Studio Modal
 * **Component**: [`DatasetIngestionStudioModal.tsx`](../frontend/src/components/ingestion/DatasetIngestionStudioModal.tsx)
@@ -215,13 +220,14 @@ All console components, navigation routes, deep-linking rules, and error states 
 | Test Suite Category | Representative Test File | Verified Capabilities | Status |
 | :--- | :--- | :--- | :---: |
 | **Routing & Deep Linking** | [`RoutingAndDeepLinking.test.tsx`](../frontend/src/pages/__tests__/RoutingAndDeepLinking.test.tsx) | 16 route resolutions, URL query params (`?openIngest=true`), dynamic `:caseId` parsing | `14/14 PASSED` |
+| **Entity Graph Deep Linking** | `GraphPage.test.tsx`, `AlertsPage.test.tsx`, `CaseDetailPage.test.tsx` | Cross-bank entity deep linking (`?entity_id=...&depth=...`), 2-hop/3-hop ego nets, URL state sync | `19/19 PASSED` |
 | **Comprehensive Error States** | `ComprehensiveErrorStates.integration.test.tsx` | Pristine states, form validation, 401/403 ABAC errors, Four-Eyes enforcement | `15/15 PASSED` |
 | **Viewport Overflow & Fit** | [`DesktopComponentFit.test.tsx`](../frontend/src/pages/__tests__/DesktopComponentFit.test.tsx) | 1920x1080, 1440x900, and 1280x800 desktop overflow prevention | `3/3 PASSED` |
 | **Modal Accessibility** | `ModalAccessibility.test.tsx` | Keyboard trap, Esc key listener, aria semantics on Platform Launch and Ingest | `4/4 PASSED` |
 | **Real-Time Stream Hook** | `useRealTimeFraudStream.test.ts` | WebSocket state machine, latency calculation, offline fallback transition | `3/3 PASSED` |
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
-| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **291/291 PASSED** |
+| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **297/297 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
 ---

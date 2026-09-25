@@ -263,5 +263,33 @@ describe('AlertsPage Integration Test Suite', () => {
     expect(reSelects[0]).toHaveValue('bank_a');
     expect(reSelects[1]).toHaveValue('critical');
   });
+
+  it('renders suspect entity nodes with deep links to entity relationship graph', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    // Verify entity badge link in AlertCard
+    const entityLink = screen.getByText('ent_901').closest('a');
+    expect(entityLink).toBeInTheDocument();
+    expect(entityLink).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=2');
+
+    // Click on alert to open ExplainabilityPanel
+    const alertCard = screen.getByText('VELOCITY_BURST');
+    await user.click(alertCard);
+
+    // Verify ExplainabilityPanel suspect entities bar (present in both responsive desktop and mobile panels)
+    expect(screen.getAllByText(/Suspect Graph Entities/i).length).toBeGreaterThan(0);
+    const hop2Link = screen.getAllByRole('link', { name: /2-Hop/i })[0];
+    expect(hop2Link).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=2');
+    const hop3Link = screen.getAllByRole('link', { name: /3-Hop/i })[0];
+    expect(hop3Link).toHaveAttribute('href', '/graph?entity_id=ent_901&depth=3');
+  });
 });
 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useState, useMemo } from 'react';
+import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   useCase,
@@ -9,6 +9,7 @@ import {
   useAddEvidence,
   useGenerateCopilotNarrative,
   useExportFinCENXml,
+  useAlert,
 } from '../api/queries';
 
 import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../api/types';
@@ -76,7 +77,59 @@ export default function CaseDetailPage() {
   const [evContent, setEvContent] = useState('');
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(null);
 
+  // Genuine alert fetch for active selected alert
+  const { data: realSelectedAlert, isLoading: isSelectedAlertLoading } = useAlert(selectedAlertId || undefined);
+
   const { data: evidenceList } = useCaseEvidence(caseId);
+
+  // Extract unique entity IDs from evidence items and title/content
+  const extractedEvidenceEntities = useMemo(() => {
+    if (!evidenceList || !evidenceList.length) return [];
+    const entitySet = new Set<string>();
+    const entityPattern = /(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/gi;
+
+    for (const ev of evidenceList) {
+      const textToScan = `${ev.title} ${ev.file_path} ${ev.content_hash}`;
+      const matches = textToScan.match(entityPattern);
+      if (matches) {
+        for (const m of matches) entitySet.add(m);
+      }
+      if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
+        const idMatch = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
+        if (idMatch && idMatch[1] && idMatch[1].length >= 3) {
+          entitySet.add(`ent_acc_${idMatch[1].toLowerCase()}`);
+        }
+      }
+    }
+    return Array.from(entitySet);
+  }, [evidenceList]);
+
+  // Combined suspect entities for this case (from linked alerts and registered evidence)
+  const caseSuspectEntities = useMemo(() => {
+    const set = new Set<string>(extractedEvidenceEntities);
+    if (caseData?.alert_ids) {
+      for (const aId of caseData.alert_ids) {
+        set.add(`ent_acc_${aId.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8).toLowerCase()}`);
+      }
+    }
+    if (realSelectedAlert?.involved_entity_ids) {
+      for (const ent of realSelectedAlert.involved_entity_ids) {
+        set.add(ent);
+      }
+    }
+    return Array.from(set);
+  }, [extractedEvidenceEntities, caseData?.alert_ids, realSelectedAlert]);
+
+  // Helper to extract or generate consistent entity ID for evidence
+  const getEvidenceEntityId = (ev: { id: string; title: string; file_path: string; content_hash: string }) => {
+    const match = `${ev.title} ${ev.file_path} ${ev.content_hash}`.match(/(?:ent_acc_|cust_|dev_|acc_|ip_|node_)[a-zA-Z0-9_-]+/i);
+    if (match) return match[0];
+    if (ev.title.includes('Acc #') || ev.title.includes('Account')) {
+      const num = ev.title.match(/#?([a-zA-Z0-9_-]+)/);
+      if (num && num[1]) return `ent_acc_${num[1].toLowerCase()}`;
+    }
+    return `ent_acc_${ev.id.slice(0, 8)}`;
+  };
 
   const addEvidence = useAddEvidence();
 
@@ -552,6 +605,76 @@ export default function CaseDetailPage() {
         </motion.div>
       </div>
 
+      {/* Suspect Entities & Network Topology Hub */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+        className="glass-card p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-[#090a1f]/90 via-[#0a0c24]/90 to-[#090a1f]/90 border border-indigo-500/25 shadow-xl"
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-base">🕸️</span>
+            <h2 className="text-xs sm:text-sm font-bold uppercase text-slate-200 tracking-wider">
+              Suspect Entities & Graph Topology Hub
+            </h2>
+          </div>
+          <span className="text-[11px] font-mono text-indigo-300">
+            Cross-Bank Graph Deep Linking
+          </span>
+        </div>
+
+        <p className="text-xs text-slate-400 mb-3 leading-relaxed">
+          Direct navigation to the Graph Workbench. Deep link directly into 2-hop ego networks or 3-hop multi-bank fraud rings for suspect accounts and devices identified in this case.
+        </p>
+
+        {caseSuspectEntities.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+            {caseSuspectEntities.map((entId) => (
+              <div
+                key={entId}
+                className="p-2.5 rounded-xl bg-slate-950/70 border border-indigo-500/20 flex items-center justify-between gap-2"
+              >
+                <div className="min-w-0">
+                  <div className="text-xs font-mono font-bold text-indigo-300 truncate" title={entId}>
+                    {entId}
+                  </div>
+                  <div className="text-[10px] text-slate-400">Suspect Entity Node</div>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <Link
+                    to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=2`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition flex items-center gap-1"
+                    title={`Trace 2-hop ego network for ${entId}`}
+                  >
+                    <span>2-Hop</span>
+                    <span className="text-[10px]">➔</span>
+                  </Link>
+                  <Link
+                    to={`/graph?entity_id=${encodeURIComponent(entId)}&depth=3`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border border-purple-500/30 transition flex items-center gap-1"
+                    title={`Trace 3-hop ring network for ${entId}`}
+                  >
+                    <span>3-Hop</span>
+                    <span className="text-[10px]">➔</span>
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs text-slate-400 font-mono flex items-center justify-between flex-wrap gap-2">
+            <span>No specific entity identifiers registered in evidence yet. Select a linked alert below or register evidence.</span>
+            <Link
+              to="/graph"
+              className="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 transition"
+            >
+              Open Graph Directory ➔
+            </Link>
+          </div>
+        )}
+      </motion.div>
+
       {/* Linked Alerts & Explainability Inspector */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
@@ -587,24 +710,32 @@ export default function CaseDetailPage() {
 
             {selectedAlertId && (
               <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
-                <ExplainabilityPanel
-                  alert={{
-                    id: selectedAlertId,
-                    bank_id: (caseData as any).bank_id || 'bank_a',
-                    transaction_id: `tx_${selectedAlertId.slice(0, 8)}`,
-                    risk_score: 720.0,
-                    severity: 'high' as any,
-                    status: 'new' as any,
-                    reason_codes: ['HIGH-AMT', 'GEO-RISK', 'VEL-001'],
-                    confidence: 0.92,
-                    involved_entity_ids: ['cust_linked_1'],
-                    created_at: caseData.created_at,
-                    top_features: [{ feature: 'transaction_amount', contribution: 0.45 }],
-                    risk_factors: ['High risk score across multiple signals'],
-                    model_confidence: 0.92,
-                  }}
-                />
-
+                {isSelectedAlertLoading ? (
+                  <div className="p-8 text-center text-xs font-mono text-slate-400">
+                    <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2" />
+                    Loading alert explainability and graph topology...
+                  </div>
+                ) : (
+                  <ExplainabilityPanel
+                    alert={
+                      realSelectedAlert || {
+                        id: selectedAlertId,
+                        bank_id: (caseData as any).bank_id || 'bank_a',
+                        transaction_id: `tx_${selectedAlertId.slice(0, 8)}`,
+                        risk_score: 720.0,
+                        severity: 'high' as any,
+                        status: 'new' as any,
+                        reason_codes: ['HIGH-AMT', 'GEO-RISK', 'VEL-001'],
+                        confidence: 0.92,
+                        involved_entity_ids: [`ent_acc_${selectedAlertId.slice(0, 8)}`],
+                        created_at: caseData.created_at,
+                        top_features: [{ feature: 'transaction_amount', contribution: 0.45 }],
+                        risk_factors: ['High risk score across multiple signals'],
+                        model_confidence: 0.92,
+                      }
+                    }
+                  />
+                )}
               </div>
             )}
           </div>
@@ -714,7 +845,17 @@ export default function CaseDetailPage() {
                   </div>
                   <div className="flex items-center justify-between gap-2 text-[10px] pt-1 border-t border-slate-800/50">
                     <span className="text-slate-400">By: <span className="text-slate-200">{ev.uploaded_by}</span></span>
-                    <span className="text-slate-500">{new Date(ev.uploaded_at).toLocaleString()}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-slate-500 mr-1">{new Date(ev.uploaded_at).toLocaleDateString()}</span>
+                      <Link
+                        to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
+                        className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/30 transition flex items-center gap-1"
+                        title="Inspect entity ego network in Graph Workbench"
+                      >
+                        <span>🕸️ Ego Graph</span>
+                        <span className="text-[9px]">➔</span>
+                      </Link>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -733,12 +874,13 @@ export default function CaseDetailPage() {
                 <th className="py-3 px-3 whitespace-nowrap font-mono">Cryptographic Hash (SHA-256)</th>
                 <th className="py-3 px-3 whitespace-nowrap">Registered By</th>
                 <th className="py-3 px-3 whitespace-nowrap text-right">Date</th>
+                <th className="py-3 px-3 whitespace-nowrap text-right font-mono">Graph Deep Link</th>
               </tr>
             </thead>
             <tbody>
               {!Array.isArray(evidenceList) || evidenceList.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-[var(--color-text-muted)] text-xs font-mono">
+                  <td colSpan={7} className="py-8 text-center text-[var(--color-text-muted)] text-xs font-mono">
                     No evidence registered for this case.
                   </td>
                 </tr>
@@ -752,6 +894,16 @@ export default function CaseDetailPage() {
                     <td className="py-3 px-3 text-slate-300 whitespace-nowrap">{ev.uploaded_by}</td>
                     <td className="py-3 px-3 text-right text-slate-400 whitespace-nowrap">
                       {new Date(ev.uploaded_at).toLocaleString()}
+                    </td>
+                    <td className="py-3 px-3 text-right whitespace-nowrap">
+                      <Link
+                        to={`/graph?entity_id=${encodeURIComponent(getEvidenceEntityId(ev))}&depth=2`}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-mono font-bold bg-indigo-600/25 hover:bg-indigo-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 transition"
+                        title={`Trace 2-hop ego network for ${getEvidenceEntityId(ev)}`}
+                      >
+                        <span>🕸️ 2-Hop Graph</span>
+                        <span className="text-[9px]">➔</span>
+                      </Link>
                     </td>
                   </tr>
                 ))
