@@ -62,6 +62,7 @@ const createWrapper = (initialRoute = '/cases/case_001') => {
 describe('CaseDetailPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionStorage.clear();
     vi.spyOn(apiClient, 'get').mockImplementation(async (url: string) => {
       if (url.includes('/evidence')) {
         return { data: [] };
@@ -183,6 +184,122 @@ describe('CaseDetailPage', () => {
       (link) => link.getAttribute('href') === '/graph?entity_id=cust_linked_99&depth=2'
     );
     expect(hasAlertEntity2Hop).toBe(true);
+  });
+
+  it('restores generated Copilot SAR narrative from sessionStorage (cfi_copilot_case_${caseId}) across component mounts', async () => {
+    const mockCopilotResponse = {
+      case_id: 'case_001',
+      fincen_sar_narrative:
+        'FinCEN SAR Narrative Part V: Suspect entity ent_acc_smurf_9981 engaged in rapid structuring across bank_alpha and bank_beta.',
+      four_eyes_briefing:
+        'Supervisor Briefing: Critical structuring pattern detected across 2 institutional nodes.',
+      recommended_action: 'escalate_sar_filing',
+      top_risk_drivers: [
+        { feature: 'cross_bank_velocity_ratio', impact: 0.88, description: 'Rapid fund transfers exceeding 8x peer median' },
+        { feature: 'device_fingerprint_mule_cluster', impact: 0.72, description: 'Shared IMEI across 3 non-resident accounts' },
+      ],
+      graph_topology_summary: { total_nodes: 12, total_edges: 28, cycle_detected: true },
+      zero_pii_verified: true,
+      generated_at: '2026-08-14T09:30:00Z',
+      lineage_hash: 'sha256_mock_copilot_lineage_0123456789abcdef',
+    };
+
+    // Pre-populate sessionStorage with case-specific key
+    sessionStorage.setItem('cfi_copilot_case_case_001', JSON.stringify(mockCopilotResponse));
+
+    render(<CaseDetailPage />, { wrapper: createWrapper() });
+
+    // Verify narrative is immediately restored from sessionStorage without calling generation API
+    await waitFor(() => {
+      expect(screen.getByText(/FinCEN SAR Narrative Part V/i)).toBeInTheDocument();
+    });
+    expect(screen.getByText(/Restored from Session Cache/i)).toBeInTheDocument();
+    expect(screen.getByText(/Supervisor Briefing: Critical structuring pattern/i)).toBeInTheDocument();
+    expect(screen.getByText('cross_bank_velocity_ratio')).toBeInTheDocument();
+    expect(screen.getByText('+88.0%')).toBeInTheDocument();
+    expect(screen.getByText(/Regenerate Narrative/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Clear Cache/i })).toBeInTheDocument();
+  });
+
+  it('persists newly generated Copilot SAR narrative to sessionStorage (cfi_copilot_case_${caseId})', async () => {
+    const mockCopilotResponse = {
+      case_id: 'case_001',
+      fincen_sar_narrative:
+        'Newly generated FinCEN SAR Narrative: High risk structuring detected across consortium.',
+      four_eyes_briefing:
+        'Supervisor Briefing: High confidence ML anomaly.',
+      recommended_action: 'escalate_sar_filing',
+      top_risk_drivers: [
+        { feature: 'high_velocity_anomaly', impact: 0.91 },
+      ],
+      graph_topology_summary: { total_nodes: 8, total_edges: 14 },
+      zero_pii_verified: true,
+      generated_at: '2026-08-14T10:00:00Z',
+      lineage_hash: 'sha256_fresh_hash_9876543210',
+    };
+
+    vi.spyOn(apiClient, 'post').mockImplementation(async (url: string) => {
+      if (url.includes('/copilot/narrative')) {
+        return { data: mockCopilotResponse };
+      }
+      return { data: {} };
+    });
+
+    render(<CaseDetailPage />, { wrapper: createWrapper() });
+
+    // Initially no narrative exists in sessionStorage
+    expect(sessionStorage.getItem('cfi_copilot_case_case_001')).toBeNull();
+
+    // Wait for case to load and click Generate AI SAR Narrative
+    const generateBtn = await screen.findByRole('button', { name: /Generate AI SAR Narrative/i });
+    fireEvent.click(generateBtn);
+
+    // Verify narrative is rendered
+    await waitFor(() => {
+      expect(screen.getByText(/Newly generated FinCEN SAR Narrative/i)).toBeInTheDocument();
+    });
+
+    // Verify it is saved to sessionStorage under cfi_copilot_case_case_001
+    const stored = sessionStorage.getItem('cfi_copilot_case_case_001');
+    expect(stored).not.toBeNull();
+    const parsed = JSON.parse(stored!);
+    expect(parsed.fincen_sar_narrative).toBe(mockCopilotResponse.fincen_sar_narrative);
+    expect(parsed.lineage_hash).toBe('sha256_fresh_hash_9876543210');
+  });
+
+  it('clears cached Copilot SAR narrative and resets session storage when Clear Cache is clicked', async () => {
+    const mockCopilotResponse = {
+      case_id: 'case_001',
+      fincen_sar_narrative: 'Existing cached SAR narrative to be purged.',
+      four_eyes_briefing: 'Supervisor briefing to be cleared.',
+      recommended_action: 'review_pending',
+      top_risk_drivers: [{ feature: 'amount_skew', impact: 0.65 }],
+      graph_topology_summary: {},
+      zero_pii_verified: true,
+      generated_at: '2026-08-14T08:00:00Z',
+      lineage_hash: 'sha256_purge_hash',
+    };
+
+    sessionStorage.setItem('cfi_copilot_case_case_001', JSON.stringify(mockCopilotResponse));
+
+    render(<CaseDetailPage />, { wrapper: createWrapper() });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Existing cached SAR narrative to be purged/i)).toBeInTheDocument();
+    });
+
+    // Click Clear Cache button
+    const clearBtn = screen.getByRole('button', { name: /Clear Cache/i });
+    fireEvent.click(clearBtn);
+
+    // Verify narrative is removed from view and button reverts to initial state
+    await waitFor(() => {
+      expect(screen.queryByText(/Existing cached SAR narrative to be purged/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole('button', { name: /Generate AI SAR Narrative/i })).toBeInTheDocument();
+
+    // Verify sessionStorage item is removed
+    expect(sessionStorage.getItem('cfi_copilot_case_case_001')).toBeNull();
   });
 });
 

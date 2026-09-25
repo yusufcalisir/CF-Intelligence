@@ -149,6 +149,10 @@ The application shell provides access to 16 distinct production views organized 
 * **FinCEN BSA SAR XML E-Filing Export**:
   * One-click generation of fully compliant FinCEN SAR XML documents.
   * Embedded XML schema validator against official XSD definitions with copy-to-clipboard and `.xml` download triggers.
+* **AI FinCEN Copilot SAR Narrative Persistence & Tab Session Storage**:
+  * AI Copilot generates an exhaustive FinCEN SAR narrative, 4-Eyes supervisor briefing, and top SHAP anomaly driver breakdown via `/api/v1/copilot/generate-sar-narrative`.
+  * **Case-Scoped Session Cache (`cfi_copilot_case_${caseId}`)**: The synthesized narrative, supervisor summary, and risk factor attributions are cached in browser `sessionStorage`. Analysts can navigate away to Live Operations, Entity Graph, or Alerts and return without losing generated narratives or triggering duplicate LLM API invocations.
+  * **Cache State & Purge Controls**: Visual session cache indicators (`💾 Restored from Session Cache` / `Session Cache Active`) and active storage key pill display cache status. Analysts can re-synthesize at any time or manually purge the session cache via "Clear Cache".
 
 ### 5.5. Entity Graph Explorer & Deep Linking (`/graph`)
 * **Component**: [`GraphPage.tsx`](../frontend/src/pages/GraphPage.tsx)
@@ -221,13 +225,14 @@ All console components, navigation routes, deep-linking rules, and error states 
 | :--- | :--- | :--- | :---: |
 | **Routing & Deep Linking** | [`RoutingAndDeepLinking.test.tsx`](../frontend/src/pages/__tests__/RoutingAndDeepLinking.test.tsx) | 16 route resolutions, URL query params (`?openIngest=true`), dynamic `:caseId` parsing | `14/14 PASSED` |
 | **Entity Graph Deep Linking** | `GraphPage.test.tsx`, `AlertsPage.test.tsx`, `CaseDetailPage.test.tsx` | Cross-bank entity deep linking (`?entity_id=...&depth=...`), 2-hop/3-hop ego nets, URL state sync | `19/19 PASSED` |
+| **FinCEN Copilot Narrative Persistence** | [`CaseDetailPage.test.tsx`](../frontend/src/pages/__tests__/CaseDetailPage.test.tsx) | Session storage caching (`cfi_copilot_case_${caseId}`), lazy state hydration, route switch sync, cache clearing | `7/7 PASSED` |
 | **Comprehensive Error States** | `ComprehensiveErrorStates.integration.test.tsx` | Pristine states, form validation, 401/403 ABAC errors, Four-Eyes enforcement | `15/15 PASSED` |
 | **Viewport Overflow & Fit** | [`DesktopComponentFit.test.tsx`](../frontend/src/pages/__tests__/DesktopComponentFit.test.tsx) | 1920x1080, 1440x900, and 1280x800 desktop overflow prevention | `3/3 PASSED` |
 | **Modal Accessibility** | `ModalAccessibility.test.tsx` | Keyboard trap, Esc key listener, aria semantics on Platform Launch and Ingest | `4/4 PASSED` |
 | **Real-Time Stream Hook** | `useRealTimeFraudStream.test.ts` | WebSocket state machine, latency calculation, offline fallback transition | `3/3 PASSED` |
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
-| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **297/297 PASSED** |
+| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **300/300 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
 ---

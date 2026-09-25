@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -37,6 +37,48 @@ const EVENT_ICONS: Record<string, string> = {
   alert_linked: '🔗',
 };
 
+// ── Case-Based Copilot SAR Session Cache Helpers ───────────
+export const getCopilotCaseStorageKey = (caseId: string) => `cfi_copilot_case_${caseId}`;
+
+export function loadCachedCopilotData(caseId: string | undefined): CopilotQueryResponse | null {
+  if (!caseId || typeof window === 'undefined') return null;
+  try {
+    const raw = window.sessionStorage.getItem(getCopilotCaseStorageKey(caseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as CopilotQueryResponse;
+    if (parsed && typeof parsed === 'object' && (parsed.fincen_sar_narrative || parsed.four_eyes_briefing)) {
+      return parsed;
+    }
+    return null;
+  } catch (e) {
+    console.warn('[CopilotCache] Failed to load cached Copilot SAR data from sessionStorage:', e);
+    return null;
+  }
+}
+
+export function saveCachedCopilotData(caseId: string | undefined, data: CopilotQueryResponse | null): void {
+  if (!caseId || typeof window === 'undefined') return;
+  try {
+    const key = getCopilotCaseStorageKey(caseId);
+    if (data) {
+      window.sessionStorage.setItem(key, JSON.stringify(data));
+    } else {
+      window.sessionStorage.removeItem(key);
+    }
+  } catch (e) {
+    console.warn('[CopilotCache] Failed to write Copilot SAR data to sessionStorage:', e);
+  }
+}
+
+export function clearCachedCopilotData(caseId: string | undefined): void {
+  if (!caseId || typeof window === 'undefined') return;
+  try {
+    window.sessionStorage.removeItem(getCopilotCaseStorageKey(caseId));
+  } catch (e) {
+    console.warn('[CopilotCache] Failed to clear Copilot cache:', e);
+  }
+}
+
 export default function CaseDetailPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const { data: caseData, isLoading } = useCase(caseId);
@@ -49,10 +91,22 @@ export default function CaseDetailPage() {
   const [xmlExportSuccess, setXmlExportSuccess] = useState<string | null>(null);
   const exportFinCEN = useExportFinCENXml();
 
-  // Agentic AML Copilot state
-  const [copilotData, setCopilotData] = useState<CopilotQueryResponse | null>(null);
+  // Agentic AML Copilot state with case-based session persistence (cfi_copilot_case_${caseId})
+  const [copilotData, setCopilotData] = useState<CopilotQueryResponse | null>(() => {
+    return loadCachedCopilotData(caseId);
+  });
   const [isCopilotLoading, setIsCopilotLoading] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [isCopilotCached, setIsCopilotCached] = useState<boolean>(() => {
+    return !!loadCachedCopilotData(caseId);
+  });
+
+  // Keep Copilot state synchronized when caseId route parameter changes
+  useEffect(() => {
+    const cached = loadCachedCopilotData(caseId);
+    setCopilotData(cached);
+    setIsCopilotCached(!!cached);
+  }, [caseId]);
 
   const generateCopilotNarrative = useGenerateCopilotNarrative();
 
@@ -65,12 +119,21 @@ export default function CaseDetailPage() {
         request: { case_id: caseId, include_fincen_narrative: true },
       });
       setCopilotData(data);
+      setIsCopilotCached(false);
+      saveCachedCopilotData(caseId, data);
     } catch (e) {
       console.error('Failed to generate Copilot narrative', e);
     } finally {
       setIsCopilotLoading(false);
     }
   };
+
+  const handleClearCopilotCache = () => {
+    clearCachedCopilotData(caseId);
+    setCopilotData(null);
+    setIsCopilotCached(false);
+  };
+
   const [evType, setEvType] = useState('document');
   const [evTitle, setEvTitle] = useState('');
   const [evFilePath, setEvFilePath] = useState('');
@@ -420,6 +483,15 @@ export default function CaseDetailPage() {
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-purple-500/15 text-purple-300 border border-purple-500/30 whitespace-nowrap">
                   FIN-2007-G003
                 </span>
+                {copilotData && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 whitespace-nowrap"
+                    title={`Session storage persistent cache active (cfi_copilot_case_${caseId})`}
+                  >
+                    <span>💾</span>
+                    <span>{isCopilotCached ? 'Restored from Session Cache' : 'Session Cache Active'}</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
                 Synthesizes FinCEN 5-Paragraph SAR Narratives & 4-Eyes Supervisor Briefings from Graph Topology
@@ -427,23 +499,35 @@ export default function CaseDetailPage() {
             </div>
           </div>
 
-          <button
-            onClick={handleGenerateCopilotNarrative}
-            disabled={isCopilotLoading}
-            className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/25 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shrink-0 border border-purple-400/30 whitespace-nowrap"
-          >
-            {isCopilotLoading ? (
-              <>
-                <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent" />
-                <span>Synthesizing AI Narrative...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-3.5 h-3.5 text-purple-200" />
-                <span>{copilotData ? 'Regenerate Narrative' : 'Generate AI SAR Narrative'}</span>
-              </>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            {copilotData && (
+              <button
+                onClick={handleClearCopilotCache}
+                className="w-full sm:w-auto px-3 py-2 bg-white/5 hover:bg-rose-500/10 text-slate-300 hover:text-rose-300 rounded-xl text-xs font-semibold transition border border-white/10 hover:border-rose-500/30 flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
+                title={`Clear cached Copilot narrative from session storage (${getCopilotCaseStorageKey(caseId || '')})`}
+              >
+                <span>🗑️</span>
+                <span>Clear Cache</span>
+              </button>
             )}
-          </button>
+            <button
+              onClick={handleGenerateCopilotNarrative}
+              disabled={isCopilotLoading}
+              className="w-full sm:w-auto px-4 py-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-purple-600/25 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2 shrink-0 border border-purple-400/30 whitespace-nowrap"
+            >
+              {isCopilotLoading ? (
+                <>
+                  <span className="animate-spin w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent" />
+                  <span>Synthesizing AI Narrative...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3.5 h-3.5 text-purple-200" />
+                  <span>{copilotData ? 'Regenerate Narrative' : 'Generate AI SAR Narrative'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Narrative Output Grid */}
@@ -457,7 +541,13 @@ export default function CaseDetailPage() {
                     <FileText className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
                     <span className="truncate">FinCEN 5-Paragraph Regulatory SAR Narrative</span>
                   </div>
-                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+                  <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                    <span
+                      className="font-mono text-[9px] text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded-full whitespace-nowrap"
+                      title={`Session cache storage key: cfi_copilot_case_${caseId}`}
+                    >
+                      cfi_copilot_case_{caseId?.slice(0, 8)}
+                    </span>
                     <span className="font-mono text-[9.5px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-2 py-0.5 rounded-full whitespace-nowrap">
                       ZERO-PII VERIFIED
                     </span>
