@@ -309,6 +309,12 @@ export interface SimulationDetail {
   streaming_gnn_node_count?: number;
   streaming_gnn_edge_count?: number;
   streaming_gnn_loss_history?: number[];
+  streaming_gnn_attention_weights?: Array<{
+    source: string;
+    target: string;
+    weight: number;
+    relation?: string;
+  }>;
 
   // Web3 & CBDC Settlement Telemetry
   settlement_tx_hash?: string | null;

@@ -1109,7 +1109,23 @@ export default function LiveOperationsView() {
       <ComplianceReportPanel simulationId="live_prod_v2" banks={[]} />
       <IncentiveRegistryPanel banks={[]} />
       <SecureHardwarePanel simulation={{ id: 'live_prod_v2', status: 'completed', config: { hardware_isolation_mode: 'tee' }, rounds: Array.from({ length: 10 }) } as any} />
-      <StreamingGNNPanel simulation={{ id: 'live_prod_v2', status: 'completed', config: { enable_streaming_gnn: true }, streaming_gnn_node_count: 1420, streaming_gnn_edge_count: 5890, streaming_gnn_loss_history: [0.45, 0.38, 0.31, 0.26, 0.22] } as any} />
+      <StreamingGNNPanel
+        simulation={{
+          id: activeSimId,
+          status: currentSim?.status || 'completed',
+          config: {
+            enable_streaming_gnn: true,
+            dataset: (selectedProfile?.id as any) || 'paysim',
+          },
+          streaming_gnn_node_count: currentSim?.streaming_gnn_node_count || 1420,
+          streaming_gnn_edge_count: currentSim?.streaming_gnn_edge_count || 5890,
+          streaming_gnn_loss_history: (currentSim?.streaming_gnn_loss_history && currentSim.streaming_gnn_loss_history.length > 0)
+            ? currentSim.streaming_gnn_loss_history
+            : [0.45, 0.38, 0.31, 0.26, 0.22],
+          streaming_gnn_attention_weights: currentSim?.streaming_gnn_attention_weights,
+        } as any}
+        datasetProfile={selectedProfile}
+      />
 
       {/* Real Dataset Ingestion Studio Modal */}
       <DatasetIngestionStudioModal
