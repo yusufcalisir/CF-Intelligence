@@ -782,7 +782,27 @@ async def ws_proxy(websocket: WebSocket, path: str):
                 except Exception:
                     pass
 
-            await asyncio.gather(forward_to_client(), forward_to_server())
+            # Use asyncio.wait with FIRST_COMPLETED so that when either party disconnects
+            # (client network drop, browser tab close, or downstream service termination),
+            # the companion forwarder task is immediately cancelled rather than hanging
+            # indefinitely on iter_text() or downstream_ws stream, eliminating zombie tasks
+            # and preventing file descriptor and memory leaks.
+            client_task = asyncio.create_task(forward_to_client(), name=f"gw_fwd_client_{ws_path}")
+            server_task = asyncio.create_task(forward_to_server(), name=f"gw_fwd_server_{ws_path}")
+
+            done, pending = await asyncio.wait(
+                [client_task, server_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            for task in pending:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    await task
+
+            for task in done:
+                with contextlib.suppress(asyncio.CancelledError, Exception):
+                    task.result()
 
     except WebSocketDisconnect:
         status_code = 1000
