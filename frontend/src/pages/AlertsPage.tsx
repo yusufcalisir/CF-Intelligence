@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useAlerts,
+  useAlert,
   useAlertExplainability,
   useAlertCounterfactuals,
   useAlertDecisionReplay,
@@ -10,18 +12,154 @@ import {
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
 import type { Alert } from '../api/types';
 
+export const ALERTS_SELECTED_ID_KEY = 'cfi_selected_alert_id';
+export const ALERTS_BANK_FILTER_KEY = 'cfi_alerts_bank_filter';
+export const ALERTS_SEVERITY_FILTER_KEY = 'cfi_alerts_severity_filter';
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 
 export default function AlertsPage() {
-  const [selectedBank, setSelectedBank] = useState<string>('');
-  const [selectedSeverity, setSelectedSeverity] = useState<string>('');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // 1. Restore selected alert ID from URL search params (?alert_id=...) or sessionStorage across tab switches
+  const [selectedAlertId, setSelectedAlertId] = useState<string | null>(() => {
+    try {
+      const urlId = searchParams.get('alert_id');
+      if (urlId) return urlId;
+      if (typeof window !== 'undefined') {
+        return sessionStorage.getItem(ALERTS_SELECTED_ID_KEY);
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
+
+  // 2. Restore filter preferences from URL or sessionStorage
+  const [selectedBank, setSelectedBank] = useState<string>(() => {
+    try {
+      const urlBank = searchParams.get('bank_id');
+      if (urlBank) return urlBank;
+      if (typeof window !== 'undefined') {
+        return sessionStorage.getItem(ALERTS_BANK_FILTER_KEY) || '';
+      }
+    } catch { /* ignore */ }
+    return '';
+  });
+
+  const [selectedSeverity, setSelectedSeverity] = useState<string>(() => {
+    try {
+      const urlSev = searchParams.get('severity');
+      if (urlSev) return urlSev;
+      if (typeof window !== 'undefined') {
+        return sessionStorage.getItem(ALERTS_SEVERITY_FILTER_KEY) || '';
+      }
+    } catch { /* ignore */ }
+    return '';
+  });
+
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+
+  // Direct fetch fallback in case the alert is outside the filtered list or on direct deep link
+  const { data: directAlert } = useAlert(selectedAlertId || undefined);
 
   const { data: alerts, isLoading } = useAlerts({
     bank_id: selectedBank || undefined,
     severity: selectedSeverity || undefined,
   });
+
+  // 3. Re-synchronize selectedAlert whenever alerts list or directAlert loads
+  useEffect(() => {
+    if (selectedAlertId) {
+      const matching = alerts?.find((a) => a.id === selectedAlertId) || directAlert;
+      if (matching) {
+        setSelectedAlert(matching);
+      }
+    } else {
+      setSelectedAlert(null);
+    }
+  }, [selectedAlertId, alerts, directAlert]);
+
+  // 4. Synchronize selectedAlertId, bank, and severity to sessionStorage
+  useEffect(() => {
+    try {
+      if (selectedAlertId) {
+        sessionStorage.setItem(ALERTS_SELECTED_ID_KEY, selectedAlertId);
+      } else {
+        sessionStorage.removeItem(ALERTS_SELECTED_ID_KEY);
+      }
+
+      if (selectedBank) {
+        sessionStorage.setItem(ALERTS_BANK_FILTER_KEY, selectedBank);
+      } else {
+        sessionStorage.removeItem(ALERTS_BANK_FILTER_KEY);
+      }
+
+      if (selectedSeverity) {
+        sessionStorage.setItem(ALERTS_SEVERITY_FILTER_KEY, selectedSeverity);
+      } else {
+        sessionStorage.removeItem(ALERTS_SEVERITY_FILTER_KEY);
+      }
+    } catch { /* ignore */ }
+  }, [selectedAlertId, selectedBank, selectedSeverity]);
+
+  // 5. Handlers with synchronized URL search parameters
+  const handleSelectAlert = (alert: Alert) => {
+    if (selectedAlertId === alert.id) {
+      handleClearSelectedAlert();
+      return;
+    }
+    setSelectedAlert(alert);
+    setSelectedAlertId(alert.id);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set('alert_id', alert.id);
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleClearSelectedAlert = () => {
+    setSelectedAlert(null);
+    setSelectedAlertId(null);
+    try {
+      sessionStorage.removeItem(ALERTS_SELECTED_ID_KEY);
+    } catch { /* ignore */ }
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('alert_id');
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleBankChange = (bankId: string) => {
+    setSelectedBank(bankId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (bankId) next.set('bank_id', bankId);
+        else next.delete('bank_id');
+        return next;
+      },
+      { replace: true }
+    );
+  };
+
+  const handleSeverityChange = (severity: string) => {
+    setSelectedSeverity(severity);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (severity) next.set('severity', severity);
+        else next.delete('severity');
+        return next;
+      },
+      { replace: true }
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -48,7 +186,7 @@ export default function AlertsPage() {
       >
         <select
           value={selectedBank}
-          onChange={(e) => setSelectedBank(e.target.value)}
+          onChange={(e) => handleBankChange(e.target.value)}
           className="glass-card px-3 py-2 text-sm rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)] text-[var(--color-text)]"
         >
           <option value="">All Banks</option>
@@ -59,7 +197,7 @@ export default function AlertsPage() {
 
         <select
           value={selectedSeverity}
-          onChange={(e) => setSelectedSeverity(e.target.value)}
+          onChange={(e) => handleSeverityChange(e.target.value)}
           className="glass-card px-3 py-2 text-sm rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)] text-[var(--color-text)]"
         >
           <option value="">All Severities</option>
@@ -93,8 +231,8 @@ export default function AlertsPage() {
                   key={alert.id}
                   alert={alert}
                   index={i}
-                  isSelected={selectedAlert?.id === alert.id}
-                  onClick={() => setSelectedAlert(alert)}
+                  isSelected={selectedAlertId === alert.id || selectedAlert?.id === alert.id}
+                  onClick={() => handleSelectAlert(alert)}
                 />
               ))}
             </AnimatePresence>
@@ -104,7 +242,7 @@ export default function AlertsPage() {
         {/* Explainability Panel (Desktop) */}
         <div className="hidden lg:block lg:col-span-1">
           {selectedAlert ? (
-            <ExplainabilityPanel alert={selectedAlert} />
+            <ExplainabilityPanel alert={selectedAlert} onClose={handleClearSelectedAlert} />
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -129,7 +267,7 @@ export default function AlertsPage() {
             <div className="p-4 border-b border-[var(--color-border)] flex items-center justify-between sticky top-0 bg-[var(--color-bg-card)] z-10">
               <h3 className="font-bold text-[var(--color-text-primary)]">Alert Details</h3>
               <button
-                onClick={() => setSelectedAlert(null)}
+                onClick={handleClearSelectedAlert}
                 className="p-1 rounded-md text-[var(--color-text-muted)] hover:text-[var(--color-text-primary)] hover:bg-[var(--color-bg-card-hover)] focus:outline-none"
                 aria-label="Close details"
               >
@@ -139,7 +277,7 @@ export default function AlertsPage() {
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              <ExplainabilityPanel alert={selectedAlert} />
+              <ExplainabilityPanel alert={selectedAlert} onClose={handleClearSelectedAlert} />
             </div>
           </motion.div>
         </div>
@@ -227,7 +365,7 @@ function AlertCard({
   );
 }
 
-export function ExplainabilityPanel({ alert }: { alert: Alert }) {
+export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?: () => void }) {
   const [activeTab, setActiveTab] = useState<'attribution' | 'counterfactuals' | 'audit' | 'gnn'>('attribution');
   const { data: report, isLoading: isReportLoading } = useAlertExplainability(alert.id);
   const { data: cfReport, isLoading: isCfLoading } = useAlertCounterfactuals(alert.id);
@@ -246,9 +384,23 @@ export function ExplainabilityPanel({ alert }: { alert: Alert }) {
           <span className="shrink-0">🧠</span>
           <span className="truncate">AI Explainability Portal</span>
         </h3>
-        <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold shrink-0">
-          GDPR Art. 22 Compliant
-        </span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-bold">
+            GDPR Art. 22 Compliant
+          </span>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="p-1 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-800 transition-colors"
+              title="Close panel"
+              aria-label="Close explainability panel"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}

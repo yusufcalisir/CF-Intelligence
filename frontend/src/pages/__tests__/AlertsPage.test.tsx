@@ -2,8 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
-import AlertsPage from '../AlertsPage';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
+import AlertsPage, {
+  ALERTS_SELECTED_ID_KEY,
+  ALERTS_BANK_FILTER_KEY,
+  ALERTS_SEVERITY_FILTER_KEY,
+} from '../AlertsPage';
 import * as queries from '../../api/queries';
 import type { Alert } from '../../api/types';
 
@@ -46,12 +50,23 @@ describe('AlertsPage Integration Test Suite', () => {
   ];
 
   beforeEach(() => {
+    sessionStorage.clear();
+    window.history.pushState({}, '', '/alerts');
     vi.restoreAllMocks();
     vi.spyOn(queries, 'useAlerts').mockReturnValue({
       data: mockAlerts,
       isLoading: false,
       error: null,
     } as any);
+
+    vi.spyOn(queries, 'useAlert').mockImplementation(((id?: string) => {
+      const alert = mockAlerts.find((a) => a.id === id);
+      return {
+        data: alert,
+        isLoading: false,
+        error: null,
+      } as any;
+    }) as any);
 
     vi.spyOn(queries, 'useAlertExplainability').mockReturnValue({
       data: {
@@ -148,4 +163,105 @@ describe('AlertsPage Integration Test Suite', () => {
       expect(severitySelect).toHaveValue('critical');
     }
   });
+
+  it('persists selected alert to sessionStorage and updates search params when clicked', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const alertCard = screen.getByText('VELOCITY_BURST');
+    await user.click(alertCard);
+
+    expect(sessionStorage.getItem(ALERTS_SELECTED_ID_KEY)).toBe('alt_001');
+    expect(screen.getAllByText(/AI Explainability Portal/i).length).toBeGreaterThan(0);
+  });
+
+  it('restores selected alert and explainability panel from sessionStorage across tab remounts', () => {
+    sessionStorage.setItem(ALERTS_SELECTED_ID_KEY, 'alt_002');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText(/AI Explainability Portal/i).length).toBeGreaterThan(0);
+    expect(sessionStorage.getItem(ALERTS_SELECTED_ID_KEY)).toBe('alt_002');
+  });
+
+  it('restores selected alert from URL search parameter ?alert_id=alt_001 on direct deep linking', () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/alerts?alert_id=alt_001']}>
+          <AlertsPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText(/AI Explainability Portal/i).length).toBeGreaterThan(0);
+  });
+
+  it('clears selected alert and removes from sessionStorage when close button is clicked', async () => {
+    const user = userEvent.setup();
+    sessionStorage.setItem(ALERTS_SELECTED_ID_KEY, 'alt_001');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    expect(screen.getAllByText(/AI Explainability Portal/i).length).toBeGreaterThan(0);
+
+    const closeBtns = screen.getAllByLabelText(/Close explainability panel|Close details/i);
+    await user.click(closeBtns[0]!);
+
+    expect(sessionStorage.getItem(ALERTS_SELECTED_ID_KEY)).toBeNull();
+    expect(screen.queryByText(/AI Explainability Portal/i)).not.toBeInTheDocument();
+  });
+
+  it('persists and restores filter preferences in sessionStorage across tab navigation', async () => {
+    const user = userEvent.setup();
+
+    const { unmount } = render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const selects = screen.getAllByRole('combobox');
+    await user.selectOptions(selects[0]!, 'bank_a');
+    await user.selectOptions(selects[1]!, 'critical');
+
+    expect(sessionStorage.getItem(ALERTS_BANK_FILTER_KEY)).toBe('bank_a');
+    expect(sessionStorage.getItem(ALERTS_SEVERITY_FILTER_KEY)).toBe('critical');
+
+    unmount();
+
+    // Re-mount component (simulate returning from another tab)
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const reSelects = screen.getAllByRole('combobox');
+    expect(reSelects[0]).toHaveValue('bank_a');
+    expect(reSelects[1]).toHaveValue('critical');
+  });
 });
+
