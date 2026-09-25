@@ -244,7 +244,7 @@ All console components, navigation routes, deep-linking rules, and error states 
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
 | **Streaming GNN Attention Dynamics** | [`StreamingGNNPanel.test.tsx`](../frontend/src/components/dashboard/__tests__/StreamingGNNPanel.test.tsx) | Dynamic GAT 4-head attention coefficients, PaySim/IEEE-CIS/Elliptic topology switching, loss sharpening, backend overrides | `7/7 PASSED` |
-| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **319/319 PASSED** |
+| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **323/323 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
 ---
