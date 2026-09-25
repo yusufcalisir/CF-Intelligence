@@ -103,7 +103,8 @@ export default function LiveOperationsView() {
   const [isOfflineDemoMode, setIsOfflineDemoMode] = useState(false);
   const [wsRetryCount, setWsRetryCount] = useState(0);
   const [isRetryingWs, setIsRetryingWs] = useState(false);
-  const offlineDemoIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const livenessCheckTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastTelemetryTimeRef = useRef<number>(Date.now());
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -111,6 +112,10 @@ export default function LiveOperationsView() {
   isTrainingRef.current = isTraining;
 
   const handleRetryLiveStream = () => {
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
     setIsRetryingWs(true);
     setWsRetryCount((prev) => prev + 1);
     setTimeout(() => setIsRetryingWs(false), 1000);
@@ -199,10 +204,14 @@ export default function LiveOperationsView() {
     let ws: WebSocket | null = null;
     let isCleanedUp = false;
 
-    // Explicit fallback ticker executed strictly when WebSocket disconnects
-    const generateOfflineDemoTicker = () => {
+    // Transition to offline/reconnecting state on connection disruption
+    const handleConnectionLost = () => {
       setWsStatus('RECONNECTING');
       setIsOfflineDemoMode(true);
+      if (livenessCheckTimerRef.current) {
+        clearInterval(livenessCheckTimerRef.current);
+        livenessCheckTimerRef.current = null;
+      }
     };
 
     try {
@@ -211,14 +220,33 @@ export default function LiveOperationsView() {
         if (!isCleanedUp) {
           setWsStatus('CONNECTED');
           setIsOfflineDemoMode(false);
-          if (offlineDemoIntervalRef.current) {
-            clearInterval(offlineDemoIntervalRef.current);
-            offlineDemoIntervalRef.current = null;
-          }
+          lastTelemetryTimeRef.current = Date.now();
+
+          // Active telemetry liveness watchdog: sends periodic ping and verifies stream activity
+          if (livenessCheckTimerRef.current) clearInterval(livenessCheckTimerRef.current);
+          livenessCheckTimerRef.current = setInterval(() => {
+            if (isCleanedUp) return;
+            if (ws && ws.readyState === WebSocket.OPEN) {
+              try {
+                ws.send(JSON.stringify({ event: 'ping', timestamp: Date.now() }));
+              } catch {
+                /* ignore transient socket send errors */
+              }
+
+              // Detect half-open / zombie connections if no frame received for > 30s
+              const silenceElapsed = Date.now() - lastTelemetryTimeRef.current;
+              if (silenceElapsed > 30000) {
+                console.warn(`[LiveOperationsView] Telemetry liveness timeout (${silenceElapsed}ms). Cycling connection.`);
+                handleConnectionLost();
+                try { ws.close(); } catch { /* ignore */ }
+              }
+            }
+          }, 10000);
         }
       };
       ws.onmessage = (event) => {
         if (isCleanedUp) return;
+        lastTelemetryTimeRef.current = Date.now();
         try {
           const raw = JSON.parse(event.data);
           const eventType = raw.event || raw.event_type;
@@ -296,11 +324,11 @@ export default function LiveOperationsView() {
         if (ws && ws.readyState !== WebSocket.CLOSED) {
           try { ws.close(); } catch { /* ignore */ }
         }
-        if (!isCleanedUp) generateOfflineDemoTicker();
+        if (!isCleanedUp) handleConnectionLost();
       };
       ws.onclose = () => {
         if (!isCleanedUp) {
-          generateOfflineDemoTicker();
+          handleConnectionLost();
           if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
           reconnectTimerRef.current = setTimeout(() => {
             if (!isCleanedUp) setWsRetryCount((c) => c + 1);
@@ -308,17 +336,23 @@ export default function LiveOperationsView() {
         }
       };
     } catch {
-      generateOfflineDemoTicker();
+      handleConnectionLost();
     }
 
     return () => {
       isCleanedUp = true;
-      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
+      }
+      if (livenessCheckTimerRef.current) {
+        clearInterval(livenessCheckTimerRef.current);
+        livenessCheckTimerRef.current = null;
+      }
       if (ws) {
         ws.onopen = null; ws.onmessage = null; ws.onerror = null; ws.onclose = null;
         try { ws.close(); } catch { /* ignore */ }
       }
-      if (offlineDemoIntervalRef.current) clearInterval(offlineDemoIntervalRef.current);
     };
   }, [wsRetryCount]);
 
@@ -453,6 +487,16 @@ export default function LiveOperationsView() {
     setChampionAuc(selectedProfile.championAucDefault);
     setGradientSubmissions(0);
   };
+
+  // Cleanup simulation phase timers on component unmount
+  useEffect(() => {
+    return () => {
+      if (phaseTimerRef.current) {
+        clearTimeout(phaseTimerRef.current);
+        phaseTimerRef.current = null;
+      }
+    };
+  }, []);
 
   // Auto-start simulation when navigated from Dashboard or via simulation route
   useEffect(() => {
