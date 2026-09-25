@@ -20,6 +20,7 @@ import GraphPage from '../GraphPage';
 import BankOnboardingPage from '../BankOnboardingPage';
 import CoordinatorPage from '../CoordinatorPage';
 import PrivacyDefensePage from '../PrivacyDefensePage';
+import CounterfactualPage from '../CounterfactualPage';
 import { apiClient } from '../../api/client';
 
 // Hoisted Mock for Three.js WebGLRenderer in headless Vitest runner
@@ -235,6 +236,8 @@ const renderAppWithRoute = (initialRoute: string) => {
             <Route path="/onboarding" element={<BankOnboardingPage />} />
             <Route path="/coordinator" element={<CoordinatorPage />} />
             <Route path="/privacy-defense" element={<PrivacyDefensePage />} />
+            <Route path="/workbench" element={<CounterfactualPage />} />
+            <Route path="/counterfactual" element={<CounterfactualPage />} />
           </Route>
         </Routes>
       </MemoryRouter>
@@ -260,6 +263,19 @@ describe('Routing, Deep Linking & Parameter Resolution Suite', () => {
       }
       if (url.includes('/api/v1/intelligence/stats')) {
         return { data: mockDashboardStats };
+      }
+      if (url.includes('/api/v1/alerts/')) {
+        return {
+          data: {
+            id: 'alt_8888',
+            bank_id: 'bank_a',
+            risk_score: 750,
+            status: 'new',
+            severity: 'high',
+            transaction_id: 'tx_8888',
+            reason_codes: ['HIGH-VELOCITY'],
+          },
+        };
       }
       if (url.includes('/api/v1/alerts')) {
         return { data: [] };
@@ -383,6 +399,21 @@ describe('Routing, Deep Linking & Parameter Resolution Suite', () => {
       renderAppWithRoute('/privacy-defense');
       await waitFor(() => {
         expect(screen.getByText(/Privacy Defense & Byzantine Suite/i)).toBeInTheDocument();
+      });
+    });
+
+    it('deep links directly to Counterfactual Remediation Workbench ("/workbench")', async () => {
+      renderAppWithRoute('/workbench');
+      await waitFor(() => {
+        expect(screen.getByText(/Counterfactual Remediation Workbench/i)).toBeInTheDocument();
+      });
+    });
+
+    it('deep links directly to Counterfactual Remediation Workbench with alert parameter ("/counterfactual?alert_id=alt_8888")', async () => {
+      renderAppWithRoute('/counterfactual?alert_id=alt_8888');
+      await waitFor(() => {
+        expect(screen.getByText(/Counterfactual Remediation Workbench/i)).toBeInTheDocument();
+        expect(screen.getAllByText('alt_8888').length).toBeGreaterThanOrEqual(1);
       });
     });
   });

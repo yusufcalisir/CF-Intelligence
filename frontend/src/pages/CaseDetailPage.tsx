@@ -808,6 +808,20 @@ export default function CaseDetailPage() {
 
             {selectedAlertId && (
               <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 pb-2 border-b border-slate-800/80">
+                  <div className="text-xs text-slate-300 font-medium flex items-center gap-1.5">
+                    <span>Audit Analysis for Linked Alert:</span>
+                    <span className="font-mono text-cyan-400 font-bold bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/20">{selectedAlertId}</span>
+                  </div>
+                  <Link
+                    to={`/workbench?alert_id=${encodeURIComponent(selectedAlertId)}`}
+                    className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-cyan-600/20 hover:bg-cyan-600/30 text-cyan-300 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1.5 shadow-sm"
+                    title="Open this alert in Counterfactual Remediation Workbench"
+                  >
+                    <span>🎛️ Counterfactual Workbench</span>
+                    <span className="text-[10px]">➔</span>
+                  </Link>
+                </div>
                 {isSelectedAlertLoading ? (
                   <div className="p-8 text-center text-xs font-mono text-slate-400">
                     <span className="inline-block w-4 h-4 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mr-2" />

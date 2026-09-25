@@ -544,6 +544,15 @@ function AlertCard({
               Status: <span className="capitalize text-slate-300 font-semibold">{alert.status}</span>
             </span>
           )}
+          <Link
+            to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
+            onClick={(e) => e.stopPropagation()}
+            className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 hover:text-cyan-100 border border-cyan-500/30 transition-all flex items-center gap-1"
+            title="Simulate feature remediation in Counterfactual Workbench"
+          >
+            <span>🎛️ Simulate</span>
+            <span className="text-[9px]">➔</span>
+          </Link>
         </div>
         {onEscalate && (
           <button
@@ -851,9 +860,38 @@ export function ExplainabilityPanel({
           {isCfLoading ? (
             <div className="text-center py-6 text-slate-400 font-mono">Generating remediation paths...</div>
           ) : !cfReport ? (
-            <div className="text-center py-6 text-slate-400 font-mono">No counterfactual report available</div>
+            <div className="text-center py-6 text-slate-400 font-mono space-y-3">
+              <div>No pre-computed counterfactual report available for this alert.</div>
+              <Link
+                to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 border border-cyan-400/40 transition-colors"
+              >
+                <span>🎛️ Launch Counterfactual Workbench</span>
+                <span className="text-[10px]">➔</span>
+              </Link>
+            </div>
           ) : (
             <>
+              {/* Direct Deep Link to Counterfactual Workbench */}
+              <div className="p-3 bg-gradient-to-r from-cyan-950/80 via-slate-900/90 to-purple-950/80 rounded-xl border border-cyan-500/30 flex items-center justify-between gap-3 shadow-lg">
+                <div>
+                  <div className="text-[11px] font-bold text-cyan-300 uppercase tracking-wider flex items-center gap-1.5">
+                    <span>🎛️</span> Interactive Parameter Workbench
+                  </div>
+                  <p className="text-[10px] text-slate-300 mt-0.5 leading-normal">
+                    Tune transaction amount, velocity, and risk sliders dynamically to simulate optimal remediation paths.
+                  </p>
+                </div>
+                <Link
+                  to={`/workbench?alert_id=${encodeURIComponent(alert.id)}`}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:brightness-110 shadow-md shadow-cyan-600/30 border border-cyan-400/40 transition-all flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer"
+                  title="Open Counterfactual Workbench for this alert"
+                >
+                  <span>Open Workbench</span>
+                  <span className="text-[10px]">➔</span>
+                </Link>
+              </div>
+
               <div className="p-3 bg-slate-900/80 rounded-xl border border-slate-800">
                 <div className="flex items-center justify-between mb-2">
                   <span className="font-bold text-slate-200">Remediation Target</span>

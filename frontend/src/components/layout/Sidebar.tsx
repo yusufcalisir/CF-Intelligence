@@ -20,6 +20,7 @@ const NAV_SECTIONS = [
       { path: '/security', label: 'Security & Compliance', icon: '🔒' },
       { path: '/scenarios', label: 'Scenarios', icon: '▶️' },
       { path: '/graph', label: 'Entity Graph', icon: '🕸️' },
+      { path: '/workbench', label: 'Counterfactual Workbench', icon: '🎛️' },
     ],
   },
 

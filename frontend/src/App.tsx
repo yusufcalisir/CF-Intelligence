@@ -23,6 +23,7 @@ const CoordinatorPage = lazy(() => import('./pages/CoordinatorPage'));
 const PrivacyDefensePage = lazy(() => import('./pages/PrivacyDefensePage'));
 const BenchmarkHubPage = lazy(() => import('./pages/BenchmarkHubPage'));
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'));
+const CounterfactualPage = lazy(() => import('./pages/CounterfactualPage'));
 
 const PageFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -114,6 +115,22 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <AlertsPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/workbench"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <CounterfactualPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/counterfactual"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <CounterfactualPage />
                   </Suspense>
                 }
               />
