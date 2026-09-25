@@ -170,6 +170,7 @@ async def create_case(
             title=req.title,
             priority=priority,
             alert_ids=req.alert_ids,
+            total_risk_score=req.total_risk_score,
         )
         result = _serialize_case(case)
         idem.complete(idempotency_key, result.model_dump())

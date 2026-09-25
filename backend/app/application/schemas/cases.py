@@ -59,6 +59,12 @@ class CaseCreateRequest(BaseModel):
         default_factory=list,
         description="Associated alert IDs (max 200)",
     )
+    total_risk_score: float = Field(
+        0.0,
+        ge=0.0,
+        le=1000.0,
+        description="Total risk score composite",
+    )
 
     @field_validator("title")
     @classmethod

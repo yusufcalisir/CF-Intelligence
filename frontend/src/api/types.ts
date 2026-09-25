@@ -608,6 +608,7 @@ export interface CaseCreatePayload {
   title: string;
   priority?: string;
   alert_ids?: string[];
+  total_risk_score?: number;
 }
 
 export interface CaseStatusUpdatePayload {

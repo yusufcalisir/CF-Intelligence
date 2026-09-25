@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useCases, useCreateCase } from '../api/queries';
+import { useCases, useCreateCase, useUpdateAlertStatus } from '../api/queries';
 import { CASE_STATUS_LABELS, PRIORITY_LABELS } from '../api/types';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { Search, X } from 'lucide-react';
@@ -58,7 +58,25 @@ export default function CasesPage() {
     return '';
   });
 
-  const [showCreateModal, setShowCreateModal] = useState(false);
+  // Check for incoming alert escalation parameters (?from_alert=... / ?alert_id=... / ?create=true)
+  const fromAlertId = searchParams.get('from_alert') || searchParams.get('alert_id') || undefined;
+  const initialTitleParam = searchParams.get('title') || '';
+  const initialPriorityParam = searchParams.get('priority') || '';
+  const initialRiskScoreParam = searchParams.get('risk_score');
+  const initialRiskScore = initialRiskScoreParam ? parseFloat(initialRiskScoreParam) : undefined;
+
+  const [showCreateModal, setShowCreateModal] = useState<boolean>(() => {
+    return Boolean(searchParams.get('create') === 'true' || searchParams.get('from_alert') || searchParams.get('alert_id'));
+  });
+
+  // Auto-open modal if escalation query params change
+  useEffect(() => {
+    if (searchParams.get('create') === 'true' || searchParams.get('from_alert') || searchParams.get('alert_id')) {
+      setShowCreateModal(true);
+    }
+  }, [searchParams]);
+
+  const updateAlertStatus = useUpdateAlertStatus();
 
   // Sync state to URL and sessionStorage
   const updateUrlAndStorage = (newStatus: string, newPriority: string, newSearch: string) => {
@@ -160,9 +178,57 @@ export default function CasesPage() {
     );
   }, [cases, searchQuery]);
 
-  const handleCreate = async (title: string, priority: string) => {
-    const result = await createCase.mutateAsync({ title, priority });
+  const handleCloseCreateModal = () => {
     setShowCreateModal(false);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    nextParams.delete('from_alert');
+    nextParams.delete('alert_id');
+    nextParams.delete('title');
+    nextParams.delete('priority');
+    nextParams.delete('risk_score');
+    setSearchParams(nextParams, { replace: true });
+  };
+
+  const handleCreate = async (
+    title: string,
+    priority: string,
+    alertIds?: string[],
+    totalRiskScore?: number
+  ) => {
+    const result = await createCase.mutateAsync({
+      title,
+      priority,
+      alert_ids: alertIds,
+      total_risk_score: totalRiskScore,
+    });
+
+    if (alertIds && alertIds.length > 0) {
+      for (const aId of alertIds) {
+        try {
+          await updateAlertStatus.mutateAsync({
+            alertId: aId,
+            payload: {
+              status: 'escalated',
+              resolution_notes: `Escalated directly to AML Case #${result.id.slice(0, 8)} (${title})`,
+            },
+          });
+        } catch {
+          // ignore non-blocking alert status update
+        }
+      }
+    }
+
+    setShowCreateModal(false);
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('create');
+    nextParams.delete('from_alert');
+    nextParams.delete('alert_id');
+    nextParams.delete('title');
+    nextParams.delete('priority');
+    nextParams.delete('risk_score');
+    setSearchParams(nextParams, { replace: true });
+
     refetch();
     navigate(`/cases/${result.id}`);
   };
@@ -355,13 +421,40 @@ export default function CasesPage() {
         </div>
       )}
 
+      {/* Inbound Alert Escalation Banner */}
+      {fromAlertId && !showCreateModal && (
+        <div className="p-3.5 bg-gradient-to-r from-indigo-950/80 via-purple-950/70 to-slate-900/80 rounded-xl border border-indigo-500/30 flex items-center justify-between gap-3 text-xs shadow-md">
+          <div className="flex items-center gap-2">
+            <span className="text-base">⚡</span>
+            <span className="text-slate-200">
+              Inbound alert escalation pending for Alert <span className="font-mono font-bold text-indigo-300">{fromAlertId}</span>
+              {initialRiskScore !== undefined && (
+                <span className="ml-2 font-mono text-amber-300">
+                  (Score: {initialRiskScore.toFixed(1)})
+                </span>
+              )}
+            </span>
+          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-colors cursor-pointer"
+          >
+            Open Escalation Wizard
+          </button>
+        </div>
+      )}
+
       {/* Create Modal */}
       <AnimatePresence>
         {showCreateModal && (
           <CreateCaseModal
-            onClose={() => setShowCreateModal(false)}
+            onClose={handleCloseCreateModal}
             onCreate={handleCreate}
             isLoading={createCase.isPending}
+            initialTitle={initialTitleParam}
+            initialPriority={initialPriorityParam}
+            fromAlertId={fromAlertId}
+            initialRiskScore={initialRiskScore}
           />
         )}
       </AnimatePresence>
@@ -373,13 +466,25 @@ function CreateCaseModal({
   onClose,
   onCreate,
   isLoading,
+  initialTitle = '',
+  initialPriority = 'p3_medium',
+  fromAlertId,
+  initialRiskScore,
 }: {
   onClose: () => void;
-  onCreate: (title: string, priority: string) => void;
+  onCreate: (title: string, priority: string, alertIds?: string[], totalRiskScore?: number) => void;
   isLoading: boolean;
+  initialTitle?: string;
+  initialPriority?: string;
+  fromAlertId?: string;
+  initialRiskScore?: number;
 }) {
-  const [title, setTitle] = useState('');
-  const [priority, setPriority] = useState('p3_medium');
+  const [title, setTitle] = useState(
+    initialTitle || (fromAlertId ? `AML Escalation: Alert #${fromAlertId.slice(0, 8)}` : '')
+  );
+  const [priority, setPriority] = useState(initialPriority || 'p3_medium');
+  const [linkedAlertId, setLinkedAlertId] = useState(fromAlertId || '');
+  const [riskScore] = useState<number | undefined>(initialRiskScore);
 
   const { containerRef } = useModalA11y<HTMLDivElement>({
     isOpen: true,
@@ -403,15 +508,36 @@ function CreateCaseModal({
         className="glass-card p-6 w-full max-w-md space-y-4 focus:outline-none"
       >
         <div className="flex items-center justify-between border-b border-[var(--color-border)] pb-2">
-          <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
+          <div className="flex items-center gap-2">
+            <span className="text-indigo-400 text-lg">⚡</span>
+            <h2 id="create-case-modal-title" className="text-lg font-bold">New Investigation Case</h2>
+          </div>
           <button
             onClick={onClose}
             aria-label="Close dialog"
-            className="text-[var(--color-text-muted)] hover:text-white p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="text-[var(--color-text-muted)] hover:text-white p-1 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             ✕
           </button>
         </div>
+
+        {fromAlertId && (
+          <div className="p-3 bg-gradient-to-r from-indigo-950/70 via-purple-950/60 to-slate-900/80 rounded-lg border border-indigo-500/30 text-xs space-y-1">
+            <div className="flex items-center justify-between font-semibold text-indigo-300">
+              <span className="flex items-center gap-1.5">
+                <span>⚡</span> Escalating from Inbound Alert
+              </span>
+              {riskScore !== undefined && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                  Risk: {riskScore.toFixed(1)} / 1000
+                </span>
+              )}
+            </div>
+            <div className="font-mono text-[11px] text-slate-300 truncate">
+              Alert ID: <span className="text-white font-bold">{fromAlertId}</span>
+            </div>
+          </div>
+        )}
 
         <div>
           <label htmlFor="case-title-input" className="block text-xs text-[var(--color-text-muted)] mb-1">Title</label>
@@ -430,7 +556,7 @@ function CreateCaseModal({
             id="case-priority-select"
             value={priority}
             onChange={(e) => setPriority(e.target.value)}
-            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
@@ -438,19 +564,40 @@ function CreateCaseModal({
           </select>
         </div>
 
+        <div>
+          <label htmlFor="case-alert-id-input" className="block text-xs text-[var(--color-text-muted)] mb-1">
+            Linked Alert ID (Optional)
+          </label>
+          <input
+            id="case-alert-id-input"
+            value={linkedAlertId}
+            onChange={(e) => setLinkedAlertId(e.target.value)}
+            placeholder="alert_..."
+            className="w-full px-3 py-2 text-sm rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] font-mono focus:outline-none focus:ring-2 focus:ring-indigo-400"
+          />
+        </div>
+
         <div className="flex gap-3 justify-end pt-2 border-t border-[var(--color-border)]">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)] focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="px-4 py-2 text-sm rounded-lg border border-[var(--color-border)] hover:bg-[var(--color-surface-alt)] focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             Cancel
           </button>
           <button
             type="button"
-            onClick={() => title && onCreate(title, priority)}
+            onClick={() =>
+              title &&
+              onCreate(
+                title,
+                priority,
+                linkedAlertId ? [linkedAlertId] : undefined,
+                riskScore
+              )
+            }
             disabled={!title || isLoading}
-            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+            className="px-4 py-2 text-sm font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-indigo-400 cursor-pointer"
           >
             {isLoading ? 'Creating...' : 'Create Case'}
           </button>

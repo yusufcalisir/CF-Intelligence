@@ -41,7 +41,7 @@ The console dynamically adapts navigation hierarchies, metric cards, and actiona
 | **`EXECUTIVE`**<br>*(CRO, Head of Financial Crime, VP Anti-Fraud)* | **Consortium ROI, Health & Risk Governance** | • Consortium ROI & Total Dollars Prevented cards.<br>• Global Quorum Status & Participating Bank Health.<br>• Consortium ROC-AUC & PR-AUC vs Single-Bank Baselines.<br>• SLA Breach Monitoring & Availability Gauges (99.99%). |
 | **`COMPLIANCE_OFFICER`**<br>*(AML Officer, MLRO, Risk Auditor)* | **Regulatory Governance, Audit & Sanctions** | • Differential Privacy Budget Gauges ($\varepsilon=1.0, \delta=10^{-5}$).<br>• FinCEN BSA Suspicious Activity Report (SAR) XML v1.2 Manager.<br>• **Four-Eyes Dual Control** supervisor signoff workbench.<br>• GDPR Article 17 "Right to Erasure" Federated Unlearning logs.<br>• Automated EU AI Act conformity assessment certification export. |
 | **`ML_ENGINEER`**<br>*(MLOps Lead, Research Scientist)* | **FL Orchestration, Convergence & Defense** | • Loss Convergence, Weight Distribution & ROC Curves.<br>• Byzantine Aggregation Algorithm Tuner (Krum, Bulyan, FedProx $\mu=0.01$).<br>• **Interactive Chaos & Byzantine Attack Injector** (`ChaosAttackInjectorPanel`).<br>• **Drag-and-Drop Dataset Ingestion Studio** (`DatasetIngestionStudioModal`).<br>• Feature drift auditor (Wasserstein Distance, JS Divergence, KS Test). |
-| **`FRAUD_INVESTIGATOR`**<br>*(Senior Fraud Analyst, Case Officer)* | **Real-Time Triage & Network Investigation** | • Live 500 tx/s streaming fraud feed with severity badges.<br>• **6-Stage AML Case Workbench** (`CaseDetailPage`).<br>• 2D/3D WebGL Multi-Bank Transaction Graph (`GraphPage`).<br>• Local TreeSHAP / KernelSHAP feature attribution panels.<br>• MinHash LSH Fuzzy PSI entity matching console (`PsiPage`). |
+| **`FRAUD_INVESTIGATOR`**<br>*(Senior Fraud Analyst, Case Officer)* | **Real-Time Triage & Network Investigation** | • Live 500 tx/s streaming fraud feed with severity badges.<br>• **Direct AML Case Escalation** (`AlertsPage` ➔ `CasesPage` / `/cases/:id`) with automated SHAP forensic dossiers.<br>• **6-Stage AML Case Workbench** (`CaseDetailPage`).<br>• 2D/3D WebGL Multi-Bank Transaction Graph (`GraphPage`).<br>• Local TreeSHAP / KernelSHAP feature attribution panels.<br>• MinHash LSH Fuzzy PSI entity matching console (`PsiPage`). |
 
 ---
 
@@ -244,7 +244,7 @@ All console components, navigation routes, deep-linking rules, and error states 
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
 | **Streaming GNN Attention Dynamics** | [`StreamingGNNPanel.test.tsx`](../frontend/src/components/dashboard/__tests__/StreamingGNNPanel.test.tsx) | Dynamic GAT 4-head attention coefficients, PaySim/IEEE-CIS/Elliptic topology switching, loss sharpening, backend overrides | `7/7 PASSED` |
-| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **311/311 PASSED** |
+| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **313/313 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
 ---

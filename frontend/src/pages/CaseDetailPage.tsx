@@ -832,6 +832,7 @@ export default function CaseDetailPage() {
                         model_confidence: 0.92,
                       }
                     }
+                    hideEscalateButton={true}
                   />
                 )}
               </div>

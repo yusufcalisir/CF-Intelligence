@@ -103,6 +103,31 @@ describe('AlertsPage Integration Test Suite', () => {
       },
       isLoading: false,
     } as any);
+
+    vi.spyOn(queries, 'useCreateCase').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({
+        id: 'case_new_999',
+        title: '[MERIDIAN TRUST] AML Case: VELOCITY_BURST - Tx tx_structuring_1001',
+        priority: 'p1_critical',
+        status: 'open',
+      }),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(queries, 'useUpdateAlertStatus').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'alt_001', status: 'escalated' }),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(queries, 'useAddCaseNote').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'note_123' }),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(queries, 'useAddEvidence').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'ev_123' }),
+      isPending: false,
+    } as any);
   });
 
   it('renders alert intelligence header, filters, and alert cards feed', () => {
@@ -296,6 +321,93 @@ describe('AlertsPage Integration Test Suite', () => {
 
     const panelPsiLink = screen.getAllByRole('link', { name: /Check PSI/i })[0];
     expect(panelPsiLink).toHaveAttribute('href', '/psi?entity_id=ent_901&auto_match=true');
+  });
+
+  it('escalates alert directly to AML investigation case with SHAP forensic payload', async () => {
+    const user = userEvent.setup();
+    const createCaseMock = vi.fn().mockResolvedValue({
+      id: 'case_new_999',
+      title: '[MERIDIAN TRUST] AML Case: VELOCITY_BURST - Tx tx_structuring_1001',
+      priority: 'p1_critical',
+      status: 'open',
+    });
+    const updateAlertStatusMock = vi.fn().mockResolvedValue({ id: 'alt_001', status: 'escalated' });
+    const addNoteMock = vi.fn().mockResolvedValue({ id: 'note_1' });
+    const addEvidenceMock = vi.fn().mockResolvedValue({ id: 'ev_1' });
+
+    vi.spyOn(queries, 'useCreateCase').mockReturnValue({
+      mutateAsync: createCaseMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useUpdateAlertStatus').mockReturnValue({
+      mutateAsync: updateAlertStatusMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useAddCaseNote').mockReturnValue({
+      mutateAsync: addNoteMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useAddEvidence').mockReturnValue({
+      mutateAsync: addEvidenceMock,
+      isPending: false,
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <AlertsPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    // Click on alert to open ExplainabilityPanel
+    const alertCard = screen.getByText('VELOCITY_BURST');
+    await user.click(alertCard);
+
+    // Verify ExplainabilityPanel renders the escalation button
+    const escalateButtons = screen.getAllByRole('button', { name: /Escalate to AML Investigation Case/i });
+    expect(escalateButtons.length).toBeGreaterThan(0);
+
+    // Click the escalation button
+    await user.click(escalateButtons[0]!);
+
+    // Verify createCase was called with alert_ids and total_risk_score
+    expect(createCaseMock).toHaveBeenCalledTimes(1);
+    expect(createCaseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: expect.stringContaining('AML Case'),
+        priority: 'p1_critical',
+        alert_ids: ['alt_001'],
+        total_risk_score: 910,
+      })
+    );
+
+    // Verify alert status was patched to 'escalated'
+    expect(updateAlertStatusMock).toHaveBeenCalledTimes(1);
+    expect(updateAlertStatusMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alertId: 'alt_001',
+        payload: expect.objectContaining({ status: 'escalated' }),
+      })
+    );
+
+    // Verify forensic SHAP case note was attached
+    expect(addNoteMock).toHaveBeenCalledTimes(1);
+    expect(addNoteMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: 'case_new_999',
+        content: expect.stringContaining('Primary SHAP Attribution Drivers'),
+      })
+    );
+
+    // Verify alert telemetry evidence was registered
+    expect(addEvidenceMock).toHaveBeenCalledTimes(1);
+    expect(addEvidenceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        caseId: 'case_new_999',
+        evidence_type: 'document',
+      })
+    );
   });
 });
 

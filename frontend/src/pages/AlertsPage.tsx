@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   useAlerts,
@@ -8,6 +8,10 @@ import {
   useAlertCounterfactuals,
   useAlertDecisionReplay,
   useAlertGNNExplanation,
+  useCreateCase,
+  useUpdateAlertStatus,
+  useAddCaseNote,
+  useAddEvidence,
 } from '../api/queries';
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
 import type { Alert } from '../api/types';
@@ -19,7 +23,15 @@ export const ALERTS_SEVERITY_FILTER_KEY = 'cfi_alerts_severity_filter';
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low', 'info'];
 
 export default function AlertsPage() {
+  const navigate = useNavigate();
+  const createCase = useCreateCase();
+  const updateAlertStatus = useUpdateAlertStatus();
+  const addCaseNote = useAddCaseNote();
+  const addEvidence = useAddEvidence();
+
   const [searchParams, setSearchParams] = useSearchParams();
+  const [escalatingAlertId, setEscalatingAlertId] = useState<string | null>(null);
+  const [escalationError, setEscalationError] = useState<string | null>(null);
 
   // 1. Restore selected alert ID from URL search params (?alert_id=...) or sessionStorage across tab switches
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(() => {
@@ -161,6 +173,103 @@ export default function AlertsPage() {
     );
   };
 
+  const handleEscalateAlertToCase = async (alertToEscalate: Alert) => {
+    setEscalatingAlertId(alertToEscalate.id);
+    setEscalationError(null);
+    try {
+      // 1. Calculate Priority based on risk score and severity
+      let priority = 'p4_low';
+      if (alertToEscalate.severity === 'critical' || alertToEscalate.risk_score >= 800) {
+        priority = 'p1_critical';
+      } else if (alertToEscalate.severity === 'high' || alertToEscalate.risk_score >= 650) {
+        priority = 'p2_high';
+      } else if (alertToEscalate.severity === 'medium' || alertToEscalate.risk_score >= 400) {
+        priority = 'p3_medium';
+      }
+
+      // 2. Synthesize descriptive Case Title
+      const bankLabel = BANK_NAMES[alertToEscalate.bank_id] || alertToEscalate.bank_id;
+      const primaryReason = alertToEscalate.reason_codes?.[0] || 'High Risk';
+      const txRef = alertToEscalate.transaction_id || alertToEscalate.id.slice(0, 8);
+      const caseTitle = `[${bankLabel.toUpperCase()}] AML Case: ${primaryReason} - Tx ${txRef}`;
+
+      // 3. Create Case via TanStack Query mutation
+      const newCase = await createCase.mutateAsync({
+        title: caseTitle,
+        priority,
+        alert_ids: [alertToEscalate.id],
+        total_risk_score: alertToEscalate.risk_score,
+      });
+
+      // 4. Update Alert status to 'escalated'
+      await updateAlertStatus.mutateAsync({
+        alertId: alertToEscalate.id,
+        payload: {
+          status: 'escalated',
+          resolution_notes: `Escalated directly to AML Investigation Case #${newCase.id.slice(0, 8)} (${newCase.title})`,
+        },
+      });
+
+      // 5. Append initial forensic SHAP attribution and triage note
+      const shapDrivers = (alertToEscalate.top_features || [])
+        .slice(0, 5)
+        .map((f: any) => `${f.feature || f.name}: +${Math.round((f.contribution ?? f.value ?? 0) * 100)}%`)
+        .join(', ');
+      const entityList = (alertToEscalate.involved_entity_ids || []).join(', ');
+      const reasonList = (alertToEscalate.reason_codes || []).join(', ');
+
+      const forensicContent = `⚡ Automated AML Triage Escalation from Alerts Workbench
+- Origin Alert ID: ${alertToEscalate.id}
+- Reporting Institution: ${bankLabel}
+- Associated Transaction: ${alertToEscalate.transaction_id || 'N/A'}
+- Composite Risk Score: ${alertToEscalate.risk_score.toFixed(1)} / 1000 (Inference Confidence: ${((alertToEscalate.confidence ?? 0) * 100).toFixed(1)}%)
+- Severity Classification: ${alertToEscalate.severity.toUpperCase()}
+- Fraud Reason Codes: ${reasonList || 'None specified'}
+- Suspect Entity Identifiers: ${entityList || 'None mapped'}
+- Primary SHAP Attribution Drivers: ${shapDrivers || 'Baseline feature distribution'}`;
+
+      await addCaseNote.mutateAsync({
+        caseId: newCase.id,
+        author: 'AI Triage Engine',
+        content: forensicContent,
+      });
+
+      // 6. Register Alert Telemetry Evidence in Case Evidence Registry (Chain of Custody)
+      const evidencePayload = JSON.stringify({
+        alert_id: alertToEscalate.id,
+        bank_id: alertToEscalate.bank_id,
+        transaction_id: alertToEscalate.transaction_id,
+        risk_score: alertToEscalate.risk_score,
+        severity: alertToEscalate.severity,
+        reason_codes: alertToEscalate.reason_codes,
+        involved_entity_ids: alertToEscalate.involved_entity_ids,
+        top_features: alertToEscalate.top_features,
+        risk_factors: alertToEscalate.risk_factors,
+        escalated_at: new Date().toISOString(),
+      }, null, 2);
+
+      await addEvidence.mutateAsync({
+        caseId: newCase.id,
+        evidence_type: 'document',
+        title: `Alert Telemetry & SHAP Dossier (${alertToEscalate.id.slice(0, 8)})`,
+        file_path: `evidence/alerts/alert_${alertToEscalate.id.slice(0, 8)}_dossier.json`,
+        content: evidencePayload,
+        uploaded_by: 'AI Triage Engine',
+      });
+
+      // 7. Route directly to /cases/:newCaseId
+      navigate(`/cases/${newCase.id}`);
+    } catch (err: unknown) {
+      console.error('Failed to escalate alert to case:', err);
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || (err as Error)?.message
+        || 'Failed to escalate alert to investigation case. Please try again.';
+      setEscalationError(detail);
+      setEscalatingAlertId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -211,6 +320,20 @@ export default function AlertsPage() {
         </div>
       </motion.div>
 
+      {/* Escalation Error Toast */}
+      {escalationError && (
+        <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-xs text-rose-300 flex items-center justify-between gap-2 animate-in fade-in">
+          <span>❌ {escalationError}</span>
+          <button
+            onClick={() => setEscalationError(null)}
+            className="text-rose-400 hover:text-white text-xs font-bold p-1 rounded"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Alert List + Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Alert Feed */}
@@ -233,6 +356,8 @@ export default function AlertsPage() {
                   index={i}
                   isSelected={selectedAlertId === alert.id || selectedAlert?.id === alert.id}
                   onClick={() => handleSelectAlert(alert)}
+                  onEscalate={handleEscalateAlertToCase}
+                  isEscalating={escalatingAlertId === alert.id}
                 />
               ))}
             </AnimatePresence>
@@ -242,7 +367,12 @@ export default function AlertsPage() {
         {/* Explainability Panel (Desktop) */}
         <div className="hidden lg:block lg:col-span-1">
           {selectedAlert ? (
-            <ExplainabilityPanel alert={selectedAlert} onClose={handleClearSelectedAlert} />
+            <ExplainabilityPanel
+              alert={selectedAlert}
+              onClose={handleClearSelectedAlert}
+              onEscalate={handleEscalateAlertToCase}
+              isEscalating={escalatingAlertId === selectedAlert.id}
+            />
           ) : (
             <motion.div
               initial={{ opacity: 0 }}
@@ -277,7 +407,12 @@ export default function AlertsPage() {
               </button>
             </div>
             <div className="p-5 overflow-y-auto">
-              <ExplainabilityPanel alert={selectedAlert} onClose={handleClearSelectedAlert} />
+              <ExplainabilityPanel
+                alert={selectedAlert}
+                onClose={handleClearSelectedAlert}
+                onEscalate={handleEscalateAlertToCase}
+                isEscalating={escalatingAlertId === selectedAlert.id}
+              />
             </div>
           </motion.div>
         </div>
@@ -291,11 +426,15 @@ function AlertCard({
   index,
   isSelected,
   onClick,
+  onEscalate,
+  isEscalating,
 }: {
   alert: Alert;
   index: number;
   isSelected: boolean;
   onClick: () => void;
+  onEscalate?: (alert: Alert) => void;
+  isEscalating?: boolean;
 }) {
   const severityColor = SEVERITY_COLORS[alert.severity] || '#6b7280';
 
@@ -392,11 +531,62 @@ function AlertCard({
           ))}
         </div>
       )}
+
+      {/* Escalation & Status Action Bar */}
+      <div className="flex items-center justify-between gap-2 pt-2 mt-2 border-t border-[var(--color-border)]/40 flex-wrap">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {alert.status === 'escalated' ? (
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
+              <span>⚡</span> Escalated to Case
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-[var(--color-text-muted)]">
+              Status: <span className="capitalize text-slate-300 font-semibold">{alert.status}</span>
+            </span>
+          )}
+        </div>
+        {onEscalate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEscalate(alert);
+            }}
+            disabled={isEscalating}
+            className="px-2.5 py-1 rounded-lg text-xs font-semibold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
+            title="Escalate alert into an official AML Investigation Case"
+          >
+            {isEscalating ? (
+              <>
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Escalating...</span>
+              </>
+            ) : (
+              <>
+                <span>⚡</span>
+                <span>Escalate to Case</span>
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </motion.div>
   );
 }
 
-export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?: () => void }) {
+export function ExplainabilityPanel({
+  alert,
+  onClose,
+  onEscalate,
+  isEscalating,
+  hideEscalateButton,
+}: {
+  alert: Alert;
+  onClose?: () => void;
+  onEscalate?: (alert: Alert) => void;
+  isEscalating?: boolean;
+  hideEscalateButton?: boolean;
+}) {
   const [activeTab, setActiveTab] = useState<'attribution' | 'counterfactuals' | 'audit' | 'gnn'>('attribution');
   const { data: report, isLoading: isReportLoading } = useAlertExplainability(alert.id);
   const { data: cfReport, isLoading: isCfLoading } = useAlertCounterfactuals(alert.id);
@@ -433,6 +623,53 @@ export function ExplainabilityPanel({ alert, onClose }: { alert: Alert; onClose?
           )}
         </div>
       </div>
+
+      {/* AML Case Escalation Action Banner */}
+      {!hideEscalateButton && (
+        <div className="p-3.5 bg-gradient-to-r from-indigo-950/90 via-purple-950/80 to-slate-900/90 rounded-xl border border-indigo-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-amber-400 font-bold text-xs uppercase tracking-wider flex items-center gap-1">
+                <span>⚡</span> Triage Action
+              </span>
+              {alert.status === 'escalated' ? (
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  ESCALATED TO CASE
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[9.5px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  CRITICAL DISPOSITION
+                </span>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-300 mt-1 leading-normal">
+              {alert.status === 'escalated'
+                ? 'This alert is linked to an AML investigation case with cryptographically chained evidence.'
+                : 'Convert alert telemetry, SHAP attributions, and suspect graph entities into an AML case.'}
+            </p>
+          </div>
+          <button
+            id="escalate-alert-to-case-btn"
+            type="button"
+            onClick={() => onEscalate && onEscalate(alert)}
+            disabled={isEscalating}
+            className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-600 hover:brightness-110 shadow-md shadow-indigo-600/30 border border-indigo-400/40 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer disabled:opacity-50"
+            title="Escalate alert to official AML Investigation Case"
+          >
+            {isEscalating ? (
+              <>
+                <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span>Escalating Case...</span>
+              </>
+            ) : (
+              <>
+                <span>⚡</span>
+                <span>Escalate to AML Investigation Case</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
 
       {/* Suspect Graph Entities & Deep-Link Jump Bar */}
       {alert.involved_entity_ids && alert.involved_entity_ids.length > 0 && (

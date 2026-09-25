@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, MemoryRouter } from 'react-router-dom';
@@ -45,6 +45,11 @@ describe('CasesPage Integration Test Suite', () => {
 
     vi.spyOn(queries, 'useCreateCase').mockReturnValue({
       mutateAsync: vi.fn().mockResolvedValue({ id: 'case_new_999' }),
+      isPending: false,
+    } as any);
+
+    vi.spyOn(queries, 'useUpdateAlertStatus').mockReturnValue({
+      mutateAsync: vi.fn().mockResolvedValue({ id: 'alt_001', status: 'escalated' }),
       isPending: false,
     } as any);
   });
@@ -272,5 +277,66 @@ describe('CasesPage Integration Test Suite', () => {
     expect(screen.getByText(/No cases yet/i)).toBeInTheDocument();
     expect(screen.getByText(/Create a case to start tracking/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /\+ Create First Case/i })).toBeInTheDocument();
+  });
+
+  it('handles inbound alert escalation deep link with pre-filled title and alert badge', async () => {
+    const user = userEvent.setup();
+    const createCaseMock = vi.fn().mockResolvedValue({ id: 'case_new_escalated' });
+    const updateAlertStatusMock = vi.fn().mockResolvedValue({ id: 'alt_999', status: 'escalated' });
+
+    vi.spyOn(queries, 'useCreateCase').mockReturnValue({
+      mutateAsync: createCaseMock,
+      isPending: false,
+    } as any);
+    vi.spyOn(queries, 'useUpdateAlertStatus').mockReturnValue({
+      mutateAsync: updateAlertStatusMock,
+      isPending: false,
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/cases?create=true&from_alert=alt_999&priority=p1_critical&title=AML+High+Risk+Investigation&risk_score=875.5']}>
+          <CasesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    // Verify modal is open and has inbound alert badge
+    const modal = screen.getByRole('dialog');
+    expect(within(modal).getByText(/Escalating from Inbound Alert/i)).toBeInTheDocument();
+    expect(within(modal).getByText('alt_999')).toBeInTheDocument();
+    expect(within(modal).getByText(/Risk: 875.5 \/ 1000/i)).toBeInTheDocument();
+
+    // Verify pre-filled inputs
+    const titleInput = within(modal).getByLabelText(/Title/i);
+    expect(titleInput).toHaveValue('AML High Risk Investigation');
+    const prioritySelect = within(modal).getByLabelText(/Priority/i);
+    expect(prioritySelect).toHaveValue('p1_critical');
+    const alertIdInput = within(modal).getByLabelText(/Linked Alert ID/i);
+    expect(alertIdInput).toHaveValue('alt_999');
+
+    // Submit case creation
+    const submitBtn = within(modal).getByRole('button', { name: /Create Case/i });
+    await user.click(submitBtn);
+
+    // Verify createCase was invoked with alert_ids and total_risk_score
+    expect(createCaseMock).toHaveBeenCalledTimes(1);
+    expect(createCaseMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'AML High Risk Investigation',
+        priority: 'p1_critical',
+        alert_ids: ['alt_999'],
+        total_risk_score: 875.5,
+      })
+    );
+
+    // Verify alert status was patched
+    expect(updateAlertStatusMock).toHaveBeenCalledTimes(1);
+    expect(updateAlertStatusMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alertId: 'alt_999',
+        payload: expect.objectContaining({ status: 'escalated' }),
+      })
+    );
   });
 });
