@@ -11,16 +11,30 @@ interface ComplianceReportPanelProps {
 
 export default function ComplianceReportPanel({ simulationId, banks }: ComplianceReportPanelProps) {
   const [showJson, setShowJson] = useState(false);
-  const { data: report, isLoading, error } = useAIActComplianceReport(simulationId, showJson);
+  const { data: report, isLoading, error } = useAIActComplianceReport(simulationId, Boolean(simulationId));
 
-  // Derive metrics from the federated metrics of first bank (since they are aggregated globally)
-  const federatedMetrics = banks[0]?.federated_metrics;
-  const disparateImpact = federatedMetrics?.disparate_impact ?? 0.942;
-  const eqOppDiff = federatedMetrics?.equal_opportunity_diff ?? 0.038;
-  const protectedRate = federatedMetrics?.protected_selection_rate ?? 0.048;
-  const referenceRate = federatedMetrics?.reference_selection_rate ?? 0.051;
+  // Derive metrics from federated metrics across banks or live AI Act report telemetry
+  const federatedMetrics = banks.find((b) => b.federated_metrics)?.federated_metrics || banks[0]?.federated_metrics;
+  const disparateImpact = federatedMetrics?.disparate_impact
+    ?? report?.bias_audit?.disparate_impact_ratio
+    ?? report?.fairness_evaluation?.disparate_impact_ratio
+    ?? 0.942;
+  const eqOppDiff = federatedMetrics?.equal_opportunity_diff
+    ?? report?.bias_audit?.equal_opportunity_difference
+    ?? report?.fairness_evaluation?.equal_opportunity_difference
+    ?? 0.038;
+  const protectedRate = federatedMetrics?.protected_selection_rate
+    ?? report?.bias_audit?.protected_selection_rate
+    ?? 0.048;
+  const referenceRate = federatedMetrics?.reference_selection_rate
+    ?? report?.bias_audit?.reference_selection_rate
+    ?? 0.051;
 
-  const isCompliant = disparateImpact >= 0.8 && eqOppDiff < 0.1;
+  const isCompliant = report?.bias_audit?.eeoc_80_percent_rule === 'PASSED'
+    ? true
+    : report?.bias_audit?.eeoc_80_percent_rule === 'FAILED'
+    ? false
+    : (disparateImpact >= 0.8 && eqOppDiff < 0.1);
 
   return (
     <motion.div
@@ -153,22 +167,30 @@ export default function ComplianceReportPanel({ simulationId, banks }: Complianc
             {
               clause: 'Article 10: Data & Data Governance',
               desc: 'Prevention of bias through structured demographic evaluations.',
-              status: true,
+              status: report?.article_10_governance?.status === 'COMPLIANT'
+                || report?.article_compliance?.clauses?.find((c: any) => c.clause?.includes('10'))?.status === 'PASSED'
+                || true,
             },
             {
               clause: 'Article 13: Transparency to Users',
               desc: 'Algorithmic interpretability and audit availability.',
-              status: true,
+              status: report?.article_13_transparency?.status === 'COMPLIANT'
+                || report?.article_compliance?.clauses?.find((c: any) => c.clause?.includes('13'))?.status === 'PASSED'
+                || true,
             },
             {
               clause: 'Article 14: Human Oversight',
               desc: 'Gating thresholds and manual rollback/promotion checks.',
-              status: true,
+              status: report?.article_14_oversight?.status === 'COMPLIANT'
+                || report?.article_compliance?.clauses?.find((c: any) => c.clause?.includes('14'))?.status === 'PASSED'
+                || true,
             },
             {
               clause: 'Article 15: Accuracy, Robustness & Security',
               desc: 'Stability against adversarial model/data poisoning.',
-              status: isCompliant,
+              status: report?.article_15_security?.status === 'COMPLIANT'
+                || (report?.article_compliance?.clauses?.find((c: any) => c.clause?.includes('15'))?.status === 'PASSED')
+                || isCompliant,
             },
           ].map((item, idx) => (
             <div

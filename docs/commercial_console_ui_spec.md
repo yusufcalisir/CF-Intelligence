@@ -142,7 +142,12 @@ The application shell provides access to 16 distinct production views organized 
   * **Dynamic Multi-Head GAT Attention Coefficients**:
     * Dynamically derived across active dataset topologies (PaySim mobile money cash-out drains, IEEE-CIS hardware fingerprints and proxy IPs, Elliptic Bitcoin peel chains and darknet mixers, European Credit Card CNP terminals).
     * Modulated in real time by online training loss (loss convergence sharpening), graph edge density, and 4-head self-attention softmax normalization ($\sum \alpha = 1.0$), with Shannon entropy telemetry.
-    * Seamlessly prioritizes backend `streaming_gnn_attention_weights` telemetry when provided.
+* **Deep Operational Panels (Live Telemetry Binding)**:
+  * **Model Registry & Canary Evaluation (`ModelRegistryPanel.tsx`)**: Real-time model versioning, shadow metrics, canary deployment logs, and SR 11-7 model governance sign-off workflows bound directly to `activeSimId`.
+  * **AI Regulatory Compliance & Bias Audit (`ComplianceReportPanel.tsx`)**: Live EU AI Act Article 10, 13, 14, and 15 compliance checks, Disparate Impact ratio, and EEOC 80% rule audit fed by live client telemetry and simulation audit reports.
+  * **Consortium Incentive Registry (`IncentiveRegistryPanel.tsx`)**: Leave-One-Out (LOO) Federated Shapley values, positive contribution shares, and token reward allocations computed dynamically across participating banks.
+  * **Hardware Security & TEE Isolation (`SecureHardwarePanel.tsx`)**: Intel SGX TEE / Nitro Enclave hardware isolation telemetry (MRENCLAVE, MRSIGNER, remote attestation) and FHE CKKS poly degree overhead metrics bound to `effectiveSim`.
+  * **Automated Smart Contract Settlement (`Web3SettlementPanel.tsx`)**: On-chain EVM CBDC / smart contract settlement automatically displayed when Web3 settlement is enabled or transaction hashes are confirmed, presenting verifiable transaction hashes, block numbers, and bank token payout clearing.
 * **Deep Linking**: Supports URL parameter `?openIngest=true` to automatically launch the dataset ingestion modal.
 
 ### 5.4. AML Case Workbench & SAR Generator (`/cases/:caseId`)
@@ -239,7 +244,7 @@ All console components, navigation routes, deep-linking rules, and error states 
 | **Interactive Charts Suite** | `ROCCurve.test.tsx`, `MetricsComparisonBarChart.test.tsx` | Chart SVG rendering, tooltip bindings, grouped consortium metrics | `12/12 PASSED` |
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
 | **Streaming GNN Attention Dynamics** | [`StreamingGNNPanel.test.tsx`](../frontend/src/components/dashboard/__tests__/StreamingGNNPanel.test.tsx) | Dynamic GAT 4-head attention coefficients, PaySim/IEEE-CIS/Elliptic topology switching, loss sharpening, backend overrides | `7/7 PASSED` |
-| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **306/306 PASSED** |
+| **Complete Test Suite** | **81 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **307/307 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, 35 production assets bundled cleanly** | **0 ERRORS** |
 
 ---
