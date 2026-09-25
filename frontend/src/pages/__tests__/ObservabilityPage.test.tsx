@@ -39,4 +39,26 @@ describe('ObservabilityPage', () => {
     expect(telemTab).toBeInTheDocument();
     fireEvent.click(telemTab);
   });
+
+  it('renders drift-to-retraining pipeline bridge with feature subset and webhook alert controls', () => {
+    render(<ObservabilityPage />, { wrapper: createWrapper() });
+
+    expect(screen.getByText(/Live Drift-to-Retraining Pipeline Bridge/i)).toBeInTheDocument();
+    expect(screen.getByText(/Alertmanager Webhook/i)).toBeInTheDocument();
+    expect(screen.getByText(/Emit ModelConceptDriftCritical/i)).toBeInTheDocument();
+    expect(screen.getByText(/Target FL Rounds:/i)).toBeInTheDocument();
+  });
+
+  it('renders Prometheus metrics exposition and SIEM telemetry exporter in telemetry tab', () => {
+    render(<ObservabilityPage />, { wrapper: createWrapper() });
+
+    const telemTab = screen.getByText(/Loki & OpenTelemetry/i);
+    fireEvent.click(telemTab);
+
+    expect(screen.getByText(/Live Prometheus Metrics Exposition/i)).toBeInTheDocument();
+    expect(screen.getByText(/Enterprise SIEM \/ SOC Telemetry Exporter/i)).toBeInTheDocument();
+    expect(screen.getByText(/Generate SIEM Payload/i)).toBeInTheDocument();
+    expect(screen.getByText(/JSON \(Splunk\/ELK\)/i)).toBeInTheDocument();
+    expect(screen.getByText(/CEF \(ArcSight\)/i)).toBeInTheDocument();
+  });
 });

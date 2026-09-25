@@ -101,23 +101,31 @@ class DriftTriggeredRetrainingService:
         reason: str = "Manual trigger from Observability Console",
         cause: RetrainingCause = RetrainingCause.PSI_DRIFT_EXCEEDED,
         psi_score: float = 0.25,
+        retrain_feature_subset: list[str] | None = None,
+        target_rounds: int = 3,
     ) -> RetrainingJobRecord:
         """Manually dispatches an automated retraining job."""
         job_id = f"retrain_{uuid.uuid4().hex[:8]}"
+        features = list(retrain_feature_subset) if retrain_feature_subset else []
         record = RetrainingJobRecord(
             job_id=job_id,
             cause=cause,
             psi_score=psi_score,
             status="TRIGGERED",
-            details={"manual_reason": reason},
+            details={
+                "manual_reason": reason,
+                "retrain_feature_subset": features,
+                "target_rounds": target_rounds,
+            },
         )
         with self._lock:
             self._jobs[job_id] = record
 
         logger.info(
-            "Manually dispatched retraining job %s (Reason: %s, Cause: %s)",
+            "Manually dispatched retraining job %s (Reason: %s, Features: %s, Cause: %s)",
             job_id,
             reason,
+            features,
             cause.value,
         )
         return record

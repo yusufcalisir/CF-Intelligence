@@ -93,7 +93,11 @@ import type {
   DriftAnalysisReport,
   CalibrationReport,
   ActiveAlertItem,
+  RetrainTriggerRequest,
   RetrainTriggerResponse,
+  SiemExportRequest,
+  SiemExportResponse,
+  PrometheusMetricsExportResponse,
   HealthCheckResponse,
   ReadinessResponse,
   SystemDiagnosticResponse,
@@ -1487,11 +1491,35 @@ export function useActiveAlerts() {
 }
 
 export function useTriggerAutoRetrain() {
-  return useMutation<RetrainTriggerResponse, Error, string | undefined>({
-    mutationFn: async (reason) => {
-      const { data } = await apiClient.post('/api/v1/monitoring/drift/trigger-retrain', null, {
-        params: { reason },
-      });
+  return useMutation<RetrainTriggerResponse, Error, RetrainTriggerRequest | string | undefined>({
+    mutationFn: async (payload) => {
+      if (typeof payload === 'string' || payload === undefined) {
+        const { data } = await apiClient.post('/api/v1/monitoring/drift/trigger-retrain', null, {
+          params: { reason: payload },
+        });
+        return data;
+      }
+      const { data } = await apiClient.post('/api/v1/monitoring/drift/trigger-retrain', payload);
+      return data;
+    },
+  });
+}
+
+export function usePrometheusMetrics() {
+  return useQuery<PrometheusMetricsExportResponse>({
+    queryKey: ['prometheus-metrics-export'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/monitoring/metrics/prometheus');
+      return data;
+    },
+    refetchInterval: 15000,
+  });
+}
+
+export function useExportSiemMetrics() {
+  return useMutation<SiemExportResponse, Error, SiemExportRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post('/api/v1/monitoring/metrics/export-siem', payload);
       return data;
     },
   });

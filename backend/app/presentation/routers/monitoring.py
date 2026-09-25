@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
@@ -21,8 +22,12 @@ from app.application.schemas.observability import (
     DriftEvaluationRequest,
     FairnessMetricsResponse,
     FeatureDriftResponse,
+    PrometheusMetricsExportResponse,
     RetrainingJobResponse,
+    RetrainTriggerRequest,
     RetrainTriggerResponse,
+    SiemExportRequest,
+    SiemExportResponse,
     TelemetryOverviewResponse,
 )
 from app.application.services.automated_retraining import (
@@ -424,22 +429,66 @@ async def receive_alertmanager_webhook(payload: AlertmanagerWebhookPayload) -> d
 @router.post("/drift/trigger-retrain", response_model=RetrainTriggerResponse, status_code=status.HTTP_200_OK)
 @api_router.post("/drift/trigger-retrain", response_model=RetrainTriggerResponse, status_code=status.HTTP_200_OK)
 async def trigger_automated_retraining(
-    reason: str = "Concept Drift PSI > 0.20 threshold exceeded",
+    request: RetrainTriggerRequest | None = None,
+    reason: str | None = Query(default=None, description="Legacy reason query parameter"),
 ) -> RetrainTriggerResponse:
     """Trigger an automated federated re-training round in response to concept drift."""
+    effective_reason = (
+        (request.reason if request and request.reason else None)
+        or reason
+        or "Concept Drift PSI > 0.20 threshold exceeded"
+    )
+    features = request.retrain_feature_subset if request else []
+    max_psi = float(request.max_psi if request and request.max_psi is not None else 0.25)
+    dispatch_webhook = request.dispatch_alertmanager_webhook if request else True
+    target_rounds = request.target_simulation_rounds if request else 3
+
     job = _retraining_service.create_manual_job(
-        reason=reason,
+        reason=effective_reason,
         cause=RetrainingCause.PSI_DRIFT_EXCEEDED,
-        psi_score=0.25,
+        psi_score=max_psi,
+        retrain_feature_subset=features,
+        target_rounds=target_rounds,
     )
     now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%SZ")
-    logger.info("Automated re-training round initiated: %s (Reason: %s)", job.job_id, reason)
+    logger.info(
+        "Automated re-training round initiated: %s (Reason: %s, Features: %s)",
+        job.job_id,
+        effective_reason,
+        features,
+    )
+
+    # 1. Update Prometheus metrics in TelemetryRegistry
+    for feat in features:
+        telemetry.telemetry_registry.record_drift_psi(feat, max_psi)
+    telemetry.telemetry_registry.record_drift_retraining(
+        cause=RetrainingCause.PSI_DRIFT_EXCEEDED.value,
+        feature_subset=features,
+    )
+
+    # 2. Dispatch Prometheus Alertmanager firing alert if requested
+    alert_dispatched = False
+    if dispatch_webhook:
+        feature_str = ", ".join(features) if features else "all-features"
+        drift_alert = ActiveAlertResponse(
+            alert_name="ModelConceptDriftCritical",
+            severity="critical",
+            summary=f"Automated federated re-training triggered for features [{feature_str}] (Peak PSI: {max_psi:.4f}). Job: {job.job_id}",
+            started_at=now_str,
+            status="firing",
+        )
+        _alert_store.record_alert(drift_alert)
+        alert_dispatched = True
 
     return RetrainTriggerResponse(
         triggered=True,
-        reason=reason,
+        reason=effective_reason,
         new_simulation_id=job.job_id,
         triggered_at=now_str,
+        retrain_feature_subset=features,
+        alertmanager_alert_dispatched=alert_dispatched,
+        prometheus_metric_emitted=True,
+        drift_features_targeted=len(features),
     )
 
 
@@ -481,3 +530,95 @@ async def get_retraining_job(job_id: str) -> RetrainingJobResponse:
         triggered_at=job.triggered_at.strftime("%Y-%m-%d %H:%M:%SZ"),
         details=job.details,
     )
+
+
+@router.get("/metrics/prometheus", response_model=PrometheusMetricsExportResponse, status_code=status.HTTP_200_OK)
+@api_router.get("/metrics/prometheus", response_model=PrometheusMetricsExportResponse, status_code=status.HTTP_200_OK)
+async def get_prometheus_metrics_summary() -> PrometheusMetricsExportResponse:
+    """Return raw Prometheus metrics in standard exposition text format with metadata."""
+    text = telemetry.telemetry_registry.get_prometheus_metrics_text()
+    metric_count = sum(1 for line in text.splitlines() if line and not line.startswith("#"))
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%SZ")
+    return PrometheusMetricsExportResponse(
+        metrics_text=text,
+        metric_count=metric_count,
+        scraped_at=now_str,
+    )
+
+
+@router.post("/metrics/export-siem", response_model=SiemExportResponse, status_code=status.HTTP_200_OK)
+@api_router.post("/metrics/export-siem", response_model=SiemExportResponse, status_code=status.HTTP_200_OK)
+async def export_metrics_to_siem(request: SiemExportRequest) -> SiemExportResponse:
+    """Export observability telemetry, active alerts, and drift metrics in SIEM format (JSON or CEF)."""
+    now_str = datetime.now(UTC).strftime("%Y-%m-%d %H:%M:%SZ")
+    events: list[dict[str, Any]] = []
+
+    # 1. Include alerts if requested
+    if request.include_alerts:
+        alerts = _alert_store.list_alerts()
+        for alert in alerts:
+            sev_num = 8 if alert.severity == "critical" else (5 if alert.severity == "warning" else 3)
+            events.append({
+                "event_type": "SECURITY_ALERT",
+                "alert_name": alert.alert_name,
+                "severity": alert.severity,
+                "severity_score": sev_num,
+                "status": alert.status,
+                "summary": alert.summary,
+                "started_at": alert.started_at,
+                "timestamp": now_str,
+            })
+
+    # 2. Include drift metrics if requested
+    if request.include_drift_metrics:
+        drift_report = _drift_service.run_full_drift_analysis(
+            current_data={"amount": _curr_amount, "velocity": _curr_velocity},
+            reference_data={"amount": _ref_amount, "velocity": _ref_velocity},
+            current_scores=_curr_risk_score,
+            reference_scores=_ref_risk_score,
+            y_true=_sample_labels,
+            y_prob=_sample_probs,
+        )
+        events.append({
+            "event_type": "CONCEPT_DRIFT_EVALUATION",
+            "concept_drift_psi": drift_report.concept_drift_psi,
+            "overall_status": drift_report.overall_status,
+            "severity_score": 7 if drift_report.overall_status == "CRITICAL" else (4 if drift_report.overall_status == "WARNING" else 1),
+            "max_psi": drift_report.max_psi,
+            "timestamp": now_str,
+        })
+        for fd in drift_report.feature_drifts:
+            events.append({
+                "event_type": "FEATURE_DRIFT_TELEMETRY",
+                "feature_name": fd.feature_name,
+                "psi": fd.psi,
+                "ks_statistic": fd.ks_statistic,
+                "wasserstein_distance": fd.wasserstein_distance,
+                "status": fd.status,
+                "severity_score": 7 if fd.status == "CRITICAL" else (4 if fd.status == "WARNING" else 1),
+                "timestamp": now_str,
+            })
+
+    export_format = request.format.lower().strip()
+    if export_format == "cef":
+        cef_lines: list[str] = []
+        for ev in events:
+            ev_type = ev.get("event_type", "GENERIC_EVENT")
+            name = str(ev.get("alert_name", ev.get("feature_name", "PlatformTelemetry")))
+            sev = int(ev.get("severity_score", 1))
+            ext_parts = [f"{k}={v}" for k, v in ev.items() if k not in ("event_type", "severity_score")]
+            extension = " ".join(ext_parts)
+            cef_lines.append(
+                f"CEF:0|ConsortiumFraudIntelligence|CFIPlatform|1.0|{ev_type}|{name}|{sev}|{extension}"
+            )
+        payload = "\n".join(cef_lines)
+    else:
+        payload = json.dumps(events, indent=2)
+
+    return SiemExportResponse(
+        format=export_format,
+        exported_at=now_str,
+        event_count=len(events),
+        payload=payload,
+    )
+

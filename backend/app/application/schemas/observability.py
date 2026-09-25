@@ -249,11 +249,50 @@ class AlertmanagerWebhookPayload(BaseModel):
     alerts: list[AlertmanagerAlert] = Field(default_factory=list)
 
 
+class RetrainTriggerRequest(BaseModel):
+    """Payload to trigger an automated federated retraining round in response to drift."""
+
+    reason: str = Field(default="Concept Drift PSI > 0.20 threshold exceeded", description="Reason for triggering retraining")
+    retrain_feature_subset: list[str] = Field(default_factory=list, description="Target features experiencing statistical or concept drift")
+    max_psi: float | None = Field(default=None, description="Observed peak population stability index")
+    dispatch_alertmanager_webhook: bool = Field(default=True, description="Whether to dispatch Prometheus Alertmanager alert")
+    target_simulation_rounds: int = Field(default=3, ge=1, le=50, description="Target federated training rounds")
+
+
 class RetrainTriggerResponse(BaseModel):
     triggered: bool
     reason: str
     new_simulation_id: str | None = None
     triggered_at: str
+    retrain_feature_subset: list[str] = Field(default_factory=list, description="Features included in retraining scope")
+    alertmanager_alert_dispatched: bool = Field(default=False, description="Flag indicating Alertmanager alert was registered")
+    prometheus_metric_emitted: bool = Field(default=True, description="Flag indicating Prometheus drift metrics were updated")
+    drift_features_targeted: int = Field(default=0, description="Count of drifted features in retraining payload")
+
+
+class SiemExportRequest(BaseModel):
+    """Payload to configure and trigger SIEM metric export."""
+
+    format: str = Field(default="json", description="SIEM export format: json or cef (Common Event Format)")
+    include_drift_metrics: bool = Field(default=True, description="Whether to include feature drift metrics")
+    include_alerts: bool = Field(default=True, description="Whether to include active Alertmanager alerts")
+
+
+class SiemExportResponse(BaseModel):
+    """SIEM format export output."""
+
+    format: str
+    exported_at: str
+    event_count: int
+    payload: str
+
+
+class PrometheusMetricsExportResponse(BaseModel):
+    """Prometheus exposition format container."""
+
+    metrics_text: str
+    metric_count: int
+    scraped_at: str
 
 
 class RetrainingJobResponse(BaseModel):

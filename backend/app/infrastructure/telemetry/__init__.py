@@ -61,6 +61,8 @@ class TelemetryRegistry:
             "cfi_grpc_request_duration_seconds": "Latency of gRPC API requests in seconds.",
             "cfi_hsm_signing_duration_seconds": "Latency of Hardware Security Module (HSM) digital signing operations.",
             "cfi_node_heartbeat_timestamp": "Unix timestamp of the last received node heartbeat.",
+            "cfi_concept_drift_psi": "Population Stability Index (PSI) tracking feature and concept drift across time windows.",
+            "cfi_model_drift_retraining_triggered_total": "Total automated federated retraining rounds triggered by statistical drift.",
         }
 
     def get_tracer(self, name: str = "cfi-platform") -> Any:
@@ -136,6 +138,21 @@ class TelemetryRegistry:
         key = f'bank_id="{bank_id}"'
         labels = self._gauge_labels.setdefault("cfi_node_heartbeat_timestamp", {})
         labels[key] = ts
+
+    def record_drift_psi(self, feature: str, psi: float) -> None:
+        """Update drift PSI gauge for a specific feature."""
+        key = f'feature="{feature}"'
+        with self._lock:
+            labels = self._gauge_labels.setdefault("cfi_concept_drift_psi", {})
+            labels[key] = float(psi)
+
+    def record_drift_retraining(self, cause: str, feature_subset: list[str]) -> None:
+        """Increment count of drift-triggered automated retraining operations."""
+        features_str = ",".join(sorted(feature_subset)) if feature_subset else "all"
+        key = f'cause="{cause}",features="{features_str}"'
+        with self._lock:
+            labels = self._counter_labels.setdefault("cfi_model_drift_retraining_triggered_total", {})
+            labels[key] = labels.get(key, 0.0) + 1.0
 
     def get_prometheus_metrics_text(self) -> str:
         """Render registered metrics in standard Prometheus exposition text format."""
@@ -306,6 +323,7 @@ cfi_inference_latency_ms = MetricProxy("cfi_inference_latency_ms", telemetry_reg
 active_simulations = MetricProxy("active_simulations", telemetry_registry)
 simulation_duration_seconds = MetricProxy("simulation_duration_seconds", telemetry_registry)
 simulation_rounds_total = MetricProxy("simulation_rounds_total", telemetry_registry)
+cfi_model_drift_retraining_triggered_total = MetricProxy("cfi_model_drift_retraining_triggered_total", telemetry_registry)
 
 
 def setup_telemetry(app: FastAPI) -> None:

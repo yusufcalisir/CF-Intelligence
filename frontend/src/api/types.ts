@@ -1373,11 +1373,42 @@ export interface ActiveAlertItem {
   status: string;
 }
 
+export interface RetrainTriggerRequest {
+  reason?: string;
+  retrain_feature_subset?: string[];
+  max_psi?: number;
+  dispatch_alertmanager_webhook?: boolean;
+  target_simulation_rounds?: number;
+}
+
 export interface RetrainTriggerResponse {
   triggered: boolean;
   reason: string;
   new_simulation_id?: string | null;
   triggered_at: string;
+  retrain_feature_subset?: string[];
+  alertmanager_alert_dispatched?: boolean;
+  prometheus_metric_emitted?: boolean;
+  drift_features_targeted?: number;
+}
+
+export interface SiemExportRequest {
+  format?: 'json' | 'cef' | string;
+  include_drift_metrics?: boolean;
+  include_alerts?: boolean;
+}
+
+export interface SiemExportResponse {
+  format: string;
+  exported_at: string;
+  event_count: number;
+  payload: string;
+}
+
+export interface PrometheusMetricsExportResponse {
+  metrics_text: string;
+  metric_count: number;
+  scraped_at: string;
 }
 
 export interface HealthCheckResponse {

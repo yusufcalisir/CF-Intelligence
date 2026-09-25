@@ -341,3 +341,83 @@ class TestPrometheusMetricsScrape:
         body = resp.text
         # Check standard Prometheus comments or CFI metric names
         assert len(body) > 0
+
+
+# ── 5. Drift Retraining Bridge & SIEM Export Verification ─────────────────────
+
+class TestDriftRetrainingBridgeAndSiemExport:
+    """Validate drift feature subset parametric retraining bridge and SIEM/Prometheus metrics export."""
+
+    def test_parametric_feature_subset_retraining_trigger(self):
+        """Verify POST /drift/trigger-retrain with JSON body and feature subset."""
+        payload = {
+            "reason": "Feature drift detected on amount and velocity",
+            "retrain_feature_subset": ["amount", "velocity"],
+            "max_psi": 0.285,
+            "dispatch_alertmanager_webhook": True,
+            "target_simulation_rounds": 5,
+        }
+        resp = client.post("/api/v1/monitoring/drift/trigger-retrain", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["triggered"] is True
+        assert data["retrain_feature_subset"] == ["amount", "velocity"]
+        assert data["drift_features_targeted"] == 2
+        assert data["alertmanager_alert_dispatched"] is True
+        assert data["prometheus_metric_emitted"] is True
+
+        job_id = data["new_simulation_id"]
+        job_resp = client.get(f"/api/v1/monitoring/retraining/jobs/{job_id}")
+        assert job_resp.status_code == 200
+        job_data = job_resp.json()
+        assert job_data["details"]["retrain_feature_subset"] == ["amount", "velocity"]
+        assert job_data["details"]["target_rounds"] == 5
+
+        alerts_resp = client.get("/api/v1/monitoring/alerts?status_filter=firing")
+        assert alerts_resp.status_code == 200
+        alert_names = [a["alert_name"] for a in alerts_resp.json()]
+        assert "ModelConceptDriftCritical" in alert_names
+
+    def test_prometheus_metrics_summary_endpoint(self):
+        """Verify GET /api/v1/monitoring/metrics/prometheus returns structured exposition summary."""
+        resp = client.get("/api/v1/monitoring/metrics/prometheus")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "metrics_text" in data
+        assert data["metric_count"] > 0
+        assert "cfi_concept_drift_psi" in data["metrics_text"]
+
+    def test_siem_export_json_format(self):
+        """Verify POST /api/v1/monitoring/metrics/export-siem returns valid JSON SIEM payload."""
+        payload = {
+            "format": "json",
+            "include_drift_metrics": True,
+            "include_alerts": True,
+        }
+        resp = client.post("/api/v1/monitoring/metrics/export-siem", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["format"] == "json"
+        assert data["event_count"] > 0
+        import json
+        parsed = json.loads(data["payload"])
+        assert isinstance(parsed, list)
+        assert len(parsed) == data["event_count"]
+
+    def test_siem_export_cef_format(self):
+        """Verify POST /api/v1/monitoring/metrics/export-siem returns ArcSight CEF formatted lines."""
+        payload = {
+            "format": "cef",
+            "include_drift_metrics": True,
+            "include_alerts": True,
+        }
+        resp = client.post("/api/v1/monitoring/metrics/export-siem", json=payload)
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["format"] == "cef"
+        assert data["event_count"] > 0
+        lines = [line for line in data["payload"].splitlines() if line.strip()]
+        assert len(lines) == data["event_count"]
+        for line in lines:
+            assert line.startswith("CEF:0|ConsortiumFraudIntelligence|CFIPlatform|1.0|")
+
