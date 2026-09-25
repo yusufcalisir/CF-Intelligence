@@ -19,6 +19,11 @@ class HandshakeRequest(BaseModel):
         pattern=r"^[a-zA-Z0-9_\-]+$",
         description="Unique bank tenant ID",
     )
+    bank_name: str | None = Field(
+        default=None,
+        max_length=128,
+        description="Human-readable bank institution display name",
+    )
     pytorch_version: str = Field(
         ...,
         max_length=32,
@@ -122,6 +127,7 @@ class ClientCapabilityResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     bank_id: str = Field(..., description="Bank identifier")
+    bank_name: str | None = Field(default=None, description="Human-readable bank institution name")
     pytorch_version: str = Field(..., description="PyTorch version")
     python_version: str = Field(..., description="Python runtime version")
     hardware_type: str = Field(..., description="Hardware accelerator type")

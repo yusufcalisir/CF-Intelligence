@@ -378,3 +378,56 @@ def test_cancel_proposal(client: TestClient) -> None:
 def test_proposal_not_found_returns_404(client: TestClient) -> None:
     resp = client.get("/api/v1/coordinator/proposals/nonexistent_prop_id")
     assert resp.status_code == 404
+
+
+def test_handshake_with_bank_name_propagation(client: TestClient) -> None:
+    payload = {
+        "bank_id": "bank_custom_tr",
+        "bank_name": "VakıfBank",
+        "pytorch_version": "2.4.0+cu124",
+        "python_version": "3.12.3",
+        "hardware_type": "cuda",
+        "ram_gb": 64.0,
+        "device_count": 2,
+    }
+    resp = client.post("/api/v1/coordinator/handshake", json=payload)
+    assert resp.status_code == 200
+    assert resp.json()["registered"] is True
+
+    clients_resp = client.get("/api/v1/coordinator/clients")
+    assert clients_resp.status_code == 200
+    registered = {c["bank_id"]: c for c in clients_resp.json()}
+    assert "bank_custom_tr" in registered
+    assert registered["bank_custom_tr"]["bank_name"] == "VakıfBank"
+
+
+def test_list_clients_auto_seeds_consortium_when_empty(client: TestClient) -> None:
+    # Ensure coordinator registry is empty
+    coordinator_service.registry.clear()
+
+    resp = client.get("/api/v1/coordinator/clients")
+    assert resp.status_code == 200
+    clients = resp.json()
+    assert len(clients) == 5
+    bank_map = {c["bank_id"]: c["bank_name"] for c in clients}
+    assert bank_map["bank_alpha"] == "Garanti BBVA"
+    assert bank_map["bank_beta"] == "İş Bankası"
+    assert bank_map["bank_gamma"] == "Akbank"
+    assert bank_map["bank_a"] == "Meridian National"
+    assert bank_map["bank_b"] == "Nexus Digital"
+
+    # Verify PyTorch 2.4 core specification
+    for c in clients:
+        assert c["pytorch_version"].startswith("2.4.0")
+
+
+def test_heartbeat_institutional_alias_resolution(client: TestClient) -> None:
+    # Auto-seed consortium nodes
+    coordinator_service.seed_consortium_nodes()
+
+    # Heartbeat to alias bank_meridian should resolve to bank_a
+    hb_resp = client.post("/api/v1/coordinator/heartbeat", json={"bank_id": "bank_meridian"})
+    assert hb_resp.status_code == 200
+    assert hb_resp.json()["success"] is True
+    assert hb_resp.json()["status"] == "ONLINE"
+

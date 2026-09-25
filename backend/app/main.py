@@ -413,7 +413,11 @@ def seed_mock_data() -> None:
         related_alert_count=1,
     )
     alert_svc._intelligence_store.push_list("intelligence_list", _intel_to_dict(intel))
-    logger.info("Successfully seeded initial demonstration data for local environment")
+    # 6. Seed authentic consortium bank nodes in FL Coordinator
+    from app.application.services.coordinator_service import coordinator_service
+
+    coordinator_service.seed_consortium_nodes()
+    logger.info("Successfully seeded initial demonstration data and consortium nodes for local environment")
 
 
 @asynccontextmanager

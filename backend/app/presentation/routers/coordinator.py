@@ -104,6 +104,7 @@ async def perform_handshake(req: HandshakeRequest) -> HandshakeResponse:
         hardware_type=req.hardware_type,
         ram_gb=req.ram_gb,
         device_count=req.device_count,
+        bank_name=req.bank_name,
     )
     profile = res.get("client_profile")
     profile_dict: dict[str, Any] | None = None
@@ -140,6 +141,8 @@ async def post_heartbeat(req: HeartbeatRequest) -> HeartbeatResponse:
 
 async def list_registered_clients() -> list[ClientCapabilityResponse]:
     """Retrieve capability profiles of all dynamically registered banks."""
+    if not coordinator_service.registry:
+        coordinator_service.seed_consortium_nodes()
     _ = coordinator_service.get_active_clients()
 
     now = time.time()
@@ -148,13 +151,14 @@ async def list_registered_clients() -> list[ClientCapabilityResponse]:
         results.append(
             ClientCapabilityResponse(
                 bank_id=client.bank_id,
+                bank_name=getattr(client, "bank_name", None),
                 pytorch_version=client.pytorch_version,
                 python_version=client.python_version,
                 hardware_type=client.hardware_type,
                 ram_gb=client.ram_gb,
                 device_count=client.device_count,
                 status=client.status,
-                last_heartbeat_ago_seconds=round(now - client.last_heartbeat, 1),
+                last_heartbeat_ago_seconds=round(max(0.0, now - client.last_heartbeat), 1),
             )
         )
     return sorted(results, key=lambda c: c.bank_id)

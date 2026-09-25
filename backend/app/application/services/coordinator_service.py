@@ -33,6 +33,85 @@ class ClientCapability:
     registered_at: float = field(default_factory=time.time)
     last_heartbeat: float = field(default_factory=time.time)
     status: str = "ONLINE"
+    bank_name: str | None = None
+
+
+CONSORTIUM_BANK_NAMES: dict[str, str] = {
+    "bank_alpha": "Garanti BBVA",
+    "garanti_bbva": "Garanti BBVA",
+    "garanti": "Garanti BBVA",
+    "bank_beta": "İş Bankası",
+    "isbank": "İş Bankası",
+    "bank_gamma": "Akbank",
+    "akbank": "Akbank",
+    "bank_a": "Meridian National",
+    "bank_meridian": "Meridian National",
+    "meridian": "Meridian National",
+    "bank_b": "Nexus Digital",
+    "bank_nexus": "Nexus Digital",
+    "nexus": "Nexus Digital",
+    "bank_delta": "Yapı Kredi",
+    "bank_c": "Heritage Regional",
+}
+
+ALIAS_BANK_MAP: dict[str, str] = {
+    "meridian": "bank_a",
+    "bank_meridian": "bank_a",
+    "nexus": "bank_b",
+    "bank_nexus": "bank_b",
+    "garanti": "bank_alpha",
+    "garanti_bbva": "bank_alpha",
+    "isbank": "bank_beta",
+    "akbank": "bank_gamma",
+}
+
+DEFAULT_CONSORTIUM_NODES: list[dict[str, Any]] = [
+    {
+        "bank_id": "bank_alpha",
+        "bank_name": "Garanti BBVA",
+        "pytorch_version": "2.4.0+cu124",
+        "python_version": "3.12.3",
+        "hardware_type": "cuda",
+        "ram_gb": 128.0,
+        "device_count": 4,
+    },
+    {
+        "bank_id": "bank_beta",
+        "bank_name": "İş Bankası",
+        "pytorch_version": "2.4.0+cu124",
+        "python_version": "3.12.3",
+        "hardware_type": "cuda",
+        "ram_gb": 64.0,
+        "device_count": 2,
+    },
+    {
+        "bank_id": "bank_gamma",
+        "bank_name": "Akbank",
+        "pytorch_version": "2.4.0+cu121",
+        "python_version": "3.12.2",
+        "hardware_type": "cuda",
+        "ram_gb": 64.0,
+        "device_count": 2,
+    },
+    {
+        "bank_id": "bank_a",
+        "bank_name": "Meridian National",
+        "pytorch_version": "2.4.0+cu121",
+        "python_version": "3.12.1",
+        "hardware_type": "cuda",
+        "ram_gb": 48.0,
+        "device_count": 1,
+    },
+    {
+        "bank_id": "bank_b",
+        "bank_name": "Nexus Digital",
+        "pytorch_version": "2.4.0+cpu",
+        "python_version": "3.12.0",
+        "hardware_type": "cpu",
+        "ram_gb": 32.0,
+        "device_count": 0,
+    },
+]
 
 
 @dataclass
@@ -49,7 +128,7 @@ class NegotiatedParameters:
 class CoordinatorService:
     """Enterprise FL Coordinator managing client discovery, heartbeats, round orchestration, and model deployment."""
 
-    def __init__(self, heartbeat_timeout_seconds: float = 15.0) -> None:
+    def __init__(self, heartbeat_timeout_seconds: float = 15.0, auto_seed: bool = False) -> None:
         self.heartbeat_timeout = heartbeat_timeout_seconds
         self.registry: dict[str, ClientCapability] = {}
 
@@ -64,17 +143,40 @@ class CoordinatorService:
         self.async_fl_engine = AsyncFLEngine(current_round=1, alpha_staleness=0.5, learning_rate=0.8)
         self.quorum_manager = DynamicQuorumManager(quorum_threshold_pct=0.60, target_window_seconds=300)
 
+        if auto_seed:
+            self.seed_consortium_nodes()
+
+    def seed_consortium_nodes(self) -> None:
+        """Seed authentic consortium banking nodes (Garanti BBVA, İş Bankası, Akbank, Meridian, Nexus)."""
+        for node in DEFAULT_CONSORTIUM_NODES:
+            self.register_client(
+                bank_id=node["bank_id"],
+                pytorch_version=node["pytorch_version"],
+                python_version=node["python_version"],
+                hardware_type=node["hardware_type"],
+                ram_gb=node["ram_gb"],
+                device_count=node["device_count"],
+                bank_name=node["bank_name"],
+            )
+
+    def reset_to_default_registry(self) -> None:
+        """Clears registry and re-seeds platform consortium bank nodes."""
+        self.registry.clear()
+        self.seed_consortium_nodes()
+
     def register_client(
         self,
         bank_id: str,
-        pytorch_version: str = "2.2.0",
+        pytorch_version: str = "2.4.0",
         python_version: str = "3.12.0",
         hardware_type: str = "cuda",
         ram_gb: float = 16.0,
         device_count: int = 1,
+        bank_name: str | None = None,
     ) -> dict[str, Any]:
         """Perform handshake & register/update a bank client capability profile."""
         clean_bank_id = bank_id.lower().strip()
+        resolved_name = bank_name or CONSORTIUM_BANK_NAMES.get(clean_bank_id)
         try:
             match_torch = re.search(r"^(\d+)", pytorch_version)
             torch_major = int(match_torch.group(1)) if match_torch else 2
@@ -111,6 +213,7 @@ class CoordinatorService:
             device_count=device_count,
             last_heartbeat=time.time(),
             status="ONLINE",
+            bank_name=resolved_name,
         )
         self.registry[clean_bank_id] = client
 
@@ -132,7 +235,11 @@ class CoordinatorService:
         """Update client heartbeat timestamp."""
         clean_bank = bank_id.lower().strip()
         if clean_bank not in self.registry:
-            return False
+            alias = ALIAS_BANK_MAP.get(clean_bank)
+            if alias and alias in self.registry:
+                clean_bank = alias
+            else:
+                return False
         self.registry[clean_bank].last_heartbeat = time.time()
         self.registry[clean_bank].status = "ONLINE"
         return True
@@ -344,13 +451,17 @@ class CoordinatorService:
         """Negotiate optimal parameters based on client hardware constraints."""
         clean_bank = bank_id.lower().strip()
         if clean_bank not in self.registry:
-            return NegotiatedParameters(
-                batch_size=16,
-                local_epochs=2,
-                gradient_accumulation_steps=4,
-                use_cuda=False,
-                status="DEGRADED",
-            )
+            alias = ALIAS_BANK_MAP.get(clean_bank)
+            if alias and alias in self.registry:
+                clean_bank = alias
+            else:
+                return NegotiatedParameters(
+                    batch_size=16,
+                    local_epochs=2,
+                    gradient_accumulation_steps=4,
+                    use_cuda=False,
+                    status="DEGRADED",
+                )
 
         client = self.registry[clean_bank]
         use_cuda = client.hardware_type == "cuda"
@@ -462,4 +573,4 @@ class CoordinatorService:
             return len(to_prune)
 
 
-coordinator_service = CoordinatorService()
+coordinator_service = CoordinatorService(auto_seed=True)

@@ -162,3 +162,44 @@ class TestParameterNegotiation:
         assert neg.batch_size == 16
         assert neg.use_cuda is False
         assert neg.status == "DEGRADED"
+
+
+class TestConsortiumNodesTelemetry:
+    """Tests for authentic consortium bank nodes seeding, alias resolution, and institutional telemetry."""
+
+    def test_seed_consortium_nodes(self):
+        svc = CoordinatorService(auto_seed=True)
+        assert len(svc.registry) == 5
+        assert svc.registry["bank_alpha"].bank_name == "Garanti BBVA"
+        assert svc.registry["bank_beta"].bank_name == "İş Bankası"
+        assert svc.registry["bank_gamma"].bank_name == "Akbank"
+        assert svc.registry["bank_a"].bank_name == "Meridian National"
+        assert svc.registry["bank_b"].bank_name == "Nexus Digital"
+        assert svc.registry["bank_alpha"].pytorch_version == "2.4.0+cu124"
+        assert svc.registry["bank_alpha"].hardware_type == "cuda"
+        assert svc.registry["bank_alpha"].ram_gb == 128.0
+        assert svc.registry["bank_b"].hardware_type == "cpu"
+        assert svc.registry["bank_b"].device_count == 0
+
+    def test_heartbeat_and_negotiation_alias_resolution(self):
+        svc = CoordinatorService(auto_seed=True)
+        # Using alias bank_meridian should resolve to bank_a
+        assert svc.record_heartbeat("bank_meridian") is True
+        assert svc.record_heartbeat("bank_nexus") is True
+        neg = svc.negotiate_parameters("bank_meridian", base_batch_size=64, base_epochs=5)
+        assert neg.use_cuda is True
+        assert neg.status == "COMPATIBLE"
+
+    def test_explicit_bank_name_registration(self):
+        svc = CoordinatorService()
+        res = svc.register_client(
+            bank_id="bank_custom",
+            pytorch_version="2.4.0",
+            python_version="3.12.0",
+            hardware_type="cuda",
+            ram_gb=32.0,
+            bank_name="Custom Federal Bank",
+        )
+        assert res["registered"] is True
+        assert svc.registry["bank_custom"].bank_name == "Custom Federal Bank"
+

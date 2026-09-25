@@ -1495,6 +1495,7 @@ export interface HandshakeResponse {
 
 export interface ClientCapabilityItem {
   bank_id: string;
+  bank_name?: string | null;
   pytorch_version: string;
   python_version: string;
   hardware_type: string;

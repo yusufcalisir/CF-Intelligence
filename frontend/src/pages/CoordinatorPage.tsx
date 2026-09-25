@@ -15,68 +15,47 @@ import {
   Layers,
 } from 'lucide-react';
 
-// Fallback bank nodes for interactive demonstration if backend client list is empty
-const DEMO_CLIENTS: ClientCapabilityItem[] = [
-  {
-    bank_id: 'bank_alpha',
-    status: 'ONLINE',
-    pytorch_version: '2.2.0+cu121',
-    python_version: '3.12.1',
-    ram_gb: 64.0,
-    hardware_type: 'cuda',
-    device_count: 2,
-    last_heartbeat_ago_seconds: 1.2,
-  },
-  {
-    bank_id: 'bank_beta',
-    status: 'ONLINE',
-    pytorch_version: '2.2.0+cu121',
-    python_version: '3.12.1',
-    ram_gb: 32.0,
-    hardware_type: 'cuda',
-    device_count: 1,
-    last_heartbeat_ago_seconds: 2.8,
-  },
-  {
-    bank_id: 'bank_gamma',
-    status: 'ONLINE',
-    pytorch_version: '2.1.2+cpu',
-    python_version: '3.11.8',
-    ram_gb: 16.0,
-    hardware_type: 'cpu',
-    device_count: 0,
-    last_heartbeat_ago_seconds: 4.1,
-  },
-];
+// Consortium institutional metadata catalog
+export const BANK_DISPLAY_NAMES: Record<string, string> = {
+  bank_alpha: 'Garanti BBVA',
+  bank_beta: 'İş Bankası',
+  bank_gamma: 'Akbank',
+  bank_a: 'Meridian National',
+  bank_meridian: 'Meridian National',
+  bank_b: 'Nexus Digital',
+  bank_nexus: 'Nexus Digital',
+  bank_delta: 'Yapı Kredi',
+  bank_c: 'Heritage Regional',
+};
 
-type CoordinatorViewMode = 'auto' | 'live' | 'sandbox';
+export function getBankDisplayName(client: { bank_id: string; bank_name?: string | null }): string {
+  return client.bank_name || BANK_DISPLAY_NAMES[client.bank_id] || client.bank_id;
+}
+
+type CoordinatorViewMode = 'all' | 'cuda' | 'cpu';
 
 export default function CoordinatorPage() {
   const { data: apiClients, refetch } = useRegisteredClients();
-  const [viewMode, setViewMode] = useState<CoordinatorViewMode>('auto');
+  const [viewMode, setViewMode] = useState<CoordinatorViewMode>('all');
   const [selectedBankId, setSelectedBankId] = useState<string>('bank_alpha');
   const [baseBatchSize, setBaseBatchSize] = useState<number>(64);
   const [baseEpochs, setBaseEpochs] = useState<number>(3);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [copiedPath, setCopiedPath] = useState<string | null>(null);
 
-  const hasLiveClients = Boolean(apiClients && apiClients.length > 0);
+  const rawClients: ClientCapabilityItem[] = apiClients ?? [];
   const displayClients: ClientCapabilityItem[] =
-    viewMode === 'live'
-      ? (apiClients ?? [])
-      : viewMode === 'sandbox'
-      ? DEMO_CLIENTS
-      : hasLiveClients
-      ? (apiClients as ClientCapabilityItem[])
-      : DEMO_CLIENTS;
+    viewMode === 'cuda'
+      ? rawClients.filter((c) => c.hardware_type === 'cuda')
+      : viewMode === 'cpu'
+      ? rawClients.filter((c) => c.hardware_type === 'cpu')
+      : rawClients;
 
-  const isShowingDemo =
-    viewMode === 'sandbox' || (viewMode === 'auto' && !hasLiveClients);
-
-  const onlineClients = displayClients.filter((c) => c.status === 'ONLINE');
-  const offlineClients = displayClients.filter((c) => c.status === 'OFFLINE');
-  const gpuClients = displayClients.filter((c) => c.hardware_type === 'cuda');
-  const totalRamGb = displayClients.reduce((acc, curr) => acc + (curr.ram_gb || 0), 0);
+  const onlineClients = rawClients.filter((c) => c.status === 'ONLINE');
+  const offlineClients = rawClients.filter((c) => c.status === 'OFFLINE');
+  const gpuClients = rawClients.filter((c) => c.hardware_type === 'cuda');
+  const cpuClients = rawClients.filter((c) => c.hardware_type === 'cpu');
+  const totalRamGb = rawClients.reduce((acc, curr) => acc + (curr.ram_gb || 0), 0);
 
   const { data: negotiatedData } = useNegotiatedParams(
     selectedBankId,
@@ -106,8 +85,9 @@ export default function CoordinatorPage() {
 
   const activeClient: ClientCapabilityItem | null =
     displayClients.find((c) => c.bank_id === selectedBankId) ??
+    rawClients.find((c) => c.bank_id === selectedBankId) ??
     displayClients[0] ??
-    (isShowingDemo ? DEMO_CLIENTS[0] : null) ??
+    rawClients[0] ??
     null;
 
   return (
@@ -137,61 +117,51 @@ export default function CoordinatorPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-          {/* Mode Selector Pill */}
+          {/* Hardware & Node Filter Pill */}
           <div className="inline-flex p-1 rounded-xl bg-black/40 border border-white/10 font-mono text-xs">
             <button
               type="button"
-              onClick={() => setViewMode('auto')}
+              onClick={() => setViewMode('all')}
               className={`px-2.5 py-1 rounded-lg transition-all text-xs cursor-pointer ${
-                viewMode === 'auto'
+                viewMode === 'all'
                   ? 'bg-indigo-600 text-white font-bold shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Auto
+              All Nodes ({rawClients.length})
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('live')}
+              onClick={() => setViewMode('cuda')}
               className={`px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1.5 cursor-pointer ${
-                viewMode === 'live'
-                  ? 'bg-emerald-600 text-white font-bold shadow'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${hasLiveClients ? 'bg-emerald-300 animate-pulse' : 'bg-amber-400'}`} />
-              Live ({apiClients?.length ?? 0})
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('sandbox')}
-              className={`px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1 cursor-pointer ${
-                viewMode === 'sandbox'
+                viewMode === 'cuda'
                   ? 'bg-purple-600 text-white font-bold shadow'
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              <span>🧪</span>
-              Sandbox (3)
+              <Zap className="w-3 h-3 text-purple-300" />
+              <span>CUDA ({gpuClients.length})</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('cpu')}
+              className={`px-2.5 py-1 rounded-lg transition-all text-xs flex items-center gap-1 cursor-pointer ${
+                viewMode === 'cpu'
+                  ? 'bg-blue-600 text-white font-bold shadow'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <HardDrive className="w-3 h-3 text-blue-300" />
+              <span>CPU ({cpuClients.length})</span>
             </button>
           </div>
 
-          <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold ${
-              isShowingDemo
-                ? 'bg-purple-500/10 border-purple-500/25 text-purple-300'
-                : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
-            }`}
-          >
-            <span
-              className={`h-2 w-2 rounded-full shrink-0 ${
-                isShowingDemo ? 'bg-purple-400' : 'bg-emerald-400 animate-pulse'
-              }`}
-            />
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold bg-emerald-500/10 border-emerald-500/25 text-emerald-400">
+            <span className="h-2 w-2 rounded-full shrink-0 bg-emerald-400 animate-pulse" />
             <span>
-              {isShowingDemo
-                ? '🧪 Sandbox Demo (3 Nodes)'
-                : `${onlineClients.length}/${displayClients.length} Live Quorum Active`}
+              {rawClients.length > 0
+                ? `${onlineClients.length}/${rawClients.length} Live Quorum Active`
+                : 'Awaiting Bank Edge Nodes'}
             </span>
           </div>
 
@@ -303,13 +273,11 @@ export default function CoordinatorPage() {
         <div className="p-4 sm:p-5 border-b border-white/10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 bg-[#03040d]/60">
           <div>
             <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span className={`h-2 w-2 rounded-full ${isShowingDemo ? 'bg-purple-400' : 'bg-indigo-400 animate-pulse'}`} />
-              {isShowingDemo ? 'Sandbox Consortium Demonstration Nodes' : 'Live Consortium Client Registry'}
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              Live Consortium Client Registry
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              {isShowingDemo
-                ? 'Simulated heterogeneous banking nodes (bank_alpha, bank_beta, bank_gamma) for hardware negotiation testing'
-                : 'Participating banking nodes registered via REST handshake (/api/v1/coordinator/handshake)'}
+              Participating consortium banking nodes registered via REST handshake (/api/v1/coordinator/handshake) and gRPC daemon
             </p>
           </div>
           <div className="text-[11px] text-indigo-300 bg-indigo-500/10 px-3 py-1 rounded-lg border border-indigo-500/20 self-start sm:self-auto font-mono">
@@ -317,7 +285,7 @@ export default function CoordinatorPage() {
           </div>
         </div>
 
-        {/* Empty State: When Live Mode has 0 Registered Edge Daemons */}
+        {/* Empty State: When 0 Registered Edge Daemons */}
         {displayClients.length === 0 ? (
           <div className="p-6 sm:p-8 text-center space-y-4">
             <div className="inline-flex p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/25 text-indigo-400">
@@ -328,7 +296,7 @@ export default function CoordinatorPage() {
                 Awaiting Live Edge Nodes (gRPC 0.0.0.0:50051)
               </h4>
               <p className="text-xs text-slate-400 leading-relaxed">
-                No active banking nodes have registered with the coordinator yet. Launch an edge node agent via CLI or switch to Sandbox Demonstration Mode.
+                No active banking nodes match the current filter or have registered with the coordinator yet. Launch an edge node agent via CLI or refresh the consortium registry.
               </p>
             </div>
             <div className="max-w-xl mx-auto p-3 rounded-xl bg-black/60 border border-white/10 font-mono text-left text-xs text-indigo-300 relative">
@@ -352,13 +320,6 @@ export default function CoordinatorPage() {
             <div className="flex items-center justify-center gap-3 pt-2">
               <button
                 type="button"
-                onClick={() => setViewMode('sandbox')}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/20 transition cursor-pointer"
-              >
-                Switch to Sandbox Demo (3 Nodes)
-              </button>
-              <button
-                type="button"
                 onClick={handleRefresh}
                 className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer flex items-center gap-1.5"
               >
@@ -376,6 +337,7 @@ export default function CoordinatorPage() {
             const isSelected = selectedBankId === client.bank_id;
             const isCuda = client.hardware_type === 'cuda';
             const isOnline = client.status === 'ONLINE';
+            const displayName = getBankDisplayName(client);
 
             return (
               <div
@@ -387,14 +349,16 @@ export default function CoordinatorPage() {
                 }`}
               >
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     <div className="h-8 w-8 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 flex items-center justify-center font-mono text-xs font-bold shrink-0">
-                      {client.bank_id.split('_')[1]?.slice(0, 2).toUpperCase() || 'BK'}
+                      {displayName.slice(0, 2).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <div className="font-mono text-sm font-bold text-slate-100 truncate">{client.bank_id}</div>
-                      <div className="text-[10px] text-slate-400 font-mono">
-                        Heartbeat: {client.last_heartbeat_ago_seconds.toFixed(1)}s ago
+                      <div className="font-sans text-sm font-bold text-slate-100 truncate">{displayName}</div>
+                      <div className="text-[10px] text-indigo-300 font-mono flex items-center gap-1.5 truncate">
+                        <span>{client.bank_id}</span>
+                        <span>·</span>
+                        <span className="text-slate-400">{client.last_heartbeat_ago_seconds.toFixed(1)}s ago</span>
                       </div>
                     </div>
                   </div>
@@ -469,6 +433,7 @@ export default function CoordinatorPage() {
                 const isSelected = selectedBankId === client.bank_id;
                 const isCuda = client.hardware_type === 'cuda';
                 const isOnline = client.status === 'ONLINE';
+                const displayName = getBankDisplayName(client);
 
                 return (
                   <tr
@@ -477,11 +442,16 @@ export default function CoordinatorPage() {
                       isSelected ? 'bg-indigo-500/10' : ''
                     }`}
                   >
-                    <td className="py-3.5 px-4 font-bold text-slate-100 flex items-center gap-2">
-                      <div className="h-7 w-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-mono text-xs">
-                        {client.bank_id.split('_')[1]?.toUpperCase() || 'BK'}
+                    <td className="py-3.5 px-4 font-bold text-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-indigo-400 flex items-center justify-center font-mono text-xs font-bold">
+                          {displayName.slice(0, 2).toUpperCase()}
+                        </div>
+                        <div>
+                          <div className="font-sans text-sm font-bold text-slate-100">{displayName}</div>
+                          <div className="font-mono text-[10px] text-indigo-300">{client.bank_id}</div>
+                        </div>
                       </div>
-                      <span className="font-mono text-sm">{client.bank_id}</span>
                     </td>
                     <td className="py-3.5 px-4">
                       <span
@@ -575,17 +545,18 @@ export default function CoordinatorPage() {
             <div className="flex items-center gap-2 self-start sm:self-auto">
               <span className="text-[11px] font-mono text-slate-400">Target Node:</span>
               <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-indigo-600/30 text-indigo-300 border border-indigo-500/40">
-                {selectedBankId}
+                {activeClient ? `${getBankDisplayName(activeClient)} (${activeClient.bank_id})` : selectedBankId}
               </span>
             </div>
           </div>
 
-          {/* Bank Node Segmented Selector Bar (3 Columns, Zero Overflow) */}
+          {/* Bank Node Segmented Selector Bar (5 Consortium Banks) */}
           {displayClients.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 bg-[#02030a]/80 p-1.5 rounded-xl border border-white/10 min-w-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 bg-[#02030a]/80 p-1.5 rounded-xl border border-white/10 min-w-0">
               {displayClients.map((c) => {
                 const isSelected = selectedBankId === c.bank_id;
                 const isCuda = c.hardware_type === 'cuda';
+                const displayName = getBankDisplayName(c);
 
                 return (
                   <button
@@ -598,13 +569,17 @@ export default function CoordinatorPage() {
                     }`}
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="font-mono text-xs font-bold truncate">
-                        {c.bank_id.split('_')[1]?.toUpperCase() || c.bank_id}
+                      <span className="font-sans text-xs font-bold truncate">
+                        {displayName}
                       </span>
                       {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />}
                     </div>
-                    <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate">
-                      {isCuda ? `⚡ ${c.device_count}x GPU` : `🖥️ CPU`}
+                    <div className="text-[10px] font-mono text-indigo-300 truncate">
+                      {c.bank_id}
+                    </div>
+                    <div className="text-[10px] font-mono text-slate-400 mt-0.5 truncate flex items-center justify-between">
+                      <span>{isCuda ? `⚡ ${c.device_count}x GPU` : `🖥️ CPU`}</span>
+                      <span>{c.ram_gb.toFixed(0)} GB</span>
                     </div>
                   </button>
                 );
@@ -615,10 +590,10 @@ export default function CoordinatorPage() {
               <span>No live edge nodes connected for hyperparameter tuning.</span>
               <button
                 type="button"
-                onClick={() => setViewMode('sandbox')}
+                onClick={handleRefresh}
                 className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 font-semibold text-[11px] cursor-pointer"
               >
-                Switch to Sandbox Mode
+                Refresh Registry
               </button>
             </div>
           )}
@@ -709,7 +684,7 @@ export default function CoordinatorPage() {
             {/* Target Hardware Summary */}
             <div className="p-3.5 rounded-xl bg-[#02030a]/80 border border-white/10 space-y-2 min-w-0">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">
-                {activeClient ? `${activeClient.bank_id} Hardware Profile` : 'Hardware Profile'}
+                {activeClient ? `${getBankDisplayName(activeClient)} (${activeClient.bank_id}) Hardware Profile` : 'Hardware Profile'}
               </span>
               {activeClient ? (
                 <div className="grid grid-cols-2 gap-2 text-xs font-mono">
