@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import CasesPage from '../CasesPage';
 import * as queries from '../../api/queries';
 
@@ -34,6 +34,8 @@ describe('CasesPage Integration Test Suite', () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionStorage.clear();
+    window.history.replaceState({}, '', '/cases');
     vi.spyOn(queries, 'useCases').mockReturnValue({
       data: mockCases,
       isLoading: false,
@@ -87,7 +89,7 @@ describe('CasesPage Integration Test Suite', () => {
     expect(screen.getByText(/Case Management/i)).toBeInTheDocument();
   });
 
-  it('allows user to filter cases by status dropdown', async () => {
+  it('allows user to filter cases by status dropdown and persists to sessionStorage', async () => {
     const user = userEvent.setup();
 
     render(
@@ -98,9 +100,157 @@ describe('CasesPage Integration Test Suite', () => {
       </QueryClientProvider>
     );
 
-    const statusSelect = screen.getByRole('combobox');
+    const statusSelect = screen.getByLabelText(/Status:/i);
     await user.selectOptions(statusSelect, 'open');
     expect(statusSelect).toHaveValue('open');
+    expect(sessionStorage.getItem('cfi_cases_status_filter')).toBe('open');
+  });
+
+  it('allows user to filter cases by priority dropdown and persists to sessionStorage', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const prioritySelect = screen.getByLabelText(/Priority:/i);
+    await user.selectOptions(prioritySelect, 'p1_critical');
+    expect(prioritySelect).toHaveValue('p1_critical');
+    expect(sessionStorage.getItem('cfi_cases_priority_filter')).toBe('p1_critical');
+  });
+
+  it('filters cases in real-time via text search input and allows clearing search', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const searchInput = screen.getByPlaceholderText(/Search case, ID, lead\.\.\./i);
+    await user.type(searchInput, 'Structuring');
+
+    // Only case_101 matches 'Structuring'
+    expect(screen.getByText(/Consortium Structuring Scheme Alpha/i)).toBeInTheDocument();
+    expect(screen.queryByText(/High Velocity Synthetic Identity Probe/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/1 case \(of 2\)/i)).toBeInTheDocument();
+
+    // Clear search with the X button
+    const clearSearchBtn = screen.getByLabelText(/Clear search/i);
+    await user.click(clearSearchBtn);
+
+    expect(screen.getByText(/Consortium Structuring Scheme Alpha/i)).toBeInTheDocument();
+    expect(screen.getByText(/High Velocity Synthetic Identity Probe/i)).toBeInTheDocument();
+    expect(screen.getByText(/2 cases/i)).toBeInTheDocument();
+  });
+
+  it('initializes filters directly from URL search parameters', () => {
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/cases?status=open&priority=p1_critical&q=Alpha']}>
+          <CasesPage />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+
+    const statusSelect = screen.getByLabelText(/Status:/i);
+    const prioritySelect = screen.getByLabelText(/Priority:/i);
+    const searchInput = screen.getByPlaceholderText(/Search case, ID, lead\.\.\./i);
+
+    expect(statusSelect).toHaveValue('open');
+    expect(prioritySelect).toHaveValue('p1_critical');
+    expect(searchInput).toHaveValue('Alpha');
+    expect(screen.getByText(/Consortium Structuring Scheme Alpha/i)).toBeInTheDocument();
+    expect(screen.queryByText(/High Velocity Synthetic Identity Probe/i)).not.toBeInTheDocument();
+  });
+
+  it('restores filters from sessionStorage when URL parameters are not set', () => {
+    sessionStorage.setItem('cfi_cases_status_filter', 'pending_review');
+    sessionStorage.setItem('cfi_cases_priority_filter', 'p2_high');
+    sessionStorage.setItem('cfi_cases_search_query', 'Synthetic');
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const statusSelect = screen.getByLabelText(/Status:/i);
+    const prioritySelect = screen.getByLabelText(/Priority:/i);
+    const searchInput = screen.getByPlaceholderText(/Search case, ID, lead\.\.\./i);
+
+    expect(statusSelect).toHaveValue('pending_review');
+    expect(prioritySelect).toHaveValue('p2_high');
+    expect(searchInput).toHaveValue('Synthetic');
+  });
+
+  it('renders dedicated filter empty state with Clear Status Filter button', async () => {
+    const user = userEvent.setup();
+
+    vi.spyOn(queries, 'useCases').mockReturnValue({
+      data: [],
+      isLoading: false,
+      error: null,
+      refetch: vi.fn(),
+    } as any);
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const statusSelect = screen.getByLabelText(/Status:/i);
+    await user.selectOptions(statusSelect, 'closed_false_positive');
+
+    expect(screen.getByText(/No cases matching filter criteria/i)).toBeInTheDocument();
+    const clearBtn = screen.getByRole('button', { name: /Clear Status Filter/i });
+    expect(clearBtn).toBeInTheDocument();
+
+    await user.click(clearBtn);
+    expect(statusSelect).toHaveValue('');
+  });
+
+  it('resets all filters and storage when Clear Filters button is clicked', async () => {
+    const user = userEvent.setup();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <BrowserRouter>
+          <CasesPage />
+        </BrowserRouter>
+      </QueryClientProvider>
+    );
+
+    const statusSelect = screen.getByLabelText(/Status:/i);
+    const prioritySelect = screen.getByLabelText(/Priority:/i);
+    const searchInput = screen.getByPlaceholderText(/Search case, ID, lead\.\.\./i);
+
+    await user.selectOptions(statusSelect, 'open');
+    await user.selectOptions(prioritySelect, 'p1_critical');
+    await user.type(searchInput, 'Alpha');
+
+    const clearAllBtn = screen.getByRole('button', { name: /Clear Filters/i });
+    expect(clearAllBtn).toBeInTheDocument();
+    await user.click(clearAllBtn);
+
+    expect(statusSelect).toHaveValue('');
+    expect(prioritySelect).toHaveValue('');
+    expect(searchInput).toHaveValue('');
+    expect(sessionStorage.getItem('cfi_cases_status_filter')).toBeNull();
+    expect(sessionStorage.getItem('cfi_cases_priority_filter')).toBeNull();
+    expect(sessionStorage.getItem('cfi_cases_search_query')).toBeNull();
   });
 
   it('renders authentic empty state when no cases exist in the database', () => {
@@ -122,34 +272,5 @@ describe('CasesPage Integration Test Suite', () => {
     expect(screen.getByText(/No cases yet/i)).toBeInTheDocument();
     expect(screen.getByText(/Create a case to start tracking/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /\+ Create First Case/i })).toBeInTheDocument();
-  });
-
-  it('renders dedicated filter empty state with Clear Status Filter button', async () => {
-    const user = userEvent.setup();
-
-    vi.spyOn(queries, 'useCases').mockReturnValue({
-      data: [],
-      isLoading: false,
-      error: null,
-      refetch: vi.fn(),
-    } as any);
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <BrowserRouter>
-          <CasesPage />
-        </BrowserRouter>
-      </QueryClientProvider>
-    );
-
-    const statusSelect = screen.getByRole('combobox');
-    await user.selectOptions(statusSelect, 'closed_false_positive');
-
-    expect(screen.getByText(/No cases matching filter/i)).toBeInTheDocument();
-    const clearBtn = screen.getByRole('button', { name: /Clear Status Filter/i });
-    expect(clearBtn).toBeInTheDocument();
-
-    await user.click(clearBtn);
-    expect(statusSelect).toHaveValue('');
   });
 });

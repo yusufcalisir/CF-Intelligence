@@ -56,7 +56,7 @@ export default function InvestigationDashboard() {
           <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       ),
-      href: '/alerts',
+      href: '/alerts?severity=CRITICAL',
     },
     {
       id: 'cases',
@@ -77,7 +77,7 @@ export default function InvestigationDashboard() {
           <polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" />
         </svg>
       ),
-      href: '/cases',
+      href: '/cases?status=open',
     },
     {
       id: 'entities',
@@ -318,9 +318,14 @@ export default function InvestigationDashboard() {
                   const pct = total > 0 ? (count / total) * 100 : 0;
                   const color = SEVERITY_COLORS[severity] || '#6b7280';
                   return (
-                    <div key={severity} className="space-y-1">
+                    <Link
+                      key={severity}
+                      to={`/alerts?severity=${severity.toUpperCase()}`}
+                      className="space-y-1 block p-1.5 -mx-1.5 rounded-lg hover:bg-white/5 transition-all group/sev cursor-pointer"
+                      title={`Filter alerts by ${severity.toUpperCase()}`}
+                    >
                       <div className="flex justify-between text-xs">
-                        <span className="capitalize font-semibold text-slate-300 flex items-center gap-1.5">
+                        <span className="capitalize font-semibold text-slate-300 flex items-center gap-1.5 group-hover/sev:text-white transition-colors">
                           <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
                           {severity}
                         </span>
@@ -337,7 +342,7 @@ export default function InvestigationDashboard() {
                           style={{ backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
                         />
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
             </div>
@@ -368,9 +373,14 @@ export default function InvestigationDashboard() {
                 const pct = total > 0 ? (count / total) * 100 : 0;
                 const bankColor = bankId === 'bank_a' ? '#6366f1' : bankId === 'bank_b' ? '#14b8a6' : '#f59e0b';
                 return (
-                  <div key={bankId} className="space-y-1">
+                  <Link
+                    key={bankId}
+                    to={`/alerts?bank_id=${bankId}`}
+                    className="space-y-1 block p-1.5 -mx-1.5 rounded-lg hover:bg-white/5 transition-all group/bank cursor-pointer"
+                    title={`Filter alerts for ${BANK_NAMES[bankId] || bankId}`}
+                  >
                     <div className="flex justify-between text-xs">
-                      <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <span className="font-semibold text-slate-300 flex items-center gap-1.5 group-hover/bank:text-white transition-colors">
                         <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: bankColor }} />
                         {BANK_NAMES[bankId] || bankId}
                       </span>
@@ -387,7 +397,7 @@ export default function InvestigationDashboard() {
                         style={{ backgroundColor: bankColor, boxShadow: `0 0 10px ${bankColor}` }}
                       />
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

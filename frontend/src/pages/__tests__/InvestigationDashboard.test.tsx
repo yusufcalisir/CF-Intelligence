@@ -42,6 +42,12 @@ describe('InvestigationDashboard', () => {
       if (url.includes('/dashboard/intelligence-stats')) {
         return { data: { total_shared: 5, pending_approvals: 2, privacy_preserved_queries: 18 } };
       }
+      if (url.includes('alerts-by-severity')) {
+        return { data: { critical: 12, high: 24, medium: 45, low: 73 } };
+      }
+      if (url.includes('alerts-by-bank')) {
+        return { data: { bank_a: 50, bank_b: 60, bank_c: 44 } };
+      }
       return { data: [] };
     });
   });
@@ -62,5 +68,35 @@ describe('InvestigationDashboard', () => {
     const links = screen.getAllByRole('link');
     const hasWorkbench = links.some((l) => l.textContent?.includes('Workbench'));
     expect(hasWorkbench).toBe(true);
+  });
+
+  it('renders smart deep links for critical alerts, open cases, and breakdown distributions', async () => {
+    render(<InvestigationDashboard />, { wrapper: createWrapper() });
+
+    expect(await screen.findByText(/Critical Alerts/i)).toBeInTheDocument();
+
+    const links = screen.getAllByRole('link');
+
+    // Verify Critical Alerts KPI card deep-links to filtered alerts
+    const criticalAlertsLink = links.find((l) =>
+      l.getAttribute('href') === '/alerts?severity=CRITICAL' &&
+      l.textContent?.includes('Critical Alerts')
+    );
+    expect(criticalAlertsLink).toBeDefined();
+
+    // Verify Open Cases KPI card deep-links to filtered cases
+    const openCasesLink = links.find((l) =>
+      l.getAttribute('href') === '/cases?status=open' &&
+      l.textContent?.includes('Open Cases')
+    );
+    expect(openCasesLink).toBeDefined();
+
+    // Verify severity breakdown links
+    const sevLinks = links.filter((l) => l.getAttribute('href')?.startsWith('/alerts?severity='));
+    expect(sevLinks.length).toBeGreaterThan(0);
+
+    // Verify consortium bank breakdown links
+    const bankLinks = links.filter((l) => l.getAttribute('href')?.startsWith('/alerts?bank_id='));
+    expect(bankLinks.length).toBeGreaterThan(0);
   });
 });
