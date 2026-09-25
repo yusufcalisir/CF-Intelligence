@@ -1,7 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import ChaosAttackInjectorPanel from '../ChaosAttackInjectorPanel';
+import ChaosAttackInjectorPanel, { CHAOS_ATTACK_SESSION_KEY } from '../ChaosAttackInjectorPanel';
 import * as queries from '../../../api/queries';
 
 const createWrapper = () => {
@@ -14,6 +14,11 @@ const createWrapper = () => {
 };
 
 describe('ChaosAttackInjectorPanel Component', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    vi.restoreAllMocks();
+  });
+
   it('renders initial nominal state with attack injection buttons', () => {
     render(<ChaosAttackInjectorPanel />, { wrapper: createWrapper() });
 
@@ -72,7 +77,7 @@ describe('ChaosAttackInjectorPanel Component', () => {
       expect(onQuarantineMock).toHaveBeenCalledWith('bank_gamma');
     });
 
-    // Verify Neutralize button resets state
+    // Verify Neutralize button resets state and clears sessionStorage
     const neutralizeBtn = screen.getByRole('button', { name: /Neutralize & Restore Quorum/i });
     fireEvent.click(neutralizeBtn);
 
@@ -81,7 +86,6 @@ describe('ChaosAttackInjectorPanel Component', () => {
       expect(onQuarantineMock).toHaveBeenCalledWith(null);
     });
   });
-
 
   it('triggers 500 tx/s smurfing burst and displays intercepted packets metric', async () => {
     vi.spyOn(queries, 'useInjectAttack').mockReturnValue({
@@ -110,6 +114,47 @@ describe('ChaosAttackInjectorPanel Component', () => {
     await waitFor(() => {
       expect(screen.getByText(/GraphSAGE Temporal GNN/i)).toBeInTheDocument();
       expect(screen.getByText(/Intercepted: 1500 txs/i)).toBeInTheDocument();
+    });
+  });
+
+  it('restores active attack telemetry from sessionStorage on mount and clears on reset', async () => {
+    const savedAttack = {
+      attack_id: 'ATK-BYZ-RESTORED',
+      attack_type: 'byzantine_poisoning',
+      status: 'quarantined',
+      defense_activated: 'Bulyan Robust Byzantine Aggregation',
+      adversary_quarantined: 'bank_gamma',
+      euclidean_distance: 35.12,
+      distance_threshold: 12.50,
+      packets_blocked: 800,
+      mitigation_latency_ms: 2.9,
+      auc_protected: 0.9450,
+      auc_compromised_baseline: 0.5100,
+      log_entry: 'Restored Byzantine attack telemetry across route transition.',
+    };
+
+    sessionStorage.setItem(CHAOS_ATTACK_SESSION_KEY, JSON.stringify(savedAttack));
+    const onQuarantineMock = vi.fn();
+
+    render(
+      <ChaosAttackInjectorPanel onQuarantineChange={onQuarantineMock} />,
+      { wrapper: createWrapper() }
+    );
+
+    // Should immediately display the restored threat HUD
+    expect(screen.getByText('CRITICAL THREAT INJECTED')).toBeInTheDocument();
+    expect(screen.getByText('Bulyan Robust Byzantine Aggregation')).toBeInTheDocument();
+    expect(screen.getByText(/Quarantined: bank_gamma/i)).toBeInTheDocument();
+    expect(onQuarantineMock).toHaveBeenCalledWith('bank_gamma');
+
+    // Neutralize button should clear sessionStorage
+    const neutralizeBtn = screen.getByRole('button', { name: /Neutralize & Restore Quorum/i });
+    fireEvent.click(neutralizeBtn);
+
+    await waitFor(() => {
+      expect(screen.getByText('CONSORTIUM NOMINAL')).toBeInTheDocument();
+      expect(sessionStorage.getItem(CHAOS_ATTACK_SESSION_KEY)).toBeNull();
+      expect(onQuarantineMock).toHaveBeenCalledWith(null);
     });
   });
 });
