@@ -67,6 +67,14 @@ export interface CounterfactualReport {
   summary_text: string;
 }
 
+export interface CounterfactualSimulationParams {
+  alert_id?: string;
+  target_score?: number;
+  amount?: number;
+  velocity?: number;
+  merchant_risk?: number;
+}
+
 export interface FLRoundResult {
   round_number: number;
   global_loss: number;

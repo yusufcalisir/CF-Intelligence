@@ -615,6 +615,9 @@ class CounterfactualChangeSchema(BaseModel):
     original_value: Any
     remediated_value: Any
     delta_explanation: str
+    suggested_value: Any = None
+    delta: float = 0.0
+    description: str = ""
 
 
 class CounterfactualExplanationResponse(BaseModel):
@@ -624,6 +627,14 @@ class CounterfactualExplanationResponse(BaseModel):
     is_cleared: bool
     changes: list[CounterfactualChangeSchema] = []
     summary_text: str = ""
+
+
+class CounterfactualSimulationRequest(BaseModel):
+    alert_id: str = "alt_1001"
+    target_score: float = 350.0
+    amount: float | None = None
+    velocity: float | None = None
+    merchant_risk: float | None = None
 
 
 class PolicyRuleEvaluationSchema(BaseModel):

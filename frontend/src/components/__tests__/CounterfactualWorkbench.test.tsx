@@ -51,9 +51,32 @@ describe('CounterfactualWorkbench Component (User Interaction)', () => {
     const simulateBtn = screen.getByRole('button', { name: /Simulate Optimal Counterfactual Path/i });
     await user.click(simulateBtn);
 
+    expect(api.fetchCounterfactual).toHaveBeenCalledWith(
+      expect.objectContaining({
+        alert_id: 'alt_1001',
+        target_score: 350.0,
+        amount: 15000,
+        velocity: 28,
+        merchant_risk: 0.95,
+      })
+    );
+
     expect(await screen.findByText(/Remediation Action Path/i)).toBeInTheDocument();
     expect(screen.getByText(/Reduce hourly transaction burst rate/i)).toBeInTheDocument();
     expect(screen.getByText(/Optimal minimal perturbation path/i)).toBeInTheDocument();
+  });
+
+  it('displays error banner when counterfactual simulation fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(api, 'fetchCounterfactual').mockRejectedValue(new Error('Backend ML engine offline'));
+
+    render(<CounterfactualWorkbench />);
+
+    const simulateBtn = screen.getByRole('button', { name: /Simulate Optimal Counterfactual Path/i });
+    await user.click(simulateBtn);
+
+    expect(await screen.findByText(/Counterfactual Simulation Error/i)).toBeInTheDocument();
+    expect(screen.getByText(/Backend ML engine offline/i)).toBeInTheDocument();
   });
 
   it('resets sliders and clears remediation report when user clicks reset button', async () => {

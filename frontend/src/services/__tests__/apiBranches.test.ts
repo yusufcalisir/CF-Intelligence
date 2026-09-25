@@ -137,24 +137,20 @@ describe('API Service Comprehensive Branch Coverage Suite', () => {
       expect(res.remediated_score).toBe(250.0);
     });
 
-    it('returns fallback remediation plan when API response is not ok', async () => {
+    it('throws error when API response is not ok', async () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: false,
         status: 404,
+        statusText: 'Not Found',
       });
 
-      const res = await fetchCounterfactual('ALT-404', 350.0);
-      expect(res.alert_id).toBe('ALT-404');
-      expect(res.is_cleared).toBe(true);
-      expect(res.changes.length).toBe(3);
+      await expect(fetchCounterfactual('ALT-404', 350.0)).rejects.toThrow(/Counterfactual API error \(404\)/i);
     });
 
-    it('returns fallback remediation plan when fetch throws network error', async () => {
+    it('throws error when fetch throws network error', async () => {
       global.fetch = vi.fn().mockRejectedValue(new Error('Connection timeout'));
 
-      const res = await fetchCounterfactual('ALT-ERR');
-      expect(res.alert_id).toBe('ALT-ERR');
-      expect(res.original_score).toBe(780.0);
+      await expect(fetchCounterfactual('ALT-ERR')).rejects.toThrow(/Connection timeout/i);
     });
   });
 

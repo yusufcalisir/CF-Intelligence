@@ -1,5 +1,6 @@
 import {
   CounterfactualReport,
+  CounterfactualSimulationParams,
   FLRoundResult,
   FLSimulationRequest,
   PredictPayload,
@@ -38,46 +39,41 @@ export async function predictTransaction(payload: PredictPayload): Promise<Predi
 }
 
 export async function fetchCounterfactual(
-  alertId: string,
+  alertIdOrParams: string | CounterfactualSimulationParams = 'alt_1001',
   targetScore: number = 350.0
 ): Promise<CounterfactualReport> {
-  try {
-    const res = await fetch(`${BASE_URL}/explainability/counterfactuals?alert_id=${alertId}&target_score=${targetScore}`);
-    if (res.ok) {
-      return await res.json();
-    }
-  } catch {
-    // Fallback simulation for offline/demo mode
+  const query = new URLSearchParams();
+
+  if (typeof alertIdOrParams === 'object') {
+    query.set('alert_id', alertIdOrParams.alert_id || 'alt_1001');
+    query.set('target_score', String(alertIdOrParams.target_score ?? targetScore));
+    if (alertIdOrParams.amount !== undefined) query.set('amount', String(alertIdOrParams.amount));
+    if (alertIdOrParams.velocity !== undefined) query.set('velocity', String(alertIdOrParams.velocity));
+    if (alertIdOrParams.merchant_risk !== undefined) query.set('merchant_risk', String(alertIdOrParams.merchant_risk));
+  } else {
+    query.set('alert_id', alertIdOrParams || 'alt_1001');
+    query.set('target_score', String(targetScore));
   }
+
+  const res = await fetch(`${BASE_URL}/explainability/counterfactuals?${query.toString()}`);
+  if (!res.ok) {
+    throw new Error(`Counterfactual API error (${res.status}): ${res.statusText}`);
+  }
+
+  const data = await res.json();
   return {
-    alert_id: alertId,
-    original_score: 780.0,
-    remediated_score: 310.0,
-    is_cleared: true,
-    changes: [
-      {
-        feature: 'transaction_amount',
-        original_value: 15000.0,
-        suggested_value: 1200.0,
-        delta: -13800.0,
-        description: 'Reduce single-transaction amount below high-risk threshold',
-      },
-      {
-        feature: 'velocity',
-        original_value: 28.0,
-        suggested_value: 3.5,
-        delta: -24.5,
-        description: 'Enforce hourly transaction velocity limit',
-      },
-      {
-        feature: 'merchant_risk_score',
-        original_value: 0.95,
-        suggested_value: 0.15,
-        delta: -0.80,
-        description: 'Reroute through verified low-risk payment gateway',
-      },
-    ],
-    summary_text: 'REMEDIATED: Risk score reduced from 780.0 to 310.0. Alert status changed to CLEARED.',
+    alert_id: data.alert_id,
+    original_score: data.original_score,
+    remediated_score: data.remediated_score,
+    is_cleared: data.is_cleared,
+    changes: (data.changes || []).map((c: any) => ({
+      feature: c.feature,
+      original_value: c.original_value,
+      suggested_value: c.suggested_value ?? c.remediated_value,
+      delta: c.delta ?? 0,
+      description: c.description ?? c.delta_explanation ?? '',
+    })),
+    summary_text: data.summary_text,
   };
 }
 

@@ -22,6 +22,7 @@ from app.application.schemas.alerts import (
 from app.application.schemas.phase2 import (
     CounterfactualChangeSchema,
     CounterfactualExplanationResponse,
+    CounterfactualSimulationRequest,
     DecisionReplayResponse,
     EdgeContributionSchema,
     ExplainabilityResponse,
@@ -406,10 +407,107 @@ async def get_alert_counterfactuals(
                 original_value=c.original_value,
                 remediated_value=c.remediated_value,
                 delta_explanation=c.delta_explanation,
+                suggested_value=c.remediated_value,
+                description=c.delta_explanation,
             )
             for c in cf.changes
         ],
         summary_text=cf.summary_text,
+    )
+
+
+@router.get("/explainability/counterfactuals", response_model=CounterfactualExplanationResponse)
+@api_router.get("/explainability/counterfactuals", response_model=CounterfactualExplanationResponse)
+async def get_explainability_counterfactuals(
+    alert_id: str = Query("alt_1001"),
+    target_score: float = Query(350.0, ge=50.0, le=800.0),
+    amount: float | None = Query(None, description="Transaction amount ($)"),
+    velocity: float | None = Query(None, description="Hourly velocity (txns/hr)"),
+    merchant_risk: float | None = Query(None, description="Merchant risk category score [0.0, 1.0]"),
+    caller_tenant: TenantDep = None,
+) -> CounterfactualExplanationResponse:
+    """Get actionable counterfactual remediation paths for an alert or interactive workbench simulation."""
+    alert = _alert_service.get_alert(alert_id)
+    if not alert:
+        from app.domain.entities_phase2 import Alert
+
+        alert_score = 780.0
+        if amount is not None or velocity is not None or merchant_risk is not None:
+            base_amt = min(300.0, ((amount or 15000.0) / 20000.0) * 300.0)
+            vel_risk = min(250.0, ((velocity or 28.0) / 30.0) * 250.0)
+            m_risk = (merchant_risk or 0.95) * 250.0
+            alert_score = round(min(990.0, base_amt + vel_risk + m_risk + 120.0), 1)
+
+        alert = Alert(
+            id=alert_id,
+            bank_id=caller_tenant or "bank_alpha",
+            risk_score=alert_score,
+            severity="high" if alert_score >= 600.0 else "medium",
+            reason_codes=["HIGH-AMT", "VEL-001", "MERCH-RISK"],
+            involved_entity_ids=["entity_workbench_demo"],
+            model_confidence=min(0.99, alert_score / 1000.0),
+        )
+
+    if caller_tenant:
+        enforce_tenant_isolation(caller_tenant, alert.bank_id)
+
+    txn_override = None
+    if amount is not None or velocity is not None or merchant_risk is not None:
+        txn_override = {
+            "transaction_amount": float(amount if amount is not None else 15000.0),
+            "velocity": float(velocity if velocity is not None else 28.0),
+            "merchant_risk_score": float(merchant_risk if merchant_risk is not None else 0.95),
+            "country_code": "US",
+            "merchant_category": "retail",
+            "device_type": "web_browser",
+            "customer_history_score": 0.85,
+            "account_age_days": 180,
+        }
+
+    cf = _explainability_service.generate_counterfactuals(
+        alert, target_score=target_score, transaction=txn_override
+    )
+
+    return CounterfactualExplanationResponse(
+        alert_id=cf.alert_id,
+        original_score=cf.original_score,
+        remediated_score=cf.remediated_score,
+        is_cleared=cf.is_cleared,
+        changes=[
+            CounterfactualChangeSchema(
+                feature=c.feature,
+                original_value=c.original_value,
+                remediated_value=c.remediated_value,
+                delta_explanation=c.delta_explanation,
+                suggested_value=c.remediated_value,
+                description=c.delta_explanation,
+                delta=(
+                    round(float(c.remediated_value) - float(c.original_value), 2)
+                    if isinstance(c.remediated_value, (int, float))
+                    and isinstance(c.original_value, (int, float))
+                    else 0.0
+                ),
+            )
+            for c in cf.changes
+        ],
+        summary_text=cf.summary_text,
+    )
+
+
+@router.post("/explainability/counterfactuals", response_model=CounterfactualExplanationResponse)
+@api_router.post("/explainability/counterfactuals", response_model=CounterfactualExplanationResponse)
+async def simulate_explainability_counterfactuals(
+    payload: CounterfactualSimulationRequest,
+    caller_tenant: TenantDep = None,
+) -> CounterfactualExplanationResponse:
+    """Execute dynamic counterfactual simulation from JSON payload for interactive workbench."""
+    return await get_explainability_counterfactuals(
+        alert_id=payload.alert_id,
+        target_score=payload.target_score,
+        amount=payload.amount,
+        velocity=payload.velocity,
+        merchant_risk=payload.merchant_risk,
+        caller_tenant=caller_tenant,
     )
 
 

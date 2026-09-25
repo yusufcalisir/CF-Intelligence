@@ -282,3 +282,49 @@ def test_tenant_isolation_enforcement(client: TestClient, populated_alert_servic
     assert r_patch.status_code == 403
 
     app.dependency_overrides.clear()
+
+
+def test_explainability_counterfactuals_workbench_endpoints(client: TestClient) -> None:
+    """Verify GET and POST /explainability/counterfactuals with dynamic workbench parameters."""
+    # 1. GET with query parameters
+    r_get = client.get(
+        "/api/v1/explainability/counterfactuals",
+        params={
+            "alert_id": "alt_1001",
+            "target_score": 350.0,
+            "amount": 15000.0,
+            "velocity": 28.0,
+            "merchant_risk": 0.95,
+        },
+    )
+    assert r_get.status_code == 200
+    data_get = r_get.json()
+    assert data_get["alert_id"] == "alt_1001"
+    assert data_get["original_score"] > 600.0
+    assert data_get["remediated_score"] <= 350.0
+    assert data_get["is_cleared"] is True
+    assert len(data_get["changes"]) > 0
+    first_change = data_get["changes"][0]
+    assert "feature" in first_change
+    assert "suggested_value" in first_change
+    assert "delta" in first_change
+    assert "description" in first_change
+
+    # 2. POST with JSON body
+    r_post = client.post(
+        "/api/v1/explainability/counterfactuals",
+        json={
+            "alert_id": "alt_1001",
+            "target_score": 350.0,
+            "amount": 25000.0,
+            "velocity": 35.0,
+            "merchant_risk": 0.99,
+        },
+    )
+    assert r_post.status_code == 200
+    data_post = r_post.json()
+    assert data_post["alert_id"] == "alt_1001"
+    assert data_post["original_score"] > 700.0
+    assert data_post["remediated_score"] <= 350.0
+    assert data_post["is_cleared"] is True
+    assert len(data_post["changes"]) > 0

@@ -9,6 +9,7 @@ export const CounterfactualWorkbench: React.FC = () => {
   const [merchantRisk, setMerchantRisk] = useState(0.95);
   const [report, setReport] = useState<CounterfactualReport | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const calculateDynamicScore = () => {
     const baseAmountRisk = Math.min(300, (amount / 20000) * 300);
@@ -22,9 +23,21 @@ export const CounterfactualWorkbench: React.FC = () => {
 
   const handleSimulateCounterfactual = async () => {
     setLoading(true);
-    const res = await fetchCounterfactual('alt_1001', 350.0);
-    setReport(res);
-    setLoading(false);
+    setError(null);
+    try {
+      const res = await fetchCounterfactual({
+        alert_id: 'alt_1001',
+        target_score: 350.0,
+        amount,
+        velocity,
+        merchant_risk: merchantRisk,
+      });
+      setReport(res);
+    } catch (err: any) {
+      setError(err?.message || 'Failed to simulate counterfactual path');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResetSliders = () => {
@@ -32,6 +45,7 @@ export const CounterfactualWorkbench: React.FC = () => {
     setVelocity(28);
     setMerchantRisk(0.95);
     setReport(null);
+    setError(null);
   };
 
   return (
@@ -172,6 +186,17 @@ export const CounterfactualWorkbench: React.FC = () => {
               </span>
             </div>
           </div>
+
+          {/* Error Banner */}
+          {error && (
+            <div className="bg-rose-500/10 border border-rose-500/20 text-rose-300 p-4 rounded-xl text-xs flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-rose-400 shrink-0" />
+              <div>
+                <p className="font-semibold">Counterfactual Simulation Error</p>
+                <p className="text-rose-300/80 mt-0.5">{error}</p>
+              </div>
+            </div>
+          )}
 
           {/* Counterfactual Remediation Path Recommendations */}
           {report && (
