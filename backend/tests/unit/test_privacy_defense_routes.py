@@ -173,3 +173,108 @@ class TestRDPCompositionEndpoints:
         data = response.json()
         assert data["total_rounds"] == 2
         assert "rdp_map" in data
+
+
+class TestBankRDPBudgetsEndpoints:
+    def test_get_bank_budgets_canonical(self) -> None:
+        response = client.get("/v1/privacy-defense/rdp/bank-budgets")
+        assert response.status_code == 200
+        data = response.json()
+        assert "consortium_target_epsilon" in data
+        assert "node_budgets" in data
+        assert len(data["node_budgets"]) >= 1
+        node = data["node_budgets"][0]
+        assert "node_id" in node
+        assert "bank_name" in node
+        assert "budget_exhaustion_pct" in node
+        assert "calibrated_sigma" in node
+
+    def test_get_bank_budgets_prefixed(self) -> None:
+        response = client.get("/api/v1/privacy-defense/rdp/bank-budgets")
+        assert response.status_code == 200
+        data = response.json()
+        assert "training_circuit_breaker_active" in data
+        assert "global_cumulative_rdp" in data
+
+
+class TestCircuitBreakerEndpoints:
+    def test_circuit_breaker_freeze_and_unfreeze(self) -> None:
+        # 1. Freeze
+        freeze_payload = {
+            "action": "freeze",
+            "reason": "Test emergency pause",
+            "actor": "secops_tester",
+            "node_id": "bank_alpha",
+        }
+        r1 = client.post("/v1/privacy-defense/rdp/circuit-breaker", json=freeze_payload)
+        assert r1.status_code == 200
+        d1 = r1.json()
+        assert d1["success"] is True
+        assert d1["action"] == "freeze"
+        assert d1["training_circuit_breaker_active"] is True
+        assert d1["frozen_by_node"] == "bank_alpha"
+
+        # Verify budget status reflects freeze
+        r_status = client.get("/v1/privacy-defense/rdp/bank-budgets")
+        assert r_status.status_code == 200
+        assert r_status.json()["training_circuit_breaker_active"] is True
+
+        # 2. Unfreeze
+        unfreeze_payload = {
+            "action": "unfreeze",
+            "reason": "Security review completed",
+            "actor": "secops_supervisor",
+        }
+        r2 = client.post("/api/v1/privacy-defense/rdp/circuit-breaker", json=unfreeze_payload)
+        assert r2.status_code == 200
+        d2 = r2.json()
+        assert d2["success"] is True
+        assert d2["action"] == "unfreeze"
+        assert d2["training_circuit_breaker_active"] is False
+
+    def test_circuit_breaker_reset_budget(self) -> None:
+        reset_payload = {
+            "action": "reset_budget",
+            "reason": "Routine epoch rollover",
+            "actor": "fl_admin",
+            "node_id": "bank_beta",
+        }
+        response = client.post("/v1/privacy-defense/rdp/circuit-breaker", json=reset_payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["success"] is True
+        assert data["action"] == "reset_budget"
+
+    def test_circuit_breaker_invalid_action_400(self) -> None:
+        bad_payload = {
+            "action": "destroy_all",
+            "reason": "Invalid payload",
+            "actor": "attacker",
+        }
+        response = client.post("/v1/privacy-defense/rdp/circuit-breaker", json=bad_payload)
+        assert response.status_code == 400
+
+
+class TestMIASimulationEndpoints:
+    def test_mia_simulation_low_epsilon_strong_defense(self) -> None:
+        payload = {"test_epsilon": 0.5, "num_samples": 40}
+        response = client.post("/v1/privacy-defense/audit/mia-simulation", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["test_epsilon"] == 0.5
+        assert data["is_dp_enabled"] is True
+        assert "membership_leakage_asr" in data
+        assert "mia_roc_auc" in data
+        assert "loss_gap" in data
+        assert len(data["train_loss_distribution"]) > 0
+        assert len(data["test_loss_distribution"]) > 0
+
+    def test_mia_simulation_high_epsilon_vulnerable(self) -> None:
+        payload = {"test_epsilon": 60.0, "num_samples": 30}
+        response = client.post("/api/v1/privacy-defense/audit/mia-simulation", json=payload)
+        assert response.status_code == 200
+        data = response.json()
+        assert data["test_epsilon"] == 60.0
+        assert data["is_dp_enabled"] is False
+        assert "Unconstrained" in data["attack_summary"]
+

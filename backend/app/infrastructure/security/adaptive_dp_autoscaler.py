@@ -28,8 +28,25 @@ from app.domain.value_objects_rdp import (
 logger = logging.getLogger(__name__)
 
 
+CONSORTIUM_BANK_METADATA: dict[str, dict[str, str]] = {
+    "bank_alpha": {"bank_name": "Garanti BBVA Node", "tier": "Tier-1 Enterprise"},
+    "bank_beta": {"bank_name": "İş Bankası Node", "tier": "Tier-1 Enterprise"},
+    "bank_gamma": {"bank_name": "Akbank Node", "tier": "Tier-1 Enterprise"},
+    "bank_delta": {"bank_name": "Yapı Kredi Node", "tier": "Tier-2 Regional"},
+}
+
+
 class AdaptiveDPAutoScaler:
     """Rényi Differential Privacy accountant and dynamic noise auto-scaler."""
+
+    _instance: AdaptiveDPAutoScaler | None = None
+
+    @classmethod
+    def get_instance(cls) -> AdaptiveDPAutoScaler:
+        """Returns the process-wide singleton instance of AdaptiveDPAutoScaler."""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
 
     def __init__(
         self,
@@ -57,6 +74,12 @@ class AdaptiveDPAutoScaler:
         self.fail_on_exhaustion = fail_on_exhaustion
 
         self._lock = threading.RLock()
+        # Circuit breaker safety freeze state
+        self._training_circuit_breaker_active: bool = False
+        self._frozen_by_node: str | None = None
+        self._frozen_at: str | None = None
+        self._freeze_reason: str | None = None
+
         # Per-node RDP accounting maps: node_id -> {alpha: cumulative_rdp}
         self._node_cumulative_rdp: dict[str, dict[float, float]] = {
             "global": {alpha: 0.0 for alpha in self.orders}
@@ -321,10 +344,19 @@ class AdaptiveDPAutoScaler:
             if node_id != "global":
                 self._node_calibration_history["global"].append(calibration)
 
-            # Compute risk tier
+            # Compute risk tier and circuit-breaker trigger
             pct = (current_eps / effective_target_eps) * 100.0
             if pct >= 100.0:
                 risk_tier = "EXHAUSTED"
+                if not self._training_circuit_breaker_active:
+                    self._training_circuit_breaker_active = True
+                    self._frozen_by_node = node_id
+                    self._frozen_at = datetime.now(UTC).isoformat()
+                    self._freeze_reason = (
+                        f"Automated RDP circuit breaker triggered by node '{node_id}': "
+                        f"Cumulative epsilon ({current_eps:.3f}) exhausted budget ({effective_target_eps:.3f})"
+                    )
+                    logger.warning("SAFETY CIRCUIT BREAKER TRIPPED: %s", self._freeze_reason)
             elif pct >= 80.0:
                 risk_tier = "BUDGET_WARNING"
             elif len(self._node_calibration_history[node_id]) < 3:
@@ -466,9 +498,148 @@ class AdaptiveDPAutoScaler:
                 )
             return summaries
 
+    def freeze_training(
+        self,
+        node_id: str | None = None,
+        reason: str = "Manual operator intervention",
+    ) -> dict[str, Any]:
+        """Freezes all consortium model training updates by engaging the safety circuit breaker."""
+        with self._lock:
+            self._training_circuit_breaker_active = True
+            self._frozen_by_node = node_id or "secops_admin"
+            self._frozen_at = datetime.now(UTC).isoformat()
+            self._freeze_reason = reason
+            logger.warning("Consortium training FROZEN by %s: %s", self._frozen_by_node, reason)
+            return {
+                "success": True,
+                "action": "freeze",
+                "training_circuit_breaker_active": True,
+                "frozen_by_node": self._frozen_by_node,
+                "frozen_at": self._frozen_at,
+                "message": f"Consortium training frozen successfully: {reason}",
+                "timestamp": self._frozen_at,
+            }
+
+    def unfreeze_training(
+        self,
+        actor: str = "secops_admin",
+        reason: str = "Operator manual unfreeze",
+    ) -> dict[str, Any]:
+        """Disengages the safety circuit breaker and resumes consortium training."""
+        with self._lock:
+            self._training_circuit_breaker_active = False
+            prev_node = self._frozen_by_node
+            self._frozen_by_node = None
+            self._frozen_at = None
+            self._freeze_reason = None
+            now_ts = datetime.now(UTC).isoformat()
+            logger.info(
+                "Consortium training RESUMED by %s (previously frozen by %s): %s",
+                actor,
+                prev_node,
+                reason,
+            )
+            return {
+                "success": True,
+                "action": "unfreeze",
+                "training_circuit_breaker_active": False,
+                "frozen_by_node": None,
+                "frozen_at": None,
+                "message": f"Consortium training resumed successfully by {actor}",
+                "timestamp": now_ts,
+            }
+
+    def reset_node_budget(self, node_id: str | None = None) -> dict[str, Any]:
+        """Resets the cumulative RDP accountant budget for a specific node or all nodes."""
+        with self._lock:
+            if node_id and node_id not in ("all", "global"):
+                if node_id in self._node_cumulative_rdp:
+                    self._node_cumulative_rdp[node_id] = {alpha: 0.0 for alpha in self.orders}
+                    self._node_calibration_history[node_id] = []
+                msg = f"Privacy budget for node '{node_id}' reset successfully."
+            else:
+                self.reset()
+                msg = "Consortium privacy budgets reset across all participating bank nodes."
+            now_ts = datetime.now(UTC).isoformat()
+            return {
+                "success": True,
+                "action": "reset_budget",
+                "training_circuit_breaker_active": self._training_circuit_breaker_active,
+                "frozen_by_node": self._frozen_by_node,
+                "frozen_at": self._frozen_at,
+                "message": msg,
+                "timestamp": now_ts,
+            }
+
+    def get_consortium_budgets(self) -> dict[str, Any]:
+        """Returns consortium-wide per-bank RDP accountant budget telemetry and safety lock status."""
+        with self._lock:
+            active_nodes = [k for k in self._node_cumulative_rdp if k != "global"]
+            # If no non-global nodes registered yet, report canonical consortium banks
+            nodes_to_query = active_nodes if active_nodes else ["bank_alpha", "bank_beta", "bank_gamma"]
+
+            node_budgets: list[dict[str, Any]] = []
+            any_exceeded = False
+
+            for nid in nodes_to_query:
+                st = self.get_accountant_state(node_id=nid)
+                history = self._node_calibration_history.get(nid, [])
+                calibrated_sigma = history[-1].calibrated_sigma if history else self.nominal_sigma
+                meta = CONSORTIUM_BANK_METADATA.get(
+                    nid,
+                    {"bank_name": f"{nid.replace('_', ' ').title()} Node", "tier": "Consortium Node"},
+                )
+
+                if st.budget_exhaustion_pct >= 100.0 or st.is_budget_exceeded:
+                    risk_tier = "EXHAUSTED"
+                    any_exceeded = True
+                elif st.budget_exhaustion_pct >= 80.0:
+                    risk_tier = "BUDGET_WARNING"
+                elif st.total_rounds < 3:
+                    risk_tier = "CALIBRATING"
+                else:
+                    risk_tier = "OPTIMAL"
+
+                node_budgets.append(
+                    {
+                        "node_id": nid,
+                        "bank_name": meta["bank_name"],
+                        "tier": meta["tier"],
+                        "rounds_completed": st.total_rounds,
+                        "cumulative_epsilon": round(st.current_epsilon_at_delta, 4),
+                        "target_epsilon": st.target_epsilon,
+                        "target_delta": st.target_delta,
+                        "budget_exhaustion_pct": round(st.budget_exhaustion_pct, 2),
+                        "is_budget_exceeded": st.is_budget_exceeded,
+                        "optimal_alpha_order": st.optimal_alpha_order,
+                        "calibrated_sigma": round(calibrated_sigma, 3),
+                        "risk_tier": risk_tier,
+                    }
+                )
+
+            global_rdp = {str(k): round(v, 6) for k, v in self.cumulative_rdp.items()}
+
+            return {
+                "consortium_target_epsilon": self.target_epsilon,
+                "consortium_target_delta": self.target_delta,
+                "total_nodes_active": len(node_budgets),
+                "any_budget_exceeded": any_exceeded or self._training_circuit_breaker_active,
+                "training_circuit_breaker_active": self._training_circuit_breaker_active,
+                "frozen_by_node": self._frozen_by_node,
+                "frozen_at": self._frozen_at,
+                "freeze_reason": self._freeze_reason,
+                "node_budgets": node_budgets,
+                "global_cumulative_rdp": global_rdp,
+                "updated_at": datetime.now(UTC).isoformat(),
+            }
+
     def reset(self) -> None:
         """Resets accountant state across all nodes while reinitializing the audit chain."""
         with self._lock:
+            self._training_circuit_breaker_active = False
+            self._frozen_by_node = None
+            self._frozen_at = None
+            self._freeze_reason = None
             self._node_cumulative_rdp = {
                 "global": {alpha: 0.0 for alpha in self.orders}
             }

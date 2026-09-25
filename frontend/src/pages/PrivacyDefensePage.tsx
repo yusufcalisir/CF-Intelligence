@@ -6,6 +6,9 @@ import {
   useAuditMIA,
   useAuditModelInversion,
   usePrivacyBudgetLog,
+  useBankRDPBudgets,
+  useCircuitBreakerAction,
+  useSimulateMIA,
 } from '../api/queries';
 import type {
   AggregationMethodInfo,
@@ -13,16 +16,23 @@ import type {
   DLGAuditResult,
   MIAAuditResult,
   ModelInversionAuditResult,
+  NodeRDPBudgetStatus,
+  MIASimulationResponse,
 } from '../api/types';
 import {
   ShieldCheck,
   ShieldAlert,
   Lock,
+  Unlock,
   Database,
   AlertTriangle,
   Play,
   FileText,
   Sparkles,
+  RotateCcw,
+  Activity,
+  Zap,
+  Sliders,
 } from 'lucide-react';
 
 // ── Types & Color Helpers ─────────────────────────────────────
@@ -195,6 +205,233 @@ const SAMPLE_TEST_LOSSES = [0.55, 0.62, 0.48, 0.70, 0.51, 0.66, 0.59, 0.44];
 const SAMPLE_GRAD_NORMS = [0.8, 1.2, 0.95, 10.5, 0.7, 1.1, 8.3, 0.85];
 const SAMPLE_ORIG_GRADS = Array.from({ length: 30 }, (_, i) => Math.sin(i) * 0.3);
 const SAMPLE_RECV_GRADS = Array.from({ length: 30 }, (_, i) => Math.sin(i) * 0.3 + Math.random() * 0.05);
+
+function MIASimulationVisualizer() {
+  const [testEps, setTestEps] = useState<number>(1.0);
+  const [numSamples, setNumSamples] = useState<number>(80);
+  const simulateMIA = useSimulateMIA();
+  const simData = simulateMIA.data as MIASimulationResponse | undefined;
+
+  const presets = [
+    { label: 'ε = 0.5 (Strong)', val: 0.5 },
+    { label: 'ε = 1.5 (Standard)', val: 1.5 },
+    { label: 'ε = 4.0 (Balanced)', val: 4.0 },
+    { label: 'ε = 8.0 (Target SLA)', val: 8.0 },
+    { label: 'No DP (ε = 60)', val: 60.0 },
+  ];
+
+  return (
+    <div className="glass-card p-4 sm:p-6 rounded-2xl border border-indigo-500/30 bg-[#080a21]/95 shadow-xl space-y-5 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-white/5">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-lg bg-indigo-500/20 text-indigo-300">
+              <Sliders className="w-4 h-4" />
+            </div>
+            <h3 className="font-bold text-slate-100 text-sm sm:text-base">
+              Membership Inference Attack (MIA) Empirical Simulator
+            </h3>
+          </div>
+          <p className="text-xs text-slate-400">
+            Simulate shadow model transaction loss distributions and observe empirical ROC-AUC / ASR under Rényi DP
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+            Shokri / Yeom Model
+          </span>
+        </div>
+      </div>
+
+      {/* Preset Buttons & Slider */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center min-w-0">
+        <div className="space-y-2">
+          <label className="text-xs font-mono text-slate-300 flex justify-between">
+            <span>Differential Privacy Noise Level (Target ε):</span>
+            <span className="font-bold text-indigo-400">
+              {testEps >= 50.0 ? '∞ (No DP)' : `ε = ${testEps.toFixed(2)}`}
+            </span>
+          </label>
+          <input
+            id="slider-mia-epsilon"
+            type="range"
+            min="0.1"
+            max="10.0"
+            step="0.1"
+            value={testEps > 10 ? 10 : testEps}
+            onChange={(e) => setTestEps(parseFloat(e.target.value))}
+            className="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+          />
+          <div className="flex flex-wrap gap-1.5 pt-1">
+            {presets.map((p) => (
+              <button
+                key={p.label}
+                onClick={() => setTestEps(p.val)}
+                className={`px-2.5 py-1 rounded-lg text-[10.5px] font-mono transition-all cursor-pointer ${
+                  testEps === p.val
+                    ? 'bg-indigo-600 text-white font-bold border border-indigo-400 shadow-sm'
+                    : 'bg-white/[0.04] hover:bg-white/[0.08] text-slate-300 border border-white/5'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3">
+          <div className="w-full sm:w-auto flex-1 space-y-1">
+            <span className="text-xs font-mono text-slate-400 block">Shadow Samples:</span>
+            <select
+              value={numSamples}
+              onChange={(e) => setNumSamples(parseInt(e.target.value, 10))}
+              className="w-full bg-[#050614] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="50">50 Shadow Transactions</option>
+              <option value="80">80 Shadow Transactions</option>
+              <option value="150">150 Shadow Transactions</option>
+            </select>
+          </div>
+
+          <button
+            id="btn-simulate-mia-dp"
+            onClick={() => simulateMIA.mutate({ test_epsilon: testEps, num_samples: numSamples })}
+            disabled={simulateMIA.isPending}
+            className="w-full sm:w-auto h-11 min-h-[44px] px-5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-600/25 disabled:opacity-50 shrink-0 whitespace-nowrap self-end"
+          >
+            {simulateMIA.isPending ? (
+              <>
+                <span className="h-3.5 w-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin shrink-0" />
+                <span>Simulating Attack...</span>
+              </>
+            ) : (
+              <>
+                <Zap className="w-3.5 h-3.5 fill-current shrink-0" />
+                <span>Simulate Under ε = {testEps >= 50 ? '∞' : testEps.toFixed(2)}</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Simulation Result Display */}
+      {simData && (
+        <div className="space-y-4 pt-3 border-t border-white/10">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Attack Success Rate (ASR)</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold font-mono text-slate-100">
+                  {(simData.membership_leakage_asr * 100).toFixed(1)}%
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">(Random Guess: 50%)</span>
+              </div>
+              <ScoreMeter value={simData.membership_leakage_asr} label="Empirical ASR" />
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">MIA ROC-AUC Score</span>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-xl font-bold font-mono ${
+                  simData.mia_roc_auc < 0.6 ? 'text-emerald-400' : simData.mia_roc_auc < 0.75 ? 'text-amber-400' : 'text-rose-400'
+                }`}>
+                  {simData.mia_roc_auc.toFixed(3)}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">(0.500 = Optimal DP)</span>
+              </div>
+              <div className="pt-2">
+                <RiskBadge tier={simData.risk_tier as RiskTier} />
+              </div>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">Loss Disparity Gap (ΔL)</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-xl font-bold font-mono text-indigo-300">
+                  {simData.loss_gap.toFixed(4)}
+                </span>
+                <span className="text-[10px] font-mono text-slate-500">(L_test - L_train)</span>
+              </div>
+              <p className="text-[10.5px] text-slate-400 font-mono">
+                Train: {simData.mean_train_loss.toFixed(3)} | Test: {simData.mean_test_loss.toFixed(3)}
+              </p>
+            </div>
+
+            <div className="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 space-y-1 flex flex-col justify-between">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">DP Defense Status</span>
+              <div>
+                <span className={`px-2.5 py-1 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1.5 ${
+                  simData.is_dp_enabled
+                    ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                }`}>
+                  <span className="h-1.5 w-1.5 rounded-full bg-current animate-pulse" />
+                  {simData.is_dp_enabled ? 'Active Noise Defense' : 'Unconstrained Overfit'}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-500">
+                Evaluated: {new Date(simData.evaluated_at).toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
+
+          {/* Loss Disparity Visual Bar */}
+          <div className="p-4 rounded-xl bg-[#03040f] border border-white/5 space-y-3">
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-indigo-400" />
+                <span>Member vs Non-Member Empirical Loss Overlap</span>
+              </span>
+              <span className="text-[11px] text-slate-400">
+                {simData.loss_gap < 0.1 ? '🟢 High Overlap (Indistinguishable)' : '🔴 Distinct Clusters (Vulnerable)'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
+              <div className="space-y-1.5 p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20">
+                <div className="flex justify-between text-emerald-300">
+                  <span>Training Set Samples (Members):</span>
+                  <span>μ = {simData.mean_train_loss.toFixed(3)}</span>
+                </div>
+                <div className="flex gap-1 overflow-hidden py-1">
+                  {simData.train_loss_distribution.slice(0, 16).map((loss, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-1 bg-emerald-500/40 rounded-sm hover:bg-emerald-400 transition-colors"
+                      style={{ height: `${Math.min(48, Math.max(8, loss * 60))}px` }}
+                      title={`Member Loss: ${loss}`}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5 p-3 rounded-lg bg-sky-500/5 border border-sky-500/20">
+                <div className="flex justify-between text-sky-300">
+                  <span>Test Set Samples (Non-Members):</span>
+                  <span>μ = {simData.mean_test_loss.toFixed(3)}</span>
+                </div>
+                <div className="flex gap-1 overflow-hidden py-1">
+                  {simData.test_loss_distribution.slice(0, 16).map((loss, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-1 bg-sky-500/40 rounded-sm hover:bg-sky-400 transition-colors"
+                      style={{ height: `${Math.min(48, Math.max(8, loss * 60))}px` }}
+                      title={`Non-Member Loss: ${loss}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-indigo-200/90 bg-indigo-500/10 p-2.5 rounded-lg border border-indigo-500/20 leading-relaxed font-mono">
+              💡 {simData.attack_summary}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function AttackAuditPanel() {
   const auditMIA = useAuditMIA();
@@ -397,16 +634,25 @@ function AttackAuditPanel() {
           </button>
         </div>
       </div>
+
+      {/* Interactive MIA Empirical Simulator under Rényi DP */}
+      <MIASimulationVisualizer />
     </div>
   );
 }
 
 function BudgetLogSection() {
   const { data: entries = [], isLoading } = usePrivacyBudgetLog(8.0);
-  const hasExhausted = entries.some((e) => e.budget_exhausted);
+  const { data: bankBudgets, isLoading: isBudgetsLoading } = useBankRDPBudgets();
+  const circuitBreakerAction = useCircuitBreakerAction();
+
+  const isFrozen = !!bankBudgets?.training_circuit_breaker_active;
+  const anyExceeded = !!bankBudgets?.any_budget_exceeded || entries.some((e) => e.budget_exhausted);
+  const nodes = bankBudgets?.node_budgets ?? [];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* 1. Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
         <div>
           <h2 className="text-base sm:text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -414,38 +660,247 @@ function BudgetLogSection() {
             <span>Enterprise Privacy Budget Audit Log (DP-SGD ε)</span>
           </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Rényi Differential Privacy (RDP) cumulative ε-consumption tracker with strict ε = 8.0 SLA ceiling
+            Rényi Differential Privacy (RDP) cumulative ε-consumption tracker with per-bank accountants and automated safety circuit-breaker
           </p>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono text-emerald-300 bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/20">
-            Target SLA: ε ≤ 8.0, δ = 1e-5
+            Consortium Target: ε ≤ {bankBudgets?.consortium_target_epsilon ?? 4.0}, δ = {bankBudgets?.consortium_target_delta?.toExponential(1) ?? '1.0e-5'}
           </span>
         </div>
       </div>
 
-      {hasExhausted && (
-        <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-300 flex items-start gap-3 shadow-lg shadow-rose-500/10">
-          <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-          <div className="space-y-0.5">
-            <strong className="text-rose-200 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
-            <p className="text-rose-300/90 leading-relaxed">
-              One or more simulation runs have depleted the global Differential Privacy budget (ε &gt; 8.0). Active learning rounds have been isolated to prevent progressive data reconstruction.
-            </p>
+      {/* 2. Automated Training Safety Circuit-Breaker Banner */}
+      <div className={`p-4 sm:p-5 rounded-2xl border transition-all duration-300 ${
+        isFrozen
+          ? 'bg-rose-500/15 border-rose-500/50 shadow-xl shadow-rose-500/20 text-rose-200'
+          : anyExceeded
+          ? 'bg-amber-500/15 border-amber-500/50 shadow-xl shadow-amber-500/20 text-amber-200'
+          : 'bg-[#080a21]/90 border-indigo-500/30 shadow-lg shadow-indigo-500/10 text-slate-200'
+      }`}>
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="flex items-start gap-3.5 min-w-0">
+            <div className={`p-2.5 rounded-xl shrink-0 ${
+              isFrozen
+                ? 'bg-rose-500/20 text-rose-300 animate-pulse'
+                : anyExceeded
+                ? 'bg-amber-500/20 text-amber-300 animate-pulse'
+                : 'bg-emerald-500/20 text-emerald-300'
+            }`}>
+              {isFrozen ? <Lock className="w-5 h-5" /> : <ShieldCheck className="w-5 h-5" />}
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${
+                  isFrozen
+                    ? 'bg-rose-500/30 text-rose-200'
+                    : anyExceeded
+                    ? 'bg-amber-500/30 text-amber-200'
+                    : 'bg-emerald-500/20 text-emerald-300'
+                }`}>
+                  {isFrozen ? '🚨 TRAINING CIRCUIT-BREAKER ENGAGED' : '🛡️ CONSORTIUM SAFETY LOCK ACTIVE'}
+                </span>
+                {bankBudgets?.frozen_by_node && (
+                  <span className="text-[11px] font-mono text-slate-400">
+                    Halted by: <span className="font-bold text-slate-200">{bankBudgets.frozen_by_node}</span>
+                  </span>
+                )}
+              </div>
+              <p className="text-xs sm:text-sm leading-relaxed">
+                {isFrozen
+                  ? (bankBudgets?.freeze_reason || 'Consortium model training has been locked due to privacy budget exhaustion or operator safety override.')
+                  : 'Automated Rényi DP accountant monitors cumulative epsilon across all participating bank nodes. Training freezes instantly if any bank depletes ε_max.'}
+              </p>
+              {bankBudgets?.frozen_at && (
+                <span className="text-[10px] font-mono text-slate-400 block">
+                  Lock Engaged At: {new Date(bankBudgets.frozen_at).toLocaleString()}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {isFrozen ? (
+              <button
+                id="btn-disengage-circuit-breaker"
+                onClick={() => circuitBreakerAction.mutate({ action: 'unfreeze', reason: 'Operator verified DP compliance' })}
+                disabled={circuitBreakerAction.isPending}
+                className="h-10 min-h-[40px] px-4 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-lg shadow-emerald-600/30 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Unlock className="w-3.5 h-3.5" />
+                <span>Resume Consortium Training</span>
+              </button>
+            ) : (
+              <button
+                id="btn-freeze-circuit-breaker"
+                onClick={() => circuitBreakerAction.mutate({ action: 'freeze', reason: 'Operator emergency safety lock triggered' })}
+                disabled={circuitBreakerAction.isPending}
+                className="h-10 min-h-[40px] px-4 rounded-xl text-xs font-bold bg-rose-600/80 hover:bg-rose-600 text-white shadow-lg shadow-rose-600/20 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>Emergency Safety Freeze</span>
+              </button>
+            )}
+
+            <button
+              id="btn-reset-consortium-budgets"
+              onClick={() => circuitBreakerAction.mutate({ action: 'reset_budget' })}
+              disabled={circuitBreakerAction.isPending}
+              className="h-10 min-h-[40px] px-3.5 rounded-xl text-xs font-mono font-semibold bg-white/[0.05] hover:bg-white/[0.1] text-slate-300 border border-white/10 transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-slate-400" />
+              <span>Reset All Budgets</span>
+            </button>
           </div>
         </div>
-      )}
+      </div>
 
-      {isLoading ? (
-        <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
-          Querying enterprise DP budget ledger...
+      {/* 3. Consortium Bank Node Rényi DP (RDP) Accountant Grid */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+            <Activity className="w-4 h-4 text-indigo-400" />
+            <span>Bank-Level Rényi DP Accountants (Live State)</span>
+          </h3>
+          <span className="text-xs font-mono text-slate-400">
+            {nodes.length} Participating Bank Nodes
+          </span>
         </div>
-      ) : entries.length === 0 ? (
-        <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono rounded-2xl border border-dashed border-white/10">
-          No training runs recorded in the current session. Run a federated round to initiate ε-tracking.
-        </div>
-      ) : (
-        <>
+
+        {isBudgetsLoading ? (
+          <div className="glass-card p-8 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+            Querying per-bank Rényi DP accountants...
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 min-w-0">
+            {nodes.map((node: NodeRDPBudgetStatus) => {
+              const isExceeded = node.is_budget_exceeded || node.budget_exhaustion_pct >= 100;
+              const isWarning = node.budget_exhaustion_pct >= 80 && !isExceeded;
+
+              return (
+                <div
+                  key={node.node_id}
+                  className={`glass-card p-4 rounded-2xl border flex flex-col justify-between gap-3 relative overflow-hidden transition-all duration-200 ${
+                    isExceeded
+                      ? 'bg-rose-500/10 border-rose-500/40 shadow-lg shadow-rose-500/10'
+                      : isWarning
+                      ? 'bg-amber-500/10 border-amber-500/40 shadow-md shadow-amber-500/10'
+                      : 'bg-[#080a21]/80 border-slate-800/80 hover:border-indigo-500/30'
+                  }`}
+                >
+                  <div className="space-y-2.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-100 text-sm block truncate">
+                          {node.bank_name}
+                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[10px] font-mono text-slate-400">{node.node_id}</span>
+                          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-white/5 text-slate-400">
+                            {node.tier}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`text-[9.5px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        isExceeded
+                          ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                          : isWarning
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                          : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                      }`}>
+                        {node.risk_tier}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs font-mono">
+                        <span className="text-slate-400">Cumulative ε:</span>
+                        <span className="font-bold text-slate-200">
+                          {node.cumulative_epsilon.toFixed(3)} / {node.target_epsilon.toFixed(1)}
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-white/5">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isExceeded
+                              ? 'bg-gradient-to-r from-rose-500 to-red-400 shadow-[0_0_8px_rgba(244,63,94,0.6)]'
+                              : isWarning
+                              ? 'bg-gradient-to-r from-amber-500 to-yellow-400'
+                              : 'bg-gradient-to-r from-emerald-500 to-teal-400'
+                          }`}
+                          style={{ width: `${Math.min(100, Math.max(0, node.budget_exhaustion_pct))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[10px] font-mono text-slate-400 pt-0.5">
+                        <span>Exhaustion: {node.budget_exhaustion_pct.toFixed(1)}%</span>
+                        <span>δ = {node.target_delta.toExponential(1)}</span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5 text-xs font-mono">
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                        <span className="text-[9px] text-slate-400 block">Rényi α*</span>
+                        <span className="text-slate-200 font-bold">{node.optimal_alpha_order.toFixed(1)}</span>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                        <span className="text-[9px] text-slate-400 block">Noise σ</span>
+                        <span className="text-indigo-300 font-bold">{node.calibrated_sigma.toFixed(3)}</span>
+                      </div>
+                      <div className="p-1.5 rounded-lg bg-white/[0.02] border border-white/5 text-center">
+                        <span className="text-[9px] text-slate-400 block">Rounds</span>
+                        <span className="text-slate-200 font-bold">{node.rounds_completed}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-white/5 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-slate-500">
+                      {isExceeded ? '⚠️ Action Required' : 'Budget Secure'}
+                    </span>
+                    <button
+                      onClick={() => circuitBreakerAction.mutate({ action: 'reset_budget', node_id: node.node_id })}
+                      disabled={circuitBreakerAction.isPending}
+                      className="text-[10.5px] font-mono text-indigo-400 hover:text-indigo-300 cursor-pointer transition-colors"
+                    >
+                      Reset Node
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 4. Global Simulation Runs Audit Ledger */}
+      <div className="space-y-3">
+        <h3 className="text-sm font-bold text-slate-200 flex items-center gap-2">
+          <Database className="w-4 h-4 text-indigo-400" />
+          <span>Simulation Ledger (Historical DP Runs)</span>
+        </h3>
+
+        {anyExceeded && (
+          <div className="rounded-2xl border border-rose-500/40 bg-rose-500/10 p-4 text-xs text-rose-300 flex items-start gap-3 shadow-lg shadow-rose-500/10">
+            <AlertTriangle className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+            <div className="space-y-0.5">
+              <strong className="text-rose-200 font-bold block">Privacy Budget Exhaustion Alert Triggered!</strong>
+              <p className="text-rose-300/90 leading-relaxed">
+                One or more simulation runs have depleted the global Differential Privacy budget (ε &gt; 8.0). Active learning rounds have been isolated to prevent progressive data reconstruction.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono animate-pulse rounded-2xl">
+            Querying enterprise DP budget ledger...
+          </div>
+        ) : entries.length === 0 ? (
+          <div className="glass-card p-12 text-center text-slate-400 text-xs font-mono rounded-2xl border border-dashed border-white/10">
+            No training runs recorded in the current session. Run a federated round to initiate ε-tracking.
+          </div>
+        ) : (
+          <>
           {/* Mobile View: Stacked DP Budget Cards (< 768px, Zero Horizontal Scroll) */}
           <div className="block md:hidden space-y-3">
             {entries.map((entry: BudgetLogEntry) => {
@@ -578,6 +1033,7 @@ function BudgetLogSection() {
           </div>
         </>
       )}
+      </div>
     </div>
   );
 }

@@ -162,3 +162,97 @@ class BudgetLogEntryResponse(BaseModel):
     sigma_history: list[float]
     budget_exhausted: bool
     epsilon_limit: float
+
+
+# ── Rényi DP Consortium & Circuit Breaker Schemas ───────────────────────
+
+class NodeRDPBudgetStatus(BaseModel):
+    """Rényi DP accountant budget status for a participating consortium bank node."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    node_id: str
+    bank_name: str
+    tier: str
+    rounds_completed: int
+    cumulative_epsilon: float
+    target_epsilon: float
+    target_delta: float
+    budget_exhaustion_pct: float
+    is_budget_exceeded: bool
+    optimal_alpha_order: float
+    calibrated_sigma: float
+    risk_tier: str
+
+
+class BankBudgetsResponse(BaseModel):
+    """Consortium-wide Rényi Differential Privacy distribution and safety freeze status."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    consortium_target_epsilon: float
+    consortium_target_delta: float
+    total_nodes_active: int
+    any_budget_exceeded: bool
+    training_circuit_breaker_active: bool
+    frozen_by_node: str | None = None
+    frozen_at: str | None = None
+    freeze_reason: str | None = None
+    node_budgets: list[NodeRDPBudgetStatus]
+    global_cumulative_rdp: dict[str, float]
+    updated_at: str
+
+
+class CircuitBreakerActionRequest(BaseModel):
+    """Payload to trigger, disengage, or reset the consortium emergency training freeze."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    action: str = Field(..., description="'freeze' | 'unfreeze' | 'reset_budget'")
+    reason: str = Field(default="Manual operator intervention", description="Audit justification")
+    actor: str = Field(default="secops_admin", description="Operator identity or service role")
+    node_id: str | None = Field(default=None, description="Optional target node for node-specific reset")
+
+
+class CircuitBreakerActionResponse(BaseModel):
+    """Receipt for circuit breaker state modification."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    success: bool
+    action: str
+    training_circuit_breaker_active: bool
+    frozen_by_node: str | None = None
+    frozen_at: str | None = None
+    message: str
+    timestamp: str
+
+
+class MIASimulationRequest(BaseModel):
+    """Payload to run Membership Inference Attack simulation at target DP epsilon."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    test_epsilon: float = Field(default=1.0, ge=0.0, le=100.0, description="DP epsilon level to evaluate")
+    num_samples: int = Field(default=100, ge=20, le=1000, description="Shadow transaction sample count")
+
+
+class MIASimulationResponse(BaseModel):
+    """Comprehensive MIA simulation receipt with shadow loss disparities and ROC-AUC."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    test_epsilon: float
+    is_dp_enabled: bool
+    membership_leakage_asr: float
+    mia_roc_auc: float
+    risk_tier: str
+    mean_train_loss: float
+    mean_test_loss: float
+    loss_gap: float
+    train_loss_distribution: list[float]
+    test_loss_distribution: list[float]
+    confidence_distribution: list[float]
+    attack_summary: str
+    evaluated_at: str
+

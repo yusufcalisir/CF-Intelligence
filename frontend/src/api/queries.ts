@@ -122,6 +122,11 @@ import type {
   CalibrateNoiseResponse,
   RDPCompositionRequest,
   RDPCompositionResponse,
+  BankBudgetsResponse,
+  CircuitBreakerActionRequest,
+  CircuitBreakerActionResponse,
+  MIASimulationRequest,
+  MIASimulationResponse,
   CaseEvidenceDossier,
   CopilotDirectGenerationRequest,
   CopilotQueryRequest,
@@ -1914,6 +1919,50 @@ export function useRDPComposition() {
     mutationFn: async (payload) => {
       const { data } = await apiClient.post<RDPCompositionResponse>(
         '/api/v1/privacy-defense/rdp-composition',
+        payload
+      );
+      return data;
+    },
+  });
+}
+
+export function useBankRDPBudgets() {
+  return useQuery<BankBudgetsResponse>({
+    queryKey: ['privacy-bank-rdp-budgets'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<BankBudgetsResponse>(
+        '/api/v1/privacy-defense/rdp/bank-budgets'
+      );
+      return data;
+    },
+    refetchInterval: 5000,
+  });
+}
+
+export function useCircuitBreakerAction() {
+  const queryClient = useQueryClient();
+  return useMutation<CircuitBreakerActionResponse, Error, CircuitBreakerActionRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<CircuitBreakerActionResponse>(
+        '/api/v1/privacy-defense/rdp/circuit-breaker',
+        payload
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['privacy-bank-rdp-budgets'] });
+      queryClient.invalidateQueries({ queryKey: ['privacy-budget-log'] });
+      queryClient.invalidateQueries({ queryKey: ['privacy-budget'] });
+      queryClient.invalidateQueries({ queryKey: ['security-status'] });
+    },
+  });
+}
+
+export function useSimulateMIA() {
+  return useMutation<MIASimulationResponse, Error, MIASimulationRequest>({
+    mutationFn: async (payload) => {
+      const { data } = await apiClient.post<MIASimulationResponse>(
+        '/api/v1/privacy-defense/audit/mia-simulation',
         payload
       );
       return data;

@@ -7,6 +7,7 @@ Membership Inference Attacks (MIA) to quantify the privacy boundaries of shared 
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import numpy as np
@@ -297,3 +298,102 @@ class PrivacyAuditService:
             "risk_tier": risk_tier,
             "params_audited": min_len,
         }
+
+    def simulate_membership_inference_under_dp(
+        self,
+        test_epsilon: float = 1.0,
+        num_samples: int = 100,
+        seed: int | None = 42,
+    ) -> dict[str, Any]:
+        """Empirically evaluate Membership Inference Attack (MIA) resistance at given DP epsilon.
+
+        As epsilon decreases (stronger noise), model memorization decreases,
+        narrowing the gap between member (train) and non-member (test) loss distributions,
+        forcing the adversary towards random guessing (ASR -> 0.50, ROC-AUC -> 0.50).
+        """
+        rng = np.random.default_rng(seed)
+        is_dp_enabled = test_epsilon < 50.0
+
+        # Base non-member test loss: ~0.55 mean with standard deviation ~0.10
+        test_losses = rng.normal(loc=0.55, scale=0.10, size=num_samples).clip(0.15, 1.2).tolist()
+
+        if is_dp_enabled:
+            # Under DP: loss gap scales with e^eps - 1. When eps <= 1.0, train loss is very close to test loss
+            gap_scale = min(0.35, 0.05 * math.log1p(test_epsilon))
+            train_loc = max(0.20, 0.55 - gap_scale)
+            train_losses = (
+                rng.normal(loc=train_loc, scale=0.10, size=num_samples).clip(0.10, 1.0).tolist()
+            )
+        else:
+            # No DP: significant overfitting/memorization gap
+            train_losses = (
+                rng.normal(loc=0.12, scale=0.04, size=num_samples).clip(0.02, 0.35).tolist()
+            )
+
+        base_audit = self.audit_membership_inference(train_losses, test_losses)
+        asr = base_audit["membership_leakage_asr"]
+
+        # Compute empirical ROC-AUC:
+        # Negative loss as positive predictor (lower loss = higher probability of member)
+        scores = np.concatenate([-np.array(train_losses), -np.array(test_losses)])
+        labels = np.concatenate([np.ones(len(train_losses)), np.zeros(len(test_losses))])
+        order = np.argsort(scores)[::-1]
+        sorted_labels = labels[order]
+
+        tps = np.cumsum(sorted_labels)
+        fps = np.cumsum(1 - sorted_labels)
+        tpr = tps / len(train_losses)
+        fpr = fps / len(test_losses)
+
+        auc = 0.0
+        prev_fpr = 0.0
+        prev_tpr = 0.0
+        for idx in range(len(tpr)):
+            curr_fpr = float(fpr[idx])
+            curr_tpr = float(tpr[idx])
+            auc += (curr_tpr + prev_tpr) * (curr_fpr - prev_fpr) / 2.0
+            prev_fpr = curr_fpr
+            prev_tpr = curr_tpr
+        roc_auc = max(0.5, min(1.0, auc))
+
+        mean_train = float(np.mean(train_losses))
+        mean_test = float(np.mean(test_losses))
+        loss_gap = float(mean_test - mean_train)
+
+        all_losses = train_losses + test_losses
+        mid_loss = float(np.mean(all_losses))
+        confidences = [
+            float(1.0 / (1.0 + np.exp(loss - mid_loss))) for loss in train_losses
+        ]
+
+        if is_dp_enabled and test_epsilon <= 2.0:
+            summary = (
+                f"Strong DP defense active (ε = {test_epsilon:.2f}). "
+                f"MIA advantage is bounded (ASR = {asr * 100:.1f}%, AUC = {roc_auc:.3f})."
+            )
+        elif is_dp_enabled:
+            summary = (
+                f"Moderate DP protection (ε = {test_epsilon:.2f}). "
+                f"Minor loss disparity detected (ASR = {asr * 100:.1f}%, AUC = {roc_auc:.3f})."
+            )
+        else:
+            summary = (
+                f"Unconstrained / No-DP mode: High memorization risk "
+                f"(ASR = {asr * 100:.1f}%, AUC = {roc_auc:.3f}). Transaction membership is vulnerable."
+            )
+
+        return {
+            "test_epsilon": test_epsilon,
+            "is_dp_enabled": is_dp_enabled,
+            "membership_leakage_asr": round(asr, 4),
+            "mia_roc_auc": round(roc_auc, 4),
+            "risk_tier": base_audit["risk_tier"],
+            "mean_train_loss": round(mean_train, 4),
+            "mean_test_loss": round(mean_test, 4),
+            "loss_gap": round(loss_gap, 4),
+            "train_loss_distribution": [round(x, 4) for x in train_losses[:20]],
+            "test_loss_distribution": [round(x, 4) for x in test_losses[:20]],
+            "confidence_distribution": [round(x, 4) for x in confidences[:20]],
+            "attack_summary": summary,
+        }
+

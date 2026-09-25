@@ -13,20 +13,26 @@ Provides enterprise-grade privacy audit capabilities:
 from __future__ import annotations
 
 import logging
+from datetime import UTC, datetime
 from typing import Any
 
 import numpy as np
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, status
 
 from app.application.schemas.privacy_defense import (
     AggregationMethodItem,
+    BankBudgetsResponse,
     BudgetLogEntryResponse,
     CalibrateNoiseRequest,
     CalibrateNoiseResponse,
+    CircuitBreakerActionRequest,
+    CircuitBreakerActionResponse,
     DLGAuditRequest,
     DLGAuditResponse,
     MIAAuditRequest,
     MIAAuditResponse,
+    MIASimulationRequest,
+    MIASimulationResponse,
     ModelInversionAuditRequest,
     ModelInversionAuditResponse,
     RDPCompositionRequest,
@@ -35,6 +41,7 @@ from app.application.schemas.privacy_defense import (
 from app.application.services.privacy_audit_service import PrivacyAuditService
 from app.application.services.privacy_service import PrivacyService
 from app.infrastructure import telemetry
+from app.infrastructure.security.adaptive_dp_autoscaler import AdaptiveDPAutoScaler
 
 logger = logging.getLogger(__name__)
 
@@ -251,6 +258,46 @@ async def compose_rdp(request: RDPCompositionRequest) -> RDPCompositionResponse:
     )
 
 
+async def get_bank_rdp_budgets() -> BankBudgetsResponse:
+    """Returns consortium-wide per-bank RDP accountant budget consumption and safety lock status."""
+    data = AdaptiveDPAutoScaler.get_instance().get_consortium_budgets()
+    return BankBudgetsResponse(**data)
+
+
+async def execute_circuit_breaker_action(
+    request: CircuitBreakerActionRequest,
+) -> CircuitBreakerActionResponse:
+    """Trigger emergency freeze, unfreeze, or reset on the consortium privacy circuit breaker."""
+    scaler = AdaptiveDPAutoScaler.get_instance()
+    action = request.action.lower().strip()
+    if action == "freeze":
+        res = scaler.freeze_training(
+            node_id=request.node_id or request.actor, reason=request.reason
+        )
+    elif action == "unfreeze":
+        res = scaler.unfreeze_training(actor=request.actor, reason=request.reason)
+    elif action == "reset_budget":
+        res = scaler.reset_node_budget(node_id=request.node_id)
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported circuit breaker action: '{request.action}'. Supported: 'freeze', 'unfreeze', 'reset_budget'",
+        )
+    return CircuitBreakerActionResponse(**res)
+
+
+async def simulate_mia_under_dp(request: MIASimulationRequest) -> MIASimulationResponse:
+    """Simulate Membership Inference Attack (MIA) resistance across target epsilon levels."""
+    data = _audit_service.simulate_membership_inference_under_dp(
+        test_epsilon=request.test_epsilon,
+        num_samples=request.num_samples,
+    )
+    return MIASimulationResponse(
+        **data,
+        evaluated_at=datetime.now(UTC).isoformat(),
+    )
+
+
 # ── Route Registrations ──────────────────────────────
 
 
@@ -310,6 +357,30 @@ def _register_privacy_defense_routes(r: APIRouter, prefix_tag: str) -> None:
         response_model=RDPCompositionResponse,
         summary="Compute Rényi DP Composition and Dual Bound",
         operation_id=f"{prefix_tag}_compose_rdp",
+    )
+    r.add_api_route(
+        "/rdp/bank-budgets",
+        get_bank_rdp_budgets,
+        methods=["GET"],
+        response_model=BankBudgetsResponse,
+        summary="Get Consortium Bank RDP Budget Distributions & Freeze State",
+        operation_id=f"{prefix_tag}_get_bank_rdp_budgets",
+    )
+    r.add_api_route(
+        "/rdp/circuit-breaker",
+        execute_circuit_breaker_action,
+        methods=["POST"],
+        response_model=CircuitBreakerActionResponse,
+        summary="Execute Safety Freeze or Reset on Consortium Circuit Breaker",
+        operation_id=f"{prefix_tag}_execute_circuit_breaker_action",
+    )
+    r.add_api_route(
+        "/audit/mia-simulation",
+        simulate_mia_under_dp,
+        methods=["POST"],
+        response_model=MIASimulationResponse,
+        summary="Simulate MIA Advantage and Shadow Loss Disparities Under DP",
+        operation_id=f"{prefix_tag}_simulate_mia_under_dp",
     )
 
 

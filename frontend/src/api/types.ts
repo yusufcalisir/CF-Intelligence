@@ -1989,6 +1989,73 @@ export interface RDPCompositionResponse {
   rdp_map: Record<string, number>;
 }
 
+export interface NodeRDPBudgetStatus {
+  node_id: string;
+  bank_name: string;
+  tier: string;
+  rounds_completed: number;
+  cumulative_epsilon: number;
+  target_epsilon: number;
+  target_delta: number;
+  budget_exhaustion_pct: number;
+  is_budget_exceeded: boolean;
+  optimal_alpha_order: number;
+  calibrated_sigma: number;
+  risk_tier: string;
+}
+
+export interface BankBudgetsResponse {
+  consortium_target_epsilon: number;
+  consortium_target_delta: number;
+  total_nodes_active: number;
+  any_budget_exceeded: boolean;
+  training_circuit_breaker_active: boolean;
+  frozen_by_node: string | null;
+  frozen_at: string | null;
+  freeze_reason: string | null;
+  node_budgets: NodeRDPBudgetStatus[];
+  global_cumulative_rdp: Record<string, number>;
+  updated_at: string;
+}
+
+export interface CircuitBreakerActionRequest {
+  action: 'freeze' | 'unfreeze' | 'reset_budget';
+  reason?: string;
+  actor?: string;
+  node_id?: string;
+}
+
+export interface CircuitBreakerActionResponse {
+  success: boolean;
+  action: string;
+  training_circuit_breaker_active: boolean;
+  frozen_by_node: string | null;
+  frozen_at: string | null;
+  message: string;
+  timestamp: string;
+}
+
+export interface MIASimulationRequest {
+  test_epsilon: number;
+  num_samples?: number;
+}
+
+export interface MIASimulationResponse {
+  test_epsilon: number;
+  is_dp_enabled: boolean;
+  membership_leakage_asr: number;
+  mia_roc_auc: number;
+  risk_tier: string;
+  mean_train_loss: number;
+  mean_test_loss: number;
+  loss_gap: number;
+  train_loss_distribution: number[];
+  test_loss_distribution: number[];
+  confidence_distribution: number[];
+  attack_summary: string;
+  evaluated_at: string;
+}
+
 // ── Autonomous Agentic AML Copilot & Evidence Assembly ─────────
 
 export interface CaseEvidenceDossier {
