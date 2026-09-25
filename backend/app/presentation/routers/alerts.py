@@ -442,7 +442,7 @@ async def get_explainability_counterfactuals(
             id=alert_id,
             bank_id=caller_tenant or "bank_alpha",
             risk_score=alert_score,
-            severity="high" if alert_score >= 600.0 else "medium",
+            severity=AlertSeverity.HIGH if alert_score >= 600.0 else AlertSeverity.MEDIUM,
             reason_codes=["HIGH-AMT", "VEL-001", "MERCH-RISK"],
             involved_entity_ids=["entity_workbench_demo"],
             model_confidence=min(0.99, alert_score / 1000.0),
