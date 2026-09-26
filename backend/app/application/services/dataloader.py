@@ -348,7 +348,7 @@ def load_paysim(
     if all_rows:
         target_nrows = None
     elif nrows is not None:
-        target_nrows = None if nrows <= 0 else int(nrows)
+        target_nrows = None if nrows <= 0 else nrows
     elif "nrows" in kwargs:
         kw_nrows = kwargs.get("nrows")
         target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
@@ -583,7 +583,7 @@ def load_ieee_cis(
     if all_rows:
         target_nrows = None
     elif nrows is not None:
-        target_nrows = None if nrows <= 0 else int(nrows)
+        target_nrows = None if nrows <= 0 else nrows
     elif "nrows" in kwargs:
         kw_nrows = kwargs.get("nrows")
         target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
@@ -724,10 +724,10 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     # 3. Temporal features along TransactionDT
     transaction_dt: np.ndarray | None = None
     if "TransactionDT" in df.columns:
-        dt = df["TransactionDT"].values.astype(np.float64)
-        df["dt_day"] = ((dt // 86400) % 7).astype(np.float32)
-        df["dt_hour"] = ((dt // 3600) % 24).astype(np.float32)
-        transaction_dt = dt
+        dt_vals = np.asarray(df["TransactionDT"].values, dtype=np.float64)
+        df["dt_day"] = ((dt_vals // 86400) % 7).astype(np.float32)
+        df["dt_hour"] = ((dt_vals // 3600) % 24).astype(np.float32)
+        transaction_dt = dt_vals
 
     # 4. Amount log transformation
     if "TransactionAmt" in df.columns:
@@ -855,8 +855,9 @@ def load_creditcard_fraud(
         else:
             feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
 
-        X = df[feature_cols].fillna(0).values.astype(np.float32)
-        y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
+        X = np.asarray(df[feature_cols].fillna(0).values, dtype=np.float32)
+        raw_y = df["Class"].values if "Class" in df.columns else df["is_fraud"].values
+        y = np.asarray(raw_y, dtype=int)
     else:
         if require_real:
             raise FileNotFoundError(
@@ -956,7 +957,7 @@ def load_creditcard_fraud(
             for col in ("Time", "Amount"):
                 if col in feature_cols:
                     c_idx = feature_cols.index(col)
-                    train_vals = X_train[:, c_idx]
+                    train_vals = np.asarray(X_train[:, c_idx], dtype=np.float32)
                     if scaling_strategy == "robust":
                         q25 = float(np.percentile(train_vals, 25))
                         q75 = float(np.percentile(train_vals, 75))
@@ -964,9 +965,9 @@ def load_creditcard_fraud(
                         iqr = max(q75 - q25, 1e-7)
                         scaling_params[col] = {"center": med, "scale": iqr, "strategy": "robust"}
                     else:
-                        mean = float(np.mean(train_vals))
-                        std = max(float(np.std(train_vals)), 1e-7)
-                        scaling_params[col] = {"center": mean, "scale": std, "strategy": "standard"}
+                        mean_val = float(np.mean(train_vals))
+                        std_val = max(float(np.std(train_vals)), 1e-7)
+                        scaling_params[col] = {"center": mean_val, "scale": std_val, "strategy": "standard"}
 
                     c_center = scaling_params[col]["center"]
                     c_scale = scaling_params[col]["scale"]
@@ -984,7 +985,7 @@ def load_creditcard_fraud(
             "feature_names": feature_cols,
             "source": chosen_source,
             "fraud_ratio": float(np.mean(y)),
-            "imbalance_ratio": float((y == 0).sum() / max(1, (y == 1).sum())),
+            "imbalance_ratio": float(np.sum(y == 0) / max(1, np.sum(y == 1))),
             "scaling_params": scaling_params,
             "split_ratios": {"train": train_ratio, "val": val_ratio, "test": test_ratio},
         }
@@ -994,7 +995,7 @@ def load_creditcard_fraud(
         for col in ("Time", "Amount"):
             if col in feature_cols:
                 c_idx = feature_cols.index(col)
-                col_vals = X[:, c_idx]
+                col_vals = np.asarray(X[:, c_idx], dtype=np.float32)
                 if scaling_strategy == "robust":
                     q25 = float(np.percentile(col_vals, 25))
                     q75 = float(np.percentile(col_vals, 75))
@@ -1002,9 +1003,9 @@ def load_creditcard_fraud(
                     iqr = max(q75 - q25, 1e-7)
                     scaling_params_unsplit[col] = {"center": med, "scale": iqr, "strategy": "robust"}
                 else:
-                    mean = float(np.mean(col_vals))
-                    std = max(float(np.std(col_vals)), 1e-7)
-                    scaling_params_unsplit[col] = {"center": mean, "scale": std, "strategy": "standard"}
+                    mean_val = float(np.mean(col_vals))
+                    std_val = max(float(np.std(col_vals)), 1e-7)
+                    scaling_params_unsplit[col] = {"center": mean_val, "scale": std_val, "strategy": "standard"}
 
                 c_center = scaling_params_unsplit[col]["center"]
                 c_scale = scaling_params_unsplit[col]["scale"]
@@ -1016,7 +1017,7 @@ def load_creditcard_fraud(
         "feature_names": feature_cols,
         "source": chosen_source,
         "fraud_ratio": float(np.mean(y)),
-        "imbalance_ratio": float((y == 0).sum() / max(1, (y == 1).sum())),
+        "imbalance_ratio": float(np.sum(y == 0) / max(1, np.sum(y == 1))),
         "scaling_params": scaling_params_unsplit,
     }
 

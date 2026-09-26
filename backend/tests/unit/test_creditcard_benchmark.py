@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import torch
@@ -150,10 +151,10 @@ class TestFederatedCreditCardTrainer:
                 p.add_(1.0)
 
         # Restore from cloned weights
-        set_weights(model, weights, torch.device("cpu"))
+        set_weights(model, weights, "cpu")
         restored = clone_weights(model)
         for k in weights:
-            assert torch.allclose(weights[k], restored[k])
+            assert torch.allclose(torch.as_tensor(weights[k]), torch.as_tensor(restored[k]))
 
     def test_sample_weighted_aggregation(self) -> None:
         """Verify aggregate_weights computes mathematically exact sample-weighted consensus."""
@@ -161,11 +162,11 @@ class TestFederatedCreditCardTrainer:
         w2 = {"fc.weight": torch.tensor([[3.0, 4.0]], dtype=torch.float32)}
 
         # Update 1: 100 samples, Update 2: 300 samples -> weights 0.25 and 0.75
-        updates = [(w1, 100), (w2, 300)]
+        updates: list[tuple[dict[str, torch.Tensor], int]] = [(w1, 100), (w2, 300)]
         agg = aggregate_weights(updates)
 
         expected = 0.25 * torch.tensor([[1.0, 2.0]]) + 0.75 * torch.tensor([[3.0, 4.0]])
-        assert torch.allclose(agg["fc.weight"], expected)
+        assert torch.allclose(torch.as_tensor(agg["fc.weight"]), torch.as_tensor(expected))
 
     def test_evaluate_model_fixed_fpr_metrics_structure(self) -> None:
         """Verify model evaluation outputs complete fixed-FPR recall and loss metrics."""
@@ -218,7 +219,10 @@ class TestFederatedCreditCardTrainer:
         assert isinstance(w_avg, dict)
         assert isinstance(w_prox, dict)
         # FedProx with large proximal penalty produces different weights closer to initial
-        assert not torch.allclose(w_avg["network.0.weight"], w_prox["network.0.weight"])
+        assert not torch.allclose(
+            torch.as_tensor(w_avg["network.0.weight"]),
+            torch.as_tensor(w_prox["network.0.weight"]),
+        )
 
 
 class TestComparativeCreditCardEvaluator:
@@ -252,7 +256,7 @@ class TestCreditCardBenchmarkPlots:
 
     def test_plot_generation(self, tmp_path: Path) -> None:
         """Verify convergence, PR, ROC, and imbalance bar charts save cleanly."""
-        conv_data = {
+        conv_data: dict[str, Any] = {
             "fedavg": {
                 "round_pr_aucs": [0.1, 0.4, 0.7],
                 "round_losses": [0.5, 0.2, 0.1],
@@ -267,7 +271,7 @@ class TestCreditCardBenchmarkPlots:
         p1 = plot_optimizer_convergence(conv_data, tmp_path / "conv.png")
         assert p1.exists()
 
-        pr_curves = {
+        pr_curves: dict[str, Any] = {
             "Centralized Upper Bound": (np.array([0.0, 0.5, 1.0]), np.array([1.0, 0.8, 0.5]), 0.80),
             "Federated Champion (FedAvg)": (np.array([0.0, 0.5, 1.0]), np.array([1.0, 0.7, 0.4]), 0.70),
             "Bank C Silo (Near-Zero Fraud)": (np.array([0.0, 0.5, 1.0]), np.array([0.1, 0.05, 0.01]), 0.05),
@@ -275,7 +279,7 @@ class TestCreditCardBenchmarkPlots:
         p2 = plot_multi_paradigm_pr(pr_curves, 0.00172, tmp_path / "pr.png")
         assert p2.exists()
 
-        roc_curves = {
+        roc_curves: dict[str, Any] = {
             "Centralized Upper Bound": (np.array([0.0, 0.01, 1.0]), np.array([0.0, 0.8, 1.0]), 0.95),
             "Federated Champion (FedAvg)": (np.array([0.0, 0.01, 1.0]), np.array([0.0, 0.75, 1.0]), 0.92),
         }

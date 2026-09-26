@@ -15,7 +15,7 @@ import platform
 import subprocess
 import sys
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -106,13 +106,13 @@ def clone_weights(model: nn.Module) -> dict[str, torch.Tensor]:
     return {k: v.detach().cpu().clone() for k, v in model.state_dict().items()}
 
 
-def set_weights(model: nn.Module, weights: Mapping[str, torch.Tensor], device: torch.device) -> None:
+def set_weights(model: nn.Module, weights: Mapping[str, Any], device: Any = "cpu") -> None:
     """Load cloned parameter weights into a PyTorch model on the designated compute device."""
-    state_dict = {k: v.to(device) for k, v in weights.items()}
+    state_dict = {k: v.to(device) if hasattr(v, "to") else torch.as_tensor(v, device=device) for k, v in weights.items()}
     model.load_state_dict(state_dict)
 
 
-def aggregate_weights(client_updates: list[tuple[dict[str, torch.Tensor], int]]) -> dict[str, torch.Tensor]:
+def aggregate_weights(client_updates: Sequence[tuple[Mapping[str, Any], int]] | list[Any]) -> dict[str, torch.Tensor]:
     """Compute sample-weighted parameter average across participating bank updates.
 
     w_global = sum_{k=1}^K (n_k / N_total) * w_k
@@ -348,9 +348,9 @@ class FederatedCreditCardTrainer:
 
     def _train_client_local(
         self,
-        initial_weights: Mapping[str, torch.Tensor],
-        X_k: np.ndarray,
-        y_k: np.ndarray,
+        initial_weights: Mapping[str, Any],
+        X_k: Any,
+        y_k: Any,
         strategy: str = "fedavg",
         fedprox_mu: float = 0.01,
     ) -> tuple[dict[str, torch.Tensor], float]:
@@ -404,8 +404,8 @@ class FederatedCreditCardTrainer:
     def evaluate_model(
         self,
         model: nn.Module,
-        X_test: np.ndarray,
-        y_test: np.ndarray,
+        X_test: Any,
+        y_test: Any,
     ) -> tuple[float, np.ndarray, dict[str, Any]]:
         """Evaluate model against untouched global holdout test set."""
         model.eval()
@@ -721,7 +721,7 @@ class ComparativeCreditCardEvaluator:
 
 
 def plot_optimizer_convergence(
-    convergence_data: dict[str, dict[str, list[float]]],
+    convergence_data: Mapping[str, Any],
     output_path: Path | str,
 ) -> Path:
     """Generate side-by-side PR-AUC and Loss convergence traces across FL optimizers."""
@@ -742,7 +742,7 @@ def plot_optimizer_convergence(
     ax1.set_title("Credit Card Fraud Test PR-AUC Convergence")
     ax1.set_xlabel("Federated Communication Round")
     ax1.set_ylabel("PR-AUC (Untouched Global Test)")
-    ax1.set_ylim([-0.02, 1.02])
+    ax1.set_ylim(-0.02, 1.02)
     ax1.legend(loc="lower right", frameon=True)
     ax1.grid(True, linestyle="--", alpha=0.6)
 
@@ -761,7 +761,7 @@ def plot_optimizer_convergence(
 
 
 def plot_multi_paradigm_pr(
-    curves_dict: dict[str, tuple[np.ndarray, np.ndarray, float]],
+    curves_dict: Mapping[str, Any],
     prevalence: float,
     output_path: Path | str,
 ) -> Path:
@@ -791,8 +791,8 @@ def plot_multi_paradigm_pr(
             label=f"Prevalence Baseline ({prevalence:.3%})",
         )
 
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("Recall (Fraud Coverage)")
     ax.set_ylabel("Precision (Positive Predictive Value)")
     ax.set_title("Credit Card Fraud Precision-Recall Curves (Extreme Imbalance)")
@@ -807,7 +807,7 @@ def plot_multi_paradigm_pr(
 
 
 def plot_multi_paradigm_roc(
-    curves_dict: dict[str, tuple[np.ndarray, np.ndarray, float]],
+    curves_dict: Mapping[str, Any],
     output_path: Path | str,
 ) -> Path:
     """Plot comparative ROC curves with diagonal reference line."""
@@ -828,8 +828,8 @@ def plot_multi_paradigm_roc(
         ax.plot(fpr, tpr, color=color, lw=lw, linestyle=ls, label=f"{name} (ROC-AUC = {auc_val:.4f})")
 
     ax.plot([0, 1], [0, 1], color="#999999", lw=1.2, linestyle="--", label="Random Chance (0.5000)")
-    ax.set_xlim([-0.02, 1.02])
-    ax.set_ylim([-0.02, 1.02])
+    ax.set_xlim(-0.02, 1.02)
+    ax.set_ylim(-0.02, 1.02)
     ax.set_xlabel("False Positive Rate (1 - Specificity)")
     ax.set_ylabel("True Positive Rate (Recall / Sensitivity)")
     ax.set_title("Credit Card Fraud ROC Curves Comparison")
@@ -844,9 +844,9 @@ def plot_multi_paradigm_roc(
 
 
 def plot_imbalance_robustness_barchart(
-    prauc_map: dict[str, float],
-    rocauc_map: dict[str, float],
-    rec01_map: dict[str, float],
+    prauc_map: Mapping[str, float],
+    rocauc_map: Mapping[str, float],
+    rec01_map: Mapping[str, float],
     output_path: Path | str,
 ) -> Path:
     """Grouped bar chart highlighting Bank C silo collapse vs Federated rescue."""
@@ -883,7 +883,7 @@ def plot_imbalance_robustness_barchart(
     ax.set_title("Credit Card Fraud: Isolated Silo Deficit vs Federated Collaborative Uplift")
     ax.set_xticks(x)
     ax.set_xticklabels(models, rotation=15, ha="right", fontsize=9)
-    ax.set_ylim([0, 1.15])
+    ax.set_ylim(0.0, 1.15)
     ax.legend(loc="upper left", frameon=True)
     ax.grid(axis="y", linestyle="--", alpha=0.6)
 
