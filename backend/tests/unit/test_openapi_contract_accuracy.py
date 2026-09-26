@@ -24,7 +24,7 @@ def client():
 def test_openapi_schema_generation():
     """Verify that openapi.json generates successfully and contains expected endpoints."""
     schema = app.openapi()
-    assert schema["info"]["title"] == "Collaborative Fraud Intelligence Simulator"
+    assert schema["info"]["title"] == "Privacy-Preserving Collaborative Financial Crime Intelligence Platform"
     assert len(schema["paths"]) >= 140
 
     required_endpoints = [

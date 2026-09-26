@@ -242,10 +242,10 @@ class FederatedLearningEngine:
             # parameters are closest to the most other clients.
             # For each client i, compute the sum of squared distances
             # to the (n - f - 2) closest other clients.
-            # Dynamic Byzantine tolerance: f = max(1, (n - 1) // 2) scaling with consortium size.
+            # Blanchard et al. (2017) invariant: 2f + 2 < n; standard Byzantine tolerance f = 1
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, (n - 1) // 2)
+            f = 1
             num_closest = max(1, n - f - 2)
 
             scores = []

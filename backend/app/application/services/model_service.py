@@ -172,7 +172,8 @@ class ModelService:
             torch.FloatTensor(y_train).to(self.device),
             sens_tensor,
         )
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=False)
+        drop_last_batch = len(dataset) > batch_size and (len(dataset) % batch_size == 1)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=drop_last_batch)
 
         import time
 
@@ -367,7 +368,8 @@ class ModelService:
             torch.FloatTensor(y_train).to(self.device),
             sens_tensor,
         )
-        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=False)
+        drop_last_batch = len(dataset) > batch_size and (len(dataset) % batch_size == 1)
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, drop_last=drop_last_batch)
 
         privacy_engine = PrivacyEngine()
 
