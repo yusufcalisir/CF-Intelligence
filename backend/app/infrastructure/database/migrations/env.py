@@ -82,6 +82,16 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 
+def _make_async_engine_kwargs(url: str) -> dict[str, Any]:
+    """Provide explicit poolclass for SQLite memory databases to prevent SADeprecationWarning."""
+    kwargs: dict[str, Any] = {}
+    if url.startswith("sqlite") and ("mode=memory" in url or ":memory:" in url):
+        from sqlalchemy.pool import StaticPool
+
+        kwargs["poolclass"] = StaticPool
+    return kwargs
+
+
 async def run_migrations_online() -> None:
     """Run migrations in 'online' mode with AsyncEngine."""
     db_url = _resolve_target_database_url()
@@ -89,7 +99,7 @@ async def run_migrations_online() -> None:
         db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
 
     is_sqlite = db_url.startswith("sqlite")
-    connectable = create_async_engine(db_url)
+    connectable = create_async_engine(db_url, **_make_async_engine_kwargs(db_url))
 
     async with connectable.connect() as connection:
         await connection.run_sync(
@@ -121,7 +131,7 @@ async def _get_active_tenants(connection_url: str) -> list[str]:
     from app.infrastructure.database import VALID_TENANTS
     from app.infrastructure.models import TenantConfigModel
 
-    engine = create_async_engine(connection_url)
+    engine = create_async_engine(connection_url, **_make_async_engine_kwargs(connection_url))
     try:
         async with engine.connect() as conn:
             stmt = select(TenantConfigModel.bank_id).where(TenantConfigModel.status != "suspended")
@@ -180,7 +190,7 @@ async def run_migrations_for_all_tenants() -> None:
         for tenant in tenants:
             clean_bank_id = sanitize_bank_id(tenant)
             tenant_url = _resolve_database_url(clean_bank_id)
-            tenant_engine = create_async_engine(tenant_url)
+            tenant_engine = create_async_engine(tenant_url, **_make_async_engine_kwargs(tenant_url))
             async with tenant_engine.connect() as conn:
                 await conn.run_sync(
                     lambda sync_conn: context.configure(
@@ -194,7 +204,7 @@ async def run_migrations_for_all_tenants() -> None:
             await tenant_engine.dispose()
     else:
         # PostgreSQL / CockroachDB: schema-isolated tenancy via search_path
-        connectable = create_async_engine(central_url)
+        connectable = create_async_engine(central_url, **_make_async_engine_kwargs(central_url))
         async with connectable.connect() as connection:
             for tenant in tenants:
                 clean_bank_id = sanitize_bank_id(tenant)

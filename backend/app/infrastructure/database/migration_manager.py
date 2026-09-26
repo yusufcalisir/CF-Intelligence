@@ -9,6 +9,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 from alembic.config import Config
 
@@ -72,13 +73,18 @@ def _ensure_migrated_or_stamped(alembic_cfg: Config, db_url: str | None) -> None
     elif "+asyncpg" in sync_url:
         sync_url = sync_url.replace("+asyncpg", "")
 
+    engine = None
     try:
         from sqlalchemy import create_engine, inspect
+        from sqlalchemy.pool import StaticPool
 
-        engine = create_engine(sync_url)
+        engine_kwargs: dict[str, Any] = {}
+        if "mode=memory" in sync_url or ":memory:" in sync_url:
+            engine_kwargs["poolclass"] = StaticPool
+
+        engine = create_engine(sync_url, **engine_kwargs)
         insp = inspect(engine)
         table_names = set(insp.get_table_names())
-        engine.dispose()
 
         # If domain tables exist but alembic_version is absent or empty, stamp head to adopt existing schema
         has_version = False
@@ -98,6 +104,9 @@ def _ensure_migrated_or_stamped(alembic_cfg: Config, db_url: str | None) -> None
             return
     except Exception as exc:
         logger.debug("Could not inspect database tables for auto-stamp check: %s", exc)
+    finally:
+        if engine is not None:
+            engine.dispose()
 
     command.upgrade(alembic_cfg, "head")
 
