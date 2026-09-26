@@ -902,27 +902,37 @@ def load_creditcard_fraud(
             rng_split.shuffle(neg_indices)
 
             n_pos = len(pos_indices)
-            if n_pos >= 3:
-                n_pos_tr = max(1, int(n_pos * train_ratio))
-                n_pos_va = max(1, int(n_pos * val_ratio))
-                if n_pos_tr + n_pos_va >= n_pos:
-                    n_pos_tr = max(1, n_pos - 2)
-                    n_pos_va = 1
+            if val_ratio <= 0.0:
+                # 2-way train/test split: no validation partition
+                n_pos_tr = max(1, int(n_pos * train_ratio)) if n_pos > 1 else (1 if n_pos == 1 else 0)
+                if n_pos_tr >= n_pos and n_pos > 1:
+                    n_pos_tr = n_pos - 1
                 pos_tr = pos_indices[:n_pos_tr]
-                pos_va = pos_indices[n_pos_tr:n_pos_tr + n_pos_va]
-                pos_te = pos_indices[n_pos_tr + n_pos_va:]
-            elif n_pos == 2:
-                pos_tr = pos_indices[:1]
-                pos_va = pos_indices[1:2]
-                pos_te = pos_indices[2:]
-            elif n_pos == 1:
-                pos_tr = pos_indices[:1]
-                pos_va = pos_indices[1:]
-                pos_te = pos_indices[1:]
-            else:
-                pos_tr = np.array([], dtype=int)
                 pos_va = np.array([], dtype=int)
-                pos_te = np.array([], dtype=int)
+                pos_te = pos_indices[n_pos_tr:]
+            else:
+                # 3-way train/val/test split
+                if n_pos >= 3:
+                    n_pos_tr = max(1, int(n_pos * train_ratio))
+                    n_pos_va = max(1, int(n_pos * val_ratio))
+                    if n_pos_tr + n_pos_va >= n_pos:
+                        n_pos_tr = max(1, n_pos - 2)
+                        n_pos_va = 1
+                    pos_tr = pos_indices[:n_pos_tr]
+                    pos_va = pos_indices[n_pos_tr:n_pos_tr + n_pos_va]
+                    pos_te = pos_indices[n_pos_tr + n_pos_va:]
+                elif n_pos == 2:
+                    pos_tr = pos_indices[:1]
+                    pos_va = pos_indices[1:2]
+                    pos_te = pos_indices[2:]
+                elif n_pos == 1:
+                    pos_tr = pos_indices[:1]
+                    pos_va = pos_indices[1:]
+                    pos_te = pos_indices[1:]
+                else:
+                    pos_tr = np.array([], dtype=int)
+                    pos_va = np.array([], dtype=int)
+                    pos_te = np.array([], dtype=int)
 
             n_neg_tr = int(len(neg_indices) * train_ratio)
             n_neg_va = int(len(neg_indices) * val_ratio)

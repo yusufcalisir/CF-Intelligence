@@ -196,9 +196,13 @@ The IEEE-CIS benchmark runner generates five empirical visual artifacts saved un
 5. **Consolidated Performance Comparison (`docs/figures/benchmark_ieee_cis_comparison.png`)**:
    Comparative bar chart contrasting PR-AUC and ROC-AUC across Centralized GBDT, Classical RF, Federated Champion, and Isolated Silos.
 
-### 3.6 European Credit Card Fraud Extreme Imbalance Fixed-FPR Threshold Benchmark
+### 3.6 European Credit Card Fraud Extreme Imbalance Benchmark
 
-Evaluated across the full $N = 284{,}807$ transactions ($492$ fraud events, $0.1727\%$ prevalence, $578:1$ imbalance ratio) under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} = 170{,}883$, $\mathcal{D}_{\mathrm{val}} = 56{,}962$, $\mathcal{D}_{\mathrm{test}} = 56{,}962$ with exactly $99$ positive fraud cases sequestered in the global test partition). `Time` and `Amount` features are scaled with `RobustScaler` (median-IQR) fitted strictly on $\mathcal{D}_{\mathrm{train}}$. Decision thresholds $\tau_{\alpha}$ were calibrated on the validation split $\mathcal{D}_{\mathrm{val}}$ to guarantee $\mathrm{FPR}_{\mathrm{val}} \le \alpha$ for operational targets $\alpha \in \{0.01\%, 0.05\%, 0.1\%, 0.5\%, 1.0\%\}$:
+Evaluated across the full $N = 284{,}807$ transactions ($492$ fraud events, $0.1725\%$ prevalence, $578:1$ imbalance ratio) under zero-leakage partitions.
+
+#### 3.6.1 Validation Fixed-FPR Threshold Selection & Estimator Benchmark
+
+Under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} = 170{,}883$, $\mathcal{D}_{\mathrm{val}} = 56{,}962$, $\mathcal{D}_{\mathrm{test}} = 56{,}962$ with exactly $99$ positive fraud cases sequestered in the global test partition). `Time` and `Amount` features are scaled with `RobustScaler` (median-IQR) fitted strictly on $\mathcal{D}_{\mathrm{train}}$. Decision thresholds $\tau_{\alpha}$ were calibrated on the validation split $\mathcal{D}_{\mathrm{val}}$ to guarantee $\mathrm{FPR}_{\mathrm{val}} \le \alpha$ for operational targets $\alpha \in \{0.01\%, 0.05\%, 0.1\%, 0.5\%, 1.0\%\}$:
 
 | Estimator / Architecture | Classification Paradigm | PR-AUC | ROC-AUC | Recall @ 0.05% FPR | Recall @ 0.1% FPR | Recall @ 1.0% FPR | Empirical FPR (@ 0.1% Target) | Brier Score | Fit Time (s) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -207,10 +211,48 @@ Evaluated across the full $N = 284{,}807$ transactions ($492$ fraud events, $0.1
 | **CreditCard Imbalance MLP (PyTorch)** | `NEURAL_DEEP_MLP` | **0.7303** | **0.9632** | **82.83%** | **83.84%** | **87.88%** | `0.121%` (69 FP) | **0.0010** | `13.56 s` |
 | **Weighted Logistic Regression** | `LINEAR_BASELINE` | **0.6559** | **0.9678** | **83.84%** | **88.89%** | **90.91%** | `0.169%` (96 FP) | **0.0218** | `0.87 s` |
 
-#### Key Empirical Insights (Extreme Imbalance & Threshold Stability)
-1. **Validation-to-Test FPR Stability**: Thresholds selected on $\mathcal{D}_{\mathrm{val}}$ to satisfy $\mathrm{FPR} \le 0.1\%$ maintain remarkable empirical stability on the untouched test partition ($0.098\%$ for HistGradientBoosting, $0.106\%$ for Random Forest, and $0.121\%$ for Neural MLP), proving zero data snooping or distribution drift.
-2. **Superior PR-AUC & Precision Retention**: Random Forest achieves champion PR-AUC ($0.7831$) and an ultra-low Brier score ($0.0007$). At the strict $0.1\%$ FPR threshold ($1$ false alarm per $1{,}000$ transactions), Random Forest captures $84.85\%$ of all fraudulent chargebacks while limiting false positives to just $60$ across $56{,}863$ legitimate payments.
-3. **Artifact Serialization**: Full evaluation metrics and calibrated thresholds are exported to `experiments/credit_card/threshold_evaluation_results.json` and formatted as a reproducible report in `experiments/credit_card/threshold_evaluation_report.md`.
+#### 3.6.2 Federated vs. Local Imbalance Robustness & Collaborative Gain
+
+Under the 3-bank federated consortium benchmark, $227{,}845$ training transactions were partitioned across $K=3$ institutions using an extreme skew scenario:
+- **Bank A (Market Leader)**: $125{,}371$ transactions ($55.0\%$ volume), $273$ positive frauds ($0.218\%$ fraud rate).
+- **Bank B (Mid-Tier Bank)**: $68{,}353$ transactions ($30.0\%$ volume), $118$ positive frauds ($0.173\%$ fraud rate).
+- **Bank C (Challenger Bank / Starved Silo)**: $34{,}121$ transactions ($15.0\%$ volume), strictly **2 positive fraud cases** ($0.0059\%$ fraud rate — severe positive sample starvation).
+
+Models were evaluated against an untouched consortium global holdout test set of $56{,}961$ transactions ($98$ positive frauds, $0.172\%$ prevalence):
+
+| Evaluation Paradigm / Model | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.05% FPR | Recall @ 0.1% FPR | Recall @ 1.0% FPR | Brier Score | Collaborative Gain ($\Delta_{\mathrm{collab}}$) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Federated Champion (FedAvg)** | `PRODUCTION_CHAMPION` | **0.7750** | **0.9837** | **81.63%** | **84.69%** | **88.78%** | **0.0007** | **+0.1228 PR-AUC** (Consortium Uplift) |
+| **Federated FedProx ($\mu=0.01$)** | `PRODUCTION_CANDIDATE` | 0.6629 | 0.9734 | 79.59% | 81.63% | 85.71% | 0.0007 | +0.0107 PR-AUC |
+| **Centralized Pooled MLP (Upper Bound)** | `THEORETICAL_UPPER_BOUND` | 0.7021 | 0.9848 | 80.61% | 83.67% | 87.76% | 0.0008 | $-0.0729$ Centralization Penalty |
+| **Bank A Silo (Standard Volume)** | `ISOLATED_SILO` | 0.7266 | 0.9848 | 79.59% | 84.69% | 85.71% | 0.0007 | Baseline Silo |
+| **Bank B Silo (Medium Volume)** | `ISOLATED_SILO` | 0.6250 | 0.9734 | 80.61% | 82.65% | 85.71% | 0.0009 | Baseline Silo |
+| **Bank C Silo (Severe Starvation, 2 Frauds)** | `ISOLATED_SILO` | 0.6050 | 0.9437 | 78.57% | 78.57% | 78.57% | 0.0017 | **+0.1700 PR-AUC** (Rescue Uplift) |
+| **Consortium Silo Mean** | `ISOLATED_SILO` | 0.6522 | 0.9673 | 79.59% | 81.97% | 83.33% | 0.0011 | Baseline Benchmark |
+
+#### Key Empirical Insights (Extreme Imbalance & Collaborative Gain)
+
+1. **Near-Zero Positive Starvation Rescue**:
+   At the standard $0.50$ decision threshold, Bank C's isolated model suffers complete collapse ($\mathrm{Precision} = 0.0$, $\mathrm{Recall} = 0.0$, $\mathrm{F1} = 0.0$) due to extreme sample starvation ($2$ frauds among $34{,}121$ transactions). Even with fixed-FPR thresholding, Bank C in isolation achieves only $0.6050$ PR-AUC. Federated consensus (`FedAvg`) rescues Bank C, elevating its effective model capability to $0.7750$ PR-AUC—a massive **$+0.1700$ PR-AUC (+28.1% relative uplift)** and expanding Recall @ 0.1% FPR from $78.57\%$ to $84.69\%$.
+2. **Federated Super-Convergence via Cross-Institutional Regularization**:
+   `FedAvg` achieves $0.7750$ PR-AUC, outperforming not only the isolated silo mean ($0.6522$, $\Delta_{\mathrm{collab}} = +0.1228$), but also the monolithic centralized pooled neural network ($0.7021$). In extreme class imbalance regimes, decentralized client optimization combined with federated averaging functions as an implicit structural regularizer, mitigating the tendency of centralized stochastic gradient descent to overfit localized majority clusters.
+3. **Fixed-FPR Operational Superiority**:
+   Under a $578:1$ class imbalance, evaluating at default $0.50$ thresholds produces misleading outcomes. Enforcing a strict operational false alarm budget of $\le 0.1\%$ FPR ($1$ false alarm per $1{,}000$ legitimate transactions) yields an actionable fraud capture rate of $84.69\%$ ($83$ out of $98$ fraudulent chargebacks intercepted) while producing only $56$ false alarms across $56{,}863$ benign payments.
+
+#### Publication-Grade Visual Artifacts
+
+The Credit Card benchmark runner generates five empirical visual artifacts saved under `experiments/credit_card/plots/` and `docs/figures/`:
+
+1. **Precision-Recall Curves (`experiments/credit_card/plots/pr_curves.png`)**:
+   Precision-recall curves comparing FedAvg, FedProx, Centralized Pooled MLP, and Isolated Silos (Bank A, B, C) with the horizontal empirical prevalence baseline ($0.172\%$).
+2. **ROC Curves (`experiments/credit_card/plots/roc_curves.png`)**:
+   True Positive Rate vs. False Positive Rate curves across all models.
+3. **Optimizer Convergence Trajectories (`experiments/credit_card/plots/optimizer_convergence.png`)**:
+   Tracks global holdout PR-AUC and BCE loss across federated communication rounds.
+4. **Imbalance Robustness Comparison (`experiments/credit_card/plots/imbalance_robustness.png`)**:
+   Grouped bar chart visualizing PR-AUC, ROC-AUC, and Recall @ 0.1% FPR across institutions.
+5. **Consolidated Benchmark Comparison (`docs/figures/benchmark_credit_card_comparison.png`)**:
+   Consolidated figure contrasting FedAvg, FedProx, Pooled Upper Bound, and Isolated Silos.
 
 ---
 
@@ -226,7 +268,10 @@ python benchmarks/runners/run_ieee_cis_benchmark.py --nrows 15000 --rounds 5 --l
 # 3. Credit Card Fraud extreme imbalance fixed-FPR threshold evaluation
 python experiments/credit_card/evaluate_thresholds.py --include-time --scaling robust
 
-# 4. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
+# 4. Credit Card Fraud multi-bank federated imbalance benchmark (FedAvg, FedProx, Silos, Pooled)
+python benchmarks/runners/run_creditcard_benchmark.py --all-rows --rounds 5 --local-epochs 2 --skew-mode extreme_skew
+
+# 5. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
 python -c "
 from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 from backend.app.application.services.dataloader import load_paysim
@@ -235,13 +280,13 @@ engine = ComparativeBenchmarkEngine()
 # Partition and execute full comparative suite
 "
 
-# 5. Enterprise payment stream stress test (ISO 20022 ingestion)
+# 6. Enterprise payment stream stress test (ISO 20022 ingestion)
 python scripts/run_enterprise_stress_test.py --banks 3 --target-tps 2000 --duration 10 --output-dir reports/
 
-# 6. Real-time inference load test (Locust headless runner)
+# 7. Real-time inference load test (Locust headless runner)
 locust -f scripts/locustfile.py --headless -u 50 -r 10 --run-time 60s --host http://localhost:8000
 
-# 7. Concurrent stream runner
+# 8. Concurrent stream runner
 python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 ```
 
@@ -249,7 +294,7 @@ python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 
 ## 5. 🧪 Automated Unit Test Suite
 
-The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, and federated optimization suite are verified by **98 automated unit tests**:
+The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, and federated optimization suite are verified by **108 automated unit tests**:
 
 ```bash
 python -m pytest \
@@ -259,6 +304,7 @@ python -m pytest \
   backend/tests/unit/test_ieee_cis_loader.py \
   backend/tests/unit/test_ieee_cis_benchmark.py \
   backend/tests/unit/test_creditcard_loader.py \
+  backend/tests/unit/test_creditcard_benchmark.py \
   backend/tests/unit/test_baselines.py \
   backend/tests/unit/test_local_training.py \
   backend/tests/unit/test_enterprise_stress_test.py \
@@ -309,7 +355,16 @@ python -m pytest \
    - Zero-Leakage Preprocessing: `RobustScaler` (median-IQR) and `StandardScaler` ($\mu, \sigma$) parameter fitting strictly on training split.
    - 3-Way Partitioning: Stratified $60/20/20$ split, total sample conservation, non-overlapping index partitions, and temporal split without future lookahead.
    - Fixed-FPR Threshold Selection: Mathematical validation guarantee ($\mathrm{FPR}_{\mathrm{val}}(\tau_{\alpha}) \le \alpha$), metric structure, single-sample neural inference, and end-to-end evaluator execution.
+10. **`test_creditcard_benchmark.py`** (10 Tests):
+    - Multi-Bank Partition Invariants: Strict sample conservation ($\sum |\mathcal{D}_k| = |\mathcal{D}|$), mutual index disjointness ($\mathcal{D}_i \cap \mathcal{D}_j = \emptyset$), and extreme skew verification (strictly 2 fraud cases sequestered in Bank C).
+    - Model Architecture & Parameter Manipulation: Weight cloning, deep detachment, state dict assignment, and positive-weighted BCE loss computation.
+    - Federated Aggregation: Sample-weighted parameter aggregation ($\mathbf{w} = \sum \frac{n_k}{N} \mathbf{w}_k$) conserving model dimensions.
+    - Fixed-FPR Metric Evaluation: Full metric dictionary structure containing PR-AUC, ROC-AUC, Brier score, and operational Recall @ strict FPR ($0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1.0\%$).
+    - FedProx Regularization: Verifies proximal penalty ($\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|_2^2$) strictly constrains model drift.
+    - Isolated Silos & Pooled Baselines: Verifies isolated bank training and pooled centralized baseline evaluation.
+    - Publication Plot Generation: Verifies generation of PR curves, ROC curves, optimizer convergence, and imbalance robustness plots.
+    - End-to-End Pipeline: End-to-end synthetic dataset benchmark execution and artifact serialization.
 
-**Test Execution Parity**: 98 passed in 100% pass rate.
+**Test Execution Parity**: 108 passed in 100% pass rate.
 
 

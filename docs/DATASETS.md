@@ -154,30 +154,28 @@ $$\max(t_{\mathrm{train}}) \le \min(t_{\mathrm{val}}) \le \max(t_{\mathrm{val}})
 $$\tau_{\alpha} = \inf \left\{ \tau \in \mathbb{R} \;\middle|\; \frac{1}{|\mathcal{S}_{\mathrm{neg}}^{\mathrm{val}}|} \sum_{i \in \mathcal{S}_{\mathrm{neg}}^{\mathrm{val}}} \mathbb{I}(\hat{s}_i \ge \tau) \le \alpha \right\}$$
 
   - Target False Positive Rates: $\alpha \in \{0.01\%, 0.05\%, 0.1\%, 0.5\%, 1.0\%\}$, corresponding to strict Tier-1 banking fraud operations constraints ($1$ false alarm per $10{,}000$ to $100$ transactions).
+- **Multi-Bank Federated Partitioning & Near-Zero Positive Rescue**:
+  - **Extreme Imbalance Partitioning Scheme**: Evaluates $K = 3$ simulated institutions where `bank_a` (Large Retail Bank, $55\%$ genuine, $70\%$ fraud), `bank_b` (Challenger Bank, $30\%$ genuine, $29\%$ fraud), and `bank_c` (Niche / Low-Fraud Bank, $15\%$ genuine volume, but strictly $2$ fraud cases out of $393$ training frauds).
+  - **Silo Starvation vs Federated Rescue**:
+    - In isolation, `bank_c` suffers catastrophic model collapse ($\text{PR-AUC} = 0.6050$, limited high-precision recall) due to extreme sample starvation ($0.0058\%$ local prevalence).
+    - Under Federated Learning ($\mathrm{FedAvg}$ / $\mathrm{FedProx}$), `bank_c` accesses collaborative network gradients without transmitting any raw transactions, expanding $\text{PR-AUC}$ to $0.7750$ ($+0.1700$ gain for Bank C) and achieving $84.69\%$ Recall @ $0.1\%$ FPR.
 - **Module Implementation & Evaluator**:
   - Partitioner & Loader: [`backend/app/application/services/dataloader.py`](file:///backend/app/application/services/dataloader.py) via `load_creditcard_fraud` / `load_creditcard`.
-  - Evaluator Suite: [`experiments/credit_card/evaluate_thresholds.py`](file:///experiments/credit_card/evaluate_thresholds.py) via `CreditCardThresholdEvaluator`.
+  - Fixed-FPR Evaluator: [`experiments/credit_card/evaluate_thresholds.py`](file:///experiments/credit_card/evaluate_thresholds.py) via `CreditCardThresholdEvaluator`.
+  - Federated Benchmark Runner: [`experiments/credit_card/run_creditcard_benchmark.py`](file:///experiments/credit_card/run_creditcard_benchmark.py) / [`benchmarks/runners/run_creditcard_benchmark.py`](file:///benchmarks/runners/run_creditcard_benchmark.py).
 
 ```python
-from app.application.services.dataloader import load_creditcard_fraud
-from experiments.credit_card.evaluate_thresholds import CreditCardThresholdEvaluator
+from experiments.credit_card.run_creditcard_benchmark import run_creditcard_benchmark
 
-# 1. Zero-leakage 3-way split with RobustScaler on Time and Amount
-dataset = load_creditcard_fraud(
-    include_time=True,
-    scale_time_amount=True,
-    scaling_strategy="robust",
-    split_data=True,
-    train_ratio=0.60,
-    val_ratio=0.20,
-    test_ratio=0.20,
+# Execute full 3-bank extreme imbalance federated benchmark
+results = run_creditcard_benchmark(
+    all_rows=True,
+    rounds=5,
+    local_epochs=2,
+    skew_mode="extreme_skew",
 )
-
-# 2. Select fixed-FPR thresholds on validation set and evaluate on test set
-evaluator = CreditCardThresholdEvaluator()
-evaluator.data = dataset
-results = evaluator.run_full_evaluation(models=["random_forest", "hist_gradient_boosting"])
-print(f"Random Forest Recall @ 0.1% FPR: {results['summary']['random_forest']['recall_at_0.1pct_fpr']:.2%}")
+print(f"FedAvg PR-AUC: {results['fed_results']['fedavg']['final_metrics']['pr_auc']:.4f}")
+print(f"Collaborative Uplift: {results['paths']['audit_dossier']}")
 ```
 
 ### 3.4 Elliptic Bitcoin Transaction Graph

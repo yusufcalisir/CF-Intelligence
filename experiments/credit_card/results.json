@@ -1,0 +1,275 @@
+{
+  "schema_version": "1.0.0",
+  "experiment_id": "exp_creditcard_extreme_imbalance_benchmark",
+  "config": {
+    "experiment_id": "exp_creditcard_extreme_imbalance_benchmark",
+    "experiment_name": "Credit Card Federated Benchmark (Mode=extreme_skew)",
+    "description": "Federated vs Local Imbalance Robustness & Precision-Recall Curve Generation on Credit Card Fraud",
+    "tags": [
+      "credit_card",
+      "federated_learning",
+      "extreme_imbalance",
+      "fedprox",
+      "fedavg",
+      "fixed_fpr"
+    ],
+    "model_type": "CreditCardImbalanceMLP",
+    "strategy": "fedavg",
+    "seeds": [
+      42
+    ],
+    "num_rounds": 5,
+    "local_epochs": 2,
+    "batch_size": 64,
+    "learning_rate": 0.002,
+    "dp_enabled": false,
+    "dp_epsilon": null,
+    "dp_delta": null,
+    "dp_max_grad_norm": null,
+    "hyperparameters": {
+      "skew_mode": "extreme_skew",
+      "alpha": 0.5,
+      "num_clients": 3,
+      "fedprox_mu": 0.01,
+      "pos_weight": 25.0,
+      "nrows_loaded": null
+    },
+    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\credit_card"
+  },
+  "hardware": {
+    "os_platform": "Windows",
+    "os_release": "11",
+    "os_version": "10.0.26200",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_architecture": "AMD64",
+    "cpu_physical_cores": 8,
+    "cpu_logical_cores": 16,
+    "total_ram_gb": 7.34,
+    "available_ram_gb": 0.82,
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu",
+    "cuda_available": false,
+    "device_name": "CPU"
+  },
+  "dataset": {
+    "dataset_name": "European Credit Card Fraud Detection",
+    "source_uri": "real_csv",
+    "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "total_samples": 284806,
+    "num_features": 30,
+    "fraud_samples": 491,
+    "fraud_rate": 0.0017248568105510324,
+    "split_ratios": {
+      "train": 0.8,
+      "test": 0.2
+    }
+  },
+  "git_commit": "f2acbdd6c5df021390a14733aae7fce5ee37d373",
+  "git_branch": "main",
+  "status": "COMPLETED",
+  "start_time_utc": "2026-09-26T18:32:00.455476+00:00",
+  "end_time_utc": "2026-09-26T18:36:38.403547+00:00",
+  "total_duration_seconds": 277.9382,
+  "final_metrics": {
+    "pr_auc": 0.77499,
+    "roc_auc": 0.98374,
+    "brier_score": 0.00072,
+    "precision": 0.7619,
+    "recall": 0.81633,
+    "f1_score": 0.78818,
+    "recall_at_001_fpr": 0.42857,
+    "recall_at_005_fpr": 0.81633,
+    "recall_at_01_fpr": 0.84694,
+    "recall_at_05_fpr": 0.86735,
+    "recall_at_1_fpr": 0.88776
+  },
+  "history": [
+    {
+      "step": 0,
+      "train_loss": 0.5354995512004409,
+      "val_loss": 0.5354995512004409,
+      "pr_auc": 0.00192,
+      "roc_auc": 0.5933,
+      "accuracy": 0.88396,
+      "f1_score": 0.0006,
+      "precision": 0.00031,
+      "recall": 0.02041,
+      "duration_seconds": 0.0,
+      "timestamp_utc": "2026-09-26T18:32:02.641119+00:00",
+      "extra": {
+        "pr_auc": 0.00192,
+        "roc_auc": 0.5933,
+        "brier_score": 0.17345,
+        "precision": 0.00031,
+        "recall": 0.02041,
+        "f1_score": 0.0006,
+        "recall_at_001_fpr": 0.0,
+        "recall_at_005_fpr": 0.0,
+        "recall_at_01_fpr": 0.0,
+        "recall_at_05_fpr": 0.0,
+        "recall_at_1_fpr": 0.0
+      }
+    },
+    {
+      "step": 1,
+      "train_loss": 0.04676,
+      "val_loss": 0.00429,
+      "pr_auc": 0.65931,
+      "roc_auc": 0.98325,
+      "accuracy": 0.99926,
+      "f1_score": 0.78571,
+      "precision": 0.78571,
+      "recall": 0.78571,
+      "duration_seconds": 22.5866,
+      "timestamp_utc": "2026-09-26T18:32:25.230582+00:00",
+      "extra": {
+        "pr_auc": 0.65931,
+        "roc_auc": 0.98325,
+        "brier_score": 0.00071,
+        "precision": 0.78571,
+        "recall": 0.78571,
+        "f1_score": 0.78571,
+        "recall_at_001_fpr": 0.08163,
+        "recall_at_005_fpr": 0.80612,
+        "recall_at_01_fpr": 0.83673,
+        "recall_at_05_fpr": 0.85714,
+        "recall_at_1_fpr": 0.85714
+      }
+    },
+    {
+      "step": 2,
+      "train_loss": 0.03809,
+      "val_loss": 0.00477,
+      "pr_auc": 0.72101,
+      "roc_auc": 0.98511,
+      "accuracy": 0.99923,
+      "f1_score": 0.78431,
+      "precision": 0.75472,
+      "recall": 0.81633,
+      "duration_seconds": 22.3918,
+      "timestamp_utc": "2026-09-26T18:32:47.620235+00:00",
+      "extra": {
+        "pr_auc": 0.72101,
+        "roc_auc": 0.98511,
+        "brier_score": 0.00074,
+        "precision": 0.75472,
+        "recall": 0.81633,
+        "f1_score": 0.78431,
+        "recall_at_001_fpr": 0.27551,
+        "recall_at_005_fpr": 0.81633,
+        "recall_at_01_fpr": 0.84694,
+        "recall_at_05_fpr": 0.85714,
+        "recall_at_1_fpr": 0.85714
+      }
+    },
+    {
+      "step": 3,
+      "train_loss": 0.03357,
+      "val_loss": 0.00473,
+      "pr_auc": 0.77651,
+      "roc_auc": 0.98474,
+      "accuracy": 0.99925,
+      "f1_score": 0.78607,
+      "precision": 0.76699,
+      "recall": 0.80612,
+      "duration_seconds": 24.7046,
+      "timestamp_utc": "2026-09-26T18:33:12.328659+00:00",
+      "extra": {
+        "pr_auc": 0.77651,
+        "roc_auc": 0.98474,
+        "brier_score": 0.00073,
+        "precision": 0.76699,
+        "recall": 0.80612,
+        "f1_score": 0.78607,
+        "recall_at_001_fpr": 0.5,
+        "recall_at_005_fpr": 0.82653,
+        "recall_at_01_fpr": 0.84694,
+        "recall_at_05_fpr": 0.85714,
+        "recall_at_1_fpr": 0.86735
+      }
+    },
+    {
+      "step": 4,
+      "train_loss": 0.03014,
+      "val_loss": 0.0047,
+      "pr_auc": 0.77076,
+      "roc_auc": 0.98303,
+      "accuracy": 0.99926,
+      "f1_score": 0.79208,
+      "precision": 0.76923,
+      "recall": 0.81633,
+      "duration_seconds": 21.6962,
+      "timestamp_utc": "2026-09-26T18:33:34.026522+00:00",
+      "extra": {
+        "pr_auc": 0.77076,
+        "roc_auc": 0.98303,
+        "brier_score": 0.00073,
+        "precision": 0.76923,
+        "recall": 0.81633,
+        "f1_score": 0.79208,
+        "recall_at_001_fpr": 0.38776,
+        "recall_at_005_fpr": 0.82653,
+        "recall_at_01_fpr": 0.84694,
+        "recall_at_05_fpr": 0.86735,
+        "recall_at_1_fpr": 0.87755
+      }
+    },
+    {
+      "step": 5,
+      "train_loss": 0.02854,
+      "val_loss": 0.00457,
+      "pr_auc": 0.77499,
+      "roc_auc": 0.98374,
+      "accuracy": 0.99925,
+      "f1_score": 0.78818,
+      "precision": 0.7619,
+      "recall": 0.81633,
+      "duration_seconds": 23.8567,
+      "timestamp_utc": "2026-09-26T18:33:57.884536+00:00",
+      "extra": {
+        "pr_auc": 0.77499,
+        "roc_auc": 0.98374,
+        "brier_score": 0.00072,
+        "precision": 0.7619,
+        "recall": 0.81633,
+        "f1_score": 0.78818,
+        "recall_at_001_fpr": 0.42857,
+        "recall_at_005_fpr": 0.81633,
+        "recall_at_01_fpr": 0.84694,
+        "recall_at_05_fpr": 0.86735,
+        "recall_at_1_fpr": 0.88776
+      }
+    }
+  ],
+  "curves": {
+    "fpr": [],
+    "tpr": [],
+    "precision": [],
+    "recall": [],
+    "thresholds": []
+  },
+  "confusion_matrix": {
+    "tn": 0,
+    "fp": 0,
+    "fn": 0,
+    "tp": 0,
+    "labels": [
+      "Legitimate",
+      "Fraud"
+    ]
+  },
+  "calibration": {
+    "prob_true": [],
+    "prob_pred": [],
+    "brier_score": 0.0
+  },
+  "artifact_paths": {
+    "results_json": "experiments/credit_card/results.json",
+    "comparative_baselines_json": "experiments/credit_card/comparative_baselines.json",
+    "audit_dossier": "experiments/credit_card/audit_dossier.md",
+    "pr_curves": "experiments/credit_card/plots/pr_curves.png",
+    "roc_curves": "experiments/credit_card/plots/roc_curves.png",
+    "optimizer_convergence": "experiments/credit_card/plots/optimizer_convergence.png",
+    "imbalance_robustness": "experiments/credit_card/plots/imbalance_robustness.png"
+  }
+}
