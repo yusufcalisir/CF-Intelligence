@@ -110,30 +110,66 @@ ELLIPTIC_ILLICIT_RATIO = 0.021  # ~2% in the real dataset
 
 def load_elliptic(
     path: Path | None = None,
+    nrows: int | None = None,
     n_mock_nodes: int = 2_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    all_rows: bool = False,
+    include_unknown: bool = False,
+    temporal_split: bool = False,
+    split_timestep: int = 34,
+    max_timesteps: int | None = None,
+    construct_graph: bool = True,
+    use_cache: bool = True,
+    force_mock: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load the Elliptic Bitcoin Dataset.
+    """Load the Elliptic Bitcoin Transaction Graph Dataset.
+
+    Supports:
+    - Real dataset loading via accelerated Parquet cache or raw CSVs.
+    - Zero future-leakage temporal split (timesteps 1..split_timestep train, split_timestep+1..49 test).
+    - Inclusion or exclusion of unknown background transactions (y = -1).
+    - PyTorch Geometric compatible edge_index (2, E) and undirected/directed adjacency lists.
+    - Export helpers to_pyg_data() and to_networkx().
 
     Returns
     -------
     dict with keys:
-        ``X``           : np.ndarray (N, 166) — node feature matrix
-        ``y``           : np.ndarray (N,)     — binary labels (1=illicit, 0=licit)
-        ``edges``       : list[tuple[int,int]] — directed edge list (src, dst)
-        ``source``      : str — "real" | "mock"
-        ``fraud_ratio`` : float — ratio of illicit nodes
+        ``X``               : np.ndarray (N, 166) — node feature matrix (col 0: timestep, cols 1..165: features)
+        ``y``               : np.ndarray (N,)     — node labels (1=illicit, 0=licit, -1=unknown if include_unknown)
+        ``edges``           : list[tuple[int,int]] — directed edge list (src, dst)
+        ``edge_index``      : np.ndarray (2, E)   — PyG-compatible 2xE edge index array
+        ``adjacency_lists`` : list[list[int]]     — per-node neighbor lists for message passing
+        ``timesteps``       : np.ndarray (N,)     — discrete timestep per transaction (1..49)
+        ``tx_ids``          : np.ndarray (N,)     — original transaction IDs
+        ``tx_to_idx``       : dict[str, int]      — map from transaction ID to node index
+        ``idx_to_tx``       : dict[int, str]      — map from node index to transaction ID
+        ``source``          : str                 — "real" | "mock"
+        ``fraud_ratio``     : float               — ratio of illicit nodes among labeled nodes
+        ``to_pyg_data``     : callable            — exports graph to PyTorch Geometric Data object or dict
+        ``to_networkx``     : callable            — exports graph to NetworkX DiGraph
+        (If temporal_split=True):
+        ``train_mask``      : np.ndarray (N,) bool — True for timestep <= split_timestep
+        ``test_mask``       : np.ndarray (N,) bool — True for timestep > split_timestep
+        ``train_labeled_mask``: np.ndarray (N,) bool — True for train nodes with y in {0, 1}
+        ``test_labeled_mask`` : np.ndarray (N,) bool — True for test nodes with y in {0, 1}
+        ``split_timestep``  : int
+        ``n_train``         : int
+        ``n_test``          : int
+        ``n_train_labeled`` : int
+        ``n_test_labeled``  : int
     """
     rng = rng or np.random.default_rng(42)
-    target_nodes = kwargs.get("n_mock_nodes") or kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_nodes
+    target_nodes = kwargs.get("n_mock_nodes") or kwargs.get("n_mock_txns") or kwargs.get("nrows") or nrows or n_mock_nodes
     n_mock_nodes = int(target_nodes)
+    target_nrows = None if all_rows else (nrows or (int(kwargs["nrows"]) if "nrows" in kwargs and kwargs["nrows"] is not None else None))
     root = resolve_dataset_dir("elliptic", path)
 
     features_csv = root / "elliptic_txs_features.csv"
     classes_csv = root / "elliptic_txs_classes.csv"
     edges_csv = root / "elliptic_txs_edgelist.csv"
+    parquet_cache = root / "elliptic_cache.parquet"
 
     if not features_csv.exists():
         cand_feat = list(root.glob("*features*.csv"))
@@ -147,81 +183,319 @@ def load_elliptic(
         cand_edges = list(root.glob("*edgelist*.csv"))
         if cand_edges:
             edges_csv = cand_edges[0]
+    if not parquet_cache.exists():
+        cand_pq = list(root.glob("*.parquet"))
+        if cand_pq:
+            parquet_cache = cand_pq[0]
 
-    if features_csv.exists() and classes_csv.exists():
-        logger.info("[Elliptic] Loading real dataset from %s", root)
-        target_nrows = kwargs.get("nrows") or kwargs.get("n_mock_txns") or kwargs.get("n_mock_nodes")
-        read_nrows = max(int(target_nrows) * 5, 2000) if target_nrows else None
+    has_real_files = parquet_cache.exists() or (features_csv.exists() and classes_csv.exists())
 
-        feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
-        # First column is txId, rest are features
-        feat_df.rename(columns={0: "txId"}, inplace=True)
-        feat_df["txId"] = feat_df["txId"].astype(str)
+    # Decide real vs mock
+    should_load_real = (
+        not force_mock
+        and (
+            require_real
+            or all_rows
+            or temporal_split
+            or path is not None
+            or ("nrows" in kwargs and kwargs["nrows"] is not None)
+            or (nrows is not None and not kwargs.get("n_mock_nodes"))
+            or kwargs.get("use_real", False)
+        )
+        and has_real_files
+    )
 
-        cls_df = pd.read_csv(classes_csv, nrows=read_nrows)
-        cls_df["txId"] = cls_df["txId"].astype(str)
-        # class 1=illicit → 1, class 2=licit → 0, unknown → dropped
-        cls_df = cls_df[cls_df["class"].astype(str) != "unknown"].copy()
-        cls_df["label"] = (cls_df["class"].astype(str) == "1").astype(int)
+    if should_load_real:
+        logger.info("[Elliptic] Loading real dataset from %s (use_cache=%s)", root, use_cache)
+        df: pd.DataFrame | None = None
 
-        # Merge strictly on txId to guarantee row alignment
-        merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
-        if target_nrows:
-            merged_df = merged_df.iloc[: int(target_nrows)]
+        if use_cache and parquet_cache.exists():
+            try:
+                df = pd.read_parquet(parquet_cache)
+                logger.info("[Elliptic] Loaded Parquet cache with shape %s", df.shape)
+            except Exception as e:
+                logger.warning("[Elliptic] Failed reading Parquet cache (%s), falling back to CSV", e)
+                df = None
 
-        y = merged_df["label"].values.astype(int)
-        feature_cols = [c for c in merged_df.columns if c not in ("txId", "class", "label")]
-        X = merged_df[feature_cols].values.astype(np.float32)
+        if df is None:
+            read_nrows = max(int(target_nrows) * 5, 2000) if (target_nrows and not all_rows) else None
+            feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
+            feat_df.rename(columns={0: "txId"}, inplace=True)
+            feat_df["txId"] = feat_df["txId"].astype(str)
 
-        # Build index mapping for edges
-        tx_id_to_idx = {tx_id: idx for idx, tx_id in enumerate(merged_df["txId"].tolist())}
+            cls_df = pd.read_csv(classes_csv, nrows=read_nrows)
+            cls_df["txId"] = cls_df["txId"].astype(str)
 
+            merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
+            # In raw CSV, column 1 is timestep
+            if 1 in merged_df.columns:
+                merged_df.rename(columns={1: "timestep"}, inplace=True)
+            df = merged_df
+
+        # Filter max timesteps if requested
+        if max_timesteps is not None and "timestep" in df.columns:
+            df = df[df["timestep"] <= max_timesteps].copy()
+
+        # Class handling: 1=illicit, 2=licit, unknown
+        class_col = "class" if "class" in df.columns else ("label" if "label" in df.columns else None)
+        if class_col is not None:
+            c_str = df[class_col].astype(str)
+            if not include_unknown:
+                df = df[c_str.isin(["1", "2"])].copy()
+                c_str = df[class_col].astype(str)
+                y = (c_str == "1").values.astype(int)
+            else:
+                y = np.where(c_str == "1", 1, np.where(c_str == "2", 0, -1)).astype(int)
+        else:
+            y = np.zeros(len(df), dtype=int)
+
+        if target_nrows is not None and not all_rows and len(df) > target_nrows:
+            df = df.iloc[:target_nrows].copy()
+            y = y[:target_nrows]
+
+        # Extract features X: timestep (col 0) + 165 numeric features
+        feature_cols = [c for c in df.columns if c not in ("txId", "class", "label")]
+        X = df[feature_cols].values.astype(np.float32)
+
+        # Timesteps
+        if "timestep" in df.columns:
+            timesteps = df["timestep"].values.astype(int)
+        elif X.shape[1] > 0:
+            timesteps = X[:, 0].astype(int)
+        else:
+            timesteps = np.ones(len(y), dtype=int)
+
+        tx_ids = df["txId"].astype(str).values if "txId" in df.columns else np.array([str(i) for i in range(len(y))])
+        tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
+        idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
+
+        # Build graph topology
         edges: list[tuple[int, int]] = []
-        if edges_csv.exists():
-            read_edge_rows = max(int(target_nrows) * 10, 5000) if target_nrows else None
+        if construct_graph and edges_csv.exists():
+            read_edge_rows = None if all_rows else (max(int(target_nrows) * 10, 5000) if target_nrows else None)
             edge_df = pd.read_csv(edges_csv, nrows=read_edge_rows)
             src_col = edge_df.columns[0]
             dst_col = edge_df.columns[1]
-            for s, d in zip(edge_df[src_col].astype(str), edge_df[dst_col].astype(str), strict=False):
-                s_idx = tx_id_to_idx.get(s)
-                d_idx = tx_id_to_idx.get(d)
-                if s_idx is not None and d_idx is not None:
-                    edges.append((s_idx, d_idx))
 
-        logger.info("[Elliptic] Loaded %d nodes, %d edges", len(y), len(edges))
-        fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
-        return {"X": X, "y": y, "edges": edges, "source": "real", "fraud_ratio": fraud_ratio}
+            src_mapped = edge_df[src_col].astype(str).map(tx_to_idx)
+            dst_mapped = edge_df[dst_col].astype(str).map(tx_to_idx)
+            valid = src_mapped.notna() & dst_mapped.notna()
+
+            src_arr = src_mapped[valid].astype(int).values
+            dst_arr = dst_mapped[valid].astype(int).values
+            edges = list(zip(src_arr.tolist(), dst_arr.tolist(), strict=False))
+            edge_index = np.vstack([src_arr, dst_arr]).astype(np.int64) if len(edges) > 0 else np.zeros((2, 0), dtype=np.int64)
+        else:
+            edge_index = np.zeros((2, 0), dtype=np.int64)
+
+        # Build adjacency lists for message passing
+        adjacency_lists: list[list[int]] = [[] for _ in range(len(y))]
+        for u, v in edges:
+            if 0 <= u < len(y) and 0 <= v < len(y):
+                adjacency_lists[u].append(v)
+                adjacency_lists[v].append(u)
+
+        labeled_mask = y != -1
+        fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
+
+        def to_pyg_data() -> Any:
+            import torch
+            data_dict: dict[str, Any] = {
+                "x": torch.from_numpy(X),
+                "y": torch.from_numpy(y),
+                "edge_index": torch.from_numpy(edge_index),
+                "timesteps": torch.from_numpy(timesteps),
+            }
+            if temporal_split:
+                data_dict["train_mask"] = torch.from_numpy(train_mask)
+                data_dict["test_mask"] = torch.from_numpy(test_mask)
+                data_dict["train_labeled_mask"] = torch.from_numpy(train_labeled_mask)
+                data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
+            try:
+                from torch_geometric.data import Data
+                return Data(**data_dict)
+            except ImportError:
+                return data_dict
+
+        def to_networkx(max_nodes: int | None = None) -> Any:
+            import networkx as nx
+            G = nx.DiGraph()
+            n_limit = len(y) if max_nodes is None else min(len(y), max_nodes)
+            for i in range(n_limit):
+                G.add_node(i, txId=tx_ids[i], timestep=int(timesteps[i]), label=int(y[i]))
+            for u, v in edges:
+                if u < n_limit and v < n_limit:
+                    G.add_edge(u, v)
+            return G
+
+        result: dict[str, Any] = {
+            "X": X,
+            "y": y,
+            "edges": edges,
+            "edge_index": edge_index,
+            "adjacency_lists": adjacency_lists,
+            "timesteps": timesteps,
+            "tx_ids": tx_ids,
+            "tx_to_idx": tx_to_idx,
+            "idx_to_tx": idx_to_tx,
+            "source": "real",
+            "fraud_ratio": fraud_ratio,
+            "to_pyg_data": to_pyg_data,
+            "to_networkx": to_networkx,
+        }
+
+        if temporal_split:
+            train_mask = timesteps <= split_timestep
+            test_mask = timesteps > split_timestep
+            train_labeled_mask = train_mask & (y != -1) if include_unknown else train_mask
+            test_labeled_mask = test_mask & (y != -1) if include_unknown else test_mask
+            result.update({
+                "train_mask": train_mask,
+                "test_mask": test_mask,
+                "train_labeled_mask": train_labeled_mask,
+                "test_labeled_mask": test_labeled_mask,
+                "split_timestep": split_timestep,
+                "n_train": int(np.sum(train_mask)),
+                "n_test": int(np.sum(test_mask)),
+                "n_train_labeled": int(np.sum(train_labeled_mask)),
+                "n_test_labeled": int(np.sum(test_labeled_mask)),
+            })
+
+        logger.info(
+            "[Elliptic] Successfully loaded real dataset: %d nodes, %d edges, fraud_ratio=%.4f",
+            len(y),
+            len(edges),
+            fraud_ratio,
+        )
+        return result
 
     if require_real:
         raise FileNotFoundError(
             f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
-            f"Expected 'elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'. "
+            f"Expected 'elliptic_cache.parquet' or ('elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'). "
             f"Synthetic fallback is disabled under strict real-data mode."
         )
 
-    # ---- Mock generation ----
+    # ---- High-Fidelity Synthetic Mock Generation ----
     logger.info(
-        "[Elliptic] Dataset not found at %s — generating synthetic mock (%d nodes, %d features)",
+        "[Elliptic] Dataset not found at %s or mock requested — generating synthetic mock (%d nodes, %d features)",
         root,
         n_mock_nodes,
         ELLIPTIC_FEATURE_DIM,
     )
 
-    # Feature matrix: step feature + 165 random numeric features
-    steps = rng.integers(1, 50, size=(n_mock_nodes, 1)).astype(np.float32)
+    timesteps = rng.integers(1, 50, size=n_mock_nodes).astype(int)
+    steps = timesteps.reshape(-1, 1).astype(np.float32)
     rest = rng.standard_normal((n_mock_nodes, ELLIPTIC_FEATURE_DIM - 1)).astype(np.float32)
     X = np.hstack([steps, rest])
 
-    # Labels: ~2% illicit, mirroring real ratio
-    y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
+    if include_unknown:
+        rand_vals = rng.random(n_mock_nodes)
+        y = np.where(rand_vals < 0.02, 1, np.where(rand_vals < 0.23, 0, -1)).astype(int)
+    else:
+        y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
 
-    # Random directed edges (~3 out-edges per node on average)
-    n_edges = n_mock_nodes * 3
-    src = rng.integers(0, n_mock_nodes, size=n_edges)
-    dst = rng.integers(0, n_mock_nodes, size=n_edges)
-    edges = list(zip(src.tolist(), dst.tolist()))
+    # Generate intra-timestep directed edges (~3 out-edges per node)
+    edges: list[tuple[int, int]] = []
+    nodes_by_ts: dict[int, list[int]] = {}
+    for idx_node, ts in enumerate(timesteps):
+        nodes_by_ts.setdefault(int(ts), []).append(idx_node)
 
-    return {"X": X, "y": y, "edges": edges, "source": "mock"}
+    for ts_nodes in nodes_by_ts.values():
+        if len(ts_nodes) > 1:
+            n_ts_edges = min(len(ts_nodes) * 3, len(ts_nodes) * (len(ts_nodes) - 1))
+            src_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
+            dst_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
+            for s, d in zip(src_sample, dst_sample, strict=False):
+                if s != d:
+                    edges.append((int(s), int(d)))
+
+    if not edges:
+        edges = [(0, 1)] if n_mock_nodes > 1 else []
+
+    edge_index = (
+        np.array([[e[0] for e in edges], [e[1] for e in edges]], dtype=np.int64)
+        if edges
+        else np.zeros((2, 0), dtype=np.int64)
+    )
+
+    adjacency_lists: list[list[int]] = [[] for _ in range(n_mock_nodes)]
+    for u, v in edges:
+        if 0 <= u < n_mock_nodes and 0 <= v < n_mock_nodes:
+            adjacency_lists[u].append(v)
+            adjacency_lists[v].append(u)
+
+    tx_ids = np.array([f"mock_tx_{i}" for i in range(n_mock_nodes)])
+    tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
+    idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
+
+    labeled_mask = y != -1
+    fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
+
+    def to_pyg_data() -> Any:
+        import torch
+        data_dict: dict[str, Any] = {
+            "x": torch.from_numpy(X),
+            "y": torch.from_numpy(y),
+            "edge_index": torch.from_numpy(edge_index),
+            "timesteps": torch.from_numpy(timesteps),
+        }
+        if temporal_split:
+            data_dict["train_mask"] = torch.from_numpy(train_mask)
+            data_dict["test_mask"] = torch.from_numpy(test_mask)
+            data_dict["train_labeled_mask"] = torch.from_numpy(train_labeled_mask)
+            data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
+        try:
+            from torch_geometric.data import Data
+            return Data(**data_dict)
+        except ImportError:
+            return data_dict
+
+    def to_networkx(max_nodes: int | None = None) -> Any:
+        import networkx as nx
+        G = nx.DiGraph()
+        n_limit = n_mock_nodes if max_nodes is None else min(n_mock_nodes, max_nodes)
+        for i in range(n_limit):
+            G.add_node(i, txId=tx_ids[i], timestep=int(timesteps[i]), label=int(y[i]))
+        for u, v in edges:
+            if u < n_limit and v < n_limit:
+                G.add_edge(u, v)
+        return G
+
+    mock_res: dict[str, Any] = {
+        "X": X,
+        "y": y,
+        "edges": edges,
+        "edge_index": edge_index,
+        "adjacency_lists": adjacency_lists,
+        "timesteps": timesteps,
+        "tx_ids": tx_ids,
+        "tx_to_idx": tx_to_idx,
+        "idx_to_tx": idx_to_tx,
+        "source": "mock",
+        "fraud_ratio": fraud_ratio,
+        "to_pyg_data": to_pyg_data,
+        "to_networkx": to_networkx,
+    }
+
+    if temporal_split:
+        train_mask = timesteps <= split_timestep
+        test_mask = timesteps > split_timestep
+        train_labeled_mask = train_mask & (y != -1) if include_unknown else train_mask
+        test_labeled_mask = test_mask & (y != -1) if include_unknown else test_mask
+        mock_res.update({
+            "train_mask": train_mask,
+            "test_mask": test_mask,
+            "train_labeled_mask": train_labeled_mask,
+            "test_labeled_mask": test_labeled_mask,
+            "split_timestep": split_timestep,
+            "n_train": int(np.sum(train_mask)),
+            "n_test": int(np.sum(test_mask)),
+            "n_train_labeled": int(np.sum(train_labeled_mask)),
+            "n_test_labeled": int(np.sum(test_labeled_mask)),
+        })
+
+    return mock_res
 
 
 # ===========================================================================

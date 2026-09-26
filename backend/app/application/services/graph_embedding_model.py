@@ -145,16 +145,18 @@ class GraphSAGELayer(nn.Module):
     def forward(
         self,
         node_features: torch.Tensor,
-        adjacency_lists: list[list[int]],
+        adjacency_lists: list[list[int]] | None = None,
+        edge_index: torch.Tensor | None = None,
         num_sample: int = 10,
     ) -> torch.Tensor:
         """Forward pass for one GraphSAGE layer.
 
         Args:
             node_features: (N, in_dim) tensor of current node representations.
-            adjacency_lists: List of neighbor indices for each node.
+            adjacency_lists: Optional list of neighbor indices for each node.
                 adjacency_lists[i] = [j, k, ...] means nodes j, k, ... are
                 neighbors of node i.
+            edge_index: Optional (2, E) PyG-style edge index tensor.
             num_sample: Maximum neighbors to sample per node (for scalability).
 
         Returns:
@@ -163,45 +165,65 @@ class GraphSAGELayer(nn.Module):
         num_nodes = node_features.size(0)
         device = node_features.device
 
-        # Build sparse adjacency matrix for vectorized mean pooling with neighbor sampling
-        rows: list[int] = []
-        cols: list[int] = []
-        vals: list[float] = []
-
-        for i in range(num_nodes):
-            neighbors = adjacency_lists[i] if i < len(adjacency_lists) else []
-            if not neighbors:
-                rows.append(i)
-                cols.append(i)
-                vals.append(1.0)
-                continue
-
-            if len(neighbors) > num_sample:
-                sampled_idx = torch.randperm(len(neighbors))[:num_sample]
-                neighbors = [neighbors[idx] for idx in sampled_idx.tolist()]
-
-            valid_neighbors = [n for n in neighbors if 0 <= n < num_nodes]
-            if not valid_neighbors:
-                rows.append(i)
-                cols.append(i)
-                vals.append(1.0)
-                continue
-
-            weight = 1.0 / len(valid_neighbors)
-            for n in valid_neighbors:
-                rows.append(i)
-                cols.append(n)
-                vals.append(weight)
-
-        if rows:
-            indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
-            values = torch.tensor(vals, dtype=torch.float32, device=device)
-            adj_sparse = torch.sparse_coo_tensor(
-                indices, values, size=(num_nodes, num_nodes), device=device, is_coalesced=True
-            )
-            agg_features = torch.sparse.mm(adj_sparse, node_features)
+        if edge_index is not None:
+            if edge_index.numel() > 0:
+                row, col = edge_index[0], edge_index[1]
+                valid = (row < num_nodes) & (col < num_nodes) & (row >= 0) & (col >= 0)
+                if valid.any():
+                    row, col = row[valid], col[valid]
+                    deg = torch.bincount(row, minlength=num_nodes).float()
+                    deg_inv = torch.where(deg > 0, 1.0 / deg, torch.zeros_like(deg))
+                    weights = deg_inv[row]
+                    indices = torch.stack([row, col])
+                    adj_sparse = torch.sparse_coo_tensor(
+                        indices, weights, size=(num_nodes, num_nodes), device=device
+                    )
+                    agg_features = torch.sparse.mm(adj_sparse, node_features)
+                else:
+                    agg_features = node_features
+            else:
+                agg_features = node_features
         else:
-            agg_features = node_features
+            # Build sparse adjacency matrix for vectorized mean pooling with neighbor sampling
+            adj_lists = adjacency_lists or [[] for _ in range(num_nodes)]
+            rows: list[int] = []
+            cols: list[int] = []
+            vals: list[float] = []
+
+            for i in range(num_nodes):
+                neighbors = adj_lists[i] if i < len(adj_lists) else []
+                if not neighbors:
+                    rows.append(i)
+                    cols.append(i)
+                    vals.append(1.0)
+                    continue
+
+                if len(neighbors) > num_sample:
+                    sampled_idx = torch.randperm(len(neighbors))[:num_sample]
+                    neighbors = [neighbors[idx] for idx in sampled_idx.tolist()]
+
+                valid_neighbors = [n for n in neighbors if 0 <= n < num_nodes]
+                if not valid_neighbors:
+                    rows.append(i)
+                    cols.append(i)
+                    vals.append(1.0)
+                    continue
+
+                weight = 1.0 / len(valid_neighbors)
+                for n in valid_neighbors:
+                    rows.append(i)
+                    cols.append(n)
+                    vals.append(weight)
+
+            if rows:
+                indices = torch.tensor([rows, cols], dtype=torch.long, device=device)
+                values = torch.tensor(vals, dtype=torch.float32, device=device)
+                adj_sparse = torch.sparse_coo_tensor(
+                    indices, values, size=(num_nodes, num_nodes), device=device, is_coalesced=True
+                )
+                agg_features = torch.sparse.mm(adj_sparse, node_features)
+            else:
+                agg_features = node_features
 
         # Combine: project self + project aggregated neighbors + bias
         h_self = self.W_self(node_features)
@@ -218,9 +240,9 @@ class GraphSAGEModel(nn.Module):
     """Multi-layer GraphSAGE for fraud node embedding and classification.
 
     Architecture (default):
-        Input (12) → GraphSAGE Layer 1 (128) → GraphSAGE Layer 2 (64) → Embedding
-                                                                            ↓
-                                                                    Classifier (1)
+        Input (12 or 166) → GraphSAGE Layer 1 (128) → GraphSAGE Layer 2 (64) → Embedding
+                                                                                    ↓
+                                                                            Classifier (1)
 
     The model produces:
     1. Node embeddings (64-dim vectors) — used for similarity search & visualization
@@ -239,6 +261,8 @@ class GraphSAGEModel(nn.Module):
     ) -> None:
         super().__init__()
         self.num_layers = num_layers
+        self.input_dim = input_dim
+        self.embedding_dim = embedding_dim
 
         # Build GraphSAGE layers
         layers = []
@@ -259,7 +283,8 @@ class GraphSAGEModel(nn.Module):
     def get_embeddings(
         self,
         node_features: torch.Tensor,
-        adjacency_lists: list[list[int]],
+        adjacency_lists: list[list[int]] | None = None,
+        edge_index: torch.Tensor | None = None,
         num_sample: int = 10,
     ) -> torch.Tensor:
         """Compute node embeddings without classification.
@@ -267,6 +292,7 @@ class GraphSAGEModel(nn.Module):
         Args:
             node_features: (N, input_dim) node feature matrix.
             adjacency_lists: Per-node neighbor index lists.
+            edge_index: Optional (2, E) PyG edge index tensor.
             num_sample: Neighbor sampling budget per layer.
 
         Returns:
@@ -274,13 +300,14 @@ class GraphSAGEModel(nn.Module):
         """
         h = node_features
         for layer in self.sage_layers:
-            h = layer(h, adjacency_lists, num_sample)
+            h = layer(h, adjacency_lists=adjacency_lists, edge_index=edge_index, num_sample=num_sample)
         return h
 
     def forward(
         self,
         node_features: torch.Tensor,
-        adjacency_lists: list[list[int]],
+        adjacency_lists: list[list[int]] | None = None,
+        edge_index: torch.Tensor | None = None,
         num_sample: int = 10,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Forward pass: embeddings + fraud predictions.
@@ -290,9 +317,40 @@ class GraphSAGEModel(nn.Module):
                 embeddings: (N, embedding_dim) node embedding matrix
                 predictions: (N,) fraud probability per node
         """
-        embeddings = self.get_embeddings(node_features, adjacency_lists, num_sample)
+        embeddings = self.get_embeddings(
+            node_features,
+            adjacency_lists=adjacency_lists,
+            edge_index=edge_index,
+            num_sample=num_sample,
+        )
         predictions = self.classifier(embeddings).squeeze(-1)
         return embeddings, predictions
+
+    def compute_loss(
+        self,
+        predictions: torch.Tensor,
+        targets: torch.Tensor,
+        mask: torch.Tensor | None = None,
+        pos_weight: float | None = None,
+    ) -> torch.Tensor:
+        """Compute binary cross-entropy loss optionally restricted to masked nodes.
+
+        Supports semi-supervised graph learning where message passing runs on all nodes
+        (including unlabeled background nodes), but loss is computed strictly on
+        labeled nodes specified by the mask.
+        """
+        if mask is not None:
+            preds = predictions[mask]
+            targs = targets[mask].float()
+        else:
+            preds = predictions
+            targs = targets.float()
+        if preds.numel() == 0:
+            return torch.tensor(0.0, device=predictions.device, requires_grad=True)
+        if pos_weight is not None:
+            weight = torch.where(targs == 1, torch.tensor(pos_weight, device=predictions.device), 1.0)
+            return F.binary_cross_entropy(preds, targs, weight=weight)
+        return F.binary_cross_entropy(preds, targs)
 
     def to_model_weights(self, include_classifier: bool = False) -> ModelWeights:
         """Serialize model parameters to ModelWeights for federation.

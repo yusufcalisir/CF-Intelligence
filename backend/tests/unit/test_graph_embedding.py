@@ -304,3 +304,49 @@ class TestGraphEmbeddingService:
 
         # node_c should NOT be found (orthogonal to node_a)
         assert "node_c" not in entity_ids
+
+
+class TestGraphSAGETensorEdgeIndex:
+    """Tests evaluating PyG-style edge_index tensors and masked semi-supervised loss."""
+
+    def test_graphsage_layer_forward_with_edge_index(self) -> None:
+        """Verify GraphSAGELayer forward pass with tensor edge_index produces valid embeddings."""
+        layer = GraphSAGELayer(in_dim=16, out_dim=8)
+        node_features = torch.randn(10, 16)
+        edge_index = torch.tensor([[0, 1, 2, 3, 4], [1, 2, 3, 4, 0]], dtype=torch.long)
+
+        out = layer(node_features, edge_index=edge_index)
+        assert out.shape == (10, 8)
+        # Verify L2 normalization
+        norms = torch.norm(out, p=2, dim=1)
+        assert torch.allclose(norms, torch.ones(10), atol=1e-5)
+
+    def test_graphsage_model_edge_index_and_166_features(self) -> None:
+        """Verify GraphSAGEModel handles 166-dim Elliptic features with edge_index."""
+        model = GraphSAGEModel(input_dim=166, hidden_dim=32, embedding_dim=16, num_layers=2)
+        node_features = torch.randn(20, 166)
+        edge_index = torch.tensor([[0, 1, 2, 3], [1, 2, 3, 0]], dtype=torch.long)
+
+        embeddings, predictions = model(node_features, edge_index=edge_index)
+        assert embeddings.shape == (20, 16)
+        assert predictions.shape == (20,)
+        assert (predictions >= 0.0).all() and (predictions <= 1.0).all()
+
+    def test_graphsage_model_compute_loss_with_mask(self) -> None:
+        """Verify masked loss computation strictly isolates labeled nodes."""
+        model = GraphSAGEModel(input_dim=16, hidden_dim=16, embedding_dim=8)
+        predictions = torch.tensor([0.9, 0.1, 0.8, 0.2], requires_grad=True)
+        targets = torch.tensor([1, 0, 0, 1])
+        mask = torch.tensor([True, True, False, False])
+
+        loss = model.compute_loss(predictions, targets, mask=mask)
+        assert loss.item() > 0.0
+
+        # Gradient should flow to masked items and not to unmasked items
+        loss.backward()
+        assert predictions.grad is not None
+        assert predictions.grad[0] != 0.0
+        assert predictions.grad[1] != 0.0
+        assert predictions.grad[2] == 0.0
+        assert predictions.grad[3] == 0.0
+

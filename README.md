@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3351%2F3351_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3363%2F3363_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -574,7 +574,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (2,672 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (2,684 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1285,7 +1285,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,041 / 3,041 passing (3,351 total incl. verification)** | 100% | 2,672 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 310 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,053 / 3,053 passing (3,363 total incl. verification)** | 100% | 2,684 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 310 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -2708,10 +2708,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,041 Tests Core / 3,351 Total)
+### Step 5: Master Test Suites Execution (3,053 Tests Core / 3,363 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (2,672 tests)
+# 1. Run full backend pytest suite (2,684 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
