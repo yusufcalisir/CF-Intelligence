@@ -242,10 +242,10 @@ class FederatedLearningEngine:
             # parameters are closest to the most other clients.
             # For each client i, compute the sum of squared distances
             # to the (n - f - 2) closest other clients.
-            # f is dynamically bounded by (n - 1) // 2 for Byzantine tolerance.
+            # Dynamic Byzantine tolerance: f = max(1, (n - 1) // 2) scaling with consortium size.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, min(1, (n - 1) // 2))
+            f = max(1, (n - 1) // 2)
             num_closest = max(1, n - f - 2)
 
             scores = []
@@ -260,7 +260,7 @@ class FederatedLearningEngine:
 
             best_idx = int(np.argmin(scores))
             avg_weights = weights_array[best_idx].tolist()
-            logger.info("Krum selected client %d as representative", best_idx)
+            logger.info("Krum selected client %d as representative (n=%d, f=%d)", best_idx, n, f)
 
         elif method == AggregationMethod.COORDINATE_WISE_MEDIAN:
             # Coordinate-wise Median: for each parameter index, take the
@@ -272,10 +272,10 @@ class FederatedLearningEngine:
         elif method == AggregationMethod.TRIMMED_MEAN:
             # Coordinate-wise Trimmed Mean: for each parameter coordinate,
             # drop the f largest and f smallest values then average the rest.
-            # Dynamic f bound based on client count n.
+            # Dynamic Byzantine tolerance: f = max(1, (n - 1) // 2).
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, min(1, (n - 1) // 2))
+            f = max(1, (n - 1) // 2)
             if n <= 2 * f:
                 # Not enough clients for trimming — fall back to plain mean
                 logger.warning(
@@ -297,10 +297,11 @@ class FederatedLearningEngine:
 
         elif method == AggregationMethod.BULYAN:
             # Bulyan (El Mhamdi et al., 2018): Byzantine-robust aggregation.
-            # Dynamic f bound based on client count n.
+            # Dynamically bounds Byzantine clients f <= (n - 3) // 4 for n >= 7,
+            # defaulting to f = 1 for smaller consortium sizes.
             weights_array = np.array([w.flat_weights for w in client_weights])
             n = len(weights_array)
-            f = max(1, min(1, max(0, (n - 3) // 4)))
+            f = max(1, (n - 3) // 4) if n >= 7 else 1
             selected_count = max(1, n - 2 * f)
 
             # Krum scores

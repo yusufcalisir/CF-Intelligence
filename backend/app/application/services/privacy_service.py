@@ -1,15 +1,13 @@
 """Privacy-enhancing mechanisms for federated learning.
 
 Implements:
-1. Differential Privacy (DP) — adds calibrated noise to model updates
-2. Privacy budget tracking — monitors cumulative epsilon across rounds
+1. Differential Privacy (DP) — calibrated Gaussian noise injection to model updates
+2. Privacy budget tracking — monitors cumulative epsilon across federated rounds
+3. Rényi Differential Privacy (RDP) moments accounting and convex dual conversion
+4. Seamless integration with PyTorch Opacus PrivacyEngine for per-sample DP training
 
-This is a simplified, educational implementation. Production DP would use
-libraries like Opacus (PyTorch) or TensorFlow Privacy, which handle
-per-sample gradient clipping and noise calibration more rigorously.
-
-See docs/threat-model.md for an honest assessment of what this protects
-against and what it doesn't.
+See docs/threat-model.md and docs/privacy-model.md for threat boundaries and
+formal privacy accounting proofs.
 """
 
 from __future__ import annotations

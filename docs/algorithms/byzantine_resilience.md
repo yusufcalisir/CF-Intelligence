@@ -51,6 +51,7 @@ Updates with projection scores exceeding $3\sigma$ along the principal singular 
 ---
 
 ## 5. Test Suite Verification
+- **FL Engine Robust Aggregation Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
 - **Unit Tests**: [`backend/tests/unit/test_byzantine_defense_branches.py`](file:///backend/tests/unit/test_byzantine_defense_branches.py)
 - **Spectral Tests**: [`backend/tests/unit/test_spectral_defense.py`](file:///backend/tests/unit/test_spectral_defense.py)
 - **Benchmark Runner**: [`benchmarks/runners/run_byzantine_benchmark.py`](file:///benchmarks/runners/run_byzantine_benchmark.py)

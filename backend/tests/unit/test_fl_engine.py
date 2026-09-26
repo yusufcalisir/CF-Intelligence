@@ -381,6 +381,36 @@ class TestByzantineRobustness:
         assert result.layer_shapes == sample_weights[0].layer_shapes
         assert len(result.flat_weights) == len(sample_weights[0].flat_weights)
 
+    def test_byzantine_multi_client_krum_and_trimmed_mean_scaling(
+        self,
+        fl_engine: FederatedLearningEngine,
+    ) -> None:
+        """With n=7 clients and f=2 Byzantine attackers, robust aggregators must reject adversaries."""
+        shapes: list[tuple[int, ...]] = [(4,)]
+        # 5 honest clients clustered near 2.0, 2 Byzantine attackers at 100.0
+        weights = [
+            ModelWeights(layer_shapes=shapes, flat_weights=[2.0, 2.0, 2.0, 2.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[2.1, 2.1, 2.1, 2.1]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[1.9, 1.9, 1.9, 1.9]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[2.0, 2.0, 2.0, 2.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[2.05, 2.05, 2.05, 2.05]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[100.0, 100.0, 100.0, 100.0]),
+            ModelWeights(layer_shapes=shapes, flat_weights=[150.0, 150.0, 150.0, 150.0]),
+        ]
+        samples = [100] * 7
+
+        # 1. Krum
+        krum_res = fl_engine.aggregate_parameters(weights, samples, method=AggregationMethod.KRUM)
+        assert all(w < 2.5 for w in krum_res.flat_weights), f"Krum failed multi-client defense: {krum_res.flat_weights}"
+
+        # 2. Trimmed Mean
+        tm_res = fl_engine.aggregate_parameters(weights, samples, method=AggregationMethod.TRIMMED_MEAN)
+        assert all(w < 2.5 for w in tm_res.flat_weights), f"Trimmed Mean failed multi-client defense: {tm_res.flat_weights}"
+
+        # 3. Bulyan
+        bulyan_res = fl_engine.aggregate_parameters(weights, samples, method=AggregationMethod.BULYAN)
+        assert all(w < 2.5 for w in bulyan_res.flat_weights), f"Bulyan failed multi-client defense: {bulyan_res.flat_weights}"
+
     def test_fed_prox_aggregation(
         self,
         fl_engine: FederatedLearningEngine,
