@@ -108,6 +108,181 @@ ELLIPTIC_FEATURE_DIM = 166
 ELLIPTIC_ILLICIT_RATIO = 0.021  # ~2% in the real dataset
 
 
+def _make_elliptic_pyg_data(
+    X: np.ndarray,
+    y: np.ndarray,
+    edge_index: np.ndarray,
+    timesteps: np.ndarray,
+    temporal_split: bool = False,
+    train_mask: np.ndarray | None = None,
+    test_mask: np.ndarray | None = None,
+    train_labeled_mask: np.ndarray | None = None,
+    test_labeled_mask: np.ndarray | None = None,
+) -> Any:
+    """Helper to convert graph matrices into PyTorch Geometric Data or tensor dict."""
+    import torch
+
+    data_dict: dict[str, Any] = {
+        "x": torch.from_numpy(X),
+        "y": torch.from_numpy(y),
+        "edge_index": torch.from_numpy(edge_index),
+        "timesteps": torch.from_numpy(timesteps),
+    }
+    if temporal_split and train_mask is not None and test_mask is not None:
+        data_dict["train_mask"] = torch.from_numpy(train_mask)
+        data_dict["test_mask"] = torch.from_numpy(test_mask)
+        if train_labeled_mask is not None:
+            data_dict["train_labeled_mask"] = torch.from_numpy(train_labeled_mask)
+        if test_labeled_mask is not None:
+            data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
+    try:
+        from torch_geometric.data import Data
+        return Data(**data_dict)
+    except ImportError:
+        return data_dict
+
+
+def _make_elliptic_networkx_graph(
+    y: np.ndarray,
+    tx_ids: np.ndarray,
+    timesteps: np.ndarray,
+    edges: list[tuple[int, int]],
+    max_nodes: int | None = None,
+) -> Any:
+    """Helper to convert node arrays and edges into NetworkX DiGraph."""
+    import networkx as nx
+
+    G = nx.DiGraph()
+    n_limit = len(y) if max_nodes is None else min(len(y), max_nodes)
+    for i in range(n_limit):
+        G.add_node(i, txId=tx_ids[i], timestep=int(timesteps[i]), label=int(y[i]))
+    for u, v in edges:
+        if u < n_limit and v < n_limit:
+            G.add_edge(u, v)
+    return G
+
+
+def _generate_mock_elliptic(
+    n_mock_nodes: int,
+    rng: np.random.Generator,
+    include_unknown: bool = False,
+    temporal_split: bool = False,
+    split_timestep: int = 34,
+) -> dict[str, Any]:
+    """Generate high-fidelity synthetic mock Elliptic graph."""
+    logger.info(
+        "[Elliptic] Generating synthetic mock (%d nodes, %d features)",
+        n_mock_nodes,
+        ELLIPTIC_FEATURE_DIM,
+    )
+
+    timesteps = rng.integers(1, 50, size=n_mock_nodes).astype(int)
+    steps = timesteps.reshape(-1, 1).astype(np.float32)
+    rest = rng.standard_normal((n_mock_nodes, ELLIPTIC_FEATURE_DIM - 1)).astype(np.float32)
+    X = np.hstack([steps, rest])
+
+    if include_unknown:
+        rand_vals = rng.random(n_mock_nodes)
+        y = np.where(rand_vals < 0.02, 1, np.where(rand_vals < 0.23, 0, -1)).astype(int)
+    else:
+        y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
+
+    # Generate intra-timestep directed edges (~3 out-edges per node)
+    edges: list[tuple[int, int]] = []
+    nodes_by_ts: dict[int, list[int]] = {}
+    for idx_node, ts in enumerate(timesteps):
+        nodes_by_ts.setdefault(int(ts), []).append(idx_node)
+
+    for ts_nodes in nodes_by_ts.values():
+        if len(ts_nodes) > 1:
+            n_ts_edges = min(len(ts_nodes) * 3, len(ts_nodes) * (len(ts_nodes) - 1))
+            src_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
+            dst_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
+            for s, d in zip(src_sample, dst_sample, strict=False):
+                if s != d:
+                    edges.append((int(s), int(d)))
+
+    if not edges:
+        edges = [(0, 1)] if n_mock_nodes > 1 else []
+
+    edge_index = (
+        np.array([[e[0] for e in edges], [e[1] for e in edges]], dtype=np.int64)
+        if edges
+        else np.zeros((2, 0), dtype=np.int64)
+    )
+
+    adjacency_lists: list[list[int]] = [[] for _ in range(n_mock_nodes)]
+    for u, v in edges:
+        if 0 <= u < n_mock_nodes and 0 <= v < n_mock_nodes:
+            adjacency_lists[u].append(v)
+            adjacency_lists[v].append(u)
+
+    tx_ids = np.array([f"mock_tx_{i}" for i in range(n_mock_nodes)])
+    tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
+    idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
+
+    labeled_mask = y != -1
+    fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
+
+    train_mask = timesteps <= split_timestep if temporal_split else None
+    test_mask = timesteps > split_timestep if temporal_split else None
+    train_labeled_mask = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
+    test_labeled_mask = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
+
+    def to_pyg_data() -> Any:
+        return _make_elliptic_pyg_data(
+            X=X,
+            y=y,
+            edge_index=edge_index,
+            timesteps=timesteps,
+            temporal_split=temporal_split,
+            train_mask=train_mask,
+            test_mask=test_mask,
+            train_labeled_mask=train_labeled_mask,
+            test_labeled_mask=test_labeled_mask,
+        )
+
+    def to_networkx(max_nodes: int | None = None) -> Any:
+        return _make_elliptic_networkx_graph(
+            y=y,
+            tx_ids=tx_ids,
+            timesteps=timesteps,
+            edges=edges,
+            max_nodes=max_nodes,
+        )
+
+    mock_res: dict[str, Any] = {
+        "X": X,
+        "y": y,
+        "edges": edges,
+        "edge_index": edge_index,
+        "adjacency_lists": adjacency_lists,
+        "timesteps": timesteps,
+        "tx_ids": tx_ids,
+        "tx_to_idx": tx_to_idx,
+        "idx_to_tx": idx_to_tx,
+        "source": "mock",
+        "fraud_ratio": fraud_ratio,
+        "to_pyg_data": to_pyg_data,
+        "to_networkx": to_networkx,
+    }
+
+    if temporal_split and train_mask is not None and test_mask is not None and train_labeled_mask is not None and test_labeled_mask is not None:
+        mock_res.update({
+            "train_mask": train_mask,
+            "test_mask": test_mask,
+            "train_labeled_mask": train_labeled_mask,
+            "test_labeled_mask": test_labeled_mask,
+            "split_timestep": split_timestep,
+            "n_train": int(np.sum(train_mask)),
+            "n_test": int(np.sum(test_mask)),
+            "n_train_labeled": int(np.sum(train_labeled_mask)),
+            "n_test_labeled": int(np.sum(test_labeled_mask)),
+        })
+
+    return mock_res
+
+
 def load_elliptic(
     path: Path | None = None,
     nrows: int | None = None,
@@ -298,35 +473,32 @@ def load_elliptic(
         labeled_mask = y != -1
         fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
 
+        train_mask = timesteps <= split_timestep if temporal_split else None
+        test_mask = timesteps > split_timestep if temporal_split else None
+        train_labeled_mask = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
+        test_labeled_mask = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
+
         def to_pyg_data() -> Any:
-            import torch
-            data_dict: dict[str, Any] = {
-                "x": torch.from_numpy(X),
-                "y": torch.from_numpy(y),
-                "edge_index": torch.from_numpy(edge_index),
-                "timesteps": torch.from_numpy(timesteps),
-            }
-            if temporal_split:
-                data_dict["train_mask"] = torch.from_numpy(train_mask)
-                data_dict["test_mask"] = torch.from_numpy(test_mask)
-                data_dict["train_labeled_mask"] = torch.from_numpy(train_labeled_mask)
-                data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
-            try:
-                from torch_geometric.data import Data
-                return Data(**data_dict)
-            except ImportError:
-                return data_dict
+            return _make_elliptic_pyg_data(
+                X=X,
+                y=y,
+                edge_index=edge_index,
+                timesteps=timesteps,
+                temporal_split=temporal_split,
+                train_mask=train_mask,
+                test_mask=test_mask,
+                train_labeled_mask=train_labeled_mask,
+                test_labeled_mask=test_labeled_mask,
+            )
 
         def to_networkx(max_nodes: int | None = None) -> Any:
-            import networkx as nx
-            G = nx.DiGraph()
-            n_limit = len(y) if max_nodes is None else min(len(y), max_nodes)
-            for i in range(n_limit):
-                G.add_node(i, txId=tx_ids[i], timestep=int(timesteps[i]), label=int(y[i]))
-            for u, v in edges:
-                if u < n_limit and v < n_limit:
-                    G.add_edge(u, v)
-            return G
+            return _make_elliptic_networkx_graph(
+                y=y,
+                tx_ids=tx_ids,
+                timesteps=timesteps,
+                edges=edges,
+                max_nodes=max_nodes,
+            )
 
         result: dict[str, Any] = {
             "X": X,
@@ -344,11 +516,7 @@ def load_elliptic(
             "to_networkx": to_networkx,
         }
 
-        if temporal_split:
-            train_mask = timesteps <= split_timestep
-            test_mask = timesteps > split_timestep
-            train_labeled_mask = train_mask & (y != -1) if include_unknown else train_mask
-            test_labeled_mask = test_mask & (y != -1) if include_unknown else test_mask
+        if temporal_split and train_mask is not None and test_mask is not None and train_labeled_mask is not None and test_labeled_mask is not None:
             result.update({
                 "train_mask": train_mask,
                 "test_mask": test_mask,
@@ -376,126 +544,13 @@ def load_elliptic(
             f"Synthetic fallback is disabled under strict real-data mode."
         )
 
-    # ---- High-Fidelity Synthetic Mock Generation ----
-    logger.info(
-        "[Elliptic] Dataset not found at %s or mock requested — generating synthetic mock (%d nodes, %d features)",
-        root,
-        n_mock_nodes,
-        ELLIPTIC_FEATURE_DIM,
+    return _generate_mock_elliptic(
+        n_mock_nodes=n_mock_nodes,
+        rng=rng,
+        include_unknown=include_unknown,
+        temporal_split=temporal_split,
+        split_timestep=split_timestep,
     )
-
-    timesteps = rng.integers(1, 50, size=n_mock_nodes).astype(int)
-    steps = timesteps.reshape(-1, 1).astype(np.float32)
-    rest = rng.standard_normal((n_mock_nodes, ELLIPTIC_FEATURE_DIM - 1)).astype(np.float32)
-    X = np.hstack([steps, rest])
-
-    if include_unknown:
-        rand_vals = rng.random(n_mock_nodes)
-        y = np.where(rand_vals < 0.02, 1, np.where(rand_vals < 0.23, 0, -1)).astype(int)
-    else:
-        y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
-
-    # Generate intra-timestep directed edges (~3 out-edges per node)
-    edges: list[tuple[int, int]] = []
-    nodes_by_ts: dict[int, list[int]] = {}
-    for idx_node, ts in enumerate(timesteps):
-        nodes_by_ts.setdefault(int(ts), []).append(idx_node)
-
-    for ts_nodes in nodes_by_ts.values():
-        if len(ts_nodes) > 1:
-            n_ts_edges = min(len(ts_nodes) * 3, len(ts_nodes) * (len(ts_nodes) - 1))
-            src_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
-            dst_sample = rng.choice(ts_nodes, size=n_ts_edges, replace=True)
-            for s, d in zip(src_sample, dst_sample, strict=False):
-                if s != d:
-                    edges.append((int(s), int(d)))
-
-    if not edges:
-        edges = [(0, 1)] if n_mock_nodes > 1 else []
-
-    edge_index = (
-        np.array([[e[0] for e in edges], [e[1] for e in edges]], dtype=np.int64)
-        if edges
-        else np.zeros((2, 0), dtype=np.int64)
-    )
-
-    adjacency_lists: list[list[int]] = [[] for _ in range(n_mock_nodes)]
-    for u, v in edges:
-        if 0 <= u < n_mock_nodes and 0 <= v < n_mock_nodes:
-            adjacency_lists[u].append(v)
-            adjacency_lists[v].append(u)
-
-    tx_ids = np.array([f"mock_tx_{i}" for i in range(n_mock_nodes)])
-    tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
-    idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
-
-    labeled_mask = y != -1
-    fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
-
-    def to_pyg_data() -> Any:
-        import torch
-        data_dict: dict[str, Any] = {
-            "x": torch.from_numpy(X),
-            "y": torch.from_numpy(y),
-            "edge_index": torch.from_numpy(edge_index),
-            "timesteps": torch.from_numpy(timesteps),
-        }
-        if temporal_split:
-            data_dict["train_mask"] = torch.from_numpy(train_mask)
-            data_dict["test_mask"] = torch.from_numpy(test_mask)
-            data_dict["train_labeled_mask"] = torch.from_numpy(train_labeled_mask)
-            data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
-        try:
-            from torch_geometric.data import Data
-            return Data(**data_dict)
-        except ImportError:
-            return data_dict
-
-    def to_networkx(max_nodes: int | None = None) -> Any:
-        import networkx as nx
-        G = nx.DiGraph()
-        n_limit = n_mock_nodes if max_nodes is None else min(n_mock_nodes, max_nodes)
-        for i in range(n_limit):
-            G.add_node(i, txId=tx_ids[i], timestep=int(timesteps[i]), label=int(y[i]))
-        for u, v in edges:
-            if u < n_limit and v < n_limit:
-                G.add_edge(u, v)
-        return G
-
-    mock_res: dict[str, Any] = {
-        "X": X,
-        "y": y,
-        "edges": edges,
-        "edge_index": edge_index,
-        "adjacency_lists": adjacency_lists,
-        "timesteps": timesteps,
-        "tx_ids": tx_ids,
-        "tx_to_idx": tx_to_idx,
-        "idx_to_tx": idx_to_tx,
-        "source": "mock",
-        "fraud_ratio": fraud_ratio,
-        "to_pyg_data": to_pyg_data,
-        "to_networkx": to_networkx,
-    }
-
-    if temporal_split:
-        train_mask = timesteps <= split_timestep
-        test_mask = timesteps > split_timestep
-        train_labeled_mask = train_mask & (y != -1) if include_unknown else train_mask
-        test_labeled_mask = test_mask & (y != -1) if include_unknown else test_mask
-        mock_res.update({
-            "train_mask": train_mask,
-            "test_mask": test_mask,
-            "train_labeled_mask": train_labeled_mask,
-            "test_labeled_mask": test_labeled_mask,
-            "split_timestep": split_timestep,
-            "n_train": int(np.sum(train_mask)),
-            "n_test": int(np.sum(test_mask)),
-            "n_train_labeled": int(np.sum(train_labeled_mask)),
-            "n_test_labeled": int(np.sum(test_labeled_mask)),
-        })
-
-    return mock_res
 
 
 # ===========================================================================
