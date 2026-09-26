@@ -22,16 +22,16 @@
 
 | Core Production Architecture | Engineering Rationale & Validation | Research, Governance & Foundations |
 |:---|:---|:---|
-| [1. Executive Summary & Three-Tier Architecture](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Research & Exploratory Modules](#19-research--exploratory-modules) |
-| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Prerequisites & System Requirements](#20-prerequisites-and-system-requirements) |
-| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Quick Start Guide](#21-step-by-step-operator-quick-start) |
-| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. AI Collaboration Methodology](#22-development-methodology--ai-collaboration) |
-| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Subsystem Self-Verification](#17-subsystem-self-verification-reports-verification) | [23. Related Work & References](#23-related-work-and-references) |
-| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--json-schemas) | [24. Citation](#24-academic-citation-and-reference-format) |
-| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Author & Maintenance](#25-author-and-maintenance) |
-| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
-| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) |
-| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | | |
+| [1. Executive Summary & Three-Tier Architecture](#1-executive-summary--three-tier-architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Tier 2: Research Prototypes](#19-tier-2-research--experimental-prototypes) |
+| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Tier 3: Consortium Simulations](#20-tier-3-demonstrations--consortium-simulations) |
+| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Prerequisites & System Requirements](#21-prerequisites-and-system-requirements) |
+| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. Quick Start Guide](#22-step-by-step-operator-quick-start) |
+| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Subsystem Self-Verification](#17-subsystem-self-verification-reports-verification) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
+| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--json-schemas) | [24. Related Work & References](#24-related-work-and-references) |
+| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Citation](#25-academic-citation-and-reference-format) |
+| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [26. Author & Maintenance](#26-author-and-maintenance) |
+| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
+| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) | |
 | [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |
 | [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
 
@@ -2407,13 +2407,16 @@ Provides real-time aggregated financial containment and MTTR operational telemet
 
 Provides real-time bank edge-node registration, institutional hardware capability telemetry (PyTorch 2.4.0, CUDA/CPU, VRAM/RAM), asynchronous staleness aggregation, and dynamic hyperparameter negotiation across consortium institutions:
 
+> **Consortium Simulation Testbed Notice:**  
+> All banking institutions, node identifiers, and telemetry payloads represented in this platform (`Bank Alpha`, `Bank Beta`, `Bank Gamma`, `Meridian National`, `Nexus Digital`) are **purely synthetic simulation testbed entities**. CF-Intelligence does not connect to live commercial banking networks, core banking ledgers, SWIFT messaging infrastructure, or real financial institutions.
+
 **1. Query Registered Consortium Clients & Telemetry (`GET /api/v1/coordinator/clients`):**
 *Response (HTTP 200 OK):*
 ```json
 [
   {
     "bank_id": "bank_alpha",
-    "bank_name": "Garanti BBVA",
+    "bank_name": "Bank Alpha (Synthetic Retail Node)",
     "pytorch_version": "2.4.0+cu124",
     "python_version": "3.12.3",
     "hardware_type": "cuda",
@@ -2425,7 +2428,7 @@ Provides real-time bank edge-node registration, institutional hardware capabilit
   },
   {
     "bank_id": "bank_beta",
-    "bank_name": "İş Bankası",
+    "bank_name": "Bank Beta (Synthetic Commercial Node)",
     "pytorch_version": "2.4.0+cu124",
     "python_version": "3.12.3",
     "hardware_type": "cuda",
@@ -2442,7 +2445,7 @@ Provides real-time bank edge-node registration, institutional hardware capabilit
 ```json
 {
   "bank_id": "bank_gamma",
-  "bank_name": "Akbank",
+  "bank_name": "Bank Gamma (Synthetic Regional Node)",
   "pytorch_version": "2.4.0+cu121",
   "python_version": "3.12.2",
   "hardware_type": "cuda",
@@ -2485,48 +2488,135 @@ Provides real-time bank edge-node registration, institutional hardware capabilit
 
 ---
 
-## 19. Research & Exploratory Modules
+## 19. Tier 2: Research & Experimental Prototypes
 
-> **Research & Exploration Note:**  
-> The modules in this section were built to explore adjacent cryptographic, hardware-assisted, and decentralized coordination primitives. They are maintained as standalone prototypes and are **not required dependencies** of the core federated fraud detection pipeline.
+> **Tier 2 Architectural Classification Notice:**  
+> The modules in this section represent algorithmic research prototypes, cryptographic explorations, and decentralized coordination designs. They are mathematically sound and fully tested in simulation, but are **isolated from the Tier 1 production core**. They require specialized hardware (bare-metal Intel SGX/AWS Nitro Enclaves), native compiled bindings (`liboqs`), or commercial third-party smart contract audits prior to regulated financial production deployment.
 
 ```mermaid
 flowchart TD
-    subgraph ResearchCrypto["Exploratory Cryptographic Primitives"]
-        zk["Groth16 zk-SNARK Weight Attestation<br/><code>zk_snark_verifier.py · Circom</code>"]
-        PQC["Post-Quantum Hybrid SecAgg<br/><code>pqc_secagg_driver.py · Kyber-768</code>"]
-        FHE["TenSEAL CKKS Homomorphic Encryption<br/><code>fhe_driver.py · Polynomial Rings</code>"]
-        TEE["Hardware TEE SGX / Nitro Driver<br/><code>tee_driver.py · Remote Attestation</code>"]
+    subgraph ResearchCrypto ["Tier 2: Exploratory Cryptographic & Hardware Primitives"]
+        zk["Groth16 zk-SNARK Weight Attestation<br/>zk_snark_verifier.py · Circom"]
+        PQC["Post-Quantum Hybrid SecAgg<br/>pqc_secagg_driver.py · Kyber-768"]
+        FHE["TenSEAL CKKS Homomorphic Encryption<br/>fhe_driver.py · Polynomial Rings"]
+        TEE["Hardware TEE SGX / Nitro Driver<br/>tee_driver.py · Remote Attestation"]
     end
 
-    subgraph ResearchSettlement["Exploratory Settlement & Governance"]
-        EVM["EVM Shapley Incentive Settlement<br/><code>ConsortiumIncentiveSettlement.sol</code>"]
-        MultiSig["Gnosis Safe 2-of-3 Governance<br/><code>GnosisSafeMultiSigCoordinator.sol</code>"]
-        Bridge["Layer-2 Cross-Chain Settlement Bridge<br/><code>layer2_crosschain_bridge.py · Chainlink CCIP</code>"]
+    subgraph ResearchSettlement ["Tier 2: Exploratory Settlement & Governance Ledgers"]
+        EVM["EVM Shapley Incentive Settlement<br/>ConsortiumIncentiveSettlement.sol"]
+        MultiSig["Gnosis Safe 2-of-3 Governance<br/>GnosisSafeMultiSigCoordinator.sol"]
+        Bridge["Layer-2 Cross-Chain Settlement Bridge<br/>layer2_crosschain_bridge.py · Chainlink CCIP"]
     end
 ```
 
 ### 19.1 Groth16 zk-SNARK Model Weight Attestation (`zk_snark_verifier.py` & `weight_attestation.circom`)
-Prototyped zero-knowledge proof circuits using Circom and Groth16 over the BN254 curve to verify that local bank updates satisfy $L_2$ norm clip bounds and match Poseidon hash commitments without revealing raw weight vectors.
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Prototyped zero-knowledge proof verification circuits using Circom and Groth16 over the BN254 (alt_bn128) elliptic curve. The circuit proves that a client's local gradient update $\Delta \mathbf{w}_k$ satisfies an $L_2$ norm clipping threshold $\|\Delta \mathbf{w}_k\|_2 \le C$ and matches a public Poseidon hash commitment, without disclosing the raw weights to the coordinator. The verifier validates proof points $(A \in G_1, B \in G_2, C \in G_1)$ via pairing check $e(A, B) = e(\alpha, \beta) \cdot e(x \cdot \gamma, \delta) \cdot e(C, \delta)$.
+- **What Would Be Required for Production Deployment:** 
+  1. Migration from Python algebraic simulation to a native Rust/Arkworks circuit compiled to WebAssembly (WASM) for client-side proving.
+  2. Multi-party computation (MPC) trusted setup ceremony (Powers of Tau Phase 2) for the specific circuit constraints.
+  3. Prover acceleration: GPU/FPGA MSM (Multi-Scalar Multiplication) and NTT (Number Theoretic Transform) pipelines to reduce client proving latency from seconds to $< 200\mathrm{ms}$.
 
-### 19.2 Post-Quantum Cryptography (PQC SecAgg) (`pqc_secagg_driver.py`)
-Exploratory hybrid SecAgg driver integrating CRYSTALS-Kyber-768 (NIST FIPS 203) Key Encapsulation Mechanism and CRYSTALS-Dilithium-3 (NIST FIPS 204) signatures to evaluate quantum-resistant key exchange overhead in distributed federations.
+### 19.2 Post-Quantum Cryptography Hybrid SecAgg (`pqc_secagg_driver.py`)
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Hybrid post-quantum key encapsulation driver combining classic X25519 Diffie-Hellman with NIST FIPS 203 CRYSTALS-Kyber-768 Key Encapsulation Mechanism (KEM) and NIST FIPS 204 CRYSTALS-Dilithium-3 signatures. Generates hybrid shared secrets $K = \mathrm{HKDF}\text{-}\mathrm{SHA256}(K_{\mathrm{X25519}} \parallel K_{\mathrm{Kyber}})$ to guard SecAgg zero-sum pairwise masks against future cryptanalytic "harvest-now, decrypt-later" quantum adversaries.
+- **What Would Be Required for Production Deployment:**
+  1. Integration of native C/Rust shared libraries from the Open Quantum Safe (`liboqs`) project via Python CFFI to replace pure-Python polynomial ring arithmetic.
+  2. Bandwidth optimization: Managing the $1{,}184$-byte Kyber-768 public keys and $1{,}088$-byte ciphertexts across high-frequency consortium federation rounds.
+  3. Formal FIPS 140-3 cryptographic module certification of the underlying PQC implementation.
 
 ### 19.3 TenSEAL CKKS Homomorphic Encryption (`fhe_driver.py`)
-Prototyped Fully Homomorphic Encryption driver using Microsoft SEAL CKKS polynomial rings ($N=8192$) for evaluating encrypted vector additions on untrusted aggregation servers without pairwise client coordination.
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Homomorphic weight aggregation driver using Microsoft SEAL CKKS (Cheon-Kim-Kim-Song) scheme via TenSEAL. Generates homomorphic encryption contexts with polynomial modulus degree $N = 8192$, coefficient modulus bit sizes $[60, 40, 40, 60]$, and scaling factor $2^{40}$. Enables the central aggregator to sum encrypted client weight vectors directly in ciphertext space without pairwise mask coordination or knowledge of secret decryption keys. Includes vectorized fallback driver for environments without TenSEAL C++ binaries.
+- **What Would Be Required for Production Deployment:**
+  1. Hardware acceleration: Dedicated FHE ASIC or GPU accelerators (e.g., Intel HEXL) to mitigate the $40\times$–$100\times$ computational overhead of homomorphic ciphertext-ciphertext addition and rescale operations.
+  2. Ciphertext compression and SIMD batching optimization to prevent multi-megabyte model update serialization bottlenecks over enterprise WAN links.
+  3. Distributed Threshold CKKS key management across consortium banks to eliminate single-party secret key custody.
 
 ### 19.4 Hardware Trusted Execution Environment (TEE) Driver (`tee_driver.py`)
-Confidential Computing enclave driver modeling Intel SGX / AWS Nitro Enclave remote attestation structures (`MRENCLAVE` validation) and memory sealing patterns. For cloud environments and CI/CD pipelines without bare-metal enclave access, the `SoftwareEmulatedTEEDriver` executes full cryptographic attestation and data sealing in memory.
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Confidential Computing enclave abstraction modeling Intel SGX and AWS Nitro Enclaves. Implements enclave measurement verification (`MRENCLAVE`, `MRSIGNER`), cryptographic report signature validation, and hardware-bound AES-256-GCM data sealing. Includes `SoftwareEmulatedTEEDriver` for cloud environments and CI/CD pipelines without bare-metal enclave access, executing complete attestation handshakes and memory sealing patterns.
+- **What Would Be Required for Production Deployment:**
+  1. Bare-metal deployment on Intel Xeon Scalable processors with SGX/TDX enabled or AWS EC2 instances with AWS Nitro Enclaves SDK.
+  2. Direct integration with Intel Attestation Service (IAS) or DCAP (Data Center Attestation Primitives) for hardware-rooted quote verification against Intel PCS (Provisioning Certificate Service).
+  3. Side-channel hardening: Mitigating cache timing, transient execution (Spectre/Meltdown variants), and controlled-channel memory access attacks against enclave boundaries.
 
 ### 19.5 Consortium Smart Contracts & Gnosis Safe Multi-Sig (`contracts/`)
-Solidity 0.8.20 smart contracts (`ConsortiumIncentiveSettlement.sol`, `GnosisSafeMultiSigCoordinator.sol`) exploring automated reward settlement and 2-of-3 multi-signature governance across consortium participants. Leave-One-Out Shapley marginal contributions are computed off-chain in Python (`smart_contract_driver.py` via `ConsortiumSettlementLedgerSimulator`); the smart contract itself is an escrow/settlement ledger that verifies pool balance conservation, prevents double-claiming, and enforces quarantine zero-payout rules over the pre-computed allocations.
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Solidity 0.8.20 smart contracts (`ConsortiumIncentiveSettlement.sol`, `GnosisSafeMultiSigCoordinator.sol`) modeling automated consortium reward distribution and 2-of-3 multi-signature governance. Leave-One-Out Shapley values are calculated off-chain in Python (`smart_contract_driver.py` via `ConsortiumSettlementLedgerSimulator`); the on-chain contract enforces escrow balance conservation $\sum p_i \le B_{\mathrm{pool}}$, prevents double-claiming, and applies zero-payout quarantine penalties to poisoned updates.
+- **What Would Be Required for Production Deployment:**
+  1. Comprehensive commercial smart contract security audit by tier-1 auditing firms (e.g., OpenZeppelin, Trail of Bits, ConsenSys Diligence).
+  2. Enterprise permissioned ledger deployment (e.g., Hyperledger Besu, Canton, or private Ethereum subnet) with gasless transaction relayers (ERC-2771 / ERC-4337 account abstraction).
+  3. Legal and regulatory harmonization: Aligning automated tokenized incentive settlement with banking cross-border capital transfer regulations.
 
-### 19.6 Cross-Chain Settlement Bridge (`layer2_crosschain_bridge.py`)
-Exploratory token routing connector modeling Chainlink CCIP `EVM2AnyMessage` payloads across Ethereum Layer-2 rollups (Arbitrum, Optimism) and enterprise ledgers (Hyperledger Fabric, Canton).
+### 19.6 Layer-2 Cross-Chain Settlement Bridge (`layer2_crosschain_bridge.py`)
+- **Status:** Experimental / Research Prototype
+- **What Is Currently Implemented:** Cross-chain messaging and liquidity routing connector modeling Chainlink CCIP `EVM2AnyMessage` payloads across Ethereum Layer-2 rollups (Arbitrum, Optimism) and enterprise permissioned ledgers. Validates Merkle proof roots, source-to-destination nonce sequences, and token pool transfer locks.
+- **What Would Be Required for Production Deployment:**
+  1. Live Chainlink CCIP Router and OnRamp contract integrations on public testnets (e.g., Sepolia, Arbitrum Sepolia).
+  2. Off-chain decentralized relayer monitoring nodes with automated gas price re-pricing and transaction replacement mechanisms.
+  3. Formal cross-chain bridge economic security modeling and circuit-breaker pause mechanisms for anomalous volume bursts.
 
 ---
 
-## 20. Prerequisites and System Requirements
+## 20. Tier 3: Demonstrations & Consortium Simulations
+
+> **Tier 3 Simulation & Testbed Classification Notice:**  
+> The components in this section provide the synthetic execution environment, test harnesses, and demonstration workflows used to evaluate the Tier 1 platform. **CF-Intelligence is not connected to real commercial banking networks, live payment switches, SWIFT infrastructure, or statutory regulatory portals.** All participant nodes, account profiles, financial transactions, and adversarial poisoning attacks described below are fully synthetic.
+
+```mermaid
+flowchart TD
+    subgraph Tier3Sim ["Tier 3: Consortium Simulation & Test Harnesses"]
+        Sim["Multi-Bank Consortium Coordinator<br/>multi_bank_simulator.py"]
+        Part["Heterogeneous Dirichlet Data Partitioner<br/>alpha = 0.1, 0.5, 1.0 (Non-IID Skew)"]
+        Attack["Adversarial Poisoning Attack Injector<br/>test_attack_injector.py · Label/Sign Flip"]
+        Net["Network Latency & Dropout Injector<br/>Jitter, Stale Weights, Dropped Packets"]
+        MockFIU["Regulatory Reporting Mock Sandbox<br/>fiu_regulatory_service.py · goAML XML"]
+        UI["Interactive Demonstration Console<br/>React Flow Multi-Bank Topology"]
+    end
+
+    Sim --> Part
+    Sim --> Attack
+    Sim --> Net
+    Sim --> MockFIU
+    Sim --> UI
+```
+
+### 20.1 Multi-Bank Consortium Coordination Harness (`multi_bank_simulator.py`)
+A comprehensive discrete-event multi-institution orchestration testbed that spins up parameterized banking nodes:
+- Configures synthetic institutions with heterogeneous compute profiles (CUDA GPU high-VRAM nodes, CPU-only edge hosts).
+- Simulates asynchronous round progression, dynamic quorum detection ($K \ge 3$), and staleness-discounted federated aggregation.
+- Coordinates cross-bank model synchronization cycles without requiring distributed multi-host infrastructure for local evaluations.
+
+### 20.2 Synthetic Clients & Heterogeneous Partitioning (Dirichlet Non-IID Skew)
+- **Synthetic Data Generation:** Generates synthetic transaction streams using generative probabilistic rules calibrated against public fraud datasets (PaySim, IEEE-CIS). Synthesizes credit transfers, merchant POS, wire transfers, and cross-border remittances.
+- **Dirichlet Distribution Partitioning:** Implements non-uniform class distribution across banks via Dirichlet allocation $\mathbf{p}_k \sim \mathrm{Dir}(\alpha \cdot \mathbf{p}_{\mathrm{global}})$. Demonstrates extreme class imbalance and non-IID conditions across banks ($\alpha = 0.1$ for severe retail/corporate specialization, $\alpha = 0.5$ for realistic cross-bank variance).
+
+### 20.3 Simulated Adversarial Poisoning Attacks (`test_attack_injector.py`)
+A rigorous adversarial evaluation harness implementing 4 standard distributed machine learning poisoning attack vectors:
+1. **Targeted Label Flipping:** Reverses fraud labels ($y \mapsto 1 - y$) on malicious client updates to induce high false-negative rates in target fraud typologies.
+2. **Gradient Sign Inversion:** Inverts the direction of gradient vectors ($\mathbf{g} \mapsto -\gamma \cdot \mathbf{g}$) to corrupt convergence and disrupt consortium optimization.
+3. **High-Variance Gaussian Noise Injection:** Corrupts model updates with additive isotropic Gaussian noise $\mathcal{N}(0, \sigma^2 \mathbf{I})$ to destabilize global aggregation.
+4. **Spectral Backdoor Trigger Injection:** Embeds rare, subtle feature triggers into transactions to evaluate spectral SVD backdoor identification.
+
+### 20.4 Simulated Network Latency & Client Dropout
+- **WAN Packet Jitter Simulation:** Injects synthetic network latency distributions ($\mathcal{N}(45\mathrm{ms}, 15\mathrm{ms}^2)$) between banks and the coordinator to evaluate asynchronous staleness weighting $\beta_k = (1 + \tau_k)^{-\gamma}$.
+- **Unannounced Client Dropout:** Drops client connections mid-round ($p_{\mathrm{drop}} \in [0.1, 0.4]$) to verify Shamir secret sharing $(t, n)$ threshold reconstruction and ensure uninterrupted consortium aggregation.
+
+### 20.5 Mocked External Integrations & FIU Regulatory Stubs
+- **UNODC goAML 4.0 XML & EU AMLA JSON Stubs:** Emulates the statutory electronic Suspicious Activity Report (SAR) filing interface. Generates schema-valid XML/JSON dossiers conforming to regulatory guidelines and stores them in local audit tables.
+- **Sanctions & PEP Mock List Verification:** Evaluates fuzzy entity resolution and MinHash LSH against synthetic sanctions watchlists (OFAC, EU Consolidated) without querying live government subscription endpoints.
+
+### 20.6 Synthetic Fraud Scenarios & Interactive Demo Console
+- **Scenario Replay Engine:** Bundles scripted cross-bank money mule routing, rapid account draining, and smurfing (structuring) fraud topologies.
+- **Interactive UI Workbench:** Exposes real-time multi-bank visualizer, transaction inspection stream, counterfactual sensitivity explorer, and model drift telemetry in the React frontend.
+
+### 20.7 Non-Production Cryptographic Demonstrations
+- Standalone cryptographic demonstrator scripts (`scripts/run_elliptic_benchmark.py`, `scripts/generate_secrets.py`) illustrate end-to-end mathematical workflows for peer review and architectural validation.
+
+---
+
+## 21. Prerequisites and System Requirements
 
 | Dependency | Minimum Version | Purpose |
 | :--- | :---: | :--- |
@@ -2541,7 +2631,7 @@ Exploratory token routing connector modeling Chainlink CCIP `EVM2AnyMessage` pay
 
 ---
 
-## 21. Step-by-Step Operator Quick Start
+## 22. Step-by-Step Operator Quick Start
 
 ### Step 1: Clone Repository and One-Click Enterprise Launch
 ```bash
@@ -2616,7 +2706,7 @@ python scripts/run_all_verifications.py
 
 ---
 
-## 22. Development Methodology & AI Collaboration
+## 23. Development Methodology & AI Collaboration
 
 This platform was engineered using a human-directed pair-programming workflow leveraging modern AI coding tools as productivity accelerators:
 
@@ -2633,7 +2723,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 23. Related Work and References
+## 24. Related Work and References
 
 1. McMahan, B., et al. (2017). *Communication-Efficient Learning of Deep Networks from Decentralized Data.* AISTATS.
 2. Bonawitz, K., et al. (2017). *Practical Secure Aggregation for Privacy-Preserving Machine Learning.* ACM CCS.
@@ -2646,7 +2736,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 24. Academic Citation and Reference Format
+## 25. Academic Citation and Reference Format
 
 ```bibtex
 @software{calisir2026cfintelligence,
@@ -2662,7 +2752,7 @@ This platform was engineered using a human-directed pair-programming workflow le
 
 ---
 
-## 25. Author and Maintenance
+## 26. Author and Maintenance
 
 Designed, developed, and maintained by **Yusuf Çalışır**.
 
