@@ -83,11 +83,16 @@ The audit inspected all components across the full repository footprint:
 3. **Formalized Threat & Privacy Models**:
    - Authored comprehensive `docs/privacy-model.md` specifying data residency boundaries, leakage invariants, and the formal distinctions between FL, DP, and SecAgg.
    - Cross-referenced formal STRIDE threat model in `docs/threat_model.md`.
+4. **Established Authoritative Quantitative Metric Claim Registry** (`benchmarks/claim_registry.json`):
+   - Formalized 19 core platform numerical assertions across fraud detection benchmarks, differential privacy utility frontiers, Byzantine resilience, inference concurrency latencies, and cryptographic masking throughputs.
+   - Enforced strict provenance tracking between stated specifications, empirical run outputs in `benchmarks/results/raw/`, and reproducible runner scripts.
+   - Guarded by automated mathematical consistency, schema integrity, and numerical reconciliation tests (`backend/tests/unit/test_claims_registry.py`).
 
 ---
 
 ## 5. What Was Verified
 
+- **Empirical Claim Registry Reconciliation**: Verified 100% exact numerical match between `benchmarks/claim_registry.json` and raw execution JSON files in `benchmarks/results/raw/` across all evaluation dimensions without metric shopping.
 - **Differential Privacy Frontier**: Verified that $(\epsilon, \delta)$-DP bounds are strictly computed via Rényi DP composition, demonstrating expected utility degradation as noise increases ($\sigma = 3.0 \to \text{PR-AUC } 0.1963$, non-private $\to \text{PR-AUC } 0.6272$).
 - **Inference Gateway Latency**: Verified that the PyTorch neural network forward pass accounts for $< 25\%$ of total request latency, while feature store lookups and serialization dominate API overhead.
 - **SSRF & Network Boundary Protections**: Verified automated rejection of loopback (`127.0.0.1`, `::1`), private ranges (RFC 1918), and AWS metadata (`169.254.169.254`).
