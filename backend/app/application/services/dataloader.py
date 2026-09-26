@@ -563,55 +563,83 @@ IEEE_CIS_REAL_FRAUD_RATIO = 0.035  # ~3.5% in real IEEE-CIS
 
 def load_ieee_cis(
     path: Path | None = None,
+    nrows: int | None = None,
     n_mock_txns: int = 8_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    all_rows: bool = False,
+    join_identity: bool = True,
+    temporal_split: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset."""
+    """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset.
+
+    Performs:
+    1. Transaction and identity left join on 'TransactionID'.
+    2. Missing value imputation and categorical encoding (ProductCD, card4, card6, DeviceType, M1-M9).
+    3. Temporal feature engineering on 'TransactionDT' (day, hour, zero future leakage).
+    """
     rng = rng or np.random.default_rng(42)
-    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
-    n_mock_txns = int(target_txns)
+    if all_rows:
+        target_nrows = None
+    elif nrows is not None:
+        target_nrows = None if nrows <= 0 else int(nrows)
+    elif "nrows" in kwargs:
+        kw_nrows = kwargs.get("nrows")
+        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
+    else:
+        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
+    n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("ieee_cis", path)
 
     parquet_files = sorted(list(root.glob("*.parquet")))
-    target_nrows = kwargs.get("nrows") or n_mock_txns
     if parquet_files:
         chosen_parquet = parquet_files[0]
         logger.info("[IEEE-CIS] Loading preprocessed Parquet from %s", chosen_parquet)
         df = pd.read_parquet(chosen_parquet)
         if target_nrows:
             df = df.iloc[:target_nrows]
-        label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
-        y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
-        feature_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud", "TransactionID") and pd.api.types.is_numeric_dtype(df[c])]
-        X = df[feature_cols].fillna(0).values.astype(np.float32)
-        return {
-            "X": X,
-            "y": y,
-            "feature_names": feature_cols,
-            "source": "real_parquet",
-            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-        }
+        res = _process_ieee_cis_dataframe(df, source="real_parquet")
+        if temporal_split or kwargs.get("temporal_split"):
+            clean_kwargs = {
+                k: v
+                for k, v in kwargs.items()
+                if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
+            }
+            return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+        return res
 
     txn_csv_candidates = [root / "train_transaction.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
+    # Exclude identity csv from transaction candidates
+    txn_csv_candidates = [c for c in txn_csv_candidates if "identity" not in c.name.lower()]
+
     for txn_csv in txn_csv_candidates:
         if txn_csv.exists():
-            logger.info("[IEEE-CIS] Loading real transaction CSV from %s", txn_csv)
-            nrows = target_nrows or 20_000
-            df = pd.read_csv(txn_csv, nrows=nrows)
-            label_col = "isFraud" if "isFraud" in df.columns else ("is_fraud" if "is_fraud" in df.columns else None)
-            y = df[label_col].values.astype(int) if label_col else np.zeros(len(df), dtype=int)
-            num_cols = df.select_dtypes(include="number").columns.tolist()
-            num_cols = [c for c in num_cols if c not in ("isFraud", "is_fraud", "TransactionID")]
-            X = df[num_cols].fillna(0).values.astype(np.float32)
-            return {
-                "X": X,
-                "y": y,
-                "feature_names": num_cols,
-                "source": "real_csv",
-                "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-            }
+            logger.info("[IEEE-CIS] Loading real transaction CSV from %s (nrows=%s)", txn_csv, target_nrows)
+            txn_df = pd.read_csv(txn_csv, nrows=target_nrows)
+
+            # Check if identity join is requested and available
+            id_csv_candidates = [root / "train_identity.csv"] + list(root.glob("*identity*.csv"))
+            id_csv = next((c for c in id_csv_candidates if c.exists()), None)
+
+            if join_identity and id_csv is not None and "TransactionID" in txn_df.columns:
+                logger.info("[IEEE-CIS] Joining identity data from %s", id_csv)
+                id_df = pd.read_csv(id_csv)
+                target_ids = set(txn_df["TransactionID"].unique())
+                id_df_sub = id_df[id_df["TransactionID"].isin(target_ids)]
+                merged_df = pd.merge(txn_df, id_df_sub, on="TransactionID", how="left")
+            else:
+                merged_df = txn_df
+
+            res = _process_ieee_cis_dataframe(merged_df, source="real_csv")
+            if temporal_split or kwargs.get("temporal_split"):
+                clean_kwargs = {
+                    k: v
+                    for k, v in kwargs.items()
+                    if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
+                }
+                return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+            return res
 
     if require_real:
         raise FileNotFoundError(
@@ -647,17 +675,118 @@ def load_ieee_cis(
     v_features = rng.standard_normal((n_mock_txns, IEEE_CIS_FEATURE_DIM - 25)).astype(np.float32)
     v_features[n_legit:, :] += 1.8  # Elevated risk offset
 
+    # TransactionDT (seconds, monotonic simulation)
+    mock_dt = np.sort(rng.integers(86400, 86400 * 180, size=n_mock_txns)).astype(np.float64)
+
     X = np.column_stack([amts.reshape(-1, 1), c_features, d_features, v_features])
     y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
 
     idx = rng.permutation(n_mock_txns)
     feature_names = [f"feat_{i}" for i in range(X.shape[1])]
-    return {
+    res = {
         "X": X[idx],
         "y": y[idx],
         "feature_names": feature_names,
         "source": "mock_ieee_cis",
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        "transaction_dt": mock_dt[idx],
+    }
+    if temporal_split or kwargs.get("temporal_split"):
+        clean_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split", "join_identity")
+        }
+        return temporal_split_dataset(res, time_col="TransactionDT", **clean_kwargs)
+    return res
+
+
+def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
+    """Process a raw or merged IEEE-CIS dataframe into numerical feature matrix."""
+    df = df.copy()
+
+    # 1. Label extraction
+    if "isFraud" in df.columns:
+        y = df["isFraud"].values.astype(int)
+    elif "is_fraud" in df.columns:
+        y = df["is_fraud"].values.astype(int)
+    elif "label" in df.columns:
+        y = df["label"].values.astype(int)
+    else:
+        y = np.zeros(len(df), dtype=int)
+
+    # 2. Identity indicators
+    if "id_01" in df.columns:
+        df["has_identity"] = df["id_01"].notnull().astype(np.float32)
+    elif "has_identity" not in df.columns:
+        df["has_identity"] = 0.0
+
+    # 3. Temporal features along TransactionDT
+    transaction_dt: np.ndarray | None = None
+    if "TransactionDT" in df.columns:
+        dt = df["TransactionDT"].values.astype(np.float64)
+        df["dt_day"] = ((dt // 86400) % 7).astype(np.float32)
+        df["dt_hour"] = ((dt // 3600) % 24).astype(np.float32)
+        transaction_dt = dt
+
+    # 4. Amount log transformation
+    if "TransactionAmt" in df.columns:
+        df["log_TransactionAmt"] = np.log1p(np.maximum(0, df["TransactionAmt"].fillna(0))).astype(np.float32)
+
+    # 5. Low-cardinality categoricals
+    if "ProductCD" in df.columns:
+        for cat in ["W", "H", "C", "S", "R"]:
+            df[f"ProductCD_{cat}"] = (df["ProductCD"] == cat).astype(np.float32)
+    if "card4" in df.columns:
+        for cat in ["visa", "mastercard", "discover", "american express"]:
+            col_clean = cat.replace(" ", "_")
+            df[f"card4_{col_clean}"] = (df["card4"] == cat).astype(np.float32)
+    if "card6" in df.columns:
+        for cat in ["debit", "credit"]:
+            df[f"card6_{cat}"] = (df["card6"] == cat).astype(np.float32)
+    if "DeviceType" in df.columns:
+        for cat in ["desktop", "mobile"]:
+            df[f"DeviceType_{cat}"] = (df["DeviceType"] == cat).astype(np.float32)
+
+    # 6. Binary/ternary match flags & identity indicators
+    for m in [f"M{i}" for i in range(1, 10)]:
+        if m in df.columns:
+            df[f"{m}_flag"] = df[m].map({"T": 1.0, "F": 0.0}).fillna(-1.0).astype(np.float32)
+    for id_f in ["id_12", "id_28", "id_29"]:
+        if id_f in df.columns:
+            df[f"{id_f}_flag"] = df[id_f].map({"Found": 1.0, "NotFound": 0.0}).fillna(-1.0).astype(np.float32)
+    for id_tf in ["id_35", "id_36", "id_37", "id_38"]:
+        if id_tf in df.columns:
+            df[f"{id_tf}_flag"] = df[id_tf].map({"T": 1.0, "F": 0.0}).fillna(-1.0).astype(np.float32)
+
+    # 7. Exclude raw non-numeric & identifier columns
+    drop_cols = {
+        "TransactionID",
+        "isFraud",
+        "is_fraud",
+        "label",
+        "ProductCD",
+        "card4",
+        "card6",
+        "P_emaildomain",
+        "R_emaildomain",
+        "DeviceType",
+        "DeviceInfo",
+    }
+    drop_cols.update([f"M{i}" for i in range(1, 10)])
+    drop_cols.update([f"id_{i:02d}" for i in range(12, 39)])
+    drop_cols.update([f"id_{i}" for i in range(12, 39)])
+
+    num_cols = [c for c in df.columns if c not in drop_cols and pd.api.types.is_numeric_dtype(df[c])]
+    X = df[num_cols].fillna(0).values.astype(np.float32)
+
+    return {
+        "X": X,
+        "y": y,
+        "feature_names": num_cols,
+        "source": source,
+        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
+        "transaction_dt": transaction_dt,
     }
 
 
@@ -898,21 +1027,29 @@ def temporal_split_dataset(
     y_arr = np.asarray(y, dtype=int)
     n_samples = len(X_arr)
 
-    # Determine time column index
+    # Determine time values and sort chronologically
     time_idx = 0
-    if feature_names and time_col:
-        if time_col in feature_names:
-            time_idx = feature_names.index(time_col)
-    elif feature_names:
-        detected = FeatureService.detect_time_column(pd.DataFrame(columns=feature_names))
-        if detected and detected in feature_names:
-            time_idx = feature_names.index(detected)
+    time_values: np.ndarray | None = None
+    if "transaction_dt" in dataset_dict and dataset_dict["transaction_dt"] is not None:
+        time_values = np.asarray(dataset_dict["transaction_dt"], dtype=np.float64)
+    elif "steps" in dataset_dict and dataset_dict["steps"] is not None:
+        time_values = np.asarray(dataset_dict["steps"], dtype=np.float64)
+
+    if time_values is None:
+        if feature_names and time_col:
+            if time_col in feature_names:
+                time_idx = feature_names.index(time_col)
+        elif feature_names:
+            detected = FeatureService.detect_time_column(pd.DataFrame(columns=feature_names))
+            if detected and detected in feature_names:
+                time_idx = feature_names.index(detected)
+        time_values = X_arr[:, time_idx]
 
     # Sort chronologically by time column
-    time_values = X_arr[:, time_idx]
     sort_idx = np.argsort(time_values)
     X_sorted = X_arr[sort_idx]
     y_sorted = y_arr[sort_idx]
+    time_sorted = time_values[sort_idx]
 
     n_train = int(n_samples * train_ratio)
     n_val = int(n_samples * val_ratio)
@@ -946,7 +1083,7 @@ def temporal_split_dataset(
         "preprocessor": prep,
         "source": dataset_dict.get("source", "unknown"),
         "is_strictly_chronological": bool(
-            len(X_train) == 0 or len(X_val) == 0 or X_train[-1, time_idx] <= X_val[0, time_idx]
+            len(X_train) == 0 or len(X_val) == 0 or time_sorted[n_train - 1] <= time_sorted[n_train]
         ),
     }
 

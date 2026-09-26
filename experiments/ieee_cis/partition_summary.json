@@ -1,0 +1,83 @@
+{
+  "dataset": "IEEE-CIS",
+  "feature_dim": 422,
+  "feature_names_sample": [
+    "TransactionDT",
+    "TransactionAmt",
+    "card1",
+    "card2",
+    "card3",
+    "card5",
+    "addr1",
+    "addr2",
+    "dist1",
+    "dist2",
+    "C1",
+    "C2",
+    "C3",
+    "C4",
+    "C5",
+    "C6",
+    "C7",
+    "C8",
+    "C9",
+    "C10",
+    "C11",
+    "C12",
+    "C13",
+    "C14",
+    "D1"
+  ],
+  "temporal_split": {
+    "test_ratio": 0.2,
+    "train_samples": 800,
+    "test_samples": 200,
+    "temporal_cutoff_dt": 102732.0
+  },
+  "partition_diagnostics": {
+    "alpha": 0.5,
+    "num_clients": 3,
+    "seed": 42,
+    "total_train_samples": 800,
+    "global_fraud_count": 13,
+    "global_fraud_ratio": 0.01625,
+    "temporal_cutoff_dt": 102732.0,
+    "total_test_samples": 200,
+    "client_statistics": {
+      "bank_a": {
+        "num_samples": 403,
+        "sample_share": 0.50375,
+        "num_legit": 400,
+        "num_fraud": 3,
+        "fraud_ratio": 0.007444168734491315,
+        "kl_divergence": 0.003033747036544519,
+        "total_variation_distance": 0.008805831265508698
+      },
+      "bank_b": {
+        "num_samples": 13,
+        "sample_share": 0.01625,
+        "num_legit": 13,
+        "num_fraud": 0,
+        "fraud_ratio": 0.0,
+        "kl_divergence": 0.016383479250507742,
+        "total_variation_distance": 0.016249999999999994
+      },
+      "bank_c": {
+        "num_samples": 384,
+        "sample_share": 0.48,
+        "num_legit": 374,
+        "num_fraud": 10,
+        "fraud_ratio": 0.026041666666666668,
+        "kl_divergence": 0.0025386039344287483,
+        "total_variation_distance": 0.009791666666666655
+      }
+    },
+    "consortium_metrics": {
+      "mean_kl_divergence": 0.007318610073827003,
+      "max_kl_divergence": 0.016383479250507742,
+      "mean_tvd": 0.01161583264405845,
+      "fraud_ratio_std": 0.010951666439723137,
+      "sample_count_std": 179.53705900330314
+    }
+  }
+}

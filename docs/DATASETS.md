@@ -81,12 +81,41 @@ $$\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount
 
 ### 3.2 IEEE-CIS Fraud Detection (Vesta Corporation)
 - **Source**: IEEE Computational Intelligence Society / Vesta Corporation Fraud Benchmark, Kaggle (`ieee-fraud-detection`).
-- **Domain**: Real-world e-commerce card-not-present (CNP) transactions with complex identity features.
+- **Domain**: Real-world e-commerce card-not-present (CNP) transactions with complex identity verification flows.
+- **Data Schema & Identity Join**:
+  - `train_transaction.csv` ($590{,}540$ records, 394 attributes): Transaction amount, product code, card metadata (`card1`–`card6`), address codes (`addr1`–`addr2`), email domains, count features (`C1`–`C14`), timedeltas (`D1`–`D15`), match flags (`M1`–`M9`), and Vesta risk indicators (`V1`–`V339`).
+  - `train_identity.csv` ($144{,}233$ records, 41 attributes): Identity verification metadata (`id_01`–`id_38`), `DeviceType`, and `DeviceInfo`.
+  - **Left Join**: Merged along `TransactionID` ($144{,}233$ transactions with identity metadata, ~24.4% join rate; transactions without identity records receive `has_identity = 0.0` and imputed indicators).
 - **Engineered Feature Pipeline**:
-  - `TransactionAmt`: Log-transformed transaction value in USD.
-  - Count features (`C1`–`C14`): Dynamic counts of phone numbers, email domains, and billing addresses associated with payment cards.
-  - Timedelta features (`D1`–`D15`): Days elapsed between subsequent transactions across identical card numbers.
-  - Vesta risk indicators (`V1`–`V339`): Proprietary engineered interaction features, match indicators, and proxy risk scores.
+  - `has_identity`: Binary indicator ($1.0$ if identity record exists, $0.0$ otherwise), capturing elevated CNP risk.
+  - `TransactionAmt` & `log_TransactionAmt`: Transacted currency value and $\log(1 + \mathrm{Amt})$ scale-normalized representation.
+  - Count features (`C1`–`C14`): Dynamic counts of addresses, phone numbers, and IP addresses associated with payment cards.
+  - Timedelta features (`D1`–`D15`): Elapsed days between subsequent transaction events across identical cards.
+  - Match indicators (`M1`–`M9`): Cardholder verification match flags mapped to ternary indicators ($1.0$ = Match/True, $0.0$ = Mismatch/False, $-1.0$ = Missing/Unknown).
+  - Identity verification flags (`id_12`, `id_28`, `id_29`, `id_35`–`id_38`): Cryptographic identity matches and browser/device trust indicators.
+  - Categorical encodings: One-hot encoded transaction product code (`ProductCD` $\in \{\mathrm{W}, \mathrm{H}, \mathrm{C}, \mathrm{S}, \mathrm{R}\}$), card network brand (`card4` $\in \{\mathrm{visa}, \mathrm{mastercard}, \mathrm{discover}, \mathrm{amex}\}$), card funding type (`card6` $\in \{\mathrm{debit}, \mathrm{credit}\}$), and hardware device category (`DeviceType` $\in \{\mathrm{desktop}, \mathrm{mobile}\}$).
+- **Strict Temporal Train/Test Separation**:
+  - Timestamp column: `TransactionDT` (monotonic elapsed seconds from reference epoch, starting at Day 1 $t_0 = 86{,}400$).
+  - Chronological split: Earliest $(1 - \mathrm{test\_ratio})$ transactions form the federated training pool; latest $\mathrm{test\_ratio}$ form the untouched global evaluation set.
+  - Zero-leakage invariant:
+
+$$\max(t_{\mathrm{train}}) \le \min(t_{\mathrm{test}})$$
+
+  - Guarantees zero lookahead bias across temporal fraud regimes.
+- **Partitioner & Module**: [`experiments/ieee_cis/temporal_split.py`](file:///experiments/ieee_cis/temporal_split.py) providing `IEEECISPartitioner` with Dirichlet ($\alpha \in \{0.1, 0.5, 1.0\}$) and card-brand institutional allocation.
+
+```python
+from experiments.ieee_cis.temporal_split import IEEECISPartitioner
+
+# Initialize 3-bank non-IID Dirichlet partitioner with 20% future test set
+partitioner = IEEECISPartitioner(alpha=0.5, num_clients=3, test_ratio=0.20, seed=42)
+partitioner.load_data(nrows=50_000, join_identity=True)
+client_data = partitioner.partition_dirichlet()
+
+# Access bank training partitions and sequestered global test set
+X_train_bank_a, y_train_bank_a = client_data["bank_a"]
+X_test_global, y_test_global = partitioner.get_global_test()
+```
 
 ### 3.3 European Credit Card Fraud (PCA Benchmark)
 - **Source**: Dal Pozzolo et al., Université Libre de Bruxelles (ULB), Kaggle (`mlg-ulb/creditcardfraud`).
