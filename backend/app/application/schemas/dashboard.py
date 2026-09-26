@@ -83,3 +83,67 @@ class RiskWeightsUpdateRequest(BaseModel):
         if not (0.0 <= v <= 1.0):
             raise ValueError("Risk weight must be strictly bounded within [0.0, 1.0]")
         return round(v, 6)
+
+
+class ComparativeModelItemSchema(BaseModel):
+    """Single model entry in the multi-paradigm comparative benchmark."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    paradigm: str = Field(..., description="Name or identifier of the evaluated paradigm")
+    category: str = Field(..., description="Model category: THEORETICAL_UPPER_BOUND, PRODUCTION_CHAMPION, ISOLATED_SILO, CLASSICAL_BASELINE")
+    pr_auc: float = Field(..., ge=0.0, le=1.0)
+    roc_auc: float = Field(..., ge=0.0, le=1.0)
+    recall_at_01_fpr: float = Field(..., ge=0.0, le=1.0)
+    f1_score: float = Field(..., ge=0.0, le=1.0)
+    brier_score: float = Field(..., ge=0.0, le=1.0)
+    latency_ms: float = Field(..., ge=0.0)
+    delta_pr_auc_vs_fed: float = Field(..., description="PR-AUC difference vs Federated Champion")
+    privacy_guarantee: str = Field(..., description="Level of privacy preservation")
+    legal_compliance: str = Field(..., description="Regulatory viability (GDPR/KVKK/Banking Secrecy)")
+    description: str = Field(..., description="Technical summary of the paradigm configuration")
+
+
+class CentralizationGapAnalysisSchema(BaseModel):
+    """Quantification of the gap between pooled upper bound and federated consensus."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    pooled_champion_model: str
+    pooled_pr_auc: float
+    pooled_roc_auc: float
+    pooled_recall_at_01_fpr: float
+    centralization_gap_pr_auc: float
+    centralization_gap_roc_auc: float
+    federated_efficiency_pct: float
+
+
+class SiloDeficitAnalysisSchema(BaseModel):
+    """Aggregate statistics quantifying isolated single-bank fraud blindness."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    mean_pr_auc: float
+    mean_roc_auc: float
+    mean_recall_at_01_fpr: float
+    silo_count: int
+    collaborative_uplift_pr_auc: float
+    collaborative_uplift_roc_auc: float
+
+
+class ComparativeBenchmarkResponseSchema(BaseModel):
+    """Full payload for the Multi-Paradigm Comparative Benchmark Widget."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    dataset_name: str
+    generated_at_utc: str
+    random_state: int
+    bank_count: int
+    total_training_samples: int
+    global_test_samples: int
+    fraud_prevalence_pct: float
+    comparison_matrix: list[ComparativeModelItemSchema]
+    centralization_gap_analysis: CentralizationGapAnalysisSchema
+    silo_deficit_analysis: SiloDeficitAnalysisSchema
+

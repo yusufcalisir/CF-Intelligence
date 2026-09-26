@@ -8,6 +8,7 @@ import {
   useAuditLogs,
 } from '../api/queries';
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
+import ComparativeModelWidget from '../components/dashboard/ComparativeModelWidget';
 
 export default function InvestigationDashboard() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -494,6 +495,9 @@ export default function InvestigationDashboard() {
           ))}
         </div>
       </motion.div>
+
+      {/* Multi-Paradigm Benchmark Baselines & Comparative Analysis */}
+      <ComparativeModelWidget />
 
       {/* Audit Logs */}
       <motion.div

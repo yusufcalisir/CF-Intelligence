@@ -3488,3 +3488,53 @@ export interface RecordRecoveryEventResponse {
   audit_hash: string;
   recorded_at: string;
 }
+
+export interface ComparativeModelItem {
+  paradigm: string;
+  category: 'THEORETICAL_UPPER_BOUND' | 'PRODUCTION_CHAMPION' | 'ISOLATED_SILO' | 'CLASSICAL_BASELINE';
+  pr_auc: number;
+  roc_auc: number;
+  recall_at_01_fpr: number;
+  f1_score: number;
+  brier_score: number;
+  latency_ms: number;
+  delta_pr_auc_vs_fed: number;
+  privacy_guarantee: string;
+  legal_compliance: string;
+  description: string;
+}
+
+export interface CentralizationGapAnalysis {
+  pooled_champion_model: string;
+  pooled_pr_auc: number;
+  pooled_roc_auc: number;
+  pooled_recall_at_01_fpr: number;
+  centralization_gap_pr_auc: number;
+  centralization_gap_roc_auc: number;
+  federated_efficiency_pct: number;
+}
+
+export interface SiloDeficitAnalysis {
+  mean_pr_auc: number;
+  mean_roc_auc: number;
+  mean_recall_at_01_fpr: number;
+  silo_count: number;
+  collaborative_uplift_pr_auc: number;
+  collaborative_uplift_roc_auc: number;
+  individual_banks?: Record<string, any>;
+  cross_bank_transfer_matrix?: Record<string, Record<string, number>>;
+}
+
+export interface ComparativeBenchmarkResponse {
+  dataset_name: string;
+  generated_at_utc: string;
+  random_state: number;
+  bank_count: number;
+  total_training_samples: number;
+  global_test_samples: number;
+  fraud_prevalence_pct: number;
+  comparison_matrix: ComparativeModelItem[];
+  centralization_gap_analysis: CentralizationGapAnalysis;
+  silo_deficit_analysis: SiloDeficitAnalysis;
+}
+

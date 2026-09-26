@@ -980,6 +980,18 @@ export function useTopRiskyMerchants(limit = 10, bankId?: string) {
   });
 }
 
+export function useComparativeBaselines() {
+  return useQuery<import('./types').ComparativeBenchmarkResponse>({
+    queryKey: ['comparative-baselines'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/api/v1/dashboard/comparative-baselines');
+      return data;
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+
 // ── Model Registry & Rollback ──────────────
 
 export function useModelVersions(simulationId: string | undefined) {
