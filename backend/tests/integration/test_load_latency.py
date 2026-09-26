@@ -161,7 +161,7 @@ class TestByzantineToleranceBounds:
     def test_coordinate_median_breakdown_point_bound(self) -> None:
         """Verifies Coordinate-Wise Median holds for f < n/2 and fails when f >= n/2."""
         engine = FederatedLearningEngine(MagicMock(), MagicMock(), MagicMock())
-        shapes = [(3,)]
+        shapes: list[tuple[int, ...]] = [(3,)]
 
         # Scenario 1: n = 5, f = 2 malicious (< 50% Byzantine nodes -> f < n/2 holds)
         w_h1 = ModelWeights(shapes, [1.0, 1.0, 1.0])
@@ -196,7 +196,7 @@ class TestByzantineToleranceBounds:
     def test_trimmed_mean_and_bulyan_bounds(self) -> None:
         """Verifies Trimmed Mean (f=1, n=4) and Bulyan (f=1, n=5) reject extreme poisoned updates."""
         engine = FederatedLearningEngine(MagicMock(), MagicMock(), MagicMock())
-        shapes = [(3,)]
+        shapes: list[tuple[int, ...]] = [(3,)]
 
         # 4 nodes with 1 poisoned node: Trimmed Mean (f=1 < 4/2)
         w1 = ModelWeights(shapes, [2.0, 2.0, 2.0])
