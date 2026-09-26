@@ -8,12 +8,13 @@ and final machine-readable experiment results.
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import platform
 from datetime import UTC, datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class HardwareMetadata(BaseModel):
@@ -187,6 +188,34 @@ class CurvePoint(BaseModel):
     precision: list[float] = Field(default_factory=list, description="Precision values")
     recall: list[float] = Field(default_factory=list, description="Recall values")
     thresholds: list[float] = Field(default_factory=list, description="Decision thresholds")
+
+    @field_validator("fpr", "tpr", "precision", "recall", "thresholds", mode="before")
+    @classmethod
+    def sanitize_float_list(cls, v: Any) -> list[float]:
+        """Sanitize floats by converting None/null, inf, and nan to valid finite floats."""
+        if v is None:
+            return []
+        if not isinstance(v, (list, tuple)):
+            try:
+                v = list(v)
+            except Exception:
+                return []
+        cleaned: list[float] = []
+        for item in v:
+            if item is None:
+                cleaned.append(1.0)
+            elif isinstance(item, (int, float)):
+                if math.isinf(item) or math.isnan(item):
+                    cleaned.append(1.0)
+                else:
+                    cleaned.append(float(item))
+            else:
+                try:
+                    val = float(item)
+                    cleaned.append(1.0 if (math.isinf(val) or math.isnan(val)) else val)
+                except (ValueError, TypeError):
+                    cleaned.append(1.0)
+        return cleaned
 
 
 class ConfusionMatrixData(BaseModel):

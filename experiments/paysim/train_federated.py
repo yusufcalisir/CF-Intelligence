@@ -205,24 +205,33 @@ def compute_curve_points(y_true: np.ndarray, y_pred_proba: np.ndarray, max_point
     fpr_raw, tpr_raw, thresh_roc = roc_curve(y_binary, y_pred_proba)
     prec_raw, rec_raw, thresh_pr = precision_recall_curve(y_binary, y_pred_proba)
 
+    def _clean_val(v: Any, fallback: float = 1.0) -> float:
+        try:
+            val = float(v)
+            if np.isinf(val) or np.isnan(val):
+                return fallback
+            return round(val, 5)
+        except (ValueError, TypeError):
+            return fallback
+
     # Subsample indices evenly if points exceed max_points
     if len(fpr_raw) > max_points:
         idx = np.round(np.linspace(0, len(fpr_raw) - 1, max_points)).astype(int)
-        fpr_list = [round(float(fpr_raw[i]), 5) for i in idx]
-        tpr_list = [round(float(tpr_raw[i]), 5) for i in idx]
-        thresh_list = [round(float(thresh_roc[i]), 5) for i in idx]
+        fpr_list = [_clean_val(fpr_raw[i], 0.0) for i in idx]
+        tpr_list = [_clean_val(tpr_raw[i], 0.0) for i in idx]
+        thresh_list = [_clean_val(thresh_roc[i], 1.0) for i in idx]
     else:
-        fpr_list = [round(float(v), 5) for v in fpr_raw]
-        tpr_list = [round(float(v), 5) for v in tpr_raw]
-        thresh_list = [round(float(v), 5) for v in thresh_roc]
+        fpr_list = [_clean_val(v, 0.0) for v in fpr_raw]
+        tpr_list = [_clean_val(v, 0.0) for v in tpr_raw]
+        thresh_list = [_clean_val(v, 1.0) for v in thresh_roc]
 
     if len(prec_raw) > max_points:
         idx_pr = np.round(np.linspace(0, len(prec_raw) - 1, max_points)).astype(int)
-        prec_list = [round(float(prec_raw[i]), 5) for i in idx_pr]
-        rec_list = [round(float(rec_raw[i]), 5) for i in idx_pr]
+        prec_list = [_clean_val(prec_raw[i], 0.0) for i in idx_pr]
+        rec_list = [_clean_val(rec_raw[i], 0.0) for i in idx_pr]
     else:
-        prec_list = [round(float(v), 5) for v in prec_raw]
-        rec_list = [round(float(v), 5) for v in rec_raw]
+        prec_list = [_clean_val(v, 0.0) for v in prec_raw]
+        rec_list = [_clean_val(v, 0.0) for v in rec_raw]
 
     return CurvePoint(
         fpr=fpr_list,

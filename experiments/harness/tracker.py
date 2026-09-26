@@ -171,11 +171,11 @@ class ExperimentTracker:
         self.history.append(metric)
 
         # Update latest observed evaluation metrics as running final metrics
-        if pr_auc is not None:
+        if pr_auc is not None and metric.pr_auc is not None:
             self.final_metrics["pr_auc"] = metric.pr_auc
-        if roc_auc is not None:
+        if roc_auc is not None and metric.roc_auc is not None:
             self.final_metrics["roc_auc"] = metric.roc_auc
-        if f1_score is not None:
+        if f1_score is not None and metric.f1_score is not None:
             self.final_metrics["f1_score"] = metric.f1_score
 
         return metric
