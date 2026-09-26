@@ -74,7 +74,7 @@ The audit inspected all components across the full repository footprint:
 ## 4. What Was Changed
 
 1. **Established Standalone Reproducible Benchmarking System** (`benchmarks/`):
-   - Created dataset acquisition, verification, and preprocessing pipelines for **PaySim**, **IEEE-CIS**, and **Elliptic Bitcoin Graph**.
+   - Created dataset acquisition, verification, and preprocessing pipelines for **PaySim**, **IEEE-CIS**, **Elliptic Bitcoin Graph**, **IBM AMLSim Multi-Hop Graph**, and **ULB Credit Card Fraud** with zero mock fallbacks and strict format enforcement.
    - Implemented automated CLI runners for fraud evaluation, FL strategy comparison, DP privacy-utility frontier, Byzantine attack defense, GraphSAGE node classification, and gateway latency under concurrency ($C \in [1, 500]$).
    - Structured machine-readable JSON output schemas capturing hardware environment metadata.
 2. **Eliminated Marketing Buzzwords & Neutralized Overclaims**:
@@ -108,6 +108,7 @@ The audit inspected all components across the full repository footprint:
 - **SSRF & Network Boundary Protections**: Verified automated rejection of loopback (`127.0.0.1`, `::1`), private ranges (RFC 1918), and AWS metadata (`169.254.169.254`).
 - **Byzantine Resilience & Breakdown Limits**: Verified that Krum, Trimmed Mean, and Bulyan aggregators successfully quarantine sign-inversion and high-variance Gaussian poisoning updates, while proving breakdown points when malicious nodes exceed theoretical limits.
 - **Curve25519 SecAgg Zero-Sum Accuracy**: Verified pairwise Diffie-Hellman mask derivation and algebraic vector cancellation without residual error.
+- **Multi-Hop Graph & Temporal AML Typology Verification**: Verified IBM Research AMLSim transaction graph with 1,323,234 transactions, 10,000 accounts, and 1,719 ground-truth multi-hop alerts (fan-in and cycle typologies) with PyTorch Geometric (`to_pyg_data`) and NetworkX (`to_networkx`) export pipelines.
 - **Unified Experiment Tracking & Binary Traces**: Verified schema validation, hardware probing, atomic disk serialization (JSON, CSV, Parquet), and Markdown dossier compilation across single and multi-seed configurations (`backend/tests/unit/test_experiment_harness.py`).
 
 ---

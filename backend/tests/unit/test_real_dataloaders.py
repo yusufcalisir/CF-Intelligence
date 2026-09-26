@@ -1,9 +1,11 @@
 """Unit tests for Real-World AML/Fraud Benchmark Dataset Loaders & LEAF Non-IID Partitioning."""
 
 import numpy as np
+import pytest
 
 from app.application.services.dataloader import (
     DATASET_REGISTRY,
+    load_amlsim,
     load_creditcard_fraud,
     load_elliptic,
     load_ieee_cis,
@@ -55,6 +57,51 @@ def test_load_creditcard_mock_structure():
     assert data["X"].shape[1] == 29
 
 
+def test_load_amlsim_structure():
+    data = load_amlsim(nrows=1000)
+    assert "X" in data
+    assert "y" in data
+    assert len(data["X"]) > 0
+    assert len(data["y"]) == len(data["X"])
+    assert data["X"].shape[1] == 6
+    assert "edges" in data
+    assert "edge_index" in data
+    assert "to_pyg_data" in data
+    assert "to_networkx" in data
+    assert callable(data["to_pyg_data"])
+    assert callable(data["to_networkx"])
+    assert data["source"] in ("real", "real_csv", "real_parquet", "mock")
+
+
+def test_load_amlsim_pyg_and_networkx():
+    data = load_amlsim(nrows=500)
+    pyg_data = data["to_pyg_data"]()
+    assert pyg_data is not None
+    if hasattr(pyg_data, "x"):
+        assert pyg_data.edge_index.shape[0] == 2
+    else:
+        assert "x" in pyg_data
+        assert "edge_index" in pyg_data
+
+    nx_graph = data["to_networkx"](max_edges=100)
+    assert nx_graph is not None
+    assert nx_graph.number_of_edges() <= 100
+
+
+def test_load_amlsim_mock_fallback(tmp_path):
+    data = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=300)
+    assert data["source"] == "mock"
+    assert data["X"].shape == (300, 6)
+    assert len(data["y"]) == 300
+    assert len(data["edges"]) == 300
+    assert data["edge_index"].shape == (2, 300)
+
+
+def test_load_amlsim_require_real_raises_on_missing(tmp_path):
+    with pytest.raises(FileNotFoundError, match="Real AMLSim dataset export not found"):
+        load_amlsim(path=tmp_path / "nonexistent", require_real=True)
+
+
 def test_leaf_non_iid_dirichlet_partitioning():
     # Generate mock dataset
     rng = np.random.default_rng(42)
@@ -71,3 +118,4 @@ def test_leaf_non_iid_dirichlet_partitioning():
         assert len(p["X"]) == p["n_samples"]
         assert len(p["y"]) == p["n_samples"]
         assert p["n_samples"] > 0
+

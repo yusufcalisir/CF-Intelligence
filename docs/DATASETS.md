@@ -7,7 +7,7 @@ This document provides the authoritative engineering and research specification 
 
 ## 1. Executive Summary & Zero-Mock Dataset Governance
 
-A core architectural invariant of **CF-Intelligence** is **Zero-Mock, Zero-Dummy Data** in production and empirical benchmarking evaluations. While legacy testing harnesses occasionally employed synthetic generators, all empirical fraud detection claims, federated learning convergence benchmarks, and differential privacy trade-offs in this platform are calibrated against four canonical, public, large-scale financial crime datasets.
+A core architectural invariant of **CF-Intelligence** is **Zero-Mock, Zero-Dummy Data** in production and empirical benchmarking evaluations. While legacy testing harnesses occasionally employed synthetic generators, all empirical fraud detection claims, federated learning convergence benchmarks, and differential privacy trade-offs in this platform are calibrated against five canonical, public, large-scale financial crime datasets.
 
 ### Dataset Portfolio Overview
 
@@ -17,6 +17,7 @@ A core architectural invariant of **CF-Intelligence** is **Zero-Mock, Zero-Dummy
 | **IEEE-CIS** | E-Commerce Card Transactions | 590,540 train txns | 378 numerical | 3.50% (20,663 frauds) | ~1.29 GB | CSV / Parquet |
 | **Credit Card Fraud** | European Cardholder PCA | 284,807 txns | 29 (V1–V28 + Amt) | 0.172% (492 frauds) | ~143.8 MB | CSV / Parquet |
 | **Elliptic Bitcoin** | Cryptocurrency Transaction Graph | 203,769 nodes, 234k edges | 166 temporal/graph | 9.76% of labeled (4,545 illicit) | ~665.2 MB | 3-CSV Bundle |
+| **IBM AMLSim** | Multi-Agent Banking Network Graph | 1,323,234 txns, 10,000 accounts | 6 canonical (tabular + graph) | 0.130% (1,719 SAR alerts) | ~72.8 MB | CSV / Parquet |
 
 ---
 
@@ -26,6 +27,11 @@ All raw dataset files are stored in `backend/storage/datasets/<dataset_name>/` o
 
 ```
 storage/datasets/
+├── amlsim/
+│   ├── accounts.csv                              # 326 KB (10,000 accounts metadata)
+│   ├── alerts.csv                                # 88 KB (1,719 ground-truth AML typology alerts)
+│   ├── transactions.csv                          # 61.05 MB (1,323,234 raw transaction flow events)
+│   └── transactions.parquet                      # 11.43 MB (Zero-copy fast columnar cache)
 ├── creditcard/
 │   └── creditcard.csv                             # 143.84 MB (284,807 rows)
 ├── elliptic/
@@ -43,6 +49,7 @@ storage/datasets/
     ├── bank_beta.parquet                         # Partitioned Non-IID client split (Bank Beta)
     └── bank_gamma.parquet                        # Partitioned Non-IID client split (Bank Gamma)
 ```
+
 
 ---
 
@@ -253,9 +260,48 @@ loss = model.compute_loss(predictions, y_t, mask=train_mask, pos_weight=9.2)
 print(f"Training Loss: {loss.item():.4f}")
 ```
 
+### 3.5 IBM Research AMLSim (Agent-Based Anti-Money Laundering Graph Simulator)
+- **Source**: IBM Research (Mark Weber et al., *Anti-Money Laundering with Graph Neural Networks*, Kaggle `anshankul/ibm-amlsim-example-dataset`).
+- **Domain**: High-fidelity agent-based multi-bank financial ecosystem simulating normal commercial transactions alongside embedded complex laundering typologies.
+- **Scale**: $1{,}323{,}234$ transactions, $10{,}000$ simulated accounts, and $1{,}719$ SAR alert ground-truth labels across 15 simulation timesteps (`storage/datasets/amlsim/`).
+- **Ground-Truth Laundering Typologies**:
+  - `cycle`: 936 alert instances. Circular transaction flow where funds pass sequentially through intermediate layering accounts before returning to the originator ($A \to B \to C \to A$), designed to obscure origin of capital.
+  - `fan_in`: 783 alert instances. Smurfing / structuring typology where multiple distinct accounts execute rapid small-value transfers aggregating into a single consolidation node.
+- **Canonical Feature Architecture (6 Features + Directed Graph Topology)**:
+  1. `step`: Discrete temporal step index ($0 \le t \le 15$).
+  2. `amount`: Monetary transfer volume.
+  3. `oldbalanceOrg`: Sender account balance prior to transaction execution (joined dynamically from `accounts.csv`).
+  4. `newbalanceOrig`: Sender post-transaction balance ($\max(0, \text{bal}_{\mathrm{orig}} - \text{amount})$).
+  5. `oldbalanceDest`: Receiver account balance prior to transaction credit (joined dynamically from `accounts.csv`).
+  6. `newbalanceDest`: Receiver post-transaction balance ($\text{bal}_{\mathrm{dest}} + \text{amount}$).
+- **Graph & Tensor Representation**:
+  - Directed Multigraph: $10{,}000$ account nodes and $1{,}323{,}234$ directed transaction edges.
+  - PyTorch Geometric Export: `to_pyg_data()` constructs PyG `Data(x=X, edge_index=edge_index, y=y, timesteps=timesteps)`.
+  - NetworkX Graph Export: `to_networkx()` generates `networkx.DiGraph` preserving edge attributes (`tx_id`, `amount`, `step`, `alert_type`).
+- **Accelerated Parquet Columnar Caching**:
+  - Automatically caches the 61 MB CSV into zero-copy columnar `transactions.parquet` (11.43 MB), slashing load latency from ~0.66s to 0.21s.
+- **Strict Zero-Mock Enforcement**:
+  - Calling `load_amlsim(require_real=True)` enforces physical file presence and raises explicit `FileNotFoundError` if dataset files are missing.
+
+```python
+from app.application.services.dataloader import load_amlsim
+
+# 1. Ingest real IBM AMLSim transaction graph with strict zero-mock enforcement
+data = load_amlsim(require_real=True, nrows=50000)
+
+print(f"Transactions: {len(data['y'])}, Features: {data['X'].shape[1]}")
+print(f"Graph Edges: {len(data['edges'])}, Fraud Prevalence: {data['fraud_ratio']:.4f}")
+
+# 2. Export to PyTorch Geometric and NetworkX
+pyg_data = data["to_pyg_data"]()
+nx_graph = data["to_networkx"](max_edges=500)
+print(f"NetworkX Graph: {nx_graph.number_of_nodes()} nodes, {nx_graph.number_of_edges()} edges")
+```
+
 ---
 
 ## 4. LEAF Dirichlet Non-IID Partitioning Formulation
+
 
 To benchmark federated algorithms under realistic cross-bank non-IID conditions without violating bank isolation, the platform employs a symmetric Dirichlet distribution $\mathrm{Dir}(\alpha)$ to partition datasets across $K$ consortium nodes:
 
@@ -306,6 +352,9 @@ kaggle datasets download -d mlg-ulb/creditcardfraud -p backend/storage/datasets/
 
 # 4. Elliptic Bitcoin
 kaggle datasets download -d ellipticco/elliptic-data-set -p backend/storage/datasets/elliptic --unzip
+
+# 5. IBM AMLSim Transaction Graph
+kaggle datasets download -d anshankul/ibm-amlsim-example-dataset -p backend/storage/datasets/amlsim --unzip
 ```
 
 ---
@@ -315,7 +364,7 @@ kaggle datasets download -d ellipticco/elliptic-data-set -p backend/storage/data
 The integrity of dataset loading, schema adherence, fast slice reads, and Dirichlet partitioning is verified continuously across:
 - [`backend/tests/unit/test_paysim_loader.py`](file:///backend/tests/unit/test_paysim_loader.py): Real PaySim dataset loading, 13-feature engineering verification, accounting error deltas, and zero temporal lookahead leakage.
 - [`backend/tests/unit/test_dirichlet_partition.py`](file:///backend/tests/unit/test_dirichlet_partition.py): Federated Non-IID Dirichlet distribution client partitioning ($\alpha \in \{0.1, 0.5, 1.0\}$), sample conservation, client isolation, and comparative benchmark integration.
-- [`backend/tests/unit/test_real_dataloaders.py`](file:///backend/tests/unit/test_real_dataloaders.py): Registry completeness, tensor dimensionalities, and label distributions.
+- [`backend/tests/unit/test_real_dataloaders.py`](file:///backend/tests/unit/test_real_dataloaders.py): Ingestion integrity for all five benchmark datasets (PaySim, IEEE-CIS, Credit Card, Elliptic, AMLSim), PyG/NetworkX graph exports, and zero-mock error guards.
 - [`backend/tests/unit/test_dataloader_edge_cases.py`](file:///backend/tests/unit/test_dataloader_edge_cases.py): Strict real-data enforcement (`require_real=True`), non-IID boundary conditions ($\alpha = 0.05$ vs $\alpha = 100.0$), rare class handling, and missing file error guards.
 - [`backend/tests/unit/test_split_isolation.py`](file:///backend/tests/unit/test_split_isolation.py): Zero data snooping, training-only preprocessor fitting, and handling of unseen categorical test tokens.
 - [`backend/tests/unit/test_feature_leakage.py`](file:///backend/tests/unit/test_feature_leakage.py): Target proxy correlation audits, outcome feature detection, and entity identifier memorization elimination.
@@ -329,6 +378,7 @@ To prevent temporal lookahead bias and data snooping in cross-bank fraud detecti
 
 ### 8.1 Chronological Arrow of Time
 Random cross-validation splits on financial event logs cause future transactions to contaminate training sets. All tabular datasets are ordered strictly ascending along their chronological timestamp:
+
 $$t_{\mathrm{train}}^{\max} \le t_{\mathrm{val}}^{\min} \le t_{\mathrm{test}}^{\min}$$
 
 | Dataset | Time / Sequence Column | Granularity |
@@ -337,9 +387,11 @@ $$t_{\mathrm{train}}^{\max} \le t_{\mathrm{val}}^{\min} \le t_{\mathrm{test}}^{\
 | **IEEE-CIS** | `TransactionDT` | Seconds elapsed from an arbitrary reference timestamp |
 | **Credit Card Fraud** | `Time` | Seconds elapsed between transaction and first transaction |
 | **Elliptic Bitcoin** | `time_step` | Discrete 2-week time steps ($1 \le t \le 49$) |
+| **IBM AMLSim** | `TIMESTAMP` / `step` | Discrete simulation time steps ($0 \le t \le 15$) |
 
 ### 8.2 Zero Data Snooping Preprocessing
-Preprocessing parameters (means $\mu_{\mathrm{train}}$, standard deviations $\sigma_{\mathrm{train}}$, medians, min/max bounds, and categorical vocabularies) are learned **strictly from the training partition**:
+Pre-processing parameters (means $\mu_{\mathrm{train}}$, standard deviations $\sigma_{\mathrm{train}}$, medians, min/max bounds, and categorical vocabularies) are learned **strictly from the training partition**:
 1. **Fit-Transform Isolation**: `DataPreprocessor.fit()` executes exclusively on $X_{\mathrm{train}}$. Transforming $X_{\mathrm{val}}$ and $X_{\mathrm{test}}$ applies $\mu_{\mathrm{train}}$ and $\sigma_{\mathrm{train}}$ without altering preprocessor state.
 2. **Unseen Categorical Tokens**: Categories appearing in validation or test partitions that were absent in $X_{\mathrm{train}}$ are mapped to an all-zero indicator vector, preventing runtime key crashes or out-of-vocabulary data snooping.
 3. **Outlier Standard Deviation Bounding**: When `clip_outliers=True`, standardized features are bounded to $[-k\sigma, +k\sigma]$ (default $k=6.0$), insulating gradient optimization against destabilizing numerical spikes.
+

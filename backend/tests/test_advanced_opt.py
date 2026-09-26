@@ -85,14 +85,14 @@ class TestEllipticLoader:
 
 
 class TestAMLSimLoader:
-    def test_mock_returns_correct_shape(self):
-        result = load_amlsim(n_mock_txns=300, rng=np.random.default_rng(0))
+    def test_mock_returns_correct_shape(self, tmp_path):
+        result = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=300, rng=np.random.default_rng(0))
         assert result["source"] == "mock"
         assert result["X"].shape == (300, 6)
         assert result["y"].shape == (300,)
 
-    def test_mock_amounts_are_positive(self):
-        result = load_amlsim(n_mock_txns=500, rng=np.random.default_rng(4))
+    def test_mock_amounts_are_positive(self, tmp_path):
+        result = load_amlsim(path=tmp_path / "nonexistent", n_mock_txns=500, rng=np.random.default_rng(4))
         amounts = result["X"][:, 1]  # amount column
         assert (amounts >= 0).all()
 

@@ -12,6 +12,7 @@ import numpy as np
 import pytest
 
 from app.application.services.dataloader import (
+    load_amlsim,
     load_creditcard_fraud,
     load_dataset,
     load_elliptic,
@@ -71,11 +72,22 @@ def _get_or_create_real_path(dataset_name: str, tmp_path: Path) -> Path | None:
         (tmp_path / "creditcard.csv").write_text(csv_content, encoding="utf-8")
         return tmp_path
 
+    if dataset_name == "amlsim":
+        candidates = [root / "transactions.parquet", root / "transactions.csv"] + list(root.glob("*.csv"))
+        if any(c.exists() for c in candidates):
+            return None
+        tx_cols = ["TX_ID", "SENDER_ACCOUNT_ID", "RECEIVER_ACCOUNT_ID", "TX_TYPE", "TX_AMOUNT", "TIMESTAMP", "IS_FRAUD", "ALERT_ID"]
+        row1 = ["1", "100", "200", "TRANSFER", "50.0", "0", "False", "-1"]
+        row2 = ["2", "200", "300", "TRANSFER", "150.0", "1", "True", "10"]
+        csv_content = ",".join(tx_cols) + "\n" + ",".join(row1) + "\n" + ",".join(row2) + "\n"
+        (tmp_path / "transactions.csv").write_text(csv_content, encoding="utf-8")
+        return tmp_path
+
     return None
 
 
 class TestRealDatasetLoading:
-    """Verifies that all 4 real datasets load genuine data without synthetic fallbacks."""
+    """Verifies that all 5 real datasets load genuine data without synthetic fallbacks."""
 
     def test_load_elliptic_real_dataset_integrity(self, tmp_path: Path) -> None:
         p = _get_or_create_real_path("elliptic", tmp_path)
@@ -116,19 +128,33 @@ class TestRealDatasetLoading:
         assert set(np.unique(data["y"])).issubset({0, 1})
         assert not np.isnan(data["X"]).any(), "Feature matrix contains NaN values"
 
+    def test_load_amlsim_real_dataset_integrity(self, tmp_path: Path) -> None:
+        p = _get_or_create_real_path("amlsim", tmp_path)
+        data = load_amlsim(path=p, nrows=500, require_real=True)
+        assert data["source"] in ("real", "real_csv", "real_parquet")
+        assert data["X"].shape[1] == 6
+        assert len(data["y"]) == len(data["X"])
+        assert set(np.unique(data["y"])).issubset({0, 1})
+        assert "edges" in data
+        assert isinstance(data["edges"], list)
+        assert not np.isnan(data["X"]).any(), "Feature matrix contains NaN values"
+
 
 class TestStrictRealModeGuards:
     """Verifies that synthetic mock fallback is forbidden when require_real=True."""
 
-    def test_strict_mode_raises_on_missing_amlsim(self) -> None:
+    def test_strict_mode_raises_on_missing_amlsim(self, tmp_path: Path) -> None:
+        empty_dir = tmp_path / "empty_amlsim"
+        empty_dir.mkdir()
         with pytest.raises(FileNotFoundError, match="Real AMLSim dataset export not found"):
-            load_dataset("amlsim", require_real=True)
+            load_dataset("amlsim", path=empty_dir, require_real=True)
 
     def test_strict_mode_raises_on_nonexistent_custom_path(self, tmp_path: Path) -> None:
         empty_dir = tmp_path / "empty_dataset"
         empty_dir.mkdir()
         with pytest.raises(FileNotFoundError, match="Real PaySim dataset files not found"):
             load_paysim(path=empty_dir, require_real=True)
+
 
     def test_load_dataset_case_insensitive_and_hyphen_tolerant(self) -> None:
         data_1 = load_dataset("PaySim", nrows=100)

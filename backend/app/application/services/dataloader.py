@@ -572,13 +572,16 @@ def load_elliptic(
 
 
 # ===========================================================================
-# AMLSim (IBM synthetic AML transaction graph)
+# AMLSim (IBM Research Agent-Based Anti-Money Laundering Synthetic Graph)
 # ===========================================================================
 
-# Real dataset layout (CSV export of AMLSim):
-#   transactions.csv — columns: step, action, amount, nameOrig, oldbalanceOrg,
-#                                newbalanceOrig, nameDest, oldbalanceDest,
-#                                newbalanceDest, isFraud, isFlaggedFraud
+# Canonical IBM AMLSim simulator layout:
+#   transactions.csv — TX_ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, TX_TYPE,
+#                      TX_AMOUNT, TIMESTAMP, IS_FRAUD, ALERT_ID
+#   accounts.csv     — ACCOUNT_ID, CUSTOMER_ID, INIT_BALANCE, COUNTRY, ACCOUNT_TYPE,
+#                      IS_FRAUD, TX_BEHAVIOR_ID
+#   alerts.csv       — ALERT_ID, ALERT_TYPE (fan_in, cycle, fan_out), IS_FRAUD,
+#                      TX_ID, SENDER_ACCOUNT_ID, RECEIVER_ACCOUNT_ID, TX_TYPE, TX_AMOUNT, TIMESTAMP
 
 AMLSIM_FEATURE_COLS = [
     "step",
@@ -588,44 +591,263 @@ AMLSIM_FEATURE_COLS = [
     "oldbalanceDest",
     "newbalanceDest",
 ]
-AMLSIM_FRAUD_RATIO = 0.015  # ~1.5% in IBM AMLSim defaults
+AMLSIM_FRAUD_RATIO = 0.0013  # ~0.13% in real 1.32M AMLSim benchmark (1,719 frauds)
+
+
+def _make_amlsim_pyg_data(
+    X: np.ndarray,
+    y: np.ndarray,
+    edge_index: np.ndarray,
+    timesteps: np.ndarray | None = None,
+    alert_types: list[str] | np.ndarray | None = None,
+) -> Any:
+    """Helper to convert AMLSim matrices into PyTorch Geometric Data or tensor dict."""
+    import torch
+
+    data_dict: dict[str, Any] = {
+        "x": torch.from_numpy(X),
+        "y": torch.from_numpy(y),
+        "edge_index": torch.from_numpy(edge_index),
+    }
+    if timesteps is not None:
+        data_dict["timesteps"] = torch.from_numpy(timesteps)
+    if alert_types is not None:
+        data_dict["alert_types"] = list(alert_types)
+    try:
+        from torch_geometric.data import Data
+        return Data(**data_dict)
+    except ImportError:
+        return data_dict
+
+
+def _make_amlsim_networkx_graph(
+    edges: list[tuple[int, int]],
+    y: np.ndarray | None = None,
+    tx_ids: np.ndarray | None = None,
+    amounts: np.ndarray | None = None,
+    timesteps: np.ndarray | None = None,
+    alert_types: list[str] | np.ndarray | None = None,
+    max_edges: int | None = None,
+) -> Any:
+    """Helper to convert AMLSim transactions into a NetworkX DiGraph."""
+    try:
+        import networkx as nx
+    except ImportError:
+        logger.warning("networkx is not installed; to_networkx returns None")
+        return None
+
+    G = nx.DiGraph()
+    limit = len(edges) if max_edges is None else min(len(edges), max_edges)
+
+    for i in range(limit):
+        u, v = edges[i]
+        attr: dict[str, Any] = {}
+        if y is not None and i < len(y):
+            attr["is_fraud"] = int(y[i])
+        if tx_ids is not None and i < len(tx_ids):
+            attr["tx_id"] = int(tx_ids[i])
+        if amounts is not None and i < len(amounts):
+            attr["amount"] = float(amounts[i])
+        if timesteps is not None and i < len(timesteps):
+            attr["step"] = int(timesteps[i])
+        if alert_types is not None and i < len(alert_types):
+            attr["alert_type"] = str(alert_types[i])
+        G.add_edge(u, v, **attr)
+
+    return G
+
+
+def _process_amlsim_dataframe(
+    df: pd.DataFrame,
+    root: Path,
+    source: str = "real_csv",
+    temporal_split: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Process a raw AMLSim DataFrame into standardized features, labels, and graph structures."""
+    # 1. Label detection
+    label_col = next((c for c in ["IS_FRAUD", "isFraud", "is_fraud", "Is Laundering", "is_laundering", "label"] if c in df.columns), None)
+    if label_col is not None:
+        y = df[label_col].astype(bool).astype(int).values
+    else:
+        y = np.zeros(len(df), dtype=int)
+
+    # 2. Check for alerts.csv
+    alerts_csv = root / "alerts.csv"
+    alerts_df = None
+    alert_types = np.array(["none"] * len(df), dtype=object)
+    if alerts_csv.exists():
+        try:
+            alerts_df = pd.read_csv(alerts_csv)
+            if "ALERT_ID" in alerts_df.columns and "ALERT_TYPE" in alerts_df.columns and "ALERT_ID" in df.columns:
+                al_map = alerts_df.drop_duplicates("ALERT_ID").set_index("ALERT_ID")["ALERT_TYPE"].to_dict()
+                alert_types = np.array([al_map.get(aid, "none") for aid in df["ALERT_ID"].values], dtype=object)
+        except Exception as exc:
+            logger.warning("[AMLSim] Failed to load alerts.csv: %s", exc)
+
+    # 3. Check for accounts.csv
+    accounts_csv = root / "accounts.csv"
+    accounts_df = None
+    acc_map: dict[int, float] = {}
+    if accounts_csv.exists():
+        try:
+            accounts_df = pd.read_csv(accounts_csv)
+            if "ACCOUNT_ID" in accounts_df.columns and "INIT_BALANCE" in accounts_df.columns:
+                acc_map = accounts_df.set_index("ACCOUNT_ID")["INIT_BALANCE"].to_dict()
+        except Exception as exc:
+            logger.warning("[AMLSim] Failed to load accounts.csv: %s", exc)
+
+    # 4. Feature and graph extraction
+    sender_col = next((c for c in ["SENDER_ACCOUNT_ID", "nameOrig", "From Bank", "Account", "sender"] if c in df.columns), None)
+    receiver_col = next((c for c in ["RECEIVER_ACCOUNT_ID", "nameDest", "To Bank", "Account.1", "receiver"] if c in df.columns), None)
+    amount_col = next((c for c in ["TX_AMOUNT", "amount", "Amount Received", "Amount Paid"] if c in df.columns), None)
+    step_col = next((c for c in ["TIMESTAMP", "step", "Timestamp", "time"] if c in df.columns), None)
+    tx_id_col = next((c for c in ["TX_ID", "tx_id", "transaction_id"] if c in df.columns), None)
+
+    if sender_col and receiver_col and amount_col and step_col:
+        steps = df[step_col].fillna(0).values.astype(np.float32)
+        amounts = df[amount_col].fillna(0.0).values.astype(np.float32)
+        if acc_map:
+            bal_orig = df[sender_col].map(acc_map).fillna(0.0).values.astype(np.float32)
+            bal_dest = df[receiver_col].map(acc_map).fillna(0.0).values.astype(np.float32)
+        elif "oldbalanceOrg" in df.columns and "oldbalanceDest" in df.columns:
+            bal_orig = df["oldbalanceOrg"].fillna(0.0).values.astype(np.float32)
+            bal_dest = df["oldbalanceDest"].fillna(0.0).values.astype(np.float32)
+        else:
+            bal_orig = np.zeros(len(df), dtype=np.float32)
+            bal_dest = np.zeros(len(df), dtype=np.float32)
+
+        new_bal_orig = (
+            np.maximum(bal_orig - amounts, 0.0).astype(np.float32)
+            if "newbalanceOrig" not in df.columns
+            else df["newbalanceOrig"].fillna(0.0).values.astype(np.float32)
+        )
+        new_bal_dest = (
+            (bal_dest + amounts).astype(np.float32)
+            if "newbalanceDest" not in df.columns
+            else df["newbalanceDest"].fillna(0.0).values.astype(np.float32)
+        )
+
+        X = np.column_stack([steps, amounts, bal_orig, new_bal_orig, bal_dest, new_bal_dest])
+        feature_names = AMLSIM_FEATURE_COLS
+
+        senders = df[sender_col].values
+        receivers = df[receiver_col].values
+        edges = list(zip(senders, receivers))
+        edge_index = np.stack([senders, receivers], axis=0)
+    else:
+        available_cols = [c for c in AMLSIM_FEATURE_COLS if c in df.columns]
+        if not available_cols:
+            available_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud", "IS_FRAUD", "label") and pd.api.types.is_numeric_dtype(df[c])]
+        X = df[available_cols].fillna(0).values.astype(np.float32)
+        feature_names = available_cols
+        edges = []
+        edge_index = np.zeros((2, 0), dtype=int)
+        amounts = X[:, 1] if X.shape[1] > 1 else np.zeros(len(X), dtype=np.float32)
+        steps = X[:, 0] if X.shape[1] > 0 else np.zeros(len(X), dtype=np.float32)
+
+    fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
+    tx_ids = df[tx_id_col].values if tx_id_col else np.arange(len(y))
+    timesteps = df[step_col].values.astype(np.int64) if step_col else np.zeros(len(y), dtype=np.int64)
+
+    def to_pyg_data() -> Any:
+        return _make_amlsim_pyg_data(X=X, y=y, edge_index=edge_index, timesteps=timesteps, alert_types=alert_types)
+
+    def to_networkx(max_edges: int | None = None) -> Any:
+        return _make_amlsim_networkx_graph(
+            edges=edges,
+            y=y,
+            tx_ids=tx_ids,
+            amounts=amounts,
+            timesteps=timesteps,
+            alert_types=alert_types,
+            max_edges=max_edges,
+        )
+
+    res: dict[str, Any] = {
+        "X": X,
+        "y": y,
+        "feature_names": feature_names,
+        "edges": edges,
+        "edge_index": edge_index,
+        "tx_ids": tx_ids,
+        "timesteps": timesteps,
+        "alert_types": alert_types,
+        "alerts": alerts_df,
+        "accounts": accounts_df,
+        "source": source,
+        "fraud_ratio": fraud_ratio,
+        "to_pyg_data": to_pyg_data,
+        "to_networkx": to_networkx,
+    }
+
+    if temporal_split:
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        return temporal_split_dataset(res, time_col="step", **clean_kwargs)
+
+    return res
 
 
 def load_amlsim(
     path: Path | None = None,
+    nrows: int | None = None,
     n_mock_txns: int = 5_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    all_rows: bool = False,
+    temporal_split: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load the AMLSim transaction dataset.
+    """Load the IBM AMLSim transaction dataset.
 
     Returns
     -------
     dict with keys:
         ``X``           : np.ndarray (N, 6) — transaction feature matrix
-        ``y``           : np.ndarray (N,)   — binary label (1=SAR / fraud)
-        ``source``      : str
-        ``fraud_ratio`` : float
+        ``y``           : np.ndarray (N,)   — binary label (1=SAR / fraud, 0=legit)
+        ``feature_names``: list[str]         — column names of X
+        ``edges``       : list[tuple[int, int]] — graph edge pairs
+        ``edge_index``  : np.ndarray (2, E) — PyTorch Geometric compatible edge index
+        ``source``      : str               — 'real_parquet', 'real_csv', or 'mock'
+        ``fraud_ratio`` : float             — fraud class prevalence
+        ``to_pyg_data`` : Callable          — export to PyTorch Geometric Data
+        ``to_networkx`` : Callable          — export to NetworkX DiGraph
     """
     rng = rng or np.random.default_rng(42)
-    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
-    n_mock_txns = int(target_txns)
+    if all_rows:
+        target_nrows = None
+    elif nrows is not None:
+        target_nrows = None if nrows <= 0 else nrows
+    elif "nrows" in kwargs:
+        kw_nrows = kwargs.get("nrows")
+        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
+    else:
+        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
+    n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("amlsim", path)
-    csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
 
+    # 1. Parquet cache check
+    parquet_cache = root / "transactions.parquet"
+    if parquet_cache.exists():
+        logger.info("[AMLSim] Loading from Parquet cache %s (nrows=%s)", parquet_cache, target_nrows)
+        df = pd.read_parquet(parquet_cache)
+        if target_nrows is not None and len(df) > target_nrows:
+            df = df.iloc[:target_nrows]
+        return _process_amlsim_dataframe(df, root=root, source="real_parquet", temporal_split=temporal_split, **kwargs)
+
+    # 2. CSV candidates
+    csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
     for csv_path in csv_candidates:
-        if csv_path.exists():
-            logger.info("[AMLSim] Loading real dataset from %s", csv_path)
-            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows") or n_mock_txns)
-            available_cols = [c for c in AMLSIM_FEATURE_COLS if c in df.columns]
-            if not available_cols:
-                available_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud") and pd.api.types.is_numeric_dtype(df[c])]
-            X = df[available_cols].fillna(0).values.astype(np.float32)
-            y = df["isFraud"].values.astype(int) if "isFraud" in df.columns else df["is_fraud"].values.astype(int)
-            logger.info("[AMLSim] Loaded %d transactions", len(y))
-            fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
-            return {"X": X, "y": y, "feature_names": available_cols, "source": "real", "fraud_ratio": fraud_ratio}
+        if csv_path.exists() and not csv_path.name.endswith(".parquet"):
+            logger.info("[AMLSim] Loading real dataset from %s (nrows=%s)", csv_path, target_nrows)
+            df = pd.read_csv(csv_path, nrows=target_nrows)
+            if target_nrows is None and not parquet_cache.exists():
+                try:
+                    df.to_parquet(parquet_cache, index=False)
+                    logger.info("[AMLSim] Cached %d transactions to %s", len(df), parquet_cache)
+                except Exception as exc:
+                    logger.debug("[AMLSim] Skipping parquet caching: %s", exc)
+            return _process_amlsim_dataframe(df, root=root, source="real_csv", temporal_split=temporal_split, **kwargs)
 
     if require_real:
         raise FileNotFoundError(
@@ -650,7 +872,34 @@ def load_amlsim(
     X = np.column_stack([steps, amounts, bal_orig, new_bal_orig, bal_dest, new_bal_dest])
     y = (rng.random(n_mock_txns) < AMLSIM_FRAUD_RATIO).astype(int)
 
-    return {"X": X, "y": y, "source": "mock"}
+    senders = rng.integers(0, 1000, size=n_mock_txns)
+    receivers = rng.integers(0, 1000, size=n_mock_txns)
+    edges = list(zip(senders, receivers))
+    edge_index = np.stack([senders, receivers], axis=0)
+
+    def to_pyg_data() -> Any:
+        return _make_amlsim_pyg_data(X=X, y=y, edge_index=edge_index, timesteps=steps.astype(int))
+
+    def to_networkx(max_edges: int | None = None) -> Any:
+        return _make_amlsim_networkx_graph(edges=edges, y=y, amounts=amounts, timesteps=steps.astype(int), max_edges=max_edges)
+
+    return {
+        "X": X,
+        "y": y,
+        "feature_names": AMLSIM_FEATURE_COLS,
+        "edges": edges,
+        "edge_index": edge_index,
+        "tx_ids": np.arange(n_mock_txns),
+        "timesteps": steps.astype(int),
+        "alert_types": np.array(["none"] * n_mock_txns, dtype=object),
+        "alerts": None,
+        "accounts": None,
+        "source": "mock",
+        "fraud_ratio": AMLSIM_FRAUD_RATIO,
+        "to_pyg_data": to_pyg_data,
+        "to_networkx": to_networkx,
+    }
+
 
 
 # ===========================================================================

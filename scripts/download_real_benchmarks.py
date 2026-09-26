@@ -40,6 +40,20 @@ DATASET_CONFIGS = {
         "primary_file": "elliptic_txs_features.csv",
         "description": "Elliptic Bitcoin Transaction Graph (203k nodes, 234k edges, 166 features)",
     },
+    "amlsim": {
+        "kaggle_slug": "anshankul/ibm-amlsim-example-dataset",
+        "url": "https://www.kaggle.com/datasets/anshankul/ibm-amlsim-example-dataset",
+        "target_dir": DATASETS_ROOT / "amlsim",
+        "primary_file": "transactions.csv",
+        "description": "IBM Research AMLSim Transaction Graph & Typologies (1.32M txns, 10k accounts, fan-in/cycle alerts)",
+    },
+    "creditcard": {
+        "kaggle_slug": "mlg-ulb/creditcardfraud",
+        "url": "https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud",
+        "target_dir": DATASETS_ROOT / "creditcard",
+        "primary_file": "creditcard.csv",
+        "description": "ULB Machine Learning Group European Cardholder PCA Fraud (284k transactions)",
+    },
 }
 
 
@@ -78,18 +92,21 @@ def download_via_kaggle_api(dataset_key: str) -> bool:
 def verify_dataset(dataset_key: str) -> bool:
     """Check if the dataset exists locally and is valid."""
     cfg = DATASET_CONFIGS[dataset_key]
-    target_dir = cfg["target_dir"]
-    primary_file = target_dir / cfg["primary_file"]
+    candidate_dirs = [
+        cfg["target_dir"],
+        Path(__file__).resolve().parent.parent / "backend" / "storage" / "datasets" / dataset_key,
+    ]
+    for target_dir in candidate_dirs:
+        if not target_dir.exists():
+            continue
+        primary_file = target_dir / cfg["primary_file"]
+        has_parquet = len(list(target_dir.glob("*.parquet"))) > 0
+        has_csv = primary_file.exists() or len(list(target_dir.glob("*.csv"))) > 0
+        if has_parquet or has_csv:
+            logger.info("[VERIFIED] %s is available at %s", dataset_key.upper(), target_dir)
+            return True
 
-    # Also check if any parquet exists
-    has_parquet = len(list(target_dir.glob("*.parquet"))) > 0
-    has_csv = primary_file.exists() or len(list(target_dir.glob("*.csv"))) > 0
-
-    if has_parquet or has_csv:
-        logger.info("[VERIFIED] %s is available at %s", dataset_key.upper(), target_dir)
-        return True
-
-    logger.warning("[MISSING] %s not found in %s", dataset_key.upper(), target_dir)
+    logger.warning("[MISSING] %s not found in %s", dataset_key.upper(), cfg["target_dir"])
     return False
 
 
@@ -117,7 +134,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download and verify real-world benchmark datasets.")
     parser.add_argument(
         "--dataset",
-        choices=["all", "paysim", "ieee_cis", "elliptic"],
+        choices=["all", "paysim", "ieee_cis", "elliptic", "amlsim", "creditcard"],
         default="all",
         help="Which dataset to download (default: all)",
     )
