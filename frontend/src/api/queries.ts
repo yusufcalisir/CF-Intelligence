@@ -252,13 +252,8 @@ export function useSimulations() {
   return useQuery<SimulationSummary[]>({
     queryKey: ['simulations'],
     queryFn: async () => {
-      try {
-        const { data } = await apiClient.get('/api/v1/simulations');
-        return data;
-      } catch {
-        // Fallback for cold start / offline backend
-        return [];
-      }
+      const { data } = await apiClient.get('/api/v1/simulations');
+      return data;
     },
     refetchInterval: 5000,
   });
@@ -343,17 +338,8 @@ export function useBanks() {
   return useQuery<BankInfo[]>({
     queryKey: ['banks'],
     queryFn: async () => {
-      try {
-        const { data } = await apiClient.get('/api/v1/banks');
-        return data;
-      } catch {
-        // Fallback mock banks on timeout or cold start
-        return [
-          { id: 'bank_a', name: 'Bank A — National Trust', tier: 'global', default_transactions: 50000, default_fraud_ratio: 0.012, fraud_pattern: 'High-frequency structuring & card cloning', characteristics: ['Global operations', 'High volume', 'Strict SLA'] },
-          { id: 'bank_b', name: 'Bank B — Metro Commercial', tier: 'regional', default_transactions: 35000, default_fraud_ratio: 0.025, fraud_pattern: 'Cross-border wire diversion & synthetic ID', characteristics: ['Regional focus', 'Commercial loans', 'Fast growth'] },
-          { id: 'bank_c', name: 'Bank C — Heritage Regional', tier: 'community', default_transactions: 15000, default_fraud_ratio: 0.038, fraud_pattern: 'Account takeover & ATO burst attacks', characteristics: ['Local retail', 'High retail fraud', 'Legacy stack'] },
-        ];
-      }
+      const { data } = await apiClient.get('/api/v1/banks');
+      return data;
     },
   });
 }

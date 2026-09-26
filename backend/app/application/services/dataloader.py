@@ -125,6 +125,8 @@ def load_elliptic(
         ``source`` : str — "real" | "mock"
     """
     rng = rng or np.random.default_rng(42)
+    target_nodes = kwargs.get("n_mock_nodes") or kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_nodes
+    n_mock_nodes = int(target_nodes)
     root = resolve_dataset_dir("elliptic", path)
 
     features_csv = root / "elliptic_txs_features.csv"
@@ -159,8 +161,9 @@ def load_elliptic(
 
         # Merge strictly on txId to guarantee row alignment
         merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
-        if kwargs.get("nrows"):
-            merged_df = merged_df.iloc[: kwargs["nrows"]]
+        target_nrows = kwargs.get("nrows") or kwargs.get("n_mock_txns") or kwargs.get("n_mock_nodes")
+        if target_nrows:
+            merged_df = merged_df.iloc[: int(target_nrows)]
 
         y = merged_df["label"].values.astype(int)
         feature_cols = [c for c in merged_df.columns if c not in ("txId", "class", "label")]
@@ -244,13 +247,15 @@ def load_amlsim(
         ``source`` : str
     """
     rng = rng or np.random.default_rng(42)
+    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
+    n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("amlsim", path)
     csv_candidates = [root / "transactions.csv"] + list(root.glob("*transaction*.csv")) + list(root.glob("*.csv"))
 
     for csv_path in csv_candidates:
         if csv_path.exists():
             logger.info("[AMLSim] Loading real dataset from %s", csv_path)
-            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows"))
+            df = pd.read_csv(csv_path, nrows=kwargs.get("nrows") or n_mock_txns)
             available_cols = [c for c in AMLSIM_FEATURE_COLS if c in df.columns]
             if not available_cols:
                 available_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud") and pd.api.types.is_numeric_dtype(df[c])]
@@ -313,6 +318,8 @@ def load_paysim(
 ) -> dict[str, Any]:
     """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
     rng = rng or np.random.default_rng(42)
+    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
+    n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("paysim", path)
 
     # Check possible filenames for PaySim
@@ -503,6 +510,8 @@ def load_ieee_cis(
 ) -> dict[str, Any]:
     """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset."""
     rng = rng or np.random.default_rng(42)
+    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
+    n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("ieee_cis", path)
 
     parquet_files = sorted(list(root.glob("*.parquet")))
@@ -598,6 +607,8 @@ def load_creditcard_fraud(
 ) -> dict[str, Any]:
     """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA)."""
     rng = rng or np.random.default_rng(42)
+    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
+    n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("creditcard", path)
 
     parquet_files = sorted(list(root.glob("*.parquet")))

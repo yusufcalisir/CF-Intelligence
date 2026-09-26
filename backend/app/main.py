@@ -225,7 +225,7 @@ def _acquire_seed_right() -> bool:
 
 
 def seed_mock_data() -> None:
-    """Seed initial mock data for Phase 2 AML platform."""
+    """Seed initial demonstration data for AML financial crime intelligence platform."""
     from app.application.services.alert_service import _alert_to_dict, _intel_to_dict
     from app.application.services.case_service import _case_to_dict
     from app.domain.entities_phase2 import Alert, SharedIntelligence
@@ -504,12 +504,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 mode_env = os.getenv("MODE", "").lower()
 service_name = (mode_env or os.getenv("SERVICE_NAME", "")).lower()
 
-app_title = "Collaborative Fraud Intelligence Simulator"
+app_title = "Privacy-Preserving Collaborative Financial Crime Intelligence Platform"
 app_description = (
-    "Privacy-preserving cross-institution fraud detection using Federated Learning. "
-    "Simulates collaborative model training between three independent banks without "
-    "sharing raw transaction data. Phase 2 adds collaborative alert intelligence, "
-    "risk scoring, case management, entity resolution, and relationship graphs."
+    "Privacy-preserving collaborative financial crime intelligence platform using Federated Learning. "
+    "Orchestrates collaborative model training between independent bank nodes without "
+    "sharing raw transaction data, integrating cross-institution alert intelligence, "
+    "composite risk scoring, case management, entity resolution, and transaction relationship graphs."
 )
 
 if service_name == "gateway":

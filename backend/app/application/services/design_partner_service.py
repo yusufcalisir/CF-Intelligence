@@ -244,7 +244,7 @@ class DesignPartnerPilotService:
         from app.application.services.dataloader import load_dataset, partition_dataset_non_iid
 
         # Load real/mock benchmark with requested sample cap for sub-second interactive response
-        data = load_dataset(dataset_name, n_mock_txns=n_samples, nrows=n_samples)
+        data = load_dataset(dataset_name, n_mock_txns=n_samples, nrows=n_samples, n_mock_nodes=n_samples)
         X, y = data["X"], data["y"]
         if len(y) > n_samples:
             X = X[:n_samples]
