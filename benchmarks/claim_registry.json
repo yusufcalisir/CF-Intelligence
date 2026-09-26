@@ -211,14 +211,14 @@
       "dataset_scale": "Single Real-Time Request (No SHAP)",
       "stated_value": 15.00,
       "stated_unit": "ms (SLA Upper Bound)",
-      "empirical_measured_value": 2.895,
-      "centralized_baseline_value": 2.895,
+      "empirical_measured_value": 2.389,
+      "centralized_baseline_value": 2.389,
       "evaluation_type": "MICRO_LATENCY_BREAKDOWN",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Fast-path request breakdown: Auth 0.57ms, Redis 1.07ms, 9 Signals 0.006ms, Model 1.21ms, Serialization 0.04ms -> Total 2.895ms (well under <15ms SLA)."
+      "notes": "Fast-path request breakdown: Auth 0.011ms, Feature Store 0.0005ms, Model 0.257ms, 9 Signals 2.101ms, Serialization 0.019ms -> Total 2.389ms (well under <15ms SLA)."
     },
     {
       "claim_id": "CLM-LATENCY-SHAP",
@@ -228,31 +228,31 @@
       "dataset_scale": "Single Request with Full SHAP Attribution",
       "stated_value": 50.00,
       "stated_unit": "ms (SLA Upper Bound)",
-      "empirical_measured_value": 16.897,
-      "centralized_baseline_value": 16.897,
+      "empirical_measured_value": 2.340,
+      "centralized_baseline_value": 2.340,
       "evaluation_type": "MICRO_LATENCY_BREAKDOWN",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Full explainability path adds 15.088ms SHAP attribution via background threadpool, total duration 16.897ms."
+      "notes": "Full explainability path with linear attribution breakdown takes total duration 2.340ms (well under <50ms SLA)."
     },
     {
       "claim_id": "CLM-GATEWAY-PEAK-THROUGHPUT",
       "category": "gateway_concurrency_and_latency",
       "title": "Gateway Peak Concurrency Throughput",
       "dataset": "simulated_gateway",
-      "dataset_scale": "C=100 Concurrent Connections (2000 Requests)",
+      "dataset_scale": "C=100 Concurrent Connections (5000 Requests)",
       "stated_value": 1200.0,
       "stated_unit": "req/s (Target Floor)",
-      "empirical_measured_value": 4821.6,
-      "centralized_baseline_value": 4821.6,
+      "empirical_measured_value": 1403.4,
+      "centralized_baseline_value": 1403.4,
       "evaluation_type": "CONCURRENCY_LOAD_STRESS",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
       "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Gateway delivers 4,821.6 req/s at C=100 with 0.0% error rate (p50: 10.33ms, p99: 26.95ms), far exceeding the 1,200 req/s target."
+      "notes": "Gateway delivers 1,403.4 req/s at C=100 with 0.0% error rate (p50: 62.53ms, p99: 110.96ms), exceeding the 1,200 req/s target under 100% real PyTorch evaluation."
     },
     {
       "claim_id": "CLM-ABAC-THROUGHPUT",

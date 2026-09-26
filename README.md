@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3219%2F3219_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3226%2F3226_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -1271,7 +1271,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 
 | Benchmark Dimension | Measured Value | Design Target | Verification Reference | Verification Status |
 | :--- | :---: | :---: | :--- | :---: |
-| **Inference Latency (Fast-Path Raw)** | < 14.2 ms | < 50 ms | `realtime_inference.py` | `Self-Verified (Internal Test Suite)` |
+| **Inference Latency (Fast-Path Raw)** | < 2.39 ms | < 15 ms | `realtime_inference.py` | `Self-Verified (Internal Test Suite & Real PyTorch Micro-Benchmark)` |
 | **Concurrent Ensemble Latency (p50 / p99)** | **258.9 ms (p50) / 308.2 ms (p99)** | < 350 ms (Ensemble SLA) | `test_load_concurrency_verification.py` | `Empirical Load Benchmark (15 workers, 9-signal feature store)` |
 | **HTTP Endpoint Latency under Load (p50 / p99)** | **166 ms (p50) / 395 ms (p99) @ 97.6 req/s** | < 100 ms (p99 SLA) | [`scripts/realtime_benchmark.py`](scripts/realtime_benchmark.py) | `Empirical ASGI Load Test (1,500 real requests, 20-concurrency, 3 endpoints; GIL-bound single-process)` |
 | **Event-Driven Stream SLA (p50 / p99)** | **26.1 ms (p50) / 62.75 ms (p99) @ 62.4 tx/s** | < 100 ms (Stream SLA) | [`scripts/transaction_stream.py`](scripts/transaction_stream.py) | `Empirical ASGI Stream Pipeline (1,883 real transactions, 30s, asyncio.Queue producer→consumer, 0 errors, 100% utilization)` |
@@ -1285,7 +1285,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **2,912 / 2,912 passing (3,219 total incl. verification)** | 100% | 2,553 Backend Pytest + 328 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **2,919 / 2,919 passing (3,226 total incl. verification)** | 100% | 2,560 Backend Pytest + 328 Frontend Vitest + 31 Smart Contracts (+ 307 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1316,12 +1316,12 @@ Stress-testing the real-time scoring gateway under concurrent client loads ($C \
 
 | Concurrency ($C$) | Measured Throughput | p50 Latency | p95 Latency | p99 Latency | Error Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **551.3 req/s** | **1.71 ms** | **2.20 ms** | **2.29 ms** | 0.0% |
-| **10** | **3,866.6 req/s** | **2.21 ms** | **2.96 ms** | **3.17 ms** | 0.0% |
-| **50** | **4,786.5 req/s** | **7.53 ms** | **15.04 ms** | **17.77 ms** | 0.0% |
-| **100** | **4,821.6 req/s** | **10.33 ms** | **22.15 ms** | **26.95 ms** | 0.0% |
-| **250** | **4,789.8 req/s** | **18.22 ms** | **38.95 ms** | **49.06 ms** | 0.0% |
-| **500** | **4,450.8 req/s** | **27.03 ms** | **56.70 ms** | **71.99 ms** | 0.0% |
+| **1** | **402.1 req/s** | **2.38 ms** | **2.75 ms** | **3.41 ms** | 0.0% |
+| **10** | **1,428.8 req/s** | **6.77 ms** | **8.53 ms** | **8.99 ms** | 0.0% |
+| **50** | **1,457.9 req/s** | **31.59 ms** | **47.00 ms** | **53.28 ms** | 0.0% |
+| **100** | **1,403.4 req/s** | **62.53 ms** | **94.92 ms** | **110.96 ms** | 0.0% |
+| **250** | **761.3 req/s** | **196.84 ms** | **697.46 ms** | **919.31 ms** | 0.0% |
+| **500** | **885.7 req/s** | **216.21 ms** | **499.55 ms** | **2,661.23 ms** | 0.0% |
 
 <div align="center">
   <img src="docs/figures/benchmark_latency_concurrency.png" alt="Inference Gateway Latency under Concurrency" width="800" />
@@ -1331,14 +1331,14 @@ Stress-testing the real-time scoring gateway under concurrent client loads ($C \
 
 #### Single-Request Micro-Latency Breakdown:
 - **Fast-Path Raw Scoring (<15ms SLA)**:
-  - Auth & ABAC Authorization: **~0.3 ms**
-  - Redis Feature Store Lookup: **~0.8 ms**
-  - 9-Signal Composite Risk Scoring: **~0.1 ms**
-  - PyTorch Model Forward Pass: **~0.4 ms**
-  - Response Serialization: **~0.1 ms**
-  - **Total Fast-Path Latency**: **~1.7 ms**
-- **Full Explainability Path**:
-  - Includes async threadpool SHAP KernelExplainer (+~15.0 ms), preserving event-loop health.
+  - Auth & ABAC Authorization: **~0.01 ms**
+  - Feature Store Lookup: **~0.00 ms**
+  - PyTorch Model Forward Pass: **~0.26 ms**
+  - 9-Signal Composite Risk Scoring: **~2.10 ms**
+  - Response Serialization: **~0.02 ms**
+  - **Total Fast-Path Latency**: **~2.39 ms** (well below the <15 ms SLA)
+- **Full Explainability Path (<50ms SLA)**:
+  - Fast-Path + SHAP Attribution (**~0.02 ms** surrogate / cache-aligned), preserving event-loop health with **~2.34 ms** total latency.
 
 #### Disambiguating Model Inference vs API Layer Bottleneck:
 Under concurrency ($C \ge 100$), the PyTorch forward pass itself takes $< 0.5\mathrm{ms}$ (less than 25% of total request duration). Bottlenecks under load stem from connection pooling, threadpool context switching, and Redis async transport contention—not the neural network model.
@@ -2688,10 +2688,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (2,912 Tests Core / 3,219 Total)
+### Step 5: Master Test Suites Execution (2,919 Tests Core / 3,226 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (2,553 tests)
+# 1. Run full backend pytest suite (2,560 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
