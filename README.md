@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3363%2F3363_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3372%2F3372_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -955,8 +955,12 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 
 ## 8. Graph Intelligence & Fuzzy Entity Resolution
 
-### 8.1 PyTorch GraphSAGE Embeddings (`graph_embedding_service.py` & `graph_embedding_model.py`)
-Trains inductive GraphSAGE models on local banking transaction graphs to produce $L_2$-normalized 64/128-dimensional entity embeddings, capturing multi-hop relational context across transaction networks.
+### 8.1 PyTorch GraphSAGE Inductive Graph Intelligence (`graph_embedding_service.py` & `experiments/elliptic/train_graphsage.py`)
+Trains 2-layer inductive GraphSAGE models with skip projections, layer normalization, and neighborhood aggregators (Mean and GCN Symmetric) over transaction graphs. Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ directed edges of the **Elliptic Bitcoin Transaction Dataset** under a strict zero-leakage temporal split (timesteps 1–34 train vs 35–49 test):
+- **High-Precision Operating Uplift**: In ultra-strict false alarm regimes ($\le 0.1\%$ FPR, or 1 false alert per 1,000 legitimate transactions), GraphSAGE achieves **Recall @ 0.1% FPR of 13.20% (and 14.96% for 1-hop)** vs **8.22% for Tabular MLP** (+4.99 percentage points, a **+60.7% relative improvement**), intercepting significantly more illicit flows with minimal alert fatigue.
+- **Controlled Neighborhood Ablations**: Evaluated across 0-hop (Tabular MLP: PR-AUC 0.4602), 1-hop (0.4604), 2-hop (0.4372), and GCN symmetric aggregation (0.4655).
+- **Sub-10ms Inference Profile**: $6.16\text{ ms}$ per $1{,}000$ transactions on standard x86 CPU.
+- **Artifacts**: [`benchmarks/results/raw/graphsage_elliptic_benchmark.json`](benchmarks/results/raw/graphsage_elliptic_benchmark.json), [`docs/algorithms/graphsage.md`](docs/algorithms/graphsage.md), [`docs/figures/benchmark_graphsage_elliptic.png`](docs/figures/benchmark_graphsage_elliptic.png).
 
 ### 8.2 Fuzzy Private Set Intersection (PSI) (`fuzzy_psi.py` & `entity_resolution.py`)
 Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer entities across institutions without sharing plain customer identifiers or raw database records.
@@ -1285,7 +1289,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,053 / 3,053 passing (3,363 total incl. verification)** | 100% | 2,684 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 310 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,062 / 3,062 passing (3,372 total incl. verification)** | 100% | 2,693 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 310 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1433,6 +1437,9 @@ make benchmark-security    # SSRF, BOLA, and multi-tenant isolation tests
 
 # PaySim real-data multi-optimizer benchmark (FedAvg, FedProx, SCAFFOLD)
 python benchmarks/runners/run_paysim_benchmark.py --nrows 30000 --rounds 10 --local-epochs 2
+
+# Elliptic Bitcoin GraphSAGE inductive neighborhood aggregation benchmark
+python benchmarks/runners/run_graphsage_benchmark.py --all-rows --epochs 15 --hidden-dim 128 --embedding-dim 64
 ```
 
 ---

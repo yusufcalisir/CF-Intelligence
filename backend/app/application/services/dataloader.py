@@ -183,9 +183,27 @@ def _generate_mock_elliptic(
 
     if include_unknown:
         rand_vals = rng.random(n_mock_nodes)
-        y = np.where(rand_vals < 0.02, 1, np.where(rand_vals < 0.23, 0, -1)).astype(int)
+        y = np.where(rand_vals < 0.05, 1, np.where(rand_vals < 0.35, 0, -1)).astype(int)
+        if temporal_split:
+            test_indices = np.where(timesteps > split_timestep)[0]
+            if len(test_indices) >= 4:
+                y[test_indices[0]] = 1
+                y[test_indices[1]] = 1
+                y[test_indices[2]] = 0
+                y[test_indices[3]] = 0
+            train_indices = np.where(timesteps <= split_timestep)[0]
+            if len(train_indices) >= 4:
+                y[train_indices[0]] = 1
+                y[train_indices[1]] = 1
+                y[train_indices[2]] = 0
+                y[train_indices[3]] = 0
     else:
         y = (rng.random(n_mock_nodes) < ELLIPTIC_ILLICIT_RATIO).astype(int)
+        if temporal_split:
+            test_indices = np.where(timesteps > split_timestep)[0]
+            if len(test_indices) >= 2:
+                y[test_indices[0]] = 1
+                y[test_indices[1]] = 0
 
     # Generate intra-timestep directed edges (~3 out-edges per node)
     edges: list[tuple[int, int]] = []
