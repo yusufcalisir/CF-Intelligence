@@ -10,6 +10,7 @@ the 'silo deficit' against the untouched global consortium test set.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
@@ -33,7 +34,7 @@ class LocalSiloEvaluator:
 
     def train_silo_models(
         self,
-        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
+        bank_partitions: Mapping[str, tuple[Any, Any]] | dict[str, Any],
         model_type: str = "gradient_boosting",  # "gradient_boosting", "random_forest", "logistic_regression"
     ) -> dict[str, Any]:
         """Train an isolated model for each bank using only that bank's local partition.
@@ -68,8 +69,8 @@ class LocalSiloEvaluator:
 
     def evaluate_silos_on_global_test(
         self,
-        X_global_test: np.ndarray,
-        y_global_test: np.ndarray,
+        X_global_test: np.ndarray | Any,
+        y_global_test: np.ndarray | Any,
     ) -> dict[str, dict[str, Any]]:
         """Evaluate each bank's isolated model against the untouched global consortium test set.
 
@@ -93,7 +94,7 @@ class LocalSiloEvaluator:
 
     def evaluate_cross_bank_transfer(
         self,
-        bank_test_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
+        bank_test_partitions: Mapping[str, tuple[Any, Any]] | dict[str, Any],
         metric_key: str = "pr_auc",
     ) -> dict[str, dict[str, float]]:
         """Compute the transfer matrix T[i][j]: model trained on Bank i evaluated on Bank j.

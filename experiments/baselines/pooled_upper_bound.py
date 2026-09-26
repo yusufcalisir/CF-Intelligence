@@ -15,9 +15,13 @@ from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping
 from typing import Any
 
 import numpy as np
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 from experiments.baselines.classical_baselines import (
     ClassicalBaselines,
@@ -26,15 +30,8 @@ from experiments.baselines.classical_baselines import (
 
 logger = logging.getLogger(__name__)
 
-try:
-    import torch
-    import torch.nn as nn
-    from torch.utils.data import DataLoader, TensorDataset
-except ImportError:
-    torch = None  # type: ignore
 
-
-class CentralizedMLP(nn.Module if torch else object):
+class CentralizedMLP(nn.Module):
     """PyTorch MLP baseline for pooled centralized tabular fraud detection."""
 
     def __init__(self, input_dim: int, hidden_dim: int = 64):
@@ -66,7 +63,7 @@ class PooledCentralizedBenchmark:
 
     def pool_partitions(
         self,
-        bank_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
+        bank_partitions: Mapping[str, tuple[Any, Any]] | dict[str, Any],
     ) -> tuple[np.ndarray, np.ndarray]:
         """Aggregate disjoint bank partitions into a single centralized matrix."""
         all_X = []
@@ -88,10 +85,10 @@ class PooledCentralizedBenchmark:
 
     def fit_and_evaluate_all(
         self,
-        X_pooled_train: np.ndarray,
-        y_pooled_train: np.ndarray,
-        X_global_test: np.ndarray,
-        y_global_test: np.ndarray,
+        X_pooled_train: np.ndarray | Any,
+        y_pooled_train: np.ndarray | Any,
+        X_global_test: np.ndarray | Any,
+        y_global_test: np.ndarray | Any,
         train_neural_mlp: bool = True,
         mlp_epochs: int = 10,
     ) -> dict[str, dict[str, Any]]:
@@ -110,7 +107,7 @@ class PooledCentralizedBenchmark:
             results[f"pooled_{k}"] = v
 
         # 2. Neural MLP on Pooled Data
-        if train_neural_mlp and torch is not None:
+        if train_neural_mlp:
             mlp_res = self._train_and_eval_mlp(
                 X_train=X_pooled_train,
                 y_train=y_pooled_train,
@@ -125,10 +122,10 @@ class PooledCentralizedBenchmark:
 
     def _train_and_eval_mlp(
         self,
-        X_train: np.ndarray,
-        y_train: np.ndarray,
-        X_test: np.ndarray,
-        y_test: np.ndarray,
+        X_train: np.ndarray | Any,
+        y_train: np.ndarray | Any,
+        X_test: np.ndarray | Any,
+        y_test: np.ndarray | Any,
         epochs: int = 10,
         batch_size: int = 64,
         lr: float = 0.001,

@@ -32,15 +32,15 @@ logger = logging.getLogger(__name__)
 
 
 def compute_recall_at_fpr(
-    y_true: np.ndarray, y_pred_proba: np.ndarray, target_fpr: float
+    y_true: np.ndarray | Any, y_pred_proba: np.ndarray | Any, target_fpr: float
 ) -> float:
     """Calculate true positive rate (recall) at a strict maximum false positive rate.
 
     Parameters
     ----------
-    y_true : np.ndarray
+    y_true : np.ndarray | Any
         Ground truth binary labels (0 or 1).
-    y_pred_proba : np.ndarray
+    y_pred_proba : np.ndarray | Any
         Predicted probabilities of positive class.
     target_fpr : float
         Maximum allowable false positive rate (e.g. 0.001 for 0.1% FPR).
@@ -60,8 +60,8 @@ def compute_recall_at_fpr(
 
 
 def compute_safe_metrics(
-    y_true: np.ndarray,
-    y_pred_proba: np.ndarray,
+    y_true: np.ndarray | Any,
+    y_pred_proba: np.ndarray | Any,
     inference_duration_s: float = 0.0,
     model_name: str = "Model",
 ) -> dict[str, Any]:

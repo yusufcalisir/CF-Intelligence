@@ -18,6 +18,7 @@ from __future__ import annotations
 import datetime
 import json
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
@@ -44,9 +45,9 @@ class ComparativeBenchmarkEngine:
 
     def run_full_comparative_suite(
         self,
-        bank_train_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
-        X_global_test: np.ndarray,
-        y_global_test: np.ndarray,
+        bank_train_partitions: Mapping[str, tuple[Any, Any]] | dict[str, Any],
+        X_global_test: np.ndarray | Any,
+        y_global_test: np.ndarray | Any,
         federated_results: dict[str, float] | None = None,
         dataset_name: str = "FinancialFraud",
         train_neural: bool = True,
