@@ -1856,8 +1856,11 @@ Publishes real-time training iteration progress broadcast via internal Redis Pub
 
 ### 18.10 Regulatory SAR Export & Key Rotation Cron Endpoints
 
+> **Regulatory Simulation Notice:**  
+> Generates schema-validated FinCEN BSA XML Schema 2.0 and UNODC goAML 4.0 electronic filing dossier prototypes for internal case investigation and audit readiness. The platform does **not** transmit live filings to statutory FinCEN BSA E-Filing or European FIU production portals (which require federal banking charter accreditations and dedicated government VPN leased lines).
+
 **1. Case SAR FinCEN XML Export (`POST /api/v1/cases/export/fincen-xml`):**
-Exports confirmed fraud cases directly into official FinCEN BSA XML Schema 2.0 electronic filings:
+Compiles confirmed fraud cases into schema-compliant FinCEN BSA XML Schema 2.0 electronic dossier prototypes:
 
 *Request (`POST /api/v1/cases/export/fincen-xml`):*
 ```json
@@ -1872,7 +1875,7 @@ Exports confirmed fraud cases directly into official FinCEN BSA XML Schema 2.0 e
   "status": "FILED",
   "submission_id": "SAR-XML-2026-9941-A8F2",
   "case_id": "CASE-2026-9941",
-  "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<EFilingSubmission ...>\n  <ReportingInstitution>Bank Alpha</ReportingInstitution>\n  <SuspiciousActivityInformation>Cross-Bank Velocity Surge</SuspiciousActivityInformation>\n</EFilingSubmission>",
+  "xml": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<EFilingSubmission ...>\n  <ReportingInstitution>Bank Alpha (Synthetic Retail Node)</ReportingInstitution>\n  <SuspiciousActivityInformation>Cross-Bank Velocity Surge</SuspiciousActivityInformation>\n</EFilingSubmission>",
   "timestamp": "2026-09-06T12:00:00Z"
 }
 ```
