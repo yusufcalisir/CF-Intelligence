@@ -117,11 +117,68 @@ X_train_bank_a, y_train_bank_a = client_data["bank_a"]
 X_test_global, y_test_global = partitioner.get_global_test()
 ```
 
-### 3.3 European Credit Card Fraud (PCA Benchmark)
-- **Source**: Dal Pozzolo et al., Université Libre de Bruxelles (ULB), Kaggle (`mlg-ulb/creditcardfraud`).
-- **Domain**: Anonymized credit card transactions by European cardholders in September 2013.
-- **Dimensionality**: 28 principal components (`V1`–`V28`) obtained via PCA for privacy preservation, plus raw `Amount`.
-- **Target**: `Class` (binary: 1 = fraudulent transaction, 0 = genuine).
+### 3.3 European Credit Card Fraud (Extreme Imbalance & PCA Benchmark)
+- **Source**: Andrea Dal Pozzolo, Olivier Caelen, Reid A. Johnson, and Gianluca Bontempi, *Calibrating Probability with Undersampling for Unbalanced Classification*, IEEE SSCI 2015; Université Libre de Bruxelles (ULB), Kaggle (`mlg-ulb/creditcardfraud`).
+- **Domain**: Real European cardholder credit card transactions over two days in September 2013.
+- **Dataset Scale & Extreme Class Imbalance**:
+  - Total Transactions: $N = 284{,}807$ payment events.
+  - Fraudulent Transactions: $N_{\mathrm{fraud}} = 492$ confirmed chargeback fraud cases.
+  - Legitimate Transactions: $N_{\mathrm{legit}} = 284{,}315$ genuine operations.
+  - Fraud Prevalence: $\pi = 0.1727\%$ (approximately $1$ fraud per $578$ legitimate transactions).
+  - Imbalance Ratio: $\mathrm{IR} \approx 578:1$, rendering standard accuracy metrics completely uninformative and demanding Precision-Recall AUC (PR-AUC) and fixed False Positive Rate (fixed-FPR) threshold calibrations.
+- **Dimensionality & Feature Schema ($d = 30$)**:
+  - `Time`: Elapsed seconds from the initial recorded transaction in the dataset ($t \in [0, 172{,}792]$ seconds, spanning exactly 48 hours).
+  - `V1`–`V28`: Confidential numerical features obtained through Principal Component Analysis (PCA) transformation applied by the original card issuer to protect cardholder identities and confidential attributes.
+  - `Amount`: Raw transacted currency value ($\mu = 88.35\text{ EUR}$, $\sigma = 250.12\text{ EUR}$, $\max = 25{,}691.16\text{ EUR}$). Characterized by heavy-tailed skewness ($95\text{th}$ percentile $= 368.00\text{ EUR}$).
+  - `Class`: Ground-truth binary fraud label ($y \in \{0, 1\}$).
+- **Zero-Leakage Feature Scaling (`RobustScaler` / `StandardScaler`)**:
+  - To prevent feature dominance and numerical gradient instability in neural and distance-based estimators while preserving extreme fraud outliers, `Time` and `Amount` undergo robust median-IQR scaling or standardization.
+  - **Zero-Lookahead Invariant**: Scaling parameters $(\tilde{x}_{\mathrm{train}}, \mathrm{IQR}_{\mathrm{train}})$ or $(\mu_{\mathrm{train}}, \sigma_{\mathrm{train}})$ are fitted **strictly** on the training partition $\mathcal{D}_{\mathrm{train}}$:
+
+$$\hat{x} = \frac{x - \operatorname{median}(x_{\mathrm{train}})}{Q_3(x_{\mathrm{train}}) - Q_1(x_{\mathrm{train}})}$$
+
+  - The fitted transformer is subsequently applied to validation ($\mathcal{D}_{\mathrm{val}}$) and test ($\mathcal{D}_{\mathrm{test}}$) splits without refitting or distribution leakage.
+- **3-Way Partitioning Architecture ($\mathcal{D}_{\mathrm{train}} / \mathcal{D}_{\mathrm{val}} / \mathcal{D}_{\mathrm{test}}$)**:
+  - **Stratified Partitioning ($60\% / 20\% / 20\%$)**: Partitions preserving exact fraud prevalence ($\pi \approx 0.172\%$) across splits:
+    - $\mathcal{D}_{\mathrm{train}}$: $170{,}883$ transactions ($294$ frauds).
+    - $\mathcal{D}_{\mathrm{val}}$: $56{,}962$ transactions ($99$ frauds) — dedicated exclusively to threshold calibration.
+    - $\mathcal{D}_{\mathrm{test}}$: $56{,}962$ transactions ($99$ frauds) — sequestered for unbiased out-of-sample empirical evaluation.
+  - **Temporal Partitioning**: Orders chronologically along the `Time` axis enforcing:
+
+$$\max(t_{\mathrm{train}}) \le \min(t_{\mathrm{val}}) \le \max(t_{\mathrm{val}}) \le \min(t_{\mathrm{test}})$$
+
+- **Fixed-FPR Decision Threshold Formulation**:
+  - Standard $0.50$ probability thresholds produce catastrophic false rejection rates under extreme imbalance.
+  - Calibrated thresholds $\tau_{\alpha}$ are selected on the validation negative cohort $\mathcal{S}_{\mathrm{neg}}^{\mathrm{val}} = \{ \hat{s}_i \mid y_i^{\mathrm{val}} = 0 \}$ satisfying:
+
+$$\tau_{\alpha} = \inf \left\{ \tau \in \mathbb{R} \;\middle|\; \frac{1}{|\mathcal{S}_{\mathrm{neg}}^{\mathrm{val}}|} \sum_{i \in \mathcal{S}_{\mathrm{neg}}^{\mathrm{val}}} \mathbb{I}(\hat{s}_i \ge \tau) \le \alpha \right\}$$
+
+  - Target False Positive Rates: $\alpha \in \{0.01\%, 0.05\%, 0.1\%, 0.5\%, 1.0\%\}$, corresponding to strict Tier-1 banking fraud operations constraints ($1$ false alarm per $10{,}000$ to $100$ transactions).
+- **Module Implementation & Evaluator**:
+  - Partitioner & Loader: [`backend/app/application/services/dataloader.py`](file:///backend/app/application/services/dataloader.py) via `load_creditcard_fraud` / `load_creditcard`.
+  - Evaluator Suite: [`experiments/credit_card/evaluate_thresholds.py`](file:///experiments/credit_card/evaluate_thresholds.py) via `CreditCardThresholdEvaluator`.
+
+```python
+from app.application.services.dataloader import load_creditcard_fraud
+from experiments.credit_card.evaluate_thresholds import CreditCardThresholdEvaluator
+
+# 1. Zero-leakage 3-way split with RobustScaler on Time and Amount
+dataset = load_creditcard_fraud(
+    include_time=True,
+    scale_time_amount=True,
+    scaling_strategy="robust",
+    split_data=True,
+    train_ratio=0.60,
+    val_ratio=0.20,
+    test_ratio=0.20,
+)
+
+# 2. Select fixed-FPR thresholds on validation set and evaluate on test set
+evaluator = CreditCardThresholdEvaluator()
+evaluator.data = dataset
+results = evaluator.run_full_evaluation(models=["random_forest", "hist_gradient_boosting"])
+print(f"Random Forest Recall @ 0.1% FPR: {results['summary']['random_forest']['recall_at_0.1pct_fpr']:.2%}")
+```
 
 ### 3.4 Elliptic Bitcoin Transaction Graph
 - **Source**: Weber et al., *Anti-Money Laundering in Bitcoin: Experimenting with Graph Convolutional Networks for Financial Forensics*, KDD 2019 (`elliptic-data-set`).

@@ -800,70 +800,218 @@ def load_creditcard_fraud(
     n_mock_txns: int = 5_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    include_time: bool = False,
+    scale_time_amount: bool = True,
+    scaling_strategy: str = "robust",
+    split_data: bool = False,
+    train_ratio: float = 0.60,
+    val_ratio: float = 0.20,
+    test_ratio: float = 0.20,
+    stratified: bool = True,
+    temporal_split: bool = False,
+    seed: int = 42,
     **kwargs: Any,
 ) -> dict[str, Any]:
-    """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA)."""
-    rng = rng or np.random.default_rng(42)
+    """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA, Time, Amount).
+
+    Supports:
+    - Zero-leakage train/validation/test 3-way splitting (stratified or temporal)
+    - RobustScaler / StandardScaler on Time and Amount fit strictly on the training partition
+    - Imbalance ratio quantification (0.172% fraud prevalence)
+    - Backward-compatible 29-feature default or 30-feature (include_time=True) extraction
+    """
+    rng = rng or np.random.default_rng(seed)
     target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
     n_mock_txns = int(target_txns)
     root = resolve_dataset_dir("creditcard", path)
 
+    target_nrows = None if kwargs.get("all_rows", False) else (kwargs.get("nrows") or None)
+
+    chosen_source = "mock_pca"
+    df: pd.DataFrame | None = None
+
     parquet_files = sorted(list(root.glob("*.parquet")))
-    target_nrows = kwargs.get("nrows") or n_mock_txns
     if parquet_files:
         chosen_parquet = parquet_files[0]
         logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
         df = pd.read_parquet(chosen_parquet)
-        if target_nrows:
+        if target_nrows is not None:
             df = df.iloc[:target_nrows]
-        y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
-        feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
+        chosen_source = "real_parquet"
+    else:
+        csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
+        for csv_path in csv_candidates:
+            if csv_path.exists():
+                logger.info("[CreditCard] Loading real dataset from %s", csv_path)
+                df = pd.read_csv(csv_path, nrows=target_nrows)
+                chosen_source = "real_csv"
+                break
+
+    if df is not None:
+        if include_time and "Time" in df.columns:
+            pca_cols = [c for c in df.columns if c.startswith("V")]
+            amount_col = ["Amount"] if "Amount" in df.columns else []
+            feature_cols = ["Time"] + pca_cols + amount_col
+        else:
+            feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
+
         X = df[feature_cols].fillna(0).values.astype(np.float32)
+        y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
+    else:
+        if require_real:
+            raise FileNotFoundError(
+                f"Real Credit Card Fraud dataset files not found in '{root}'. "
+                f"Expected 'creditcard.csv'. "
+                f"Synthetic fallback is disabled under strict real-data mode."
+            )
+        logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
+        # Ensure at least 6 frauds in small mock datasets so train, val, and test splits
+        # each contain positive samples under extreme imbalance scenarios.
+        n_fraud = max(6, int(n_mock_txns * 0.01)) if n_mock_txns < 5_000 else max(1, int(n_mock_txns * 0.00172))
+        n_legit = n_mock_txns - n_fraud
+        y_raw = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
+        idx_perm = rng.permutation(n_mock_txns)
+        y = y_raw[idx_perm]
+
+        pca_features = rng.standard_normal((n_mock_txns, 28)).astype(np.float32)
+        amount_vals = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
+        time_vals = rng.uniform(0.0, 172800.0, size=n_mock_txns).astype(np.float32)
+
+        if include_time:
+            X = np.column_stack([time_vals, pca_features, amount_vals]).astype(np.float32)
+            feature_cols = ["Time"] + [f"V{i}" for i in range(1, 29)] + ["Amount"]
+        else:
+            X = np.column_stack([pca_features, amount_vals]).astype(np.float32)
+            feature_cols = [f"V{i}" for i in range(1, 29)] + ["Amount"]
+
+    if split_data:
+        n_samples = len(y)
+        if temporal_split and "Time" in feature_cols:
+            time_idx = feature_cols.index("Time")
+            order = np.argsort(X[:, time_idx])
+            n_train = int(n_samples * train_ratio)
+            n_val = int(n_samples * val_ratio)
+            train_idx = order[:n_train]
+            val_idx = order[n_train:n_train + n_val]
+            test_idx = order[n_train + n_val:]
+        else:
+            rng_split = np.random.default_rng(seed)
+            pos_indices = np.where(y == 1)[0]
+            neg_indices = np.where(y == 0)[0]
+            rng_split.shuffle(pos_indices)
+            rng_split.shuffle(neg_indices)
+
+            n_pos = len(pos_indices)
+            if n_pos >= 3:
+                n_pos_tr = max(1, int(n_pos * train_ratio))
+                n_pos_va = max(1, int(n_pos * val_ratio))
+                if n_pos_tr + n_pos_va >= n_pos:
+                    n_pos_tr = max(1, n_pos - 2)
+                    n_pos_va = 1
+                pos_tr = pos_indices[:n_pos_tr]
+                pos_va = pos_indices[n_pos_tr:n_pos_tr + n_pos_va]
+                pos_te = pos_indices[n_pos_tr + n_pos_va:]
+            elif n_pos == 2:
+                pos_tr = pos_indices[:1]
+                pos_va = pos_indices[1:2]
+                pos_te = pos_indices[2:]
+            elif n_pos == 1:
+                pos_tr = pos_indices[:1]
+                pos_va = pos_indices[1:]
+                pos_te = pos_indices[1:]
+            else:
+                pos_tr = np.array([], dtype=int)
+                pos_va = np.array([], dtype=int)
+                pos_te = np.array([], dtype=int)
+
+            n_neg_tr = int(len(neg_indices) * train_ratio)
+            n_neg_va = int(len(neg_indices) * val_ratio)
+            neg_tr = neg_indices[:n_neg_tr]
+            neg_va = neg_indices[n_neg_tr:n_neg_tr + n_neg_va]
+            neg_te = neg_indices[n_neg_tr + n_neg_va:]
+
+            train_idx = np.sort(np.concatenate([pos_tr, neg_tr]))
+            val_idx = np.sort(np.concatenate([pos_va, neg_va]))
+            test_idx = np.sort(np.concatenate([pos_te, neg_te]))
+
+        X_train = X[train_idx].copy()
+        y_train = y[train_idx].copy()
+        X_val = X[val_idx].copy()
+        y_val = y[val_idx].copy()
+        X_test = X[test_idx].copy()
+        y_test = y[test_idx].copy()
+
+        scaling_params: dict[str, Any] = {}
+        if scale_time_amount:
+            for col in ("Time", "Amount"):
+                if col in feature_cols:
+                    c_idx = feature_cols.index(col)
+                    train_vals = X_train[:, c_idx]
+                    if scaling_strategy == "robust":
+                        q25 = float(np.percentile(train_vals, 25))
+                        q75 = float(np.percentile(train_vals, 75))
+                        med = float(np.median(train_vals))
+                        iqr = max(q75 - q25, 1e-7)
+                        scaling_params[col] = {"center": med, "scale": iqr, "strategy": "robust"}
+                    else:
+                        mean = float(np.mean(train_vals))
+                        std = max(float(np.std(train_vals)), 1e-7)
+                        scaling_params[col] = {"center": mean, "scale": std, "strategy": "standard"}
+
+                    c_center = scaling_params[col]["center"]
+                    c_scale = scaling_params[col]["scale"]
+                    X_train[:, c_idx] = (X_train[:, c_idx] - c_center) / c_scale
+                    X_val[:, c_idx] = (X_val[:, c_idx] - c_center) / c_scale
+                    X_test[:, c_idx] = (X_test[:, c_idx] - c_center) / c_scale
+                    X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
+
         return {
             "X": X,
             "y": y,
+            "train": {"X": X_train, "y": y_train, "indices": train_idx},
+            "val": {"X": X_val, "y": y_val, "indices": val_idx},
+            "test": {"X": X_test, "y": y_test, "indices": test_idx},
             "feature_names": feature_cols,
-            "source": "real_parquet",
-            "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+            "source": chosen_source,
+            "fraud_ratio": float(np.mean(y)),
+            "imbalance_ratio": float((y == 0).sum() / max(1, (y == 1).sum())),
+            "scaling_params": scaling_params,
+            "split_ratios": {"train": train_ratio, "val": val_ratio, "test": test_ratio},
         }
 
-    csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
-    for csv_path in csv_candidates:
-        if csv_path.exists():
-            logger.info("[CreditCard] Loading real dataset from %s", csv_path)
-            df = pd.read_csv(csv_path, nrows=target_nrows)
-            feature_cols = [c for c in df.columns if c not in ("Time", "Class", "is_fraud", "isFraud") and pd.api.types.is_numeric_dtype(df[c])]
-            X = df[feature_cols].fillna(0).values.astype(np.float32)
-            y = df["Class"].values.astype(int) if "Class" in df.columns else df["is_fraud"].values.astype(int)
-            return {
-                "X": X,
-                "y": y,
-                "feature_names": feature_cols,
-                "source": "real_csv",
-                "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-            }
+    scaling_params_unsplit: dict[str, Any] = {}
+    if scale_time_amount:
+        for col in ("Time", "Amount"):
+            if col in feature_cols:
+                c_idx = feature_cols.index(col)
+                col_vals = X[:, c_idx]
+                if scaling_strategy == "robust":
+                    q25 = float(np.percentile(col_vals, 25))
+                    q75 = float(np.percentile(col_vals, 75))
+                    med = float(np.median(col_vals))
+                    iqr = max(q75 - q25, 1e-7)
+                    scaling_params_unsplit[col] = {"center": med, "scale": iqr, "strategy": "robust"}
+                else:
+                    mean = float(np.mean(col_vals))
+                    std = max(float(np.std(col_vals)), 1e-7)
+                    scaling_params_unsplit[col] = {"center": mean, "scale": std, "strategy": "standard"}
 
-    if require_real:
-        raise FileNotFoundError(
-            f"Real Credit Card Fraud dataset files not found in '{root}'. "
-            f"Expected 'creditcard.csv'. "
-            f"Synthetic fallback is disabled under strict real-data mode."
-        )
+                c_center = scaling_params_unsplit[col]["center"]
+                c_scale = scaling_params_unsplit[col]["scale"]
+                X[:, c_idx] = (X[:, c_idx] - c_center) / c_scale
 
-    # Mock generation
-    logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
-    n_fraud = max(1, int(n_mock_txns * 0.00172))
-    n_legit = n_mock_txns - n_fraud
-    X = rng.standard_normal((n_mock_txns, 29)).astype(np.float32)
-    X[:, -1] = np.abs(rng.exponential(scale=88.0, size=n_mock_txns)).astype(np.float32)
-    y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
-    idx = rng.permutation(n_mock_txns)
     return {
-        "X": X[idx],
-        "y": y[idx],
-        "source": "mock_pca",
-        "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
+        "X": X,
+        "y": y,
+        "feature_names": feature_cols,
+        "source": chosen_source,
+        "fraud_ratio": float(np.mean(y)),
+        "imbalance_ratio": float((y == 0).sum() / max(1, (y == 1).sum())),
+        "scaling_params": scaling_params_unsplit,
     }
+
+
+load_creditcard = load_creditcard_fraud
 
 
 # ===========================================================================
@@ -961,6 +1109,7 @@ DATASET_REGISTRY: dict[str, Any] = {
     "paysim": load_paysim,
     "ieee_cis": load_ieee_cis,
     "creditcard": load_creditcard_fraud,
+    "credit_card": load_creditcard_fraud,
 }
 
 
