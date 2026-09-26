@@ -12,7 +12,7 @@ The SLA Contract Engine monitors enterprise Service Level Agreements ($99.9\%$ u
 | **Inference Latency ($p99$ SLO)** | $< 100.0\text{ ms}$ | Continuous 5-minute sliding window | Heuristic Circuit Breaker auto-failover | `sla_monitor.py` / Locust load runner |
 | **Median Latency ($p50$ SLO)** | $< 60.0\text{ ms}$ | Continuous 5-minute sliding window | Dynamic worker scaling alert | OpenTelemetry OTLP tracing |
 | **Recovery Time Objective (RTO)**| $< 30.0\text{ seconds}$ | Regional failure event | Standby region automatic promotion | `MultiRegionFailoverManager` |
-| **Recovery Point Objective (RPO)**| $0\text{ transactions lost}$ | Synchronous Raft replication | Zero state rollback guarantee | `BackupVerifier` |
+| **Recovery Point Objective (RPO)**| 0 transactions lost | Synchronous Raft replication | Zero state rollback guarantee | `BackupVerifier` |
 
 ---
 

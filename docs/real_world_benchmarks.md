@@ -43,8 +43,11 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Key Fraud Mechanics**:
   Fraudsters execute unauthorized `TRANSFER` actions followed immediately by `CASH_OUT` to liquidate illicit funds. The source account balance is systematically depleted to zero.
 * **Engineered Discrepancy Features**:
-  $$\text{ErrorBal}_{\text{orig}} = \text{NewBal}_{\text{orig}} + \text{Amount} - \text{OldBal}_{\text{orig}}$$
-  $$\text{ErrorBal}_{\text{dest}} = \text{OldBal}_{\text{dest}} + \text{Amount} - \text{NewBal}_{\text{dest}}$$
+
+  $$\mathrm{ErrorBal}_{\mathrm{orig}} = \mathrm{NewBal}_{\mathrm{orig}} + \mathrm{Amount} - \mathrm{OldBal}_{\mathrm{orig}}$$
+
+  $$\mathrm{ErrorBal}_{\mathrm{dest}} = \mathrm{OldBal}_{\mathrm{dest}} + \mathrm{Amount} - \mathrm{NewBal}_{\mathrm{dest}}$$
+
 * **Implementation**: [`dataloader.py: load_paysim()`](../backend/app/application/services/dataloader.py#L221)
 
 ---
@@ -134,8 +137,9 @@ The [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fide
    $$JS(P \parallel Q) = \frac{1}{2} D_{\text{KL}}\left(P \parallel \frac{P+Q}{2}\right) + \frac{1}{2} D_{\text{KL}}\left(Q \parallel \frac{P+Q}{2}\right) \in [0, 1]$$
 3. **Kolmogorov-Smirnov Test ($D_{\text{KS}}, p\text{-value}$)**:
    $$D_{\text{KS}} = \sup_x |F_{\text{real}}(x) - F_{\text{synth}}(x)|$$
-4. **Performance Degradation Index ($\Delta_{\text{deg}}$)**:
-   $$\Delta_{\text{PR-AUC}} = \text{PR-AUC}_{\text{real-world}} - \text{PR-AUC}_{\text{synthetic-lab}} = 0.8420 - 0.9420 = -0.1000$$
+4. **Performance Degradation Index** ($\Delta_{\mathrm{deg}}$):
+
+   $$\Delta_{\mathrm{PR\text{-}AUC}} = \mathrm{PR\text{-}AUC}_{\mathrm{real\text{-}world}} - \mathrm{PR\text{-}AUC}_{\mathrm{synthetic\text{-}lab}} = 0.8420 - 0.9420 = -0.1000$$
 
 ---
 
@@ -156,9 +160,9 @@ PREDICTED             ├──────────────┼───�
 ### Financial Cost-Utility Function:
 $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right) + \left( FP(\tau) \cdot C_{\text{FP}} \right) + \left( TP(\tau) \cdot C_{\text{TP}} \right)$$
 
-* $C_{\text{FN}} = \$850$ (Direct unrecovered dollar chargeback per missed fraud).
-* $C_{\text{FP}} = \$18$ (Customer SMS/OTP friction, phone support, blocked card re-issuance).
-* $C_{\text{TP}} = \$6$ (Compliance analyst SAR triage & FinCEN automated filing review).
+* $C_{\mathrm{FN}} = 850\text{ USD}$ (\$850 direct unrecovered dollar chargeback per missed fraud).
+* $C_{\mathrm{FP}} = 18\text{ USD}$ (\$18 customer SMS/OTP friction, phone support, blocked card re-issuance).
+* $C_{\mathrm{TP}} = 6\text{ USD}$ (\$6 compliance analyst SAR triage & FinCEN automated filing review).
 
 ---
 

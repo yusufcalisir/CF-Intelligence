@@ -12,7 +12,7 @@ The Collaborative Fraud Intelligence (CFI) platform utilizes the **Zero-Downtime
 │                                                                                        │
 │   [ Steady State: Current Version v2.0.0 ]                                             │
 │                     │                                                                  │
-│                     ▼  initiate_upgrade(target_version="v2.1.0", window=48h)           │
+│                     v  initiate_upgrade(target_version="v2.1.0", window=48h)           │
 │   ┌──────────────────────────────────────────────────────────┐                         │
 │   │ 1. DRAINING_CONNECTIONS                                  │                         │
 │   │    - Intercept new connection handshakes                 │                         │
@@ -20,14 +20,14 @@ The Collaborative Fraud Intelligence (CFI) platform utilizes the **Zero-Downtime
 │   │    - Route new traffic to standby ingress                │                         │
 │   └──────────────────────────────────────────────────────────┘                         │
 │                     │ (Active Connections == 0)                                        │
-│                     ▼                                                                  │
+│                     v                                                                  │
 │   ┌──────────────────────────────────────────────────────────┐                         │
 │   │ 2. ROLLING_UPGRADE                                       │                         │
 │   │    - Batch pod updates (MaxSurge=25%, MaxUnavailable=0)  │                         │
 │   │    - Execute forward-compatible Alembic migrations       │                         │
 │   └──────────────────────────────────────────────────────────┘                         │
 │                     │ execute_rolling_instance_update                                  │
-│                     ▼                                                                  │
+│                     v                                                                  │
 │   ┌──────────────────────────────────────────────────────────┐                         │
 │   │ 3. DUAL_VERSION_ACTIVE (48-Hour Compatibility Window)    │                         │
 │   │    - Both v2.0.0 and v2.1.0 endpoints coexist            │                         │
@@ -35,7 +35,7 @@ The Collaborative Fraud Intelligence (CFI) platform utilizes the **Zero-Downtime
 │   │    - Bank node SDKs execute non-disruptive migration     │                         │
 │   └──────────────────────────────────────────────────────────┘                         │
 │                     │ finalize_upgrade                                                 │
-│                     ▼                                                                  │
+│                     v                                                                  │
 │   [ 4. UPGRADE_COMPLETED: Current Version Promoted to v2.1.0 ]                         │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```

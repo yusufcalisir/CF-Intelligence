@@ -12,23 +12,23 @@
 To guarantee compliance with **SOC 2 Type II (Trust Services Criteria CC6.1 - CC6.3)**, **GDPR Article 28**, and international banking secrecy laws, the CFI multi-tenancy layer was subjected to comprehensive adversarial boundary and penetration testing:
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────────────────┐
-│                     MULTI-TENANT ISOLATION PENETRATION AUDIT MATRIX                      │
-├───────────────────────────────────┼─────────────────────────────────────┼────────────────┤
-│ ATTACK VECTOR / TEST SCENARIO     │ TESTED DEFENSE MECHANISM            │  AUDIT RESULT  │
-├───────────────────────────────────┼─────────────────────────────────────┼────────────────┤
-│ Cross-Tenant ContextVar Injection │ Thread-Local `ContextVar.reset()`   │ BLOCKED [PASS] │
-│ Path Traversal via Tenant ID      │ `sanitize_bank_id` Stripping (`..`) │ BLOCKED [PASS] │
-│ SQL Injection in Tenant Identity  │ Regex Alphanumeric + Double-Quoting │ BLOCKED [PASS] │
-│ Redis Cache Key Collusion         │ Namespaced Keys: cfi:tenant:<id>:*  │ ISOLATED [PASS]│
-│ Database Session Pool Bleed       │ Dynamic AsyncEngine Factory / Bank  │ ISOLATED [PASS]│
-│ Cross-Tenant BOLA / IDOR Tamper   │ Global TenantAccessControlMiddleware│ REJECTED [PASS]│
-│ Unencrypted PII Ingestion         │ Type-Salted HMAC-SHA256 Tokenizer   │ SANITIZED [OK] │
-│ Alembic Migration Schema Drift    │ Auto-Discovery from tenant_configs  │ NO DRIFT [PASS]│
-│ Stale Key Decryption After Revoke │ Fail-Closed Versioned KMS Envelope  │ BLOCKED [PASS] │
-│ API Quota Burst Exhaustion        │ TenantMeteringService (HTTP 429)    │ ENFORCED [PASS]│
-│ Concurrent Model Promotion Race   │ Atomic Champion Lock & Dual Signoff │ SERIALIZED [OK]│
-└───────────────────────────────────┴─────────────────────────────────────┴────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│                       MULTI-TENANT ISOLATION PENETRATION AUDIT MATRIX                        │
+├───────────────────────────────────┬───────────────────────────────────────┬──────────────────┤
+│ ATTACK VECTOR / TEST SCENARIO     │ TESTED DEFENSE MECHANISM              │   AUDIT RESULT   │
+├───────────────────────────────────┼───────────────────────────────────────┼──────────────────┤
+│ Cross-Tenant ContextVar Injection │ Thread-Local `ContextVar.reset()`     │  BLOCKED [PASS]  │
+│ Path Traversal via Tenant ID      │ `sanitize_bank_id` Stripping (`..`)   │  BLOCKED [PASS]  │
+│ SQL Injection in Tenant Identity  │ Regex Alphanumeric + Double-Quoting   │  BLOCKED [PASS]  │
+│ Redis Cache Key Collusion         │ Namespaced Keys: cfi:tenant:<id>:*    │ ISOLATED [PASS]  │
+│ Database Session Pool Bleed       │ Dynamic AsyncEngine Factory / Bank    │ ISOLATED [PASS]  │
+│ Cross-Tenant BOLA / IDOR Tamper   │ Global TenantAccessControlMiddleware  │ REJECTED [PASS]  │
+│ Unencrypted PII Ingestion         │ Type-Salted HMAC-SHA256 Tokenizer     │  SANITIZED [OK]  │
+│ Alembic Migration Schema Drift    │ Auto-Discovery from tenant_configs    │ NO DRIFT [PASS]  │
+│ Stale Key Decryption After Revoke │ Fail-Closed Versioned KMS Envelope    │  BLOCKED [PASS]  │
+│ API Quota Burst Exhaustion        │ TenantMeteringService (HTTP 429)      │ ENFORCED [PASS]  │
+│ Concurrent Model Promotion Race   │ Atomic Champion Lock & Dual Signoff   │ SERIALIZED [OK]  │
+└───────────────────────────────────┴───────────────────────────────────────┴──────────────────┘
 ```
 
 ---

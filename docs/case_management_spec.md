@@ -250,12 +250,11 @@ Synthesizes a standardized 5-paragraph FinCEN SAR narrative:
 - Compiles XML adhering strictly to `schemas/FinCEN_SAR_2.0.xsd`:
   - `<SubmissionHeader>`: `ActivityType="SAR"`, `SubmissionType="New"`, `CreatedTimestamp`.
   - `<Activity>`: `ActivityID`, `ActivityStatus`, `ReportingInstitution`.
-  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`). Unlinked alerts dynamically derive a deterministic zero-PII subject privacy hash ($\mathrm{SHA\text{-}256}(\mathrm{prefix}_{\mathrm{subject}} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) eliminating static mock constants.
+  - `<Subjects>`: Type-salted HMAC-SHA256 privacy hashes for all involved suspect entities (`EntityPrivacyHash`). Unlinked alerts dynamically derive a deterministic zero-PII subject privacy hash ($\operatorname{SHA-256}(\mathrm{prefix}_{\mathrm{subject}} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) eliminating static mock constants.
   - `<SuspiciousActivityDetails>`: Composite `TotalRiskScore`, `Priority`, linked `AlertIds`.
   - `<Narrative>`: Summary, investigator notes, and cryptographically signed event timeline.
 - **Validation Mandate**: Validates generated XML against `schemas/FinCEN_SAR_2.0.xsd` using `lxml.etree.XMLSchema`. Malformed XML or missing required elements raises [`SARValidationError`](../backend/app/application/services/regulatory_reporter.py#L24).
-- **Cryptographic Filing Hash**: Computes an immutable SHA-256 filing hash for regulatory e-filing auditability:
-  $$\mathcal{H}_{\mathrm{filing}} = \mathrm{SHA\text{-}256}(\mathcal{X}_{\mathrm{canonical}})$$
+- **Cryptographic Filing Hash**: Computes an immutable SHA-256 filing hash for regulatory e-filing auditability: $\mathcal{H}_{\mathrm{filing}} = \operatorname{SHA-256}(\mathcal{X}_{\mathrm{canonical}})$.
 - **Atomic Storage**: Persists filings under `storage/regulatory_filings/sar_{case_id}.xml` via atomic rename (`os.replace`) protected by a reentrant mutex (`threading.RLock()`).
 - **State Guard**: Generating SAR XML for an unconfirmed or open case is strictly rejected (`"is not resolved confirmed fraud"`). Missing cases fail closed with HTTP 404 (zero mock fallbacks).
 

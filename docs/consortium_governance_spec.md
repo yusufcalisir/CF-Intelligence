@@ -101,15 +101,15 @@ class ProposalStatus(str, Enum):
      - `new_status`: transitions consortium status (`ACTIVE`, `SUSPENDED`, `ARCHIVED`).
 
 ### Weighted Quorum Evaluation Engine
-Votes are evaluated based on institutions' allocated stake weights ($\mathrm{voting\_power} \ge 0.0$):
-$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
-$$\mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
+Votes are evaluated based on institutions' allocated stake weights (`voting_power` $\ge 0.0$):
+$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}$$
+$$\mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}$$
 
 - **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$, status transitions to `APPROVED` and action is executed.
 - **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.
-- **TTL Expiration**: If $\mathrm{elapsed\_time} \ge \mathrm{ttl\_seconds}$ (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
+- **TTL Expiration**: If `elapsed_time` $\ge$ `ttl_seconds` (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
 - **Sponsor Cancellation**: The proposing bank can voluntarily withdraw a pending proposal before resolution, transitioning state to `CANCELLED`.
-- **Role Hierarchy**: `OBSERVER` institutions have $\mathrm{power} = 0.0$ and cannot sponsor proposals or cast votes.
+- **Role Hierarchy**: `OBSERVER` institutions have $\mathrm{power}(m) = 0.0$ and cannot sponsor proposals or cast votes.
 
 ---
 

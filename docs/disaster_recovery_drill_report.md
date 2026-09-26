@@ -15,17 +15,17 @@
 To scientifically validate the contractual disaster recovery guarantees in [`docs/legal/service_level_agreement.md`](legal/service_level_agreement.md), the engineering team executed an automated **Chaos Engineering Regional Failure Drill** under real synthetic credit transfer transaction load:
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                    EMPIRICAL DISASTER RECOVERY DRILL MEASUREMENTS                      │
-├───────────────────────────────────┬──────────────────────┬─────────────┬───────────────┤
-│ METRIC / SLA DIMENSION            │ CONTRACTUAL SLA      │ MEASURED    │ VERDICT       │
-├───────────────────────────────────┼──────────────────────┼─────────────┼───────────────┤
-│ Recovery Time Objective (RTO)     │ <= 30.00 seconds     │ 15.02 sec   │ COMPLIANT [OK]│
-│ Recovery Point Objective (RPO)    │ 0 records lost       │ 0 lost      │ COMPLIANT [OK]│
-│ Total Transactions Processed      │ 1,000 txns (500 tps) │ 1,000 txns  │ 100% Retained │
-│ Automated Service Credit Penalty  │ 0%                   │ 0.00%       │ Compliant     │
-│ Immutable Audit Trail Logged      │ SHA-256 Chained      │ VERIFIED    │ APPENDED [OK] │
-└───────────────────────────────────┴──────────────────────┴─────────────┴───────────────┘
+┌───────────────────────────────────────────────────────────────────────────────────────────────┐
+│                         EMPIRICAL DISASTER RECOVERY DRILL MEASUREMENTS                        │
+├────────────────────────────────────┬────────────────────────┬──────────────┬──────────────────┤
+│ METRIC / SLA DIMENSION             │ CONTRACTUAL SLA        │ MEASURED     │     VERDICT      │
+├────────────────────────────────────┼────────────────────────┼──────────────┼──────────────────┤
+│ Recovery Time Objective (RTO)      │ <= 30.00 seconds       │ 15.02 sec    │  COMPLIANT [OK]  │
+│ Recovery Point Objective (RPO)     │ 0 records lost         │ 0 lost       │  COMPLIANT [OK]  │
+│ Total Transactions Processed       │ 1,000 txns (500 tps)   │ 1,000 txns   │  100% Retained   │
+│ Automated Service Credit Penalty   │ 0%                     │ 0.00%        │    Compliant     │
+│ Immutable Audit Trail Logged       │ SHA-256 Chained        │ VERIFIED     │  APPENDED [OK]   │
+└────────────────────────────────────┴────────────────────────┴──────────────┴──────────────────┘
 ```
 
 ---

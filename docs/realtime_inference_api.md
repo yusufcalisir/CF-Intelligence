@@ -142,7 +142,7 @@ The platform supports dual-scale decision mappings corresponding to API interfac
 | Decision | Risk Score Range | Action Executed | Escalation Overrides |
 | :--- | :--- | :--- | :--- |
 | **`ALLOW`** | $0 \le \text{Score} < 300$ | Transaction authorized immediately. | Standard throughput |
-| **`REVIEW`** | $300 \le \text{Score} \le 900$ | Transaction flagged for Four-Eyes analyst investigation. | Amounts $\ge \$50,000$ or FATF Greylist |
+| **`REVIEW`** | $300 \le \text{Score} \le 900$ | Transaction flagged for Four-Eyes analyst investigation. | Amounts $\ge 50{,}000\text{ USD}$ or FATF Greylist |
 | **`BLOCK`** | $900 < \text{Score} \le 1000$ | Transaction rejected immediately and alert dispatched. | FATF NCCT Blacklist ($\ge 950$) |
 
 ### 3.2 Streaming JIT Gateway (`/v1/inference/score` — $[0.0, 1.0]$ Float Scale)

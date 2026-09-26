@@ -92,8 +92,7 @@ Every purge or RTBF execution produces a signed `ErasureAuditRecord`:
 - `tenant_id`: Isolated bank institution ID (e.g. `bank_alpha`).
 - `category`: [`DataCategory`](../backend/app/domain/retention_policy.py) enum value.
 - `records_erased_count`: Actual count of physically purged SQL rows (`rowcount`).
-- `erasure_hash`: SHA-256 cryptographic digest computed as:
-  $$\mathrm{SHA\text{-}256}(\mathrm{erasure}_{\mathrm{id}} \mathbin{\Vert} \mathrm{tenant}_{\mathrm{id}} \mathbin{\Vert} \mathrm{category} \mathbin{\Vert} \mathrm{timestamp})$$
+- `erasure_hash`: SHA-256 cryptographic digest computed as $\operatorname{SHA-256}(\mathrm{erasure}_{\mathrm{id}} \mathbin{\Vert} \mathrm{tenant}_{\mathrm{id}} \mathbin{\Vert} \mathrm{category} \mathbin{\Vert} \mathrm{timestamp})$.
 - `timestamp`: UTC timestamp of the completed operation.
 
 Audit trails are queryable per tenant via:
