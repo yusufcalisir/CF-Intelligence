@@ -2,7 +2,7 @@
 
 > **CF-Intelligence Technical Audit Report**  
 > **Repository:** [`https://github.com/yusufcalisir/CF-Intelligence`](https://github.com/yusufcalisir/CF-Intelligence)  
-> **Audited Baseline:** 3,226 Automated Tests across Backend, Frontend, and Verification Suites.
+> **Audited Baseline:** 3,233 Automated Tests across Backend, Frontend, and Verification Suites.
 
 ---
 
@@ -92,6 +92,11 @@ The audit inspected all components across the full repository footprint:
    - Grounded sub-15ms fast path (< 2.5ms empirical) and peak concurrent gateway throughput (> 1,400 req/s, 0% errors).
    - Validated Byzantine fault tolerance breakdown limits ($f < n/2$ for Median, $f < (n-2)/2$ for Bulyan, $f < (n-1)/2$ for Trimmed Mean/Krum).
    - Verified Curve25519 ECDH SecAgg throughput and algebraic zero-sum cancellation ($|\sum M_i| < 10^{-4}$).
+6. **Established Unified Experiment Infrastructure & Publication Suite** (`experiments/harness/`, `docs/EXPERIMENTS.md`):
+   - Implemented stateful context manager (`ExperimentTracker`), atomic serialization (`ExperimentExporter`), and orchestrator (`ExperimentRunner`).
+   - Standardized dual machine-readable outputs: `results.json`, `metrics.csv`, and binary columnar `traces.parquet` (PyArrow).
+   - Built automated publication-grade plotting suite (`plot_publication_figures.py`, `scripts/generate_charts.py`) producing 300 DPI ROC, PR, calibration curves, and confusion matrices directly from raw execution arrays.
+   - Integrated multi-seed evaluation with 95% confidence intervals, automated Markdown dossier generation (`REPORT.md`), and frontend contract synchronization (`frontend/src/types/benchmark.ts`).
 
 ---
 
@@ -103,6 +108,7 @@ The audit inspected all components across the full repository footprint:
 - **SSRF & Network Boundary Protections**: Verified automated rejection of loopback (`127.0.0.1`, `::1`), private ranges (RFC 1918), and AWS metadata (`169.254.169.254`).
 - **Byzantine Resilience & Breakdown Limits**: Verified that Krum, Trimmed Mean, and Bulyan aggregators successfully quarantine sign-inversion and high-variance Gaussian poisoning updates, while proving breakdown points when malicious nodes exceed theoretical limits.
 - **Curve25519 SecAgg Zero-Sum Accuracy**: Verified pairwise Diffie-Hellman mask derivation and algebraic vector cancellation without residual error.
+- **Unified Experiment Tracking & Binary Traces**: Verified schema validation, hardware probing, atomic disk serialization (JSON, CSV, Parquet), and Markdown dossier compilation across single and multi-seed configurations (`backend/tests/unit/test_experiment_harness.py`).
 
 ---
 

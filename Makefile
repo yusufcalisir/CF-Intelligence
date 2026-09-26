@@ -1,4 +1,4 @@
-.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security
+.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
 
 SHELL := /bin/bash
 
@@ -179,10 +179,21 @@ benchmark-latency: ## Run Inference Gateway concurrency and latency harness
 	python benchmarks/runners/run_latency_benchmark.py --mock-load
 
 generate-charts: ## Generate publication-grade figures from raw benchmark JSONs
-	python benchmarks/runners/generate_charts.py
+	python scripts/generate_charts.py
 
 benchmark-security: ## Run comprehensive security regression test suite
 	python -m pytest backend/tests/unit/test_perimeter_waf.py backend/tests/unit/test_multi_tenancy.py -v
+
+# ──────────────────────────────────────────────
+# Unified Experiment Harness Suite
+# ──────────────────────────────────────────────
+
+experiment-all: ## Run unified experiment harness across multiple seeds and compile dossiers
+	python -m experiments.harness.runner --name ProductionFraudMLP --rounds 5 --seeds 42 123 456
+	python scripts/generate_charts.py --include-experiments
+
+experiment-clean: ## Clean generated experiment runs and temporary traces
+	rm -rf experiments/results/*/.tmp* experiments/results/*/*.tmp
 
 # ──────────────────────────────────────────────
 # Utilities

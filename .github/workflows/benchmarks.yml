@@ -63,11 +63,15 @@ jobs:
 
       - name: Run Inference Gateway Latency Harness
         run: |
-          python benchmarks/runners/run_latency_benchmark.py --mock-load
+          python benchmarks/runners/run_latency_benchmark.py --workers 50
+
+      - name: Run Unified Experiment Harness (Multi-Seed Production Run)
+        run: |
+          python -m experiments.harness.runner --name ProductionFraudMLP --rounds 5 --seeds 42 123
 
       - name: Generate Publication Charts
         run: |
-          python benchmarks/runners/generate_charts.py
+          python scripts/generate_charts.py --include-experiments
 
       - name: Archive Benchmark JSON & Chart Artifacts
         uses: actions/upload-artifact@v4
@@ -75,4 +79,5 @@ jobs:
           name: benchmark-results-and-figures
           path: |
             benchmarks/results/raw/*.json
+            experiments/results/**
             docs/figures/*.png

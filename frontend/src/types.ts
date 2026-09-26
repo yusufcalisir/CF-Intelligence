@@ -233,3 +233,4 @@ export interface KafkaStreamingHealthResponse {
   };
 }
 
+export * from './types/benchmark';

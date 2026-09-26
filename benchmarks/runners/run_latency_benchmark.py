@@ -238,6 +238,11 @@ def run_concurrency_stress_test(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run inference latency and concurrency benchmark")
     parser.add_argument("--workers", type=int, default=50, help="Requests per worker")
+    parser.add_argument(
+        "--mock-load",
+        action="store_true",
+        help="Deprecated compatibility flag (real PyTorch execution is always enforced)",
+    )
     args = parser.parse_args()
 
     run_concurrency_stress_test(requests_per_worker=args.workers)
