@@ -65,7 +65,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 2535 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 2549 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:

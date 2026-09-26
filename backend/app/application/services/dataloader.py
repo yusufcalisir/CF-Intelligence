@@ -112,6 +112,7 @@ def load_elliptic(
     path: Path | None = None,
     n_mock_nodes: int = 2_000,
     rng: np.random.Generator | None = None,
+    require_real: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the Elliptic Bitcoin Dataset.
@@ -119,10 +120,11 @@ def load_elliptic(
     Returns
     -------
     dict with keys:
-        ``X``      : np.ndarray (N, 166) — node feature matrix
-        ``y``      : np.ndarray (N,)     — binary labels (1=illicit, 0=licit)
-        ``edges``  : list[tuple[int,int]] — directed edge list (src, dst)
-        ``source`` : str — "real" | "mock"
+        ``X``           : np.ndarray (N, 166) — node feature matrix
+        ``y``           : np.ndarray (N,)     — binary labels (1=illicit, 0=licit)
+        ``edges``       : list[tuple[int,int]] — directed edge list (src, dst)
+        ``source``      : str — "real" | "mock"
+        ``fraud_ratio`` : float — ratio of illicit nodes
     """
     rng = rng or np.random.default_rng(42)
     target_nodes = kwargs.get("n_mock_nodes") or kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_nodes
@@ -148,12 +150,15 @@ def load_elliptic(
 
     if features_csv.exists() and classes_csv.exists():
         logger.info("[Elliptic] Loading real dataset from %s", root)
-        feat_df = pd.read_csv(features_csv, header=None)
+        target_nrows = kwargs.get("nrows") or kwargs.get("n_mock_txns") or kwargs.get("n_mock_nodes")
+        read_nrows = max(int(target_nrows) * 5, 2000) if target_nrows else None
+
+        feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
         # First column is txId, rest are features
         feat_df.rename(columns={0: "txId"}, inplace=True)
         feat_df["txId"] = feat_df["txId"].astype(str)
 
-        cls_df = pd.read_csv(classes_csv)
+        cls_df = pd.read_csv(classes_csv, nrows=read_nrows)
         cls_df["txId"] = cls_df["txId"].astype(str)
         # class 1=illicit → 1, class 2=licit → 0, unknown → dropped
         cls_df = cls_df[cls_df["class"].astype(str) != "unknown"].copy()
@@ -161,7 +166,6 @@ def load_elliptic(
 
         # Merge strictly on txId to guarantee row alignment
         merged_df = pd.merge(cls_df, feat_df, on="txId", how="inner")
-        target_nrows = kwargs.get("nrows") or kwargs.get("n_mock_txns") or kwargs.get("n_mock_nodes")
         if target_nrows:
             merged_df = merged_df.iloc[: int(target_nrows)]
 
@@ -174,17 +178,26 @@ def load_elliptic(
 
         edges: list[tuple[int, int]] = []
         if edges_csv.exists():
-            edge_df = pd.read_csv(edges_csv)
+            read_edge_rows = max(int(target_nrows) * 10, 5000) if target_nrows else None
+            edge_df = pd.read_csv(edges_csv, nrows=read_edge_rows)
             src_col = edge_df.columns[0]
             dst_col = edge_df.columns[1]
-            for s, d in zip(edge_df[src_col].astype(str), edge_df[dst_col].astype(str)):
+            for s, d in zip(edge_df[src_col].astype(str), edge_df[dst_col].astype(str), strict=False):
                 s_idx = tx_id_to_idx.get(s)
                 d_idx = tx_id_to_idx.get(d)
                 if s_idx is not None and d_idx is not None:
                     edges.append((s_idx, d_idx))
 
         logger.info("[Elliptic] Loaded %d nodes, %d edges", len(y), len(edges))
-        return {"X": X, "y": y, "edges": edges, "source": "real"}
+        fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
+        return {"X": X, "y": y, "edges": edges, "source": "real", "fraud_ratio": fraud_ratio}
+
+    if require_real:
+        raise FileNotFoundError(
+            f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
+            f"Expected 'elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
 
     # ---- Mock generation ----
     logger.info(
@@ -235,6 +248,7 @@ def load_amlsim(
     path: Path | None = None,
     n_mock_txns: int = 5_000,
     rng: np.random.Generator | None = None,
+    require_real: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load the AMLSim transaction dataset.
@@ -242,9 +256,10 @@ def load_amlsim(
     Returns
     -------
     dict with keys:
-        ``X``      : np.ndarray (N, 6) — transaction feature matrix
-        ``y``      : np.ndarray (N,)   — binary label (1=SAR / fraud)
-        ``source`` : str
+        ``X``           : np.ndarray (N, 6) — transaction feature matrix
+        ``y``           : np.ndarray (N,)   — binary label (1=SAR / fraud)
+        ``source``      : str
+        ``fraud_ratio`` : float
     """
     rng = rng or np.random.default_rng(42)
     target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
@@ -262,7 +277,15 @@ def load_amlsim(
             X = df[available_cols].fillna(0).values.astype(np.float32)
             y = df["isFraud"].values.astype(int) if "isFraud" in df.columns else df["is_fraud"].values.astype(int)
             logger.info("[AMLSim] Loaded %d transactions", len(y))
-            return {"X": X, "y": y, "feature_names": available_cols, "source": "real"}
+            fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
+            return {"X": X, "y": y, "feature_names": available_cols, "source": "real", "fraud_ratio": fraud_ratio}
+
+    if require_real:
+        raise FileNotFoundError(
+            f"Real AMLSim dataset export not found in '{root}'. "
+            f"AMLSim is an IBM synthetic transaction generator; provide transactions.csv or generate records. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
 
     # ---- Mock generation ----
     logger.info(
@@ -314,6 +337,7 @@ def load_paysim(
     path: Path | None = None,
     n_mock_txns: int = 10_000,
     rng: np.random.Generator | None = None,
+    require_real: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
@@ -351,6 +375,13 @@ def load_paysim(
             logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
             df = pd.read_csv(csv_file, nrows=target_nrows)
             return _process_paysim_dataframe(df, source="real_csv")
+
+    if require_real:
+        raise FileNotFoundError(
+            f"Real PaySim dataset files not found in '{root}'. "
+            f"Expected 'PS_20174392719_1491204439457_log.csv' or partitioned Parquet files. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
 
     # ---- High-Fidelity Synthetic Mock of M-Pesa PaySim ----
     logger.info(
@@ -506,6 +537,7 @@ def load_ieee_cis(
     path: Path | None = None,
     n_mock_txns: int = 8_000,
     rng: np.random.Generator | None = None,
+    require_real: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load IEEE-CIS Fraud Detection (Vesta Corporation) benchmark dataset."""
@@ -552,6 +584,13 @@ def load_ieee_cis(
                 "source": "real_csv",
                 "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
             }
+
+    if require_real:
+        raise FileNotFoundError(
+            f"Real IEEE-CIS Fraud Detection dataset files not found in '{root}'. "
+            f"Expected 'train_transaction.csv'. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
 
     # ---- High-Fidelity Synthetic Mock of IEEE-CIS / Vesta ----
     logger.info(
@@ -603,6 +642,7 @@ def load_creditcard_fraud(
     path: Path | None = None,
     n_mock_txns: int = 5_000,
     rng: np.random.Generator | None = None,
+    require_real: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load European Credit Card Fraud Detection benchmark (V1-V28 PCA)."""
@@ -646,6 +686,13 @@ def load_creditcard_fraud(
                 "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
             }
 
+    if require_real:
+        raise FileNotFoundError(
+            f"Real Credit Card Fraud dataset files not found in '{root}'. "
+            f"Expected 'creditcard.csv'. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
+
     # Mock generation
     logger.warning("[CreditCard] Generating PCA mock dataset (%d txns)", n_mock_txns)
     n_fraud = max(1, int(n_mock_txns * 0.00172))
@@ -679,6 +726,15 @@ def partition_dataset_non_iid(
     Academic standard for non-IID federated learning evaluation (LEAF benchmark).
     Lower alpha (< 0.5) implies extreme non-IID heterogeneity across banks.
     """
+    if len(X) == 0:
+        raise ValueError("Cannot partition empty dataset (X is empty)")
+    if len(X) != len(y):
+        raise ValueError(f"Length mismatch between features X ({len(X)}) and labels y ({len(y)})")
+    if num_banks < 1:
+        raise ValueError(f"num_banks must be at least 1, got {num_banks}")
+    if alpha <= 0.0:
+        raise ValueError(f"Dirichlet concentration parameter alpha must be strictly positive, got {alpha}")
+
     rng = np.random.default_rng(seed)
     classes = np.unique(y)
 
@@ -751,9 +807,10 @@ DATASET_REGISTRY: dict[str, Any] = {
 }
 
 
-def load_dataset(name: str, **kwargs: Any) -> dict[str, Any]:
+def load_dataset(name: str, require_real: bool = False, **kwargs: Any) -> dict[str, Any]:
     """Load a benchmark dataset by registry name."""
     clean_name = name.lower().replace("-", "_").strip()
     if clean_name not in DATASET_REGISTRY:
         raise ValueError(f"Unknown dataset '{name}'. Available: {list(DATASET_REGISTRY)}")
-    return DATASET_REGISTRY[clean_name](**kwargs)
+    return DATASET_REGISTRY[clean_name](require_real=require_real, **kwargs)
+
