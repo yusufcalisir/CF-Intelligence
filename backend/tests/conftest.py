@@ -4,16 +4,22 @@ import contextlib
 import importlib.util
 import os
 import sys
+from pathlib import Path
 from typing import Any
+
+# Ensure repository root is on sys.path for cross-cutting benchmark experiment modules
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 # Pre-load pyarrow on Windows to initialize C++ DLLs cleanly before pytest collects tests
 if importlib.util.find_spec("pyarrow") is not None:
     with contextlib.suppress(ImportError):
         import pyarrow as _pyarrow  # noqa: F401
 
-import pytest
+import pytest  # noqa: E402
 
-from tests.factories.data_factory import TestDataFactory
+from tests.factories.data_factory import TestDataFactory  # noqa: E402
 
 # ── DDoS Throttle bypass ───────────────────────────────────────────────────────
 # Setting TESTING=1 before the app module is imported causes DDoSProtectionMiddleware

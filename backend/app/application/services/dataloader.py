@@ -335,15 +335,26 @@ PAYSIM_REAL_FRAUD_RATIO = 0.00129  # 8,213 frauds out of 6.36M txns (~0.129%)
 
 def load_paysim(
     path: Path | None = None,
+    nrows: int | None = None,
     n_mock_txns: int = 10_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    all_rows: bool = False,
+    temporal_split: bool = False,
     **kwargs: Any,
 ) -> dict[str, Any]:
     """Load PaySim (Kenya M-Pesa Mobile Money Fraud) dataset."""
     rng = rng or np.random.default_rng(42)
-    target_txns = kwargs.get("n_mock_txns") or kwargs.get("nrows") or n_mock_txns
-    n_mock_txns = int(target_txns)
+    if all_rows:
+        target_nrows = None
+    elif nrows is not None:
+        target_nrows = None if nrows <= 0 else int(nrows)
+    elif "nrows" in kwargs:
+        kw_nrows = kwargs.get("nrows")
+        target_nrows = None if (kw_nrows is None or kw_nrows <= 0) else int(kw_nrows)
+    else:
+        target_nrows = int(kwargs.get("n_mock_txns") or n_mock_txns)
+    n_mock_txns = target_nrows or n_mock_txns
     root = resolve_dataset_dir("paysim", path)
 
     # Check possible filenames for PaySim
@@ -352,7 +363,6 @@ def load_paysim(
         root / "PS_20174392719_1491204439457_log.csv",
         root / "paysim1.csv",
     ]
-    target_nrows = kwargs.get("nrows") or n_mock_txns
     parquet_files = sorted(list(root.glob("*.parquet")))
 
     if parquet_files:
@@ -361,20 +371,32 @@ def load_paysim(
         full_df = pd.concat(dfs, ignore_index=True)
         if target_nrows:
             full_df = full_df.iloc[:target_nrows]
-        return _process_paysim_dataframe(full_df, source="real_parquet")
+        res = _process_paysim_dataframe(full_df, source="real_parquet")
+        if temporal_split or kwargs.get("temporal_split"):
+            clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+            return temporal_split_dataset(res, **clean_kwargs)
+        return res
 
     for csv_file in possible_csvs:
         if csv_file.exists():
             logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
             df = pd.read_csv(csv_file, nrows=target_nrows)
-            return _process_paysim_dataframe(df, source="real_csv")
+            res = _process_paysim_dataframe(df, source="real_csv")
+            if temporal_split or kwargs.get("temporal_split"):
+                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+                return temporal_split_dataset(res, **clean_kwargs)
+            return res
 
     all_csvs = list(root.glob("*paysim*.csv")) + list(root.glob("*PS*.csv")) + list(root.glob("*.csv"))
     for csv_file in all_csvs:
         if csv_file.exists():
             logger.info("[PaySim] Loading real dataset from %s (nrows=%s)", csv_file, target_nrows)
             df = pd.read_csv(csv_file, nrows=target_nrows)
-            return _process_paysim_dataframe(df, source="real_csv")
+            res = _process_paysim_dataframe(df, source="real_csv")
+            if temporal_split or kwargs.get("temporal_split"):
+                clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+                return temporal_split_dataset(res, **clean_kwargs)
+            return res
 
     if require_real:
         raise FileNotFoundError(
@@ -446,13 +468,18 @@ def load_paysim(
 
     # Shuffle
     idx = rng.permutation(n_mock_txns)
-    return {
+    res = {
         "X": X[idx],
         "y": y[idx],
         "feature_names": PAYSIM_FEATURE_COLS,
         "source": "mock_mpesa",
         "fraud_ratio": float(np.mean(y)),
+        "steps": X[idx, 0],
     }
+    if temporal_split or kwargs.get("temporal_split"):
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        return temporal_split_dataset(res, **clean_kwargs)
+    return res
 
 
 def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
@@ -516,6 +543,7 @@ def _process_paysim_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]:
         "feature_names": available_cols,
         "source": source,
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))) if len(y) > 0 else 0.0,
+        "steps": X[:, 0] if (len(available_cols) > 0 and available_cols[0] == "step") else None,
     }
 
 
@@ -816,6 +844,7 @@ def temporal_split_dataset(
     preprocess: bool = False,
     numeric_strategy: str = "standardize",
     impute_strategy: str = "median",
+    **kwargs: Any,
 ) -> dict[str, Any]:
     """Split a dataset chronologically to enforce strict train-val-test temporal isolation."""
     from app.application.services.feature_service import FeatureService
@@ -936,7 +965,8 @@ def load_dataset(
     data = DATASET_REGISTRY[clean_name](require_real=require_real, **kwargs)
 
     if temporal_split:
-        return temporal_split_dataset(data, preprocess=preprocess, **kwargs)
+        clean_kwargs = {k: v for k, v in kwargs.items() if k not in ("nrows", "n_mock_txns", "all_rows", "require_real", "temporal_split")}
+        return temporal_split_dataset(data, preprocess=preprocess, **clean_kwargs)
 
     return data
 

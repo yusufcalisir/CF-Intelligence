@@ -33,12 +33,49 @@ where $n_k$ is the number of local transaction samples at Bank $k$, $N = \sum_{k
 
 ---
 
-## 4. Operational Limitations
-- **Client Drift under Non-IID Data**: When local label distributions diverge significantly ($\alpha < 0.5$ in Dirichlet skew), local SGD steps pull weights towards local minima, degrading global convergence.
+## 4. Non-IID Dirichlet Client Partitioning & Client Drift Dynamics
+
+Cross-bank federated fraud detection operates inherently under heterogeneous data distributions across financial institutions. In **CF-Intelligence**, this institutional heterogeneity is mathematically modeled using a Dirichlet distribution $\operatorname{Dir}(\alpha \cdot \mathbf{1}_K)$ implemented in [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py).
+
+### 4.1 Dirichlet Allocation Formulation
+
+For each binary transaction class $c \in \{0, 1\}$ (legitimate transactions and fraudulent transfers), a probability vector $\mathbf{q}_c = (q_{c,1}, \dots, q_{c,K})$ is sampled independently:
+
+$$\mathbf{q}_c \sim \operatorname{Dir}(\alpha \cdot \mathbf{1}_K), \quad \text{where } \sum_{k=1}^K q_{c,k} = 1, \; q_{c,k} \ge 0$$
+
+where $\alpha > 0$ denotes the Dirichlet concentration parameter and $K$ is the number of participating banking institutions (default $K=3$: Bank A, Bank B, Bank C).
+
+The number of samples of class $c$ assigned to institution $k$ is $n_{c,k} = \lfloor q_{c,k} N_c \rfloor$, with residual samples allocated to maintain exact dataset conservation:
+
+$$\sum_{k=1}^K n_{c,k} = N_c, \quad \mathcal{D}_j \cap \mathcal{D}_k = \emptyset \quad \forall j \neq k$$
+
+### 4.2 Impact of Concentration Parameter $\alpha$ on Client Drift
+
+The gradient variance between local client objectives and the global consortium objective is directly bounded by the Dirichlet concentration:
+
+$$\mathbb{E}_{k \sim \mathcal{P}_K} \left[ \left\| \nabla F_k(w) - \nabla f(w) \right\|^2 \right] \le G^2(\alpha)$$
+
+- **$\alpha = 0.1$ (Extreme Non-IID Heterogeneity)**: Induces severe label distribution skew and high Kullback-Leibler divergence ($D_{\mathrm{KL}}(P_k \parallel P_{\mathrm{global}}) \gg 1.0$). Certain banks encounter negligible fraud while others experience high alert volume. Local SGD directions diverge sharply, resulting in client drift that accelerates the need for proximal regularization (FedProx $\mu > 0$) or control variates (SCAFFOLD).
+- **$\alpha = 0.5$ (Realistic Consortium Skew)**: Calibrated to empirical banking consortium structures, simulating volume differences between Tier-1 retail banks, regional commercial lenders, and digital challenger banks.
+- **$\alpha = 1.0$ (Uniform Dirichlet / Moderate Heterogeneity)**: Approaching balanced participation where all institutions observe representative cross-bank fraud signals.
+
+### 4.3 Statistical Divergence Metrics
+
+The platform quantifies client distribution divergence via Kullback-Leibler (KL) divergence and Total Variation Distance (TVD):
+
+$$D_{\mathrm{KL}}(P_k \parallel P_{\mathrm{global}}) = \sum_{c \in \{0, 1\}} P_k(c) \ln \frac{P_k(c) + \epsilon}{P_{\mathrm{global}}(c) + \epsilon}$$
+
+$$\operatorname{TVD}(P_k, P_{\mathrm{global}}) = \frac{1}{2} \sum_{c \in \{0, 1\}} \lvert P_k(c) - P_{\mathrm{global}}(c) \rvert$$
+
+---
+
+## 5. Operational Limitations
+- **Client Drift under Extreme Skew**: When local label distributions diverge significantly ($\alpha \le 0.1$ in Dirichlet skew), vanilla FedAvg weights oscillate between local minima, degrading global test PR-AUC.
 - **System Stragglers**: In synchronous FedAvg, round completion latency is bounded by the slowest banking node.
 
 ---
 
-## 5. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
+## 6. Test Suite Verification
+- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py), [`backend/tests/unit/test_dirichlet_partition.py`](file:///backend/tests/unit/test_dirichlet_partition.py)
+- **Partitioner Implementation**: [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py)
 - **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)

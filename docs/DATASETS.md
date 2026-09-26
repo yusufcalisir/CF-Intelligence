@@ -51,12 +51,33 @@ storage/datasets/
 ### 3.1 PaySim (Mobile Money Transfer Network)
 - **Source**: Lopez-Rojas et al., *PaySim: A financial mobile money simulator for fraud detection*, Kaggle (`ealaxi/paysim1`).
 - **Domain**: African mobile money operator logs (M-Pesa Kenya topology).
+- **Scale**: 6,362,620 transactions (470.7 MB CSV on disk: `backend/storage/datasets/paysim/PS_20174392719_1491204439457_log.csv`).
 - **Fraud Topology**: Fraudulent transactions occur almost exclusively in `TRANSFER` and `CASH_OUT` transaction types, typically executed as double-step asset drain attacks (illicit transfer followed by immediate cash out).
-- **Engineered Feature Pipeline**:
-  - `step`: Time unit in hours ($1 \le t \le 744$, covering 30 simulated calendar days).
-  - One-hot transaction types: `type_TRANSFER`, `type_CASH_OUT`, `type_PAYMENT`, `type_DEBIT`, `type_CASH_IN`.
-  - Account balance deltas: $\Delta \mathrm{bal}_{\mathrm{orig}} = \mathrm{newbalanceOrig} + \mathrm{amount} - \mathrm{oldbalanceOrg}$ and $\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount} - \mathrm{newbalanceDest}$.
-  - Flagging zero-balance origins post-transaction (classic account drain signature).
+- **Engineered Feature Pipeline (13 Canonical Features)**:
+  1. `step`: Time unit in hours ($1 \le t \le 744$, covering 30 simulated calendar days).
+  2. `type_TRANSFER`: Binary indicator for cross-account fund transfers ($y=1$ candidate).
+  3. `type_CASH_OUT`: Binary indicator for physical agent cash-out requests ($y=1$ candidate).
+  4. `type_PAYMENT`: Binary indicator for merchant goods/services purchases ($y=0$ strictly).
+  5. `type_DEBIT`: Binary indicator for bank debit transactions ($y=0$ strictly).
+  6. `type_CASH_IN`: Binary indicator for cash deposit transactions ($y=0$ strictly).
+  7. `amount`: Transacted currency value.
+  8. `oldbalanceOrg`: Initial sender account balance prior to transaction.
+  9. `newbalanceOrig`: Resulting sender balance post-transaction (emptied to 0.0 in fraud).
+  10. `oldbalanceDest`: Initial recipient account balance prior to transaction.
+  11. `newbalanceDest`: Resulting recipient balance post-transaction.
+  12. `errorBalanceOrig`: Sender accounting mismatch delta:
+
+$$\Delta \mathrm{bal}_{\mathrm{orig}} = \mathrm{newbalanceOrig} + \mathrm{amount} - \mathrm{oldbalanceOrg}$$
+
+  13. `errorBalanceDest`: Recipient accounting mismatch delta:
+
+$$\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount} - \mathrm{newbalanceDest}$$
+
+- **Strict Temporal Train/Test Separation**:
+  - Training partition: Earliest transactions ($t \le t_{\mathrm{cutoff}}$), default 80% past steps.
+  - Global test partition: Latest transactions ($t > t_{\mathrm{cutoff}}$), default 20% future steps.
+  - Invariant assertion: $\max(t_{\mathrm{train}}) \le \min(t_{\mathrm{test}})$ with zero lookahead contamination.
+- **Partitioner Module**: [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py) providing `PaySimPartitioner`.
 
 ### 3.2 IEEE-CIS Fraud Detection (Vesta Corporation)
 - **Source**: IEEE Computational Intelligence Society / Vesta Corporation Fraud Benchmark, Kaggle (`ieee-fraud-detection`).
@@ -142,6 +163,8 @@ kaggle datasets download -d ellipticco/elliptic-data-set -p backend/storage/data
 ## 7. Verification Test Suite
 
 The integrity of dataset loading, schema adherence, fast slice reads, and Dirichlet partitioning is verified continuously across:
+- [`backend/tests/unit/test_paysim_loader.py`](file:///backend/tests/unit/test_paysim_loader.py): Real PaySim dataset loading, 13-feature engineering verification, accounting error deltas, and zero temporal lookahead leakage.
+- [`backend/tests/unit/test_dirichlet_partition.py`](file:///backend/tests/unit/test_dirichlet_partition.py): Federated Non-IID Dirichlet distribution client partitioning ($\alpha \in \{0.1, 0.5, 1.0\}$), sample conservation, client isolation, and comparative benchmark integration.
 - [`backend/tests/unit/test_real_dataloaders.py`](file:///backend/tests/unit/test_real_dataloaders.py): Registry completeness, tensor dimensionalities, and label distributions.
 - [`backend/tests/unit/test_dataloader_edge_cases.py`](file:///backend/tests/unit/test_dataloader_edge_cases.py): Strict real-data enforcement (`require_real=True`), non-IID boundary conditions ($\alpha = 0.05$ vs $\alpha = 100.0$), rare class handling, and missing file error guards.
 - [`backend/tests/unit/test_split_isolation.py`](file:///backend/tests/unit/test_split_isolation.py): Zero data snooping, training-only preprocessor fitting, and handling of unseen categorical test tokens.
