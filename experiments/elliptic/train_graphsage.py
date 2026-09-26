@@ -792,7 +792,7 @@ class EllipticGraphSAGEBenchmark:
                 "results_json": str(target_dir / "results.json"),
                 "comparative_baselines": str(target_dir / "comparative_baselines.json"),
                 "audit_dossier": str(target_dir / "audit_dossier.md"),
-                "benchmark_raw": str(raw_results_dir / "graphsage_elliptic_benchmark.json"),
+                "benchmark_raw": str(target_dir / "graphsage_elliptic_benchmark.json"),
                 **plot_paths,
             },
         )
@@ -808,7 +808,7 @@ class EllipticGraphSAGEBenchmark:
         with open(baselines_json_path, "w", encoding="utf-8") as f:
             json.dump(comparative_baselines, f, indent=2)
 
-        raw_benchmark_path = raw_results_dir / "graphsage_elliptic_benchmark.json"
+        raw_benchmark_path = target_dir / "graphsage_elliptic_benchmark.json"
         raw_payload = {
             "timestamp_utc": end_time_utc,
             "benchmark": "GraphSAGE Elliptic Bitcoin Inductive Node Classification",

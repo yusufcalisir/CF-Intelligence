@@ -17,6 +17,7 @@ import time
 from typing import Any
 
 import numpy as np
+from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import HistGradientBoostingClassifier, RandomForestClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
@@ -161,8 +162,16 @@ class ClassicalBaselines:
         y_train: np.ndarray,
         max_iter: int = 500,
         c_param: float = 1.0,
-    ) -> LogisticRegression:
+    ) -> Any:
         """Fit class-balanced Logistic Regression with L2 regularization."""
+        y_binary = (y_train > 0).astype(int)
+        if len(np.unique(y_binary)) < 2:
+            constant_class = int(y_binary[0]) if len(y_binary) > 0 else 0
+            model = DummyClassifier(strategy="constant", constant=constant_class)
+            model.fit(X_train, y_binary)
+            self.fitted_models["logistic_regression"] = model
+            return model
+
         model = LogisticRegression(
             C=c_param,
             max_iter=max_iter,
@@ -181,8 +190,16 @@ class ClassicalBaselines:
         n_estimators: int = 100,
         max_depth: int | None = 12,
         n_jobs: int = -1,
-    ) -> RandomForestClassifier:
+    ) -> Any:
         """Fit class-balanced Random Forest ensemble."""
+        y_binary = (y_train > 0).astype(int)
+        if len(np.unique(y_binary)) < 2:
+            constant_class = int(y_binary[0]) if len(y_binary) > 0 else 0
+            model = DummyClassifier(strategy="constant", constant=constant_class)
+            model.fit(X_train, y_binary)
+            self.fitted_models["random_forest"] = model
+            return model
+
         model = RandomForestClassifier(
             n_estimators=n_estimators,
             max_depth=max_depth,
@@ -201,10 +218,17 @@ class ClassicalBaselines:
         max_iter: int = 100,
         max_leaf_nodes: int = 31,
         learning_rate: float = 0.1,
-    ) -> HistGradientBoostingClassifier:
+    ) -> Any:
         """Fit Histogram-based Gradient Boosted Trees (LightGBM equivalent in scikit-learn)."""
-        # Compute class balance weights
         y_binary = (y_train > 0).astype(int)
+        if len(np.unique(y_binary)) < 2:
+            constant_class = int(y_binary[0]) if len(y_binary) > 0 else 0
+            model = DummyClassifier(strategy="constant", constant=constant_class)
+            model.fit(X_train, y_binary)
+            self.fitted_models["gradient_boosting"] = model
+            return model
+
+        # Compute class balance weights
         pos_count = int(np.sum(y_binary))
         neg_count = len(y_binary) - pos_count
         pos_weight = float(neg_count / max(1, pos_count))
@@ -229,6 +253,11 @@ class ClassicalBaselines:
             duration = time.perf_counter() - start
             if probs.ndim == 2 and probs.shape[1] >= 2:
                 return probs[:, 1], duration
+            elif probs.ndim == 2 and probs.shape[1] == 1:
+                # Single-class dummy classifier
+                if hasattr(model, "classes_") and model.classes_[0] == 1:
+                    return np.ones(len(X), dtype=float), duration
+                return np.zeros(len(X), dtype=float), duration
             return probs.ravel(), duration
         elif hasattr(model, "decision_function"):
             raw_scores = model.decision_function(X)

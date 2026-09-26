@@ -33,6 +33,14 @@ def elliptic_dir():
 class TestEllipticLoaderRealDataset:
     """Tests evaluating real Elliptic Bitcoin dataset files."""
 
+    @pytest.fixture(autouse=True)
+    def skip_if_no_real_dataset(self, elliptic_dir):
+        parquet_cache = elliptic_dir / "elliptic_cache.parquet"
+        features_csv = elliptic_dir / "elliptic_txs_features.csv"
+        classes_csv = elliptic_dir / "elliptic_txs_classes.csv"
+        if not parquet_cache.exists() and not (features_csv.exists() and classes_csv.exists()):
+            pytest.skip("Physical Elliptic Bitcoin dataset files not present on disk.")
+
     def test_real_dataset_presence_and_cache(self, elliptic_dir):
         """Verify real Elliptic dataset exists with Parquet cache or CSVs."""
         parquet_cache = elliptic_dir / "elliptic_cache.parquet"
@@ -235,8 +243,9 @@ class TestEllipticLoaderMockAndEdgeCases:
         """Verify GraphSAGEModel processes 166-dim Elliptic features with edge_index and masked loss."""
         # Load a manageable slice for neural execution
         data = load_elliptic(
-            require_real=True,
+            require_real=False,
             nrows=1000,
+            n_mock_nodes=1000,
             include_unknown=True,
             temporal_split=True,
             split_timestep=34,

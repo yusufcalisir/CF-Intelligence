@@ -1002,7 +1002,7 @@ def load_ieee_cis(
         n_mock_txns,
         IEEE_CIS_FEATURE_DIM,
     )
-    n_fraud = max(1, int(n_mock_txns * IEEE_CIS_REAL_FRAUD_RATIO))
+    n_fraud = max(2 if n_mock_txns >= 20 else 1, int(n_mock_txns * IEEE_CIS_REAL_FRAUD_RATIO))
     n_legit = n_mock_txns - n_fraud
 
     # TransactionAmt (log-normal, higher skew for fraud)
@@ -1022,21 +1022,41 @@ def load_ieee_cis(
     v_features = rng.standard_normal((n_mock_txns, IEEE_CIS_FEATURE_DIM - 25)).astype(np.float32)
     v_features[n_legit:, :] += 1.8  # Elevated risk offset
 
-    # TransactionDT (seconds, monotonic simulation)
-    mock_dt = np.sort(rng.integers(86400, 86400 * 180, size=n_mock_txns)).astype(np.float64)
-
     X = np.column_stack([amts.reshape(-1, 1), c_features, d_features, v_features])
     y = np.array([0] * n_legit + [1] * n_fraud, dtype=int)
 
+    # Permute X and y so fraud is distributed uniformly across the temporal timeline
     idx = rng.permutation(n_mock_txns)
+    X = X[idx]
+    y = y[idx]
+
+    # Guarantee both temporal partitions (train ~80% and test ~20%) contain fraud samples
+    if n_mock_txns >= 20 and n_fraud >= 2:
+        split_point = int(n_mock_txns * 0.8)
+        train_frauds = np.where(y[:split_point] == 1)[0]
+        test_frauds = np.where(y[split_point:] == 1)[0]
+        if len(train_frauds) == 0 and len(test_frauds) > 0:
+            legit_train = np.where(y[:split_point] == 0)[0][0]
+            fraud_test = split_point + test_frauds[0]
+            y[legit_train], y[fraud_test] = y[fraud_test], y[legit_train]
+            X[[legit_train, fraud_test]] = X[[fraud_test, legit_train]]
+        elif len(test_frauds) == 0 and len(train_frauds) > 1:
+            fraud_train = train_frauds[-1]
+            legit_test = split_point + np.where(y[split_point:] == 0)[0][0]
+            y[fraud_train], y[legit_test] = y[legit_test], y[fraud_train]
+            X[[fraud_train, legit_test]] = X[[legit_test, fraud_train]]
+
+    # TransactionDT (seconds, strictly monotonic simulation matching chronological order)
+    mock_dt = np.sort(rng.integers(86400, 86400 * 180, size=n_mock_txns)).astype(np.float64)
+
     feature_names = [f"feat_{i}" for i in range(X.shape[1])]
     res = {
-        "X": X[idx],
-        "y": y[idx],
+        "X": X,
+        "y": y,
         "feature_names": feature_names,
         "source": "mock_ieee_cis",
         "fraud_ratio": float(np.mean(np.asarray(y, dtype=float))),
-        "transaction_dt": mock_dt[idx],
+        "transaction_dt": mock_dt,
     }
     if temporal_split or kwargs.get("temporal_split"):
         clean_kwargs = {

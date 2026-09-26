@@ -955,13 +955,8 @@ def run_ieee_benchmark(
         output_path=dossier_path,
     )
 
-    # 7. Serialize raw benchmark JSON for benchmarks/results/raw/fraud_benchmark_ieee_cis.json
-    if output_dir is not None:
-        raw_benchmark_path = out_dir / "fraud_benchmark_ieee_cis.json"
-    else:
-        raw_results_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
-        raw_results_dir.mkdir(parents=True, exist_ok=True)
-        raw_benchmark_path = raw_results_dir / "fraud_benchmark_ieee_cis.json"
+    # 7. Serialize raw benchmark JSON for out_dir / fraud_benchmark_ieee_cis.json
+    raw_benchmark_path = out_dir / "fraud_benchmark_ieee_cis.json"
 
     comp_pooled = comparative_results.get("individual_pooled_models", {}).get("pooled_gradient_boosting", {})
     m_fedavg = optimizer_results["fedavg"]["final_metrics"]
