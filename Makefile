@@ -1,4 +1,4 @@
-.PHONY: help dev test lint docker-up docker-down migrate clean
+.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security
 
 SHELL := /bin/bash
 
