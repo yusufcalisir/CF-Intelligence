@@ -1,0 +1,27 @@
+{
+  "timestamp_utc": "2026-09-26T01:28:58.836664+00:00",
+  "dataset": "paysim",
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu"
+  },
+  "centralized_baseline": {
+    "pr_auc": 0.4654305200341006,
+    "roc_auc": 0.9890726817042607,
+    "recall_at_0_1_pct_fpr": 0.4,
+    "recall_at_0_5_pct_fpr": 0.6,
+    "recall_at_1_0_pct_fpr": 0.6
+  },
+  "federated_fedavg": {
+    "rounds": 3,
+    "clients": 5,
+    "pr_auc": 0.146294279197505,
+    "roc_auc": 0.9712280701754386,
+    "recall_at_0_1_pct_fpr": 0.2,
+    "recall_at_0_5_pct_fpr": 0.2,
+    "recall_at_1_0_pct_fpr": 0.2,
+    "pr_auc_parity_ratio": 0.3143203330189502
+  }
+}

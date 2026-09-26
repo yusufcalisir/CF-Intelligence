@@ -1,0 +1,15 @@
+{
+  "timestamp_utc": "2026-09-26T01:28:50.393441+00:00",
+  "model": "GraphSAGE (2-layer Mean Aggregator)",
+  "temporal_split": "Timesteps 1-34 Train vs 35-49 Test",
+  "zero_future_leakage_enforced": true,
+  "train_nodes": 3000,
+  "test_nodes": 1500,
+  "metrics": {
+    "pr_auc": 0.9001,
+    "roc_auc": 0.986,
+    "precision": 0.9636,
+    "recall": 0.3333,
+    "f1_score": 0.4953
+  }
+}

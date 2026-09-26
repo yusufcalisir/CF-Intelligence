@@ -82,6 +82,33 @@ format-check: ## Check formatting with ruff
 	cd backend && ruff format --check app/ tests/
 
 # ──────────────────────────────────────────────
+# Empirical Benchmarks
+# ──────────────────────────────────────────────
+
+benchmark: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency ## Run complete benchmark suite
+
+benchmark-fraud: ## Run fraud detection benchmark (PaySim / IEEE-CIS)
+	python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --rounds 10
+
+benchmark-fl: ## Run federated learning optimization benchmark (Non-IID Dirichlet)
+	python benchmarks/runners/run_fl_benchmark.py --rounds 10 --alpha 0.5
+
+benchmark-dp: ## Run differential privacy utility frontier sweep
+	python benchmarks/runners/run_dp_tradeoff.py
+
+benchmark-byzantine: ## Run Byzantine resilience benchmark (Sign Inversion)
+	python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion
+
+benchmark-graph: ## Run GraphSAGE node classification benchmark (Elliptic)
+	python benchmarks/runners/run_graph_benchmark.py
+
+benchmark-latency: ## Run inference gateway latency and concurrency stress test
+	python benchmarks/runners/run_latency_benchmark.py --workers 50
+
+benchmark-security: ## Run security regression test suite (SSRF, BOLA, Tenant Isolation)
+	cd backend && python -m pytest tests/unit/test_perimeter_waf.py tests/unit/test_multi_tenancy.py tests/unit/test_auth_security.py -v
+
+# ──────────────────────────────────────────────
 # Frontend
 # ──────────────────────────────────────────────
 

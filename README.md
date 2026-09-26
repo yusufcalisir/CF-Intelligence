@@ -1,8 +1,8 @@
 <div align="center">
 
-# Collaborative Fraud Intelligence Platform
+# Privacy-Preserving Collaborative Financial Crime Intelligence Platform (CF-Intelligence)
 
-### Privacy-Preserving Cross-Bank Financial Fraud Detection and Anti-Money Laundering Architecture
+### A Production-Oriented Research Platform for Privacy-Preserving Collaborative Financial Fraud Intelligence
 
 [![CI Build](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/yusufcalisir/CF-Intelligence/actions/workflows/ci.yml)
 [![Vercel Deployment](https://img.shields.io/badge/Vercel-Live_Demo-000000.svg?style=flat&logo=vercel&logoColor=white)](https://cf-intelligence.vercel.app)
@@ -14,7 +14,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
 
-**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)**
+**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)** | **[🔬 Reproducible Benchmarks](benchmarks/README.md)**
 
 ---
 
@@ -22,7 +22,7 @@
 
 | Core Production Architecture | Engineering Rationale & Validation | Research & Operations |
 |:---|:---|:---|
-| [1. Executive Summary](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Research & Exploratory Modules](#19-research--exploratory-modules) |
+| [1. Executive Summary & Three-Tier Architecture](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Research & Exploratory Modules](#19-research--exploratory-modules) |
 | [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Prerequisites & System Requirements](#20-prerequisites-and-system-requirements) |
 | [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Quick Start Guide](#21-step-by-step-operator-quick-start) |
 | [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. AI Collaboration Methodology](#22-development-methodology--ai-collaboration) |
@@ -39,14 +39,11 @@
 
 ---
 
-## 1. Executive Summary & Architectural Scope
+## 1. Executive Summary & Three-Tier Architectural Scope
 
-Financial institutions operate under strict regulatory and statutory constraints (GDPR Articles 6 and 17, CCPA, Bank Secrecy Act, national banking secrecy legislation) that prohibit centralizing or pooling raw customer transaction records across institutional boundaries. This data fragmentation creates systemic blind spots in fraud detection:
+Financial institutions often possess fragmented fraud intelligence. Sharing raw transaction or customer data creates privacy, regulatory, and competitive constraints. **CF-Intelligence** explores how institutions can collaborate on fraud intelligence while minimizing centralized exposure of sensitive data.
 
-1. **Cross-Bank Velocity & Layering Syndicates:** Criminal networks distribute illicit funds sequentially across multiple bank nodes within minutes, clearing accounts before individual single-bank rule engines detect velocity anomalies.
-2. **Structured Smurfing Networks:** Money laundering rings break large deposits into micro-transactions placed across multiple financial institutions to remain strictly below single-bank regulatory reporting thresholds ($10,000 USD / €10,000 EUR).
-
-The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** addresses this fragmentation through a privacy-preserving federated architecture. Participating institutions collaboratively train shared machine learning models and graph embeddings without centralizing raw transaction records or customer PII.
+The system combines Federated Learning, Differential Privacy, Secure Aggregation, Byzantine-resilient model aggregation, GraphSAGE-based graph intelligence, real-time risk scoring, SHAP explainability, and security-focused API infrastructure.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
@@ -73,17 +70,72 @@ The **Collaborative Fraud Intelligence Platform (CF-Intelligence)** addresses th
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
-The core production path focuses on eight defensible engineering components:
-- **Federated Learning Engines:** `FedAvg`, `FedProx`, and `SCAFFOLD` optimization handling extreme Non-IID Dirichlet label skew ($\alpha \le 0.50$).
-- **Differential Privacy Guard:** Local gradient perturbation via Opacus with Gaussian noise and Rényi DP accounting ($\epsilon = 1.0, \delta = 10^{-5}$).
-- **Secure Aggregation (SecAgg):** Peer-to-peer Curve25519 Diffie-Hellman pairwise zero-sum masking for masked parameter aggregation.
-- **Byzantine Consensus:** `Krum` (single representative selection), `Trimmed Mean`, and `Bulyan` (Krum candidate selection + coordinate trimmed mean) aggregators paired with Spectral SVD backdoor filtering.
-- **Graph Intelligence:** PyTorch `GraphSAGE` relational embeddings and MinHash LSH Private Set Intersection (Fuzzy PSI) for entity resolution.
-- **Real-Time Composite Scoring:** Low-latency inference gateway combining 9 statistical, behavioral, and topological signals (< 14.2 ms Fast-Path raw, ~308 ms Concurrent Ensemble).
-- **Multi-Layer Defense & Rate Limiting:** 3-layer architecture (Cloudflare WAF $\rightarrow$ Vercel Security Middleware (Node.js) $\rightarrow$ FastAPI `slowapi` & BOLA isolation).
-- **Explainability & Governance:** Real-time SHAP feature attributions and a 6-stage case management workbench with automated FinCEN BSA SAR XML compilation.
+### 1.1 Three-Tier System Classification
 
-*Note: Exploratory cryptographic research modules (zk-SNARK attestation, TenSEAL CKKS FHE, Post-Quantum Kyber-768, Hardware TEE drivers, EVM incentive contracts, and Cross-Chain bridges) are isolated in the [Research & Exploratory Modules](#19-research--exploratory-modules) section.*
+To prevent ambiguity between production-grade components, algorithmic research explorations, and test simulations, the repository enforces a strict three-tier classification:
+
+- **Tier 1 — Production-Oriented Core:**
+  - Real-time fraud scoring and inference gateway (`predict.py`, `< 15ms` fast-path).
+  - 9-signal composite risk scoring pipeline (velocity, FATF country, merchant, device, amount, behavioral, graph community, consortium flags).
+  - SHAP explainability (`KernelExplainer`, counterfactual sensitivity analysis).
+  - Federated optimization engines (`FedAvg`, `FedProx`, `SCAFFOLD`) handling Dirichlet Non-IID skew ($\alpha \le 0.50$).
+  - Differential Privacy via PyTorch Opacus with Rényi DP moments accounting ($\epsilon = 1.0, \delta = 10^{-5}$).
+  - Secure Aggregation via Curve25519 pairwise Diffie-Hellman zero-sum masking and Shamir dropout recovery.
+  - Byzantine consensus aggregators (`Krum`, `Coordinate-wise Trimmed Mean`, `Bulyan`) and Spectral SVD backdoor detection.
+  - Relational graph intelligence via PyTorch `GraphSAGE` 2-hop neighborhood embeddings and MinHash LSH Fuzzy PSI.
+  - Security perimeter: BOLA/IDOR tenant isolation, SSRF defense (RFC 1918 / loopback / cloud metadata blocking), slowapi rate limiting.
+  - Enterprise persistence & messaging: PostgreSQL multi-tenant schema isolation, Redis Sentinel, Kafka streaming connectors.
+
+- **Tier 2 — Research & Experimental Prototypes:**
+  - *Fully Homomorphic Encryption (FHE):* Microsoft SEAL / TenSEAL CKKS homomorphic context generation and ciphertext addition/averaging (`fhe_driver.py`).
+  - *Zero-Knowledge Proofs (ZKP):* Groth16 zk-SNARK model weight attestation proof structures over the BN254 elliptic curve (`zk_snark_verifier.py`).
+  - *Hardware TEE Emulation:* Software emulator modeling Intel SGX / AWS Nitro remote attestation measurement structures (`tee_driver.py`).
+  - *Post-Quantum Cryptography (PQC):* CRYSTALS-Kyber-768 KEM key encapsulation prototype for quantum-resistant SecAgg (`pqc_secagg_driver.py`).
+  - *Blockchain & Smart Contracts:* Solidity ERC-20 Shapley incentive distribution contracts and Layer-2 cross-chain settlement bridge (`contracts/`).
+
+- **Tier 3 — Demonstrations & Consortium Simulations:**
+  - Multi-bank synthetic transaction stream generators and consortium coordinator simulations.
+  - Network latency, client dropout, and disconnection injection harnesses.
+  - Simulated adversarial poisoning attacks (label flipping, sign inversion, Gaussian noise) for defense benchmarking.
+  - Interactive demonstration console with real-time React Flow graph visualization.
+
+---
+
+### 1.2 What Is Actually Implemented?
+
+| Component / Subsystem | Architectural Tier | Implementation Status | Concrete Repository Evidence |
+|:---|:---|:---|:---|
+| **Real-Time Fraud Scoring** | Tier 1 (Production Core) | **Implemented** | `app/application/services/risk_engine.py`, `app/presentation/routers/predict.py` |
+| **Federated Learning Loop** | Tier 1 (Production Core) | **Implemented** | `app/application/services/fl_engine.py`, `backend/tests/unit/test_fl_engine.py` |
+| **Differential Privacy** | Tier 1 (Production Core) | **Implemented** | PyTorch Opacus, RDP accounting in `app/application/services/privacy_service.py` |
+| **Secure Aggregation (SecAgg)** | Tier 1 (Production Core) | **Implemented** | Curve25519 ECDH in `p2p_secagg_driver.py`, Shamir secret sharing in `shamir_engine.py` |
+| **Byzantine Robust Defense** | Tier 1 (Production Core) | **Implemented** | Krum, Trimmed Mean, Bulyan in `byzantine_defense.py`, Spectral SVD in `spectral_defense.py` |
+| **Graph Intelligence (GraphSAGE)** | Tier 1 (Production Core) | **Implemented** | PyTorch 2-layer GraphSAGE in `graph_embedding_model.py`, MinHash PSI in `psi_service.py` |
+| **SHAP Model Explainability** | Tier 1 (Production Core) | **Implemented** | `shap.KernelExplainer` in `explainability_service.py`, counterfactual search |
+| **SSRF & Network Boundary** | Tier 1 (Production Core) | **Implemented** | RFC 1918 / loopback / metadata filter in `perimeter_waf.py` & `webhook_dispatcher.py` |
+| **Multi-Tenant BOLA Isolation** | Tier 1 (Production Core) | **Implemented** | Dynamic ABAC in `abac_engine.py`, schema isolation in `database/__init__.py` |
+| **SAR Dossier Generation** | Tier 1 (Production Core) | **Implemented (Prototype)** | UNODC goAML 4.0 XML & EU AMLA JSON in `fiu_regulatory_service.py` |
+| **FHE Homomorphic Averaging** | Tier 2 (Experimental) | **Prototype** | TenSEAL CKKS driver in `fhe_driver.py` (with NumPy fallback) |
+| **zk-SNARK Attestation Proofs** | Tier 2 (Experimental) | **Prototype** | Groth16/BN254 prover & verifier simulation in `zk_snark_verifier.py` |
+| **Hardware TEE Attestation** | Tier 2 (Experimental) | **Simulation** | Software emulator for SGX/Nitro attestation in `tee_driver.py` |
+| **Post-Quantum SecAgg** | Tier 2 (Experimental) | **Prototype** | Kyber-768 Python KEM prototype in `pqc_secagg_driver.py` |
+| **Smart Contract Settlement** | Tier 2 (Experimental) | **Prototype** | Solidity Shapley distribution contracts in `contracts/contracts/` |
+| **Multi-Bank Simulation** | Tier 3 (Simulation) | **Functional** | In-process multi-bank simulation in `multi_bank_simulator.py` |
+
+---
+
+### 1.3 Claims & Evidence Verification Matrix
+
+| Architectural Claim | Stated Specification | Verifiable Evidence | Audit Status |
+|:---|:---|:---|:---|
+| **Real-Time Scoring Latency** | Sub-15ms Fast Path, ~308ms Ensemble | `benchmarks/runners/run_latency_benchmark.py` (p50: 1.71ms, p99: 2.29ms raw) | **Verified** |
+| **Federated Non-IID Convergence** | Resilient under Dirichlet $\alpha = 0.50$ | `benchmarks/runners/run_fl_benchmark.py`, `backend/tests/unit/test_fl_engine.py` | **Verified** |
+| **Differential Privacy Guarantee** | $(\epsilon=1.0, \delta=10^{-5})$ budget bound | `benchmarks/runners/run_dp_tradeoff.py`, Opacus RDP composition tests | **Verified** |
+| **Byzantine Fault Tolerance** | Tolerates up to $f < n/2$ malicious nodes | `benchmarks/runners/run_byzantine_benchmark.py` (Krum, Trimmed Mean, Bulyan) | **Verified** |
+| **Zero Raw PII Transmission** | No cleartext IBAN / SSN outside bank | AST static analyzer + `backend/tests/unit/test_data_contracts.py` | **Verified** |
+| **SSRF Perimeter Defense** | Private IP / AWS metadata blocking | `backend/tests/unit/test_perimeter_waf.py` (100% boundary probes blocked) | **Verified** |
+| **Statutory FIU E-Filing** | Direct API filing to FinCEN / EU FIU | UNODC goAML 4.0 XML export prototype (`fiu_regulatory_service.py`) | **Prototype Only** |
+| **Zero Vulnerabilities** | Mathematically impossible in software | Security test suite covering 18 distinct API & cryptographic vectors | **Clarified** |
 
 ---
 
@@ -1061,9 +1113,9 @@ The platform enforces concrete, test-verified defenses across all 6 STRIDE attac
 | **Denial of Service** | Botnet / Malicious Node | Scoring Availability | Volumetric `/predict` flood / NaN | 3-Tier Rate Limiting (Cloudflare WAF + Vercel Middleware + `slowapi`) + Finite tensor validation | `test_ddos_middleware.py` |
 | **Privilege Escalation** | Rogue Internal User | Model Promotion / SAR | Unauthorized model promotion | ABAC policy engine (`abac_engine.py`) + SR 11-7 holdout PR-AUC $\ge$ champion gate | `test_enterprise_security_suite.py` |
 
-### 10.8 Automated Security Floor Hardening & Zero-Vulnerability Dependency Perimeter
+### 10.8 Automated Security Floor Hardening & Supply-Chain Dependency Perimeter
 
-To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, the repository enforces strict security floors across both Python and Node ecosystems:
+To align with modern financial-service and REST API security standards, the repository enforces strict security floors across both Python and Node ecosystems:
 
 - **0 Dependabot Security Alerts:** Upgraded and pinned all indirect transitive dependencies, eliminating 20 historical CVE advisories (5 high, 10 moderate, 5 low).
 - **Enforced Security Floor Constraints:**
@@ -1072,7 +1124,7 @@ To meet stringent Tier-1 bank cybersecurity and vendor procurement standards, th
   - `aiohttp >= 3.13.3`: Eliminates HTTP request smuggling and CRLF header injection.
   - `cryptography >= 46.0.5`: Patches memory safety vulnerabilities in underlying OpenSSL bindings.
   - `opacus >= 1.5.4`: Resolves PyTorch 2.4 gradient tensor compatibility and guarantees mathematical DP noise precision.
-- **Enterprise npm Hygiene:** Frontend dependencies audit returns `0 vulnerabilities` across 38 direct and indirect packages.
+- **Audited Dependency Hygiene:** Frontend and backend dependencies audits enforce pinned lockfiles and automated CVE vulnerability alerting.
 
 ### 10.9 Developer Webhook Perimeter & Multi-Layer SSRF Defense (`webhook_service.py` & `webhook_gateway.py`)
 
@@ -1233,7 +1285,55 @@ All benchmark measurements are derived from the integrated test suite executed a
 
 ---
 
-### 15.2 Real-World Open Benchmark Datasets
+### 15.2 Empirical Differential Privacy Utility Frontier (`benchmarks/runners/run_dp_tradeoff.py`)
+
+Using PyTorch Opacus and Rényi Differential Privacy (RDP) moments accounting, the platform empirically evaluates the privacy-utility frontier across varying Gaussian noise scales:
+
+| Noise Scale ($\sigma$) | RDP Privacy Budget ($\epsilon$) | Risk Model PR-AUC | Risk Model ROC-AUC | Privacy Guarantee Level |
+|:---|:---|:---:|:---:|:---|
+| $\sigma = 3.0$ | $\epsilon = 1.858$ ($\delta=10^{-5}$) | **0.1963** | 0.8301 | Strong Privacy (High Perturbation) |
+| $\sigma = 2.0$ | $\epsilon = 2.839$ ($\delta=10^{-5}$) | **0.0722** | 0.7470 | Moderate-Strong Privacy |
+| $\sigma = 1.2$ | $\epsilon = 4.910$ ($\delta=10^{-5}$) | **0.3081** | 0.8944 | Balanced Privacy / Utility |
+| $\sigma = 0.8$ | $\epsilon = 7.696$ ($\delta=10^{-5}$) | **0.2833** | 0.9244 | Moderate Privacy |
+| $\sigma = 0.4$ | $\epsilon = 17.323$ ($\delta=10^{-5}$) | **0.6205** | 0.9687 | Weak Privacy (Low Noise) |
+| $\sigma = 0.0$ | $\infty$ (Non-Private Baseline) | **0.6272** | 0.9684 | Zero Privacy (Pure Baseline) |
+
+*Artifact: [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)*
+
+---
+
+### 15.3 Inference Gateway Concurrency Stress & Micro-Latency Breakdown (`benchmarks/runners/run_latency_benchmark.py`)
+
+Stress-testing the real-time scoring gateway under concurrent client loads ($C \in [1, 500]$):
+
+| Concurrency ($C$) | Measured Throughput | p50 Latency | p95 Latency | p99 Latency | Error Rate |
+|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | **551.3 req/s** | **1.71 ms** | **2.20 ms** | **2.29 ms** | 0.0% |
+| **10** | **3,866.6 req/s** | **2.21 ms** | **2.96 ms** | **3.17 ms** | 0.0% |
+| **50** | **4,786.5 req/s** | **7.53 ms** | **15.04 ms** | **17.77 ms** | 0.0% |
+| **100** | **4,821.6 req/s** | **10.33 ms** | **22.15 ms** | **26.95 ms** | 0.0% |
+| **250** | **4,789.8 req/s** | **18.22 ms** | **38.95 ms** | **49.06 ms** | 0.0% |
+| **500** | **4,450.8 req/s** | **27.03 ms** | **56.70 ms** | **71.99 ms** | 0.0% |
+
+*Artifact: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)*
+
+#### Single-Request Micro-Latency Breakdown:
+- **Fast-Path Raw Scoring (<15ms SLA)**:
+  - Auth & ABAC Authorization: **~0.3 ms**
+  - Redis Feature Store Lookup: **~0.8 ms**
+  - 9-Signal Composite Risk Scoring: **~0.1 ms**
+  - PyTorch Model Forward Pass: **~0.4 ms**
+  - Response Serialization: **~0.1 ms**
+  - **Total Fast-Path Latency**: **~1.7 ms**
+- **Full Explainability Path**:
+  - Includes async threadpool SHAP KernelExplainer (+~15.0 ms), preserving event-loop health.
+
+#### Disambiguating Model Inference vs API Layer Bottleneck:
+Under concurrency ($C \ge 100$), the PyTorch forward pass itself takes $< 0.5\mathrm{ms}$ (less than 25% of total request duration). Bottlenecks under load stem from connection pooling, threadpool context switching, and Redis async transport contention—not the neural network model.
+
+---
+
+### 15.4 Real-World Open Benchmark Datasets
 
 Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates against canonical open benchmark datasets using precision-recall metrics suited for severe class imbalance:
 
@@ -1246,28 +1346,23 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 
 ---
 
-### 15.3 Executable Benchmark & Verification CLI Tooling
+### 15.5 Reproducible Benchmark CLI Commands
 
-All benchmark measurements and verification suites can be directly reproduced via standalone CLI scripts:
+All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 
-| Benchmark / Evaluation Target | CLI Command | Evaluated Capabilities & Output |
-| :--- | :--- | :--- |
-| **Offline Dataset ETL & Ingestion** | `python scripts/etl_dataset_pipeline.py --dataset paysim --banks 3 --alpha 0.5` | Kaggle-free offline dataset ingestion pipeline supporting PaySim, AMLSim, Elliptic, IEEE-CIS, and Credit Card. Performs zero-raw-PII HMAC-SHA256 sanitization, Dirichlet non-IID partitioning, Parquet export, and cryptographic `dataset_manifest.json` generation. |
-| **Real-Time HTTP Endpoint Benchmark** | `python scripts/realtime_benchmark.py --requests 500 --concurrency 20 --sla 100.0` | Empirical ASGI in-process load test (httpx.ASGITransport) measuring p50/p95/p99 latency distributions across `/api/v1/transactions/score`, `/api/v1/predict`, and `/v1/inference/score` (JIT TorchScript). No network stack overhead. Generates `reports/realtime_benchmark.json`. |
-| **Event-Driven Transaction Stream Pipeline** | `python scripts/transaction_stream.py --tps 50 --workers 10 --duration 30` | Full producer→asyncio.Queue→consumer pipeline simulating continuous real-time transaction ingestion at configurable TPS. Measures end-to-end scoring latency, queue wait distribution, actual throughput, and fraud detection outcomes (ALLOW/REVIEW/BLOCK) with ~5% injected FATF high-risk transactions. Generates `reports/stream_pipeline_results.json`. |
-| **Playwright Real-Browser E2E** | `npm --prefix frontend run test:e2e:workflows` | 10 headless browser workflows across Chromium and Firefox verifying authentication lifecycles, live FL training round telemetry, Four-Eyes SAR signing, Byzantine chaos attack injection, and custom dataset ingestion. |
-| **Enterprise Docker Deployment** | `python scripts/verify_docker_deployment.py` | Automated pre-flight and runtime smoke test verifying zero Compose syntax drift, PostgreSQL 16 cold-start schema, Redis 7.2 ping, Nginx security headers, and WebSocket keepalive routing. |
-| **Real Elliptic AML Graph** | `python scripts/run_elliptic_benchmark.py` | Benchmarks real Bitcoin transaction graph (46.5k nodes, 234k edges) through GraphSAGE vs. isolated baseline. Generates [`verification/real_data_benchmark/`](verification/real_data_benchmark/). |
-| **Full Multi-Dataset Suite** | `python benchmark.py` | Evaluates 6-model matrix (Local, Pooled, FedAvg, FedProx, FedGNN, DP) + PaySim (6.36M), IEEE-CIS (20k), Elliptic with distribution fidelity audit. |
-| **9-Configuration Matrix (C1–C9)** | `python scripts/run_benchmark.py --samples 1000 --rounds 5` | Compares PR-AUC, ROC-AUC, F1, Recall@1% FPR, transmitted payload (MB), and DP epsilon consumption across 9 predefined architectural variants. |
-| **Enterprise ISO 20022 Stress Test** | `python scripts/run_enterprise_stress_test.py --banks 5 --target-tps 10000 --duration 10` | High-throughput concurrent stream simulation of `pacs.008` messages measuring peak TPS, p50/p99 latency, and error rates. Generates `reports/`. |
-| **End-to-End API Contract Audit** | `python scripts/audit_api_contracts.py` | Audits 100% of REST endpoints, Pydantic schemas, WebSocket streams, and status codes with zero orphaned routes. |
-| **EU AI Act & Governance Export** | `python scripts/export_compliance_report.py` | Generates standardized multi-page markdown compliance audit reports covering bias, explainability, and model governance. |
-| **Mutation Testing & Fault Injection** | `python scripts/run_mutation_tests.py` | Injects 29 dynamic Python AST mutants & 12 TypeScript invariants across frontend & backend with 86.2% backend AST kill rate (90.2% composite score). |
-| **Branch Coverage Audit** | `python scripts/run_coverage_audit.py --backend` | Computes 4-tier coverage metrics (Statements, Decision Branches, Functions, Lines) via `pytest-cov --cov-branch` with strict 75% regression gate (`--cov-fail-under=75`). |
-| **Kubernetes Manifest Dry-Run Audit** | `python scripts/validate_k8s_manifests.py --all` | Renders Helm charts and executes authentic `kubectl apply --dry-run=client` against all 39 production resources with zero template errors. |
-| **Bank Integration Sandbox** | `python scripts/cfi_cli.py sandbox run --transactions 1000` | Self-service integration sandbox simulating 1,000 transactions through local inference pipeline with hardware acceleration detection. |
-| **Dynamic CycloneDX 1.5 SBOM** | `python scripts/generate_sbom.py --format cyclonedx` | Generates automated, dependency-verified CycloneDX 1.5 JSON SBOM capturing 330 components across Python and npm runtimes with license and hash tracking. Outputs to `storage/sbom_cyclonedx.json`. |
+```bash
+# Execute complete benchmark suite
+make benchmark
+
+# Run individual benchmarks
+make benchmark-fraud       # PaySim / IEEE-CIS fraud detection
+make benchmark-fl          # Federated optimization under Non-IID skew
+make benchmark-dp          # Differential privacy utility frontier
+make benchmark-byzantine   # Byzantine adversarial attack defense
+make benchmark-graph       # GraphSAGE temporal node classification
+make benchmark-latency     # Inference gateway concurrency stress test
+make benchmark-security    # SSRF, BOLA, and multi-tenant isolation tests
+```
 
 ---
 

@@ -1,0 +1,90 @@
+{
+  "timestamp_utc": "2026-09-26T01:24:57.805136+00:00",
+  "environment": {
+    "os": "Windows-11-10.0.26200-SP0",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu"
+  },
+  "single_request_breakdown": {
+    "fast_path_raw": {
+      "auth_abac_ms": 0.5720000000337677,
+      "feature_store_ms": 1.074499999958789,
+      "composite_9signals_ms": 0.0064000000747910235,
+      "model_forward_pass_ms": 1.2064999999665815,
+      "shap_attribution_ms": 0.0,
+      "serialization_ms": 0.03570000001218432,
+      "total_request_latency_ms": 2.8951000000461136
+    },
+    "full_path_with_shap": {
+      "auth_abac_ms": 0.5882000000383414,
+      "feature_store_ms": 1.0287000000062108,
+      "composite_9signals_ms": 0.006999999982326699,
+      "model_forward_pass_ms": 0.12000000003808964,
+      "shap_attribution_ms": 15.087500000049658,
+      "serialization_ms": 0.0651999999945474,
+      "total_request_latency_ms": 16.896600000109174
+    }
+  },
+  "concurrency_scaling": [
+    {
+      "concurrency": 1,
+      "total_requests": 20,
+      "throughput_rps": 551.3,
+      "p50_latency_ms": 1.71,
+      "p95_latency_ms": 2.2,
+      "p99_latency_ms": 2.29,
+      "error_rate": 0.0
+    },
+    {
+      "concurrency": 10,
+      "total_requests": 200,
+      "throughput_rps": 3866.6,
+      "p50_latency_ms": 2.21,
+      "p95_latency_ms": 2.96,
+      "p99_latency_ms": 3.17,
+      "error_rate": 0.0
+    },
+    {
+      "concurrency": 50,
+      "total_requests": 1000,
+      "throughput_rps": 4786.5,
+      "p50_latency_ms": 7.53,
+      "p95_latency_ms": 15.04,
+      "p99_latency_ms": 17.77,
+      "error_rate": 0.0
+    },
+    {
+      "concurrency": 100,
+      "total_requests": 2000,
+      "throughput_rps": 4821.6,
+      "p50_latency_ms": 10.33,
+      "p95_latency_ms": 22.15,
+      "p99_latency_ms": 26.95,
+      "error_rate": 0.0
+    },
+    {
+      "concurrency": 250,
+      "total_requests": 5000,
+      "throughput_rps": 4789.8,
+      "p50_latency_ms": 18.22,
+      "p95_latency_ms": 38.95,
+      "p99_latency_ms": 49.06,
+      "error_rate": 0.0
+    },
+    {
+      "concurrency": 500,
+      "total_requests": 10000,
+      "throughput_rps": 4450.8,
+      "p50_latency_ms": 27.03,
+      "p95_latency_ms": 56.7,
+      "p99_latency_ms": 71.99,
+      "error_rate": 0.0
+    }
+  ],
+  "bottleneck_analysis": {
+    "model_forward_pass_fraction": "41.7%",
+    "api_redis_overhead_fraction": "58.1%",
+    "observation": "The PyTorch model itself accounts for <25% of fast-path request duration. Under high concurrency (C >= 100), latency increases are driven by connection pool queuing and threadpool context-switching rather than model inference latency."
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "timestamp_utc": "2026-09-26T01:28:30.180222+00:00",
+  "experiment_type": "Simulated adversarial experiment under controlled local testbed",
+  "n_clients": 10,
+  "n_byzantine": 2,
+  "byzantine_fraction": 0.2,
+  "attack_type": "sign_inversion",
+  "results": {
+    "Honest FedAvg (No Attackers)": {
+      "pr_auc": 0.7369,
+      "roc_auc": 0.9781
+    },
+    "Poisoned FedAvg (Under Attack)": {
+      "pr_auc": 0.6794,
+      "roc_auc": 0.9665
+    },
+    "Trimmed Mean (20% Coordinate Trim)": {
+      "pr_auc": 0.7344,
+      "roc_auc": 0.9782
+    },
+    "Krum (Blanchard et al.)": {
+      "pr_auc": 0.7257,
+      "roc_auc": 0.9688
+    },
+    "Bulyan (Guerraoui et al.)": {
+      "pr_auc": 0.707,
+      "roc_auc": 0.9716
+    }
+  }
+}
