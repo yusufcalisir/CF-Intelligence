@@ -48,6 +48,52 @@ describe('InvestigationDashboard', () => {
       if (url.includes('alerts-by-bank')) {
         return { data: { bank_a: 50, bank_b: 60, bank_c: 44 } };
       }
+      if (url.includes('comparative-baselines')) {
+        return {
+          data: {
+            dataset_name: 'PaySim & Financial Consortia',
+            generated_at_utc: '2026-09-26T12:00:00Z',
+            random_state: 42,
+            bank_count: 3,
+            total_training_samples: 150000,
+            global_test_samples: 45000,
+            fraud_prevalence_pct: 0.129,
+            comparison_matrix: [
+              {
+                paradigm: 'Federated Learning Champion (FedAvg / FedProx)',
+                category: 'PRODUCTION_CHAMPION',
+                pr_auc: 0.842,
+                roc_auc: 0.975,
+                recall_at_01_fpr: 0.624,
+                f1_score: 0.751,
+                brier_score: 0.0158,
+                latency_ms: 0.26,
+                delta_pr_auc_vs_fed: 0.0,
+                privacy_guarantee: 'ZERO_RAW_PII_CURVE25519_OPACUS_DP',
+                legal_compliance: 'FULLY_COMPLIANT_GDPR_KVKK',
+                description: 'Consortium model trained via decentralized gradients with SecAgg and Differential Privacy',
+              },
+            ],
+            centralization_gap_analysis: {
+              pooled_champion_model: 'pooled_gradient_boosting',
+              pooled_pr_auc: 0.865,
+              pooled_roc_auc: 0.984,
+              pooled_recall_at_01_fpr: 0.665,
+              centralization_gap_pr_auc: 0.023,
+              centralization_gap_roc_auc: 0.009,
+              federated_efficiency_pct: 97.34,
+            },
+            silo_deficit_analysis: {
+              mean_pr_auc: 0.694,
+              mean_roc_auc: 0.882,
+              mean_recall_at_01_fpr: 0.432,
+              silo_count: 3,
+              collaborative_uplift_pr_auc: 0.148,
+              collaborative_uplift_roc_auc: 0.093,
+            },
+          },
+        };
+      }
       return { data: [] };
     });
   });

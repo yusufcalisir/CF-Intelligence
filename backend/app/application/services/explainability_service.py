@@ -679,12 +679,16 @@ class ExplainabilityService:
         attributions: list[LIMEFeatureAttribution] = []
         for i, name in enumerate(feature_names):
             w_coeff = float(slopes[i])
+            rounded_weight = round(w_coeff, 4)
+            if abs(rounded_weight) == 0.0:
+                rounded_weight = 0.0
+            direction = "INCREASES_RISK" if rounded_weight >= 0 else "DECREASES_RISK"
             attributions.append(
                 LIMEFeatureAttribution(
                     feature=name,
-                    weight=round(w_coeff, 4),
+                    weight=rounded_weight,
                     value=round(float(x_0[i]), 4),
-                    direction="INCREASES_RISK" if w_coeff >= 0 else "DECREASES_RISK",
+                    direction=direction,
                 )
             )
 
