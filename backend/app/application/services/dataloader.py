@@ -807,10 +807,137 @@ DATASET_REGISTRY: dict[str, Any] = {
 }
 
 
-def load_dataset(name: str, require_real: bool = False, **kwargs: Any) -> dict[str, Any]:
-    """Load a benchmark dataset by registry name."""
+def temporal_split_dataset(
+    dataset_dict: dict[str, Any],
+    time_col: str | None = None,
+    train_ratio: float = 0.70,
+    val_ratio: float = 0.15,
+    test_ratio: float = 0.15,
+    preprocess: bool = False,
+    numeric_strategy: str = "standardize",
+    impute_strategy: str = "median",
+) -> dict[str, Any]:
+    """Split a dataset chronologically to enforce strict train-val-test temporal isolation."""
+    from app.application.services.feature_service import FeatureService
+    from app.application.services.preprocessor import DataPreprocessor
+
+    X = dataset_dict["X"]
+    y = dataset_dict["y"]
+    feature_names = dataset_dict.get("feature_names")
+
+    # If already a pandas DataFrame
+    if isinstance(X, pd.DataFrame):
+        df = X.copy()
+        df["_label_"] = y
+        train_df, val_df, test_df, split_meta = FeatureService.temporal_split(
+            df,
+            time_col=time_col,
+            train_ratio=train_ratio,
+            val_ratio=val_ratio,
+            test_ratio=test_ratio,
+            label_col="_label_",
+        )
+        y_train = train_df.pop("_label_").to_numpy(dtype=int)
+        y_val = val_df.pop("_label_").to_numpy(dtype=int)
+        y_test = test_df.pop("_label_").to_numpy(dtype=int)
+
+        if preprocess:
+            prep = DataPreprocessor(numeric_strategy=numeric_strategy, impute_strategy=impute_strategy)
+            X_train = prep.fit_transform(train_df)
+            X_val = prep.transform(val_df)
+            X_test = prep.transform(test_df)
+        else:
+            prep = None
+            X_train = train_df.to_numpy(dtype=np.float32)
+            X_val = val_df.to_numpy(dtype=np.float32)
+            X_test = test_df.to_numpy(dtype=np.float32)
+
+        return {
+            "X_train": X_train,
+            "y_train": y_train,
+            "X_val": X_val,
+            "y_val": y_val,
+            "X_test": X_test,
+            "y_test": y_test,
+            "split_meta": split_meta,
+            "preprocessor": prep,
+            "source": dataset_dict.get("source", "unknown"),
+        }
+
+    # If X is a numpy array
+    X_arr = np.asarray(X, dtype=np.float32)
+    y_arr = np.asarray(y, dtype=int)
+    n_samples = len(X_arr)
+
+    # Determine time column index
+    time_idx = 0
+    if feature_names and time_col:
+        if time_col in feature_names:
+            time_idx = feature_names.index(time_col)
+    elif feature_names:
+        detected = FeatureService.detect_time_column(pd.DataFrame(columns=feature_names))
+        if detected and detected in feature_names:
+            time_idx = feature_names.index(detected)
+
+    # Sort chronologically by time column
+    time_values = X_arr[:, time_idx]
+    sort_idx = np.argsort(time_values)
+    X_sorted = X_arr[sort_idx]
+    y_sorted = y_arr[sort_idx]
+
+    n_train = int(n_samples * train_ratio)
+    n_val = int(n_samples * val_ratio)
+
+    X_train_raw = X_sorted[:n_train]
+    y_train = y_sorted[:n_train]
+    X_val_raw = X_sorted[n_train : n_train + n_val]
+    y_val = y_sorted[n_train : n_train + n_val]
+    X_test_raw = X_sorted[n_train + n_val :]
+    y_test = y_sorted[n_train + n_val :]
+
+    if preprocess:
+        prep = DataPreprocessor(numeric_strategy=numeric_strategy, impute_strategy=impute_strategy)
+        X_train = prep.fit_transform(X_train_raw)
+        X_val = prep.transform(X_val_raw)
+        X_test = prep.transform(X_test_raw)
+    else:
+        prep = None
+        X_train = X_train_raw
+        X_val = X_val_raw
+        X_test = X_test_raw
+
+    return {
+        "X_train": X_train,
+        "y_train": y_train,
+        "X_val": X_val,
+        "y_val": y_val,
+        "X_test": X_test,
+        "y_test": y_test,
+        "time_col_idx": time_idx,
+        "preprocessor": prep,
+        "source": dataset_dict.get("source", "unknown"),
+        "is_strictly_chronological": bool(
+            len(X_train) == 0 or len(X_val) == 0 or X_train[-1, time_idx] <= X_val[0, time_idx]
+        ),
+    }
+
+
+def load_dataset(
+    name: str,
+    require_real: bool = False,
+    temporal_split: bool = False,
+    preprocess: bool = False,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Load a benchmark dataset by registry name, optionally applying temporal split and preprocessing."""
     clean_name = name.lower().replace("-", "_").strip()
     if clean_name not in DATASET_REGISTRY:
         raise ValueError(f"Unknown dataset '{name}'. Available: {list(DATASET_REGISTRY)}")
-    return DATASET_REGISTRY[clean_name](require_real=require_real, **kwargs)
+    data = DATASET_REGISTRY[clean_name](require_real=require_real, **kwargs)
+
+    if temporal_split:
+        return temporal_split_dataset(data, preprocess=preprocess, **kwargs)
+
+    return data
+
 

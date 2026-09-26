@@ -146,3 +146,29 @@ kaggle datasets download -d ellipticco/elliptic-data-set -p backend/storage/data
 The integrity of dataset loading, schema adherence, fast slice reads, and Dirichlet partitioning is verified continuously across:
 - [`backend/tests/unit/test_real_dataloaders.py`](file:///backend/tests/unit/test_real_dataloaders.py): Registry completeness, tensor dimensionalities, and label distributions.
 - [`backend/tests/unit/test_dataloader_edge_cases.py`](file:///backend/tests/unit/test_dataloader_edge_cases.py): Strict real-data enforcement (`require_real=True`), non-IID boundary conditions ($\alpha = 0.05$ vs $\alpha = 100.0$), rare class handling, and missing file error guards.
+- [`backend/tests/unit/test_split_isolation.py`](file:///backend/tests/unit/test_split_isolation.py): Zero data snooping, training-only preprocessor fitting, and handling of unseen categorical test tokens.
+- [`backend/tests/unit/test_feature_leakage.py`](file:///backend/tests/unit/test_feature_leakage.py): Target proxy correlation audits, outcome feature detection, and entity identifier memorization elimination.
+- [`verification/etl_pipeline/tests/test_data_integrity.py`](file:///verification/etl_pipeline/tests/test_data_integrity.py): Scientific verification of temporal monotonicity and absence of covariate leakage across benchmark datasets.
+
+---
+
+## 8. Data Hygiene, Temporal Partitioning & Split Isolation
+
+To prevent temporal lookahead bias and data snooping in cross-bank fraud detection benchmarks, the platform implements strict partition hygiene via [`FeatureService`](file:///backend/app/application/services/feature_service.py) and [`DataPreprocessor`](file:///backend/app/application/services/preprocessor.py):
+
+### 8.1 Chronological Arrow of Time
+Random cross-validation splits on financial event logs cause future transactions to contaminate training sets. All tabular datasets are ordered strictly ascending along their chronological timestamp:
+$$t_{\mathrm{train}}^{\max} \le t_{\mathrm{val}}^{\min} \le t_{\mathrm{test}}^{\min}$$
+
+| Dataset | Time / Sequence Column | Granularity |
+|:---|:---|:---|
+| **PaySim** | `step` | 1-hour discrete increments ($1 \le t \le 744$) |
+| **IEEE-CIS** | `TransactionDT` | Seconds elapsed from an arbitrary reference timestamp |
+| **Credit Card Fraud** | `Time` | Seconds elapsed between transaction and first transaction |
+| **Elliptic Bitcoin** | `time_step` | Discrete 2-week time steps ($1 \le t \le 49$) |
+
+### 8.2 Zero Data Snooping Preprocessing
+Preprocessing parameters (means $\mu_{\mathrm{train}}$, standard deviations $\sigma_{\mathrm{train}}$, medians, min/max bounds, and categorical vocabularies) are learned **strictly from the training partition**:
+1. **Fit-Transform Isolation**: `DataPreprocessor.fit()` executes exclusively on $X_{\mathrm{train}}$. Transforming $X_{\mathrm{val}}$ and $X_{\mathrm{test}}$ applies $\mu_{\mathrm{train}}$ and $\sigma_{\mathrm{train}}$ without altering preprocessor state.
+2. **Unseen Categorical Tokens**: Categories appearing in validation or test partitions that were absent in $X_{\mathrm{train}}$ are mapped to an all-zero indicator vector, preventing runtime key crashes or out-of-vocabulary data snooping.
+3. **Outlier Standard Deviation Bounding**: When `clip_outliers=True`, standardized features are bounded to $[-k\sigma, +k\sigma]$ (default $k=6.0$), insulating gradient optimization against destabilizing numerical spikes.

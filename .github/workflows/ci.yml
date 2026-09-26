@@ -65,7 +65,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 2567 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 2583 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -307,7 +307,7 @@ jobs:
   # 10. Subsystem Scientific Verification & Reference Audits
   # --------------------------------------------------------------------------
   scientific-verification-audit:
-    name: 10. Scientific Verification Audit Suite (307 Tests across 18 Math & Privacy Modules)
+    name: 10. Scientific Verification Audit Suite (310 Tests across 18 Math & Privacy Modules)
     runs-on: ubuntu-latest
     needs: backend-unit-and-integration
     steps:
