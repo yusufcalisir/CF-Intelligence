@@ -141,6 +141,8 @@ class TestTemporalSplitIsolation:
         assert len(test_df) == 15
 
         # Check temporal order boundaries
+        assert meta.train_time_max is not None and meta.val_time_min is not None
+        assert meta.val_time_max is not None and meta.test_time_min is not None
         assert float(meta.train_time_max) <= float(meta.val_time_min)
         assert float(meta.val_time_max) <= float(meta.test_time_min)
 

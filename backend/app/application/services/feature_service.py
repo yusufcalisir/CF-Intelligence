@@ -226,7 +226,7 @@ class FeatureService:
             for split_name, split_data in [("train", train_df), ("val", val_df), ("test", test_df)]:
                 if len(split_data) > 0:
                     y_split = pd.to_numeric(split_data[label_col], errors="coerce").fillna(0).astype(int)
-                    n_fraud = int((y_split == 1).sum())
+                    n_fraud = (y_split == 1).sum()
                     ratio = float(n_fraud / len(split_data))
                     metrics[f"{split_name}_fraud_count"] = n_fraud
                     metrics[f"{split_name}_fraud_ratio"] = ratio
@@ -283,7 +283,7 @@ class FeatureService:
         issues: list[FeatureLeakageIssue] = []
         leaked_cols_set: set[str] = set()
 
-        y_series = pd.to_numeric(df[label_col], errors="coerce").fillna(0).to_numpy()
+        y_series = pd.to_numeric(df[label_col], errors="coerce").fillna(0).to_numpy(dtype=np.float64)
         y_std = float(np.std(y_series))
 
         for col in candidate_cols:
@@ -324,7 +324,7 @@ class FeatureService:
 
             # 3. Numeric correlation check (Target proxy detection)
             if pd.api.types.is_numeric_dtype(col_series):
-                clean_num = pd.to_numeric(col_series, errors="coerce").fillna(0).to_numpy()
+                clean_num = pd.to_numeric(col_series, errors="coerce").fillna(0).to_numpy(dtype=np.float64)
                 col_std = float(np.std(clean_num))
 
                 # Zero variance check
@@ -412,7 +412,7 @@ class FeatureService:
         missing_counts: dict[str, int] = {}
         missing_ratios: dict[str, float] = {}
         for col in df.columns:
-            n_missing = int(df[col].isna().sum())
+            n_missing = df[col].isna().sum()
             if n_missing > 0:
                 missing_counts[col] = n_missing
                 ratio = float(n_missing / n_rows)
@@ -448,8 +448,8 @@ class FeatureService:
         class_imbalance: dict[str, Any] | None = None
         if label_col and label_col in df.columns:
             y_arr = pd.to_numeric(df[label_col], errors="coerce").fillna(0).astype(int)
-            fraud_count = int((y_arr == 1).sum())
-            legit_count = int((y_arr == 0).sum())
+            fraud_count = (y_arr == 1).sum()
+            legit_count = (y_arr == 0).sum()
             fraud_ratio = float(fraud_count / n_rows) if n_rows > 0 else 0.0
             imbalance_ratio = float(legit_count / max(1, fraud_count))
 

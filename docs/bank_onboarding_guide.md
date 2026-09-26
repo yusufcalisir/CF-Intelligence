@@ -295,9 +295,7 @@ $$\text{Masked Gradient: } m_u = g_u + \sum_{v > u} s_{u,v} - \sum_{v < u} s_{v,
 - **Secure Aggregation (SecAgg)**: Nodes exchange Diffie-Hellman public keys to generate zero-sum pairwise masks $s_{u,v}$. Upon aggregation, pairwise masks cancel out exactly ($\sum_u m_u = \sum_u g_u$).
 - **Differential Privacy (DP)**: Local gradients are clipped to $L_2$ norm threshold $C \le 1.0$, and Gaussian noise calibrated to privacy budget $\epsilon \le 10.0$ is injected. Submissions violating $\epsilon$ bounds are rejected (`REJECTED_EPSILON`).
 - **ECDSA Digital Signatures**: Each gradient tensor is compressed via `zlib` and digitally signed by the node's HSM / PKI private key:
-
-  $$\mathrm{Signature} = \operatorname{Sign}_{K_{\mathrm{private}}}\Big(\mathrm{round\text{-}id} \mathbin{\Vert} \mathrm{bank\text{-}id} \mathbin{\Vert} \mathrm{SHA\text{-}256}(\mathrm{compressed\text{-}gradient})\Big)$$
-
+  $$\text{Signature} = \text{Sign}_{K_{\text{private}}}\Big(\text{round-id} \mathbin{\Vert} \text{bank-id} \mathbin{\Vert} \text{SHA-256}(\text{compressed-gradient})\Big)$$
 
 ### 2. PostgreSQL Engine-Level Schema Isolation
 - **Dedicated Schema**: `CREATE SCHEMA IF NOT EXISTS tenant_{bank_id}` ensures physical table separation.

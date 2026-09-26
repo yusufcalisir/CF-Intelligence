@@ -142,7 +142,7 @@ class DataPreprocessor:
         else:
             df = X.copy()
 
-        transformed_cols: list[np.ndarray] = []
+        transformed_cols: list[Any] = []
 
         # 1. Transform numeric columns
         for col in self.numeric_cols:

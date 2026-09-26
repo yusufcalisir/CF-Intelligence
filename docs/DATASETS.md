@@ -56,14 +56,8 @@ storage/datasets/
   - `step`: Time unit in hours ($1 \le t \le 744$, covering 30 simulated calendar days).
   - One-hot transaction types: `type_TRANSFER`, `type_CASH_OUT`, `type_PAYMENT`, `type_DEBIT`, `type_CASH_IN`.
   - Account balance deltas:
-
-    $$
-    \begin{aligned}
-    \Delta \mathrm{bal}_{\mathrm{orig}} &= \mathrm{newbalanceOrig} + \mathrm{amount} - \mathrm{oldbalanceOrg} \\
-    \Delta \mathrm{bal}_{\mathrm{dest}} &= \mathrm{oldbalanceDest} + \mathrm{amount} - \mathrm{newbalanceDest}
-    \end{aligned}
-    $$
-
+    $$\Delta \mathrm{bal}_{\mathrm{orig}} = \mathrm{newbalanceOrig} + \mathrm{amount} - \mathrm{oldbalanceOrg}$$
+    $$\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount} - \mathrm{newbalanceDest}$$
   - Flagging zero-balance origins post-transaction (classic account drain signature).
 
 ### 3.2 IEEE-CIS Fraud Detection (Vesta Corporation)

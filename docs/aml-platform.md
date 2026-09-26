@@ -170,16 +170,14 @@ To satisfy national Financial Intelligence Unit (FIU) mandates (FinCEN, MASAK, F
 ### 2. Automated FinCEN SAR 2.0 XML Generation & Cryptographic Filing Hash
 * Transitions into `SAR_FILED` trigger [regulatory_reporter.py](../backend/app/application/services/regulatory_reporter.py) to compile case metadata, timeline events, investigator notes, and suspect hashes into a schema-compliant FinCEN BSA Suspicious Activity Report (SAR) XML file (`EFilingSubmission`).
 * All outputs are strictly validated against the official XML schema at [FinCEN_SAR_2.0.xsd](../backend/schemas/FinCEN_SAR_2.0.xsd), validating mandatory root tags, `<SubmissionHeader>`, `<ReportingInstitution>`, `<Subjects>`, `<SuspiciousActivityDetails>`, and `<Narrative>` structures.
-* Subject entities are strictly tokenized using Zero-PII privacy hashes; unlinked cases dynamically derive a deterministic HMAC digest ($(\mathrm{SHA\text{-}256}(\mathrm{prefix}_{\mathrm{subject}} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}}))[0:32]$) preventing static mock strings.
+* Subject entities are strictly tokenized using Zero-PII privacy hashes; unlinked cases dynamically derive a deterministic HMAC digest ($\mathrm{SHA\text{-}256}(\mathrm{prefix}_{\mathrm{subject}} \mathbin{\Vert} \mathrm{id}_{\mathrm{case}})_{[0:32]}$) preventing static mock strings.
 * Each filing is fingerprinted with an immutable SHA-256 cryptographic digest: $\mathcal{H}_{\mathrm{filing}} = \mathrm{SHA\text{-}256}(\mathcal{X}_{\mathrm{canonical}})$.
 * Generated filings are saved atomically under `storage/regulatory_filings/sar_{case_id}.xml` using temporary file creation and atomic rename (`os.replace`) protected by a reentrant mutex (`threading.RLock()`).
 * Endpoints are available via `/api/v1/cases/{case_id}/sar-report`, `/api/v1/cases/{case_id}/file-sar`, `/api/v1/cases/export/fincen-xml`, and dedicated compliance management routes `/api/v1/compliance/sar/*` (`/filings`, `/validate`, `/generate`, `/{filing_id}`).
 
 ### 3. Cryptographic Timeline Audit Chain
 * Events are bound using sequential SHA-256 block hashing:
-
-  $$H_i = \mathrm{SHA\text{-}256}(\mathrm{timestamp} \mathbin{\Vert} \mathrm{type} \mathbin{\Vert} \mathrm{description} \mathbin{\Vert} \mathrm{actor} \mathbin{\Vert} H_{i-1})$$
-
+  $$H_i = \text{SHA-256}(\text{timestamp} \mathbin{\Vert} \text{type} \mathbin{\Vert} \text{description} \mathbin{\Vert} \text{actor} \mathbin{\Vert} H_{i-1})$$
 * Enforces an append-only, tamper-proof record of all investigator actions and status transitions, ensuring legal defensibility.
 
 ---
@@ -266,9 +264,7 @@ To align institutional incentives and enforce accountability across commercial f
 * **Adversarial Evasion Stress Tests (FGSM & PGD)**: Generates 1-step Fast Gradient Sign Method and 5-step Projected Gradient Descent perturbations bounded by $L_\infty \in [0.01, 0.25]$.
 * **Tabular Constraint Projection ($\Pi_{\mathcal{X}}$)**: Enforces non-negativity and domain feature limits on perturbed inputs to preserve financial validity.
 * **Robust Training Formulation**: Blends clean and adversarial loss during local SGD iterations:
-
-  $$\mathcal{L}_{\mathrm{total}} = \lambda \mathcal{L}(f_\theta(x_{\mathrm{clean}}), y) + (1-\lambda) \mathcal{L}(f_\theta(x_{\mathrm{adv}}), y)$$
-
+  $$\mathcal{L}_{\text{total}} = \lambda \mathcal{L}(f_\theta(x_{\text{clean}}), y) + (1-\lambda) \mathcal{L}(f_\theta(x_{\text{adv}}), y)$$
   calculating clean vs robust accuracy under evasion attacks.
 
 ---

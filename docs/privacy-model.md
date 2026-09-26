@@ -51,10 +51,8 @@ The following assets are permanently bound to the local bank node's security dom
 
 ### 2.2 Data Transmitted Outside the Bank
 Only mathematically transformed and blinded representations are permitted to transit the consortium network:
-- **Masked Perturbed Model Updates**:
-
+- **Masked Perturbed Model Updates**: 
   $$\widetilde{\Delta w}_k = \mathrm{Clip}_C(\Delta w_k) + \mathcal{N}\left(0, \sigma^2 C^2 \mathbf{I}\right) + \sum_{j > k} s_{k,j} - \sum_{j < k} s_{j,k}$$
-
   where $C$ is the L2 clipping norm, $\sigma$ is the DP noise multiplier, and $s_{k,j}$ are pairwise Diffie-Hellman zero-sum masks.
 - **Homomorphic Hash Commitments**: SHA-256 / Poseidon hash digests of weight vectors for Byzantine consensus verification.
 - **Consortium Metadata**: Bank node identifier, protocol version, active model epoch identifier, and sample count (if participating in weighted FedAvg, protected by differential privacy count perturbation).

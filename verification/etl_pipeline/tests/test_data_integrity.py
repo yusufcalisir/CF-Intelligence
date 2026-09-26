@@ -83,7 +83,7 @@ def test_absence_of_data_snooping_in_scaling() -> None:
 
     # Check scaled values strictly reflect test values scaled using train parameters
     expected_scaled = (X_test_shifted["feat"].to_numpy(dtype=np.float32) - train_mean) / train_std
-    np.testing.assert_allclose(X_test_scaled[:, 0], expected_scaled, rtol=1e-5)
+    np.testing.assert_allclose(np.asarray(X_test_scaled[:, 0], dtype=np.float32), expected_scaled, rtol=1e-5)
 
     # Verify clipped mode bounds extreme outliers to clip_std_factor
     prep_clipped = DataPreprocessor(numeric_strategy="standardize", clip_outliers=True, clip_std_factor=6.0)

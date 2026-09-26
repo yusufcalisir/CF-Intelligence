@@ -43,14 +43,8 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Key Fraud Mechanics**:
   Fraudsters execute unauthorized `TRANSFER` actions followed immediately by `CASH_OUT` to liquidate illicit funds. The source account balance is systematically depleted to zero.
 * **Engineered Discrepancy Features**:
-
-  $$
-  \begin{aligned}
-  \mathrm{ErrorBal}_{\mathrm{orig}} &= \mathrm{NewBal}_{\mathrm{orig}} + \mathrm{Amount} - \mathrm{OldBal}_{\mathrm{orig}} \\
-  \mathrm{ErrorBal}_{\mathrm{dest}} &= \mathrm{OldBal}_{\mathrm{dest}} + \mathrm{Amount} - \mathrm{NewBal}_{\mathrm{dest}}
-  \end{aligned}
-  $$
-
+  $$\text{ErrorBal}_{\text{orig}} = \text{NewBal}_{\text{orig}} + \text{Amount} - \text{OldBal}_{\text{orig}}$$
+  $$\text{ErrorBal}_{\text{dest}} = \text{OldBal}_{\text{dest}} + \text{Amount} - \text{NewBal}_{\text{dest}}$$
 * **Implementation**: [`dataloader.py: load_paysim()`](../backend/app/application/services/dataloader.py#L221)
 
 ---
@@ -98,9 +92,9 @@ In privacy-preserving federated fraud detection and AML research, standard synth
   * $\alpha = 0.50$: Extreme Non-IID skew mirroring retail vs. commercial vs. wealth management institutions.
 * **Implementation**: [`fl_dirichlet_partitioner.py: DirichletPartitioner`](../backend/app/application/services/fl_dirichlet_partitioner.py) & [`dataloader.py: partition_dataset_non_iid()`](../backend/app/application/services/dataloader.py#L480)
 * **Statistical Verification (`compute_partition_stats`)**:
-  - Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c \lvert P_i(c) - P_{\mathrm{global}}(c) \rvert \in [0, 1]$).
+  - Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c |P_i(c) - P_{\text{global}}(c)| \in [0, 1]$).
   - Shannon Label Entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$).
-  - Boundary Donor Rebalancing: Strictly guarantees $\lvert D_i \rvert \ge \mathrm{size}_{\mathrm{min}}$ without distorting natural Dirichlet concentration.
+  - Boundary Donor Rebalancing: Strictly guarantees $|D_i| \ge \mathrm{size}_{\mathrm{min}}$ without distorting natural Dirichlet concentration.
 
 ---
 
@@ -140,10 +134,8 @@ The [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fide
    $$JS(P \parallel Q) = \frac{1}{2} D_{\text{KL}}\left(P \parallel \frac{P+Q}{2}\right) + \frac{1}{2} D_{\text{KL}}\left(Q \parallel \frac{P+Q}{2}\right) \in [0, 1]$$
 3. **Kolmogorov-Smirnov Test ($D_{\text{KS}}, p\text{-value}$)**:
    $$D_{\text{KS}} = \sup_x |F_{\text{real}}(x) - F_{\text{synth}}(x)|$$
-4. **Performance Degradation Index ($\Delta_{\mathrm{deg}}$)**:
-
-   $$\Delta_{\mathrm{PR\text{-}AUC}} = \mathrm{PR\text{-}AUC}_{\mathrm{real\text{-}world}} - \mathrm{PR\text{-}AUC}_{\mathrm{synthetic\text{-}lab}} = 0.8420 - 0.9420 = -0.1000$$
-
+4. **Performance Degradation Index ($\Delta_{\text{deg}}$)**:
+   $$\Delta_{\text{PR-AUC}} = \text{PR-AUC}_{\text{real-world}} - \text{PR-AUC}_{\text{synthetic-lab}} = 0.8420 - 0.9420 = -0.1000$$
 
 ---
 
@@ -162,11 +154,11 @@ PREDICTED             ├──────────────┼───�
 ```
 
 ### Financial Cost-Utility Function:
-$$\mathrm{Cost}_{\mathrm{Total}}(\tau) = \left( \mathrm{FN}(\tau) \cdot C_{\mathrm{FN}} \right) + \left( \mathrm{FP}(\tau) \cdot C_{\mathrm{FP}} \right) + \left( \mathrm{TP}(\tau) \cdot C_{\mathrm{TP}} \right)$$
+$$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right) + \left( FP(\tau) \cdot C_{\text{FP}} \right) + \left( TP(\tau) \cdot C_{\text{TP}} \right)$$
 
-* $C_{\mathrm{FN}} = 850\text{ USD}$ (Direct unrecovered dollar chargeback per missed fraud).
-* $C_{\mathrm{FP}} = 18\text{ USD}$ (Customer SMS/OTP friction, phone support, blocked card re-issuance).
-* $C_{\mathrm{TP}} = 6\text{ USD}$ (Compliance analyst SAR triage & FinCEN automated filing review).
+* $C_{\text{FN}} = \$850$ (Direct unrecovered dollar chargeback per missed fraud).
+* $C_{\text{FP}} = \$18$ (Customer SMS/OTP friction, phone support, blocked card re-issuance).
+* $C_{\text{TP}} = \$6$ (Compliance analyst SAR triage & FinCEN automated filing review).
 
 ---
 

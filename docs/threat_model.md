@@ -238,7 +238,7 @@ With default settings (ε=1.0, δ=1e-5) over 10 rounds:
 | Private Set Intersection (PSI) | Simulated DH-PSI / **Secure TEE Enclave Matching** | **Hardware Enclave (Intel SGX)** or Multi-party Computation (MPC) |
 | DP accounting & Budgeting | Basic composition + **Strict Budget Limit Gating** | Rényi DP (moments accountant) + Budget limits |
 | Byzantine resilience | **Krum / Median Implemented** | Krum / Trimmed Mean |
-| Audit logging & Vulnerability Audits | **SHA-256 Cryptographic Hash Chain Ledger** ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) | Tamper-evident audit trail + Real-time vulnerability scanning |
+| Audit logging & Vulnerability Audits | **SHA-256 Cryptographic Hash Chain Ledger ($H_i = \text{SHA256}(L_i \Vert H_{i-1})$)** | Tamper-evident audit trail + Real-time vulnerability scanning |
 | Key management & Secrets | **HashiCorp Vault KV v2 Secret Engine Client** | HSM-backed key infrastructure / HashiCorp Vault |
 
 This gap analysis is intentional — the simulator demonstrates the concepts and simulates hardware constraints. Production deployment requires hardening each layer.
@@ -253,7 +253,7 @@ The system architecture and interfaces are mapped against the **STRIDE** securit
 |:---|:---|:---|:---|:---|
 | **Spoofing** | A compromised or malicious node masquerades as a verified participating bank to send false parameters or steal global weights, or exploits listening client ports. | FL Aggregation Coordinator, Client Network Interface | **mTLS 1.3 X.509 PKI** with SAN verification, HashiCorp Vault Root CA (`init_vault_pki.py`), dynamic cert rotation (`mtls_manager.py`), OIDC JWT validation, and **Zero-Inbound Port Standalone Bank Client Daemon (`cfi-bank-client`)** initiating outbound-only egress mTLS streams to coordinator port `50051` (zero listening ports on client subnet). | Certificate revocation propagation latency. |
 | **Tampering** | A participant alters local parameters to degrade model performance (Model Poisoning) or inject backdoors. | Pytorch Training, FedAvg Engine | Byzantine-Robust aggregation (Krum, Coordinate-wise Median), **SHA-256 Cryptographic Audit Chain** | Attack scale threshold limits. If $>50\%$ of nodes are compromised, median fails. |
-| **Repudiation** | An attacker performs malicious actions (e.g., model poisoning) and denies execution due to lack of non-repudiation logs. | Microservices Gateway | **Tamper-Proof SHA-256 Audit Chain** ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) with 1-click retrospective verification | Offline ledger backup frequency. |
+| **Repudiation** | An attacker performs malicious actions (e.g., model poisoning) and denies execution due to lack of non-repudiation logs. | Microservices Gateway | **Tamper-Proof SHA-256 Audit Chain ($H_i = \text{SHA256}(L_i \Vert H_{i-1})$)** with 1-click retrospective verification | Offline ledger backup frequency. |
 | **Information Disclosure** | Passive intercept of model weights allows gradient inversion, reconstructing raw transaction features or identity fields. | Network Gateway, Aggregation Engine | Differential Privacy (L2 clipping + noise), Secure Aggregation masking, **HashiCorp Vault KV v2 & PKI Secrets Engine Isolation** | Basic composition limits budget tracking. Requires advanced accounting. |
 | **Denial of Service** | A client drops offline or sends malformed weights, stalling coordinator aggregation routines. | flower_engine, Celery Workers | Quorum checks ($\ge$ Min Clients), timeout intervals, fallback state | Distributed denial of service on gateway endpoints. |
 | **Elevation of Privilege** | An unauthorized client gains access to case management records or starts scenarios via gateway. | gateway API router | **Dynamic ABAC Engine** (multi-tenant bank isolation, shift hour restrictions, approval tier limits, clearance levels), OIDC JWT claims | Policy misconfiguration risks. |
@@ -546,7 +546,7 @@ The Hardware Security Module Key Vault Engine (`hsm_signer.py`) anchors node pri
 * **Threat**: Adversary with root privileges on the bank node host attempts to extract private RSA-4096 or Ed25519 signing keys from container RAM or disk storage.
 * **Mitigations**:
   * **Zero-Disk Private Key Architecture (`HSMSignerEngine`)**: Private signing keys are generated directly inside FIPS 140-2 Level 3 hardware enclaves (`generate_key_pair`) with `is_exportable = False`.
-  * **In-Hardware Execution**: All digital signature operations ($S = \operatorname{Sign}_{\mathrm{HSM}}(H)$) execute within the hardware enclave boundaries via PKCS#11 standard calls (`sign_digest`). Plaintext private key material never touches host disk, swap, or container memory.
+  * **In-Hardware Execution**: All digital signature operations ($S = \text{Sign}_{\text{HSM}}(H)$) execute within the hardware enclave boundaries via PKCS#11 standard calls (`sign_digest`). Plaintext private key material never touches host disk, swap, or container memory.
 
 ### 17.2 Unauthorized Key Usage & Key Handle Forgery (Tampering & Elevation of Privilege)
 * **Threat**: Rogue process attempts to sign arbitrary payloads using unassigned HSM key handles.
