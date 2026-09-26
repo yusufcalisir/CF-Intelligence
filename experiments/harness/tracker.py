@@ -78,13 +78,27 @@ def _discover_git_info() -> tuple[str, str]:
     return commit, branch
 
 
-def _decimate_curve(x: Sequence[float], y: Sequence[float], max_points: int = 100) -> tuple[list[float], list[float]]:
+def _decimate_curve(
+    x: Sequence[float] | np.ndarray,
+    y: Sequence[float] | np.ndarray,
+    max_points: int = 100,
+) -> tuple[list[float], list[float]]:
     """Decimate curve coordinates to max_points while preserving endpoints."""
-    if len(x) <= max_points:
-        return [round(float(v), 6) for v in x], [round(float(v), 6) for v in y]
-    indices = np.linspace(0, len(x) - 1, max_points, dtype=int)
-    dec_x = [round(float(x[i]), 6) for i in indices]
-    dec_y = [round(float(y[i]), 6) for i in indices]
+    def _to_clean_float(v: Any) -> float:
+        try:
+            val = float(v)
+            if np.isinf(val) or np.isnan(val):
+                return 1.0
+            return round(val, 6)
+        except (ValueError, TypeError):
+            return 1.0
+
+    n = len(x)
+    if n <= max_points:
+        return [_to_clean_float(v) for v in x], [_to_clean_float(v) for v in y]
+    indices = np.linspace(0, n - 1, max_points, dtype=int)
+    dec_x = [_to_clean_float(x[int(i)]) for i in indices]
+    dec_y = [_to_clean_float(y[int(i)]) for i in indices]
     return dec_x, dec_y
 
 
