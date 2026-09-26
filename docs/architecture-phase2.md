@@ -499,8 +499,14 @@ To move beyond heuristic relationship weights, the platform introduces a **Feder
 
 1. **Local Graph Representation**: Each bank constructs a graph mapping its entities to a 12-dimensional numerical feature representation (entity types, risk levels, alert logs, local degrees, and activity recency).
 2. **GraphSAGE Model**: A 2-layer GraphSAGE architecture performs message-passing:
-   $$\mathbf{h}_{\mathcal{N}(v)}^{(k)} = \text{AGGREGATE}\left(\{\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\}\right)$$
-   $$\mathbf{h}_v^{(k)} = \sigma\left(\mathbf{W}^{(k)} \cdot \left[\mathbf{h}_v^{(k-1)} \,\|\, \mathbf{h}_{\mathcal{N}(v)}^{(k)}\right]\right)$$
+
+   $$
+   \begin{aligned}
+   \mathbf{h}_{\mathcal{N}(v)}^{(k)} &= \operatorname{AGGREGATE}\left(\left\{\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\right\}\right) \\
+   \mathbf{h}_v^{(k)} &= \sigma\left(\mathbf{W}^{(k)} \cdot \left[\mathbf{h}_v^{(k-1)} \mathbin{\Vert} \mathbf{h}_{\mathcal{N}(v)}^{(k)}\right]\right)
+   \end{aligned}
+   $$
+
 3. **Federated Aggregation**: Only GNN parameters ($\mathbf{W}^{(k)}$ projection weights) are sent to the coordinator. The coordinator aggregates GNN parameters using Krum or FedAvg, then redistributes the global GNN.
 4. **Downstream Analytics**:
    - **Embedding-Enhanced Propagation**: Connected node risk transfer weights are calculated dynamically using cosine similarity of GNN embeddings rather than hardcoded heuristics.

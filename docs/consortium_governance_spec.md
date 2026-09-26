@@ -47,9 +47,9 @@ The Federated Consortium Governance engine ([`ConsortiumGovernanceService`](../b
 
 A governance proposal evaluates member votes dynamically across the consortium's active voting membership:
 
-$$\mathrm{ratio}_{\mathrm{for}} = \frac{|\mathcal{V}_{\mathrm{for}}|}{N_{\mathrm{members}}}, \quad \mathrm{ratio}_{\mathrm{against}} = \frac{|\mathcal{V}_{\mathrm{against}}|}{N_{\mathrm{members}}}$$
+$$\mathrm{ratio}_{\mathrm{for}} = \frac{\lvert \mathcal{V}_{\mathrm{for}} \rvert}{N_{\mathrm{members}}}, \quad \mathrm{ratio}_{\mathrm{against}} = \frac{\lvert \mathcal{V}_{\mathrm{against}} \rvert}{N_{\mathrm{members}}}$$
 
-where $|\mathcal{V}_{\mathrm{for}}|$ is the tally of affirmative votes (`votes_for`), $|\mathcal{V}_{\mathrm{against}}|$ is the tally of dissenting votes (`votes_against`), and $N_{\mathrm{members}}$ is the active voting member count.
+where $\lvert \mathcal{V}_{\mathrm{for}} \rvert$ is the tally of affirmative votes (`votes_for`), $\lvert \mathcal{V}_{\mathrm{against}} \rvert$ is the tally of dissenting votes (`votes_against`), and $N_{\mathrm{members}}$ is the active voting member count.
 
 - **Approval Condition:** If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$ (where $\theta_{\mathrm{quorum}}$ is the required quorum ratio, e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
 - **Rejection Condition:** If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, the proposal transitions to `REJECTED`.
@@ -101,13 +101,19 @@ class ProposalStatus(str, Enum):
      - `new_status`: transitions consortium status (`ACTIVE`, `SUSPENDED`, `ARCHIVED`).
 
 ### Weighted Quorum Evaluation Engine
-Votes are evaluated based on institutions' allocated stake weights ($\mathrm{voting\_power} \ge 0.0$):
-$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
-$$\mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M},\, m.\mathrm{can\_vote}} \mathrm{power}(m)}$$
+
+Votes are evaluated based on institutions' allocated stake weights ($\mathrm{power}_{\mathrm{vote}} \ge 0.0$):
+
+$$
+\begin{aligned}
+\mathrm{ratio}_{\mathrm{for}} &= \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{voting}}} \mathrm{power}(m)} \\
+\mathrm{ratio}_{\mathrm{against}} &= \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{voting}}} \mathrm{power}(m)}
+\end{aligned}
+$$
 
 - **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$, status transitions to `APPROVED` and action is executed.
 - **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.
-- **TTL Expiration**: If $\mathrm{elapsed\_time} \ge \mathrm{ttl\_seconds}$ (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
+- **TTL Expiration**: If $t_{\mathrm{elapsed}} \ge t_{\mathrm{TTL}}$ (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
 - **Sponsor Cancellation**: The proposing bank can voluntarily withdraw a pending proposal before resolution, transitioning state to `CANCELLED`.
 - **Role Hierarchy**: `OBSERVER` institutions have $\mathrm{power} = 0.0$ and cannot sponsor proposals or cast votes.
 

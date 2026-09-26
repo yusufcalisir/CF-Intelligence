@@ -20,11 +20,11 @@ To scientifically validate the contractual disaster recovery guarantees in [`doc
 ├───────────────────────────────────┬──────────────────────┬─────────────┬───────────────┤
 │ METRIC / SLA DIMENSION            │ CONTRACTUAL SLA      │ MEASURED    │ VERDICT       │
 ├───────────────────────────────────┼──────────────────────┼─────────────┼───────────────┤
-│ Recovery Time Objective (RTO)     │ ≤ 30.00 seconds      │ 15.02 sec   │ COMPLIANT (✓) │
-│ Recovery Point Objective (RPO)    │ 0 records lost       │ 0 lost      │ COMPLIANT (✓) │
+│ Recovery Time Objective (RTO)     │ <= 30.00 seconds     │ 15.02 sec   │ COMPLIANT [OK]│
+│ Recovery Point Objective (RPO)    │ 0 records lost       │ 0 lost      │ COMPLIANT [OK]│
 │ Total Transactions Processed      │ 1,000 txns (500 tps) │ 1,000 txns  │ 100% Retained │
 │ Automated Service Credit Penalty  │ 0%                   │ 0.00%       │ Compliant     │
-│ Immutable Audit Trail Logged      │ SHA-256 Chained      │ VERIFIED    │ Appended (✓)  │
+│ Immutable Audit Trail Logged      │ SHA-256 Chained      │ VERIFIED    │ APPENDED [OK] │
 └───────────────────────────────────┴──────────────────────┴─────────────┴───────────────┘
 ```
 

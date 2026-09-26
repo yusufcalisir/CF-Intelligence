@@ -11,15 +11,15 @@ The SLA Contract Engine monitors enterprise Service Level Agreements ($99.9\%$ u
 | **Uptime Availability (SLA)** | $\ge 99.90\%$ monthly | Calendar Month ($\approx 43.8\text{ min}$ max downtime) | 10% invoice credit discount per breach tier | Prometheus availability probe |
 | **Inference Latency ($p99$ SLO)** | $< 100.0\text{ ms}$ | Continuous 5-minute sliding window | Heuristic Circuit Breaker auto-failover | `sla_monitor.py` / Locust load runner |
 | **Median Latency ($p50$ SLO)** | $< 60.0\text{ ms}$ | Continuous 5-minute sliding window | Dynamic worker scaling alert | OpenTelemetry OTLP tracing |
-| **Recovery Time Objective (RTO)**| $< 30.0\text{ seconds}$ | Regional failure event | Standby region automatic promotion | `MultiRegionFailoverManager` |
-| **Recovery Point Objective (RPO)**| $0\text{ transactions lost}$ | Synchronous Raft replication | Zero state rollback guarantee | `BackupVerifier` |
+| **Recovery Time Objective (RTO)**| $< 30.0\text{ s}$ | Regional failure event | Standby region automatic promotion | `MultiRegionFailoverManager` |
+| **Recovery Point Objective (RPO)**| 0 transactions lost | Synchronous Raft replication | Zero state rollback guarantee | `BackupVerifier` |
 
 ---
 
 ## 📉 Error Budget Consumption & Penalty Calculation
 
 1. **Error Budget Tracking**:
-   $$\text{Error Budget Remaining \%} = \frac{(100\% - \text{Target \%}) - (100\% - \text{Measured Uptime \%})}{100\% - \text{Target \%}} \times 100$$
+   $$\mathrm{Error\ Budget\ Remaining\ (\%)} = \frac{(100\% - \text{Target \%}) - (100\% - \text{Measured Uptime \%})}{100\% - \text{Target \%}} \times 100$$
 
 2. **Automated Penalty Accounting**:
    - If measured monthly availability $< 99.9\%$, `SLAContractEngine.generate_monthly_penalty_report()` automatically compiles a signed `PenaltyReport` allocating a **10% credit discount** against the member institution's monthly consortium dues.

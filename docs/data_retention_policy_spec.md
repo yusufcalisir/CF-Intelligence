@@ -93,7 +93,9 @@ Every purge or RTBF execution produces a signed `ErasureAuditRecord`:
 - `category`: [`DataCategory`](../backend/app/domain/retention_policy.py) enum value.
 - `records_erased_count`: Actual count of physically purged SQL rows (`rowcount`).
 - `erasure_hash`: SHA-256 cryptographic digest computed as:
+
   $$\mathrm{SHA\text{-}256}(\mathrm{erasure}_{\mathrm{id}} \mathbin{\Vert} \mathrm{tenant}_{\mathrm{id}} \mathbin{\Vert} \mathrm{category} \mathbin{\Vert} \mathrm{timestamp})$$
+
 - `timestamp`: UTC timestamp of the completed operation.
 
 Audit trails are queryable per tenant via:

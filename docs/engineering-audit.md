@@ -36,7 +36,7 @@ The audit inspected all components across the full repository footprint:
 │                       THREE-TIER SYSTEM CLASSIFICATION                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ TIER 1: PRODUCTION-ORIENTED CORE                                            │
-│ Fully operational, covered by unit/integration tests, zero-mock execution:   │
+│ Fully operational, covered by unit/integration tests, zero-mock execution:  │
 │ - 9-Signal Composite Risk Scoring Engine (`risk_engine.py`)                 │
 │ - Real-Time Inference Gateway (`predict.py`, sub-15ms fast path)            │
 │ - Federated Learning Training Loop (FedAvg, FedProx, SCAFFOLD)              │
@@ -45,18 +45,18 @@ The audit inspected all components across the full repository footprint:
 │ - Byzantine Consensus Aggregators (Krum, Coordinate-wise Trimmed Mean,      │
 │   Bulyan, Spectral SVD backdoor filter)                                     │
 │ - PyTorch GraphSAGE Relational Graph Intelligence                           │
-│ - SHAP Model Explainability (`KernelExplainer`, Counterfactual Analysis)     │
+│ - SHAP Model Explainability (`KernelExplainer`, Counterfactual Analysis)    │
 │ - SSRF Perimeter Defense & RFC 1918 Private IP Rejection                    │
 │ - BOLA / IDOR Cross-Tenant Isolation Enforcement                            │
 │ - UNODC goAML 4.0 XML & EU AMLA Interoperability Generator                  │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ TIER 2: RESEARCH / EXPERIMENTAL PROTOTYPES                                  │
-│ Demonstrates cryptographic/algorithmic feasibility; requires specialized     │
+│ Demonstrates cryptographic/algorithmic feasibility; requires specialized    │
 │ hardware or commercial SDKs for production deployment:                      │
 │ - TenSEAL Microsoft SEAL CKKS Homomorphic Encryption (`fhe_driver.py`)      │
-│ - Groth16 zk-SNARK Attestation Verifier over BN254 (`zk_snark_verifier.py`)  │
+│ - Groth16 zk-SNARK Attestation Verifier over BN254 (`zk_snark_verifier.py`) │
 │ - Software-Emulated TEE Attestation Driver (`tee_driver.py`)                │
-│ - Post-Quantum Kyber-768 SecAgg Prototype (`pqc_secagg_driver.py`)         │
+│ - Post-Quantum Kyber-768 SecAgg Prototype (`pqc_secagg_driver.py`)          │
 │ - EVM Smart Contract Settlement & L2 Cross-Chain Bridge (`contracts/`)      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ TIER 3: DEMONSTRATIONS & CONSORTIUM SIMULATIONS                             │
