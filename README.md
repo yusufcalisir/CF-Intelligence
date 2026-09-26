@@ -20,7 +20,7 @@
 
 ### Architectural Specification Index
 
-| Core Production Architecture | Engineering Rationale & Validation | Research & Operations |
+| Core Production Architecture | Engineering Rationale & Validation | Research, Governance & Foundations |
 |:---|:---|:---|
 | [1. Executive Summary & Three-Tier Architecture](#1-executive-summary--architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Research & Exploratory Modules](#19-research--exploratory-modules) |
 | [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Prerequisites & System Requirements](#20-prerequisites-and-system-requirements) |
@@ -28,9 +28,9 @@
 | [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. AI Collaboration Methodology](#22-development-methodology--ai-collaboration) |
 | [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Subsystem Self-Verification](#17-subsystem-self-verification-reports-verification) | [23. Related Work & References](#23-related-work-and-references) |
 | [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--json-schemas) | [24. Citation](#24-academic-citation-and-reference-format) |
-| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | | [25. Author & Maintenance](#25-author-and-maintenance) |
-| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | | |
-| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | | |
+| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Author & Maintenance](#25-author-and-maintenance) |
+| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
+| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) |
 | [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | | |
 | [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |
 | [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
@@ -1298,6 +1298,10 @@ Using PyTorch Opacus and Rényi Differential Privacy (RDP) moments accounting, t
 | $\sigma = 0.4$ | $\epsilon = 17.323$ ($\delta=10^{-5}$) | **0.6205** | 0.9687 | Weak Privacy (Low Noise) |
 | $\sigma = 0.0$ | $\infty$ (Non-Private Baseline) | **0.6272** | 0.9684 | Zero Privacy (Pure Baseline) |
 
+<div align="center">
+  <img src="docs/figures/benchmark_privacy_utility.png" alt="Differential Privacy vs Model Utility Frontier" width="750" />
+</div>
+
 *Artifact: [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)*
 
 ---
@@ -1314,6 +1318,10 @@ Stress-testing the real-time scoring gateway under concurrent client loads ($C \
 | **100** | **4,821.6 req/s** | **10.33 ms** | **22.15 ms** | **26.95 ms** | 0.0% |
 | **250** | **4,789.8 req/s** | **18.22 ms** | **38.95 ms** | **49.06 ms** | 0.0% |
 | **500** | **4,450.8 req/s** | **27.03 ms** | **56.70 ms** | **71.99 ms** | 0.0% |
+
+<div align="center">
+  <img src="docs/figures/benchmark_latency_concurrency.png" alt="Inference Gateway Latency under Concurrency" width="800" />
+</div>
 
 *Artifact: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)*
 
@@ -1333,7 +1341,39 @@ Under concurrency ($C \ge 100$), the PyTorch forward pass itself takes $< 0.5\ma
 
 ---
 
-### 15.4 Real-World Open Benchmark Datasets
+### 15.4 Byzantine Adversarial Resilience & Model Poisoning Defense
+
+Evaluating model defenses against Byzantine client poisoning (Sign Inversion attack: 2 malicious nodes out of 10 clients submitting $\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$):
+
+| Aggregation Strategy | Test PR-AUC | Test ROC-AUC | Resilience Assessment |
+|:---|:---:|:---:|:---|
+| **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
+| **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
+| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | **Resilient** (99.7% of Clean PR-AUC) |
+| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | **Resilient** (98.5% of Clean PR-AUC) |
+| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | **Resilient** (95.9% of Clean PR-AUC) |
+
+<div align="center">
+  <img src="docs/figures/benchmark_byzantine_resilience.png" alt="Byzantine Attack Defense PR-AUC" width="750" />
+</div>
+
+*Artifact: [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json)*
+
+---
+
+### 15.5 Federated Optimization & Non-IID Convergence (`benchmarks/runners/run_fl_benchmark.py`)
+
+Evaluating optimization convergence under Dirichlet label skew ($\alpha = 0.50$):
+
+<div align="center">
+  <img src="docs/figures/benchmark_fl_convergence.png" alt="FL Strategy Convergence" width="850" />
+</div>
+
+*Artifact: [`benchmarks/results/raw/fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json)*
+
+---
+
+### 15.6 Real-World Open Benchmark Datasets
 
 Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates against canonical open benchmark datasets using precision-recall metrics suited for severe class imbalance:
 
@@ -1344,9 +1384,13 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (203k total / 46.5k labeled nodes, 234k edges) | **0.8746** | 0.2543 (`+0.6203`) | **80.6%** (`+28.2%`) | **-61.2% False Alarms** |
 | **[Credit Card Fraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)** | European Cards PCA (284k txns, LEAF $\alpha=0.50$) | **0.8250** | 0.6430 (`+0.1820`) | **59.8%** (`+20.1%`) | **-65.0% False Alarms** |
 
+<div align="center">
+  <img src="docs/figures/benchmark_auc_comparison.png" alt="Fraud Detection Performance AUC Comparison" width="750" />
+</div>
+
 ---
 
-### 15.5 Reproducible Benchmark CLI Commands
+### 15.7 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 

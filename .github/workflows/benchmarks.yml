@@ -1,0 +1,78 @@
+name: Reproducible Empirical Benchmarks Suite
+
+on:
+  workflow_dispatch:
+    inputs:
+      dataset:
+        description: 'Dataset to evaluate (paysim, ieee_cis, all)'
+        required: true
+        default: 'all'
+      concurrency_limit:
+        description: 'Maximum concurrency load for latency harness'
+        required: true
+        default: '500'
+  schedule:
+    # Run weekly on Sunday at 02:00 UTC
+    - cron: '0 2 * * 0'
+
+permissions:
+  contents: read
+
+jobs:
+  run-benchmarks:
+    name: Execute Empirical Benchmarks & Performance Harness
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install matplotlib scikit-learn
+
+      - name: Run Fraud Detection Benchmarks
+        run: |
+          python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --synthetic-eval
+          python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --synthetic-eval
+
+      - name: Run Federated Learning Convergence Benchmark
+        run: |
+          python benchmarks/runners/run_fl_benchmark.py --rounds 10 --alpha 0.5
+
+      - name: Run Differential Privacy Frontier Sweep
+        run: |
+          python benchmarks/runners/run_dp_tradeoff.py
+
+      - name: Run Byzantine Resilience Benchmark
+        run: |
+          python benchmarks/runners/run_byzantine_benchmark.py
+
+      - name: Run GraphSAGE Elliptic Benchmark
+        run: |
+          python benchmarks/runners/run_graph_benchmark.py
+
+      - name: Run Inference Gateway Latency Harness
+        run: |
+          python benchmarks/runners/run_latency_benchmark.py --mock-load
+
+      - name: Generate Publication Charts
+        run: |
+          python benchmarks/runners/generate_charts.py
+
+      - name: Archive Benchmark JSON & Chart Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-and-figures
+          path: |
+            benchmarks/results/raw/*.json
+            docs/figures/*.png

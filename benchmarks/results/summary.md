@@ -73,3 +73,39 @@
 | **Precision** | **0.9636** | High confidence on flagged suspicious entity accounts |
 | **Recall** | **0.3333** | Conservative threshold (p >= 0.5) prior to threshold tuning |
 | **F1-Score** | **0.4953** | Harmonic mean on minority illicit class |
+
+---
+
+## 5. Fraud Detection: Centralized vs Federated Baselines
+- **Runner**: `benchmarks/runners/run_fraud_benchmark.py`
+- **Raw Artifacts**: [`fraud_benchmark_paysim.json`](./raw/fraud_benchmark_paysim.json), [`fraud_benchmark_ieee_cis.json`](./raw/fraud_benchmark_ieee_cis.json)
+
+| Dataset | Evaluation Setting | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
+|:---|:---|:---:|:---:|:---:|:---:|:---:|
+| **PaySim** | Centralized Baseline | **0.4654** | 0.9891 | 0.4000 | 0.6000 | 0.6000 |
+| **PaySim** | Federated FedAvg (5 clients) | **0.1463** | 0.9712 | 0.2000 | 0.2000 | 0.2000 |
+| **IEEE-CIS** | Centralized Baseline | **0.7811** | 0.9892 | 0.3692 | 0.6154 | 0.6923 |
+| **IEEE-CIS** | Federated FedAvg (5 clients) | **0.7554** | 0.9859 | 0.4308 | 0.6308 | 0.6769 |
+
+---
+
+## 6. Federated Optimization Under Non-IID Label Skew
+- **Runner**: `benchmarks/runners/run_fl_benchmark.py`
+- **Experimental Setup**: 5 Clients, Dirichlet parameter $\alpha = 0.5$ (severe class imbalance skew across clients), 10 communication rounds.
+- **Raw Artifact**: [`fl_comparison_alpha_0.5.json`](./raw/fl_comparison_alpha_0.5.json)
+
+| FL Strategy | Convergence PR-AUC (Round 1) | Final PR-AUC (Round 10) | Final ROC-AUC | Communication Volume (MB) |
+|:---|:---:|:---:|:---:|:---:|
+| **FedAvg** (McMahan et al., 2017) | 0.2602 | 0.0757 | 0.4347 | 0.147 MB |
+| **FedProx** ($\mu=0.01$; Li et al., 2020) | 0.0599 | 0.0548 | 0.2080 | 0.147 MB |
+| **SCAFFOLD** (Karimireddy et al., 2020) | 0.0595 | 0.0570 | 0.2448 | 0.147 MB |
+
+---
+
+## 7. Generated Visual Figures
+All benchmark runs automatically feed into [`benchmarks/runners/generate_charts.py`](../runners/generate_charts.py), generating 300 DPI publication-grade figures stored in `docs/figures/`:
+- `docs/figures/benchmark_auc_comparison.png`
+- `docs/figures/benchmark_fl_convergence.png`
+- `docs/figures/benchmark_privacy_utility.png`
+- `docs/figures/benchmark_byzantine_resilience.png`
+- `docs/figures/benchmark_latency_concurrency.png`

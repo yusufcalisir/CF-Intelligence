@@ -154,6 +154,37 @@ migrate-rollback: ## Rollback last migration
 	cd backend && alembic downgrade -1
 
 # ──────────────────────────────────────────────
+# Benchmarks & Reproducibility Suite
+# ──────────────────────────────────────────────
+
+benchmark: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts ## Run complete reproducible benchmark suite
+
+benchmark-fraud: ## Run PaySim & IEEE-CIS fraud detection benchmarks
+	python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --synthetic-eval
+	python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --synthetic-eval
+
+benchmark-fl: ## Run Federated Learning (FedAvg, FedProx, SCAFFOLD) benchmark
+	python benchmarks/runners/run_fl_benchmark.py --rounds 10 --alpha 0.5
+
+benchmark-dp: ## Run Differential Privacy privacy-utility tradeoff sweep
+	python benchmarks/runners/run_dp_tradeoff.py
+
+benchmark-byzantine: ## Run Byzantine resilience benchmark under model poisoning
+	python benchmarks/runners/run_byzantine_benchmark.py
+
+benchmark-graph: ## Run GraphSAGE inductive graph intelligence benchmark
+	python benchmarks/runners/run_graph_benchmark.py
+
+benchmark-latency: ## Run Inference Gateway concurrency and latency harness
+	python benchmarks/runners/run_latency_benchmark.py --mock-load
+
+generate-charts: ## Generate publication-grade figures from raw benchmark JSONs
+	python benchmarks/runners/generate_charts.py
+
+benchmark-security: ## Run comprehensive security regression test suite
+	python -m pytest backend/tests/unit/test_perimeter_waf.py backend/tests/unit/test_multi_tenancy.py -v
+
+# ──────────────────────────────────────────────
 # Utilities
 # ──────────────────────────────────────────────
 
