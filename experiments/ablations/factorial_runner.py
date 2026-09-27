@@ -199,13 +199,13 @@ class FactorialMLPClassifier(nn.Module if torch else object):  # type: ignore
 
     def __init__(self, input_dim: int = 22, hidden_dim: int = 48) -> None:
         super().__init__()
-        self.fc1 = nn.Linear(input_dim, hidden_dim)
-        self.ln1 = nn.LayerNorm(hidden_dim)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(hidden_dim, 1)
-        self.sigmoid = nn.Sigmoid()
+        self.fc1 = nn.Linear(input_dim, hidden_dim)  # type: ignore[union-attr]
+        self.ln1 = nn.LayerNorm(hidden_dim)  # type: ignore[union-attr]
+        self.relu = nn.ReLU()  # type: ignore[union-attr]
+        self.fc2 = nn.Linear(hidden_dim, 1)  # type: ignore[union-attr]
+        self.sigmoid = nn.Sigmoid()  # type: ignore[union-attr]
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: "torch.Tensor") -> "torch.Tensor":  # type: ignore[override]
         return self.sigmoid(self.fc2(self.relu(self.ln1(self.fc1(x)))))
 
 
@@ -780,7 +780,7 @@ def generate_factorial_ablation_plot(suite: FactorialAblationSuiteResult, output
             ax4.text(j, i, f"{val:.4f}\nPR-AUC", ha="center", va="center", color="black", fontweight="bold")
     plt.colorbar(im, ax=ax4, fraction=0.046, pad=0.04)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.95])
+    plt.tight_layout(rect=(0, 0, 1, 0.95))
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=300)
     plt.close()
