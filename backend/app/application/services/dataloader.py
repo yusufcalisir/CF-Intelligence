@@ -1867,7 +1867,12 @@ def _generate_mock_synthaml(
         rng = np.random.default_rng(42)
 
     logger.warning("[SynthAML] Generating synthetic fallback mock (%d alerts)...", n_mock_alerts)
+    import sys
     import tempfile
+
+    repo_root = Path(__file__).resolve().parents[4]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
 
     from scripts.generate_synthaml_dataset import generate_synthaml
 
@@ -2090,6 +2095,8 @@ def temporal_split_dataset(
         time_values = np.asarray(dataset_dict["transaction_dt"], dtype=np.float64)
     elif "steps" in dataset_dict and dataset_dict["steps"] is not None:
         time_values = np.asarray(dataset_dict["steps"], dtype=np.float64)
+    elif "timestamps" in dataset_dict and dataset_dict["timestamps"] is not None:
+        time_values = np.asarray(dataset_dict["timestamps"], dtype=np.float64)
 
     if time_values is None:
         if feature_names and time_col:
