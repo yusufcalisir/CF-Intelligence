@@ -92,6 +92,18 @@ def generate_auc_comparison(results_dir: Path, output_dir: Path):
 
 
 def generate_fl_convergence(results_dir: Path, output_dir: Path):
+    # Check if full multi-alpha Dirichlet sweep results exist
+    base_dir = results_dir.parents[1]
+    sweep_results_file = base_dir / "experiments" / "ablations" / "dirichlet_sweep_results.json"
+    if sweep_results_file.exists():
+        from experiments.ablations.dirichlet_sweep import generate_fl_convergence_plot
+        with open(sweep_results_file) as f:
+            sweep_data = json.load(f)
+        out_file = output_dir / "benchmark_fl_convergence.png"
+        generate_fl_convergence_plot(sweep_data, out_file)
+        print(f"[+] Saved 4-panel FL convergence figure: {out_file}")
+        return
+
     fl_file = results_dir / "fl_comparison_alpha_0.5.json"
     if not fl_file.exists():
         print("[!] No FL comparison data found, skipping convergence chart.")

@@ -43,6 +43,26 @@ In standard FedAvg, when local data distributions differ ($\nabla F_i(w^*) \neq 
 
 ---
 
-## 5. Test Suite Verification
+## 5. Non-IID Dirichlet Sweep Empirical Evaluation
+
+The platform evaluates SCAFFOLD against FedAvg and FedProx under varying degrees of Dirichlet label and feature skew $\alpha \in \{0.1, 0.5, 1.0\}$:
+- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](file:///experiments/ablations/dirichlet_sweep.py)
+- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](file:///experiments/ablations/audit_dossier.md)
+- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](file:///docs/figures/benchmark_fl_convergence.png)
+
+### Empirical Results Summary across 10 Federation Rounds
+
+| Skew Regime | Dirichlet $\alpha$ | SCAFFOLD PR-AUC | SCAFFOLD ROC-AUC | Validation Loss | Communication (MB) | Control Variate Overhead |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Pathological Extreme Skew** | $\alpha = 0.1$ | **0.2551** | 0.8600 | 0.0976 | 0.294 MB | $2.0\times$ bandwidth vs FedAvg |
+| **Moderate Consortium Skew** | $\alpha = 0.5$ | **0.2196** | 0.9175 | 0.0969 | 0.294 MB | Corrected local drift direction |
+| **Mild Statistical Skew** | $\alpha = 1.0$ | **0.2004** | 0.8901 | 0.1074 | 0.294 MB | Steady asymptotic convergence |
+
+*Key Takeaway*: SCAFFOLD successfully bounds client drift under non-IID heterogeneity by aligning local gradient updates $(g_k - c_k + c)$ with the consortium global consensus gradient. While it incurs double the payload per round ($92.30\text{ KB/round}$ per client), it achieves accelerated convergence under extreme statistical skew.
+
+---
+
+## 6. Test Suite Verification
 - **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
+- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](file:///backend/tests/unit/test_dirichlet_sweep.py)
 - **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)

@@ -204,6 +204,12 @@ if __name__ == "__main__":
     parser.add_argument("--rounds", type=int, default=10)
     parser.add_argument("--alpha", type=float, default=0.5)
     parser.add_argument("--dropout", type=float, default=0.0)
+    parser.add_argument("--sweep", action="store_true", help="Execute complete Dirichlet sensitivity sweep across alpha in {0.1, 0.5, 1.0}")
     args = parser.parse_args()
 
-    run_fl_experiment(rounds=args.rounds, dirichlet_alpha=args.alpha, dropout_rate=args.dropout)
+    if args.sweep:
+        from experiments.ablations.dirichlet_sweep import run_dirichlet_sensitivity_sweep
+
+        run_dirichlet_sensitivity_sweep(rounds=args.rounds, n_clients=5)
+    else:
+        run_fl_experiment(rounds=args.rounds, dirichlet_alpha=args.alpha, dropout_rate=args.dropout)

@@ -402,7 +402,7 @@ The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant)
 │   │   └── presentation/         # API controllers & WebSocket streams
 │   │       ├── routers/             # 42 modular FastAPI REST endpoints (incl. FININT, SEPA Recalls, Sanctions, goAML, Open AML Adapter, Corporate UBO, European AML Scenarios, Asset Recovery)
 │   │       └── websockets/          # Real-time alert & training WebSockets
-│   └── tests/                    # 2,765 automated unit, integration, & security tests
+│   └── tests/                    # 2,780 automated unit, integration, & security tests
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                  # TanStack Query clients & REST hooks
@@ -638,7 +638,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,765 automated backend tests (+ 310 scientific verification tests) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Prometheus/SIEM Telemetry Export, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,780 automated backend tests (+ 310 scientific verification tests) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Prometheus/SIEM Telemetry Export, and DR Failover |
 
 
 

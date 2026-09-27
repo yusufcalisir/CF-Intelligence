@@ -75,7 +75,10 @@ $$\operatorname{TVD}(P_k, P_{\mathrm{global}}) = \frac{1}{2} \sum_{c \in \{0, 1\
 
 ---
 
-## 6. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py), [`backend/tests/unit/test_dirichlet_partition.py`](file:///backend/tests/unit/test_dirichlet_partition.py)
+## 6. Test Suite Verification & Empirical Benchmarking
+- **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py), [`backend/tests/unit/test_dirichlet_partition.py`](file:///backend/tests/unit/test_dirichlet_partition.py), [`backend/tests/unit/test_dirichlet_sweep.py`](file:///backend/tests/unit/test_dirichlet_sweep.py)
 - **Partitioner Implementation**: [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py)
+- **Multi-Alpha Sweep Runner**: [`experiments/ablations/dirichlet_sweep.py`](file:///experiments/ablations/dirichlet_sweep.py)
+- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](file:///experiments/ablations/audit_dossier.md)
+- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](file:///docs/figures/benchmark_fl_convergence.png)
 - **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)

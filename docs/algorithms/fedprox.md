@@ -38,6 +38,26 @@ FedProx adds a proximal regularization term to the local objective function to c
 
 ---
 
-## 5. Test Suite Verification
+## 5. Non-IID Dirichlet Sweep Empirical Evaluation
+
+The platform evaluates FedProx ($\mu = 0.01$) against FedAvg and SCAFFOLD under varying degrees of Dirichlet label and feature skew $\alpha \in \{0.1, 0.5, 1.0\}$:
+- **Experiment Runner**: [`experiments/ablations/dirichlet_sweep.py`](file:///experiments/ablations/dirichlet_sweep.py)
+- **Empirical Dossier**: [`experiments/ablations/audit_dossier.md`](file:///experiments/ablations/audit_dossier.md)
+- **Publication Figure**: [`docs/figures/benchmark_fl_convergence.png`](file:///docs/figures/benchmark_fl_convergence.png)
+
+### Empirical Results Summary across 10 Federation Rounds
+
+| Skew Regime | Dirichlet $\alpha$ | FedProx PR-AUC | FedProx ROC-AUC | Validation Loss | Communication (MB) | Drift Suppression |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Pathological Extreme Skew** | $\alpha = 0.1$ | **0.2776** | 0.8628 | 0.0969 | 0.147 MB | Bounded ($\|w_k - w_t\|_2 \le 0.18$) |
+| **Moderate Consortium Skew** | $\alpha = 0.5$ | **0.2285** | 0.9185 | 0.0969 | 0.147 MB | Stable convergence |
+| **Mild Statistical Skew** | $\alpha = 1.0$ | **0.2180** | 0.8959 | 0.1068 | 0.147 MB | Baseline alignment |
+
+*Key Takeaway*: Under extreme statistical heterogeneity ($\alpha = 0.1$), FedProx restrains client gradient drift, preventing the loss oscillation characteristic of standard FedAvg without requiring the stateful control variate memory of SCAFFOLD.
+
+---
+
+## 6. Test Suite Verification
 - **Unit Tests**: [`backend/tests/unit/test_fl_engine.py`](file:///backend/tests/unit/test_fl_engine.py)
+- **Dirichlet Sensitivity Tests**: [`backend/tests/unit/test_dirichlet_sweep.py`](file:///backend/tests/unit/test_dirichlet_sweep.py)
 - **Benchmark Runner**: [`benchmarks/runners/run_fl_benchmark.py`](file:///benchmarks/runners/run_fl_benchmark.py)
