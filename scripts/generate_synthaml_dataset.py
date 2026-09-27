@@ -50,7 +50,7 @@ def generate_synthaml(
 
     # 1. Generate Alerts
     alert_ids = np.arange(1, n_alerts + 1)
-    n_pos = int(round(n_alerts * positive_ratio))
+    n_pos = round(n_alerts * positive_ratio)
 
     outcomes = np.zeros(n_alerts, dtype=int)
     pos_indices = rng.choice(n_alerts, size=n_pos, replace=False)

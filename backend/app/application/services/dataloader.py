@@ -136,9 +136,10 @@ def _make_elliptic_pyg_data(
         if test_labeled_mask is not None:
             data_dict["test_labeled_mask"] = torch.from_numpy(test_labeled_mask)
     try:
-        from torch_geometric.data import Data
-        return Data(**data_dict)
-    except ImportError:
+        import importlib
+        pyg_data_mod = importlib.import_module("torch_geometric.data")
+        return pyg_data_mod.Data(**data_dict)
+    except (ImportError, AttributeError):
         return data_dict
 
 
@@ -411,7 +412,7 @@ def load_elliptic(
                 df = None
 
         if df is None:
-            read_nrows = max(int(target_nrows) * 5, 2000) if (target_nrows and not all_rows) else None
+            read_nrows = max(target_nrows * 5, 2000) if (target_nrows and not all_rows) else None
             feat_df = pd.read_csv(features_csv, header=None, nrows=read_nrows)
             feat_df.rename(columns={0: "txId"}, inplace=True)
             feat_df["txId"] = feat_df["txId"].astype(str)
@@ -436,9 +437,10 @@ def load_elliptic(
             if not include_unknown:
                 df = df[c_str.isin(["1", "2"])].copy()
                 c_str = df[class_col].astype(str)
-                y = (c_str == "1").values.astype(int)
+                y: np.ndarray = np.asarray((c_str == "1").to_numpy(dtype=int))
             else:
-                y = np.where(c_str == "1", 1, np.where(c_str == "2", 0, -1)).astype(int)
+                c_arr = c_str.to_numpy()
+                y = np.where(c_arr == "1", 1, np.where(c_arr == "2", 0, -1)).astype(int)
         else:
             y = np.zeros(len(df), dtype=int)
 
@@ -448,24 +450,24 @@ def load_elliptic(
 
         # Extract features X: timestep (col 0) + 165 numeric features
         feature_cols = [c for c in df.columns if c not in ("txId", "class", "label")]
-        X = df[feature_cols].values.astype(np.float32)
+        X: np.ndarray = np.asarray(df[feature_cols].to_numpy(), dtype=np.float32)
 
         # Timesteps
         if "timestep" in df.columns:
-            timesteps = df["timestep"].values.astype(int)
+            timesteps: np.ndarray = np.asarray(df["timestep"].to_numpy(), dtype=int)
         elif X.shape[1] > 0:
-            timesteps = X[:, 0].astype(int)
+            timesteps = np.asarray(X[:, 0], dtype=int)
         else:
             timesteps = np.ones(len(y), dtype=int)
 
-        tx_ids = df["txId"].astype(str).values if "txId" in df.columns else np.array([str(i) for i in range(len(y))])
+        tx_ids: np.ndarray = np.asarray(df["txId"].astype(str).to_numpy(), dtype=str) if "txId" in df.columns else np.array([str(i) for i in range(len(y))])
         tx_to_idx = {tx_id: idx for idx, tx_id in enumerate(tx_ids)}
         idx_to_tx = {idx: tx_id for idx, tx_id in enumerate(tx_ids)}
 
         # Build graph topology
         edges: list[tuple[int, int]] = []
         if construct_graph and edges_csv.exists():
-            read_edge_rows = None if all_rows else (max(int(target_nrows) * 10, 5000) if target_nrows else None)
+            read_edge_rows = None if all_rows else (max(target_nrows * 10, 5000) if target_nrows else None)
             edge_df = pd.read_csv(edges_csv, nrows=read_edge_rows)
             src_col = edge_df.columns[0]
             dst_col = edge_df.columns[1]
@@ -474,9 +476,9 @@ def load_elliptic(
             dst_mapped = edge_df[dst_col].astype(str).map(tx_to_idx)
             valid = src_mapped.notna() & dst_mapped.notna()
 
-            src_arr = src_mapped[valid].astype(int).values
-            dst_arr = dst_mapped[valid].astype(int).values
-            edges = list(zip(src_arr.tolist(), dst_arr.tolist(), strict=False))
+            src_arr = np.asarray(src_mapped[valid].to_numpy(), dtype=np.int64)
+            dst_arr = np.asarray(dst_mapped[valid].to_numpy(), dtype=np.int64)
+            edges = [(int(u), int(v)) for u, v in zip(src_arr, dst_arr, strict=False)]
             edge_index = np.vstack([src_arr, dst_arr]).astype(np.int64) if len(edges) > 0 else np.zeros((2, 0), dtype=np.int64)
         else:
             edge_index = np.zeros((2, 0), dtype=np.int64)
@@ -491,10 +493,10 @@ def load_elliptic(
         labeled_mask = y != -1
         fraud_ratio = float(np.mean(y[labeled_mask] == 1)) if np.any(labeled_mask) else 0.0
 
-        train_mask = timesteps <= split_timestep if temporal_split else None
-        test_mask = timesteps > split_timestep if temporal_split else None
-        train_labeled_mask = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
-        test_labeled_mask = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
+        train_mask: np.ndarray | None = np.asarray(timesteps <= split_timestep) if temporal_split else None
+        test_mask: np.ndarray | None = np.asarray(timesteps > split_timestep) if temporal_split else None
+        train_labeled_mask: np.ndarray | None = (train_mask & (y != -1)) if (temporal_split and train_mask is not None and include_unknown) else train_mask
+        test_labeled_mask: np.ndarray | None = (test_mask & (y != -1)) if (temporal_split and test_mask is not None and include_unknown) else test_mask
 
         def to_pyg_data() -> Any:
             return _make_elliptic_pyg_data(
@@ -614,9 +616,10 @@ def _make_amlsim_pyg_data(
     if alert_types is not None:
         data_dict["alert_types"] = list(alert_types)
     try:
-        from torch_geometric.data import Data
-        return Data(**data_dict)
-    except ImportError:
+        import importlib
+        pyg_data_mod = importlib.import_module("torch_geometric.data")
+        return pyg_data_mod.Data(**data_dict)
+    except (ImportError, AttributeError):
         return data_dict
 
 
@@ -668,7 +671,7 @@ def _process_amlsim_dataframe(
     # 1. Label detection
     label_col = next((c for c in ["IS_FRAUD", "isFraud", "is_fraud", "Is Laundering", "is_laundering", "label"] if c in df.columns), None)
     if label_col is not None:
-        y = df[label_col].astype(bool).astype(int).values
+        y: np.ndarray = np.asarray(df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
     else:
         y = np.zeros(len(df), dtype=int)
 
@@ -705,14 +708,14 @@ def _process_amlsim_dataframe(
     tx_id_col = next((c for c in ["TX_ID", "tx_id", "transaction_id"] if c in df.columns), None)
 
     if sender_col and receiver_col and amount_col and step_col:
-        steps = df[step_col].fillna(0).values.astype(np.float32)
-        amounts = df[amount_col].fillna(0.0).values.astype(np.float32)
+        steps: np.ndarray = np.asarray(df[step_col].fillna(0).to_numpy(), dtype=np.float32)
+        amounts: np.ndarray = np.asarray(df[amount_col].fillna(0.0).to_numpy(), dtype=np.float32)
         if acc_map:
-            bal_orig = df[sender_col].map(acc_map).fillna(0.0).values.astype(np.float32)
-            bal_dest = df[receiver_col].map(acc_map).fillna(0.0).values.astype(np.float32)
+            bal_orig: np.ndarray = np.asarray(df[sender_col].map(acc_map).fillna(0.0).to_numpy(), dtype=np.float32)
+            bal_dest: np.ndarray = np.asarray(df[receiver_col].map(acc_map).fillna(0.0).to_numpy(), dtype=np.float32)
         elif "oldbalanceOrg" in df.columns and "oldbalanceDest" in df.columns:
-            bal_orig = df["oldbalanceOrg"].fillna(0.0).values.astype(np.float32)
-            bal_dest = df["oldbalanceDest"].fillna(0.0).values.astype(np.float32)
+            bal_orig = np.asarray(df["oldbalanceOrg"].fillna(0.0).to_numpy(), dtype=np.float32)
+            bal_dest = np.asarray(df["oldbalanceDest"].fillna(0.0).to_numpy(), dtype=np.float32)
         else:
             bal_orig = np.zeros(len(df), dtype=np.float32)
             bal_dest = np.zeros(len(df), dtype=np.float32)
@@ -720,35 +723,35 @@ def _process_amlsim_dataframe(
         new_bal_orig = (
             np.maximum(bal_orig - amounts, 0.0).astype(np.float32)
             if "newbalanceOrig" not in df.columns
-            else df["newbalanceOrig"].fillna(0.0).values.astype(np.float32)
+            else np.asarray(df["newbalanceOrig"].fillna(0.0).to_numpy(), dtype=np.float32)
         )
         new_bal_dest = (
             (bal_dest + amounts).astype(np.float32)
             if "newbalanceDest" not in df.columns
-            else df["newbalanceDest"].fillna(0.0).values.astype(np.float32)
+            else np.asarray(df["newbalanceDest"].fillna(0.0).to_numpy(), dtype=np.float32)
         )
 
         X = np.column_stack([steps, amounts, bal_orig, new_bal_orig, bal_dest, new_bal_dest])
         feature_names = AMLSIM_FEATURE_COLS
 
-        senders = df[sender_col].values
-        receivers = df[receiver_col].values
-        edges = list(zip(senders, receivers))
+        senders = np.asarray(df[sender_col].to_numpy(), dtype=np.int64)
+        receivers = np.asarray(df[receiver_col].to_numpy(), dtype=np.int64)
+        edges: list[tuple[int, int]] = [(int(u), int(v)) for u, v in zip(senders, receivers, strict=False)]
         edge_index = np.stack([senders, receivers], axis=0)
     else:
         available_cols = [c for c in AMLSIM_FEATURE_COLS if c in df.columns]
         if not available_cols:
             available_cols = [c for c in df.columns if c not in ("isFraud", "is_fraud", "IS_FRAUD", "label") and pd.api.types.is_numeric_dtype(df[c])]
-        X = df[available_cols].fillna(0).values.astype(np.float32)
+        X = np.asarray(df[available_cols].fillna(0).to_numpy(), dtype=np.float32)
         feature_names = available_cols
         edges = []
-        edge_index = np.zeros((2, 0), dtype=int)
+        edge_index = np.zeros((2, 0), dtype=np.int64)
         amounts = X[:, 1] if X.shape[1] > 1 else np.zeros(len(X), dtype=np.float32)
         steps = X[:, 0] if X.shape[1] > 0 else np.zeros(len(X), dtype=np.float32)
 
     fraud_ratio = float(np.mean(y == 1)) if len(y) > 0 else 0.0
-    tx_ids = df[tx_id_col].values if tx_id_col else np.arange(len(y))
-    timesteps = df[step_col].values.astype(np.int64) if step_col else np.zeros(len(y), dtype=np.int64)
+    tx_ids: np.ndarray = np.asarray(df[tx_id_col].to_numpy()) if tx_id_col else np.arange(len(y))
+    timesteps: np.ndarray = np.asarray(df[step_col].to_numpy(), dtype=np.int64) if step_col else np.zeros(len(y), dtype=np.int64)
 
     def to_pyg_data() -> Any:
         return _make_amlsim_pyg_data(X=X, y=y, edge_index=edge_index, timesteps=timesteps, alert_types=alert_types)
@@ -1341,8 +1344,8 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     transaction_dt: np.ndarray | None = None
     if "TransactionDT" in df.columns:
         dt_vals = np.asarray(df["TransactionDT"].values, dtype=np.float64)
-        df["dt_day"] = ((dt_vals // 86400) % 7).astype(np.float32)
-        df["dt_hour"] = ((dt_vals // 3600) % 24).astype(np.float32)
+        df["dt_day"] = pd.Series(((dt_vals // 86400) % 7).astype(np.float32), index=df.index)
+        df["dt_hour"] = pd.Series(((dt_vals // 3600) % 24).astype(np.float32), index=df.index)
         transaction_dt = dt_vals
 
     # 4. Amount log transformation
@@ -1765,7 +1768,7 @@ def _aggregate_synthaml_alert_features(
     """
     label_col = next((c for c in ["OUTCOME", "outcome", "is_fraud", "IS_FRAUD", "label"] if c in alerts_df.columns), None)
     if label_col is not None:
-        y = alerts_df[label_col].astype(bool).astype(int).values
+        y: np.ndarray = np.asarray(alerts_df[label_col].astype(bool).astype(int).to_numpy(), dtype=int)
     else:
         y = np.zeros(len(alerts_df), dtype=int)
 
@@ -1776,7 +1779,7 @@ def _aggregate_synthaml_alert_features(
     grouped = tx_df.groupby(tx_alert_col)
 
     feature_matrix: list[list[float]] = []
-    alert_ids = alerts_df[alert_id_col].values
+    alert_ids = alerts_df[alert_id_col].to_numpy()
 
     for aid in alert_ids:
         if aid in grouped.groups:
@@ -1805,13 +1808,13 @@ def _aggregate_synthaml_alert_features(
             # Size metrics (standardized log-DKK)
             size_col = next((c for c in ["SIZE", "size", "TX_AMOUNT", "amount"] if c in group.columns), None)
             if size_col:
-                sizes = group[size_col].astype(float).values
+                sizes = np.asarray(group[size_col].astype(float).to_numpy(), dtype=np.float64)
                 s_mean = float(np.mean(sizes))
                 s_max = float(np.max(sizes))
                 s_std = float(np.std(sizes)) if len(sizes) > 1 else 0.0
 
                 if entry_col:
-                    is_cr = (group[entry_col].astype(str).str.lower() == "credit").values
+                    is_cr = np.asarray((group[entry_col].astype(str).str.lower() == "credit").to_numpy(), dtype=bool)
                     cr_vol = float(np.sum(sizes[is_cr])) if np.any(is_cr) else 0.0
                     db_vol = float(np.sum(sizes[~is_cr])) if np.any(~is_cr) else 0.0
                 else:
@@ -1824,7 +1827,7 @@ def _aggregate_synthaml_alert_features(
             # Window temporal metrics
             ts_col = next((c for c in ["TIMESTAMP", "timestamp", "date", "DATE"] if c in group.columns), None)
             if ts_col and pd.api.types.is_numeric_dtype(group[ts_col]):
-                timestamps = group[ts_col].values
+                timestamps = np.asarray(group[ts_col].to_numpy(), dtype=np.float64)
                 span_sec = float(np.max(timestamps) - np.min(timestamps))
                 window_days = max(1.0 / 24.0, span_sec / 86400.0)
             else:
@@ -1851,7 +1854,7 @@ def _aggregate_synthaml_alert_features(
             # Fallback zero vector if no transactions found for alert
             feature_matrix.append([0.0] * len(SYNTHAML_FEATURE_COLS))
 
-    X = np.array(feature_matrix, dtype=np.float32)
+    X: np.ndarray = np.asarray(feature_matrix, dtype=np.float32)
     return X, y, SYNTHAML_FEATURE_COLS
 
 
