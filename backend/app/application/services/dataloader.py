@@ -1727,6 +1727,281 @@ def partition_dataset_non_iid(
 
 
 # ===========================================================================
+# SynthAML (Danish Spar Nord Bank Synthetic AML Benchmark - Nature Sci Data 2023)
+# ===========================================================================
+
+# Canonical SynthAML layout:
+#   synthetic_alerts.csv       — ALERT_ID, ACCOUNT_ID, DATE, TIMESTAMP, OUTCOME
+#   synthetic_transactions.csv — TRANSACTION_ID, ALERT_ID, ACCOUNT_ID, TIMESTAMP,
+#                                DATE, ENTRY, TYPE, SIZE, AMOUNT_DKK
+
+SYNTHAML_FEATURE_COLS = [
+    "n_transactions",
+    "credit_ratio",
+    "card_ratio",
+    "cash_ratio",
+    "international_ratio",
+    "wire_ratio",
+    "size_mean",
+    "size_max",
+    "size_std",
+    "total_credit_volume",
+    "total_debit_volume",
+    "net_flow",
+    "window_days",
+    "tx_frequency_per_day",
+]
+SYNTHAML_FRAUD_RATIO = 0.085  # ~8.5% in Spar Nord empirical baseline (Nature Sci Data 2023)
+
+
+def _aggregate_synthaml_alert_features(
+    alerts_df: pd.DataFrame,
+    tx_df: pd.DataFrame,
+) -> tuple[np.ndarray, np.ndarray, list[str]]:
+    """Aggregate lookback transaction sequences into alert-level tabular features.
+
+    Conforms to the benchmark feature pipeline described in:
+    "A synthetic data set to benchmark anti-money laundering methods" (DOI: 10.1038/s41597-023-02569-2).
+    """
+    label_col = next((c for c in ["OUTCOME", "outcome", "is_fraud", "IS_FRAUD", "label"] if c in alerts_df.columns), None)
+    if label_col is not None:
+        y = alerts_df[label_col].astype(bool).astype(int).values
+    else:
+        y = np.zeros(len(alerts_df), dtype=int)
+
+    alert_id_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in alerts_df.columns), "ALERT_ID")
+    tx_alert_col = next((c for c in ["ALERT_ID", "alert_id", "id"] if c in tx_df.columns), "ALERT_ID")
+
+    # Group transactions by alert ID
+    grouped = tx_df.groupby(tx_alert_col)
+
+    feature_matrix: list[list[float]] = []
+    alert_ids = alerts_df[alert_id_col].values
+
+    for aid in alert_ids:
+        if aid in grouped.groups:
+            group = grouped.get_group(aid)
+            n_tx = len(group)
+
+            # Directional entry
+            entry_col = next((c for c in ["ENTRY", "entry"] if c in group.columns), None)
+            if entry_col:
+                n_credits = (group[entry_col].astype(str).str.lower() == "credit").sum()
+                credit_ratio = float(n_credits / max(1, n_tx))
+            else:
+                credit_ratio = 0.5
+
+            # Transaction channels: card, cash, international, wire
+            type_col = next((c for c in ["TYPE", "type", "channel"] if c in group.columns), None)
+            if type_col:
+                types_lower = group[type_col].astype(str).str.lower()
+                card_ratio = float((types_lower == "card").sum() / max(1, n_tx))
+                cash_ratio = float((types_lower == "cash").sum() / max(1, n_tx))
+                intl_ratio = float((types_lower == "international").sum() / max(1, n_tx))
+                wire_ratio = float((types_lower == "wire").sum() / max(1, n_tx))
+            else:
+                card_ratio, cash_ratio, intl_ratio, wire_ratio = 0.5, 0.2, 0.1, 0.2
+
+            # Size metrics (standardized log-DKK)
+            size_col = next((c for c in ["SIZE", "size", "TX_AMOUNT", "amount"] if c in group.columns), None)
+            if size_col:
+                sizes = group[size_col].astype(float).values
+                s_mean = float(np.mean(sizes))
+                s_max = float(np.max(sizes))
+                s_std = float(np.std(sizes)) if len(sizes) > 1 else 0.0
+
+                if entry_col:
+                    is_cr = (group[entry_col].astype(str).str.lower() == "credit").values
+                    cr_vol = float(np.sum(sizes[is_cr])) if np.any(is_cr) else 0.0
+                    db_vol = float(np.sum(sizes[~is_cr])) if np.any(~is_cr) else 0.0
+                else:
+                    cr_vol = float(np.sum(sizes)) / 2.0
+                    db_vol = cr_vol
+                net_flow = float(cr_vol - db_vol)
+            else:
+                s_mean, s_max, s_std, cr_vol, db_vol, net_flow = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+
+            # Window temporal metrics
+            ts_col = next((c for c in ["TIMESTAMP", "timestamp", "date", "DATE"] if c in group.columns), None)
+            if ts_col and pd.api.types.is_numeric_dtype(group[ts_col]):
+                timestamps = group[ts_col].values
+                span_sec = float(np.max(timestamps) - np.min(timestamps))
+                window_days = max(1.0 / 24.0, span_sec / 86400.0)
+            else:
+                window_days = 30.0
+            tx_freq = float(n_tx / max(1.0, window_days))
+
+            feature_matrix.append([
+                float(n_tx),
+                credit_ratio,
+                card_ratio,
+                cash_ratio,
+                intl_ratio,
+                wire_ratio,
+                s_mean,
+                s_max,
+                s_std,
+                cr_vol,
+                db_vol,
+                net_flow,
+                window_days,
+                tx_freq,
+            ])
+        else:
+            # Fallback zero vector if no transactions found for alert
+            feature_matrix.append([0.0] * len(SYNTHAML_FEATURE_COLS))
+
+    X = np.array(feature_matrix, dtype=np.float32)
+    return X, y, SYNTHAML_FEATURE_COLS
+
+
+def _generate_mock_synthaml(
+    n_mock_alerts: int = 500,
+    rng: np.random.Generator | None = None,
+) -> dict[str, Any]:
+    """Generate high-fidelity synthetic mock of the SynthAML benchmark."""
+    if rng is None:
+        rng = np.random.default_rng(42)
+
+    logger.warning("[SynthAML] Generating synthetic fallback mock (%d alerts)...", n_mock_alerts)
+    import tempfile
+
+    from scripts.generate_synthaml_dataset import generate_synthaml
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        alerts_df, tx_df = generate_synthaml(tmp_dir, n_alerts=n_mock_alerts, seed=42)
+
+    X, y, feature_names = _aggregate_synthaml_alert_features(alerts_df, tx_df)
+
+    return {
+        "X": X,
+        "y": y,
+        "feature_names": feature_names,
+        "alerts_df": alerts_df,
+        "transactions_df": tx_df,
+        "alert_ids": alerts_df["ALERT_ID"].values,
+        "account_ids": alerts_df["ACCOUNT_ID"].values,
+        "timestamps": alerts_df["TIMESTAMP"].values,
+        "dates": alerts_df["DATE"].values,
+        "source": "synthetic_fallback",
+        "fraud_ratio": float(np.mean(y == 1)),
+        "n_alerts": len(y),
+        "n_transactions": len(tx_df),
+    }
+
+
+def load_synthaml(
+    require_real: bool = False,
+    data_dir: Path | str | None = None,
+    all_rows: bool = False,
+    nrows: int | None = None,
+    n_mock_alerts: int = 500,
+    seed: int = 42,
+) -> dict[str, Any]:
+    """Load the SynthAML Spar Nord Bank synthetic AML alert and transaction dataset.
+
+    Args:
+        require_real: If True, raise FileNotFoundError when real dataset files are missing.
+        data_dir: Explicit dataset path, or resolved automatically via resolve_dataset_dir.
+        all_rows: If True, load all rows without truncation.
+        nrows: Maximum number of alerts to ingest (useful for fast testing).
+        n_mock_alerts: Number of alerts to generate in synthetic fallback mode.
+        seed: Random seed for mock generator.
+
+    Returns:
+        dict containing:
+        - X: (N, 14) float array of engineered alert features.
+        - y: (N,) binary int array of alert outcomes (1 = reported/SAR, 0 = dismissed).
+        - feature_names: list of 14 engineered feature names.
+        - alerts_df: DataFrame of alerts.
+        - transactions_df: DataFrame of lookback transaction sequences.
+        - alert_ids: Array of alert IDs.
+        - timestamps: Array of alert timestamps.
+        - source: 'real_parquet', 'real_csv', or 'synthetic_fallback'.
+        - fraud_ratio: Prevalence of reported SAR alerts.
+    """
+    root = resolve_dataset_dir("synthaml", explicit_path=data_dir)
+    alerts_parquet = root / "alerts.parquet"
+    tx_parquet = root / "transactions.parquet"
+
+    alerts_csv = root / "synthetic_alerts.csv" if (root / "synthetic_alerts.csv").exists() else root / "alerts.csv"
+    tx_csv = root / "synthetic_transactions.csv" if (root / "synthetic_transactions.csv").exists() else root / "transactions.csv"
+
+    # 1. Fast Parquet loader
+    if alerts_parquet.exists() and tx_parquet.exists():
+        logger.info("[SynthAML] Ingesting columnar Parquet cache from '%s'...", root)
+        alerts_df = pd.read_parquet(alerts_parquet)
+        tx_df = pd.read_parquet(tx_parquet)
+        if not all_rows and nrows is not None and len(alerts_df) > nrows:
+            alerts_df = alerts_df.iloc[:nrows].copy()
+            valid_aids = set(alerts_df["ALERT_ID"].values)
+            tx_df = tx_df[tx_df["ALERT_ID"].isin(valid_aids)].copy()
+
+        X, y, feature_names = _aggregate_synthaml_alert_features(alerts_df, tx_df)
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": feature_names,
+            "alerts_df": alerts_df,
+            "transactions_df": tx_df,
+            "alert_ids": alerts_df["ALERT_ID"].values,
+            "account_ids": alerts_df["ACCOUNT_ID"].values if "ACCOUNT_ID" in alerts_df.columns else np.zeros(len(y), dtype=int),
+            "timestamps": alerts_df["TIMESTAMP"].values if "TIMESTAMP" in alerts_df.columns else np.zeros(len(y), dtype=int),
+            "dates": alerts_df["DATE"].values if "DATE" in alerts_df.columns else np.array([""] * len(y)),
+            "source": "real_parquet",
+            "fraud_ratio": float(np.mean(y == 1)),
+            "n_alerts": len(y),
+            "n_transactions": len(tx_df),
+        }
+
+    # 2. Raw CSV loader
+    if alerts_csv.exists() and tx_csv.exists():
+        logger.info("[SynthAML] Ingesting CSV files from '%s'...", root)
+        alerts_df = pd.read_csv(alerts_csv)
+        tx_df = pd.read_csv(tx_csv)
+        if not all_rows and nrows is not None and len(alerts_df) > nrows:
+            alerts_df = alerts_df.iloc[:nrows].copy()
+            valid_aids = set(alerts_df["ALERT_ID"].values)
+            tx_df = tx_df[tx_df["ALERT_ID"].isin(valid_aids)].copy()
+
+        # Cache to Parquet for accelerated future reads
+        try:
+            alerts_df.to_parquet(alerts_parquet, index=False)
+            tx_df.to_parquet(tx_parquet, index=False)
+            logger.info("[SynthAML] Cached Parquet files to '%s'", root)
+        except Exception as exc:
+            logger.warning("[SynthAML] Parquet caching skipped: %s", exc)
+
+        X, y, feature_names = _aggregate_synthaml_alert_features(alerts_df, tx_df)
+        return {
+            "X": X,
+            "y": y,
+            "feature_names": feature_names,
+            "alerts_df": alerts_df,
+            "transactions_df": tx_df,
+            "alert_ids": alerts_df["ALERT_ID"].values,
+            "account_ids": alerts_df["ACCOUNT_ID"].values if "ACCOUNT_ID" in alerts_df.columns else np.zeros(len(y), dtype=int),
+            "timestamps": alerts_df["TIMESTAMP"].values if "TIMESTAMP" in alerts_df.columns else np.zeros(len(y), dtype=int),
+            "dates": alerts_df["DATE"].values if "DATE" in alerts_df.columns else np.array([""] * len(y)),
+            "source": "real_csv",
+            "fraud_ratio": float(np.mean(y == 1)),
+            "n_alerts": len(y),
+            "n_transactions": len(tx_df),
+        }
+
+    # 3. Missing file handling
+    if require_real:
+        raise FileNotFoundError(
+            f"Real SynthAML dataset files not found in '{root}'. "
+            f"Expected 'synthetic_alerts.csv' and 'synthetic_transactions.csv' (or 'alerts.parquet'/'transactions.parquet'). "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
+
+    rng = np.random.default_rng(seed)
+    return _generate_mock_synthaml(n_mock_alerts=nrows or n_mock_alerts, rng=rng)
+
+
+# ===========================================================================
 # Convenience Registry
 # ===========================================================================
 
@@ -1737,6 +2012,8 @@ DATASET_REGISTRY: dict[str, Any] = {
     "ieee_cis": load_ieee_cis,
     "creditcard": load_creditcard_fraud,
     "credit_card": load_creditcard_fraud,
+    "synthaml": load_synthaml,
+    "synth_aml": load_synthaml,
 }
 
 

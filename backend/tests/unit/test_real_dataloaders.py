@@ -10,12 +10,13 @@ from app.application.services.dataloader import (
     load_elliptic,
     load_ieee_cis,
     load_paysim,
+    load_synthaml,
     partition_dataset_non_iid,
 )
 
 
 def test_dataset_registry_contains_all_targets():
-    expected = {"elliptic", "amlsim", "paysim", "ieee_cis", "creditcard"}
+    expected = {"elliptic", "amlsim", "paysim", "ieee_cis", "creditcard", "synthaml"}
     assert expected.issubset(set(DATASET_REGISTRY.keys()))
 
 
@@ -100,6 +101,18 @@ def test_load_amlsim_mock_fallback(tmp_path):
 def test_load_amlsim_require_real_raises_on_missing(tmp_path):
     with pytest.raises(FileNotFoundError, match="Real AMLSim dataset export not found"):
         load_amlsim(path=tmp_path / "nonexistent", require_real=True)
+
+
+def test_load_synthaml_structure():
+    data = load_synthaml(nrows=200)
+    assert "X" in data
+    assert "y" in data
+    assert len(data["X"]) > 0
+    assert len(data["y"]) == len(data["X"])
+    assert data["X"].shape[1] == 14
+    assert "alerts_df" in data
+    assert "transactions_df" in data
+    assert data["source"] in ("real_parquet", "real_csv", "synthetic_fallback")
 
 
 def test_leaf_non_iid_dirichlet_partitioning():

@@ -54,6 +54,13 @@ DATASET_CONFIGS = {
         "primary_file": "creditcard.csv",
         "description": "ULB Machine Learning Group European Cardholder PCA Fraud (284k transactions)",
     },
+    "synthaml": {
+        "kaggle_slug": "figshare/10.1038/s41597-023-02569-2",
+        "url": "https://doi.org/10.1038/s41597-023-02569-2",
+        "target_dir": DATASETS_ROOT / "synthaml",
+        "primary_file": "synthetic_alerts.csv",
+        "description": "SynthAML Spar Nord Bank Synthetic AML Benchmark (Nature Sci Data 2023: 20k alerts, 16M txns, SDV copula)",
+    },
 }
 
 
