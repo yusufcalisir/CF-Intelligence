@@ -34,6 +34,7 @@ import {
   Zap,
   Sliders,
 } from 'lucide-react';
+import PrivacyBudgetWidget from '../components/telemetry/PrivacyBudgetWidget';
 
 // ── Types & Color Helpers ─────────────────────────────────────
 
@@ -871,6 +872,9 @@ function BudgetLogSection() {
           </div>
         )}
       </div>
+
+      {/* 3b. Empirical DP Privacy-Utility Frontier & RDP Noise Calibration (Phase 15.1) */}
+      <PrivacyBudgetWidget />
 
       {/* 4. Global Simulation Runs Audit Ledger */}
       <div className="space-y-3">

@@ -50,6 +50,8 @@ describe('PrivacyDefensePage', () => {
     expect(await screen.findByText(/Enterprise Privacy Budget Audit Log \(DP-SGD ε\)/i)).toBeInTheDocument();
     expect(screen.getByText(/CONSORTIUM SAFETY LOCK/i)).toBeInTheDocument();
     expect(screen.getByText(/Bank-Level Rényi DP Accountants/i)).toBeInTheDocument();
+    expect(screen.getByText(/DP-SGD Noise Calibration & Privacy-Utility Frontier/i)).toBeInTheDocument();
+    expect(screen.getByText(/Phase 15.1 — RDP Moments Accountant/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Emergency Safety Freeze/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Reset All Budgets/i })).toBeInTheDocument();
   });

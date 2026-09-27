@@ -54,8 +54,43 @@ export interface DPSweepData {
   pareto_frontier: ParetoPoint[];
 }
 
-interface PrivacyBudgetWidgetProps {
-  sweepData: DPSweepData;
+export const DEFAULT_DP_SWEEP_DATA: DPSweepData = {
+  configurations: [
+    { sigma: 0.5, num_rounds: 5, epsilon: 1.100562, optimal_alpha: 24.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.017553, roc_auc: 0.357561, runtime_seconds: 6.385 },
+    { sigma: 0.5, num_rounds: 10, epsilon: 1.567528, optimal_alpha: 16.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.079330, roc_auc: 0.667204, runtime_seconds: 8.479 },
+    { sigma: 0.5, num_rounds: 20, epsilon: 2.246630, optimal_alpha: 12.0, delta: 1e-05, budget_exhausted: true, pr_auc: 0.294406, roc_auc: 0.852488, runtime_seconds: 13.952 },
+    { sigma: 0.5, num_rounds: 50, epsilon: 3.644704, optimal_alpha: 8.0, delta: 1e-05, budget_exhausted: true, pr_auc: 0.659856, roc_auc: 0.980998, runtime_seconds: 35.508 },
+    { sigma: 1.0, num_rounds: 5, epsilon: 0.544956, optimal_alpha: 48.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.014091, roc_auc: 0.231688, runtime_seconds: 2.729 },
+    { sigma: 1.0, num_rounds: 10, epsilon: 0.774438, optimal_alpha: 32.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.025453, roc_auc: 0.518596, runtime_seconds: 5.751 },
+    { sigma: 1.0, num_rounds: 20, epsilon: 1.100562, optimal_alpha: 24.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.056606, roc_auc: 0.771239, runtime_seconds: 11.234 },
+    { sigma: 1.0, num_rounds: 50, epsilon: 1.770244, optimal_alpha: 16.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.392155, roc_auc: 0.965825, runtime_seconds: 28.184 },
+    { sigma: 1.5, num_rounds: 5, epsilon: 0.364371, optimal_alpha: 72.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.013713, roc_auc: 0.207834, runtime_seconds: 2.780 },
+    { sigma: 1.5, num_rounds: 10, epsilon: 0.514691, optimal_alpha: 48.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.021044, roc_auc: 0.442998, runtime_seconds: 5.867 },
+    { sigma: 1.5, num_rounds: 20, epsilon: 0.730335, optimal_alpha: 36.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.023557, roc_auc: 0.697410, runtime_seconds: 11.834 },
+    { sigma: 1.5, num_rounds: 50, epsilon: 1.168710, optimal_alpha: 24.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.207530, roc_auc: 0.932857, runtime_seconds: 30.129 },
+    { sigma: 2.0, num_rounds: 5, epsilon: 0.275037, optimal_alpha: 96.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.013824, roc_auc: 0.200115, runtime_seconds: 2.871 },
+    { sigma: 2.0, num_rounds: 10, epsilon: 0.380905, optimal_alpha: 64.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.023051, roc_auc: 0.407920, runtime_seconds: 5.922 },
+    { sigma: 2.0, num_rounds: 20, epsilon: 0.544956, optimal_alpha: 48.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.018307, roc_auc: 0.638706, runtime_seconds: 11.847 },
+    { sigma: 2.0, num_rounds: 50, epsilon: 0.868725, optimal_alpha: 32.0, delta: 1e-05, budget_exhausted: false, pr_auc: 0.110553, roc_auc: 0.836801, runtime_seconds: 30.325 },
+  ],
+  calibrated_sigma: 0.887007,
+  target_epsilon: 2.0,
+  delta: 1e-05,
+  q: 0.05,
+  pareto_frontier: [
+    { epsilon: 0.28, pr_auc: 0.013824 },
+    { epsilon: 0.38, pr_auc: 0.023051 },
+    { epsilon: 0.77, pr_auc: 0.025453 },
+    { epsilon: 0.87, pr_auc: 0.110553 },
+    { epsilon: 1.17, pr_auc: 0.207530 },
+    { epsilon: 1.77, pr_auc: 0.392155 },
+    { epsilon: 2.25, pr_auc: 0.294406 },
+    { epsilon: 3.64, pr_auc: 0.659856 },
+  ],
+};
+
+export interface PrivacyBudgetWidgetProps {
+  sweepData?: DPSweepData;
   /** Compact mode hides the secondary chart and shows only the KPI cards */
   compact?: boolean;
 }
@@ -126,7 +161,7 @@ function KPICard({
 // ---------------------------------------------------------------------------
 
 export default function PrivacyBudgetWidget({
-  sweepData,
+  sweepData = DEFAULT_DP_SWEEP_DATA,
   compact = false,
 }: PrivacyBudgetWidgetProps) {
   const { configurations, calibrated_sigma, target_epsilon, delta, pareto_frontier } = sweepData;
