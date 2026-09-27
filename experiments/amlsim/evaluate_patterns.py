@@ -763,8 +763,8 @@ def run_amlsim_pattern_benchmark(
     ax.set_xlabel("Recall")
     ax.set_ylabel("Precision")
     ax.set_title("IBM AMLSim Multi-Hop Pattern Detection: Precision-Recall Curves")
-    ax.set_xlim([0.0, 1.0])
-    ax.set_ylim([0.0, 1.05])
+    ax.set_xlim(0.0, 1.0)
+    ax.set_ylim(0.0, 1.05)
     ax.legend(loc="upper right", frameon=True)
     fig.tight_layout()
     pr_curve_path = plots_dir / "pr_curves.png"
@@ -790,8 +790,8 @@ def run_amlsim_pattern_benchmark(
     ax.set_xlabel("False Positive Rate (FPR)")
     ax.set_ylabel("True Positive Rate (TPR / Recall)")
     ax.set_title("IBM AMLSim Multi-Hop Pattern Detection: ROC Curves")
-    ax.set_xlim([-0.01, 1.0])
-    ax.set_ylim([0.0, 1.02])
+    ax.set_xlim(-0.01, 1.0)
+    ax.set_ylim(0.0, 1.02)
     ax.legend(loc="lower right", frameon=True)
     fig.tight_layout()
     roc_curve_path = plots_dir / "roc_curves.png"
@@ -831,7 +831,7 @@ def run_amlsim_pattern_benchmark(
     ax.set_title("Laundering Typology Interception by Architecture")
     ax.set_xticks(x_pos)
     ax.set_xticklabels(models_labels, fontweight="semibold")
-    ax.set_ylim([0.0, 1.05])
+    ax.set_ylim(0.0, 1.05)
     ax.legend(loc="upper right", frameon=True)
     fig.tight_layout()
     typology_path = plots_dir / "typology_detection.png"
@@ -858,7 +858,7 @@ def run_amlsim_pattern_benchmark(
     ax.set_xticklabels(hops, fontweight="semibold")
     ax.set_ylabel("Metric Value")
     ax.set_title("Graph Neighborhood Hop Ablation (0-Hop vs 1-Hop vs 2-Hop)")
-    ax.set_ylim([0.0, 1.05])
+    ax.set_ylim(0.0, 1.05)
     ax.legend(loc="center right", frameon=True)
     fig.tight_layout()
     hop_path = plots_dir / "hop_ablation.png"
@@ -882,8 +882,8 @@ def run_amlsim_pattern_benchmark(
     ax_a.set_title("A. Precision-Recall Curves", fontweight="bold")
     ax_a.set_xlabel("Recall")
     ax_a.set_ylabel("Precision")
-    ax_a.set_xlim([0, 1])
-    ax_a.set_ylim([0, 1.05])
+    ax_a.set_xlim(0.0, 1.0)
+    ax_a.set_ylim(0.0, 1.05)
     ax_a.legend(loc="upper right", fontsize=8)
 
     # Panel B: ROC Curves
@@ -902,8 +902,8 @@ def run_amlsim_pattern_benchmark(
     ax_b.set_title("B. ROC Curves with Strict Operating Points", fontweight="bold")
     ax_b.set_xlabel("FPR")
     ax_b.set_ylabel("TPR (Recall)")
-    ax_b.set_xlim([-0.01, 1.0])
-    ax_b.set_ylim([0, 1.02])
+    ax_b.set_xlim(-0.01, 1.0)
+    ax_b.set_ylim(0.0, 1.02)
     ax_b.legend(loc="lower right", fontsize=8)
 
     # Panel C: Typology Interception Rates
@@ -915,7 +915,7 @@ def run_amlsim_pattern_benchmark(
     ax_c.set_xticks(x_pos)
     ax_c.set_xticklabels(models_labels, fontsize=8)
     ax_c.set_ylabel("Recall")
-    ax_c.set_ylim([0, 1.05])
+    ax_c.set_ylim(0.0, 1.05)
     ax_c.legend(loc="upper right", fontsize=8)
 
     # Panel D: Hop Ablation Progression
@@ -927,7 +927,7 @@ def run_amlsim_pattern_benchmark(
     ax_d.set_xticks(xh)
     ax_d.set_xticklabels(hops, fontsize=8)
     ax_d.set_ylabel("Metric Value")
-    ax_d.set_ylim([0, 1.05])
+    ax_d.set_ylim(0.0, 1.05)
     ax_d.legend(loc="center right", fontsize=8)
 
     fig.suptitle(
