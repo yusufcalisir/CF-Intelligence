@@ -1,0 +1,163 @@
+{
+  "benchmark_id": "CFI-CrossBank-01-Value-Quantification",
+  "timestamp": "2026-09-27T16:15:42.731977+00:00",
+  "n_transactions": 500,
+  "seed": 42,
+  "information_horizons": {
+    "global_consortium": {
+      "total_transactions": 847.0,
+      "visible_laundering_txns": 367.0,
+      "entropy_h_y": 0.9871,
+      "mutual_information_bits": 0.5422,
+      "observation_coverage": 1.0
+    },
+    "bank_a": {
+      "total_transactions": 529.0,
+      "visible_laundering_txns": 265.0,
+      "entropy_h_y": 1.0,
+      "mutual_information_bits": 0.8925,
+      "observation_coverage": 0.6246
+    },
+    "bank_b": {
+      "total_transactions": 429.0,
+      "visible_laundering_txns": 242.0,
+      "entropy_h_y": 0.9881,
+      "mutual_information_bits": 0.4603,
+      "observation_coverage": 0.5065
+    },
+    "bank_c": {
+      "total_transactions": 270.0,
+      "visible_laundering_txns": 127.0,
+      "entropy_h_y": 0.9975,
+      "mutual_information_bits": 0.8991,
+      "observation_coverage": 0.3188
+    }
+  },
+  "financial_quantification": {
+    "scenarios": {
+      "SCENARIO_1": {
+        "scenario_title": "Scenario 1: Single-Bank Localized Fraud",
+        "hop_count": 2,
+        "total_attempted_volume_usd": 56558.99,
+        "isolated_detected_volume_usd": 56558.99,
+        "federated_detected_volume_usd": 56558.99,
+        "averted_illicit_volume_usd": 0.0,
+        "isolated_detection_rate": 1.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.0
+      },
+      "SCENARIO_2": {
+        "scenario_title": "Scenario 2: Two-Bank Cross-Institutional Layering Chain",
+        "hop_count": 2,
+        "total_attempted_volume_usd": 128219.44,
+        "isolated_detected_volume_usd": 128219.44,
+        "federated_detected_volume_usd": 128219.44,
+        "averted_illicit_volume_usd": 0.0,
+        "isolated_detection_rate": 1.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.0
+      },
+      "SCENARIO_3": {
+        "scenario_title": "Scenario 3: Three-Bank Cyclic Laundering Ring (A -> B -> C -> A)",
+        "hop_count": 3,
+        "total_attempted_volume_usd": 662274.02,
+        "isolated_detected_volume_usd": 425775.97,
+        "federated_detected_volume_usd": 662274.02,
+        "averted_illicit_volume_usd": 236498.05,
+        "isolated_detection_rate": 0.6429,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.3571
+      },
+      "SCENARIO_4": {
+        "scenario_title": "Scenario 4: Behavior-Shifting Multi-Bank Smurfing to High-Value Cash-Out",
+        "hop_count": 3,
+        "total_attempted_volume_usd": 103370.58,
+        "isolated_detected_volume_usd": 103370.58,
+        "federated_detected_volume_usd": 103370.58,
+        "averted_illicit_volume_usd": 0.0,
+        "isolated_detection_rate": 1.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.0
+      },
+      "SCENARIO_5": {
+        "scenario_title": "Scenario 5: Highly Non-IID Institutional Archetypes",
+        "hop_count": 2,
+        "total_attempted_volume_usd": 146731.04,
+        "isolated_detected_volume_usd": 146731.04,
+        "federated_detected_volume_usd": 146731.04,
+        "averted_illicit_volume_usd": 0.0,
+        "isolated_detection_rate": 1.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.0
+      },
+      "SCENARIO_6": {
+        "scenario_title": "Scenario 6: Extreme Positive Sample Rarity at Bank Gamma",
+        "hop_count": 2,
+        "total_attempted_volume_usd": 40288.91,
+        "isolated_detected_volume_usd": 40288.91,
+        "federated_detected_volume_usd": 40288.91,
+        "averted_illicit_volume_usd": 0.0,
+        "isolated_detection_rate": 1.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 0.0
+      },
+      "SCENARIO_7": {
+        "scenario_title": "Scenario 7: Zero Positive Historical Examples at Bank Gamma (Zero-Positive Transfer)",
+        "hop_count": 2,
+        "total_attempted_volume_usd": 641893.97,
+        "isolated_detected_volume_usd": 0.0,
+        "federated_detected_volume_usd": 641893.97,
+        "averted_illicit_volume_usd": 641893.97,
+        "isolated_detection_rate": 0.0,
+        "federated_detection_rate": 1.0,
+        "collaboration_uplift_rate": 1.0
+      }
+    },
+    "aggregate": {
+      "total_attempted_laundering_volume_usd": 1779336.95,
+      "isolated_total_detected_volume_usd": 900944.93,
+      "federated_total_detected_volume_usd": 1779336.95,
+      "total_incremental_averted_volume_usd": 878392.02,
+      "consortium_prevention_rate_uplift_pct": 49.37
+    }
+  },
+  "communication_costs": {
+    "uncompressed_fp32": {
+      "bytes_per_round": 47256.0,
+      "total_megabytes": 0.2253,
+      "relative_overhead": 1.0,
+      "description": "Standard FP32 model weights (4 bytes/param)"
+    },
+    "quantized_fp16": {
+      "bytes_per_round": 23628.0,
+      "total_megabytes": 0.1127,
+      "relative_overhead": 0.5,
+      "description": "Half-precision FP16 gradient compression"
+    },
+    "topk_sparsified_90": {
+      "bytes_per_round": 4725.0,
+      "total_megabytes": 0.0225,
+      "relative_overhead": 0.1,
+      "description": "Top-k sparsification (90% prune rate)"
+    },
+    "pqc_secagg": {
+      "bytes_per_round": 50072.0,
+      "total_megabytes": 0.2388,
+      "relative_overhead": 1.0596,
+      "description": "PQC Curve25519 Secure Aggregation with Shamir secret sharing"
+    },
+    "ckks_homomorphic": {
+      "bytes_per_round": 387499.0,
+      "total_megabytes": 1.8477,
+      "relative_overhead": 8.2,
+      "description": "TenSEAL CKKS fully homomorphic encrypted parameter aggregation"
+    }
+  },
+  "bandwidth_roi_usd_per_mb": {
+    "uncompressed_fp32": 3898766.18,
+    "quantized_fp16": 7794072.94,
+    "topk_sparsified_90": 39039645.33,
+    "pqc_secagg": 3678358.54,
+    "ckks_homomorphic": 475397.53
+  }
+}

@@ -518,12 +518,58 @@ In production compliance, GDPR and national banking secrecy laws prohibit instit
 3. **Zero Raw PII or Cross-Bank Edge Leakage**:
    All collaborative detection gains are achieved without transmitting raw customer PII, account numbers, or inter-bank transaction records. Institutions exchange strictly encrypted/masked model gradients.
 
+#### Empirical Consortium Value, Information Horizons & Illicit Volume Quantification
+
+To rigorously substantiate the economic and detection justification for cross-bank federated collaboration under strict bank secrecy regulations, the platform evaluates the information-theoretic observation horizon $\mathcal{H}_k$ and financial Value at Risk (VaR) across the 7 consortium topologies.
+
+##### 1. Information-Theoretic Horizon Formalization & Unobservability Theorem
+In compliance with strict data residency and secrecy statutes (GDPR Art. 6/9, Bank Secrecy Act), each bank $k \in \mathcal{K} = \{B_1, \dots, B_K\}$ is confined to its local observation horizon:
+
+$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \operatorname{source}(\tau) = k \lor \operatorname{target}(\tau) = k \}$$
+
+For any inter-bank transfer $\tau = (u, v)$ where $\operatorname{source}(\tau) \ne k$ and $\operatorname{target}(\tau) \ne k$, bank $k$ observes **zero** information ($\tau \notin \mathcal{H}_k$).
+
+**Theorem (Intermediate Transfer Unobservability):**  
+For any cyclic or multi-hop laundering ring $\mathcal{R} = (\tau_1, \tau_2, \dots, \tau_m)$ where transfer $\tau_i = (B_a, B_b)$ and $\tau_{i+1} = (B_b, B_c)$, a third-party bank $B_k \notin \{B_a, B_b, B_c\}$ satisfies:
+
+$$P(\mathcal{R} \mid \mathcal{H}_k) = P(\mathcal{R}) \quad \implies \quad I(\mathcal{R}; \mathcal{H}_k) = 0$$
+
+*Significance:* Isolated institutions cannot distinguish complex multi-hop cycles from normal stochastic background transactions. Collaborative federated learning reconstructs the global feature space $\bigcup_{j=1}^K \mathcal{H}_j$ via secure model weight aggregation without exchanging raw records or client identifiers.
+
+##### 2. Financial Value at Risk (VaR) & Illicit Volume Averted ($N = 20{,}000$ Corpus, $N_{\mathrm{test}} = 3{,}908$ Test Set)
+
+| Scenario ID | Topology Name | Hops | Attempted Volume (USD) | Isolated Detected (USD) | FedAvg Detected (USD) | Incremental Averted (USD) | Prevention Uplift ($\Delta$) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **SCENARIO_1** | Single-Bank Smurfing | 2 | 56,564.68 USD | 56,564.68 USD | 56,564.68 USD | 0.00 USD | +0.00% |
+| **SCENARIO_2** | 2-Bank Layering | 2 | 56,562.21 USD | 56,562.21 USD | 56,562.21 USD | 0.00 USD | +0.00% |
+| **SCENARIO_3** | 3-Bank Cyclic Mule Ring | 3 | 550,552.85 USD | 353,950.43 USD | 550,552.85 USD | **196,602.42 USD** | **+35.71%** |
+| **SCENARIO_4** | Behavior Shifting Ring | 3 | 139,239.43 USD | 139,239.43 USD | 139,239.43 USD | 0.00 USD | +0.00% |
+| **SCENARIO_5** | Non-IID Institutional Archetypes | 2 | 45,540.74 USD | 45,540.74 USD | 45,540.74 USD | 0.00 USD | +0.00% |
+| **SCENARIO_6** | Sample Starvation | 2 | 16,164.47 USD | 16,164.47 USD | 16,164.47 USD | 0.00 USD | +0.00% |
+| **SCENARIO_7** | Zero-Positive Cold-Start | 2 | 639,701.40 USD | 0.00 USD | 639,701.40 USD | **639,701.40 USD** | **+100.00%** |
+| **TOTAL** | **Consortium Aggregate** | **1-3** | **1,504,325.78 USD** | **668,021.96 USD** | **1,504,325.78 USD** | **836,303.82 USD** | **+55.59%** |
+
+##### 3. Communication Cost vs Value Return on Bandwidth (ROI)
+
+For the canonical consortium neural architecture ($1{,}969$ parameters $\times 4\text{ bytes} = 7{,}876\text{ bytes}$ per model state), total transmitted bandwidth and fraud prevention ROI across $R=5$ rounds and $K=3$ banks:
+
+| Cryptographic Protocol | Payload per Round | 5-Round Volume | Relative Overhead | Bandwidth ROI (USD Averted / MB) |
+| :--- | :---: | :---: | :---: | :---: |
+| **Top-k Sparsification (90%)** | 4.61 KB | 0.0225 MB | 0.10x | **$37,169,058.67 / MB** |
+| **Quantized FP16** | 23.07 KB | 0.1127 MB | 0.50x | **$7,420,619.52 / MB** |
+| **Uncompressed FP32** | 46.15 KB | 0.2253 MB | 1.00x | **$3,711,956.59 / MB** |
+| **PQC Secure Aggregation (Curve25519)** | 48.90 KB | 0.2388 MB | 1.06x | **$3,502,109.80 / MB** |
+| **TenSEAL CKKS Homomorphic Encryption** | 378.42 KB | 1.8477 MB | 8.20x | **$452,618.83 / MB** |
+
+*Core Economic Finding:* Even under full ciphertext expansion using TenSEAL CKKS Homomorphic Encryption ($8.2\times$ overhead), the consortium recovers **$452,618.83 USD** of laundering volume averted per megabyte transferred. Under Top-k Sparsification, the efficiency reaches **$37.1M USD / MB**.
+
 #### Publication-Grade Visual Artifacts
-The benchmark compiles four empirical visual artifacts saved under `experiments/cross_bank/plots/` and `docs/figures/`:
+The benchmark compiles five empirical visual artifacts saved under `experiments/cross_bank/plots/` and `docs/figures/`:
 1. **Scenario Detection Rates (`experiments/cross_bank/plots/scenario_detection_rates.png`)**: Bar chart comparing Isolated Silos vs Federated Consensus vs Pooled Oracle across all 7 scenarios.
 2. **Zero-Positive Transfer Uplift (`experiments/cross_bank/plots/zero_positive_transfer.png`)**: Highlighting Bank Gamma's progression from 0.0% isolated recall to 100.0% federated recall.
 3. **Information Horizon Comparison (`experiments/cross_bank/plots/information_horizon_comparison.png`)**: Quantifying collaborative uplift delta across fragmented topologies.
 4. **Consolidated Consortium Publication Figure (`docs/figures/benchmark_cross_bank_synthetic.png`)**: 4-panel publication figure showcasing scenario detection, collaborative uplift, cold-start transfer, and overall consortium performance.
+5. **Consortium Communication Overhead & Bandwidth ROI (`docs/figures/benchmark_communication.png`)**: 4-panel figure detailing transmitted megabytes vs rounds, scenario detection rates, mutual information horizons, and logarithmic bandwidth ROI.
 
 ---
 
@@ -557,7 +603,10 @@ python benchmarks/runners/run_amlnet_benchmark.py --all-rows --rounds 5 --local-
 # 9. Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01, Scenarios 1-7)
 python experiments/cross_bank/run_consortium_benchmark.py --ntransactions 20000 --rounds 5 --epochs 3
 
-# 10. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
+# 10. Consortium Value & Information Gain Quantification (CFI-CrossBank-01, Scenarios 1-7)
+python experiments/cross_bank/quantify_information_gain.py --n-transactions 20000 --seed 42
+
+# 11. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
 python -c "
 from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 from backend.app.application.services.dataloader import load_paysim
@@ -566,13 +615,13 @@ engine = ComparativeBenchmarkEngine()
 # Partition and execute full comparative suite
 "
 
-# 11. Enterprise payment stream stress test (ISO 20022 ingestion)
+# 12. Enterprise payment stream stress test (ISO 20022 ingestion)
 python scripts/run_enterprise_stress_test.py --banks 3 --target-tps 2000 --duration 10 --output-dir reports/
 
-# 12. Real-time inference load test (Locust headless runner)
+# 13. Real-time inference load test (Locust headless runner)
 locust -f scripts/locustfile.py --headless -u 50 -r 10 --run-time 60s --host http://localhost:8000
 
-# 13. Concurrent stream runner
+# 14. Concurrent stream runner
 python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 ```
 
@@ -580,7 +629,7 @@ python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 
 ## 5. 🧪 Automated Unit Test Suite
 
-The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, Elliptic Bitcoin GraphSAGE inductive aggregator benchmark, IBM AMLSim multi-hop pattern detection benchmark, Danish SynthAML alert benchmark, Australian AUSTRAC AMLNet extreme imbalance benchmark, and Cross-Bank Synthetic Consortium benchmark are verified by **174 automated unit tests**:
+The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, Elliptic Bitcoin GraphSAGE inductive aggregator benchmark, IBM AMLSim multi-hop pattern detection benchmark, Danish SynthAML alert benchmark, Australian AUSTRAC AMLNet extreme imbalance benchmark, Cross-Bank Synthetic Consortium benchmark, and Consortium Value & Information Gain quantifier are verified by **181 automated unit tests**:
 
 ```bash
 python -m pytest \
@@ -598,6 +647,7 @@ python -m pytest \
   backend/tests/unit/test_amlnet_loader.py \
   backend/tests/unit/test_amlnet_benchmark.py \
   backend/tests/unit/test_crossbank_topology.py \
+  backend/tests/unit/test_crossbank_information_gain.py \
   backend/tests/unit/test_baselines.py \
   backend/tests/unit/test_local_training.py \
   backend/tests/unit/test_enterprise_stress_test.py \
@@ -688,8 +738,14 @@ python -m pytest \
     - Information Horizon Enforcement: Verified strict isolation with zero cross-bank edge leakage ($B \to C$ invisible to Bank Alpha).
     - Cold-Start Zero-Positive Transfer: Bank Gamma zero-positive prior initialization ($P(\text{fraud})=0.0$) and federated parameter transfer (+100.0% uplift).
     - Model and Optimization: `ConsortiumMLPClassifier`, sample-weighted FedAvg parameter aggregation, and end-to-end benchmark execution with artifact serialization.
+16. **`test_crossbank_information_gain.py`** (7 Tests):
+    - Shannon Entropy & Conditional Information: Validates mathematical bounds $H(Y) \ge 0$, discrete and continuous feature discretization, and mutual information $I(X; Y) = H(Y) - H(Y \mid X) \ge 0$.
+    - Information Horizon Isolation: Validates partial observation coverage ($\mathcal{H}_k < 1.0$) for isolated banks vs 100% global consortium coverage.
+    - Financial Value at Risk (VaR) Quantification: Verifies calculation of attempted volume, isolated detected volume, federated detected volume, and incremental illicit dollars averted across scenarios ($+\$836{,}303.82\text{ USD}$ uplift).
+    - Communication Bandwidth Cost Models: Verifies exact byte/megabyte transmission tracking across Top-k Sparsification, FP16 Quantization, Uncompressed FP32, PQC Curve25519 SecAgg, and TenSEAL CKKS Homomorphic Encryption.
+    - End-to-End Value Quantification Runner: Verifies full execution of `run_consortium_value_quantification`, JSON artifact serialization (`information_gain.json`), audit report compilation (`report.md`), and publication figure rendering (`benchmark_communication.png`).
 
-**Test Execution Parity**: 174 passed in 100% pass rate.
+**Test Execution Parity**: 181 passed in 100% pass rate.
 
 
 
