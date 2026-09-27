@@ -1,0 +1,161 @@
+{
+  "dataset": "synthaml",
+  "provenance": {
+    "source": "Nature Scientific Data 2023 (Spar Nord Bank & Aarhus University)",
+    "doi": "10.1038/s41597-023-02569-2",
+    "observation_window": "7 to 90 days lookback",
+    "features_engineered": 14
+  },
+  "diagnostics": {
+    "skew_mode": "institutional_split",
+    "alpha": null,
+    "total_alerts": 5000,
+    "train_alerts": 4000,
+    "test_alerts": 1000,
+    "global_sar_prevalence": 0.045,
+    "client_breakdown": {
+      "bank_alpha": {
+        "total_samples": 1980,
+        "sar_samples": 70,
+        "sar_ratio": 0.03535353535353535,
+        "volume_share": 0.495
+      },
+      "bank_beta": {
+        "total_samples": 1196,
+        "sar_samples": 50,
+        "sar_ratio": 0.04180602006688963,
+        "volume_share": 0.299
+      },
+      "bank_gamma": {
+        "total_samples": 824,
+        "sar_samples": 60,
+        "sar_ratio": 0.07281553398058252,
+        "volume_share": 0.206
+      }
+    }
+  },
+  "centralized_pooled": {
+    "pr_auc": 0.9992761066516926,
+    "roc_auc": 0.9997567238816055,
+    "brier_score": 0.022144226357340813,
+    "ece": 0.030178263112902635,
+    "precision": 0.9958677685950413,
+    "recall": 0.9836734693877551,
+    "f1_score": 0.9897330595482546,
+    "best_threshold": 0.025915108621120453,
+    "recall_at_001_fpr": 0.9714285714285714,
+    "recall_at_005_fpr": 0.9836734693877551,
+    "recall_at_01_fpr": 0.9836734693877551
+  },
+  "tabular_baselines": {
+    "random_forest": {
+      "pr_auc": 0.9998553752209546,
+      "roc_auc": 0.9999567509122854,
+      "brier_score": 0.015600800000000001,
+      "ece": 0.05545999999999998,
+      "precision": 1.0,
+      "recall": 0.9959183673469387,
+      "f1_score": 0.9979550102249489,
+      "best_threshold": 0.36,
+      "recall_at_001_fpr": 0.9959183673469387,
+      "recall_at_005_fpr": 0.9959183673469387,
+      "recall_at_01_fpr": 0.9959183673469387
+    },
+    "logistic_regression": {
+      "pr_auc": 1.0,
+      "roc_auc": 1.0,
+      "brier_score": 0.0180581229289333,
+      "ece": 0.04039704070640803,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1_score": 1.0,
+      "best_threshold": 0.9785022466254782,
+      "recall_at_001_fpr": 1.0,
+      "recall_at_005_fpr": 1.0,
+      "recall_at_01_fpr": 1.0
+    }
+  },
+  "isolated_silos": {
+    "bank_alpha": {
+      "pr_auc": 0.9990772134074788,
+      "roc_auc": 0.9996918502500337,
+      "brier_score": 0.050447311252355576,
+      "ece": 0.06666760754818096,
+      "precision": 0.9682539682539683,
+      "recall": 0.9959183673469387,
+      "f1_score": 0.9818913480885312,
+      "best_threshold": 0.0031650010496377945,
+      "recall_at_001_fpr": 0.963265306122449,
+      "recall_at_005_fpr": 0.9755102040816327,
+      "recall_at_01_fpr": 0.9918367346938776
+    },
+    "bank_beta": {
+      "pr_auc": 0.9965702187797227,
+      "roc_auc": 0.9987025273685634,
+      "brier_score": 0.009312719106674194,
+      "ece": 0.00741533917095511,
+      "precision": 0.9876543209876543,
+      "recall": 0.9795918367346939,
+      "f1_score": 0.9836065573770492,
+      "best_threshold": 0.5963891744613647,
+      "recall_at_001_fpr": 0.889795918367347,
+      "recall_at_005_fpr": 0.9795918367346939,
+      "recall_at_01_fpr": 0.9836734693877551
+    },
+    "bank_gamma": {
+      "pr_auc": 0.9971876400482466,
+      "roc_auc": 0.9990647384781727,
+      "brier_score": 0.02406402677297592,
+      "ece": 0.030299059316515924,
+      "precision": 0.9678714859437751,
+      "recall": 0.9836734693877551,
+      "f1_score": 0.9757085020242915,
+      "best_threshold": 0.006942841224372387,
+      "recall_at_001_fpr": 0.8204081632653061,
+      "recall_at_005_fpr": 0.9551020408163265,
+      "recall_at_01_fpr": 0.9755102040816327
+    }
+  },
+  "federated_consensus": {
+    "fedavg": {
+      "pr_auc": 0.9984548645462111,
+      "roc_auc": 0.9994864170833897,
+      "brier_score": 0.011940116994082928,
+      "ece": 0.011110943153500558,
+      "precision": 0.9876543209876543,
+      "recall": 0.9795918367346939,
+      "f1_score": 0.9836065573770492,
+      "best_threshold": 0.08514710515737534,
+      "recall_at_001_fpr": 0.8979591836734694,
+      "recall_at_005_fpr": 0.9795918367346939,
+      "recall_at_01_fpr": 0.9877551020408163
+    },
+    "fedprox": {
+      "pr_auc": 0.9985181465482489,
+      "roc_auc": 0.999491823219354,
+      "brier_score": 0.02072163298726082,
+      "ece": 0.027242598626762628,
+      "precision": 0.972,
+      "recall": 0.9918367346938776,
+      "f1_score": 0.9818181818181818,
+      "best_threshold": 0.013233290985226631,
+      "recall_at_001_fpr": 0.9428571428571428,
+      "recall_at_005_fpr": 0.9714285714285714,
+      "recall_at_01_fpr": 0.9918367346938776
+    }
+  },
+  "collaboration_uplift": {
+    "fedavg_vs_mean_silo_pr_auc": 0.0008431738010616918,
+    "fedavg_vs_worst_silo_pr_auc": 0.0018846457664883909,
+    "best_silo_pr_auc": 0.9990772134074788,
+    "mean_silo_pr_auc": 0.9976116907451494,
+    "worst_silo_pr_auc": 0.9965702187797227,
+    "fedavg_pr_auc": 0.9984548645462111
+  },
+  "execution_profile": {
+    "elapsed_seconds": 22.65,
+    "git_commit": "502a3373d0a1fb64000039d16d56f6a987d9b650",
+    "git_branch": "main",
+    "platform": "Windows-11-10.0.26200-SP0"
+  }
+}
