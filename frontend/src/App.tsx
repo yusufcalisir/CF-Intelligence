@@ -24,6 +24,7 @@ const PrivacyDefensePage = lazy(() => import('./pages/PrivacyDefensePage'));
 const BenchmarkHubPage = lazy(() => import('./pages/BenchmarkHubPage'));
 const ApiDocsPage = lazy(() => import('./pages/ApiDocsPage'));
 const CounterfactualPage = lazy(() => import('./pages/CounterfactualPage'));
+const ConsortiumPage = lazy(() => import('./pages/ConsortiumPage'));
 
 const PageFallback = () => (
   <div className="flex min-h-[60vh] items-center justify-center">
@@ -97,6 +98,14 @@ export default function App() {
                 element={
                   <Suspense fallback={<PageFallback />}>
                     <BenchmarkHubPage />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/consortium"
+                element={
+                  <Suspense fallback={<PageFallback />}>
+                    <ConsortiumPage />
                   </Suspense>
                 }
               />

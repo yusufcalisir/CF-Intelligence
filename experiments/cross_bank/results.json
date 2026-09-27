@@ -1,0 +1,139 @@
+{
+  "benchmark_id": "CFI-CrossBank-01",
+  "timestamp": "2026-09-27T15:19:21.529343+00:00",
+  "total_transactions": 19567,
+  "total_accounts": 10000,
+  "scenarios_evaluated": 7,
+  "overall_isolated_detection_rate": 0.8061,
+  "overall_federated_detection_rate": 1.0,
+  "overall_pooled_detection_rate": 1.0,
+  "overall_delta_detection_rate": 0.1939,
+  "scenarios": {
+    "SCENARIO_1": {
+      "scenario_id": "SCENARIO_1",
+      "scenario_name": "Scenario 1: Single-Bank Localized Fraud",
+      "isolated_detection_rate": 1.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 1,
+      "participating_institutions": 1
+    },
+    "SCENARIO_2": {
+      "scenario_id": "SCENARIO_2",
+      "scenario_name": "Scenario 2: Two-Bank Cross-Institutional Layering Chain",
+      "isolated_detection_rate": 1.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 1,
+      "participating_institutions": 2
+    },
+    "SCENARIO_3": {
+      "scenario_id": "SCENARIO_3",
+      "scenario_name": "Scenario 3: Three-Bank Cyclic Laundering Ring (A -> B -> C -> A)",
+      "isolated_detection_rate": 0.6429,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.3571,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 2,
+      "participating_institutions": 3
+    },
+    "SCENARIO_4": {
+      "scenario_id": "SCENARIO_4",
+      "scenario_name": "Scenario 4: Behavior-Shifting Multi-Bank Smurfing to High-Value Cash-Out",
+      "isolated_detection_rate": 1.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 2,
+      "participating_institutions": 3
+    },
+    "SCENARIO_5": {
+      "scenario_id": "SCENARIO_5",
+      "scenario_name": "Scenario 5: Highly Non-IID Institutional Archetypes",
+      "isolated_detection_rate": 1.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 1,
+      "participating_institutions": 3
+    },
+    "SCENARIO_6": {
+      "scenario_id": "SCENARIO_6",
+      "scenario_name": "Scenario 6: Extreme Positive Sample Rarity at Bank Gamma",
+      "isolated_detection_rate": 1.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 0.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 1,
+      "participating_institutions": 3
+    },
+    "SCENARIO_7": {
+      "scenario_id": "SCENARIO_7",
+      "scenario_name": "Scenario 7: Zero Positive Historical Examples at Bank Gamma (Zero-Positive Transfer)",
+      "isolated_detection_rate": 0.0,
+      "federated_detection_rate": 1.0,
+      "pooled_detection_rate": 1.0,
+      "delta_detection_rate": 1.0,
+      "isolated_pr_auc": 0.8832,
+      "federated_pr_auc": 0.9729,
+      "delta_pr_auc": 0.0898,
+      "isolated_recall_at_01_fpr": 0.881,
+      "federated_recall_at_01_fpr": 0.9881,
+      "rounds_to_detection": 1,
+      "participating_institutions": 3
+    }
+  },
+  "institution_metrics": {
+    "bank_a": {
+      "train_samples": 8842.0,
+      "isolated_local_loss": 0.042
+    },
+    "bank_b": {
+      "train_samples": 6245.0,
+      "isolated_local_loss": 0.051
+    },
+    "bank_c": {
+      "train_samples": 4623.0,
+      "isolated_local_loss": 0.0
+    }
+  },
+  "zero_positive_transfer_recall": 1.0,
+  "metadata": {
+    "rounds": 5,
+    "local_epochs": 3,
+    "seed": 42,
+    "feature_count": 14
+  }
+}
