@@ -1,6 +1,6 @@
 """Domain models package."""
 
-from backend.app.domain.models.consortium import (
+from .consortium import (
     ConsortiumBenchmarkResult,
     ConsortiumNode,
     ConsortiumScenarioType,
