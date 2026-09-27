@@ -11,6 +11,7 @@ import json
 import os
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 import matplotlib
 
@@ -62,16 +63,19 @@ class ConsortiumMLPClassifier(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
-    def predict_proba(self, x: np.ndarray) -> np.ndarray:
+    def predict_proba(self, x: np.ndarray | torch.Tensor | Any) -> np.ndarray:
         self.eval()
         with torch.no_grad():
-            t_x = torch.tensor(x, dtype=torch.float32)
+            if isinstance(x, torch.Tensor):
+                t_x = x.float()
+            else:
+                t_x = torch.tensor(np.asarray(x), dtype=torch.float32)
             logits = self.forward(t_x).squeeze(-1)
             probs = torch.sigmoid(logits).cpu().numpy()
-        return probs
+        return np.asarray(probs)
 
 
-def initialize_zero_positive_model(model: nn.Module) -> nn.Module:
+def initialize_zero_positive_model(model: ConsortiumMLPClassifier) -> ConsortiumMLPClassifier:
     """Initialize isolated model for cold-start institution with zero historical positive fraud."""
     with torch.no_grad():
         for p in model.parameters():
@@ -81,14 +85,14 @@ def initialize_zero_positive_model(model: nn.Module) -> nn.Module:
 
 
 def train_single_model(
-    model: nn.Module,
-    X_train: np.ndarray,
-    y_train: np.ndarray,
+    model: ConsortiumMLPClassifier,
+    X_train: np.ndarray | Any,
+    y_train: np.ndarray | Any,
     epochs: int = 5,
     lr: float = 0.005,
     batch_size: int = 64,
     pos_weight: float | None = None,
-) -> nn.Module:
+) -> ConsortiumMLPClassifier:
     """Train PyTorch model locally with cost-sensitive BCE."""
     if len(X_train) == 0:
         return model
@@ -96,23 +100,26 @@ def train_single_model(
     model.to(device)
     model.train()
 
-    n_pos = int(np.sum(y_train == 1))
-    n_neg = int(np.sum(y_train == 0))
+    X_train_arr = np.asarray(X_train)
+    y_train_arr = np.asarray(y_train)
+
+    n_pos = int(np.sum(y_train_arr == 1))
+    n_neg = int(np.sum(y_train_arr == 0))
     if pos_weight is None:
         pos_weight = float(n_neg / max(1, n_pos)) if n_pos > 0 else 1.0
 
     criterion = nn.BCEWithLogitsLoss(pos_weight=torch.tensor([pos_weight], device=device))
     optimizer = optim.Adam(model.parameters(), lr=lr, weight_decay=1e-4)
 
-    dataset_size = len(X_train)
+    dataset_size = len(X_train_arr)
     indices = np.arange(dataset_size)
 
     for _ in range(epochs):
         np.random.shuffle(indices)
         for start_idx in range(0, dataset_size, batch_size):
             batch_idx = indices[start_idx : start_idx + batch_size]
-            b_x = torch.tensor(X_train[batch_idx], dtype=torch.float32, device=device)
-            b_y = torch.tensor(y_train[batch_idx], dtype=torch.float32, device=device)
+            b_x = torch.tensor(X_train_arr[batch_idx], dtype=torch.float32, device=device)
+            b_y = torch.tensor(y_train_arr[batch_idx], dtype=torch.float32, device=device)
 
             optimizer.zero_grad()
             preds = model(b_x).squeeze(-1)
@@ -123,11 +130,14 @@ def train_single_model(
     return model
 
 
-def aggregate_weights(models: list[nn.Module], weights: list[float]) -> dict[str, torch.Tensor]:
+def aggregate_weights(
+    models: list[ConsortiumMLPClassifier] | list[nn.Module] | list[Any],
+    weights: list[int] | list[float],
+) -> dict[str, torch.Tensor]:
     """Sample-weighted FedAvg parameter aggregation."""
-    total_weight = sum(weights)
-    norm_weights = [w / total_weight for w in weights]
-    avg_state = {}
+    total_weight = float(sum(weights))
+    norm_weights = [float(w) / total_weight for w in weights]
+    avg_state: dict[str, torch.Tensor] = {}
 
     first_state = models[0].state_dict()
     for key in first_state:
@@ -139,18 +149,24 @@ def aggregate_weights(models: list[nn.Module], weights: list[float]) -> dict[str
     return avg_state
 
 
-def calculate_recall_at_fpr(y_true: np.ndarray, y_score: np.ndarray, target_fpr: float = 0.001) -> float:
+def calculate_recall_at_fpr(
+    y_true: np.ndarray | Any,
+    y_score: np.ndarray | Any,
+    target_fpr: float = 0.001,
+) -> float:
     """Calculate empirical Recall at a strict False Positive Rate threshold."""
-    if len(np.unique(y_true)) < 2:
+    y_true_arr = np.asarray(y_true)
+    y_score_arr = np.asarray(y_score)
+    if len(np.unique(y_true_arr)) < 2:
         return 0.0
 
-    n_neg = np.sum(y_true == 0)
-    n_pos = np.sum(y_true == 1)
+    n_neg = int(np.sum(y_true_arr == 0))
+    n_pos = int(np.sum(y_true_arr == 1))
     if n_neg == 0 or n_pos == 0:
         return 0.0
 
-    order = np.argsort(y_score)[::-1]
-    sorted_labels = y_true[order]
+    order = np.argsort(y_score_arr)[::-1]
+    sorted_labels = y_true_arr[order]
 
     cum_fp = np.cumsum(sorted_labels == 0)
     cum_tp = np.cumsum(sorted_labels == 1)
@@ -161,7 +177,7 @@ def calculate_recall_at_fpr(y_true: np.ndarray, y_score: np.ndarray, target_fpr:
         return 0.0
 
     best_tp = cum_tp[valid_idx[-1]]
-    return float(best_tp / n_pos)
+    return float(round(float(best_tp / n_pos), 4))
 
 
 def run_consortium_benchmark(
@@ -210,10 +226,10 @@ def run_consortium_benchmark(
     y_train_nodes: dict[str, np.ndarray] = {}
     for b_id in bank_ids:
         X_train_nodes[b_id] = scaler.transform(train_partitions[b_id][FEATURE_COLUMNS].values)
-        y_train_nodes[b_id] = train_partitions[b_id]["is_laundering"].values.astype(int)
+        y_train_nodes[b_id] = np.asarray(train_partitions[b_id]["is_laundering"].to_numpy(dtype=int))
 
     X_test_global = scaler.transform(test_df[FEATURE_COLUMNS].values)
-    y_test_global = test_df["is_laundering"].values.astype(int)
+    y_test_global = np.asarray(test_df["is_laundering"].to_numpy(dtype=int))
 
     # 6. Train Isolated Local Silo Models
     print("\n--- Training Isolated Banking Silo Models ---")
@@ -260,7 +276,7 @@ def run_consortium_benchmark(
     # 8. Train Global Pooled Oracle (Theoretical Upper Bound)
     print("\n--- Training Global Pooled Oracle Model ---")
     X_train_pooled = scaler.transform(train_df[FEATURE_COLUMNS].values)
-    y_train_pooled = train_df["is_laundering"].values.astype(int)
+    y_train_pooled = np.asarray(train_df["is_laundering"].to_numpy(dtype=int))
     pooled_model = ConsortiumMLPClassifier(input_dim=len(FEATURE_COLUMNS))
     pooled_model = train_single_model(
         pooled_model,
@@ -290,8 +306,8 @@ def run_consortium_benchmark(
 
     for sc_id, sc_def in SCENARIO_DEFINITIONS.items():
         # Mask test records belonging to this scenario
-        sc_mask = test_df["scenario_id"] == sc_id
-        n_sc_pos = np.sum(sc_mask)
+        sc_mask = np.asarray((test_df["scenario_id"] == sc_id).to_numpy(dtype=bool))
+        n_sc_pos = int(np.sum(sc_mask))
 
         if n_sc_pos == 0:
             # If random chronological split placed all instances in train, assign representative baseline

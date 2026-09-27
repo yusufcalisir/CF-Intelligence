@@ -52,12 +52,12 @@ class TestConsortiumDomainModels:
 
         # Value bounds validation
         with pytest.raises((ValidationError, ValueError)):
-            ConsortiumNode(
-                bank_id="invalid",
-                name="Invalid",
-                volume_share=1.5,  # Must be <= 1.0
-                account_count=0,
-            )
+            ConsortiumNode.model_validate({
+                "bank_id": "invalid",
+                "name": "Invalid",
+                "volume_share": 1.5,  # Must be <= 1.0
+                "account_count": 0,
+            })
 
     def test_cross_bank_transaction_model(self) -> None:
         tx = CrossBankTransaction(
@@ -198,16 +198,16 @@ class TestConsortiumModelAndOptimization:
         # 50/50 weighting
         agg_state = aggregate_weights([m1, m2], [100, 100])
         first_weight = agg_state["net.0.weight"]
-        assert torch.allclose(first_weight, torch.full_like(first_weight, 2.0))
+        assert np.allclose(first_weight.detach().cpu().numpy(), 2.0)
 
         # 25/75 weighting
         agg_state_skewed = aggregate_weights([m1, m2], [100, 300])
         skewed_weight = agg_state_skewed["net.0.weight"]
-        assert torch.allclose(skewed_weight, torch.full_like(skewed_weight, 2.5))
+        assert np.allclose(skewed_weight.detach().cpu().numpy(), 2.5)
 
     def test_recall_at_fixed_fpr_computation(self) -> None:
-        y_true = np.array([0, 0, 0, 0, 1, 1, 1, 1])
-        y_score_perfect = np.array([0.1, 0.2, 0.25, 0.3, 0.7, 0.8, 0.9, 0.95])
+        y_true = np.array([0, 0, 0, 0, 1, 1, 1, 1], dtype=int)
+        y_score_perfect = np.array([0.1, 0.2, 0.25, 0.3, 0.7, 0.8, 0.9, 0.95], dtype=float)
 
         rec = calculate_recall_at_fpr(y_true, y_score_perfect, target_fpr=0.01)
         assert rec == 1.0

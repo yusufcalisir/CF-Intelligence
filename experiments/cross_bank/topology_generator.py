@@ -196,7 +196,7 @@ class CrossBankNetworkGenerator:
         bank_probs = [n.volume_share for n in self.nodes]
 
         for i in range(n_samples):
-            step = int(self.rng.randint(0, timesteps))
+            step = self.rng.randint(0, timesteps)
             source_bank = self.rng.choice(bank_ids, p=bank_probs)
 
             # 75% intra-bank, 25% inter-bank
@@ -246,7 +246,7 @@ class CrossBankNetworkGenerator:
         if scenario_id == "SCENARIO_1":
             # Scenario 1: Localized smurfing within Bank Alpha (20 instances)
             for inst in range(25):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 mule1 = f"bank_a_mule1_{inst:02d}"
                 mule2 = f"bank_a_mule2_{inst:02d}"
                 exit_acc = f"bank_a_exit_{inst:02d}"
@@ -297,7 +297,7 @@ class CrossBankNetworkGenerator:
         elif scenario_id == "SCENARIO_2":
             # Scenario 2: Two-bank layering chain (Bank Alpha -> Bank Beta -> Cashout) (25 instances)
             for inst in range(25):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 src_a = f"bank_a_orig_{inst:02d}"
                 mule_b = f"bank_b_layer_{inst:02d}"
                 dest_b = f"bank_b_dest_{inst:02d}"
@@ -334,7 +334,7 @@ class CrossBankNetworkGenerator:
         elif scenario_id == "SCENARIO_3":
             # Scenario 3: Three-bank cyclic ring (A -> B -> C -> A) (30 instances)
             for inst in range(30):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 acc_a = f"bank_a_ring_{inst:02d}"
                 acc_b = f"bank_b_ring_{inst:02d}"
                 acc_c = f"bank_c_ring_{inst:02d}"
@@ -386,7 +386,7 @@ class CrossBankNetworkGenerator:
         elif scenario_id == "SCENARIO_4":
             # Scenario 4: Behavior-shifting (Smurfing at A -> Consolidation at B -> High-value cashout at C) (25 instances)
             for inst in range(25):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 smurf_a1 = f"bank_a_smurf1_{inst:02d}"
                 smurf_a2 = f"bank_a_smurf2_{inst:02d}"
                 pool_b = f"bank_b_pool_{inst:02d}"
@@ -440,7 +440,7 @@ class CrossBankNetworkGenerator:
         elif scenario_id == "SCENARIO_5":
             # Scenario 5: Non-IID archetype cross-bank flow (20 instances)
             for inst in range(20):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 # Retail to Commercial to Remittance
                 records.append({
                     "transaction_id": f"tx_sc5_{inst:02d}_0",
@@ -472,7 +472,7 @@ class CrossBankNetworkGenerator:
         elif scenario_id == "SCENARIO_6":
             # Scenario 6: Extreme Rarity at Bank Gamma (Alpha=40, Beta=25, Gamma=2)
             for inst in range(15):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 records.append({
                     "transaction_id": f"tx_sc6_{inst:02d}_a",
                     "step": base_step,
@@ -488,7 +488,7 @@ class CrossBankNetworkGenerator:
                 })
             # Only 2 instances reach Bank Gamma
             for inst in range(2):
-                base_step = int(self.rng.randint(5, timesteps - 10))
+                base_step = self.rng.randint(5, timesteps - 10)
                 records.append({
                     "transaction_id": f"tx_sc6_gamma_{inst:02d}",
                     "step": base_step,
@@ -509,7 +509,7 @@ class CrossBankNetworkGenerator:
             # We inject test transactions targeting Bank Gamma at later steps.
             for inst in range(20):
                 # Put strictly in later timesteps (test set)
-                base_step = int(self.rng.randint(int(timesteps * 0.82), timesteps - 2))
+                base_step = self.rng.randint(int(timesteps * 0.82), timesteps - 2)
                 records.append({
                     "transaction_id": f"tx_sc7_{inst:02d}",
                     "step": base_step,
