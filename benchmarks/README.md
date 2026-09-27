@@ -16,6 +16,7 @@ The benchmark suite provides reproducible quantitative evaluation across five co
 | **Byzantine Adversarial Defense** | `benchmarks/runners/run_byzantine_benchmark.py` | Sign Inversion, Noise | Robust PR-AUC (Krum, Trimmed Mean, Bulyan) |
 | **Graph Intelligence (GraphSAGE)**| `benchmarks/runners/run_graph_benchmark.py` | Elliptic Bitcoin Graph | Node PR-AUC, ROC-AUC, Temporal Split (Timestep 34) |
 | **Inference Gateway Latency** | `benchmarks/runners/run_latency_benchmark.py` | HTTP Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s) |
+| **Architectural Factorial Ablation** | `benchmarks/runners/run_factorial_ablation.py` | Synthetic Consortium ($2^4 = 16$ Grid) | PR-AUC, Recall @ 0.01% FPR, ANOVA Main Effects, Pareto Frontier |
 
 ---
 
@@ -80,6 +81,9 @@ python benchmarks/runners/run_graph_benchmark.py
 
 # 6. Run Real-Time Gateway Concurrency Stress Test
 python benchmarks/runners/run_latency_benchmark.py --workers 50
+
+# 7. Run Architectural Component Factorial Ablation Benchmark (Graph x DP x SecAgg x CrossBank)
+python benchmarks/runners/run_factorial_ablation.py --rounds 5 --local-epochs 2 --n-clients 5
 ```
 
 ---
@@ -112,6 +116,7 @@ benchmarks/results/
 │   ├── dp_privacy_utility_tradeoff.json
 │   ├── byzantine_benchmark_sign_inversion.json
 │   ├── graphsage_elliptic_benchmark.json
+│   ├── factorial_ablation_matrix.json
 │   └── latency_concurrency_benchmark.json
 └── summary.md
 ```

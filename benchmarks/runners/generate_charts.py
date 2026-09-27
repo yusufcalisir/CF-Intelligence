@@ -266,6 +266,22 @@ def generate_latency_concurrency(results_dir: Path, output_dir: Path):
     print(f"[+] Saved: {out_file}")
 
 
+def generate_factorial_ablation(results_dir: Path, output_dir: Path):
+    base_dir = results_dir.parents[1]
+    ablation_file = base_dir / "experiments" / "ablations" / "ablation_results.json"
+    if ablation_file.exists():
+        from experiments.ablations.factorial_runner import (
+            FactorialAblationSuiteResult,
+            generate_factorial_ablation_plot,
+        )
+        with open(ablation_file, encoding="utf-8") as f:
+            suite_data = json.load(f)
+        suite = FactorialAblationSuiteResult.model_validate(suite_data)
+        out_file = output_dir / "benchmark_factorial_ablations.png"
+        generate_factorial_ablation_plot(suite, out_file)
+        print(f"[+] Saved 4-panel factorial ablation figure: {out_file}")
+
+
 def main():
     root = Path(__file__).resolve().parents[2]
     results_dir = root / "benchmarks" / "results" / "raw"
@@ -276,6 +292,7 @@ def main():
     print("[*] Generating benchmark visualization charts...")
     generate_auc_comparison(results_dir, output_dir)
     generate_fl_convergence(results_dir, output_dir)
+    generate_factorial_ablation(results_dir, output_dir)
     generate_privacy_utility(results_dir, output_dir)
     generate_byzantine_resilience(results_dir, output_dir)
     generate_latency_concurrency(results_dir, output_dir)
