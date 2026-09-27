@@ -39,7 +39,7 @@ flowchart TD
 | Adversary Profile | Attacking Capabilities | Defense Mechanisms Applied | Guarantee / Bound |
 |:---|:---|:---|:---|
 | **Curious Coordinator** | Inspects aggregated and individual network payloads | Curve25519 Secure Aggregation (SecAgg) with zero-sum pairwise masking | Coordinator learns *only* $\sum \Delta w_k$; individual $\Delta w_k$ blinded ($|r(w_u, y_u)| < 0.05$, $H(y_u) \ge 31.95\text{ bits}$; verified in `test_zero_server_knowledge.py`) |
-| **Poisoned FL Client** | Injects label-flipping, sign-inversion, or backdoor triggers | Krum, Coordinate-wise Trimmed Mean, Bulyan, Spectral SVD | Tolerates up to $f < \frac{n-2}{2}$ Byzantine nodes |
+| **Poisoned FL Client** | Injects label-flipping, sign-inversion, or scaled updates ($100\times$) | Krum, Coordinate-wise Trimmed Mean, Bulyan, Spectral SVD | Tolerates up to $f < \frac{n-2}{2}$ (Krum), $n \ge 4f + 3$ (Bulyan); verified in `test_byzantine_defense_branches.py` |
 | **Reconstruction Attacker** | Executes gradient inversion (DLG) to reconstruct transaction PII | PyTorch Opacus Differential Privacy (DP-SGD) | Bounded privacy loss $(\epsilon, \delta)$ with RDP accountant |
 | **SSRF Webhook Exploiter** | Dispatches requests to internal microservices or cloud metadata | Perimeter WAF with DNS resolution pinning and RFC 1918 / 169.254 blocking | Hard network rejection with fail-closed architecture |
 | **Cross-Tenant Intruder** | Requests transaction, case, or alert IDs belonging to rival banks | Repository-level tenant scoping and ABAC claim enforcement | Strict isolation (HTTP 403 / 404 Forbidden) |

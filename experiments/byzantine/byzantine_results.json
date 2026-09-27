@@ -1,0 +1,1133 @@
+{
+  "timestamp_utc": "2026-09-27T21:32:48.501453+00:00",
+  "n_clients": 10,
+  "swept_f_values": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "swept_byzantine_fractions": [
+    0.0,
+    0.1,
+    0.2,
+    0.3,
+    0.4,
+    0.5,
+    0.6
+  ],
+  "attacks": [
+    "sign_flip",
+    "scaled_update",
+    "gaussian_noise",
+    "label_poisoning"
+  ],
+  "defenses": [
+    "FedAvg",
+    "Coordinate Median",
+    "Trimmed Mean (20%)",
+    "Krum",
+    "Bulyan"
+  ],
+  "breakdown_matrix": {
+    "FedAvg": {
+      "theoretical_max_f": 0,
+      "theoretical_max_fraction": 0.0,
+      "empirical_breakdown_by_attack": {
+        "sign_flip": 3,
+        "scaled_update": 2,
+        "gaussian_noise": 1,
+        "label_poisoning": 4
+      }
+    },
+    "Coordinate Median": {
+      "theoretical_max_f": 4,
+      "theoretical_max_fraction": 0.4,
+      "empirical_breakdown_by_attack": {
+        "sign_flip": 5,
+        "scaled_update": 5,
+        "gaussian_noise": 6,
+        "label_poisoning": 5
+      }
+    },
+    "Trimmed Mean (20%)": {
+      "theoretical_max_f": 2,
+      "theoretical_max_fraction": 0.2,
+      "empirical_breakdown_by_attack": {
+        "sign_flip": 4,
+        "scaled_update": 4,
+        "gaussian_noise": 5,
+        "label_poisoning": 5
+      }
+    },
+    "Krum": {
+      "theoretical_max_f": 3,
+      "theoretical_max_fraction": 0.3,
+      "empirical_breakdown_by_attack": {
+        "sign_flip": 5,
+        "scaled_update": 5,
+        "gaussian_noise": 6,
+        "label_poisoning": 5
+      }
+    },
+    "Bulyan": {
+      "theoretical_max_f": 1,
+      "theoretical_max_fraction": 0.1,
+      "empirical_breakdown_by_attack": {
+        "sign_flip": 5,
+        "scaled_update": 5,
+        "gaussian_noise": 6,
+        "label_poisoning": 5
+      }
+    }
+  },
+  "results": {
+    "sign_flip": {
+      "f_0_frac_0.00": {
+        "FedAvg": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9791,
+          "l2_error": 0.2042,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9986,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9734,
+          "l2_error": 0.2303,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9769,
+          "l2_error": 0.2153,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9941,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.9045,
+          "l2_error": 0.4666,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9789,
+          "l2_error": 0.2079,
+          "status": "RESILIENT"
+        }
+      },
+      "f_1_frac_0.10": {
+        "FedAvg": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9748,
+          "l2_error": 0.422,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9767,
+          "l2_error": 0.2214,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9808,
+          "l2_error": 0.1999,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9938,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.9001,
+          "l2_error": 0.4432,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9673,
+          "l2_error": 0.2548,
+          "status": "RESILIENT"
+        }
+      },
+      "f_2_frac_0.20": {
+        "FedAvg": {
+          "pr_auc": 0.9985,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9799,
+          "l2_error": 0.7815,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9979,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9849,
+          "l2_error": 0.1838,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9891,
+          "l2_error": 0.1477,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9962,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.934,
+          "l2_error": 0.4452,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9962,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.934,
+          "l2_error": 0.4452,
+          "status": "RESILIENT"
+        }
+      },
+      "f_3_frac_0.30": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9829,
+          "l2_error": 1.2045,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9834,
+          "l2_error": 0.2427,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9977,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9268,
+          "l2_error": 0.8081,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9519,
+          "l2_error": 0.3972,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9519,
+          "l2_error": 0.3972,
+          "status": "RESILIENT"
+        }
+      },
+      "f_4_frac_0.40": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9844,
+          "l2_error": 1.5664,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9965,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.8685,
+          "l2_error": 0.5562,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9427,
+          "l2_error": 1.4433,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.9965,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.8685,
+          "l2_error": 0.5562,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9965,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.8685,
+          "l2_error": 0.5562,
+          "status": "RESILIENT"
+        }
+      },
+      "f_5_frac_0.50": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9732,
+          "l2_error": 2.0082,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9407,
+          "l2_error": 2.2795,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9575,
+          "l2_error": 2.1262,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9407,
+          "l2_error": 2.2795,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9407,
+          "l2_error": 2.2795,
+          "status": "BROKEN"
+        }
+      },
+      "f_6_frac_0.60": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9574,
+          "l2_error": 2.5796,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9574,
+          "l2_error": 4.4082,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9618,
+          "l2_error": 3.0021,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9574,
+          "l2_error": 4.4082,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9574,
+          "l2_error": 4.4082,
+          "status": "BROKEN"
+        }
+      }
+    },
+    "scaled_update": {
+      "f_0_frac_0.00": {
+        "FedAvg": {
+          "pr_auc": 0.9986,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9764,
+          "l2_error": 0.2184,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9804,
+          "l2_error": 0.1977,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9765,
+          "l2_error": 0.2173,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9961,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9257,
+          "l2_error": 0.4221,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9702,
+          "l2_error": 0.2449,
+          "status": "RESILIENT"
+        }
+      },
+      "f_1_frac_0.10": {
+        "FedAvg": {
+          "pr_auc": 0.8947,
+          "roc_auc": 0.9985,
+          "cosine_sim": 0.9797,
+          "l2_error": 9.7629,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9748,
+          "l2_error": 0.2357,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9749,
+          "l2_error": 0.2409,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9672,
+          "l2_error": 0.4295,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9738,
+          "l2_error": 0.2306,
+          "status": "RESILIENT"
+        }
+      },
+      "f_2_frac_0.20": {
+        "FedAvg": {
+          "pr_auc": 0.2772,
+          "roc_auc": 0.9659,
+          "cosine_sim": 0.9887,
+          "l2_error": 18.7049,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9556,
+          "l2_error": 0.3216,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9979,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9564,
+          "l2_error": 0.331,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9938,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.8379,
+          "l2_error": 0.5464,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9938,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.8379,
+          "l2_error": 0.5464,
+          "status": "RESILIENT"
+        }
+      },
+      "f_3_frac_0.30": {
+        "FedAvg": {
+          "pr_auc": 0.1541,
+          "roc_auc": 0.9282,
+          "cosine_sim": 0.9654,
+          "l2_error": 27.5212,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9955,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9161,
+          "l2_error": 0.5044,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.4146,
+          "roc_auc": 0.9815,
+          "cosine_sim": 0.9644,
+          "l2_error": 15.432,
+          "status": "DEGRADED"
+        },
+        "Krum": {
+          "pr_auc": 0.9884,
+          "roc_auc": 0.9995,
+          "cosine_sim": 0.8797,
+          "l2_error": 0.5418,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9884,
+          "roc_auc": 0.9995,
+          "cosine_sim": 0.8797,
+          "l2_error": 0.5418,
+          "status": "RESILIENT"
+        }
+      },
+      "f_4_frac_0.40": {
+        "FedAvg": {
+          "pr_auc": 0.0988,
+          "roc_auc": 0.8807,
+          "cosine_sim": 0.9607,
+          "l2_error": 42.0009,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9871,
+          "roc_auc": 0.9996,
+          "cosine_sim": 0.8926,
+          "l2_error": 0.7694,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.1172,
+          "roc_auc": 0.9015,
+          "cosine_sim": 0.9602,
+          "l2_error": 35.1643,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.9871,
+          "roc_auc": 0.9996,
+          "cosine_sim": 0.8926,
+          "l2_error": 0.7694,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9871,
+          "roc_auc": 0.9996,
+          "cosine_sim": 0.8926,
+          "l2_error": 0.7694,
+          "status": "RESILIENT"
+        }
+      },
+      "f_5_frac_0.50": {
+        "FedAvg": {
+          "pr_auc": 0.0829,
+          "roc_auc": 0.8553,
+          "cosine_sim": 0.9609,
+          "l2_error": 53.2297,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0824,
+          "roc_auc": 0.8543,
+          "cosine_sim": 0.9603,
+          "l2_error": 53.5265,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0829,
+          "roc_auc": 0.8553,
+          "cosine_sim": 0.9607,
+          "l2_error": 53.3569,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0824,
+          "roc_auc": 0.8543,
+          "cosine_sim": 0.9603,
+          "l2_error": 53.5265,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0824,
+          "roc_auc": 0.8543,
+          "cosine_sim": 0.9603,
+          "l2_error": 53.5265,
+          "status": "BROKEN"
+        }
+      },
+      "f_6_frac_0.60": {
+        "FedAvg": {
+          "pr_auc": 0.0811,
+          "roc_auc": 0.8517,
+          "cosine_sim": 0.9368,
+          "l2_error": 54.75,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0642,
+          "roc_auc": 0.8094,
+          "cosine_sim": 0.9368,
+          "l2_error": 91.2587,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0756,
+          "roc_auc": 0.8399,
+          "cosine_sim": 0.9368,
+          "l2_error": 60.9253,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0642,
+          "roc_auc": 0.8094,
+          "cosine_sim": 0.9368,
+          "l2_error": 91.2587,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0642,
+          "roc_auc": 0.8094,
+          "cosine_sim": 0.9368,
+          "l2_error": 91.2587,
+          "status": "BROKEN"
+        }
+      }
+    },
+    "gaussian_noise": {
+      "f_0_frac_0.00": {
+        "FedAvg": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9741,
+          "l2_error": 0.2266,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9528,
+          "l2_error": 0.3038,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9661,
+          "l2_error": 0.2586,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9967,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9087,
+          "l2_error": 0.4667,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9674,
+          "l2_error": 0.255,
+          "status": "RESILIENT"
+        }
+      },
+      "f_1_frac_0.10": {
+        "FedAvg": {
+          "pr_auc": 0.0221,
+          "roc_auc": 0.4278,
+          "cosine_sim": -0.0578,
+          "l2_error": 4.8218,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9684,
+          "l2_error": 0.2563,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9685,
+          "l2_error": 0.2587,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9944,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.8901,
+          "l2_error": 0.4778,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.968,
+          "l2_error": 0.2593,
+          "status": "RESILIENT"
+        }
+      },
+      "f_2_frac_0.20": {
+        "FedAvg": {
+          "pr_auc": 0.1286,
+          "roc_auc": 0.7635,
+          "cosine_sim": 0.1857,
+          "l2_error": 5.5067,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9941,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.9616,
+          "l2_error": 0.2868,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9949,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.9624,
+          "l2_error": 0.2787,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9923,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.8961,
+          "l2_error": 0.4445,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9923,
+          "roc_auc": 0.9998,
+          "cosine_sim": 0.8961,
+          "l2_error": 0.4445,
+          "status": "RESILIENT"
+        }
+      },
+      "f_3_frac_0.30": {
+        "FedAvg": {
+          "pr_auc": 0.2209,
+          "roc_auc": 0.8495,
+          "cosine_sim": 0.2623,
+          "l2_error": 7.0664,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.98,
+          "l2_error": 0.2321,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.8183,
+          "roc_auc": 0.9884,
+          "cosine_sim": 0.5761,
+          "l2_error": 1.7346,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9988,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9498,
+          "l2_error": 0.3647,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9988,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9498,
+          "l2_error": 0.3647,
+          "status": "RESILIENT"
+        }
+      },
+      "f_4_frac_0.40": {
+        "FedAvg": {
+          "pr_auc": 0.5899,
+          "roc_auc": 0.9601,
+          "cosine_sim": 0.432,
+          "l2_error": 9.6572,
+          "status": "DEGRADED"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9555,
+          "l2_error": 0.4592,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9468,
+          "roc_auc": 0.9974,
+          "cosine_sim": 0.6875,
+          "l2_error": 3.0008,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9555,
+          "l2_error": 0.4592,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9555,
+          "l2_error": 0.4592,
+          "status": "RESILIENT"
+        }
+      },
+      "f_5_frac_0.50": {
+        "FedAvg": {
+          "pr_auc": 0.0607,
+          "roc_auc": 0.6664,
+          "cosine_sim": 0.1085,
+          "l2_error": 7.8303,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9494,
+          "l2_error": 0.328,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0298,
+          "roc_auc": 0.5443,
+          "cosine_sim": 0.0309,
+          "l2_error": 3.5444,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9494,
+          "l2_error": 0.328,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9494,
+          "l2_error": 0.328,
+          "status": "RESILIENT"
+        }
+      },
+      "f_6_frac_0.60": {
+        "FedAvg": {
+          "pr_auc": 0.0283,
+          "roc_auc": 0.4399,
+          "cosine_sim": -0.0374,
+          "l2_error": 8.5743,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.2947,
+          "roc_auc": 0.8414,
+          "cosine_sim": 0.2967,
+          "l2_error": 1.6329,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.085,
+          "roc_auc": 0.6396,
+          "cosine_sim": 0.1037,
+          "l2_error": 6.2768,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.2947,
+          "roc_auc": 0.8414,
+          "cosine_sim": 0.2967,
+          "l2_error": 1.6329,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.2947,
+          "roc_auc": 0.8414,
+          "cosine_sim": 0.2967,
+          "l2_error": 1.6329,
+          "status": "BROKEN"
+        }
+      }
+    },
+    "label_poisoning": {
+      "f_0_frac_0.00": {
+        "FedAvg": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9889,
+          "l2_error": 0.1499,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.98,
+          "l2_error": 0.214,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9845,
+          "l2_error": 0.1866,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9977,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9318,
+          "l2_error": 0.3845,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9996,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9816,
+          "l2_error": 0.1993,
+          "status": "RESILIENT"
+        }
+      },
+      "f_1_frac_0.10": {
+        "FedAvg": {
+          "pr_auc": 0.9986,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9714,
+          "l2_error": 0.2747,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9761,
+          "l2_error": 0.2359,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9725,
+          "l2_error": 0.2489,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9981,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9658,
+          "l2_error": 0.3854,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9986,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9598,
+          "l2_error": 0.3496,
+          "status": "RESILIENT"
+        }
+      },
+      "f_2_frac_0.20": {
+        "FedAvg": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.977,
+          "l2_error": 0.4991,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9986,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.976,
+          "l2_error": 0.218,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9993,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9811,
+          "l2_error": 0.1993,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.9976,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9674,
+          "l2_error": 0.3338,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.9976,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9674,
+          "l2_error": 0.3338,
+          "status": "RESILIENT"
+        }
+      },
+      "f_3_frac_0.30": {
+        "FedAvg": {
+          "pr_auc": 0.9989,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9758,
+          "l2_error": 0.7469,
+          "status": "RESILIENT"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.9982,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9828,
+          "l2_error": 0.2573,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9992,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9755,
+          "l2_error": 0.555,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 0.997,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9331,
+          "l2_error": 0.4183,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 0.997,
+          "roc_auc": 0.9999,
+          "cosine_sim": 0.9331,
+          "l2_error": 0.4183,
+          "status": "RESILIENT"
+        }
+      },
+      "f_4_frac_0.40": {
+        "FedAvg": {
+          "pr_auc": 0.3327,
+          "roc_auc": 0.8975,
+          "cosine_sim": 0.3135,
+          "l2_error": 0.9974,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9637,
+          "l2_error": 0.5265,
+          "status": "RESILIENT"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.9832,
+          "roc_auc": 0.9995,
+          "cosine_sim": 0.8154,
+          "l2_error": 0.9392,
+          "status": "RESILIENT"
+        },
+        "Krum": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9637,
+          "l2_error": 0.5265,
+          "status": "RESILIENT"
+        },
+        "Bulyan": {
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "cosine_sim": 0.9637,
+          "l2_error": 0.5265,
+          "status": "RESILIENT"
+        }
+      },
+      "f_5_frac_0.50": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9625,
+          "l2_error": 1.2472,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0002,
+          "cosine_sim": -0.8636,
+          "l2_error": 1.4704,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9083,
+          "l2_error": 1.3414,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0002,
+          "cosine_sim": -0.8636,
+          "l2_error": 1.4704,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0002,
+          "cosine_sim": -0.8636,
+          "l2_error": 1.4704,
+          "status": "BROKEN"
+        }
+      },
+      "f_6_frac_0.60": {
+        "FedAvg": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9669,
+          "l2_error": 1.4754,
+          "status": "BROKEN"
+        },
+        "Coordinate Median": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9682,
+          "l2_error": 2.4116,
+          "status": "BROKEN"
+        },
+        "Trimmed Mean (20%)": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0001,
+          "cosine_sim": -0.9491,
+          "l2_error": 1.7122,
+          "status": "BROKEN"
+        },
+        "Krum": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9682,
+          "l2_error": 2.4116,
+          "status": "BROKEN"
+        },
+        "Bulyan": {
+          "pr_auc": 0.0131,
+          "roc_auc": 0.0,
+          "cosine_sim": -0.9682,
+          "l2_error": 2.4116,
+          "status": "BROKEN"
+        }
+      }
+    }
+  }
+}
