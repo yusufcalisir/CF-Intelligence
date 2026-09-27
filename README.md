@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3494%2F3494_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3528%2F3528_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -698,7 +698,7 @@ CF-Intelligence/
 │   ├── mathematical/                                # Master mathematical protocol & 35 formal invariant proofs
 │   ├── federated_learning/                          # FL convergence, Non-IID Dirichlet skew & optimizer audits
 │   ├── differential_privacy/                        # Opacus DP noise scale & Rényi DP moments accountant verification (test_dp_bounds.py)
-│   ├── secure_aggregation/                          # Curve25519 SecAgg pairwise masking & Shamir recovery audits
+│   ├── secure_aggregation/                          # Curve25519 SecAgg pairwise masking, Shamir recovery & zero-knowledge boundary audits
 │   ├── zero_trust_pki/                              # Vault PKI, mTLS certificate lifecycles & ABAC policy audits
 │   ├── risk_scoring/                                # 9-Signal composite scoring & sub-100ms inference SLA audit
 │   ├── explainability/                              # SHAP feature attributions & counterfactual generator audits
@@ -1288,7 +1288,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,158 / 3,158 passing (3,494 total incl. verification)** | 100% | 2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 336 Scientific Verification Tests across 19 modules) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,158 / 3,158 passing (3,528 total incl. verification)** | 100% | 2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 370 Scientific Verification Tests across 19 modules) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1487,7 +1487,7 @@ The reports below document the internal scientific verification suites validatin
 | **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py` | [Verification Report ↗](verification/federated_learning/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Differential Privacy** | `privacy_service.py`, `psi_service.py` | [Verification Report ↗](verification/differential_privacy/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **RDP Moments Accounting** | `rdp_accountant.py`, `test_dp_bounds.py` | [Verification Report ↗](verification/differential_privacy/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
-| **Secure Aggregation** | `p2p_secagg_driver.py`, `shamir_engine.py` | [Verification Report ↗](verification/secure_aggregation/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
+| **Secure Aggregation** | `p2p_secagg_driver.py`, `shamir_engine.py`, `test_secagg_correctness.py` | [Verification Report ↗](verification/secure_aggregation/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Zero-Trust PKI & ABAC** | `vault_client.py`, `abac_engine.py` | [Verification Report ↗](verification/zero_trust_pki/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Federation Coordinator** | `coordinator_service.py` | [Verification Report ↗](verification/federation_coordinator/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **AML Risk Scoring Engine** | `risk_engine.py`, `alert_service.py` | [Verification Report ↗](verification/risk_scoring/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
@@ -2724,7 +2724,7 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,158 Tests Core / 3,468 Total)
+### Step 5: Master Test Suites Execution (3,158 Tests Core / 3,528 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
 # 1. Run full backend pytest suite (2,789 tests)
@@ -2746,7 +2746,7 @@ npm --prefix frontend run test:visual
 # 6. Run Kubernetes manifest dry-run validation suite (39 rendered resources)
 python scripts/validate_k8s_manifests.py --all
 
-# 7. Run master scientific invariant verification suite (18 modules, 310 tests)
+# 7. Run master scientific invariant verification suite (19 modules, 370 tests)
 python scripts/run_all_verifications.py
 ```
 

@@ -35,8 +35,10 @@ while remaining cryptographically blinded to any individual bank's contribution 
 ---
 
 ## 3. Threat Model & Security Assumptions
-- **Adversary Limit**: Protects against an honest-but-curious coordinator colluding with up to $t-1$ corrupted clients.
-- **Collusion Bound**: Requires at least $t$ honest clients to guarantee secrecy of dropped client updates ($t \ge \lfloor \frac{n}{2} \rfloor + 1$).
+- **Adversary Limit**: Protects against an honest-but-curious coordinator colluding with up to $N - 2$ corrupted clients.
+- **Collusion Bound**: Requires at least 2 honest clients $(u, v)$ to guarantee complete confidentiality of model updates; their mutual pairwise mask $s_{u,v}$ prevents the coordinator and all $N - 2$ colluding participants from unblinding individual updates.
+- **Information-Theoretic Barrier**: In the event of $N - 1$ colluding participants, the remaining client's update is algebraically determined by subtracting known weights from the global sum $S - \sum_{i \neq u} w_i = w_u$, representing the fundamental information-theoretic limit of all additive aggregation protocols.
+- **Replay & Tamper Resistance**: Ephemeral Curve25519 key agreements combined with round-salted HKDF-SHA256 derivation (`cfi:secagg:round:{round_id}`) prevent cross-round replay and mask injection attacks.
 
 ---
 
@@ -50,6 +52,14 @@ while remaining cryptographically blinded to any individual bank's contribution 
 
 ---
 
-## 5. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_p2p_secagg_driver.py`](file:///backend/tests/unit/test_p2p_secagg_driver.py)
-- **Shamir Engine**: [`backend/tests/unit/test_shamir_engine.py`](file:///backend/tests/unit/test_shamir_engine.py)
+## 5. Test Suite Verification & Scientific Proofs
+- **Scientific Verification Suite (53 Passing Tests)**:
+  - [`verification/secure_aggregation/tests/test_secagg_correctness.py`](file:///verification/secure_aggregation/tests/test_secagg_correctness.py): 27 mathematical tests proving exact pairwise mask cancellation $\sum_{u \in U} \text{masks}_u \equiv \mathbf{0} \pmod{2^{32}}$ for $N \in \{2, 3, 5, 8\}$ and dimensions $d \in \{1, 16, 256, 1024, 20000\}$, with floating-point equivalence $|w_{\text{secagg}} - w_{\text{plain}}| < 10^{-6}$.
+  - [`verification/secure_aggregation/tests/test_zero_server_knowledge.py`](file:///verification/secure_aggregation/tests/test_zero_server_knowledge.py): 7 statistical and cryptographic tests verifying $|r(w_u, y_u)| < 0.05$ (zero correlation), Shannon entropy $H(y_u) \ge 31.95\text{ bits}$, $N-2$ non-collusion protection, Shamir $(t, n)$ dropout privacy, and round isolation.
+  - [`verification/secure_aggregation/tests/test_secagg_hypothesis.py`](file:///verification/secure_aggregation/tests/test_secagg_hypothesis.py): 6 Hypothesis property-based tests verifying unweighted and weighted zero-sum invariants.
+  - [`verification/secure_aggregation/tests/test_secagg_robustness.py`](file:///verification/secure_aggregation/tests/test_secagg_robustness.py): 12 failure injection and protocol stress scenarios.
+  - [`verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py`](file:///verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py): TenSEAL CKKS homomorphic linearity verification.
+- **Unit & Integration Tests**:
+  - [`backend/tests/unit/test_p2p_secagg_driver.py`](file:///backend/tests/unit/test_p2p_secagg_driver.py): 16 unit tests covering Curve25519 ECDH key exchange, HMAC bundle signing, PRNG counter expansion, and modular arithmetic.
+  - [`backend/tests/unit/test_p2p_secagg_dropout_recovery.py`](file:///backend/tests/unit/test_p2p_secagg_dropout_recovery.py): Dropout reconstruction using Shamir $(t, n)$ shares.
+  - [`backend/tests/unit/test_shamir_engine.py`](file:///backend/tests/unit/test_shamir_engine.py): Polynomial secret sharing primitives over Galois fields.
