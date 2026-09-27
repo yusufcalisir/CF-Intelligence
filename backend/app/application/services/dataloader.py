@@ -1343,10 +1343,10 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     # 3. Temporal features along TransactionDT
     transaction_dt: np.ndarray | None = None
     if "TransactionDT" in df.columns:
-        dt_vals = np.asarray(df["TransactionDT"].values, dtype=np.float64)
-        df["dt_day"] = ((dt_vals // 86400) % 7).astype(np.float32)
-        df["dt_hour"] = ((dt_vals // 3600) % 24).astype(np.float32)
-        transaction_dt = dt_vals
+        dt_series = pd.to_numeric(df["TransactionDT"], errors="coerce").fillna(0)
+        df["dt_day"] = ((dt_series // 86400) % 7).astype(np.float32)
+        df["dt_hour"] = ((dt_series // 3600) % 24).astype(np.float32)
+        transaction_dt = np.asarray(dt_series.values, dtype=np.float64)
 
     # 4. Amount log transformation
     if "TransactionAmt" in df.columns:
