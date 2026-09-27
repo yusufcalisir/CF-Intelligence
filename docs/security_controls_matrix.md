@@ -20,7 +20,7 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`SOC2-CC6.8`** | SOC 2 Type II | Multi-Layer L7 DDoS protection & `slowapi` granular rate limiting | `DDoSProtectionMiddleware`, `rate_limiter.py` | `test_ddos_middleware.py` | `PASS` |
 | **`SOC2-CC7.2`** | SOC 2 Type II | Tamper-evident append-only SHA-256 cryptographic audit chain | `ImmutableAuditChain` (`immutable_audit_chain.py`) | `test_enterprise_security_suite.py` | `PASS` |
 | **`ISO27001-A.9.4.2`** | ISO 27001 | Four-Eyes supervisor dual-authorization signature on case closure | `CaseLifecycleStateMachine` (`case_workbench.py`) | `test_case_management_workbench.py` | `PASS` |
-| **`ISO27001-A.12.1.2`** | ISO 27001 | Gaussian DP noise ($\epsilon \le 1.0, \delta = 10^{-5}$) & Rényi accounting | `OpacusDPGuard`, `PrivacyAuditService` | `test_privacy_service.py` | `PASS` |
+| **`ISO27001-A.12.1.2`** | ISO 27001 | Gaussian DP noise ($\epsilon \le 2.0, \delta = 10^{-5}$), RDP Moments Accounting & Utility Frontier | `OpacusDPGuard`, `RDPMomentsAccountant`, `PrivacyAuditService` | `test_privacy_service.py`<br/>`test_dp_bounds.py` | `PASS` |
 | **`ISO27001-A.12.6.1`** | ISO 27001 | Formal STRIDE threat model covering 6 attack pillars | `docs/threat_model.md` | `test_byzantine_defense_validation.py` | `PASS` |
 | **`SOC2-CC6.9`** | SOC 2 Type II | Zero-Vulnerability Supply Chain Security & Pinned Security Floor | `backend/requirements.txt`, Dependabot Policy | `pytest backend/tests/` | `PASS` |
 | **`GDPR-ART-25`** | GDPR Art. 25 | Privacy by Design: Client-Side Luhn PAN & Type-Salted HMAC Sanitization | `piiSanitizer.ts`, `DatasetDropzone.tsx` | `test_dataset_ingestor.py` | `PASS` |
@@ -38,7 +38,7 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 
 ## 🔒 Verification References
 
-All controls listed above are automatically verified by the continuous testing pipeline across **3,158 automated tests** (2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts) and 18 scientific verification audit modules (310 verification tests; 3,468 total).
+All controls listed above are automatically verified by the continuous testing pipeline across **3,158 automated tests** (2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts) and 19 scientific verification audit modules (336 verification tests; 3,494 total).
 
 
 

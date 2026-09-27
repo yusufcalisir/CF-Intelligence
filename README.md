@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3468%2F3468_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3494%2F3494_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -441,6 +441,7 @@ CF-Intelligence/
 │   │   │   │   ├── rate_limiter.py                  # slowapi granular route quotas & DDoS sliding window protection
 │   │   │   │   ├── immutable_audit_chain.py         # Tamper-evident append-only SHA-256 cryptographic audit chain
 │   │   │   │   ├── adaptive_dp_autoscaler.py        # Dynamic (epsilon, delta) budget autoscaler on distribution drift
+│   │   │   │   ├── rdp_accountant.py                # Rényi Differential Privacy (RDP) moments accountant & noise calibrator
 │   │   │   │   ├── oidc_authenticator.py            # OpenID Connect (OIDC) JWT provider integration
 │   │   │   │   ├── signature_verifier.py            # eIDAS QWAC/QSeal & ECDSA digital signature verifier
 │   │   │   │   ├── compression_engine.py            # Gradient quantization & Zstandard compression engine
@@ -692,11 +693,11 @@ CF-Intelligence/
 │   ├── real_world_benchmarks.md                     # Empirical validation on PaySim, IEEE-CIS & Elliptic datasets
 │   └── ...                                          # Additional operational, API, and deployment documentation
 │
-├── verification/                                    # 18 Scientific Subsystem Self-Verification Modules
+├── verification/                                    # 19 Scientific Subsystem Self-Verification Modules
 │   ├── README.md                                    # Master scientific audit catalog & mathematical verification index
 │   ├── mathematical/                                # Master mathematical protocol & 35 formal invariant proofs
 │   ├── federated_learning/                          # FL convergence, Non-IID Dirichlet skew & optimizer audits
-│   ├── differential_privacy/                        # Opacus DP noise scale & Rényi DP accounting verification
+│   ├── differential_privacy/                        # Opacus DP noise scale & Rényi DP moments accountant verification (test_dp_bounds.py)
 │   ├── secure_aggregation/                          # Curve25519 SecAgg pairwise masking & Shamir recovery audits
 │   ├── zero_trust_pki/                              # Vault PKI, mTLS certificate lifecycles & ABAC policy audits
 │   ├── risk_scoring/                                # 9-Signal composite scoring & sub-100ms inference SLA audit
@@ -1287,28 +1288,34 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,158 / 3,158 passing (3,468 total incl. verification)** | 100% | 2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 310 Scientific Verification Tests) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,158 / 3,158 passing (3,494 total incl. verification)** | 100% | 2,789 Backend Pytest + 341 Frontend Vitest + 28 Smart Contracts (+ 336 Scientific Verification Tests across 19 modules) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
 ### 15.2 Empirical Differential Privacy Utility Frontier (`benchmarks/runners/run_dp_tradeoff.py`)
 
-Using PyTorch Opacus and Rényi Differential Privacy (RDP) moments accounting, the platform empirically evaluates the privacy-utility frontier across varying Gaussian noise scales:
+Using Rényi Differential Privacy (RDP) moments accounting (`RDPMomentsAccountant`, Mironov 2017) and Gaussian gradient perturbation across $\sigma \in \{0.5, 1.0, 1.5, 2.0\} \times T \in \{5, 10, 20, 50\}$ ($q=0.05, \delta=10^{-5}$), the platform empirically evaluates the privacy-utility Pareto frontier and calibrates noise multiplier $\sigma^* = 0.8870$ for statutory target $\epsilon \le 2.0$:
 
-| Noise Scale ($\sigma$) | RDP Privacy Budget ($\epsilon$) | Risk Model PR-AUC | Risk Model ROC-AUC | Privacy Guarantee Level |
-|:---|:---|:---:|:---:|:---|
-| $\sigma = 3.0$ | $\epsilon = 1.858$ ($\delta=10^{-5}$) | **0.1963** | 0.8301 | Strong Privacy (High Perturbation) |
-| $\sigma = 2.0$ | $\epsilon = 2.839$ ($\delta=10^{-5}$) | **0.0722** | 0.7470 | Moderate-Strong Privacy |
-| $\sigma = 1.2$ | $\epsilon = 4.910$ ($\delta=10^{-5}$) | **0.3081** | 0.8944 | Balanced Privacy / Utility |
-| $\sigma = 0.8$ | $\epsilon = 7.696$ ($\delta=10^{-5}$) | **0.2833** | 0.9244 | Moderate Privacy |
-| $\sigma = 0.4$ | $\epsilon = 17.323$ ($\delta=10^{-5}$) | **0.6205** | 0.9687 | Weak Privacy (Low Noise) |
-| $\sigma = 0.0$ | $\infty$ (Non-Private Baseline) | **0.6272** | 0.9684 | Zero Privacy (Pure Baseline) |
+| Noise Scale ($\sigma$) | Rounds ($T$) | RDP Privacy Loss ($\epsilon$) | Optimal Order ($\alpha^*$) | Risk Model PR-AUC | Risk Model ROC-AUC | Privacy Compliance ($\epsilon \le 2.0$) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---|
+| $\sigma = 0.5$ | 5 | $\epsilon = 1.1006$ | $\alpha = 24$ | **0.0176** | 0.3576 | ✅ Compliant |
+| $\sigma = 0.5$ | 10 | $\epsilon = 1.5675$ | $\alpha = 16$ | **0.0793** | 0.6672 | ✅ Compliant |
+| $\sigma = 0.5$ | 20 | $\epsilon = 2.2466$ | $\alpha = 12$ | **0.2944** | 0.8525 | ⚠️ Budget Exceeded |
+| $\sigma = 0.5$ | 50 | $\epsilon = 3.6447$ | $\alpha = 8$ | **0.6599** | 0.9810 | ⚠️ Budget Exceeded |
+| $\sigma = 1.0$ | 5 | $\epsilon = 0.5450$ | $\alpha = 48$ | **0.0141** | 0.2317 | ✅ Compliant (High Privacy) |
+| $\sigma = 1.0$ | 10 | $\epsilon = 0.7714$ | $\alpha = 32$ | **0.0255** | 0.3996 | ✅ Compliant |
+| $\sigma = 1.0$ | 20 | $\epsilon = 1.1006$ | $\alpha = 24$ | **0.0566** | 0.5557 | ✅ Compliant |
+| $\sigma = 1.0$ | 50 | $\epsilon = 1.7675$ | $\alpha = 16$ | **0.3922** | 0.9452 | ✅ Compliant (Recommended $\sigma$) |
+| $\sigma = 1.5$ | 20 | $\epsilon = 0.7269$ | $\alpha = 32$ | **0.0236** | 0.3834 | ✅ Compliant |
+| $\sigma = 1.5$ | 50 | $\epsilon = 1.1672$ | $\alpha = 24$ | **0.2075** | 0.8942 | ✅ Compliant |
+| $\sigma = 2.0$ | 20 | $\epsilon = 0.5450$ | $\alpha = 48$ | **0.0183** | 0.3055 | ✅ Compliant |
+| $\sigma = 2.0$ | 50 | $\epsilon = 0.8714$ | $\alpha = 32$ | **0.1106** | 0.8368 | ✅ Compliant (Maximum Defense) |
 
 <div align="center">
   <img src="docs/figures/benchmark_privacy_utility.png" alt="Differential Privacy vs Model Utility Frontier" width="750" />
 </div>
 
-*Artifact: [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)*
+*Artifacts: [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json), [`experiments/dp_evaluation/audit_dossier.md`](experiments/dp_evaluation/audit_dossier.md)*
 
 ---
 
@@ -1479,6 +1486,7 @@ The reports below document the internal scientific verification suites validatin
 | :--- | :--- | :--- | :---: |
 | **Federated Learning Engine** | `fl_engine.py`, `flower_engine.py` | [Verification Report ↗](verification/federated_learning/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Differential Privacy** | `privacy_service.py`, `psi_service.py` | [Verification Report ↗](verification/differential_privacy/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
+| **RDP Moments Accounting** | `rdp_accountant.py`, `test_dp_bounds.py` | [Verification Report ↗](verification/differential_privacy/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Secure Aggregation** | `p2p_secagg_driver.py`, `shamir_engine.py` | [Verification Report ↗](verification/secure_aggregation/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Zero-Trust PKI & ABAC** | `vault_client.py`, `abac_engine.py` | [Verification Report ↗](verification/zero_trust_pki/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |
 | **Federation Coordinator** | `coordinator_service.py` | [Verification Report ↗](verification/federation_coordinator/scientific_audit_report.md) | `Self-Verified (Internal Test Suite)` |

@@ -52,7 +52,7 @@ Contains business logic orchestration. Defines ports (interfaces) for data acces
 * [`services/regulatory_reporter.py`](../backend/app/application/services/regulatory_reporter.py): [`RegulatoryReporterService`](../backend/app/application/services/regulatory_reporter.py#L30) generating FinCEN BSA XML 2.0 payloads and validating against `schemas/FinCEN_SAR_2.0.xsd`.
 * [`services/model_service.py`](../backend/app/application/services/model_service.py): Lifecycle of the PyTorch MLP model (training, CPU/GPU evaluation, Integrated Gradients attributions).
 * [`services/fl_engine.py`](../backend/app/application/services/fl_engine.py): Core Federated Learning engine orchestrating multi-client training rounds across FedAvg, FedProx ($\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}_t\|^2$), SCAFFOLD, FedAdam, FedAdaGrad, FedYogi, Krum, Trimmed Mean, Coordinate-wise Median, and Bulyan, with thread-safe simulation concurrency locks and zero-memory-leak state lifecycle cleanup.
-* [`services/privacy_service.py`](../backend/app/application/services/privacy_service.py): Bounded L2 gradient clipping and Gaussian mechanism noise addition.
+* [`services/privacy_service.py`](../backend/app/application/services/privacy_service.py) & [`services/rdp_accountant.py`](../backend/app/application/services/rdp_accountant.py): Bounded L2 gradient clipping, Gaussian mechanism noise addition, and Rényi Differential Privacy (RDP) moments accounting with optimal order search over $\alpha \in [1.5, 512]$, analytical subsampled Gaussian RDP composition, binary search noise calibration $\sigma^*$, and strict privacy budget enforcement.
 * [`services/risk_engine.py`](../backend/app/application/services/risk_engine.py): Combines 9 independent heuristic and ML signals into a single score ($0 \text{ to } 1000$).
 * [`services/entity_resolution.py`](../backend/app/application/services/entity_resolution.py): Computes deterministic one-way HMAC-SHA256 privacy hashes for account and device identifiers.
 * [`services/explainability_service.py`](../backend/app/application/services/explainability_service.py): Computes SHAP attributions using `shap.KernelExplainer` with analytical fallbacks.
@@ -620,15 +620,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,765 Backend + 310 Verification Automated Suites)
+     └── 6. pytest-security-and-compliance-suites (2,789 Backend + 336 Verification Automated Suites across 19 modules)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,765 backend automated tests** (and 310 scientific verification tests) across unit, integration, and property-based suites:
+The entire codebase is validated by **2,789 backend automated tests** (and 336 scientific verification tests across 19 modules; 3,494 total system tests) across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,765 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,789 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -638,7 +638,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,789 automated backend tests (+ 310 scientific verification tests) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Prometheus/SIEM Telemetry Export, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,789 automated backend tests (+ 336 scientific verification tests across 19 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Prometheus/SIEM Telemetry Export, and DR Failover |
 
 
 

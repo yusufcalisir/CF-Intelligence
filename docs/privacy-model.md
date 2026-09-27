@@ -76,7 +76,9 @@ For Gaussian perturbation mechanism with noise scale $\sigma$ and subsampling ra
 $$\mathcal{D}_{\alpha}(\mathcal{M}(D) \,\|\, \mathcal{M}(D')) \le \frac{q^2 \alpha}{2 \sigma^2} + O(q^3)$$
 
 - **Clipping Norm ($C$)**: Fixed at $C = 1.0$ L2 norm, bounding maximum sensitivity $\Delta_2 = C$.
-- **Target Budget**: Cumulative $(\epsilon = 1.0, \delta = 10^{-5})$ over 50 communication rounds.
+- **Target Budget**: Cumulative $(\epsilon \le 2.0, \delta = 10^{-5})$ over 50 communication rounds ($q = 0.05$).
+- **Calibrated Noise Multiplier**: Formally calibrated via binary search in `RDPMomentsAccountant` (`rdp_accountant.py`): $\sigma^* = 0.8870$ achieves $\epsilon \le 2.0$ at $T = 50$ federation rounds under analytical RDP conversion ($q=0.05, \delta=10^{-5}$).
+- **Empirical Utility Frontier**: Evaluated in `experiments/dp_evaluation/run_dp_noise_sweep.py` across $\sigma \in \{0.5, 1.0, 1.5, 2.0\} \times T \in \{5, 10, 20, 50\}$, maintaining $\operatorname{PR-AUC} = 0.3922$ ($\operatorname{ROC-AUC} = 0.9452$) at $\sigma=1.0, T=50$ ($\epsilon = 1.7675 \le 2.0$).
 - **Exhaustion Enforcement**: If a bank node exhausts its allocated privacy budget ($\epsilon_{\mathrm{spent}} > \epsilon_{\mathrm{budget}}$), the local daemon automatically transitions to inference-only mode, terminating gradient transmission.
 
 ---

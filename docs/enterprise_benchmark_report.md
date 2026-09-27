@@ -683,6 +683,46 @@ The multi-objective Pareto frontier balances detection utility ($\operatorname{P
 
 ---
 
+### 3.14 Differential Privacy Empirical Evaluation & Privacy-Utility Frontier (`CFI-DP-EVAL-01`)
+
+To quantify the exact utility trade-off under formal Differential Privacy guarantees, the platform evaluates DP-SGD across an extensive grid of Gaussian noise multipliers and federation round counts:
+- **Noise Multipliers ($\sigma$)**: $\sigma \in \{0.5, 1.0, 1.5, 2.0\}$ with gradient L2 clipping bound $C = 1.0$.
+- **Federation Rounds ($T$)**: $T \in \{5, 10, 20, 50\}$ rounds with subsampling ratio $q = 0.05$.
+- **Formal Privacy Bound**: Computed via Rényi Differential Privacy (RDP) moments accountant with order search $\alpha \in [1.5, 512]$, converting to $(\epsilon, \delta = 10^{-5})$-DP.
+- **Controlled Noise Calibration**: Automated binary search solves for exact $\sigma^*$ satisfying target $\epsilon \le 2.0$ at $T = 50$ rounds ($\sigma^* = 0.8870$).
+
+#### 16-Configuration Privacy-Utility Grid
+
+| $\sigma$ | $T$ (rounds) | $\epsilon$ | $\alpha^*$ | PR-AUC | ROC-AUC | Budget ($\epsilon \le 2.0$) |
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| 0.5 | 5 | 1.1006 | 24 | 0.0176 | 0.3576 | ✅ OK |
+| 0.5 | 10 | 1.5675 | 16 | 0.0793 | 0.6672 | ✅ OK |
+| 0.5 | 20 | 2.2466 | 12 | 0.2944 | 0.8525 | ⚠️ EXCEEDED |
+| 0.5 | 50 | 3.6447 | 8 | 0.6599 | 0.9810 | ⚠️ EXCEEDED |
+| 1.0 | 5 | 0.5450 | 48 | 0.0141 | 0.2317 | ✅ OK |
+| 1.0 | 10 | 0.7714 | 32 | 0.0255 | 0.3996 | ✅ OK |
+| 1.0 | 20 | 1.1006 | 24 | 0.0566 | 0.5557 | ✅ OK |
+| 1.0 | 50 | 1.7675 | 16 | 0.3922 | 0.9452 | ✅ OK |
+| 1.5 | 5 | 0.3605 | 64 | 0.0137 | 0.2006 | ✅ OK |
+| 1.5 | 10 | 0.5116 | 48 | 0.0210 | 0.3231 | ✅ OK |
+| 1.5 | 20 | 0.7269 | 32 | 0.0236 | 0.3834 | ✅ OK |
+| 1.5 | 50 | 1.1672 | 24 | 0.2075 | 0.8942 | ✅ OK |
+| 2.0 | 5 | 0.2827 | 64 | 0.0138 | 0.1880 | ✅ OK |
+| 2.0 | 10 | 0.3827 | 64 | 0.0231 | 0.2943 | ✅ OK |
+| 2.0 | 20 | 0.5450 | 48 | 0.0183 | 0.3055 | ✅ OK |
+| 2.0 | 50 | 0.8714 | 32 | 0.1106 | 0.8368 | ✅ OK |
+
+#### Key Empirical Findings & Production Guidelines
+
+1. **Strict Privacy Compliance**: $\sigma \ge 1.0$ guarantees zero budget overrun under $\epsilon \le 2.0$ for all round counts up to $T = 50$. At $\sigma = 1.0, T = 50$, the system achieves $\epsilon = 1.7675$ while retaining strong detection performance ($\operatorname{PR-AUC} = 0.3922$, $\operatorname{ROC-AUC} = 0.9452$).
+2. **Calibrated Noise Multiplier**: Analytical RDP calibration derives $\sigma^* = 0.8870$ for exact $\epsilon = 2.0000$ at $T = 50$ rounds.
+3. **Subsampled Gaussian Amplification**: Subsampling ratio $q = 0.05$ provides significant privacy amplification over naïve full-batch Gaussian mechanisms.
+4. **4-Panel Publication Figure**: [`docs/figures/benchmark_privacy_utility.png`](figures/benchmark_privacy_utility.png) visualizes: (1) Privacy-Utility Frontier ($\epsilon$ vs PR-AUC), (2) $\epsilon$ vs $\sigma$ Curves across round counts, (3) Utility Degradation vs Noise Level, and (4) Privacy Loss $\epsilon$ Heatmap.
+- Dossier: [`experiments/dp_evaluation/audit_dossier.md`](../experiments/dp_evaluation/audit_dossier.md).
+- Raw Benchmark JSON: [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](../benchmarks/results/raw/dp_privacy_utility_tradeoff.json).
+
+---
+
 ## 4. How to Reproduce Benchmark Results
 
 ```bash
@@ -722,7 +762,10 @@ python experiments/ablations/dirichlet_sweep.py --rounds 10 --n-clients 5
 # 12. Architectural component factorial ablation benchmark (Graph x DP x SecAgg x Cross-Bank)
 python benchmarks/runners/run_factorial_ablation.py --rounds 5 --local-epochs 2 --n-clients 5
 
-# 13. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
+# 13. Differential Privacy noise sweep & RDP moments accounting benchmark
+python experiments/dp_evaluation/run_dp_noise_sweep.py --sigmas 0.5 1.0 1.5 2.0 --rounds 5 10 20 50
+
+# 14. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
 python -c "
 from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 from backend.app.application.services.dataloader import load_paysim
@@ -731,13 +774,13 @@ engine = ComparativeBenchmarkEngine()
 # Partition and execute full comparative suite
 "
 
-# 14. Enterprise payment stream stress test (ISO 20022 ingestion)
+# 15. Enterprise payment stream stress test (ISO 20022 ingestion)
 python scripts/run_enterprise_stress_test.py --banks 3 --target-tps 2000 --duration 10 --output-dir reports/
 
-# 15. Real-time inference load test (Locust headless runner)
+# 16. Real-time inference load test (Locust headless runner)
 locust -f scripts/locustfile.py --headless -u 50 -r 10 --run-time 60s --host http://localhost:8000
 
-# 16. Concurrent stream runner
+# 17. Concurrent stream runner
 python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 ```
 
