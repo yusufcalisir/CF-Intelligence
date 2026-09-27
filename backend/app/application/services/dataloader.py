@@ -1344,8 +1344,8 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
     transaction_dt: np.ndarray | None = None
     if "TransactionDT" in df.columns:
         dt_vals = np.asarray(df["TransactionDT"].values, dtype=np.float64)
-        df["dt_day"] = pd.Series(((dt_vals // 86400) % 7).astype(np.float32), index=df.index)
-        df["dt_hour"] = pd.Series(((dt_vals // 3600) % 24).astype(np.float32), index=df.index)
+        df["dt_day"] = ((dt_vals // 86400) % 7).astype(np.float32)
+        df["dt_hour"] = ((dt_vals // 3600) % 24).astype(np.float32)
         transaction_dt = dt_vals
 
     # 4. Amount log transformation
