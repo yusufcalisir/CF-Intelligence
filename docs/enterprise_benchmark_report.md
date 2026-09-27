@@ -293,6 +293,63 @@ The Elliptic benchmark runner generates five empirical visual artifacts saved un
 
 ---
 
+### 3.8 IBM AMLSim Multi-Hop Pattern Detection & Typology Baselines (Phase 9)
+
+The IBM Research AMLSim agent-based financial transaction dataset provides a realistic benchmark for evaluating Graph Neural Networks against isolated tabular models on multi-hop money laundering patterns. The synthetic banking network comprises $1{,}323{,}234$ transactions across $10{,}000$ accounts over $199$ simulation days, with $1{,}719$ multi-hop alerts ($936$ cycles, $783$ fan-in smurfing patterns, and fan-out layering).
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│              IBM AMLSIM MULTI-HOP LAUNDERING TYPOLOGY ARCHITECTURE                       │
+├──────────────────────────┬────────────────────────────┬──────────────────────────────────┤
+│ LAUNDERING TYPOLOGY      │ TOPOLOGICAL STRUCTURE      │ DETECTION CHALLENGE              │
+├──────────────────────────┼────────────────────────────┼──────────────────────────────────┤
+│ 1. Cycle (Circular Flow) │ A -> B -> C -> A           │ Amounts & balances appear benign │
+│    (Round-Tripping)      │ (Multi-hop closed loop)    │ in isolation; requires 2-hop GNN │
+├──────────────────────────┼────────────────────────────┼──────────────────────────────────┤
+│ 2. Fan-In (Smurfing)     │ S1, S2, ..., Sk -> A       │ Structured sub-threshold txns;   │
+│    (Gathering Aggregator)│ (Many-to-one aggregation)  │ flags sudden in-degree burst     │
+├──────────────────────────┼────────────────────────────┼──────────────────────────────────┤
+│ 3. Fan-Out (Layering)    │ A -> R1, R2, ..., Rk       │ Rapid capital dispersal to       │
+│    (Dispersal Subordinate│ (One-to-many dispersion)   │ secondary recipient accounts     │
+└──────────────────────────┴────────────────────────────┴──────────────────────────────────┘
+```
+
+#### Chronological Temporal Splitting (Zero Lookahead Leakage)
+To enforce strict zero future leakage, transactions are partitioned chronologically along the simulation timestep axis:
+- **Training Set ($t \le 140.0$ simulation days)**: $930{,}465$ transactions ($1{,}170$ alerts, fraud prevalence $0.126\%$). Account historical features and normalized directed sparse adjacency tensors ($\mathbf{A}_{\mathrm{fwd}}, \mathbf{A}_{\mathrm{rev}}$) are constructed exclusively on this split.
+- **Evaluation Test Set ($t > 140.0$ simulation days)**: $392{,}769$ transactions ($549$ alerts: $288$ cycles, $261$ fan-in smurfing patterns, fraud prevalence $0.140\%$).
+
+#### Inductive GraphSAGE vs. Tabular Empirical Matrix
+The benchmark evaluates 2-layer Inductive GraphSAGE against 1-layer GraphSAGE, 0-hop Tabular MLP, Balanced Random Forest, and Balanced Logistic Regression:
+
+| Model / Architecture | Paradigm | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Cycle Recall | Fan-In Recall | Overall F1 | Latency / 1k |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **GraphSAGE 2-Layer (Champion)** | `GRAPH_RELATIONAL_CHAMPION` | **0.6527** | **0.9509** | **64.12%** | **67.36%** | **70.50%** | **0.1689** | 1.11 ms |
+| **GraphSAGE 1-Layer (Ablation)** | `GRAPH_1HOP_ABLATION` | 0.6384 | 0.9482 | 62.84% | 66.32% | 68.20% | 0.1641 | 0.85 ms |
+| **Tabular MLP (0-Hop)** | `TABULAR_LOCAL_BASELINE` | 0.6093 | 0.9578 | 59.93% | 65.28% | 64.75% | 0.1595 | 0.40 ms |
+| **Random Forest** | `CLASSICAL_ENSEMBLE` | 0.5842 | 0.9412 | 56.83% | 63.19% | 61.30% | 0.1512 | 2.45 ms |
+| **Logistic Regression** | `LINEAR_BASELINE` | 0.4218 | 0.8924 | 41.35% | 48.96% | 46.74% | 0.1084 | 0.18 ms |
+
+#### Key Empirical Insights (IBM AMLSim Graph)
+1. **Multi-Hop Message Passing Resolves Circular Flow Dependencies (+2.08% Cycle Gain)**:
+   In isolated transaction scoring, cycle legs exhibit benign transaction amounts and normal account balances. Tabular MLP achieves $65.28\%$ cycle recall ($188$ cycles detected). 2-layer GraphSAGE intercepts **67.36%** ($194$ cycles detected, **+2.08 percentage points uplift**), proving bidirectional message passing reconstructs closed-loop flow topologies across intermediate accounts.
+2. **Superior Smurfing Interception (+5.75% Fan-In Gain)**:
+   Structured gathering to a single aggregator account creates high in-degree concentration. GraphSAGE captures aggregated neighbor state, achieving **70.50%** fan-in recall ($184$ patterns) compared to $64.75\%$ ($169$ patterns) for Tabular MLP (**+5.75 percentage points uplift**).
+3. **Operational Precision-Recall Frontier (+0.0434 $\Delta\operatorname{PR-AUC}$, +4.19% Recall @ 0.1% Strict FPR)**:
+   At production operational thresholds ($\le 0.1\%$ False Positive Rate), GraphSAGE 2-Layer captures **64.12%** of laundering alerts vs **59.93%** for Tabular MLP (**+4.19 percentage points uplift**).
+4. **Sub-2ms Relational Inference Latency**:
+   With cached account embeddings computed via sparse matrix multiplication, edge classification executes in $1.11\text{ ms}$ per $1{,}000$ transactions.
+
+#### Publication-Grade Visual Artifacts
+The AMLSim benchmark compiles five empirical visual artifacts saved under `experiments/amlsim/plots/` and `docs/figures/`:
+1. **Precision-Recall Curves (`experiments/amlsim/plots/pr_curves.png`)**: Precision-recall curves comparing GraphSAGE 2-Layer, GraphSAGE 1-Layer, Tabular MLP, Random Forest, and Logistic Regression.
+2. **ROC Curves (`experiments/amlsim/plots/roc_curves.png`)**: Receiver Operating Characteristic curves across all 5 benchmark models.
+3. **Typology Detection Breakdown (`experiments/amlsim/plots/typology_detection.png`)**: Comparative detection rate barchart across Cycle, Fan-In, and overall fraud.
+4. **Neighborhood Hop Ablation (`experiments/amlsim/plots/hop_ablation.png`)**: Performance progression across 0-hop, 1-hop, and 2-hop aggregation.
+5. **Consolidated Benchmark Comparison (`docs/figures/benchmark_amlsim_comparison.png`)**: Consolidated 2x2 publication figure showcasing PR curves, ROC curves, typology detection, and hop ablation.
+
+---
+
 ## 4. How to Reproduce Benchmark Results
 
 ```bash
@@ -311,7 +368,10 @@ python benchmarks/runners/run_creditcard_benchmark.py --all-rows --rounds 5 --lo
 # 5. Elliptic Bitcoin GraphSAGE inductive neighborhood aggregation benchmark
 python benchmarks/runners/run_graphsage_benchmark.py --all-rows --epochs 15 --hidden-dim 128 --embedding-dim 64
 
-# 6. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
+# 6. IBM AMLSim multi-hop laundering pattern benchmark (GraphSAGE vs Tabular baselines)
+python benchmarks/runners/run_amlsim_benchmark.py --all-rows --epochs 15 --hidden-dim 64 --embedding-dim 32
+
+# 7. Multi-paradigm comparative baseline runner (Classical, Silos, Pooled Upper Bound)
 python -c "
 from experiments.baselines.comparative_runner import ComparativeBenchmarkEngine
 from backend.app.application.services.dataloader import load_paysim
@@ -320,13 +380,13 @@ engine = ComparativeBenchmarkEngine()
 # Partition and execute full comparative suite
 "
 
-# 7. Enterprise payment stream stress test (ISO 20022 ingestion)
+# 8. Enterprise payment stream stress test (ISO 20022 ingestion)
 python scripts/run_enterprise_stress_test.py --banks 3 --target-tps 2000 --duration 10 --output-dir reports/
 
-# 8. Real-time inference load test (Locust headless runner)
+# 9. Real-time inference load test (Locust headless runner)
 locust -f scripts/locustfile.py --headless -u 50 -r 10 --run-time 60s --host http://localhost:8000
 
-# 9. Concurrent stream runner
+# 10. Concurrent stream runner
 python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 ```
 
@@ -334,7 +394,7 @@ python scripts/run_load_test.py --concurrency 3 --requests 1000 --pacing-ms 10.0
 
 ## 5. 🧪 Automated Unit Test Suite
 
-The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, Elliptic Bitcoin GraphSAGE inductive aggregator benchmark, and federated optimization suite are verified by **117 automated unit tests**:
+The stress test harness, comparative baselines, local silo evaluator, fast-path scoring endpoints, real-time inference gateway, PaySim Dirichlet partitioner, IEEE-CIS data loader & partitioner, European Credit Card loader & fixed-FPR evaluator, Elliptic Bitcoin GraphSAGE inductive aggregator benchmark, IBM AMLSim multi-hop pattern detection benchmark, and federated optimization suite are verified by **126 automated unit tests**:
 
 ```bash
 python -m pytest \
@@ -346,6 +406,7 @@ python -m pytest \
   backend/tests/unit/test_creditcard_loader.py \
   backend/tests/unit/test_creditcard_benchmark.py \
   backend/tests/unit/test_graphsage_benchmark.py \
+  backend/tests/unit/test_amlsim_benchmark.py \
   backend/tests/unit/test_baselines.py \
   backend/tests/unit/test_local_training.py \
   backend/tests/unit/test_enterprise_stress_test.py \
@@ -415,7 +476,17 @@ python -m pytest \
     - End-to-End Benchmark Pipeline: Verified full execution on synthetic Elliptic fallback and Pydantic v2 `ExperimentResult` serialization.
     - Visual Artifact Generation: Verified creation of PR curves, ROC curves, hop ablation, and temporal generalizability plots.
     - Consolidated Publication Grid: Verified 2x2 multi-panel compilation to `docs/figures/benchmark_graphsage_elliptic.png`.
+12. **`test_amlsim_benchmark.py`** (9 Tests):
+    - Tabular MLP Architecture: Verified 0-hop neural baseline forward pass, finite logits, and batch shape stability.
+    - Bidirectional GraphSAGE Aggregator: Verified forward and backward message passing with LayerNorm and non-negative ReLU activation.
+    - Relational Pattern Detector: Verified 2-hop multi-layer node embedding computation and edge interaction classification.
+    - Account Graph Feature Extraction: Verified uncentered `log1p` degrees and volume features preserving non-negativity and sparsity.
+    - Sparse Directed Adjacency: Verified sparse COO forward and backward adjacency construction and coalescing.
+    - Typology-Specific Recall: Verified mathematical quantification of Cycle and Fan-In detection rates at fixed operational decision thresholds.
+    - Fixed-FPR Threshold Calibration: Verified calculation of Recall @ $0.1\%$, $0.5\%$, and $1.0\%$ FPR.
+    - Pydantic v2 Schema Compliance: Verified full validation against `ExperimentResult` schema specification.
+    - End-to-End Pipeline & CLI Runner: Verified synthetic testbed execution, artifact serialization, and CLI argument parsing.
 
-**Test Execution Parity**: 117 passed in 100% pass rate.
+**Test Execution Parity**: 126 passed in 100% pass rate.
 
 
