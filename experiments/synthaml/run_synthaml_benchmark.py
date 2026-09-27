@@ -381,11 +381,11 @@ class SynthAMLPartitioner:
             n_neg = len(shuffled_neg)
 
             # Institutional distribution proportions
-            alpha_pos = int(round(n_pos * 0.39))
-            beta_pos = int(round(n_pos * 0.28))
+            alpha_pos = round(n_pos * 0.39)
+            beta_pos = round(n_pos * 0.28)
 
-            alpha_neg = int(round(n_neg * 0.50))
-            beta_neg = int(round(n_neg * 0.30))
+            alpha_neg = round(n_neg * 0.50)
+            beta_neg = round(n_neg * 0.30)
 
             idx_alpha = np.concatenate([shuffled_pos[:alpha_pos], shuffled_neg[:alpha_neg]])
             idx_beta = np.concatenate([
@@ -753,8 +753,8 @@ def run_synthaml_benchmark(
     ax.set_ylabel("Precision")
     ax.set_title("SynthAML Alert Detection: Precision-Recall Frontier")
     ax.legend(loc="lower left", frameon=True, fontsize=8)
-    ax.set_xlim([0.0, 1.02])
-    ax.set_ylim([0.0, 1.02])
+    ax.set_xlim(0.0, 1.02)
+    ax.set_ylim(0.0, 1.02)
     plt.tight_layout()
     pr_curve_file = plots_path / "pr_curves.png"
     plt.savefig(pr_curve_file)
@@ -778,8 +778,8 @@ def run_synthaml_benchmark(
     ax.set_ylabel("True Positive Rate (Recall)")
     ax.set_title("SynthAML Alert Detection: ROC Curves")
     ax.legend(loc="lower right", frameon=True, fontsize=8)
-    ax.set_xlim([-0.01, 1.01])
-    ax.set_ylim([0.0, 1.02])
+    ax.set_xlim(-0.01, 1.01)
+    ax.set_ylim(0.0, 1.02)
     plt.tight_layout()
     roc_curve_file = plots_path / "roc_curves.png"
     plt.savefig(roc_curve_file)
