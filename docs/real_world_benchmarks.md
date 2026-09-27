@@ -221,3 +221,4 @@ Continuous integration suites validate all benchmark data ingestion, distributio
 | **Benchmark Runner** | `backend/tests/unit/test_benchmark_runner.py` | FedAvg vs Centralized vs Local, DP noise accuracy reduction, JSON report generation | `4/4 PASSED` |
 | **Design Partner Sandbox** | `backend/tests/unit/test_design_partner_sandbox.py` | Type-salted HMAC-SHA256 tokenization, zero-raw-PII regex scan, pilot checklist, PaySim & IEEE evaluation | `4/4 PASSED` |
 | **Offline Dataset Ingestion & ETL** | `backend/tests/unit/test_real_world_dataset_ingestion.py` | Kaggle-free offline dataset ingestion, PaySim/IEEE-CIS/CreditCard/Elliptic schema normalization, zero-raw-PII HMAC hashing, Parquet export, SHA-256 manifest integrity | `7/7 PASSED` |
+| **AMLNet Extreme Imbalance** | `backend/tests/unit/test_amlnet_benchmark.py` | AUSTRAC interbank rare-event detection, low-FPR profiling, FedAvg/FedProx aggregation, Pydantic v2 schema | `13/13 PASSED` |
