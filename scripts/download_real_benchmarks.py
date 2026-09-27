@@ -61,6 +61,13 @@ DATASET_CONFIGS = {
         "primary_file": "synthetic_alerts.csv",
         "description": "SynthAML Spar Nord Bank Synthetic AML Benchmark (Nature Sci Data 2023: 20k alerts, 16M txns, SDV copula)",
     },
+    "amlnet": {
+        "kaggle_slug": "zenodo/10.5281/zenodo.10058474",
+        "url": "https://doi.org/10.5281/zenodo.10058474",
+        "target_dir": DATASETS_ROOT / "amlnet",
+        "primary_file": "transactions.csv",
+        "description": "AMLNet AUSTRAC Australian AML/CTF Multi-Agent Benchmark (Huda et al. Zenodo: 1.09M txns, structuring/layering/integration)",
+    },
 }
 
 
@@ -141,7 +148,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Download and verify real-world benchmark datasets.")
     parser.add_argument(
         "--dataset",
-        choices=["all", "paysim", "ieee_cis", "elliptic", "amlsim", "creditcard"],
+        choices=["all", "paysim", "ieee_cis", "elliptic", "amlsim", "creditcard", "synthaml", "amlnet"],
         default="all",
         help="Which dataset to download (default: all)",
     )

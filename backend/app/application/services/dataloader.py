@@ -2010,6 +2010,222 @@ def load_synthaml(
 
 
 # ===========================================================================
+# AMLNet (AUSTRAC Knowledge-Guided Multi-Agent Synthetic AML Benchmark)
+# ===========================================================================
+
+# Canonical Huda et al. / AUSTRAC layout:
+#   step, type, amount, category, nameOrig, nameDest, oldbalanceOrg, newbalanceOrig,
+#   hour, day_of_week, day_of_month, month, metadata, isFraud, isMoneyLaundering,
+#   laundering_typology, fraud_probability
+
+AMLNET_FEATURE_COLS = [
+    "amount",
+    "log_amount",
+    "oldbalanceOrg",
+    "newbalanceOrig",
+    "balance_orig_delta",
+    "balance_orig_ratio",
+    "hour",
+    "day_of_week",
+    "type_TRANSFER",
+    "type_OSKO",
+    "type_BPAY",
+    "type_EFTPOS",
+    "type_DEBIT",
+    "type_NPP",
+    "is_near_reporting_threshold",
+    "category_high_risk",
+    "is_night_txn",
+    "is_weekend_txn",
+]
+AMLNET_FRAUD_RATIO = 0.0014  # ~0.14% empirical AUSTRAC rare-event laundering prevalence
+AMLNET_TYPOLOGIES = ["normal", "structuring", "layering", "integration"]
+
+
+def _process_amlnet_dataframe(
+    df: pd.DataFrame,
+    source: str = "real_parquet",
+) -> dict[str, Any]:
+    """Process an AMLNet DataFrame into standardized numerical features, labels, and metadata."""
+    # 1. Labels
+    label_col = next((c for c in ["isMoneyLaundering", "is_money_laundering", "isLaundering", "isFraud", "is_fraud"] if c in df.columns), None)
+    if label_col:
+        y = np.asarray(df[label_col].fillna(0).astype(int).values, dtype=int)
+    else:
+        y = np.zeros(len(df), dtype=int)
+
+    typology_col = next((c for c in ["laundering_typology", "typology", "laundering_phase"] if c in df.columns), None)
+    if typology_col:
+        typologies = np.asarray(df[typology_col].fillna("normal").astype(str).values, dtype=object)
+    else:
+        typologies = np.array(["normal" if val == 0 else "suspicious" for val in y], dtype=object)
+
+    # 2. Amounts & Balances
+    amount = np.asarray(pd.to_numeric(df.get("amount", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    log_amount = np.log1p(np.maximum(0.0, amount)).astype(np.float32)
+    old_bal = np.asarray(pd.to_numeric(df.get("oldbalanceOrg", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    new_bal = np.asarray(pd.to_numeric(df.get("newbalanceOrig", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
+
+    bal_delta = (new_bal + amount - old_bal).astype(np.float32)
+    bal_ratio = (amount / (old_bal + 1.0)).astype(np.float32)
+
+    # 3. Temporal
+    hour = np.asarray(pd.to_numeric(df.get("hour", 12), errors="coerce").fillna(12).values, dtype=np.float32)
+    dow = np.asarray(pd.to_numeric(df.get("day_of_week", 0), errors="coerce").fillna(0).values, dtype=np.float32)
+
+    # 4. Payment channel one-hot encoding
+    type_col = df.get("type", pd.Series(["TRANSFER"] * len(df))).astype(str).str.upper()
+    t_transfer = (type_col == "TRANSFER").astype(np.float32).values
+    t_osko = (type_col == "OSKO").astype(np.float32).values
+    t_bpay = (type_col == "BPAY").astype(np.float32).values
+    t_eftpos = (type_col == "EFTPOS").astype(np.float32).values
+    t_debit = (type_col == "DEBIT").astype(np.float32).values
+    t_npp = (type_col == "NPP").astype(np.float32).values
+
+    # 5. Risk indicators
+    # Structuring: amounts close to the AUSTRAC $10,000 threshold
+    near_thresh = ((amount >= 8500.0) & (amount < 10000.0)).astype(np.float32)
+
+    # High-risk category
+    cat_col = df.get("category", pd.Series(["Retail"] * len(df))).astype(str)
+    high_risk_cats = {"Cryptocurrency", "Shell Company", "Luxury Goods", "Gambling", "Investment"}
+    high_risk = cat_col.isin(high_risk_cats).astype(np.float32).values
+
+    # Timing flags
+    is_night = ((hour < 5.0) | (hour > 22.0)).astype(np.float32)
+    is_weekend = (dow >= 5.0).astype(np.float32)
+
+    X = np.column_stack([
+        amount,
+        log_amount,
+        old_bal,
+        new_bal,
+        bal_delta,
+        bal_ratio,
+        hour,
+        dow,
+        t_transfer,
+        t_osko,
+        t_bpay,
+        t_eftpos,
+        t_debit,
+        t_npp,
+        near_thresh,
+        high_risk,
+        is_night,
+        is_weekend,
+    ]).astype(np.float32)
+
+    steps = np.asarray(pd.to_numeric(df.get("step", np.arange(len(df))), errors="coerce").fillna(0).values, dtype=np.float64)
+
+    return {
+        "X": X,
+        "y": y,
+        "feature_names": AMLNET_FEATURE_COLS,
+        "raw_df": df,
+        "typologies": typologies,
+        "steps": steps,
+        "source": source,
+        "fraud_ratio": float(np.mean(y == 1)) if len(y) > 0 else 0.0,
+        "n_samples": len(y),
+    }
+
+
+def _generate_mock_amlnet(
+    n_mock_txns: int = 2000,
+    rng: np.random.Generator | None = None,
+) -> dict[str, Any]:
+    """Generate high-fidelity synthetic mock of the AMLNet benchmark."""
+    logger.warning("[AMLNet] Generating synthetic fallback mock (%d txns)...", n_mock_txns)
+    import sys
+    import tempfile
+
+    repo_root = Path(__file__).resolve().parents[4]
+    if str(repo_root) not in sys.path:
+        sys.path.insert(0, str(repo_root))
+
+    from scripts.generate_amlnet_dataset import generate_amlnet
+
+    seed = int(rng.integers(0, 100000)) if rng is not None else 42
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        df = generate_amlnet(tmp_dir, n_transactions=n_mock_txns, seed=seed)
+
+    return _process_amlnet_dataframe(df, source="synthetic_fallback")
+
+
+def load_amlnet(
+    require_real: bool = False,
+    data_dir: Path | str | None = None,
+    all_rows: bool = False,
+    nrows: int | None = None,
+    n_mock_txns: int = 2000,
+    seed: int = 42,
+    **kwargs: Any,
+) -> dict[str, Any]:
+    """Load the AUSTRAC-aligned AMLNet multi-agent synthetic AML transaction dataset.
+
+    Args:
+        require_real: If True, raise FileNotFoundError when real dataset files are missing.
+        data_dir: Explicit dataset path, or resolved automatically via resolve_dataset_dir.
+        all_rows: If True, load all rows without truncation.
+        nrows: Maximum number of transactions to ingest (useful for fast testing).
+        n_mock_txns: Number of transactions to generate in synthetic fallback mode.
+        seed: Random seed for mock generator.
+
+    Returns:
+        dict containing:
+        - X: Feature matrix (N, 18).
+        - y: Binary laundering labels (N,).
+        - feature_names: Names of engineered features.
+        - raw_df: Underlying pandas DataFrame.
+        - typologies: Array of AML typologies ('normal', 'structuring', 'layering', 'integration').
+        - steps: Array of simulation timesteps.
+        - source: 'real_parquet', 'real_csv', or 'synthetic_fallback'.
+        - fraud_ratio: Class prevalence of money laundering.
+        - n_samples: Total number of ingested records.
+    """
+    root = resolve_dataset_dir("amlnet", explicit_path=data_dir)
+    parquet_cache = root / "transactions.parquet"
+    csv_candidates = [
+        root / "transactions.csv",
+        root / "amlnet_transactions.csv",
+    ] + list(root.glob("*.csv"))
+
+    # 1. Fast Parquet loader
+    if parquet_cache.exists():
+        logger.info("[AMLNet] Ingesting columnar Parquet cache from '%s'...", parquet_cache)
+        df = pd.read_parquet(parquet_cache)
+        if not all_rows and nrows is not None and len(df) > nrows:
+            df = df.iloc[:nrows].copy()
+        return _process_amlnet_dataframe(df, source="real_parquet")
+
+    # 2. Raw CSV loader
+    for csv_file in csv_candidates:
+        if csv_file.exists() and not csv_file.name.endswith(".parquet"):
+            logger.info("[AMLNet] Ingesting CSV from '%s'...", csv_file)
+            df = pd.read_csv(csv_file, nrows=nrows if (not all_rows and nrows is not None) else None)
+            # Cache to Parquet for accelerated future reads
+            if not parquet_cache.exists() and (all_rows or nrows is None):
+                try:
+                    df.to_parquet(parquet_cache, index=False)
+                    logger.info("[AMLNet] Cached Parquet to '%s'", parquet_cache)
+                except Exception as exc:
+                    logger.debug("[AMLNet] Skipping Parquet cache write: %s", exc)
+            return _process_amlnet_dataframe(df, source="real_csv")
+
+    # 3. Missing file handling
+    if require_real:
+        raise FileNotFoundError(
+            f"Real AMLNet dataset files not found in '{root}'. "
+            f"Expected 'transactions.csv' or 'transactions.parquet'. "
+            f"Synthetic fallback is disabled under strict real-data mode."
+        )
+
+    rng = np.random.default_rng(seed)
+    return _generate_mock_amlnet(n_mock_txns=nrows or n_mock_txns, rng=rng)
+
+
+# ===========================================================================
 # Convenience Registry
 # ===========================================================================
 
@@ -2022,6 +2238,8 @@ DATASET_REGISTRY: dict[str, Any] = {
     "credit_card": load_creditcard_fraud,
     "synthaml": load_synthaml,
     "synth_aml": load_synthaml,
+    "amlnet": load_amlnet,
+    "aml_net": load_amlnet,
 }
 
 

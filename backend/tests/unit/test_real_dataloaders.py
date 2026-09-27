@@ -5,6 +5,7 @@ import pytest
 
 from app.application.services.dataloader import (
     DATASET_REGISTRY,
+    load_amlnet,
     load_amlsim,
     load_creditcard_fraud,
     load_elliptic,
@@ -16,7 +17,7 @@ from app.application.services.dataloader import (
 
 
 def test_dataset_registry_contains_all_targets():
-    expected = {"elliptic", "amlsim", "paysim", "ieee_cis", "creditcard", "synthaml"}
+    expected = {"elliptic", "amlsim", "paysim", "ieee_cis", "creditcard", "synthaml", "amlnet"}
     assert expected.issubset(set(DATASET_REGISTRY.keys()))
 
 
@@ -112,6 +113,18 @@ def test_load_synthaml_structure():
     assert data["X"].shape[1] == 14
     assert "alerts_df" in data
     assert "transactions_df" in data
+    assert data["source"] in ("real_parquet", "real_csv", "synthetic_fallback")
+
+
+def test_load_amlnet_structure():
+    data = load_amlnet(nrows=200)
+    assert "X" in data
+    assert "y" in data
+    assert len(data["X"]) > 0
+    assert len(data["y"]) == len(data["X"])
+    assert data["X"].shape[1] == 18
+    assert "raw_df" in data
+    assert "typologies" in data
     assert data["source"] in ("real_parquet", "real_csv", "synthetic_fallback")
 
 
