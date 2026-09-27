@@ -1,0 +1,59 @@
+{
+  "n_member_samples": 500,
+  "n_nonmember_samples": 500,
+  "model_dimension": 1024,
+  "dp_mitigates_mia": true,
+  "dp_mitigates_dlg": true,
+  "mia_results": [
+    {
+      "sigma": 0.0,
+      "epsilon_bound": null,
+      "asr": 0.949,
+      "advantage": 0.449,
+      "tpr_member": 0.994,
+      "tnr_nonmember": 0.904
+    },
+    {
+      "sigma": 1.0,
+      "epsilon_bound": 1.7675,
+      "asr": 0.91,
+      "advantage": 0.41,
+      "tpr_member": 0.916,
+      "tnr_nonmember": 0.904
+    },
+    {
+      "sigma": 2.0,
+      "epsilon_bound": 0.8714,
+      "asr": 0.539,
+      "advantage": 0.039,
+      "tpr_member": 0.174,
+      "tnr_nonmember": 0.904
+    }
+  ],
+  "dlg_results": [
+    {
+      "sigma": 0.0,
+      "epsilon_bound": null,
+      "mean_cosine_similarity": 1.0,
+      "max_cosine_similarity": 1.0,
+      "alarm_rate": 1.0,
+      "gradient_norm_ratio": 1.0
+    },
+    {
+      "sigma": 1.0,
+      "epsilon_bound": 1.7675,
+      "mean_cosine_similarity": 0.0332,
+      "max_cosine_similarity": 0.1027,
+      "alarm_rate": 0.0,
+      "gradient_norm_ratio": 1.002
+    },
+    {
+      "sigma": 2.0,
+      "epsilon_bound": 0.8714,
+      "mean_cosine_similarity": 0.0176,
+      "max_cosine_similarity": 0.0873,
+      "alarm_rate": 0.0,
+      "gradient_norm_ratio": 2.0086
+    }
+  ]
+}
