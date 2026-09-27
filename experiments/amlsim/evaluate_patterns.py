@@ -153,9 +153,9 @@ class GraphSAGELayer(nn.Module):
 
     def forward(
         self,
-        h: torch.Tensor,
-        adj_fwd: torch.Tensor,
-        adj_bwd: torch.Tensor,
+        h: Any,
+        adj_fwd: Any,
+        adj_bwd: Any,
     ) -> torch.Tensor:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -211,9 +211,9 @@ class GraphSAGEPatternDetector(nn.Module):
 
     def compute_node_embeddings(
         self,
-        node_feats: torch.Tensor,
-        adj_fwd: torch.Tensor,
-        adj_bwd: torch.Tensor,
+        node_feats: Any,
+        adj_fwd: Any,
+        adj_bwd: Any,
     ) -> torch.Tensor:
         """Compute inductive node representations across the account interaction graph."""
         h = self.layer1(node_feats, adj_fwd, adj_bwd)
@@ -225,13 +225,13 @@ class GraphSAGEPatternDetector(nn.Module):
 
     def forward(
         self,
-        edge_x: torch.Tensor,
-        senders: torch.Tensor,
-        receivers: torch.Tensor,
-        node_feats: torch.Tensor,
-        adj_fwd: torch.Tensor,
-        adj_bwd: torch.Tensor,
-        cached_node_emb: torch.Tensor | None = None,
+        edge_x: Any,
+        senders: Any,
+        receivers: Any,
+        node_feats: Any,
+        adj_fwd: Any,
+        adj_bwd: Any,
+        cached_node_emb: Any | None = None,
     ) -> torch.Tensor:
         """Score transaction edges using local features and multi-hop node embeddings."""
         if cached_node_emb is not None:
@@ -251,12 +251,12 @@ class GraphSAGEPatternDetector(nn.Module):
 # 3. Graph Adjacency & Account Feature Engineering
 # ===========================================================================
 def build_account_features_and_adjacency(
-    senders: np.ndarray,
-    receivers: np.ndarray,
-    amounts: np.ndarray,
+    senders: Any,
+    receivers: Any,
+    amounts: Any,
     num_accounts: int,
     accounts_df: Any = None,
-    train_indices: np.ndarray | None = None,
+    train_indices: Any | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """Construct account node features and degree-normalized directed adjacency matrices.
 
@@ -349,8 +349,8 @@ def build_account_features_and_adjacency(
 # 4. Evaluation & Typology Metric Calculations
 # ===========================================================================
 def calculate_metrics_at_fixed_fpr(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
+    y_true: Any,
+    y_pred: Any,
     target_fpr: float = 0.001,
 ) -> float:
     """Calculate empirical True Positive Rate (Recall) at fixed False Positive Rate."""
@@ -364,9 +364,9 @@ def calculate_metrics_at_fixed_fpr(
 
 
 def evaluate_model_metrics(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
-    typologies: np.ndarray,
+    y_true: Any,
+    y_pred: Any,
+    typologies: Any,
     model_name: str,
     latency_ms: float = 0.0,
 ) -> dict[str, Any]:
@@ -965,9 +965,12 @@ def run_amlsim_pattern_benchmark(
         json.dump(baselines_data, f, indent=2)
 
     # 8. Serialize Machine-Readable Benchmark Registry Entry
-    raw_benchmarks_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
-    raw_benchmarks_dir.mkdir(parents=True, exist_ok=True)
-    raw_benchmark_path = raw_benchmarks_dir / "fraud_benchmark_amlsim.json"
+    if (require_real or data.get("source") == "real") and output_dir is None:
+        raw_benchmarks_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
+        raw_benchmarks_dir.mkdir(parents=True, exist_ok=True)
+        raw_benchmark_path = raw_benchmarks_dir / "fraud_benchmark_amlsim.json"
+    else:
+        raw_benchmark_path = target_dir / "fraud_benchmark_amlsim.json"
 
     raw_benchmark_entry = {
         "benchmark_id": "fraud_benchmark_amlsim",
