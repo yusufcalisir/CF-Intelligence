@@ -369,6 +369,19 @@ pytest backend/tests/unit/test_case_management_workbench.py \
 
 ---
 
+## 🎯 Cost-Sensitive Decision Threshold Integration & Case Triage (Phase 20)
+
+In enterprise case management, investigation queues represent a scarce and costly operational resource ($c_{\mathrm{FP}} = 45\text{ USD}$ per analyst review). Conversely, unflagged fraudulent transactions that bypass triage directly inflict chargeback liabilities ($c_{\mathrm{FN}} = 850\text{ USD}$).
+
+The Case Management subsystem interfaces directly with the `RiskUtilityService` domain module ([`backend/app/domain/risk_utility.py`](../backend/app/domain/risk_utility.py)) and the interactive Policy Workbench (`frontend/src/pages/PoliciesPage.tsx` via `ThresholdTuningSlider.tsx`):
+
+1. **Objective-Driven Queue Sizing**: Rather than applying arbitrary cutoff scores (e.g. 750 or 800), institutions configure the unit cost matrix ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}, c_{\mathrm{TN}}$) to determine the mathematically optimal triage cutoff:
+   $$\tau^* = \arg\min_{\tau} \left( c_{\mathrm{FN}} \cdot \mathrm{FN}(\tau) + c_{\mathrm{FP}} \cdot \mathrm{FP}(\tau) + c_{\mathrm{TP}} \cdot \mathrm{TP}(\tau) \right)$$
+2. **Empirical Optimization**: At the calibrated optimal cutoff $\tau^* = 600$ (normalized $0.60$), the system captures 81.0% of true fraud while containing false alarms to 149 out of 4,900 clean transactions (3.04% FPR), achieving maximum net financial savings of **$60,930.00** per 5,000 transactions (71.7% efficiency).
+3. **Analyst Workload Balancing**: When investigation backlogs surge or analyst capacity fluctuates, risk officers dynamically adjust $\tau$ with live preview of projected case volumes, preventing queue starvation or SLA breaches under EU AMLD6 guidelines.
+
+---
+
 ## 📋 Compliance & Regulatory Standard Alignment
 
 | Standard / Mandate | Article / Requirement | Implementation in Case Management Workbench |

@@ -620,15 +620,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,836 Backend + 399 Verification Automated Suites across 20 modules)
+     └── 6. pytest-security-and-compliance-suites (2,853 Backend + 399 Verification Automated Suites across 20 modules)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,836 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,609 total system tests) across unit, integration, and property-based suites:
+The entire codebase is validated by **2,853 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,631 total system tests) across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,836 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,853 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |

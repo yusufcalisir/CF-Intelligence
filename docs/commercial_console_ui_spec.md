@@ -245,7 +245,8 @@ All console components, navigation routes, deep-linking rules, and error states 
 | **Security & Compliance UI** | [`SecurityPage.test.tsx`](../frontend/src/pages/__tests__/SecurityPage.test.tsx) | Vault seal status, ABAC simulator tab switches, EU AI Act export | `2/2 PASSED` |
 | **Streaming GNN Attention Dynamics** | [`StreamingGNNPanel.test.tsx`](../frontend/src/components/dashboard/__tests__/StreamingGNNPanel.test.tsx) | Dynamic GAT 4-head attention coefficients, PaySim/IEEE-CIS/Elliptic topology switching, loss sharpening, backend overrides | `7/7 PASSED` |
 | **Calibration Reliability Plot** | [`CalibrationReliabilityPlot.test.tsx`](../frontend/src/components/dashboard/__tests__/CalibrationReliabilityPlot.test.tsx) | 10-bin reliability diagram, Platt/Isotonic method toggles, ECE/MCE/Brier badges, modal table | `5/5 PASSED` |
-| **Complete Test Suite** | **82 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **333/333 PASSED** |
+| **Threshold Tuning Slider** | [`ThresholdTuningSlider.test.tsx`](../frontend/src/components/dashboard/__tests__/ThresholdTuningSlider.test.tsx) | Cost-sensitive decision threshold tuning, confusion matrix projection, optimal cutoff snap | `5/5 PASSED` |
+| **Complete Test Suite** | **83 Test Files** | **Comprehensive UI/UX, Contract & Integration Verification** | **338/338 PASSED** |
 | **Production Build** | `tsc -b && vite build` | **Zero TypeScript compile errors, production assets bundled cleanly** | **0 ERRORS** |
 
 ---

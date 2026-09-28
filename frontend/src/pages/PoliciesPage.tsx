@@ -22,6 +22,7 @@ import {
 } from '../api/queries';
 import { useModalA11y } from '../hooks/useModalA11y';
 import { BusinessRule, Alert } from '../api/types';
+import { ThresholdTuningSlider } from '../components/dashboard/ThresholdTuningSlider';
 
 export interface AMLRuleTemplate {
   id: string;
@@ -351,6 +352,9 @@ export default function PoliciesPage() {
           <span>Add Policy Rule</span>
         </button>
       </div>
+
+      {/* Cost-Sensitive Empirical Decision Threshold Optimizer */}
+      <ThresholdTuningSlider />
 
       {/* Main Grid: Active Rules + Dynamic Tester */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
