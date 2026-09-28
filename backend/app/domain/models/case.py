@@ -8,7 +8,6 @@ separation of duties (ApproverID != InvestigatorID).
 from __future__ import annotations
 
 import hashlib
-import re
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
@@ -362,7 +361,7 @@ class CaseDomainModel:
                 actor_id=actor_id,
                 assigned_investigator=self.assigned_to,
                 supervisor_signatures=candidate_sigs,
-                require_dual_supervisors=False if len(candidate_sigs) == 1 else True,
+                require_dual_supervisors=len(candidate_sigs) != 1,
             )
             self.supervisor_signatures = verified_sigs
             self.closed_at = datetime.now(UTC)

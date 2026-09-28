@@ -25,6 +25,7 @@ from app.application.schemas.cases import (
     CaseSignRequest,
     CaseStatusRequest,
     CaseSummaryResponse,
+    CaseValidateTransitionRequest,
     EvidenceRequest,
     EvidenceResponse,
     ExportFinCENXmlRequest,
@@ -32,7 +33,6 @@ from app.application.schemas.cases import (
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
     TimelineVerificationResponse,
-    CaseValidateTransitionRequest,
 )
 from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.case_service import (

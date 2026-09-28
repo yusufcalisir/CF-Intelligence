@@ -14,7 +14,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from app.domain.enums import CasePriority, CaseStatus
 from app.main import app
 from app.presentation.routers.cases import get_case_service
 

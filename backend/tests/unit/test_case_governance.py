@@ -11,20 +11,16 @@ Covers:
 """
 
 from datetime import UTC, datetime
+
 import pytest
 
 from app.domain.models.case import (
-    CASE_STATE_TRANSITIONS,
-    TERMINAL_CASE_STATES,
     CaseDomainModel,
-    CaseResolution,
     CaseState,
-    CaseTimelineEvent,
-    FourEyesSignature,
-    InvalidCaseTransitionError,
-    SelfApprovalProhibitedError,
     DuplicateSupervisorSignatureError,
     FourEyesVerificationError,
+    InvalidCaseTransitionError,
+    SelfApprovalProhibitedError,
     TerminalCaseImmutableError,
     clean_identity,
     compute_timeline_hash,

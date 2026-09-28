@@ -18,6 +18,7 @@ export interface FourEyesApprovalModalProps {
   isSubmitting?: boolean;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components
 export function cleanIdentity(id: string | null | undefined): string {
   if (!id) return '';
   let cleaned = id.trim();
