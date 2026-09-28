@@ -132,7 +132,7 @@ class SARGenerator:
     def get_schema_path(cls, framework: RegulatoryFramework | str) -> Path:
         """Resolve full filesystem path for the requested regulatory schema."""
         schemas_dir = cls._locate_schemas_directory()
-        val = framework.value if isinstance(framework, RegulatoryFramework) else str(framework)
+        val = framework.value if isinstance(framework, RegulatoryFramework) else framework
 
         mapping: dict[str, str] = {
             RegulatoryFramework.FINCEN_SAR_2_0.value: "FinCEN_SAR_2.0.xsd",
@@ -156,7 +156,7 @@ class SARGenerator:
     @classmethod
     def get_compiled_schema(cls, framework: RegulatoryFramework | str) -> Any:
         """Compile and cache lxml.etree.XMLSchema instance in a thread-safe registry."""
-        val = framework.value if isinstance(framework, RegulatoryFramework) else str(framework)
+        val = framework.value if isinstance(framework, RegulatoryFramework) else framework
         with cls._cache_lock:
             if val in cls._schema_cache:
                 return cls._schema_cache[val]
