@@ -16,6 +16,7 @@ ignore = ["E501", "N803", "N806", "B905", "B007", "B904", "B008", "TC001", "TC00
 [lint.per-file-ignores]
 "scripts/*" = ["E402", "TC003"]
 "backend/tests/*" = ["E402"]
+"experiments/*" = ["E402"]
 
 [lint.isort]
 known-first-party = ["app"]

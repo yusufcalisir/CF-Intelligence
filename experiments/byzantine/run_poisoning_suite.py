@@ -29,8 +29,8 @@ import argparse
 import datetime
 import json
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -412,8 +412,8 @@ def generate_audit_dossier(results: dict[str, Any], dossier_file: Path) -> None:
         "",
         f"> **Evaluation Timestamp:** `{results['timestamp_utc']}`  ",
         f"> **Consortium Scale:** `N = {results['n_clients']}` simulated financial institutions  ",
-        f"> **Malicious Fractions Swept:** `0%, 10%, 20%, 30%, 40%, 50%, 60%` ($f \\in [0, 6]$)  ",
-        f"> **Adversarial Modalities:** `Sign Inversion`, `Extreme Scaling (x100)`, `Gaussian Noise`, `Label Poisoning`  ",
+        "> **Malicious Fractions Swept:** `0%, 10%, 20%, 30%, 40%, 50%, 60%` ($f \\in [0, 6]$)  ",
+        "> **Adversarial Modalities:** `Sign Inversion`, `Extreme Scaling (x100)`, `Gaussian Noise`, `Label Poisoning`  ",
         "> **Verification Standard:** Zero-Mock Empirical Execution on 2,000 holdout transactions  ",
         "",
         "---",

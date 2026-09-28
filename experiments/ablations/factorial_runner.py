@@ -205,7 +205,7 @@ class FactorialMLPClassifier(nn.Module if torch else object):  # type: ignore
         self.fc2 = nn.Linear(hidden_dim, 1)  # type: ignore[union-attr]
         self.sigmoid = nn.Sigmoid()  # type: ignore[union-attr]
 
-    def forward(self, x: "torch.Tensor") -> "torch.Tensor":  # type: ignore[override]
+    def forward(self, x: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
         return self.sigmoid(self.fc2(self.relu(self.ln1(self.fc1(x)))))
 
 
