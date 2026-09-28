@@ -21,7 +21,7 @@ test.describe('Visual Regression: Live Consortium Operations & FL Dashboard', ()
     await expect(page.locator('text=Consortium Incentive Registry').first()).toBeAttached();
 
     await expect(page).toHaveScreenshot('operations-fullpage.png', {
-      fullPage: true,
+      fullPage: false,
     });
   });
 });
