@@ -15,7 +15,6 @@ import hashlib
 import logging
 import re
 import threading
-import xml.dom.minidom
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -24,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 import defusedxml.ElementTree as DefusedET
+import defusedxml.minidom
 
 logger = logging.getLogger(__name__)
 
@@ -357,7 +357,7 @@ class SARGenerator:
                 ET.SubElement(ee, "Timestamp").text = e.get("timestamp", datetime.now(UTC).isoformat())
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        parsed = xml.dom.minidom.parseString(raw_xml)
+        parsed = defusedxml.minidom.parseString(raw_xml)
         pretty_xml = parsed.toprettyxml(indent="  ")
 
         report = cls.validate_xml(
@@ -471,7 +471,7 @@ class SARGenerator:
                     ET.SubElement(ta, "currency_code").text = to_acc["currency_code"]
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        parsed = xml.dom.minidom.parseString(raw_xml)
+        parsed = defusedxml.minidom.parseString(raw_xml)
         pretty_xml = parsed.toprettyxml(indent="  ")
 
         report = cls.validate_xml(
@@ -543,7 +543,7 @@ class SARGenerator:
         ET.SubElement(cdtr_id, "IBAN").text = creditor_iban
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        parsed = xml.dom.minidom.parseString(raw_xml)
+        parsed = defusedxml.minidom.parseString(raw_xml)
         pretty_xml = parsed.toprettyxml(indent="  ")
 
         report = cls.validate_xml(
@@ -594,7 +594,7 @@ class SARGenerator:
         amt_el.text = f"{amount:.2f}"
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        parsed = xml.dom.minidom.parseString(raw_xml)
+        parsed = defusedxml.minidom.parseString(raw_xml)
         pretty_xml = parsed.toprettyxml(indent="  ")
 
         report = cls.validate_xml(
@@ -654,7 +654,7 @@ class SARGenerator:
             ET.SubElement(cdtr_id, "IBAN").text = entry.get("creditor_iban", account_iban)
 
         raw_xml = ET.tostring(root, encoding="utf-8").decode("utf-8")
-        parsed = xml.dom.minidom.parseString(raw_xml)
+        parsed = defusedxml.minidom.parseString(raw_xml)
         pretty_xml = parsed.toprettyxml(indent="  ")
 
         report = cls.validate_xml(
