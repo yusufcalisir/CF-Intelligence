@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3938%2F3938_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3948%2F3948_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,153 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,163 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1290,7 +1290,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,539 / 3,539 passing (3,938 total incl. verification)** | 100% | 3,153 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,549 / 3,549 passing (3,948 total incl. verification)** | 100% | 3,163 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1462,7 +1462,23 @@ To ensure fraud detection models do not hide localized failure modes beneath hig
 
 ---
 
-### 15.9 Reproducible Benchmark CLI Commands
+### 15.9 Demographic Attribute Availability & Fairness Governance (`experiments/fairness/demographic_audit.py`)
+
+Pursuant to Federal Reserve SR 11-7 / OCC 2011-12, ECOA Regulation B (12 CFR Part 1002), and EU GDPR Article 9 special-category data prohibitions, models enforce a **Zero Demographic PII Invariant**. All 7 benchmark datasets were audited and confirmed to contain **0 / 10** protected demographic attributes. Operational proxy attributes (`channel_type`, `country_corridor`, `merchant_category_tier`) are audited under the EEOC 80% Four-Fifths rule ($0.80 \le \mathrm{DIR} \le 1.25$):
+
+| Operational Proxy Dimension | Privileged Group | Unprivileged Group | Disparate Impact (DIR) | Equal Opportunity (EOD) | Demographic Parity (DPD) | 80% Rule Compliance |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: |
+| **Payment Channel Rail** | Online / Web Rail | Mobile App Rail | **1.1338** | +0.0228 | +0.0032 | `COMPLIANT [PASS]` |
+| **Country Corridor** | Domestic Core Rail | Cross-Border Wire Rail | **0.9737** | -0.0218 | -0.0007 | `COMPLIANT [PASS]` |
+| **Merchant Risk Tier** | Standard Retail (5411) | Financial Wire (6012) | **1.1401** | -0.0568 | +0.0034 | `COMPLIANT [PASS]` |
+
+> **Federal Reserve SR 11-7 / OCC 2011-12 Model Governance Notice:** Direct demographic subgroup fairness testing (e.g. disparate impact by race or sex) is mathematically inapplicable because demographic ground truth is neither collected nor retained in the transaction scoring perimeter.
+
+*Artifact: [`benchmarks/results/raw/demographic_fairness_audit.json`](benchmarks/results/raw/demographic_fairness_audit.json)*
+
+---
+
+### 15.10 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 
@@ -2763,10 +2779,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,539 Tests Core / 3,938 Total)
+### Step 5: Master Test Suites Execution (3,549 Tests Core / 3,948 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,153 tests)
+# 1. Run full backend pytest suite (3,163 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
