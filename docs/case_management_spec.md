@@ -169,26 +169,32 @@ To guarantee compliance with **SOC 2 Type II (CC6.1–CC6.3)**, **ISO 27001 (A.9
 ```
 
 1. **Strict Two-Signature Rule**:
-   - Resolving a case (`RESOLVED_CONFIRMED_FRAUD` or `RESOLVED_FALSE_POSITIVE`) strictly requires two valid supervisor signatures matching format `SIG_SUPERVISOR_<ID>`.
-   - Submitting a single signature or an invalid signature raises `InvalidCaseTransitionError`:
+   - Resolving a case (`RESOLVED_CONFIRMED_FRAUD` or `CLOSED_CONFIRMED`) strictly requires two valid supervisor signatures matching format `supervisor:<id>` or `SIG_SUPERVISOR_<ID>`.
+   - Submitting a single signature or an invalid signature raises `FourEyesVerificationError` / `InvalidCaseTransitionError`:
      `"Four-Eyes dual supervisor authorization requires 2 distinct supervisor signatures (got 1)"`.
-2. **Identity Distinctness ([`extract_supervisor_identity`](../backend/app/domain/case_management.py#L33))**:
-   - Both signatures must carry distinct supervisor identities (e.g., `SIG_SUPERVISOR_ALICE` and `SIG_SUPERVISOR_BOB`).
-   - If the same supervisor attempts to sign twice (`SIG_SUPERVISOR_ALICE` and `SIG_SUPERVISOR_ALICE`), the transition is rejected:
-     `"Four-Eyes dual supervisor authorization requires 2 distinct supervisor identities (duplicate signer identity 'ALICE' rejected)"`.
+2. **Identity Distinctness ([`clean_identity`](../backend/app/domain/models/case.py#L126))**:
+   - Both signatures must carry distinct supervisor identities (e.g., `supervisor:alice` and `supervisor:bob`).
+   - If the same supervisor attempts to sign twice (`supervisor:alice` and `SIG_SUPERVISOR_alice`), the transition is rejected:
+     `"Duplicate supervisor signature 'alice' rejected under Four-Eyes dual control governance."`.
 3. **Analyst vs. Supervisor Separation of Duties**:
-   - In [`CaseManagementService.change_status()`](../backend/app/application/services/case_service.py#L233), the supervisor signature cannot match the analyst actor (`supervisor_signature != actor`).
-4. **Asynchronous Multi-Shift Dual Sign-Off**:
-   - When the first supervisor signs, the case transitions to `PENDING_SECOND_SIGNATURE`. This enables seamless handoff between shifts and timezones before secondary sign-off and final case closure.
+   - In [`CaseManagementService.change_status()`](../backend/app/application/services/case_service.py) and [`validate_four_eyes_authorization`](../backend/app/domain/models/case.py), the supervisor signature cannot match the analyst actor ($\text{ApproverID} \neq \text{ActorID}$).
+4. **Assigned Investigator Self-Approval Prohibition (ApproverID != InvestigatorID)**:
+   - To prevent conflict of interest, the investigator assigned to a case is strictly prohibited from approving or providing supervisor signoff on their own investigation.
+   - Any attempt by an assigned investigator to self-approve via `/sign` or `/resolve` raises `SelfApprovalProhibitedError` and returns `HTTP 403 Forbidden`.
+5. **Interactive Pre-Validation & Modal Workflow**:
+   - Prior to triggering irreversible status mutations, clients can pre-validate proposed transitions via `POST /api/v1/cases/{case_id}/validate-transition`.
+   - In the commercial console, [`FourEyesApprovalModal`](../frontend/src/components/cases/FourEyesApprovalModal.tsx) provides real-time client-side warning banners, prefix normalization, and validation guardrails.
+6. **Asynchronous Multi-Shift Dual Sign-Off**:
+   - When the first supervisor signs, the case records the first verified signature and enters `PENDING_REVIEW` / `FOUR_EYES_PENDING`. This enables seamless handoff between shifts and timezones before secondary sign-off and final case closure.
 
 ---
 
 ## 🛡️ Cryptographic Integrity & Evidence Registry
 
 ### 1. Cryptographic Timeline Hash-Chaining
-All investigation lifecycle events recorded in [`CaseManagementService._add_event()`](../backend/app/application/services/case_service.py#L152) are cryptographically linked using SHA-256 block hashing:
+All investigation lifecycle events recorded in [`CaseManagementService._add_event()`](../backend/app/application/services/case_service.py) are cryptographically linked using SHA-256 block hashing:
 
-$$\mathrm{hash}_t = \mathrm{SHA\text{-}256}\Big(\mathrm{timestamp}_t \,\|\, \mathrm{event}_{\mathrm{type},\,t} \,\|\, \mathrm{description}_t \,\|\, \mathrm{actor}_t \,\|\, \mathrm{hash}_{t-1}\Big)$$
+$$\mathrm{hash}_t = \operatorname{SHA-256}\Big(\mathrm{timestamp}_t \mathbin{\Vert} \mathrm{event}_{\mathrm{type},\,t} \mathbin{\Vert} \mathrm{description}_t \mathbin{\Vert} \mathrm{actor}_t \mathbin{\Vert} \mathrm{hash}_{t-1}\Big)$$
 
 - **Genesis Block**: The first event (`created`) binds to `parent_hash = "0" * 64`.
 - **Tamper Evidence**: Any alteration to historical audit events, notes, or timestamps invalidates all downstream hash chains, guaranteeing evidentiary admissibility in regulatory and judicial proceedings.

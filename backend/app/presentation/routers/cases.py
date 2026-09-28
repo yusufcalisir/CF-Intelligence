@@ -32,6 +32,7 @@ from app.application.schemas.cases import (
     InvestigatorAuditLogResponse,
     SessionDurationRequest,
     TimelineVerificationResponse,
+    CaseValidateTransitionRequest,
 )
 from app.application.services.aml_agentic_copilot import AMLAgenticCopilot
 from app.application.services.case_service import (
@@ -44,6 +45,14 @@ from app.application.services.case_service import (
 from app.application.services.idempotency import IdempotencyService
 from app.dependencies import TenantDep, enforce_tenant_isolation
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.models.case import (
+    DuplicateSupervisorSignatureError,
+    FourEyesVerificationError,
+    InvalidCaseTransitionError,
+    SelfApprovalProhibitedError,
+    TerminalCaseImmutableError,
+    clean_identity,
+)
 from app.domain.value_objects_copilot import CopilotQueryRequest, CopilotQueryResponse
 
 logger = logging.getLogger(__name__)
@@ -171,6 +180,7 @@ async def create_case(
             priority=priority,
             alert_ids=req.alert_ids,
             total_risk_score=req.total_risk_score,
+            assigned_to=req.assigned_to,
         )
         result = _serialize_case(case)
         idem.complete(idempotency_key, result.model_dump())
@@ -222,6 +232,17 @@ async def update_case_status(case_id: str, req: CaseStatusRequest) -> CaseRespon
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except SelfApprovalProhibitedError as e:
+        if "assigned investigator" in str(e).lower():
+            raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except (
+        DuplicateSupervisorSignatureError,
+        FourEyesVerificationError,
+        InvalidCaseTransitionError,
+        TerminalCaseImmutableError,
+    ) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=str(e))
@@ -252,6 +273,22 @@ async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
         case = _case_service.get_case(case_id)
         if not case:
             raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+
+        if not case.is_open:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid operation: Case '{case_id}' is finalized in terminal state '{case.status.value}' and cannot receive additional signatures.",
+            )
+
+        # Invariant: Assigned investigator cannot self-approve / sign as supervisor
+        clean_sup = clean_identity(req.supervisor_id)
+        if case.assigned_to and clean_sup == clean_identity(case.assigned_to):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Self-approval prohibited: Assigned investigator '{case.assigned_to}' "
+                f"cannot sign as supervisor on their own case under Four-Eyes dual control governance.",
+            )
+
         if req.action == "REJECT":
             case = _case_service.change_status(
                 case_id,
@@ -265,10 +302,10 @@ async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
             )
             return _serialize_case(case)
 
-        sig = f"supervisor:{req.supervisor_id}"
+        sig = f"supervisor:{clean_sup}"
         existing_sigs = list(getattr(case, "supervisor_signatures", []) or [])
-        clean_existing = [s.replace("supervisor:", "").strip().lower() for s in existing_sigs]
-        if req.supervisor_id.strip().lower() in clean_existing:
+        clean_existing = [clean_identity(s) for s in existing_sigs]
+        if clean_sup in clean_existing:
             raise HTTPException(status_code=400, detail="Supervisor has already signed this case.")
 
         existing_sigs.append(sig)
@@ -295,20 +332,36 @@ async def sign_case(case_id: str, req: CaseSignRequest) -> CaseResponse:
 @api_router.post("/{case_id}/resolve", response_model=CaseResponse)
 async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
     """Resolve and close a case under strict Four-Eyes dual control."""
+    case = _case_service.get_case(case_id)
+    if not case:
+        raise HTTPException(status_code=404, detail=f"Case not found: {case_id}")
+
     # Check that supervisors are distinct identities
-    if req.primary_supervisor.strip().lower() == req.secondary_supervisor.strip().lower():
+    if clean_identity(req.primary_supervisor) == clean_identity(req.secondary_supervisor):
         raise HTTPException(
             status_code=400,
             detail="Primary and secondary supervisors must be distinct individuals (Four-Eyes dual control).",
         )
+
     # Check separation of duties: supervisor signatures must not match analyst actor
-    analyst_clean = req.actor.replace("analyst:", "").strip().lower()
+    analyst_clean = clean_identity(req.actor)
     for s_id in (req.primary_supervisor, req.secondary_supervisor):
-        if s_id.replace("supervisor:", "").strip().lower() == analyst_clean:
+        if clean_identity(s_id) == analyst_clean:
             raise HTTPException(
                 status_code=400,
                 detail="Supervisor signature must be different from the analyst actor (Four-Eyes Principle).",
             )
+
+    # Check separation of duties: supervisor signatures must not match assigned investigator (ApproverID != InvestigatorID)
+    if case.assigned_to:
+        assigned_clean = clean_identity(case.assigned_to)
+        for s_id in (req.primary_supervisor, req.secondary_supervisor):
+            if clean_identity(s_id) == assigned_clean:
+                raise HTTPException(
+                    status_code=403,
+                    detail=f"Self-approval prohibited: Assigned investigator '{case.assigned_to}' "
+                    f"cannot approve their own case (Four-Eyes Principle: ApproverID != InvestigatorID).",
+                )
 
     try:
         target_status = (
@@ -326,10 +379,55 @@ async def resolve_case(case_id: str, req: CaseResolveRequest) -> CaseResponse:
         return _serialize_case(case)
     except CaseNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except SelfApprovalProhibitedError as e:
+        if "assigned investigator" in str(e).lower():
+            raise HTTPException(status_code=403, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+    except (
+        DuplicateSupervisorSignatureError,
+        FourEyesVerificationError,
+        InvalidCaseTransitionError,
+        TerminalCaseImmutableError,
+    ) as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except ValueError as e:
         if "not found" in str(e).lower():
             raise HTTPException(status_code=404, detail=str(e))
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/{case_id}/validate-transition", response_model=dict)
+@api_router.post("/{case_id}/validate-transition", response_model=dict)
+async def validate_case_transition(
+    case_id: str,
+    req: CaseValidateTransitionRequest | None = None,
+    target_status: str | None = Query(None),
+    actor: str = Query("analyst"),
+    supervisor_signatures: list[str] | None = Query(None),
+) -> dict[str, Any]:
+    """Pre-validate a proposed status transition and Four-Eyes authorization requirements."""
+    resolved_target = (req.target_status or req.target_state if req else None) or target_status
+    if not resolved_target:
+        raise HTTPException(
+            status_code=422,
+            detail="target_status or target_state must be provided either in request body or as query parameter.",
+        )
+    resolved_actor = (req.actor_id or req.actor if req else None) or actor
+    resolved_sigs = (req.supervisor_signatures if req and req.supervisor_signatures else None) or supervisor_signatures
+
+    try:
+        new_status = CaseStatus(resolved_target.lower())
+    except ValueError:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid status value: {resolved_target!r}. Valid values: {[e.value for e in CaseStatus]}",
+        )
+    return _case_service.validate_transition(
+        case_id=case_id,
+        new_status=new_status,
+        actor=resolved_actor,
+        supervisor_signatures=resolved_sigs,
+    )
 
 
 @router.get("/{case_id}/timeline/verify", response_model=TimelineVerificationResponse)

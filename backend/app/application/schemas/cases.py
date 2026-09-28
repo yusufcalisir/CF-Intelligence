@@ -65,6 +65,11 @@ class CaseCreateRequest(BaseModel):
         le=1000.0,
         description="Total risk score composite",
     )
+    assigned_to: str | None = Field(
+        None,
+        max_length=128,
+        description="Assigned investigator identity",
+    )
 
     @field_validator("title")
     @classmethod
@@ -110,7 +115,7 @@ class CaseStatusRequest(BaseModel):
         "analyst",
         min_length=1,
         max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
     )
     supervisor_signature: str | None = Field(None, max_length=512)
     second_supervisor_signature: str | None = Field(None, max_length=512)
@@ -125,14 +130,14 @@ class CaseEscalateRequest(BaseModel):
         "analyst",
         min_length=1,
         max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
     )
 
 
 class CaseSignRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
-    supervisor_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
+    supervisor_id: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@:]+$")
     action: str = Field("APPROVE", pattern=r"^(APPROVE|REJECT)$")
     notes: str | None = Field(None, max_length=512)
 
@@ -141,14 +146,29 @@ class CaseResolveRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     resolution: str = Field(..., pattern=r"^(CONFIRMED_FRAUD|FALSE_POSITIVE)$")
-    primary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
-    secondary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@]+$")
+    primary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@:]+$")
+    secondary_supervisor: str = Field(..., min_length=1, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@:]+$")
     actor: str = Field(
         "analyst",
         min_length=1,
         max_length=128,
-        pattern=r"^[a-zA-Z0-9_\-\.@]+$",
+        pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
     )
+
+
+class CaseValidateTransitionRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    target_status: str | None = None
+    target_state: str | None = None
+    actor: str = Field(
+        "analyst",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[a-zA-Z0-9_\-\.@:]+$",
+    )
+    actor_id: str | None = Field(None, max_length=128, pattern=r"^[a-zA-Z0-9_\-\.@:]+$")
+    supervisor_signatures: list[str] = Field(default_factory=list)
 
 
 class TimelineVerificationResponse(BaseModel):

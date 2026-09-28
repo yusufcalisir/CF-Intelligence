@@ -16,6 +16,7 @@ import { CASE_STATUS_LABELS, PRIORITY_LABELS, CopilotQueryResponse } from '../ap
 import { useQueryClient } from '@tanstack/react-query';
 import { ExplainabilityPanel } from './AlertsPage';
 import { Bot, Sparkles, Copy, Check, FileText, ShieldAlert } from 'lucide-react';
+import { FourEyesApprovalModal } from '../components/cases/FourEyesApprovalModal';
 
 
 const STATUS_COLORS: Record<string, string> = {
@@ -87,6 +88,7 @@ export default function CaseDetailPage() {
   const queryClient = useQueryClient();
   const [noteContent, setNoteContent] = useState('');
   const [supervisorSig, setSupervisorSig] = useState('');
+  const [isFourEyesModalOpen, setIsFourEyesModalOpen] = useState(false);
   const [isExportingXml, setIsExportingXml] = useState(false);
   const [xmlExportSuccess, setXmlExportSuccess] = useState<string | null>(null);
   const exportFinCEN = useExportFinCENXml();
@@ -205,15 +207,54 @@ export default function CaseDetailPage() {
 
   const [statusError, setStatusError] = useState<string | null>(null);
 
+  const handleFourEyesConfirm = async (payload: {
+    resolution: 'CONFIRMED_FRAUD' | 'FALSE_POSITIVE';
+    primarySupervisor: string;
+    secondarySupervisor: string;
+    notes: string;
+  }) => {
+    if (!caseId) return;
+    setStatusError(null);
+    const targetStatus = payload.resolution === 'CONFIRMED_FRAUD' ? 'closed_confirmed' : 'closed_false_positive';
+    try {
+      await updateStatus.mutateAsync({
+        caseId,
+        status: targetStatus,
+        actor: 'analyst',
+        supervisor_signature: `supervisor:${payload.primarySupervisor}`,
+        second_supervisor_signature: `supervisor:${payload.secondarySupervisor}`,
+        supervisor_signatures: [
+          `supervisor:${payload.primarySupervisor}`,
+          `supervisor:${payload.secondarySupervisor}`,
+        ],
+      });
+      if (payload.notes) {
+        await addNote.mutateAsync({
+          caseId,
+          author: `supervisor:${payload.primarySupervisor}`,
+          content: `Four-Eyes Signoff Consensus Rationale: ${payload.notes}`,
+        });
+      }
+      queryClient.invalidateQueries({ queryKey: ['case', caseId] });
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+        || 'Four-Eyes authorization failed.';
+      setStatusError(`❌ ${detail}`);
+      throw err;
+    }
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     if (!caseId) return;
     setStatusError(null);
+    const isClosure = newStatus.startsWith('closed_');
+    if (isClosure && (!supervisorSig || !supervisorSig.trim())) {
+      setStatusError('Supervisor signature is required for case closure (Four-Eyes Principle)');
+      setIsFourEyesModalOpen(true);
+      return;
+    }
     try {
-      const isClosure = newStatus.startsWith('closed_');
-      if (isClosure && (!supervisorSig || !supervisorSig.trim())) {
-        setStatusError('⚠️ Supervisor signature is required for case closure (Four-Eyes Principle).');
-        return;
-      }
       await updateStatus.mutateAsync({
         caseId,
         status: newStatus,
@@ -1043,6 +1084,20 @@ export default function CaseDetailPage() {
           </table>
         </div>
       </motion.div>
+
+      {/* Four-Eyes Dual Control Signoff Modal */}
+      {caseData && (
+        <FourEyesApprovalModal
+          isOpen={isFourEyesModalOpen}
+          onClose={() => setIsFourEyesModalOpen(false)}
+          caseId={caseData.id}
+          caseTitle={caseData.title}
+          assignedInvestigator={caseData.assigned_to}
+          currentActor="analyst"
+          onConfirm={handleFourEyesConfirm}
+          isSubmitting={updateStatus.isPending}
+        />
+      )}
     </div>
   );
 }

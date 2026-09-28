@@ -19,6 +19,14 @@ from typing import Any
 
 from app.domain.entities_phase2 import Case, CaseEvent, CaseNote
 from app.domain.enums import CasePriority, CaseStatus
+from app.domain.models.case import (
+    DuplicateSupervisorSignatureError,
+    FourEyesVerificationError,
+    InvalidCaseTransitionError,
+    SelfApprovalProhibitedError,
+    TerminalCaseImmutableError,
+    clean_identity,
+)
 from app.infrastructure.redis_store import RedisStore
 
 logger = logging.getLogger(__name__)
@@ -194,6 +202,7 @@ class CaseManagementService:
         priority: CasePriority = CasePriority.P3_MEDIUM,
         alert_ids: list[str] | None = None,
         total_risk_score: float = 0.0,
+        assigned_to: str | None = None,
     ) -> Case:
         """Create a new investigation case."""
         with self._lock:
@@ -203,6 +212,8 @@ class CaseManagementService:
                 alert_ids=alert_ids or [],
                 total_risk_score=float(total_risk_score),
             )
+            if assigned_to:
+                case.assigned_to = assigned_to
 
             self._add_event(case, "created", f"Case created: {title}", "system")
 
@@ -266,10 +277,16 @@ class CaseManagementService:
         with self._lock:
             case = self._get_case(case_id)
             old_status = case.status
+            # Terminal state immutability check (Replay Resistance)
+            if old_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
+                raise TerminalCaseImmutableError(
+                    f"Invalid transition: Case '{case_id}' is finalized in terminal state '{old_status.value}' "
+                    f"and cannot transition to '{new_status.value}' (Replay Resistance Invariant)."
+                )
 
             valid = _VALID_TRANSITIONS.get(old_status, set())
             if new_status not in valid:
-                raise ValueError(
+                raise InvalidCaseTransitionError(
                     f"Invalid transition: {old_status.value} → {new_status.value}. "
                     f"Valid targets: {', '.join(s.value for s in valid)}"
                 )
@@ -298,22 +315,34 @@ class CaseManagementService:
 
             if new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
                 if not collected_signatures:
-                    raise ValueError(
+                    raise FourEyesVerificationError(
                         "Case closure requires secondary supervisor signature (Four-Eyes Principle)."
                     )
+
                 # Check separation of duties: supervisor signature must be different from analyst actor
+                # and assigned investigator (ApproverID != InvestigatorID and ApproverID != ActorID)
+                clean_actor = clean_identity(actor)
+                clean_assigned = clean_identity(case.assigned_to)
+
                 for sig in collected_signatures:
-                    sig_clean = sig.replace("supervisor:", "").strip().lower()
-                    actor_clean = actor.replace("analyst:", "").strip().lower()
-                    if sig_clean == actor_clean:
-                        raise ValueError(
+                    sig_clean = clean_identity(sig)
+                    if sig_clean == clean_actor:
+                        raise SelfApprovalProhibitedError(
                             "Supervisor signature must be different from the analyst actor (Four-Eyes Principle)."
                         )
+                    if clean_assigned and sig_clean == clean_assigned:
+                        raise SelfApprovalProhibitedError(
+                            f"Supervisor signature '{sig}' cannot match the assigned investigator '{case.assigned_to}' "
+                            f"(Four-Eyes Principle: ApproverID != InvestigatorID)."
+                        )
+
                 # If multiple signatures are provided, validate they are distinct supervisors
                 if len(collected_signatures) > 1:
-                    clean_ids = [s.replace("supervisor:", "").strip().lower() for s in collected_signatures]
+                    clean_ids = [clean_identity(s) for s in collected_signatures]
                     if len(set(clean_ids)) < len(clean_ids):
-                        raise ValueError("Duplicate supervisor signatures rejected under Four-Eyes dual control.")
+                        raise DuplicateSupervisorSignatureError(
+                            "Duplicate supervisor signatures rejected under Four-Eyes dual control."
+                        )
 
                 case.closed_at = datetime.now(UTC)
                 case.supervisor_signatures = collected_signatures
@@ -405,6 +434,60 @@ class CaseManagementService:
             logger.info("Case %s status: %s → %s", case_id[:8], old_status.value, new_status.value)
             self._cases.set(case.id, _case_to_dict(case))
             return case
+
+    def validate_transition(
+        self,
+        case_id: str,
+        new_status: CaseStatus,
+        actor: str = "analyst",
+        supervisor_signatures: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Pre-validate a proposed status transition without mutating persistent state."""
+        with self._lock:
+            case = self._get_case(case_id)
+            old_status = case.status
+            if old_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE):
+                return {
+                    "allowed": False,
+                    "reason": f"Case '{case_id}' is finalized in terminal state '{old_status.value}'.",
+                    "requires_four_eyes": False,
+                }
+            valid = _VALID_TRANSITIONS.get(old_status, set())
+            if new_status not in valid:
+                return {
+                    "allowed": False,
+                    "reason": f"Invalid transition: {old_status.value} → {new_status.value}.",
+                    "requires_four_eyes": False,
+                }
+            is_closure = new_status in (CaseStatus.CLOSED_CONFIRMED, CaseStatus.CLOSED_FALSE_POSITIVE)
+            if is_closure:
+                sigs = supervisor_signatures or []
+                if not sigs:
+                    return {
+                        "allowed": False,
+                        "reason": "Case closure requires Four-Eyes supervisor authorization.",
+                        "requires_four_eyes": True,
+                    }
+                from app.domain.models.case import validate_four_eyes_authorization
+
+                try:
+                    validate_four_eyes_authorization(
+                        actor_id=actor,
+                        assigned_investigator=case.assigned_to,
+                        supervisor_signatures=sigs,
+                        require_dual_supervisors=len(sigs) > 1,
+                    )
+                except Exception as exc:
+                    return {
+                        "allowed": False,
+                        "reason": str(exc),
+                        "requires_four_eyes": True,
+                    }
+            return {
+                "allowed": True,
+                "reason": None,
+                "requires_four_eyes": is_closure,
+            }
 
     def link_alert(self, case_id: str, alert_id: str) -> Case:
         """Link an additional alert to an existing case."""

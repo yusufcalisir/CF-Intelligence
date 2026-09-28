@@ -1,5 +1,23 @@
 """Domain models package."""
 
+from .case import (
+    CASE_STATE_TRANSITIONS,
+    TERMINAL_CASE_STATES,
+    CaseDomainError,
+    CaseDomainModel,
+    CaseResolution,
+    CaseState,
+    CaseTimelineEvent,
+    DuplicateSupervisorSignatureError,
+    FourEyesSignature,
+    FourEyesVerificationError,
+    InvalidCaseTransitionError,
+    SelfApprovalProhibitedError,
+    TerminalCaseImmutableError,
+    clean_identity,
+    compute_timeline_hash,
+    validate_four_eyes_authorization,
+)
 from .consortium import (
     ConsortiumBenchmarkResult,
     ConsortiumNode,
@@ -18,4 +36,21 @@ __all__ = [
     "CrossBankTransaction",
     "ScenarioMetrics",
     "ConsortiumBenchmarkResult",
+    "CaseState",
+    "CaseResolution",
+    "CASE_STATE_TRANSITIONS",
+    "TERMINAL_CASE_STATES",
+    "CaseDomainError",
+    "InvalidCaseTransitionError",
+    "SelfApprovalProhibitedError",
+    "DuplicateSupervisorSignatureError",
+    "FourEyesVerificationError",
+    "TerminalCaseImmutableError",
+    "FourEyesSignature",
+    "CaseTimelineEvent",
+    "CaseDomainModel",
+    "clean_identity",
+    "compute_timeline_hash",
+    "validate_four_eyes_authorization",
 ]
+

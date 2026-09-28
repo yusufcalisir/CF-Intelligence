@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import SecurityPage from '../SecurityPage';
+import * as queries from '../../api/queries';
 
 const createWrapper = () => {
   const queryClient = new QueryClient({
@@ -18,6 +19,18 @@ const createWrapper = () => {
 };
 
 describe('SecurityPage', () => {
+  beforeEach(() => {
+    vi.spyOn(queries, 'useSecurityStatus').mockReturnValue({
+      data: {
+        mtls: { enabled: true, ca_cn: 'Meridian Root CA', tls_version: 'TLSv1.3', peer_verification: 'VERIFIED', sample_cert: { cn: 'bank-node.meridian', sans: ['DNS:bank-node.meridian'], valid_until: '2027-01-01' } },
+        oidc: { provider: 'Keycloak', issuer: 'https://auth.bank', client_id: 'cf-intelligence' },
+        abac: { active_policies: 12, default_action: 'DENY', enforced_policies: ['POL-01: Cross-Bank Isolation'] },
+        vault: { vault_url: 'http://localhost:8200', mount_point: 'secret/', sample_secret_source: 'VAULT_KV' },
+        audit_chain: { length: 154, last_hash: 'abc' },
+      },
+      isLoading: false,
+    } as any);
+  });
   it('renders security modules header and security posture summary', async () => {
     render(<SecurityPage />, { wrapper: createWrapper() });
 

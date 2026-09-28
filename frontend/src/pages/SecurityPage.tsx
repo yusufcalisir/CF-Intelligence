@@ -633,7 +633,7 @@ export default function SecurityPage() {
                   Active ABAC Compliance Policies
                 </h3>
                 <div className="space-y-2 text-xs">
-                  {status?.abac.enforced_policies.map((pol, i) => (
+                  {status?.abac?.enforced_policies?.map((pol, i) => (
                     <div key={i} className="p-2 rounded bg-[var(--color-surface-alt)] font-mono font-bold flex items-center justify-between">
                       <span>{pol}</span>
                       <span className="text-emerald-400">ENFORCED</span>
