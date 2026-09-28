@@ -1,4 +1,4 @@
-.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
+.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
 
 SHELL := /bin/bash
 
@@ -81,32 +81,6 @@ format: ## Format backend code with ruff
 format-check: ## Check formatting with ruff
 	cd backend && ruff format --check app/ tests/
 
-# ──────────────────────────────────────────────
-# Empirical Benchmarks
-# ──────────────────────────────────────────────
-
-benchmark: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency ## Run complete benchmark suite
-
-benchmark-fraud: ## Run fraud detection benchmark (PaySim / IEEE-CIS)
-	python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --rounds 10
-
-benchmark-fl: ## Run federated learning optimization benchmark (Non-IID Dirichlet)
-	python benchmarks/runners/run_fl_benchmark.py --rounds 10 --alpha 0.5
-
-benchmark-dp: ## Run differential privacy utility frontier sweep
-	python benchmarks/runners/run_dp_tradeoff.py
-
-benchmark-byzantine: ## Run Byzantine resilience benchmark (Sign Inversion)
-	python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion
-
-benchmark-graph: ## Run GraphSAGE node classification benchmark (Elliptic)
-	python benchmarks/runners/run_graph_benchmark.py
-
-benchmark-latency: ## Run inference gateway latency and concurrency stress test
-	python benchmarks/runners/run_latency_benchmark.py --workers 50
-
-benchmark-security: ## Run security regression test suite (SSRF, BOLA, Tenant Isolation)
-	cd backend && python -m pytest tests/unit/test_perimeter_waf.py tests/unit/test_multi_tenancy.py tests/unit/test_auth_security.py -v
 
 # ──────────────────────────────────────────────
 # Frontend
@@ -157,7 +131,26 @@ migrate-rollback: ## Rollback last migration
 # Benchmarks & Reproducibility Suite
 # ──────────────────────────────────────────────
 
-benchmark: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts ## Run complete reproducible benchmark suite
+reproduce-all: ## Master one-line command to verify reproducibility, run tests, and validate master matrix
+	python scripts/run_all_tests.py
+	python -m experiments.harness.compile_reports --verify
+	python benchmarks/generate_master_benchmark_matrix.py --verify
+
+benchmark-all: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency benchmark-factorial benchmark-matrix generate-charts ## Run complete reproducible benchmark suite
+
+benchmark: benchmark-all ## Alias for benchmark-all
+
+benchmark-matrix: ## Generate and verify the master empirical comparative benchmark matrix
+	python benchmarks/generate_master_benchmark_matrix.py --verify
+
+benchmark-verify: ## Audit standardized 5-artifact hierarchy across all 8 canonical benchmark datasets
+	python -m experiments.harness.compile_reports --verify
+
+benchmark-factorial: ## Run 16-configuration architectural component factorial ablation sweep
+	python benchmarks/runners/run_factorial_ablation.py
+
+benchmark-download: ## Download and verify real benchmark datasets via CLI
+	python scripts/download_real_benchmarks.py --all
 
 benchmark-fraud: ## Run PaySim & IEEE-CIS fraud detection benchmarks
 	python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --synthetic-eval
