@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3926%2F3926_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3938%2F3938_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,141 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,153 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1290,7 +1290,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,527 / 3,527 passing (3,926 total incl. verification)** | 100% | 3,141 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,539 / 3,539 passing (3,938 total incl. verification)** | 100% | 3,153 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1447,7 +1447,22 @@ To eliminate random initialization variance artifacts and establish statutory co
 
 ---
 
-### 15.8 Reproducible Benchmark CLI Commands
+### 15.8 Systematic Error Stratification & Failure Mode Diagnostics (`experiments/error_analysis/stratify_errors.py`)
+
+To ensure fraud detection models do not hide localized failure modes beneath high aggregate scores, the platform decomposes classification residuals across four orthogonal banking axes (evaluated on $10{,}000$ transactions with empirical loss parameters $C_{\mathrm{FN}} = 850\text{ USD}$ and $C_{\mathrm{FP}} = 25\text{ USD}$):
+
+| Operational Dimension | High-Risk Stratum Slice | Dominant Error | Empirical Rate | Financial Risk & Mitigation Mechanism |
+| :--- | :--- | :---: | :---: | :--- |
+| **Transaction Amount** | Low Amounts ($\$50-\$250$) | False Negative | **47.67% FNR** | Micro-structuring smurfing; mitigated via DH-PSI cross-bank anonymous velocity counters. |
+| **Temporal (Hour of Day)**| Late Night (`00:00-05:59`) | False Positive | **14.98% FPR** | Automated nocturnal batch clearing; mitigated via ISO 20022 `camt.053` corporate calendar whitelist. |
+| **Merchant Category (MCC)**| Specialty Retail (`5999`) | False Negative | **43.48% FNR** | Cross-border arbitrage & DP noise; mitigated by routing $[0.45, 0.55]$ borderline scores to Four-Eyes review. |
+| **Graph Network Degree** | Super-Hubs ($k > 50$) | False Negative | **90.00% FNR** | Aggregator neighborhood over-smoothing in GNNs; mitigated via temporal edge-weight attention discounting. |
+
+*Artifact: [`benchmarks/results/raw/error_stratification_analysis.json`](benchmarks/results/raw/error_stratification_analysis.json)*
+
+---
+
+### 15.9 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 
@@ -2748,10 +2763,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,527 Tests Core / 3,926 Total)
+### Step 5: Master Test Suites Execution (3,539 Tests Core / 3,938 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,141 tests)
+# 1. Run full backend pytest suite (3,153 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
