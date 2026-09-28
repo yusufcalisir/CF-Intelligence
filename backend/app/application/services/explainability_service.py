@@ -18,7 +18,6 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from app.domain.value_objects_phase2 import (
-    CounterfactualChange,
     CounterfactualExplanation,
     DecisionReplayReport,
     EdgeContribution,
@@ -770,175 +769,15 @@ class ExplainabilityService:
         (amount, country, velocity, channel, merchant category) and re-evaluates
         every candidate perturbation through the real RiskScoringEngine.
         """
-        from app.application.services.risk_engine import RiskScoringEngine
+        from app.application.services.counterfactual_service import CounterfactualService
 
-        engine = risk_engine or RiskScoringEngine()
-        orig_score = alert.risk_score
-
-        # 1. Resolve or reconstruct base transaction features
-        if transaction:
-            working_txn = transaction.copy()
-            entity_hash = str(
-                transaction.get("entity_hash")
-                or (alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}")
-            )
-        else:
-            entity_hash = alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}"
-            top_feat_dict = {
-                f.get("feature"): f.get("contribution")
-                for f in alert.top_features
-                if isinstance(f, dict)
-            }
-            has_high_amt = "HIGH-AMT" in alert.reason_codes or orig_score > 600 or "transaction_amount" in top_feat_dict
-            has_geo = "GEO-RISK" in alert.reason_codes or "country_code" in top_feat_dict
-            has_vel = "VEL-001" in alert.reason_codes or "velocity" in top_feat_dict
-            has_merch = "MERCH-RISK" in alert.reason_codes or "merchant_category" in top_feat_dict
-
-            working_txn = {
-                "transaction_amount": 4500.0 if has_high_amt else 150.0,
-                "country_code": "KP" if has_geo else "US",
-                "velocity": 12.0 if has_vel else 1.0,
-                "merchant_category": "gambling" if has_merch else "retail",
-                "device_type": "phone_banking" if orig_score > 700 else "web_browser",
-                "customer_history_score": 0.35 if orig_score > 600 else 0.85,
-                "merchant_risk_score": 0.85 if has_merch else 0.10,
-                "account_age_days": 20 if orig_score > 650 else 365,
-            }
-
-            # Register baseline and history in engine if alert indicates historical risk
-            if has_high_amt:
-                engine.register_baseline(entity_hash, {"mean_amount": 100.0, "std_amount": 25.0})
-            if "CB-HIST" in alert.reason_codes:
-                engine.register_chargeback(entity_hash, 0.05)
-            if alert.historical_evidence:
-                engine.register_alert(entity_hash)
-                engine.register_alert(entity_hash)
-
-        # Initial evaluation through the real engine
-        base_ml = alert.model_confidence or max(0.1, min(0.99, orig_score / 1000.0))
-        initial_eval = engine.score_transaction(working_txn, ml_prediction=base_ml, entity_hash=entity_hash)
-        current_score = initial_eval.score
-
-        working_ml = base_ml
-        changes: list[CounterfactualChange] = []
-        applied_features: set[str] = set()
-
-        # Mutable feature perturbation candidates
-        mutable_options: dict[str, list[tuple[Any, str]]] = {
-            "country_code": [
-                ("US", "Originate transaction from domestic home country (US) instead of high-risk jurisdiction"),
-            ],
-            "transaction_amount": [
-                (round(float(working_txn.get("transaction_amount", 1000)) * 0.50, 2), "Reduce transaction amount by 50% to lower exposure"),
-                (round(float(working_txn.get("transaction_amount", 1000)) * 0.25, 2), "Reduce transaction amount by 75% within standard limit"),
-                (50.0, "Reduce transaction amount to $50.00 within typical baseline pattern"),
-            ],
-            "velocity": [
-                (3.0, "Space out transactions to moderate velocity (3 txns/hr)"),
-                (1.0, "Space out transactions to normal velocity (1 txn/hr)"),
-            ],
-            "merchant_category": [
-                ("retail", "Transact with verified 3DS retail merchant instead of high-risk category"),
-                ("grocery", "Route transaction to standard verified merchant"),
-            ],
-            "device_type": [
-                ("mobile_app", "Authenticate and complete transaction via enrolled mobile app with biometric 2FA"),
-            ],
-        }
-
-        # Greedy coordinate descent over candidate perturbations
-        for _ in range(5):
-            if current_score <= target_score:
-                break
-
-            best_candidate = None
-            best_score = current_score
-            best_feat = None
-            best_val = None
-            best_desc = None
-            best_orig = None
-
-            for feat, candidates in mutable_options.items():
-                if feat in applied_features:
-                    continue
-                orig_val = working_txn.get(feat)
-                for cand_val, desc in candidates:
-                    if cand_val == orig_val:
-                        continue
-                    temp_txn = working_txn.copy()
-                    temp_txn[feat] = cand_val
-
-                    # When suspicious high-risk features normalize, ML prediction score drops
-                    ml_drop = 0.12 if feat in ("country_code", "transaction_amount", "merchant_category") else 0.04
-                    temp_ml = max(0.08, working_ml - ml_drop)
-
-                    eval_res = engine.score_transaction(temp_txn, ml_prediction=temp_ml, entity_hash=entity_hash)
-                    if eval_res.score < best_score:
-                        best_score = eval_res.score
-                        best_candidate = (temp_txn, temp_ml)
-                        best_feat = feat
-                        best_val = cand_val
-                        best_desc = desc
-                        best_orig = orig_val
-
-            if (
-                best_candidate is not None
-                and best_feat is not None
-                and best_desc is not None
-                and best_score < current_score
-            ):
-                working_txn, working_ml = best_candidate
-                applied_features.add(best_feat)
-
-                orig_str = (
-                    f"${best_orig:,.2f}"
-                    if isinstance(best_orig, (int, float)) and best_feat == "transaction_amount"
-                    else str(best_orig)
-                )
-                remed_str = (
-                    f"${best_val:,.2f}"
-                    if isinstance(best_val, (int, float)) and best_feat == "transaction_amount"
-                    else str(best_val)
-                )
-
-                changes.append(
-                    CounterfactualChange(
-                        feature=best_feat,
-                        original_value=orig_str,
-                        remediated_value=remed_str,
-                        delta_explanation=best_desc,
-                    )
-                )
-                current_score = best_score
-            else:
-                break
-
-        # Final verification: Re-evaluate through the real risk engine
-        final_eval = engine.score_transaction(working_txn, ml_prediction=working_ml, entity_hash=entity_hash)
-        final_score = final_eval.score
-        is_cleared = final_score <= target_score
-
-        if is_cleared:
-            summary_text = (
-                f"This alert (risk score {orig_score:.0f}/1000) was CLEARED to {final_score:.1f}/1000 "
-                f"via verified engine re-scoring with {len(changes)} remediation step(s):\n"
-                + "\n".join(f"• {c.feature}: {c.delta_explanation}" for c in changes)
-            )
-        else:
-            summary_text = (
-                f"Counterfactual search reduced risk score from {orig_score:.0f} to {final_score:.1f}/1000 "
-                f"with {len(changes)} step(s), but did not reach the {target_score:.0f} clearance threshold:\n"
-                + "\n".join(f"• {c.feature}: {c.delta_explanation}" for c in changes)
-            )
-
-        return CounterfactualExplanation(
-            alert_id=alert.id,
-            original_score=orig_score,
-            remediated_score=final_score,
-            is_cleared=is_cleared,
-            changes=changes,
-            summary_text=summary_text,
+        cf_service = CounterfactualService(risk_engine=risk_engine)
+        return cf_service.generate_counterfactual(
+            alert=alert,
+            target_score=target_score,
+            transaction=transaction,
         )
+
 
     def replay_inference_audit(
         self,
