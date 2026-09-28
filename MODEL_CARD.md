@@ -143,7 +143,7 @@ $$\mathrm{CI}_{95\%} = \left[ \mu - t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}}
 | **Elliptic Bitcoin Graph** | GraphSAGE GNN | ROC-AUC | **0.9860** | Single-run baseline | 0.9860 | 0.9860 |
 | **Elliptic Bitcoin Graph** | GraphSAGE GNN | PR-AUC | **0.9001** | Single-run baseline | 0.9001 | 0.9001 |
 
-*Raw Statistical Artifact: [`benchmarks/results/raw/multi_seed_statistical_summary.json`](../benchmarks/results/raw/multi_seed_statistical_summary.json)*
+*Raw Statistical Artifact: [`benchmarks/results/raw/multi_seed_statistical_summary.json`](benchmarks/results/raw/multi_seed_statistical_summary.json)*
 
 ### 4.2 Multi-Hop Graph Detection Uplift
 On the IBM AMLSim benchmark, inductive GraphSAGE achieves significant detection uplift over Tabular MLP baselines:
@@ -188,7 +188,7 @@ $$\mathrm{DIR} = \frac{\mathbb{P}(\hat{Y}=1 \mid A=\text{unprivileged})}{\mathbb
 | **Country Corridor** | Domestic Core Rail | Cross-Border Wire Rail | **0.9737** | -0.0218 | -0.0007 | `COMPLIANT [PASS]` |
 | **Merchant Risk Tier** | Standard Retail (5411) | Financial Wire (6012) | **1.1401** | -0.0568 | +0.0034 | `COMPLIANT [PASS]` |
 
-*Raw Fairness Artifact: [`benchmarks/results/raw/demographic_fairness_audit.json`](../benchmarks/results/raw/demographic_fairness_audit.json)*
+*Raw Fairness Artifact: [`benchmarks/results/raw/demographic_fairness_audit.json`](benchmarks/results/raw/demographic_fairness_audit.json)*
 
 ---
 
@@ -203,7 +203,7 @@ $$\mathrm{DIR} = \frac{\mathbb{P}(\hat{Y}=1 \mid A=\text{unprivileged})}{\mathbb
 
 ## 7. Model Limitations & Concrete Failure Modes
 
-Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_analysis.json`](../benchmarks/results/raw/error_stratification_analysis.json)) document 4 concrete enterprise failure modes:
+Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_analysis.json`](benchmarks/results/raw/error_stratification_analysis.json)) document 4 concrete enterprise failure modes:
 
 | Failure Mode | Affected Operational Stratum | Empirical Rate | Root Cause | Engineering Mitigation |
 | :--- | :--- | :---: | :--- | :--- |
@@ -225,8 +225,8 @@ Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_a
 ## 9. Verification & Audit Test Suites
 
 The model artifacts and governance contracts are certified by automated test suites:
-- **Demographic Availability & Fairness Audit**: [`backend/tests/unit/test_demographic_fairness_audit.py`](../backend/tests/unit/test_demographic_fairness_audit.py) (**10 tests, 100% passing**)
-- **Systematic Error Stratification & Failure Modes**: [`backend/tests/unit/test_error_stratification.py`](../backend/tests/unit/test_error_stratification.py) (**12 tests, 100% passing**)
-- **Multi-Seed Statistical Robustness**: [`backend/tests/unit/test_multi_seed_runner.py`](../backend/tests/unit/test_multi_seed_runner.py) (**13 tests, 100% passing**)
-- **Federal Reserve SR 11-7 Model Governance**: [`backend/tests/unit/test_model_governance_hardening.py`](../backend/tests/unit/test_model_governance_hardening.py) (**89 total SR 11-7 tests, 100% passing**)
-- **Claim Registry Reconciliation**: [`backend/tests/unit/test_claims_registry.py`](../backend/tests/unit/test_claims_registry.py) (**4 tests, 100% passing**)
+- **Demographic Availability & Fairness Audit**: [`backend/tests/unit/test_demographic_fairness_audit.py`](backend/tests/unit/test_demographic_fairness_audit.py) (**10 tests, 100% passing**)
+- **Systematic Error Stratification & Failure Modes**: [`backend/tests/unit/test_error_stratification.py`](backend/tests/unit/test_error_stratification.py) (**12 tests, 100% passing**)
+- **Multi-Seed Statistical Robustness**: [`backend/tests/unit/test_multi_seed_runner.py`](backend/tests/unit/test_multi_seed_runner.py) (**13 tests, 100% passing**)
+- **Federal Reserve SR 11-7 Model Governance**: [`backend/tests/unit/test_model_governance_hardening.py`](backend/tests/unit/test_model_governance_hardening.py) (**89 total SR 11-7 tests, 100% passing**)
+- **Claim Registry Reconciliation**: [`backend/tests/unit/test_claims_registry.py`](backend/tests/unit/test_claims_registry.py) (**4 tests, 100% passing**)
