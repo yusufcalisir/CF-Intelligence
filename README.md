@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3983%2F3983_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3993%2F3993_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,198 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,208 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1290,7 +1290,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,584 / 3,584 passing (3,983 total incl. verification)** | 100% | 3,198 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,594 / 3,594 passing (3,993 total incl. verification)** | 100% | 3,208 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1508,7 +1508,43 @@ Consolidated empirical performance matrix across all eight canonical benchmark d
 
 ---
 
-### 15.11 Reproducible Benchmark CLI Commands
+### 15.11 Architectural Component Factorial Ablation Matrix ($2^4 = 16$ Grid)
+
+Full factorial attribution ($N = 8{,}000, K = 5, \alpha = 0.5$) across four foundational system components: **Graph Structural Neighborhoods (G)**, **Cross-Bank Transaction Signals (CB)**, **Differential Privacy (DP)**, and **Secure Aggregation (SecAgg)**:
+
+| ID | Configuration | Graph | CB | DP | SecAgg | PR-AUC | ROC-AUC | Recall @ 0.01% FPR | Recall @ 0.1% FPR | ECE | Runtime (ms) | Comm (KB) | Privacy ($\epsilon$) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `C01` | Baseline (Tabular Silo) | ❌ | ❌ | ❌ | ❌ | **0.2428** | 0.8765 | 0.0222 | 0.0222 | 0.0119 | 4091.5 | 9.76 | $\infty$ (None) |
+| `C02` **[Pareto]** | CrossBank | ❌ | ✅ | ❌ | ❌ | **0.9600** | 0.9984 | 0.7556 | 0.8667 | 0.0253 | 2738.1 | 9.76 | $\infty$ (None) |
+| `C03` | SecAgg | ❌ | ❌ | ❌ | ✅ | **0.2428** | 0.8765 | 0.0222 | 0.0222 | 0.0119 | 2568.0 | 10.42 | $\infty$ (None) |
+| `C04` **[Pareto]** | CrossBank + SecAgg | ❌ | ✅ | ❌ | ✅ | **0.9600** | 0.9984 | 0.7556 | 0.8667 | 0.0253 | 2515.5 | 10.42 | $\infty$ (None) |
+| `C05` | DP | ❌ | ❌ | ✅ | ❌ | **0.1935** | 0.8629 | 0.0000 | 0.0444 | 0.0125 | 2904.5 | 9.76 | $\epsilon=2.55$ |
+| `C06` | CrossBank + DP | ❌ | ✅ | ✅ | ❌ | **0.9157** | 0.9940 | 0.6000 | 0.7778 | 0.0237 | 2976.0 | 9.76 | $\epsilon=2.55$ |
+| `C07` | DP + SecAgg | ❌ | ❌ | ✅ | ✅ | **0.1935** | 0.8629 | 0.0000 | 0.0444 | 0.0125 | 5635.0 | 10.42 | $\epsilon=2.55$ |
+| `C08` | CrossBank + DP + SecAgg | ❌ | ✅ | ✅ | ✅ | **0.9157** | 0.9940 | 0.6000 | 0.7778 | 0.0237 | 5557.1 | 10.42 | $\epsilon=2.55$ |
+| `C09` | Graph | ✅ | ❌ | ❌ | ❌ | **0.9072** | 0.9925 | 0.5778 | 0.6222 | 0.0241 | 9378.6 | 9.76 | $\infty$ (None) |
+| `C10` **[Pareto]** | Graph + CrossBank | ✅ | ✅ | ❌ | ❌ | **0.9842** | 0.9996 | 0.6000 | 0.9333 | 0.0282 | 3055.3 | 9.76 | $\infty$ (None) |
+| `C11` | Graph + SecAgg | ✅ | ❌ | ❌ | ✅ | **0.9072** | 0.9925 | 0.5778 | 0.6222 | 0.0241 | 2408.5 | 10.42 | $\infty$ (None) |
+| `C12` **[Pareto]** | Graph + CrossBank + SecAgg | ✅ | ✅ | ❌ | ✅ | **0.9842** | 0.9996 | 0.6000 | 0.9333 | 0.0282 | 3689.9 | 10.42 | $\infty$ (None) |
+| `C13` | Graph + DP | ✅ | ❌ | ✅ | ❌ | **0.8301** | 0.9781 | 0.4444 | 0.5333 | 0.0127 | 3056.3 | 9.76 | $\epsilon=2.55$ |
+| `C14` | Graph + CrossBank + DP | ✅ | ✅ | ✅ | ❌ | **0.9342** | 0.9966 | 0.7556 | 0.7556 | 0.0213 | 3277.0 | 9.76 | $\epsilon=2.55$ |
+| `C15` | Graph + DP + SecAgg | ✅ | ❌ | ✅ | ✅ | **0.8301** | 0.9781 | 0.4444 | 0.5333 | 0.0127 | 4143.1 | 10.42 | $\epsilon=2.55$ |
+| `C16` **[Production]** | Graph + CrossBank + DP + SecAgg | ✅ | ✅ | ✅ | ✅ | **0.9342** | 0.9966 | 0.7556 | 0.7556 | 0.0213 | 3717.8 | 10.42 | $\epsilon=2.55$ |
+
+#### Statistical ANOVA Marginal Main Effects
+
+| Factor | $\Delta\operatorname{PR-AUC}$ | $\Delta\text{Recall @ 0.01% FPR}$ | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
+| :--- | :---: | :---: | :---: | :---: | :--- |
+| **Graph** | **+0.3359** | **+0.2500** | +12.9% | +0.0% | Multi-hop structural embeddings offer the single highest individual detection uplift. |
+| **CrossBank** | **+0.4051** | **+0.4167** | -19.5% | +0.0% | Cross-bank transaction flow features expose distributed layering invisible to local silos. |
+| **DP** | **-0.0552** | **-0.0389** | +2.7% | +0.0% | Controlled privacy tax under Rényi DP moments accountant ($\epsilon \le 2.55, \delta = 10^{-5}$). |
+| **SecAgg** | **+0.0000** | **+0.0000** | -4.0% | +6.8% | Mathematically lossless zero-sum cancellation; zero impact on model accuracy. |
+
+*Artifact: [`benchmarks/results/raw/factorial_ablation_matrix.json`](benchmarks/results/raw/factorial_ablation_matrix.json) | Runner: [`benchmarks/runners/run_factorial_ablation.py`](benchmarks/runners/run_factorial_ablation.py)*
+
+---
+
+### 15.12 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 
