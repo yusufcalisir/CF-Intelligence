@@ -25,8 +25,8 @@ export default function LossChart({ rounds, totalRounds }: LossChartProps) {
       return {
         round: actual.round_number,
         loss: parseFloat(actual.global_loss.toFixed(4)),
-        participants: actual.participating_banks.length,
-        dropped: actual.dropped_banks.length > 0,
+        participants: actual.participating_banks?.length ?? 0,
+        dropped: Boolean(actual.dropped_banks && actual.dropped_banks.length > 0),
       };
     }
     return placeholder;

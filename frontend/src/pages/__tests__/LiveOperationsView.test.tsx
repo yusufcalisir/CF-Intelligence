@@ -361,5 +361,67 @@ describe('LiveOperationsView Component', () => {
     expect(screen.getByText(/0x71C7656EC7ab88b098defB751B7401B5f6d8976F/i)).toBeInTheDocument();
     expect(screen.getByText(/0x3a7e58b1c4d92a0e7f8b9c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f/i)).toBeInTheDocument();
   });
+
+  it('renders Model Telemetry & Empirical Validation charts using effectiveBanks and effectiveRounds even without backend simulation', () => {
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    // Verify Model Telemetry & Empirical Validation section header
+    expect(screen.getByText(/Model Telemetry & Empirical Validation/i)).toBeInTheDocument();
+    expect(screen.getByText(/Institutional Model Verification & Discrimination Analytics/i)).toBeInTheDocument();
+
+    // Verify Charts Grid rendered without showing the fallback empty state
+    expect(screen.queryByText(/Launch a federated training run or select an existing simulation to view real-time model verification metrics/i)).not.toBeInTheDocument();
+
+    // Verify ROC curve header and training loss convergence charts
+    expect(screen.getByText(/ROC Curve - Federated Model/i)).toBeInTheDocument();
+    expect(screen.getByText(/Training Loss Convergence/i)).toBeInTheDocument();
+    expect(screen.getByText(/Confusion Matrix/i)).toBeInTheDocument();
+    expect(screen.getByText(/Feature Importance/i)).toBeInTheDocument();
+    expect(screen.getByText(/Model Performance Comparison — All Banks/i)).toBeInTheDocument();
+  });
+
+  it('ignores background WebSocket round_start events when in simulated mock training mode', () => {
+    let instance: any = null;
+
+    class TestWebSocket {
+      static OPEN = 1;
+      static CLOSED = 3;
+      readyState = 1;
+      send = vi.fn();
+      close = vi.fn();
+      onopen: (() => void) | null = null;
+      onclose: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      onmessage: ((e: { data: string }) => void) | null = null;
+
+      constructor(public url: string) {
+        instance = this;
+      }
+    }
+
+    vi.stubGlobal('WebSocket', TestWebSocket);
+
+    render(<LiveOperationsView />, { wrapper: createWrapper() });
+
+    act(() => {
+      instance.onopen();
+    });
+
+    // Send a background round_start event over the WebSocket
+    act(() => {
+      instance.onmessage({
+        data: JSON.stringify({
+          event_type: 'round_start',
+          data: { round: 1, total: 10 },
+        }),
+      });
+    });
+
+    // In mock mode, background WS events should be ignored, so training should not be forced into federated mode
+    expect(screen.queryByText(/Round 1 \/ 10/i)).not.toBeInTheDocument();
+
+    vi.unstubAllGlobals();
+  });
 });
+
 

@@ -1,7 +1,7 @@
 """Master Unified Test Runner for CF-Intelligence.
 
 Executes all test suites across the repository:
-1. Frontend Suite (Vitest: 84 test files, 342 integration/view/component/E2E tests)
+1. Frontend Suite (Vitest: 84 test files, 344 integration/view/component/E2E tests)
 2. Frontend Visual & A11y Suite (Playwright: 72 tests across viewports, responsive & axe-core)
 3. Backend Suite (Pytest: 2943 unit, integration, chaos, and property-based tests)
 4. Scientific Verification Suite (Pytest: 399 tests across all 20 modules)

@@ -109,6 +109,7 @@ export default function LiveOperationsView() {
   const lastTelemetryTimeRef = useRef<number>(Date.now());
   const phaseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hasAutoStartedRef = useRef(false);
 
   const isTrainingRef = useRef(isTraining);
   isTrainingRef.current = isTraining;
@@ -122,6 +123,18 @@ export default function LiveOperationsView() {
     setWsRetryCount((prev) => prev + 1);
     setTimeout(() => setIsRetryingWs(false), 1000);
   };
+
+  // ── Dataset-aware training state ──────────────────────────────────────────
+  const initialProfile = (storedSession?.selectedProfileKey && DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES])
+    ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
+    : DATASET_PROFILES.paysim;
+  const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(initialProfile);
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
+  const trainingModeRef = useRef(trainingMode);
+  trainingModeRef.current = trainingMode;
+  const [isConfigOpen, setIsConfigOpen] = useState(false);
+  const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
+  const createSimulation = useCreateSimulation();
 
   // ── Real Backend Query Hooks ───────────────────────────────────────────────
   const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
@@ -141,12 +154,28 @@ export default function LiveOperationsView() {
       id: b.id,
       name: b.name,
       tier: b.tier || 'Tier 1',
-      fraud_ratio: idx === 0 ? 0.008 : idx === 1 ? 0.025 : 0.012,
+      fraud_ratio: selectedProfile.fraudRatio * (idx === 0 ? 0.9 : idx === 1 ? 1.2 : 0.8),
       num_transactions: idx === 0 ? 125400 : idx === 1 ? 98200 : 45600,
       status: b.status,
       contribution_score: idx === 0 ? 0.4281 : idx === 1 ? 0.3510 : 0.2209,
       quarantined: b.status === 'QUARANTINED',
-      local_metrics: null,
+      local_metrics: {
+        accuracy: 0.882,
+        precision: 0.841,
+        recall: 0.795,
+        f1_score: 0.817,
+        auc_roc: idx === 0 ? 0.884 : idx === 1 ? 0.871 : 0.865,
+        loss: 0.32,
+        confusion_matrix: [[97800, 580], [280, 790]],
+        roc_fpr: [0, 0.05, 0.12, 0.25, 1],
+        roc_tpr: [0, 0.72, 0.84, 0.91, 1],
+        roc_thresholds: [1, 0.8, 0.5, 0.3, 0],
+        feature_importance: { amount: 0.42, velocity_24h: 0.31, geo_distance: 0.18, device_trust: 0.09 },
+        disparate_impact: 0.912,
+        equal_opportunity_diff: 0.051,
+        protected_selection_rate: 0.045,
+        reference_selection_rate: 0.049,
+      },
       federated_metrics: {
         accuracy: championAuc > 0 ? championAuc : 0.945,
         precision: 0.924,
@@ -167,7 +196,7 @@ export default function LiveOperationsView() {
       improvement: null,
       data_profile: null,
     }));
-  }, [simBanks, bankNodes, championAuc, roundHistory]);
+  }, [simBanks, bankNodes, championAuc, roundHistory, selectedProfile]);
 
   // Derive genuine simulation telemetry object for hardware isolation & deep panels
   const effectiveSim: SimulationDetail = useMemo(() => {
@@ -201,6 +230,7 @@ export default function LiveOperationsView() {
             global_accuracy: 0.88 + i * 0.01,
             global_auc_roc: 0.91 + i * 0.008,
             participating_banks: ['bank_alpha', 'bank_beta', 'bank_gamma'],
+            dropped_banks: [],
             training_duration_seconds: 3.8,
             created_at: new Date().toISOString(),
           })),
@@ -216,6 +246,25 @@ export default function LiveOperationsView() {
       on_chain_payouts: currentSim?.on_chain_payouts || undefined,
     } as SimulationDetail;
   }, [activeSimId, currentSim, trainingPhase, isTraining, currentRound, effectiveBanks, simRounds]);
+
+  // Derive robust round list for LossChart: prioritize backend query rounds, fallback to dynamic roundHistory
+  const effectiveRounds: any[] = useMemo(() => {
+    if (simRounds && simRounds.length > 0) return simRounds;
+    if (roundHistory && roundHistory.length > 0) {
+      return roundHistory.map((rh) => ({
+        round_number: rh.round,
+        total_rounds: TOTAL_ROUNDS,
+        global_loss: rh.loss,
+        global_accuracy: rh.auc,
+        global_auc_roc: rh.auc,
+        participating_banks: ['bank_alpha', 'bank_beta', 'bank_gamma'],
+        dropped_banks: [],
+        training_duration_seconds: 1.2,
+        created_at: new Date().toISOString(),
+      }));
+    }
+    return (effectiveSim?.rounds || []) as any[];
+  }, [simRounds, roundHistory, effectiveSim]);
 
   // Compute live Shapley on-chain payouts if not provided directly by backend
   const effectiveOnChainPayouts: OnChainPayout[] = useMemo(() => {
@@ -264,17 +313,6 @@ export default function LiveOperationsView() {
   const [rocModelType, setRocModelType] = useState<'local' | 'federated'>('federated');
   const activeBank = effectiveBanks.find((b) => b.id === selectedBankId) || effectiveBanks[0] || null;
 
-  // ── Dataset-aware training state ──────────────────────────────────────────
-  const initialProfile = (storedSession?.selectedProfileKey && DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES])
-    ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
-    : DATASET_PROFILES.paysim;
-  const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(initialProfile);
-  const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
-  const trainingModeRef = useRef(trainingMode);
-  trainingModeRef.current = trainingMode;
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
-  const [isIngestModalOpen, setIsIngestModalOpen] = useState(false);
-  const createSimulation = useCreateSimulation();
 
   // Persist session state so navigating away and returning preserves completed simulation results
   useEffect(() => {
@@ -386,8 +424,9 @@ export default function LiveOperationsView() {
             return;
           }
 
-          // If local simulated (mock) training is actively running, ignore background WS round events
-          if (isTrainingRef.current && trainingModeRef.current === 'mock') {
+          // If simulated (mock) training mode is selected, ignore background WS round events
+          // so background streams or reconnection replays don't corrupt or restart client-side simulation
+          if (trainingModeRef.current === 'mock') {
             return;
           }
 
@@ -607,6 +646,7 @@ export default function LiveOperationsView() {
     try {
       sessionStorage.removeItem(SESSION_STORAGE_KEY);
     } catch { /* ignore */ }
+    hasAutoStartedRef.current = false;
     setIsTraining(false);
     setTrainingPhase('pending');
     setRoundHistory([]);
@@ -629,7 +669,8 @@ export default function LiveOperationsView() {
   // Auto-start simulation when navigated from Dashboard or via simulation route
   useEffect(() => {
     const isAutoStart = id || location.pathname.startsWith('/simulation') || location.search.includes('autostart=true');
-    if (isAutoStart && !isTraining && trainingPhase === 'pending') {
+    if (isAutoStart && !isTraining && trainingPhase === 'pending' && !hasAutoStartedRef.current) {
+      hasAutoStartedRef.current = true;
       // Auto-start uses paysim defaults for backward compatibility
       startSimulatedTraining(DATASET_PROFILES.paysim);
     }
@@ -1102,13 +1143,13 @@ export default function LiveOperationsView() {
           </div>
 
           <div className="flex items-center gap-2">
-            {simBanks.length > 0 && (
+            {effectiveBanks.length > 0 && (
               <select
-                value={selectedBankId || simBanks[0]?.id}
+                value={selectedBankId || effectiveBanks[0]?.id}
                 onChange={(e) => setSelectedBankId(e.target.value)}
                 className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-400"
               >
-                {simBanks.map((b) => (
+                {effectiveBanks.map((b) => (
                   <option key={b.id} value={b.id}>
                     {b.name}
                   </option>
@@ -1143,11 +1184,11 @@ export default function LiveOperationsView() {
         </div>
 
         {/* Charts Grid */}
-        {simBanks.length > 0 ? (
+        {effectiveBanks.length > 0 ? (
           <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-              <ROCCurve banks={simBanks} modelType={rocModelType} />
-              <LossChart rounds={simRounds} totalRounds={TOTAL_ROUNDS} />
+              <ROCCurve banks={effectiveBanks} modelType={rocModelType} />
+              <LossChart rounds={effectiveRounds} totalRounds={TOTAL_ROUNDS} />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
@@ -1165,7 +1206,7 @@ export default function LiveOperationsView() {
               )}
             </div>
 
-            <MetricsComparisonBarChart banks={simBanks} />
+            <MetricsComparisonBarChart banks={effectiveBanks} />
           </div>
         ) : (
           <div className="p-8 text-center border border-dashed border-slate-800 rounded-xl">
