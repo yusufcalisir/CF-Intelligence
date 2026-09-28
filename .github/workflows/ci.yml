@@ -86,7 +86,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 3055 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 3075 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -113,7 +113,7 @@ jobs:
   # 3. Frontend Unit, View & Component Test Suite
   # --------------------------------------------------------------------------
   frontend-unit-and-integration:
-    name: 3. Frontend Unit & Component Test Suite (Vitest 349 Tests)
+    name: 3. Frontend Unit & Component Test Suite (Vitest 355 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
