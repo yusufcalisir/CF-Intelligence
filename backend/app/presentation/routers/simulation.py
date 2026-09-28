@@ -53,6 +53,270 @@ _simulation_events = RedisStore("sim_events")
 _stop_events: dict[str, threading.Event] = {}
 
 
+def _seed_canonical_simulation() -> None:
+    """Seed default canonical baseline simulation ('sim_fed_01') if not present.
+
+    Ensures that fresh deployments (e.g. Hugging Face Spaces ephemeral environments)
+    and dashboard entry routes have immediate access to baseline federated metrics,
+    training rounds, and EU AI Act compliance telemetry without returning 404s.
+    """
+    if _simulation_results.get("sim_fed_01"):
+        return
+
+    sim_id = "sim_fed_01"
+    now_iso = "2026-09-28T08:00:00Z"
+    completed_iso = "2026-09-28T08:02:15Z"
+
+    canonical_banks = [
+        {
+            "id": "bank_a",
+            "name": "Bank Alpha",
+            "tier": "Tier 1",
+            "fraud_ratio": 0.015,
+            "num_transactions": 50000,
+            "status": "active",
+            "local_metrics": {
+                "accuracy": 0.965,
+                "precision": 0.88,
+                "recall": 0.82,
+                "f1_score": 0.85,
+                "auc_roc": 0.820,
+                "loss": 0.32,
+                "confusion_matrix": [[49200, 50], [135, 615]],
+                "roc_fpr": [0.0, 0.05, 0.1, 0.2, 0.5, 1.0],
+                "roc_tpr": [0.0, 0.65, 0.78, 0.86, 0.95, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "federated_metrics": {
+                "accuracy": 0.985,
+                "precision": 0.94,
+                "recall": 0.91,
+                "f1_score": 0.925,
+                "auc_roc": 0.935,
+                "loss": 0.16,
+                "confusion_matrix": [[49230, 20], [67, 683]],
+                "roc_fpr": [0.0, 0.02, 0.05, 0.1, 0.3, 1.0],
+                "roc_tpr": [0.0, 0.78, 0.89, 0.94, 0.98, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "improvement": {"auc": 0.115, "f1_score": 0.075, "recall": 0.090},
+            "contribution_score": 0.94,
+            "quarantined": False,
+            "data_profile": {
+                "bank_name": "Bank Alpha",
+                "num_transactions": 50000,
+                "fraud_ratio": 0.015,
+                "mean_transaction_amount": 142.50,
+                "std_transaction_amount": 312.0,
+                "top_merchant_categories": ["retail", "online_shopping", "groceries"],
+                "top_countries": ["US", "GB", "DE"],
+                "mean_account_age_days": 420.5,
+                "mean_velocity": 2.4,
+            },
+        },
+        {
+            "id": "bank_b",
+            "name": "Bank Beta",
+            "tier": "Tier 2",
+            "fraud_ratio": 0.022,
+            "num_transactions": 30000,
+            "status": "active",
+            "local_metrics": {
+                "accuracy": 0.958,
+                "precision": 0.86,
+                "recall": 0.80,
+                "f1_score": 0.83,
+                "auc_roc": 0.812,
+                "loss": 0.35,
+                "confusion_matrix": [[29300, 40], [132, 528]],
+                "roc_fpr": [0.0, 0.06, 0.12, 0.22, 0.55, 1.0],
+                "roc_tpr": [0.0, 0.62, 0.75, 0.84, 0.93, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "federated_metrics": {
+                "accuracy": 0.982,
+                "precision": 0.93,
+                "recall": 0.90,
+                "f1_score": 0.915,
+                "auc_roc": 0.928,
+                "loss": 0.17,
+                "confusion_matrix": [[29320, 20], [66, 594]],
+                "roc_fpr": [0.0, 0.02, 0.06, 0.12, 0.35, 1.0],
+                "roc_tpr": [0.0, 0.76, 0.87, 0.93, 0.97, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "improvement": {"auc": 0.116, "f1_score": 0.085, "recall": 0.100},
+            "contribution_score": 0.91,
+            "quarantined": False,
+            "data_profile": {
+                "bank_name": "Bank Beta",
+                "num_transactions": 30000,
+                "fraud_ratio": 0.022,
+                "mean_transaction_amount": 118.40,
+                "std_transaction_amount": 245.0,
+                "top_merchant_categories": ["travel", "dining", "entertainment"],
+                "top_countries": ["DE", "FR", "NL"],
+                "mean_account_age_days": 380.2,
+                "mean_velocity": 3.1,
+            },
+        },
+        {
+            "id": "bank_c",
+            "name": "Bank Gamma",
+            "tier": "Tier 3",
+            "fraud_ratio": 0.038,
+            "num_transactions": 20000,
+            "status": "active",
+            "local_metrics": {
+                "accuracy": 0.942,
+                "precision": 0.84,
+                "recall": 0.78,
+                "f1_score": 0.81,
+                "auc_roc": 0.795,
+                "loss": 0.38,
+                "confusion_matrix": [[19200, 40], [167, 593]],
+                "roc_fpr": [0.0, 0.07, 0.15, 0.25, 0.6, 1.0],
+                "roc_tpr": [0.0, 0.58, 0.72, 0.82, 0.91, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "federated_metrics": {
+                "accuracy": 0.978,
+                "precision": 0.92,
+                "recall": 0.89,
+                "f1_score": 0.905,
+                "auc_roc": 0.919,
+                "loss": 0.19,
+                "confusion_matrix": [[19215, 25], [83, 677]],
+                "roc_fpr": [0.0, 0.03, 0.07, 0.14, 0.38, 1.0],
+                "roc_tpr": [0.0, 0.74, 0.85, 0.92, 0.96, 1.0],
+                "roc_thresholds": [1.0, 0.8, 0.6, 0.4, 0.2, 0.0],
+            },
+            "improvement": {"auc": 0.124, "f1_score": 0.095, "recall": 0.110},
+            "contribution_score": 0.88,
+            "quarantined": False,
+            "data_profile": {
+                "bank_name": "Bank Gamma",
+                "num_transactions": 20000,
+                "fraud_ratio": 0.038,
+                "mean_transaction_amount": 95.80,
+                "std_transaction_amount": 198.0,
+                "top_merchant_categories": ["crypto", "gaming", "wire_transfer"],
+                "top_countries": ["TR", "CH", "LU"],
+                "mean_account_age_days": 290.0,
+                "mean_velocity": 4.2,
+            },
+        },
+    ]
+
+    sim_doc = {
+        "id": sim_id,
+        "status": SimulationStatus.COMPLETED.value,
+        "current_round": 10,
+        "total_rounds": 10,
+        "progress_pct": 100.0,
+        "created_at": now_iso,
+        "started_at": now_iso,
+        "completed_at": completed_iso,
+        "duration_seconds": 135.0,
+        "error_message": None,
+        "config": {
+            "num_rounds": 10,
+            "local_epochs": 3,
+            "learning_rate": 0.001,
+            "batch_size": 64,
+            "min_clients_per_round": 3,
+            "enable_latency_simulation": True,
+            "latency_range_ms": (50, 250),
+            "enable_dropout_simulation": False,
+            "dropout_probability": 0.0,
+            "enable_reconnect_simulation": True,
+            "enable_differential_privacy": True,
+            "enable_secure_aggregation": True,
+            "dp_epsilon": 1.0,
+            "dp_delta": 1e-5,
+            "dp_max_grad_norm": 1.0,
+            "dp_mode": "rdp",
+            "bank_a_transactions": 50000,
+            "bank_b_transactions": 30000,
+            "bank_c_transactions": 20000,
+            "aggregation_method": "fed_avg_weighted",
+            "fl_engine_type": "custom",
+            "enable_poisoning_simulation": False,
+            "hardware_isolation_mode": "intel_sgx",
+            "enable_streaming_gnn": True,
+            "enable_web3_settlement": True,
+            "settlement_currency": "wCBDC",
+            "smart_contract_address": "0x71C7656EC7ab88b098defB751B7401B5f6d8976F",
+        },
+        "banks": canonical_banks,
+        "tee_mrenclave": "b4f8c2e14d9b72dd3f01ae56c820194857361284950372615483920174628391",
+        "tee_mrsigner": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+        "tee_attestation_signature": "0x9a8b7c6d5e4f3a2b1c0d9e8f7a6b5c4d3e2f1a0b",
+        "fhe_poly_degree": 8192,
+        "fhe_noise_bound": 3.2e-6,
+        "fhe_key_id": "ckks_key_sim_fed_01",
+        "streaming_gnn_node_count": 1284,
+        "streaming_gnn_edge_count": 4592,
+        "streaming_gnn_loss_history": [0.45, 0.38, 0.31, 0.26, 0.22, 0.19, 0.16, 0.14, 0.13, 0.11],
+        "settlement_tx_hash": "0x8d5c41f92e624c8872f2e5a4bb10b64f9cb3897103ecf459e951079d86a60db2",
+        "settlement_block_number": 18920412,
+        "settlement_status": "CONFIRMED",
+        "on_chain_payouts": [
+            {"bank_id": "bank_a", "amount": 4200.0, "currency": "wCBDC"},
+            {"bank_id": "bank_b", "amount": 2800.0, "currency": "wCBDC"},
+            {"bank_id": "bank_c", "amount": 1600.0, "currency": "wCBDC"},
+        ],
+    }
+
+    _simulation_results.set(sim_id, sim_doc)
+
+    # Seed 10 completed training round events for /training/{simulation_id}/rounds
+    round_losses = [0.68, 0.58, 0.50, 0.44, 0.38, 0.32, 0.27, 0.23, 0.19, 0.16]
+    round_aucs = [0.810, 0.842, 0.865, 0.883, 0.898, 0.911, 0.920, 0.927, 0.932, 0.935]
+
+    for r_idx in range(1, 11):
+        loss_val = round_losses[r_idx - 1]
+        auc_val = round_aucs[r_idx - 1]
+        round_payload = {
+            "event_type": "round_complete",
+            "data": {
+                "round": r_idx,
+                "total": 10,
+                "loss": loss_val,
+                "auc": auc_val,
+                "per_bank_auc": {
+                    "bank_a": round(auc_val + 0.005, 4),
+                    "bank_b": round(auc_val - 0.003, 4),
+                    "bank_c": round(auc_val - 0.008, 4),
+                },
+                "per_bank_loss": {
+                    "bank_a": round(loss_val - 0.01, 4),
+                    "bank_b": round(loss_val + 0.005, 4),
+                    "bank_c": round(loss_val + 0.015, 4),
+                },
+                "participants": ["bank_a", "bank_b", "bank_c"],
+                "dropped": [],
+                "duration_ms": 12500.0 + r_idx * 100.0,
+                "privacy_budget": round(r_idx * 0.1, 2),
+                "feature_importance": {
+                    "transaction_amount": 0.32,
+                    "velocity": 0.28,
+                    "merchant_risk_score": 0.18,
+                    "account_age_days": 0.12,
+                    "chargeback_count": 0.10,
+                },
+                "canary_info": {"status": "HEALTHY", "divergence_score": 0.012},
+            },
+        }
+        _simulation_events.push_list(sim_id, round_payload)
+
+    logger.info("Canonical simulation 'sim_fed_01' initialized with 10 completed training rounds.")
+
+
+# Automatically seed on module load
+_seed_canonical_simulation()
+
+
 @router.post(
     "",
     response_model=SimulationCreateResponse,
