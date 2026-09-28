@@ -16,7 +16,7 @@ This directory contains the authoritative mathematical, algorithmic, and impleme
 | **[Curve25519 SecAgg](file:///docs/algorithms/secure_aggregation.md)** | Bonawitz et al., 2017 | Pairwise zero-sum update blinding | `backend/app/infrastructure/security/p2p_secagg_driver.py` | `test_p2p_secagg_driver.py` |
 | **[Byzantine Robustness (Krum/Bulyan)](file:///docs/algorithms/byzantine_resilience.md)** | Blanchard et al., 2017; Guerraoui et al., 2018 | Poisoned / adversarial weight filtering | `backend/app/domain/byzantine_defense.py` | `test_byzantine_defense_branches.py` |
 | **[GraphSAGE](file:///docs/algorithms/graphsage.md)** | Hamilton et al., 2017 | Inductive multi-hop transaction graph embeddings | `backend/app/application/services/graph_embedding_model.py` | `test_graph_embedding.py` |
-| **[MinHash LSH Fuzzy PSI](file:///docs/algorithms/minhash_lsh.md)** | Broder, 1997 | Cross-bank entity matching without raw identifier exposure | `backend/app/application/services/graph_engine.py` | `test_graph_engine.py` |
+| **[MinHash LSH Fuzzy PSI](file:///docs/algorithms/minhash_lsh.md)** | Broder, 1997 | Cross-bank entity matching without raw identifier exposure | `backend/app/domain/minhash_lsh.py`, `graph_engine.py` | `test_minhash_psi.py`, `test_graph_engine.py` |
 | **[SHAP KernelExplainer](file:///docs/algorithms/shap_explainability.md)** | Lundberg & Lee, 2017 | Local cooperative game theory feature attribution | `backend/app/application/services/explainability_service.py` | `test_explainability_service.py` |
 
 ---

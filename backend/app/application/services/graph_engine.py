@@ -1100,3 +1100,161 @@ class GraphEngine:
                 clusters.append(component)
 
         return clusters
+
+    # ── MinHash LSH Fuzzy Entity Resolution ──────────────────────
+
+    def find_fuzzy_matches(
+        self,
+        entity_id: str,
+        similarity_threshold: float = 0.40,
+        num_hashes: int = 64,
+        num_bands: int = 16,
+        rows_per_band: int = 4,
+        cross_bank_only: bool = True,
+    ) -> list[dict[str, Any]]:
+        """Finds candidate matching entities in the graph using MinHash LSH.
+
+        Extracts display labels and text attributes from the target entity,
+        computes MinHash signatures, and queries across all registered entities.
+        """
+        from app.domain.minhash_lsh import (
+            compute_minhash_signature,
+            estimate_jaccard_similarity,
+            partition_into_lsh_bands,
+        )
+
+        with self._lock:
+            target_data = self._entities.get(entity_id)
+            if not target_data:
+                return []
+            target_ent = _dict_to_entity(target_data)
+            target_text = target_ent.display_label or target_ent.id
+
+            target_sig = compute_minhash_signature(target_text, num_hashes=num_hashes)
+            target_bands = set(
+                partition_into_lsh_bands(
+                    target_sig, num_bands=num_bands, rows_per_band=rows_per_band
+                )
+            )
+
+            candidates: list[dict[str, Any]] = []
+            for val in self._entities.list_values():
+                cand_ent = _dict_to_entity(val)
+                if cand_ent.id == entity_id:
+                    continue
+                if cross_bank_only and cand_ent.bank_id == target_ent.bank_id:
+                    continue
+
+                cand_text = cand_ent.display_label or cand_ent.id
+                cand_sig = compute_minhash_signature(cand_text, num_hashes=num_hashes)
+                cand_bands = partition_into_lsh_bands(
+                    cand_sig, num_bands=num_bands, rows_per_band=rows_per_band
+                )
+
+                collided_bands = sum(1 for b in cand_bands if b in target_bands)
+                if collided_bands > 0:
+                    sim = estimate_jaccard_similarity(target_sig, cand_sig)
+                    if sim >= similarity_threshold:
+                        candidates.append(
+                            {
+                                "entity_id": cand_ent.id,
+                                "bank_id": cand_ent.bank_id,
+                                "display_label": cand_ent.display_label,
+                                "entity_type": cand_ent.entity_type.value,
+                                "estimated_jaccard": sim,
+                                "collided_bands": collided_bands,
+                                "total_bands": num_bands,
+                            }
+                        )
+
+            candidates.sort(key=lambda x: x["estimated_jaccard"], reverse=True)
+            return candidates
+
+    def link_fuzzy_entities(
+        self,
+        similarity_threshold: float = 0.50,
+        num_hashes: int = 64,
+        num_bands: int = 16,
+        rows_per_band: int = 4,
+        auto_add_relationship: bool = False,
+    ) -> list[dict[str, Any]]:
+        """Scans the graph for cross-institution entities with high fuzzy similarity.
+
+        Returns detected duplicate / mule candidate pairs. If auto_add_relationship=True,
+        creates RelationshipType.SAME_ENTITY edges between matched entities.
+        """
+        from app.domain.minhash_lsh import (
+            compute_minhash_signature,
+            estimate_jaccard_similarity,
+            partition_into_lsh_bands,
+        )
+
+        with self._lock:
+            entities = [_dict_to_entity(v) for v in self._entities.list_values()]
+            if len(entities) < 2:
+                return []
+
+            # Index all entities by LSH bands
+            band_index: dict[str, list[tuple[Entity, list[int]]]] = defaultdict(list)
+            for ent in entities:
+                text = ent.display_label or ent.id
+                sig = compute_minhash_signature(text, num_hashes=num_hashes)
+                bands = partition_into_lsh_bands(
+                    sig, num_bands=num_bands, rows_per_band=rows_per_band
+                )
+                for b in bands:
+                    band_index[b].append((ent, sig))
+
+            # Candidate pair tracking
+            candidate_pairs: dict[
+                tuple[str, str], tuple[Entity, Entity, list[int], list[int], int]
+            ] = {}
+            for entries in band_index.values():
+                for i in range(len(entries)):
+                    for j in range(i + 1, len(entries)):
+                        e1, s1 = entries[i]
+                        e2, s2 = entries[j]
+                        if e1.bank_id != e2.bank_id:
+                            pair_key = (min(e1.id, e2.id), max(e1.id, e2.id))
+                            if pair_key not in candidate_pairs:
+                                candidate_pairs[pair_key] = (e1, e2, s1, s2, 1)
+                            else:
+                                prior = candidate_pairs[pair_key]
+                                candidate_pairs[pair_key] = (
+                                    prior[0],
+                                    prior[1],
+                                    prior[2],
+                                    prior[3],
+                                    prior[4] + 1,
+                                )
+
+            matches: list[dict[str, Any]] = []
+            for (id1, id2), (e1, e2, s1, s2, band_cnt) in candidate_pairs.items():
+                sim = estimate_jaccard_similarity(s1, s2)
+                if sim >= similarity_threshold:
+                    match_info = {
+                        "source_entity_id": id1,
+                        "source_bank_id": e1.bank_id,
+                        "target_entity_id": id2,
+                        "target_bank_id": e2.bank_id,
+                        "estimated_jaccard": sim,
+                        "collided_bands": band_cnt,
+                        "total_bands": num_bands,
+                    }
+                    matches.append(match_info)
+
+                    if auto_add_relationship:
+                        rel = Relationship(
+                            id=f"fuzzy_same_{id1[:8]}_{id2[:8]}",
+                            source_entity_id=id1,
+                            target_entity_id=id2,
+                            relationship_type=RelationshipType.SAME_ENTITY,
+                            confidence=sim,
+                            evidence=[
+                                f"MinHash LSH fuzzy match J={sim:.4f} across {band_cnt}/{num_bands} bands"
+                            ],
+                        )
+                        self.add_relationship(rel)
+
+            matches.sort(key=lambda x: x["estimated_jaccard"], reverse=True)
+            return matches
