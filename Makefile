@@ -1,4 +1,4 @@
-.PHONY: help dev test lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
+.PHONY: help dev test test-smoke lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
 
 SHELL := /bin/bash
 
@@ -46,6 +46,9 @@ kafka-topics: ## List Kafka event topics
 
 test: ## Run backend tests
 	cd backend && python -m pytest tests/ -v --cov=app --cov-report=term-missing
+
+test-smoke: ## Run deterministic CI smoke gates (dataloaders, model serialization, schemas)
+	pytest backend/tests/unit/test_ci_smoke_gates.py -v
 
 test-unit: ## Run unit tests only
 	cd backend && python -m pytest tests/unit/ -v

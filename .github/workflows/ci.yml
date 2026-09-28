@@ -86,7 +86,7 @@ jobs:
   # 2. Backend Unit, Integration & Chaos Test Suite
   # --------------------------------------------------------------------------
   backend-unit-and-integration:
-    name: 2. Backend Unit & Integration Test Suite (Pytest 3218 Tests)
+    name: 2. Backend Unit & Integration Test Suite (Pytest 3228 Tests)
     runs-on: ubuntu-latest
     needs: lint-and-security
     steps:
@@ -102,6 +102,12 @@ jobs:
         run: |
           pip install uv
           uv pip install --system -r backend/requirements.txt pytest pytest-cov pytest-asyncio
+
+      - name: Run Deterministic ML & Pipeline Smoke Gates (Dataloaders, Serialization, Schemas)
+        env:
+          PYTHONPATH: backend
+        run: |
+          pytest backend/tests/unit/test_ci_smoke_gates.py -v
 
       - name: Run Backend Pytest Suite
         env:
