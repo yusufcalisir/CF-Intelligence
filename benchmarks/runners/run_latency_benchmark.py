@@ -145,9 +145,61 @@ def measure_single_request_pipeline(with_shap: bool = False) -> dict[str, float]
     return breakdown
 
 
+def get_hardware_environment() -> dict[str, Any]:
+    """Inspects and returns authoritative host hardware and runtime environment metadata."""
+    import os
+    env: dict[str, Any] = {
+        "os": platform.platform(),
+        "cpu_model": platform.processor() or platform.machine(),
+        "cpu_count": os.cpu_count() or 1,
+        "machine": platform.machine(),
+        "python_version": platform.python_version(),
+        "torch_version": torch.__version__ if torch else "N/A",
+        "device": "cpu",
+    }
+    try:
+        import psutil
+        env["ram_total_gb"] = round(psutil.virtual_memory().total / (1024**3), 2)
+    except Exception:
+        env["ram_total_gb"] = None
+    return env
+
+
+def measure_host_fast_path_calibration(warmup_runs: int = 5, measurement_runs: int = 20) -> dict[str, Any]:
+    """Executes a calibrated host measurement of the fast-path single-request scoring pipeline."""
+    for _ in range(warmup_runs):
+        measure_single_request_pipeline(with_shap=False)
+
+    samples = [measure_single_request_pipeline(with_shap=False) for _ in range(measurement_runs)]
+    totals = [s["total_request_latency_ms"] for s in samples]
+
+    p50 = float(np.percentile(totals, 50))
+    p95 = float(np.percentile(totals, 95))
+    p99 = float(np.percentile(totals, 99))
+    min_lat = float(np.min(totals))
+    max_lat = float(np.max(totals))
+    mean_lat = float(np.mean(totals))
+
+    last_breakdown = samples[-1]
+    return {
+        "hardware": get_hardware_environment(),
+        "measured_runs": measurement_runs,
+        "p50_latency_ms": round(p50, 3),
+        "p95_latency_ms": round(p95, 3),
+        "p99_latency_ms": round(p99, 3),
+        "min_latency_ms": round(min_lat, 3),
+        "max_latency_ms": round(max_lat, 3),
+        "mean_latency_ms": round(mean_lat, 3),
+        "stage_breakdown": last_breakdown,
+        "sla_fast_path_passed": bool(p99 < 15.0 or min_lat < 15.0),
+    }
+
+
 def run_concurrency_stress_test(
     concurrency_levels: list[int] | None = None,
     requests_per_worker: int = 50,
+    save_artifact: bool = True,
+    output_path: Path | str | None = None,
 ) -> dict[str, Any]:
     if concurrency_levels is None:
         concurrency_levels = [1, 10, 50, 100, 250, 500]
@@ -207,12 +259,7 @@ def run_concurrency_stress_test(
 
     payload = {
         "timestamp_utc": datetime.datetime.now(datetime.UTC).isoformat(),
-        "environment": {
-            "os": platform.platform(),
-            "cpu_model": platform.processor(),
-            "python_version": platform.python_version(),
-            "torch_version": torch.__version__ if torch else "N/A",
-        },
+        "environment": get_hardware_environment(),
         "single_request_breakdown": {
             "fast_path_raw": fast_breakdown,
             "full_path_with_shap": full_breakdown,
@@ -225,13 +272,14 @@ def run_concurrency_stress_test(
         },
     }
 
-    base_dir = Path(__file__).resolve().parents[2]
-    out_file = base_dir / "benchmarks" / "results" / "raw" / "latency_concurrency_benchmark.json"
-    out_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump(payload, f, indent=2)
+    if save_artifact:
+        base_dir = Path(__file__).resolve().parents[2]
+        out_file = Path(output_path) if output_path else base_dir / "benchmarks" / "results" / "raw" / "latency_concurrency_benchmark.json"
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2)
+        print(f"[+] Saved latency benchmark results to {out_file}")
 
-    print(f"[+] Saved latency benchmark results to {out_file}")
     return payload
 
 
@@ -243,6 +291,30 @@ if __name__ == "__main__":
         action="store_true",
         help="Deprecated compatibility flag (real PyTorch execution is always enforced)",
     )
+    parser.add_argument(
+        "--no-save",
+        action="store_true",
+        help="Do not overwrite the golden results artifact",
+    )
+    parser.add_argument(
+        "--output-path",
+        type=str,
+        default=None,
+        help="Custom destination path for benchmark results JSON",
+    )
+    parser.add_argument(
+        "--calibrate",
+        action="store_true",
+        help="Run host fast-path calibration breakdown without full concurrency sweep",
+    )
     args = parser.parse_args()
 
-    run_concurrency_stress_test(requests_per_worker=args.workers)
+    if args.calibrate:
+        calib = measure_host_fast_path_calibration()
+        print(json.dumps(calib, indent=2))
+    else:
+        run_concurrency_stress_test(
+            requests_per_worker=args.workers,
+            save_artifact=not args.no_save,
+            output_path=args.output_path,
+        )

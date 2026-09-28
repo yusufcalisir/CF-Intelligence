@@ -1,90 +1,94 @@
 {
-  "timestamp_utc": "2026-09-26T09:34:01.085565+00:00",
+  "timestamp_utc": "2026-09-28T17:48:42.916280+00:00",
   "environment": {
     "os": "Windows-11-10.0.26200-SP0",
     "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_count": 16,
+    "machine": "AMD64",
     "python_version": "3.12.10",
-    "torch_version": "2.12.0+cpu"
+    "torch_version": "2.12.0+cpu",
+    "device": "cpu",
+    "ram_total_gb": 7.34
   },
   "single_request_breakdown": {
     "fast_path_raw": {
-      "auth_abac_ms": 0.011099997209385037,
-      "feature_store_ms": 0.0005000001692678779,
-      "model_forward_pass_ms": 0.25720000121509656,
-      "composite_9signals_ms": 2.101100002619205,
+      "auth_abac_ms": 0.005100000635138713,
+      "feature_store_ms": 0.00039999940781854093,
+      "model_forward_pass_ms": 0.1857999995991122,
+      "composite_9signals_ms": 2.0875999998679617,
       "shap_attribution_ms": 0.0,
-      "serialization_ms": 0.01939999856404029,
-      "total_request_latency_ms": 2.389299999776995
+      "serialization_ms": 0.014799999917158857,
+      "total_request_latency_ms": 2.29369999942719
     },
     "full_path_with_shap": {
-      "auth_abac_ms": 0.006300000677583739,
-      "feature_store_ms": 0.0002999986463692039,
-      "model_forward_pass_ms": 0.19350000002305023,
-      "composite_9signals_ms": 2.0967000018572435,
-      "shap_attribution_ms": 0.020200001017656177,
-      "serialization_ms": 0.023399999918183312,
-      "total_request_latency_ms": 2.340400002140086
+      "auth_abac_ms": 0.004800000169780105,
+      "feature_store_ms": 0.00030000046535860747,
+      "model_forward_pass_ms": 0.18430000091029797,
+      "composite_9signals_ms": 2.7281000002403744,
+      "shap_attribution_ms": 0.0351999988197349,
+      "serialization_ms": 0.032500000088475645,
+      "total_request_latency_ms": 2.9852000006940216
     }
   },
   "concurrency_scaling": [
     {
       "concurrency": 1,
-      "total_requests": 50,
-      "throughput_rps": 402.1,
-      "p50_latency_ms": 2.38,
-      "p95_latency_ms": 2.75,
-      "p99_latency_ms": 3.41,
+      "total_requests": 10,
+      "throughput_rps": 377.2,
+      "p50_latency_ms": 2.39,
+      "p95_latency_ms": 3.19,
+      "p99_latency_ms": 3.53,
       "error_rate": 0.0
     },
     {
       "concurrency": 10,
-      "total_requests": 500,
-      "throughput_rps": 1428.8,
-      "p50_latency_ms": 6.77,
-      "p95_latency_ms": 8.53,
-      "p99_latency_ms": 8.99,
+      "total_requests": 100,
+      "throughput_rps": 1452.0,
+      "p50_latency_ms": 5.94,
+      "p95_latency_ms": 7.4,
+      "p99_latency_ms": 7.96,
       "error_rate": 0.0
     },
     {
       "concurrency": 50,
-      "total_requests": 2500,
-      "throughput_rps": 1457.9,
-      "p50_latency_ms": 31.59,
-      "p95_latency_ms": 47.0,
-      "p99_latency_ms": 53.28,
+      "total_requests": 500,
+      "throughput_rps": 1791.0,
+      "p50_latency_ms": 17.94,
+      "p95_latency_ms": 30.68,
+      "p99_latency_ms": 35.45,
       "error_rate": 0.0
     },
     {
       "concurrency": 100,
-      "total_requests": 5000,
-      "throughput_rps": 1403.4,
-      "p50_latency_ms": 62.53,
-      "p95_latency_ms": 94.92,
-      "p99_latency_ms": 110.96,
+      "total_requests": 1000,
+      "throughput_rps": 1394.7,
+      "p50_latency_ms": 37.75,
+      "p95_latency_ms": 64.72,
+      "p99_latency_ms": 79.34,
       "error_rate": 0.0
     },
     {
       "concurrency": 250,
-      "total_requests": 12500,
-      "throughput_rps": 761.3,
-      "p50_latency_ms": 196.84,
-      "p95_latency_ms": 697.46,
-      "p99_latency_ms": 919.31,
+      "total_requests": 2500,
+      "throughput_rps": 1286.4,
+      "p50_latency_ms": 71.8,
+      "p95_latency_ms": 126.02,
+      "p99_latency_ms": 147.07,
       "error_rate": 0.0
     },
     {
       "concurrency": 500,
-      "total_requests": 25000,
-      "throughput_rps": 885.7,
-      "p50_latency_ms": 216.21,
-      "p95_latency_ms": 499.55,
-      "p99_latency_ms": 2661.23,
+      "total_requests": 5000,
+      "throughput_rps": 1043.6,
+      "p50_latency_ms": 116.28,
+      "p95_latency_ms": 285.27,
+      "p99_latency_ms": 361.49,
       "error_rate": 0.0
     }
   ],
   "bottleneck_analysis": {
-    "model_forward_pass_fraction": "10.8%",
-    "api_redis_overhead_fraction": "1.3%",
+    "model_forward_pass_fraction": "8.1%",
+    "api_redis_overhead_fraction": "0.9%",
     "observation": "The PyTorch model itself accounts for <25% of fast-path request duration. Under high concurrency (C >= 100), latency increases are driven by connection pool queuing and threadpool context-switching rather than model inference latency."
   }
 }

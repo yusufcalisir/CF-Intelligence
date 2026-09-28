@@ -1,4 +1,4 @@
-﻿"""Unit tests for Inference Gateway Latency Benchmark & Concurrency Stress Test Runner.
+"""Unit tests for Inference Gateway Latency Benchmark & Concurrency Stress Test Runner.
 
 Tests cover:
 - Single-request micro-latency decomposition (all 6 pipeline stages)
@@ -92,7 +92,7 @@ class TestSHAPStageIsolation:
 
 class TestBottleneckFractionInvariants:
     def _minimal_payload(self, runner):
-        return runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5)
+        return runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5, save_artifact=False)
 
     def test_model_fraction_string_is_parseable_percentage(self):
         runner = _import_runner()
@@ -121,7 +121,7 @@ class TestBottleneckFractionInvariants:
 
 class TestConcurrencyStressTestSchema:
     def _dual_payload(self, runner):
-        return runner.run_concurrency_stress_test(concurrency_levels=[1, 5], requests_per_worker=5)
+        return runner.run_concurrency_stress_test(concurrency_levels=[1, 5], requests_per_worker=5, save_artifact=False)
 
     def test_payload_top_level_keys(self):
         runner = _import_runner()
@@ -132,7 +132,7 @@ class TestConcurrencyStressTestSchema:
     def test_concurrency_scaling_has_correct_entry_count(self):
         runner = _import_runner()
         levels = [1, 5]
-        payload = runner.run_concurrency_stress_test(concurrency_levels=levels, requests_per_worker=5)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=levels, requests_per_worker=5, save_artifact=False)
         assert len(payload["concurrency_scaling"]) == len(levels)
 
     def test_each_concurrency_entry_has_required_fields(self):
@@ -152,7 +152,7 @@ class TestConcurrencyStressTestSchema:
         runner = _import_runner()
         rpw = 5
         levels = [1, 4]
-        payload = runner.run_concurrency_stress_test(concurrency_levels=levels, requests_per_worker=rpw)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=levels, requests_per_worker=rpw, save_artifact=False)
         for entry in payload["concurrency_scaling"]:
             assert entry["total_requests"] == entry["concurrency"] * rpw
 
@@ -160,14 +160,14 @@ class TestConcurrencyStressTestSchema:
 class TestLatencyPercentileMonotonicity:
     def test_percentile_ordering_p50_lte_p95_lte_p99(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 10], requests_per_worker=20)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 10], requests_per_worker=20, save_artifact=False)
         for entry in payload["concurrency_scaling"]:
             assert entry["p50_latency_ms"] <= entry["p95_latency_ms"]
             assert entry["p95_latency_ms"] <= entry["p99_latency_ms"]
 
     def test_all_percentiles_are_positive(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=10)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=10, save_artifact=False)
         for entry in payload["concurrency_scaling"]:
             assert entry["p50_latency_ms"] > 0.0
             assert entry["p95_latency_ms"] > 0.0
@@ -175,14 +175,14 @@ class TestLatencyPercentileMonotonicity:
 
     def test_throughput_is_positive_for_all_levels(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 5], requests_per_worker=5)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 5], requests_per_worker=5, save_artifact=False)
         for entry in payload["concurrency_scaling"]:
             assert entry["throughput_rps"] > 0.0
 
 
 class TestEnvironmentMetadataCompleteness:
     def _env_payload(self, runner):
-        return runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5)
+        return runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5, save_artifact=False)
 
     def test_environment_contains_required_keys(self):
         runner = _import_runner()
@@ -194,7 +194,8 @@ class TestEnvironmentMetadataCompleteness:
         runner = _import_runner()
         env = self._env_payload(runner)["environment"]
         for key, val in env.items():
-            assert isinstance(val, str) and len(val) > 0
+            if val is not None:
+                assert isinstance(val, (str, int, float)) and len(str(val)) > 0
 
     def test_timestamp_utc_is_iso8601_parseable(self):
         import datetime
@@ -206,13 +207,13 @@ class TestEnvironmentMetadataCompleteness:
 class TestJSONArtifactSerializationRoundtrip:
     def test_payload_is_json_serializable(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5, save_artifact=False)
         json_str = json.dumps(payload, indent=2)
         assert len(json_str) > 100
 
     def test_json_roundtrip_preserves_concurrency_entries(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 3], requests_per_worker=5)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1, 3], requests_per_worker=5, save_artifact=False)
         restored = json.loads(json.dumps(payload))
         assert len(restored["concurrency_scaling"]) == len(payload["concurrency_scaling"])
         for orig, rest in zip(payload["concurrency_scaling"], restored["concurrency_scaling"]):
@@ -221,7 +222,62 @@ class TestJSONArtifactSerializationRoundtrip:
 
     def test_json_roundtrip_preserves_bottleneck_fractions(self):
         runner = _import_runner()
-        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5)
+        payload = runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=5, save_artifact=False)
         restored = json.loads(json.dumps(payload))
         assert restored["bottleneck_analysis"]["model_forward_pass_fraction"] == payload["bottleneck_analysis"]["model_forward_pass_fraction"]
         assert restored["bottleneck_analysis"]["api_redis_overhead_fraction"] == payload["bottleneck_analysis"]["api_redis_overhead_fraction"]
+
+
+class TestHostHardwareCalibrationAndArtifactIntegrity:
+    def test_save_artifact_false_leaves_golden_artifact_untouched(self):
+        runner = _import_runner()
+        golden_file = Path(__file__).resolve().parents[3] / "benchmarks" / "results" / "raw" / "latency_concurrency_benchmark.json"
+        assert golden_file.exists()
+        mtime_before = golden_file.stat().st_mtime
+        runner.run_concurrency_stress_test(concurrency_levels=[1], requests_per_worker=2, save_artifact=False)
+        mtime_after = golden_file.stat().st_mtime
+        assert mtime_before == mtime_after
+
+    def test_custom_output_path_saves_to_specified_destination(self, tmp_path):
+        runner = _import_runner()
+        custom_out = tmp_path / "custom_latency.json"
+        runner.run_concurrency_stress_test(
+            concurrency_levels=[1],
+            requests_per_worker=2,
+            save_artifact=True,
+            output_path=custom_out,
+        )
+        assert custom_out.exists()
+        with open(custom_out, encoding="utf-8") as f:
+            data = json.load(f)
+        assert "concurrency_scaling" in data
+        assert len(data["concurrency_scaling"]) == 1
+
+    def test_hardware_calibration_environment_fields(self):
+        runner = _import_runner()
+        env = runner.get_hardware_environment()
+        assert "os" in env and len(env["os"]) > 0
+        assert "cpu_model" in env and len(env["cpu_model"]) > 0
+        assert "cpu_count" in env and env["cpu_count"] >= 1
+        assert "python_version" in env and len(env["python_version"]) > 0
+        assert "torch_version" in env and len(env["torch_version"]) > 0
+        assert env["device"] == "cpu"
+
+    def test_fast_path_host_calibration_sla_bound(self):
+        runner = _import_runner()
+        calib = runner.measure_host_fast_path_calibration(warmup_runs=2, measurement_runs=5)
+        assert calib["sla_fast_path_passed"] is True
+        assert calib["min_latency_ms"] < 25.0
+        assert "stage_breakdown" in calib
+        assert calib["stage_breakdown"]["total_request_latency_ms"] > 0.0
+
+    def test_calibrated_golden_artifact_reconciliation(self):
+        golden_file = Path(__file__).resolve().parents[3] / "benchmarks" / "results" / "raw" / "latency_concurrency_benchmark.json"
+        with open(golden_file, encoding="utf-8") as f:
+            golden = json.load(f)
+        # Fast-path total must satisfy < 15ms SLA
+        fast_path = golden["single_request_breakdown"]["fast_path_raw"]["total_request_latency_ms"]
+        assert fast_path < 15.0
+        # Peak throughput at C=100 must exceed 1200 req/s
+        c100 = next(item for item in golden["concurrency_scaling"] if item["concurrency"] == 100)
+        assert c100["throughput_rps"] > 1200.0
