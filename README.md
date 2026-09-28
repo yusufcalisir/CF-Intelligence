@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3913%2F3913_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3926%2F3926_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,128 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,141 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1290,7 +1290,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,514 / 3,514 passing (3,913 total incl. verification)** | 100% | 3,128 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,527 / 3,527 passing (3,926 total incl. verification)** | 100% | 3,141 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1429,7 +1429,25 @@ To quantify collaborative value and privacy trade-offs, five distinct paradigms 
 
 ---
 
-### 15.7 Reproducible Benchmark CLI Commands
+### 15.7 Multi-Seed Statistical Robustness & Confidence Intervals (`experiments/harness/multi_seed_runner.py`)
+
+To eliminate random initialization variance artifacts and establish statutory confidence bounds, benchmarks are evaluated across **5 deterministic seeds** ($\{42, 123, 456, 789, 1024\}$). Metrics report empirical mean, sample standard deviation ($\mu \pm \sigma$, $ddof=1$), and $95\%$ Student-$t$ confidence intervals ($t_{0.975, \, 4} = 2.776$):
+
+| Benchmark Suite | Paradigm / Strategy | Metric Dimension | Empirical Mean ($\mu \pm \sigma$) | 95% Confidence Interval | Observed [Min, Max] |
+| :--- | :--- | :--- | :---: | :---: | :---: |
+| **Fraud Detection (PaySim)** | Centralized Baseline | ROC-AUC | **0.9544 ± 0.0430** | `[0.9009, 1.0000]` | [0.8806, 0.9891] |
+| **Fraud Detection (PaySim)** | Centralized Baseline | PR-AUC | **0.3720 ± 0.1081** | `[0.2378, 0.5062]` | [0.2345, 0.4883] |
+| **Fraud Detection (PaySim)** | Federated FedAvg | ROC-AUC | **0.9092 ± 0.0798** | `[0.8101, 1.0000]` | [0.7753, 0.9712] |
+| **Fraud Detection (PaySim)** | Federated FedAvg | PR-AUC | **0.2051 ± 0.1362** | `[0.0360, 0.3742]` | [0.0704, 0.4325] |
+| **Federated Optimizer** | FedAvg (Dirichlet $\alpha=0.5$) | Final ROC-AUC | **0.3878 ± 0.1606** | `[0.1884, 0.5871]` | [0.2547, 0.5809] |
+| **Federated Optimizer** | FedProx (Dirichlet $\alpha=0.5$) | Final ROC-AUC | **0.3109 ± 0.1068** | `[0.1783, 0.4435]` | [0.1691, 0.4473] |
+| **Federated Optimizer** | SCAFFOLD (Dirichlet $\alpha=0.5$) | Final ROC-AUC | **0.2558 ± 0.1289** | `[0.0957, 0.4158]` | [0.0976, 0.4228] |
+
+*Artifact: [`benchmarks/results/raw/multi_seed_statistical_summary.json`](benchmarks/results/raw/multi_seed_statistical_summary.json)*
+
+---
+
+### 15.8 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 
@@ -2730,10 +2748,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,514 Tests Core / 3,913 Total)
+### Step 5: Master Test Suites Execution (3,527 Tests Core / 3,926 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,128 tests)
+# 1. Run full backend pytest suite (3,141 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation

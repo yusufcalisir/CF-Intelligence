@@ -68,6 +68,8 @@ def run_fraud_benchmark(
     batch_size: int = 128,
     lr: float = 0.005,
     seed: int = 42,
+    save_artifact: bool = True,
+    output_path: Path | str | None = None,
 ) -> dict[str, Any]:
     np.random.seed(seed)
     if torch:
@@ -213,18 +215,19 @@ def run_fraud_benchmark(
     }
 
     # Save artifact
-    results_dir = base_dir / "benchmarks" / "results" / "raw"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    out_file = results_dir / f"fraud_benchmark_{dataset_name}.json"
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump(results, f, indent=2)
+    if save_artifact:
+        results_dir = base_dir / "benchmarks" / "results" / "raw"
+        results_dir.mkdir(parents=True, exist_ok=True)
+        out_file = Path(output_path) if output_path else results_dir / f"fraud_benchmark_{dataset_name}.json"
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(results, f, indent=2)
+        print(f"Saved machine-readable results to: {out_file}")
 
     print("\n================== FRAUD BENCHMARK RESULTS ==================")
     print(f"Dataset:                  {dataset_name.upper()}")
     print(f"Centralized PR-AUC:       {central_pr_auc:.4f} (Recall@0.1% FPR: {central_r_01:.4f})")
     print(f"Federated FedAvg PR-AUC:  {fl_pr_auc:.4f} (Recall@0.1% FPR: {fl_r_01:.4f})")
     print(f"Federated/Central Parity: {results['federated_fedavg']['pr_auc_parity_ratio']*100:.1f}%")
-    print(f"Saved machine-readable results to: {out_file}")
     print("============================================================\n")
 
     return results

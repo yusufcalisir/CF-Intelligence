@@ -50,6 +50,8 @@ def run_fl_experiment(
     dirichlet_alpha: float = 0.5,
     dropout_rate: float = 0.0,
     seed: int = 42,
+    save_artifact: bool = True,
+    output_path: Path | str | None = None,
 ) -> dict[str, Any]:
     rng = np.random.default_rng(seed)
     if torch:
@@ -189,13 +191,14 @@ def run_fl_experiment(
         "strategies": strategy_results,
     }
 
-    base_dir = Path(__file__).resolve().parents[2]
-    out_file = base_dir / "benchmarks" / "results" / "raw" / f"fl_comparison_alpha_{dirichlet_alpha}.json"
-    out_file.parent.mkdir(parents=True, exist_ok=True)
-    with open(out_file, "w", encoding="utf-8") as f:
-        json.dump(out_payload, f, indent=2)
+    if save_artifact:
+        base_dir = Path(__file__).resolve().parents[2]
+        out_file = Path(output_path) if output_path else base_dir / "benchmarks" / "results" / "raw" / f"fl_comparison_alpha_{dirichlet_alpha}.json"
+        out_file.parent.mkdir(parents=True, exist_ok=True)
+        with open(out_file, "w", encoding="utf-8") as f:
+            json.dump(out_payload, f, indent=2)
+        print(f"[+] Saved FL comparison benchmark to {out_file}")
 
-    print(f"[+] Saved FL comparison benchmark to {out_file}")
     return out_payload
 
 
