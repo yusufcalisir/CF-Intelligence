@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
-from scipy import stats
+from scipy import stats  # type: ignore[import-untyped]
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class ModelDriftService:
         if len(actual_valid) == 0 or len(expected_valid) == 0:
             return 0.0
 
-        num_bins = max(2, int(num_bins))
+        num_bins = max(2, num_bins)
 
         # Small-sample guard (N < 30): quantile PSI exhibits unstable behavior at N < 30
         if len(actual_valid) < 30 or len(expected_valid) < 30:
@@ -188,7 +188,7 @@ class ModelDriftService:
         num_bins: int = 10,
     ) -> CalibrationReport:
         """Compute Brier Score, ECE, and reliability curve bins for model probability predictions."""
-        num_bins = max(2, int(num_bins))
+        num_bins = max(2, num_bins)
         if len(y_true) == 0 or len(y_prob) == 0 or len(y_true) != len(y_prob):
             return CalibrationReport(
                 brier_score=0.0,

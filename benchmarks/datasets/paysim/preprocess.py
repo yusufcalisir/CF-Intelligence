@@ -26,9 +26,9 @@ def preprocess_paysim(
         rng = np.random.default_rng(seed)
         n_samples = sample_limit or 10000
         fraud_p = 0.005
-        y = (rng.random(n_samples) < fraud_p).astype(int)
+        labels = (rng.random(n_samples) < fraud_p).astype(int)
         amounts = rng.exponential(scale=500.0, size=n_samples)
-        amounts[y == 1] *= 5.0
+        amounts[labels == 1] *= 5.0
         types = rng.choice(["CASH_OUT", "TRANSFER", "PAYMENT", "CASH_IN", "DEBIT"], size=n_samples)
         df = pd.DataFrame({
             "step": rng.integers(1, 744, size=n_samples),
@@ -38,7 +38,7 @@ def preprocess_paysim(
             "newbalanceOrig": rng.uniform(0, 100000, size=n_samples),
             "oldbalanceDest": rng.uniform(0, 100000, size=n_samples),
             "newbalanceDest": rng.uniform(0, 100000, size=n_samples),
-            "isFraud": y,
+            "isFraud": labels,
         })
     else:
         print(f"[+] Loading raw PaySim dataset from {csv_path}...")
@@ -79,8 +79,8 @@ def preprocess_paysim(
         else:
             X_num[col] = 0.0
 
-    X = pd.concat([X_num, type_dummies], axis=1).values.astype(np.float32)
-    y = df_filtered["isFraud"].values.astype(np.int64)
+    X = np.asarray(pd.concat([X_num, type_dummies], axis=1).to_numpy(), dtype=np.float32)
+    y = np.asarray(df_filtered["isFraud"].to_numpy(), dtype=np.int64)
 
     # 2. Dirichlet Non-IID Partitioning
     rng = np.random.default_rng(seed)

@@ -70,13 +70,15 @@ def preprocess_elliptic(
 
     feature_cols = [c for c in labeled.columns if c not in ["txId", "time_step", "class", "label"]]
 
-    X_train = train_df[feature_cols].values.astype(np.float32)
-    y_train = train_df["label"].values.astype(np.int64)
-    train_ids = train_df["txId"].values
+    X_train = np.asarray(train_df[feature_cols].to_numpy(), dtype=np.float32)
+    y_train = np.asarray(train_df["label"].to_numpy(), dtype=np.int64)
+    train_ids = np.asarray(train_df["txId"].to_numpy())
+    train_timesteps = np.asarray(train_df["time_step"].to_numpy())
 
-    X_test = test_df[feature_cols].values.astype(np.float32)
-    y_test = test_df["label"].values.astype(np.int64)
-    test_ids = test_df["txId"].values
+    X_test = np.asarray(test_df[feature_cols].to_numpy(), dtype=np.float32)
+    y_test = np.asarray(test_df["label"].to_numpy(), dtype=np.int64)
+    test_ids = np.asarray(test_df["txId"].to_numpy())
+    test_timesteps = np.asarray(test_df["time_step"].to_numpy())
 
     # Normalize features using train statistics only (prevent leakage)
     feat_mean = np.mean(X_train, axis=0, keepdims=True)
@@ -89,7 +91,7 @@ def preprocess_elliptic(
         X=X_train,
         y=y_train,
         node_ids=train_ids,
-        timesteps=train_df["time_step"].values,
+        timesteps=train_timesteps,
     )
 
     np.savez_compressed(
@@ -97,7 +99,7 @@ def preprocess_elliptic(
         X=X_test,
         y=y_test,
         node_ids=test_ids,
-        timesteps=test_df["time_step"].values,
+        timesteps=test_timesteps,
     )
 
     # Save edges

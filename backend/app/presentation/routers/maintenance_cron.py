@@ -144,7 +144,7 @@ async def execute_scheduled_health_check(
         )
         count = bank_res.scalar()
         if count and count > 0:
-            active_banks = int(count)
+            active_banks = count
     except Exception as exc:
         logger.debug("Database probe during cron health check: %s", exc)
         db_healthy = True

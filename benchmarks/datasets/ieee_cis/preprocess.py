@@ -27,10 +27,10 @@ def preprocess_ieee_cis(
         rng = np.random.default_rng(seed)
         n_samples = sample_limit or 10000
         fraud_p = 0.035
-        y = (rng.random(n_samples) < fraud_p).astype(int)
+        labels = (rng.random(n_samples) < fraud_p).astype(int)
         df = pd.DataFrame({
             "TransactionID": np.arange(1000, 1000 + n_samples),
-            "isFraud": y,
+            "isFraud": labels,
             "TransactionAmt": rng.exponential(scale=150.0, size=n_samples),
             "card1": rng.integers(1000, 9999, size=n_samples),
             "card2": rng.integers(100, 999, size=n_samples),
@@ -61,8 +61,8 @@ def preprocess_ieee_cis(
             else:
                 df[col] = 0.0
 
-    X = df[num_cols].values.astype(np.float32)
-    y = df["isFraud"].values.astype(np.int64)
+    X = np.asarray(df[num_cols].to_numpy(), dtype=np.float32)
+    y = np.asarray(df["isFraud"].to_numpy(), dtype=np.int64)
 
     # Non-IID Dirichlet Partition
     rng = np.random.default_rng(seed)

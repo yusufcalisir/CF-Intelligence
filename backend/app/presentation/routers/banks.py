@@ -8,7 +8,7 @@ from typing import Any
 import numpy as np
 import pandas as pd  # noqa: TC002
 from fastapi import APIRouter, HTTPException
-from scipy import stats
+from scipy import stats  # type: ignore[import-untyped]
 
 from app.application.schemas.banks import (
     BankConfigItem,

@@ -278,7 +278,7 @@ def _train_and_evaluate_torch(
     Gaussian noise injection (σ per parameter) before aggregation.
     """
     assert _TORCH_OK, "PyTorch required for neural training path"
-    assert torch is not None
+    assert torch is not None and TensorDataset is not None and DataLoader is not None
 
     torch.manual_seed(seed)
     model = _DPMLP(input_dim=X_train.shape[1])

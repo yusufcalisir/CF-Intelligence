@@ -407,4 +407,4 @@ class DataGenerator:
             else:
                 encoded[col] = 0.0
 
-        return encoded.values.astype(np.float32)
+        return np.asarray(encoded.to_numpy(), dtype=np.float32)

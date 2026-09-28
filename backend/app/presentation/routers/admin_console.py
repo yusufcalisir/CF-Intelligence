@@ -109,13 +109,13 @@ async def get_dashboard_summary(
         )
         db_banks = bank_res.scalar()
         if db_banks and db_banks > 0:
-            active_banks_count = int(db_banks)
+            active_banks_count = db_banks
 
         # Dynamic query 2: Federated rounds
         rounds_res = await session.execute(select(func.count(FederatedRoundModel.id)))
         db_rounds = rounds_res.scalar()
         if db_rounds and db_rounds > 0:
-            fl_rounds_count = int(db_rounds)
+            fl_rounds_count = db_rounds
 
         # Dynamic query 3: Global Model AUC
         auc_res = await session.execute(
@@ -129,7 +129,7 @@ async def get_dashboard_summary(
         cases_res = await session.execute(select(func.count(CaseModel.id)))
         db_cases = cases_res.scalar()
         if db_cases and db_cases > 0:
-            cases_count = int(db_cases)
+            cases_count = db_cases
 
     except Exception as exc:
         logger.warning("Could not dynamically resolve live database metrics: %s. Using baseline.", exc)
@@ -199,7 +199,7 @@ async def list_admin_tenants(
                 legal_name=m.legal_name,
                 jurisdiction=m.jurisdiction,
                 status=str(m.status.value if hasattr(m.status, "value") else m.status),
-                schema_provisioned=bool(m.schema_provisioned),
+                schema_provisioned=m.schema_provisioned,
                 created_at=m.created_at.isoformat() if m.created_at else datetime.now(UTC).isoformat(),
             )
             for m in models

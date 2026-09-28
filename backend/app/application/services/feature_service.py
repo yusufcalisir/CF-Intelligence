@@ -283,7 +283,7 @@ class FeatureService:
         issues: list[FeatureLeakageIssue] = []
         leaked_cols_set: set[str] = set()
 
-        y_series = pd.to_numeric(df[label_col], errors="coerce").fillna(0).to_numpy(dtype=np.float64)
+        y_series = np.asarray(pd.to_numeric(df[label_col], errors="coerce").fillna(0).to_numpy(), dtype=np.float64)
         y_std = float(np.std(y_series))
 
         for col in candidate_cols:
@@ -324,7 +324,7 @@ class FeatureService:
 
             # 3. Numeric correlation check (Target proxy detection)
             if pd.api.types.is_numeric_dtype(col_series):
-                clean_num = pd.to_numeric(col_series, errors="coerce").fillna(0).to_numpy(dtype=np.float64)
+                clean_num = np.asarray(pd.to_numeric(col_series, errors="coerce").fillna(0).to_numpy(), dtype=np.float64)
                 col_std = float(np.std(clean_num))
 
                 # Zero variance check

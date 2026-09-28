@@ -96,7 +96,8 @@ def safe_precision_recall_curve(
     try:
         from sklearn.metrics import precision_recall_curve
 
-        return precision_recall_curve(y_t, y_p)
+        prec, rec, thresh = precision_recall_curve(y_t, y_p)
+        return np.asarray(prec), np.asarray(rec), np.asarray(thresh)
     except Exception:
         return np.array([0.0, 1.0]), np.array([1.0, 0.0]), np.array([0.5])
 

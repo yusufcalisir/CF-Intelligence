@@ -157,12 +157,12 @@ class LocalLabelFeedbackPipeline:
             raw_attributes=raw_attributes,
         )
 
-        label = determination if isinstance(determination, FeedbackLabel) else FeedbackLabel(str(determination))
+        label = determination if isinstance(determination, FeedbackLabel) else FeedbackLabel(determination)
 
         # Calibrate default priority and weight based on business impact
         if priority is None:
             priority = 3 if label == FeedbackLabel.CONFIRMED_FRAUD else 1
-        priority = max(1, min(3, int(priority)))
+        priority = max(1, min(3, priority))
 
         if weight is None:
             weight = 2.0 if label == FeedbackLabel.CONFIRMED_FRAUD else 1.0

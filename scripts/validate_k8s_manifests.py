@@ -125,7 +125,7 @@ class DiscoveryHandler(http.server.BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def log_message(self, format_str, *args):
+    def log_message(self, format: str, *args: object) -> None:  # noqa: A002
         pass
 
 

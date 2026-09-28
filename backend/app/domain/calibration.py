@@ -402,7 +402,7 @@ class IsotonicCalibrator:
         if not self._fitted:
             raise RuntimeError("IsotonicCalibrator must be fitted before calling predict_proba")
         y_prob = np.asarray(y_prob, dtype=np.float64)
-        if self._thresholds is None or len(self._thresholds) == 0:
+        if self._thresholds is None or self._values is None or len(self._thresholds) == 0:
             return np.clip(y_prob, 0.0, 1.0)
         return np.clip(np.interp(y_prob, self._thresholds, self._values), 0.0, 1.0)
 

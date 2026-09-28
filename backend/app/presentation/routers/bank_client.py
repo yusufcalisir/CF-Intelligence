@@ -366,7 +366,7 @@ async def edge_heartbeat(payload: EdgeHeartbeatRequest) -> EdgeHeartbeatResponse
         bank_id=payload.bank_id,
         server_time=time.time(),
         next_heartbeat_seconds=15,
-        attestation_verified=bool(payload.attestation_quote is None or len(payload.attestation_quote) > 0),
+        attestation_verified=(payload.attestation_quote is None or len(payload.attestation_quote) > 0),
     )
 
 

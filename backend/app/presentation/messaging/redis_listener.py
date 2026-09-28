@@ -8,6 +8,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from redis.asyncio import Redis
 
 from app.application.services.data_generator import DataGenerator
@@ -86,7 +87,10 @@ class RedisBankClientListener:
                     continue
 
                 channel = message["channel"]
-                data = json.loads(message["data"])
+                raw_data = message.get("data")
+                if raw_data is None:
+                    continue
+                data = json.loads(raw_data)
 
                 if channel in init_channels:
                     await self._handle_init(data)
@@ -118,7 +122,7 @@ class RedisBankClientListener:
             )
             df, labels = datasets[self.bank_id]
             X = DataGenerator.encode_features(df)
-            y = labels.values
+            y = np.asarray(labels.values)
 
             # Perform train-test split
             from sklearn.model_selection import train_test_split

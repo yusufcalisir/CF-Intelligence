@@ -335,7 +335,7 @@ health_port: 8080
             status=model.status,
             cert_fingerprint=model.cert_fingerprint,
             vault_key_path=model.vault_key_path,
-            schema_provisioned=bool(model.schema_provisioned),
+            schema_provisioned=model.schema_provisioned,
             created_at=model.created_at,
             activated_at=model.activated_at,
         )
