@@ -30,7 +30,7 @@ jobs:
       - name: Install Linting & Security Tools (uv)
         run: |
           pip install uv
-          uv pip install --system ruff mypy bandit
+          uv pip install --system ruff mypy bandit pydantic pydantic-settings types-PyYAML
 
       - name: Ruff Lint Check
         run: ruff check app/ tests/
