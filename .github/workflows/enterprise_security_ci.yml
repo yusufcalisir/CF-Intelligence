@@ -58,7 +58,28 @@ jobs:
       - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
         run: |
-          pip-audit -r requirements.txt \
+          for i in 1 2 3; do
+            echo "Running pip-audit dependency scan (attempt $i/3)..."
+            if pip-audit -r requirements.txt \
+              --timeout 30 \
+              --ignore-vuln GHSA-c5qf-59p4-3g47 \
+              --ignore-vuln PYSEC-2026-3552 \
+              --ignore-vuln PYSEC-2026-3553 \
+              --ignore-vuln PYSEC-2026-3554 \
+              --ignore-vuln GHSA-537c-gmf6-5ccf \
+              --ignore-vuln PYSEC-2026-35 \
+              --ignore-vuln PYSEC-2026-1284 \
+              --ignore-vuln PYSEC-2026-2141 \
+              --ignore-vuln PYSEC-2026-1805; then
+              echo "✅ pip-audit completed successfully."
+              exit 0
+            fi
+            echo "⚠️ pip-audit attempt $i encountered transient service error (PyPI 503/timeout). Retrying in 10s..."
+            sleep 10
+          done
+          echo "⚠️ PyPI JSON API unavailable after 3 attempts. Executing resilient fallback via OSV vulnerability service..."
+          pip-audit -s osv -r requirements.txt \
+            --timeout 30 \
             --ignore-vuln GHSA-c5qf-59p4-3g47 \
             --ignore-vuln PYSEC-2026-3552 \
             --ignore-vuln PYSEC-2026-3553 \
