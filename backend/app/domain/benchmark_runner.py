@@ -91,7 +91,7 @@ class BenchmarkRunner:
         rng.shuffle(y_true)
 
         # Baseline performance profiles
-        profiles = {
+        profiles: dict[str, dict[str, Any]] = {
             "C1": {
                 "auc_mean": 0.820,
                 "auc_std": 0.01,
@@ -198,8 +198,8 @@ class BenchmarkRunner:
             recall_at_1pct_fpr=round(recall_1pct, 4),
             false_positive_rate=0.01,
             epsilon_consumed=prof["eps"],
-            total_bytes_transmitted=prof["bytes"],
-            rounds_to_convergence=prof["rounds"],
+            total_bytes_transmitted=int(prof["bytes"]),
+            rounds_to_convergence=int(prof["rounds"]),
             training_time_seconds=round(elapsed + 0.15, 3),
             inference_latency_p99_ms=prof["lat"],
         )
