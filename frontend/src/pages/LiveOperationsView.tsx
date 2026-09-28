@@ -1188,19 +1188,26 @@ export default function LiveOperationsView() {
 
           <div className="flex items-center gap-2">
             {effectiveBanks.length > 0 && (
-              <select
-                id="select-consortium-bank-analytics"
-                aria-label="Select consortium bank for discrimination analytics"
-                value={selectedBankId || effectiveBanks[0]?.id}
-                onChange={(e) => setSelectedBankId(e.target.value)}
-                className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-400"
-              >
-                {effectiveBanks.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center">
+                <label htmlFor="select-consortium-bank-analytics" className="sr-only">
+                  Select consortium bank for discrimination analytics
+                </label>
+                <select
+                  id="select-consortium-bank-analytics"
+                  name="consortium_bank_analytics"
+                  title="Select consortium bank for discrimination analytics"
+                  aria-label="Select consortium bank for discrimination analytics"
+                  value={selectedBankId || effectiveBanks[0]?.id}
+                  onChange={(e) => setSelectedBankId(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-indigo-400"
+                >
+                  {effectiveBanks.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             )}
             <div className="flex rounded-lg bg-slate-900 p-0.5 border border-slate-800 text-xs">
               <button

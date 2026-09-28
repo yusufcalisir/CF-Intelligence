@@ -616,10 +616,14 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
                 />
               </div>
               <div className="space-y-1 shrink-0 w-32">
-                <label className="text-[9px] text-[var(--color-text-muted)] uppercase font-semibold">
+                <label htmlFor="feedback-outcome-select" className="text-[9px] text-[var(--color-text-muted)] uppercase font-semibold">
                   Actual Outcome
                 </label>
                 <select
+                  id="feedback-outcome-select"
+                  name="feedback_outcome"
+                  aria-label="Actual Outcome"
+                  title="Actual Outcome"
                   value={feedbackLabel}
                   onChange={(e) => setFeedbackLabel(e.target.value)}
                   className="w-full bg-[var(--color-bg-card)] border border-[var(--color-border-subtle)] rounded px-2 py-1.5 text-xs text-[var(--color-text-primary)] focus:outline-none"
@@ -660,8 +664,12 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
             <form onSubmit={handleSignOff} className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[9px] text-[var(--color-text-muted)] uppercase font-semibold">Signer Role</label>
+                  <label htmlFor="signer-role-select" className="text-[9px] text-[var(--color-text-muted)] uppercase font-semibold">Signer Role</label>
                   <select
+                    id="signer-role-select"
+                    name="signer_role"
+                    aria-label="Signer Role"
+                    title="Signer Role"
                     value={signoffRole}
                     onChange={(e) => setSignoffRole(e.target.value as any)}
                     className="w-full bg-[var(--color-bg-elevated)] border border-[var(--color-border-subtle)] rounded px-2.5 py-1.5 text-xs text-[var(--color-text-primary)]"
