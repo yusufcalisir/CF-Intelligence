@@ -148,7 +148,7 @@ class ModelDriftService:
                 continue
 
             # 1. Kolmogorov-Smirnov 2-sample test
-            ks_res = stats.ks_2samp(curr_valid, ref_valid)
+            ks_res: Any = stats.ks_2samp(curr_valid, ref_valid)
             ks_stat = float(ks_res.statistic)
             ks_p_val = float(ks_res.pvalue)
 
@@ -183,7 +183,7 @@ class ModelDriftService:
 
     def compute_calibration(
         self,
-        y_true: list[int],
+        y_true: list[int] | list[float],
         y_prob: list[float],
         num_bins: int = 10,
     ) -> CalibrationReport:

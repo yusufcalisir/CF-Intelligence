@@ -200,8 +200,8 @@ class TemporalGeneralizationSuiteResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 def calculate_recall_at_fixed_fpr(
-    y_true: np.ndarray,
-    y_pred: np.ndarray,
+    y_true: np.ndarray | Any,
+    y_pred: np.ndarray | Any,
     target_fpr: float,
 ) -> float:
     """Calculate empirical Recall at a strict maximum False Positive Rate cutoff."""
@@ -216,8 +216,8 @@ def calculate_recall_at_fixed_fpr(
 
 
 def calculate_ece(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
+    y_true: np.ndarray | Any,
+    y_prob: np.ndarray | Any,
     num_bins: int = 10,
 ) -> float:
     """Calculate Expected Calibration Error (ECE) across equal-width probability bins."""
@@ -246,8 +246,8 @@ def calculate_ece(
 
 
 def compute_psi(
-    expected: np.ndarray,
-    actual: np.ndarray,
+    expected: np.ndarray | Any,
+    actual: np.ndarray | Any,
     num_bins: int = 10,
 ) -> float:
     """Compute Population Stability Index (PSI) with Laplace quantile smoothing."""
@@ -278,9 +278,9 @@ def compute_psi(
 
 
 def calculate_feature_drift(
-    reference_X: np.ndarray,
-    target_X: np.ndarray,
-    target_p3_X: np.ndarray,
+    reference_X: np.ndarray | Any,
+    target_X: np.ndarray | Any,
+    target_p3_X: np.ndarray | Any,
     feature_names: list[str],
 ) -> list[FeatureDriftProfile]:
     """Calculate Kolmogorov-Smirnov 2-sample tests and PSI for each feature."""
@@ -292,8 +292,10 @@ def calculate_feature_drift(
         p3_feat = target_p3_X[:, idx]
 
         # KS statistics
-        ks_p2 = float(stats.ks_2samp(ref_feat, p2_feat).statistic)
-        ks_p3 = float(stats.ks_2samp(ref_feat, p3_feat).statistic)
+        ks_res_p2: Any = stats.ks_2samp(ref_feat, p2_feat)
+        ks_res_p3: Any = stats.ks_2samp(ref_feat, p3_feat)
+        ks_p2 = float(ks_res_p2.statistic)
+        ks_p3 = float(ks_res_p3.statistic)
 
         # PSI
         psi_p2 = compute_psi(ref_feat, p2_feat)
@@ -524,7 +526,8 @@ def _evaluate_partition(
         pr_auc = float(np.mean(y == 1))
         roc_auc = 0.50
 
-    f1 = float(f1_score(y, preds, zero_division=0))
+    zd: Any = 0
+    f1 = float(f1_score(y, preds, zero_division=zd))
     rec_01 = calculate_recall_at_fixed_fpr(y, probs, target_fpr=0.001)
     rec_05 = calculate_recall_at_fixed_fpr(y, probs, target_fpr=0.005)
     rec_10 = calculate_recall_at_fixed_fpr(y, probs, target_fpr=0.010)
@@ -554,8 +557,8 @@ def _evaluate_partition(
 
 
 def _evaluate_kfold_cv(
-    X_pooled: np.ndarray,
-    y_pooled: np.ndarray,
+    X_pooled: np.ndarray | Any,
+    y_pooled: np.ndarray | Any,
     config: TemporalGeneralizationConfig,
 ) -> KFoldMetrics:
     """Execute standard randomized K-fold cross-validation (the optimistic baseline)."""
@@ -576,7 +579,8 @@ def _evaluate_kfold_cv(
 
         pr_aucs.append(float(average_precision_score(y_te, probs)))
         roc_aucs.append(float(roc_auc_score(y_te, probs)))
-        f1s.append(float(f1_score(y_te, preds, zero_division=0)))
+        zd: Any = 0
+        f1s.append(float(f1_score(y_te, preds, zero_division=zd)))
         rec_01s.append(calculate_recall_at_fixed_fpr(y_te, probs, target_fpr=0.001))
 
     return KFoldMetrics(
@@ -813,8 +817,9 @@ def format_temporal_benchmark_markdown(result: TemporalGeneralizationSuiteResult
 
 
 if __name__ == "__main__":
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")
+    reconfigure_fn = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure_fn):
+        reconfigure_fn(encoding="utf-8")
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     suite = run_temporal_generalization_benchmark()
     md = format_temporal_benchmark_markdown(suite)
