@@ -984,5 +984,10 @@ The benchmark evaluates uncalibrated raw model probabilities against Platt Scali
 
 **Empirical Result**: Post-hoc calibration with Isotonic Regression reduces Expected Calibration Error by **75.1%** (from $0.0482$ to $0.0120$) and Maximum Calibration Error by **75.2%** (from $0.1250$ to $0.0310$), ensuring that continuous risk scores correspond faithfully to real-world fraud probabilities.
 
-**Test Execution Parity**: 238 passed in 100% pass rate across benchmark and verification suites.
+### 19.3 Interactive Dashboard Visualization (`CalibrationReliabilityPlot.tsx`)
+
+The platform exposes the reliability diagram and dynamic method toggles (Raw Model vs Platt Scaling vs Isotonic Regression) via the interactive `frontend/src/components/dashboard/CalibrationReliabilityPlot.tsx` component mounted on `ObservabilityPage.tsx`. The visualizer renders Recharts-based composite reliability curves against the diagonal reference line ($y = x$), per-bin calibration gap indicators ($\lvert\mathrm{conf}(b) - \mathrm{acc}(b)\rvert$), summary KPI badges (ECE, MCE, Brier Score), and an expandable 10-bin empirical frequency data table.
+
+**Test Execution Parity**: 238 passed in 100% pass rate across benchmark and verification suites; 5/5 Vitest tests passed on `CalibrationReliabilityPlot.test.tsx`.
+
 

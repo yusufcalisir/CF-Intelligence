@@ -9,6 +9,7 @@ import {
   useExportSiemMetrics,
 } from '../api/queries';
 import ConnectorDiagnosticsPanel from '../components/dashboard/ConnectorDiagnosticsPanel';
+import CalibrationReliabilityPlot from '../components/dashboard/CalibrationReliabilityPlot';
 
 export default function ObservabilityPage() {
   const [activeTab, setActiveTab] = useState<'drift' | 'calibration' | 'alerts' | 'telemetry' | 'connectors'>('drift');
@@ -506,68 +507,12 @@ export default function ObservabilityPage() {
         </div>
       )}
 
-      {/* Tab 2: Model Calibration */}
+      {/* Tab 2: Model Calibration & Reliability Diagram */}
       {activeTab === 'calibration' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-card p-5 space-y-4 md:col-span-1">
-            <h3 className="text-sm font-bold uppercase text-[var(--color-text-muted)]">
-              Calibration Summary
-            </h3>
-            {isCalibLoading ? (
-              <div className="py-4 text-xs text-[var(--color-text-muted)]">Loading calibration...</div>
-            ) : (
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
-                  <span className="text-[var(--color-text-muted)]">Brier Score</span>
-                  <span className="font-mono font-bold text-emerald-400">{calibData?.brier_score}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
-                  <span className="text-[var(--color-text-muted)]">Expected Calibration Error (ECE)</span>
-                  <span className="font-mono font-bold">{calibData?.expected_calibration_error}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
-                  <span className="text-[var(--color-text-muted)]">Max Calibration Error</span>
-                  <span className="font-mono font-bold">{calibData?.max_calibration_error}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded bg-[var(--color-surface-alt)]">
-                  <span className="text-[var(--color-text-muted)]">Well Calibrated</span>
-                  <span className="font-mono text-emerald-400 font-bold">
-                    {calibData?.is_well_calibrated ? 'YES (Brier <= 0.15)' : 'NO (Degraded)'}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="glass-card p-4 sm:p-5 space-y-4 md:col-span-2">
-            <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
-              Reliability Curve Bins (10-Bin Calibration)
-            </h3>
-            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-              {calibData?.bins.map((bin) => (
-                <div
-                  key={bin.bin_index}
-                  className="p-3 rounded-lg bg-[var(--color-surface-alt)] text-xs flex flex-col sm:grid sm:grid-cols-12 items-start sm:items-center font-mono gap-2 border border-white/5"
-                >
-                  <div className="sm:col-span-3 text-[var(--color-text-primary)] font-semibold truncate">
-                    Bin #{bin.bin_index} [{bin.prob_min} - {bin.prob_max}]
-                  </div>
-                  <div className="sm:col-span-3 text-left">
-                    <span className="text-[var(--color-text-muted)] text-[11px]">Pred Prob: </span>
-                    <strong className="text-[var(--color-primary)] font-bold">{bin.mean_predicted_prob}</strong>
-                  </div>
-                  <div className="sm:col-span-3 text-left">
-                    <span className="text-[var(--color-text-muted)] text-[11px]">Actual Ratio: </span>
-                    <strong className="text-emerald-400 font-bold">{bin.empirical_fraud_ratio}</strong>
-                  </div>
-                  <div className="sm:col-span-3 sm:text-right text-[11px] text-[var(--color-text-muted)]">
-                    ({bin.sample_count} samples)
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        <CalibrationReliabilityPlot
+          report={calibData}
+          isLoading={isCalibLoading}
+        />
       )}
 
       {/* Tab 3: Prometheus Alertmanager */}

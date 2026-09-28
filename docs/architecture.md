@@ -624,7 +624,7 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,836 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,604 total system tests) across unit, integration, and property-based suites:
+The entire codebase is validated by **2,836 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,609 total system tests) across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
