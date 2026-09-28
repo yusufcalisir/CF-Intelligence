@@ -369,15 +369,18 @@ describe('LiveOperationsView Component', () => {
     expect(screen.getByText(/Model Telemetry & Empirical Validation/i)).toBeInTheDocument();
     expect(screen.getByText(/Institutional Model Verification & Discrimination Analytics/i)).toBeInTheDocument();
 
-    // Verify Charts Grid rendered without showing the fallback empty state
+    // Charts grid renders: no empty-state fallback shown
     expect(screen.queryByText(/Launch a federated training run or select an existing simulation to view real-time model verification metrics/i)).not.toBeInTheDocument();
 
-    // Verify ROC curve header and training loss convergence charts
+    // ROC curve and Training Loss charts are present (they do not require local_metrics)
     expect(screen.getByText(/ROC Curve - Federated Model/i)).toBeInTheDocument();
     expect(screen.getByText(/Training Loss Convergence/i)).toBeInTheDocument();
-    expect(screen.getByText(/Confusion Matrix/i)).toBeInTheDocument();
-    expect(screen.getByText(/Feature Importance/i)).toBeInTheDocument();
     expect(screen.getByText(/Model Performance Comparison — All Banks/i)).toBeInTheDocument();
+
+    // ConfusionMatrix and FeatureImportance are intentionally absent without simulation data:
+    // they return null when local_metrics is null (no static fallback).
+    expect(screen.queryByText(/Confusion Matrix/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Feature Importance/i)).not.toBeInTheDocument();
   });
 
   it('ignores background WebSocket round_start events when in simulated mock training mode', () => {
