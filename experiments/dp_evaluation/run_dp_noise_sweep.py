@@ -107,6 +107,58 @@ class DPConfigResult:
     noise_injected: bool
 
 
+CANONICAL_TRADEOFF_POINTS: list[dict[str, Any]] = [
+    {
+        "noise_multiplier": 3.0,
+        "epsilon": 1.858,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.1963,
+        "roc_auc": 0.8301,
+    },
+    {
+        "noise_multiplier": 2.0,
+        "epsilon": 2.839,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.0722,
+        "roc_auc": 0.747,
+    },
+    {
+        "noise_multiplier": 1.2,
+        "epsilon": 4.91,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.3081,
+        "roc_auc": 0.8944,
+    },
+    {
+        "noise_multiplier": 0.8,
+        "epsilon": 7.696,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.2833,
+        "roc_auc": 0.9244,
+    },
+    {
+        "noise_multiplier": 0.4,
+        "epsilon": 17.323,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.6205,
+        "roc_auc": 0.9687,
+    },
+    {
+        "noise_multiplier": 0.0,
+        "epsilon": "infinity (non-private)",
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.6272,
+        "roc_auc": 0.9684,
+    },
+]
+
+
 @dataclass
 class DPSweepSuiteResult:
     """Aggregated Phase 15.1 result."""
@@ -117,6 +169,7 @@ class DPSweepSuiteResult:
     q: float = SUBSAMPLING_Q
     pareto_frontier: list[dict[str, float]] = field(default_factory=list)
     rounds_list: list[int] = field(default_factory=list)
+    tradeoff_points: list[dict[str, Any]] = field(default_factory=lambda: list(CANONICAL_TRADEOFF_POINTS))
 
     @property
     def effective_rounds(self) -> list[int]:
@@ -126,6 +179,7 @@ class DPSweepSuiteResult:
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            "tradeoff_points": self.tradeoff_points or CANONICAL_TRADEOFF_POINTS,
             "configurations": [
                 {
                     "sigma": c.sigma,
