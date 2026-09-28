@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-3973%2F3973_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-3983%2F3983_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,188 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,198 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1290,7 +1290,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,574 / 3,574 passing (3,973 total incl. verification)** | 100% | 3,188 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,584 / 3,584 passing (3,983 total incl. verification)** | 100% | 3,198 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1478,7 +1478,37 @@ Pursuant to Federal Reserve SR 11-7 / OCC 2011-12, ECOA Regulation B (12 CFR Par
 
 ---
 
-### 15.10 Reproducible Benchmark CLI Commands
+### 15.10 Master Empirical Comparative Benchmark Matrix (Strict Null Representation)
+
+Consolidated empirical performance matrix across all eight canonical benchmark datasets. To prevent deceptive reporting, unexecuted benchmarks or inapplicable baselines are strictly represented as `—` (`null`), never as fabricated `0.0000` values:
+
+| Dataset | Domain & Scale | Model / Paradigm | Clients & Rounds | PR-AUC | ROC-AUC | F1-Score | Precision | Recall | Recall @ 0.1% FPR | Status |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| **PaySim Mobile Money**<br>*6.36M txns (Blekinge)* | Centralized Pooled Oracle | Centralized Neural Classifier | 1 silo (Pooled) | 0.4654 | — | — | — | — | 0.4000 | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg) | 3 clients / 10 rnds | **0.1184** | **0.8700** | 0.0000 | 0.0000 | 0.0000 | **0.3333** | `FEDERATED [OK]` |
+| **IEEE-CIS Card Fraud**<br>*590k txns (Vesta Corp)* | Centralized Pooled Oracle | Centralized Neural Classifier | 1 silo (Pooled) | 0.7811 | — | — | — | — | 0.3692 | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.7554** | — | — | — | — | **0.4308** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx) | 3 clients / 5 rnds | 0.0691 | 0.6632 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | `FEDPROX [OK]` |
+| **European Credit Card**<br>*284k txns (ULB MLG)* | Centralized Pooled Oracle | Centralized Logistic/MLP | 1 silo (Pooled) | 0.7920 | 0.9850 | — | — | — | — | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg) | 3 clients / 5 rnds | **0.7750** | **0.9837** | 0.7882 | 0.7619 | 0.8163 | **0.8469** | `FEDERATED [OK]` |
+| **Elliptic Bitcoin Graph**<br>*203k nodes (MIT-IBM)* | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.9001 | — | — | — | — | — | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.4372** | **0.8388** | 0.3804 | 0.2711 | 0.6371 | **0.1320** | `FEDERATED [OK]` |
+| **IBM AMLSim Graph**<br>*1.32M txns (IBM AI)* | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.6720 | — | — | — | — | — | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood | Graph / 15 rnds | **0.6527** | **0.9509** | 0.1689 | — | — | **0.6412** | `FEDERATED [OK]` |
+| **Danish SynthAML**<br>*20k alerts (Spar Nord)* | Centralized Pooled Oracle | Centralized AlertMLP | 1 silo (Pooled) | 0.9995 | 0.9998 | — | — | — | — | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | AlertMLPClassifier (FedAvg) | 3 clients / 6 rnds | **0.9985** | **0.9995** | 0.9836 | 0.9877 | 0.9796 | **0.9878** | `FEDERATED [OK]` |
+| | Isolated Silos (No Sharing) | Isolated Bank Silos (Alpha/Beta/Gamma) | Isolated Local | Mean: 0.7245 (Worst: 0.2214) | — | — | — | — | — | `ISOLATED [OK]` |
+| **AUSTRAC AMLNet**<br>*1.09M txns (Griffith)* | Centralized Pooled Oracle | Centralized AMLNetClassifier | 1 silo (Pooled) | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | 1.0000 | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | AMLNetClassifier (FedAvg) | 3 clients / 6 rnds | **1.0000** | **1.0000** | 1.0000 | 1.0000 | 1.0000 | **1.0000** | `FEDERATED [OK]` |
+| **CFI-CrossBank Consortium**<br>*100k txns (7 Scenarios)* | Centralized Pooled Oracle | Pooled Consortium Oracle Upper Bound | 1 silo (Pooled) | 0.9850 | 0.9990 | — | — | — | 0.9900 | `CENTRALIZED` |
+| | **Federated FedAvg (Collaborative)** | Collaborative Federated Intelligence | 3 clients / 2 rnds | **0.9729** | **0.9985** | — | — | — | **0.9881** | `FEDERATED [OK]` |
+| | Isolated Silos (No Sharing) | Isolated Bank Nodes (No Cross-Bank) | Isolated Local | Mean: 0.8832 | — | — | — | — | — | `ISOLATED [OK]` |
+
+*Artifact: [`benchmarks/results/raw/master_benchmark_matrix.json`](benchmarks/results/raw/master_benchmark_matrix.json) | Generator: [`benchmarks/generate_master_benchmark_matrix.py`](benchmarks/generate_master_benchmark_matrix.py)*
+
+---
+
+### 15.11 Reproducible Benchmark CLI Commands
 
 All benchmarks can be executed via standardized `make` targets or standalone scripts in `benchmarks/`:
 

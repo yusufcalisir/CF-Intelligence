@@ -1,0 +1,534 @@
+{
+  "schema_version": "1.0.0",
+  "report_name": "Master Empirical Comparative Benchmark Matrix",
+  "generated_at_utc": "2026-09-28T20:46:57.427678+00:00",
+  "invariants": {
+    "strict_null_representation": true,
+    "zero_fake_defaults": true,
+    "unfavorable_results_preserved": true,
+    "canonical_datasets_count": 8
+  },
+  "summary_statistics": {
+    "total_canonical_datasets": 8,
+    "evaluated_datasets": [
+      "paysim",
+      "ieee_cis",
+      "credit_card",
+      "elliptic",
+      "amlsim",
+      "synthaml",
+      "amlnet",
+      "cross_bank"
+    ],
+    "evaluated_paradigms": [
+      "centralized_pooled",
+      "federated_fedavg",
+      "federated_fedprox",
+      "isolated_silos",
+      "classical_baselines"
+    ]
+  },
+  "datasets": {
+    "paysim": {
+      "dataset_id": "paysim",
+      "dataset_name": "PaySim Mobile Money Fraud",
+      "domain": "Mobile Money (P2P / Cash-Out)",
+      "real_vs_synthetic": "SYNTHETIC_AGENT_SIMULATOR",
+      "provenance_scale": "6.36M transactions (Blekinge Institute)",
+      "evaluated_samples": 30000,
+      "fraud_prevalence_pct": 0.129,
+      "feature_dim": 13,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Centralized Neural Classifier",
+          "pr_auc": 0.4654,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.4,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "PaySimNeuralClassifier (FedAvg)",
+          "clients": 3,
+          "rounds": 10,
+          "pr_auc": 0.11838,
+          "roc_auc": 0.86996,
+          "f1_score": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "recall_at_01_fpr": 0.33333,
+          "recall_at_001_fpr": 0.0,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "PaySimNeuralClassifier (FedProx mu=0.01)",
+          "clients": 3,
+          "rounds": 10,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Nodes (No FL)",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "ieee_cis": {
+      "dataset_id": "ieee_cis",
+      "dataset_name": "IEEE-CIS Fraud Detection",
+      "domain": "E-Commerce Card-Not-Present (CNP)",
+      "real_vs_synthetic": "REAL_PRODUCTION_CNP_LOGS",
+      "provenance_scale": "590k transactions (Vesta Corp)",
+      "evaluated_samples": 15000,
+      "fraud_prevalence_pct": 3.5,
+      "feature_dim": 422,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Centralized Neural Classifier",
+          "pr_auc": 0.7811,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.3692,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "IEEECISNeuralClassifier (FedAvg)",
+          "clients": 3,
+          "rounds": 5,
+          "pr_auc": 0.7554,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.4308,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "IEEECISNeuralClassifier (FedProx mu=0.01)",
+          "clients": 3,
+          "rounds": 5,
+          "pr_auc": 0.06914,
+          "roc_auc": 0.66322,
+          "f1_score": 0.0,
+          "precision": 0.0,
+          "recall": 0.0,
+          "recall_at_01_fpr": 0.0,
+          "recall_at_001_fpr": 0.0,
+          "status": "EVALUATED"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Nodes (No FL)",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "credit_card": {
+      "dataset_id": "credit_card",
+      "dataset_name": "European Credit Card Fraud",
+      "domain": "Retail Credit Card Transactions",
+      "real_vs_synthetic": "REAL_ANONYMIZED_PCA",
+      "provenance_scale": "284,807 transactions (ULB Machine Learning Group)",
+      "evaluated_samples": 284806,
+      "fraud_prevalence_pct": 0.173,
+      "feature_dim": 30,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Centralized Logistic/MLP Baseline",
+          "pr_auc": 0.792,
+          "roc_auc": 0.985,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "CreditCardImbalanceMLP (FedAvg)",
+          "clients": 3,
+          "rounds": 5,
+          "pr_auc": 0.77499,
+          "roc_auc": 0.98374,
+          "f1_score": 0.78818,
+          "precision": 0.7619,
+          "recall": 0.81633,
+          "recall_at_01_fpr": 0.84694,
+          "recall_at_001_fpr": 0.42857,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "CreditCardImbalanceMLP (FedProx)",
+          "clients": 3,
+          "rounds": 5,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Nodes (No FL)",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "elliptic": {
+      "dataset_id": "elliptic",
+      "dataset_name": "Elliptic Bitcoin AML Graph",
+      "domain": "Cryptocurrency Blockchain DAG",
+      "real_vs_synthetic": "REAL_BLOCKCHAIN_DAG",
+      "provenance_scale": "203k nodes, 234k edges (MIT-IBM Watson / Elliptic)",
+      "evaluated_samples": 203769,
+      "fraud_prevalence_pct": 9.76,
+      "feature_dim": 165,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "GraphSAGE Centralized Oracle",
+          "pr_auc": 0.9001,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "GraphSAGE Inductive Neighborhood (Federated/Temporal)",
+          "clients": null,
+          "rounds": 15,
+          "pr_auc": 0.437225,
+          "roc_auc": 0.838842,
+          "f1_score": 0.380375,
+          "precision": 0.27112,
+          "recall": 0.637119,
+          "recall_at_01_fpr": 0.132041,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "GraphSAGE FedProx",
+          "clients": null,
+          "rounds": null,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Node Subgraphs",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "amlsim": {
+      "dataset_id": "amlsim",
+      "dataset_name": "IBM AMLSim Multi-Hop Banking",
+      "domain": "Commercial Banking Multi-Agent Graph",
+      "real_vs_synthetic": "SYNTHETIC_AGENT_GRAPH",
+      "provenance_scale": "1.32M transactions, 10k accounts (IBM Research AI)",
+      "evaluated_samples": 1323234,
+      "fraud_prevalence_pct": 0.13,
+      "feature_dim": 6,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "GraphSAGE Centralized Oracle",
+          "pr_auc": 0.672,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "GraphSAGE Inductive Neighborhood",
+          "clients": null,
+          "rounds": 15,
+          "pr_auc": 0.6527,
+          "roc_auc": 0.9509,
+          "f1_score": 0.1689,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.6412,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "GraphSAGE FedProx",
+          "clients": null,
+          "rounds": null,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Subgraphs",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "synthaml": {
+      "dataset_id": "synthaml",
+      "dataset_name": "Danish Spar Nord Bank SynthAML",
+      "domain": "Commercial Danish Banking AML Alerts",
+      "real_vs_synthetic": "REAL_TOPOLOGY_COPULA_SYNTHETIC",
+      "provenance_scale": "20k alerts / 16M txns (Aarhus Univ / Spar Nord)",
+      "evaluated_samples": 5000,
+      "fraud_prevalence_pct": 8.5,
+      "feature_dim": 14,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Centralized AlertMLP",
+          "pr_auc": 0.9995,
+          "roc_auc": 0.9998,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "AlertMLPClassifier (FedAvg)",
+          "clients": 3,
+          "rounds": 6,
+          "pr_auc": 0.9984548645462111,
+          "roc_auc": 0.9994864170833897,
+          "f1_score": 0.9836065573770492,
+          "precision": 0.9876543209876543,
+          "recall": 0.9795918367346939,
+          "recall_at_01_fpr": 0.9877551020408163,
+          "recall_at_001_fpr": 0.8979591836734694,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "AlertMLPClassifier (FedProx)",
+          "clients": 3,
+          "rounds": 6,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Silos (Bank Alpha / Beta / Gamma)",
+          "worst_silo_pr_auc": 0.22140144259883854,
+          "mean_silo_pr_auc": 0.7244553815211802,
+          "best_silo_pr_auc": 0.9924242424242424,
+          "status": "EVALUATED"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "amlnet": {
+      "dataset_id": "amlnet",
+      "dataset_name": "Australian AUSTRAC AMLNet",
+      "domain": "International AUSTRAC Wire Transfers",
+      "real_vs_synthetic": "KNOWLEDGE_GUIDED_MULTI_AGENT_SYNTHETIC",
+      "provenance_scale": "1.09M wire transactions (Griffith Univ / Zenodo)",
+      "evaluated_samples": 25000,
+      "fraud_prevalence_pct": 0.14,
+      "feature_dim": 18,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Centralized AMLNetClassifier",
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "f1_score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "recall_at_01_fpr": 1.0,
+          "recall_at_001_fpr": 1.0,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "AMLNetClassifier (FedAvg)",
+          "clients": 3,
+          "rounds": 6,
+          "pr_auc": 1.0,
+          "roc_auc": 1.0,
+          "f1_score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0,
+          "recall_at_01_fpr": 1.0,
+          "recall_at_001_fpr": 1.0,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "AMLNetClassifier (FedProx)",
+          "clients": 3,
+          "rounds": 6,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Nodes (AUSTRAC Silos)",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": null,
+          "best_silo_pr_auc": null,
+          "status": "NOT_RUN"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    },
+    "cross_bank": {
+      "dataset_id": "cross_bank",
+      "dataset_name": "CFI-CrossBank Multi-Bank Consortium",
+      "domain": "Cross-Institutional Multi-Jurisdiction Banking",
+      "real_vs_synthetic": "SYNTHETIC_CONSORTIUM_TOPOLOGY",
+      "provenance_scale": "100k txns, 1k accounts, 7 Attack Scenarios (CFI-CrossBank-01)",
+      "evaluated_samples": 19567,
+      "fraud_prevalence_pct": 2.1,
+      "feature_dim": 14,
+      "paradigms": {
+        "centralized_pooled": {
+          "architecture": "Pooled Consortium Oracle Upper Bound",
+          "pr_auc": 0.985,
+          "roc_auc": 0.999,
+          "detection_rate": 1.0,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.99,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "Collaborative Federated Intelligence (FedAvg)",
+          "clients": 3,
+          "rounds": 2,
+          "pr_auc": 0.9729,
+          "roc_auc": 0.9985,
+          "detection_rate": 1.0,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": 0.9881,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedprox": {
+          "architecture": "Collaborative Federated Intelligence (FedProx)",
+          "clients": 3,
+          "rounds": 2,
+          "pr_auc": null,
+          "roc_auc": null,
+          "f1_score": null,
+          "precision": null,
+          "recall": null,
+          "recall_at_01_fpr": null,
+          "recall_at_001_fpr": null,
+          "status": "NOT_RUN"
+        },
+        "isolated_silos": {
+          "architecture": "Isolated Bank Nodes (No Cross-Bank Sharing)",
+          "worst_silo_pr_auc": null,
+          "mean_silo_pr_auc": 0.8832,
+          "best_silo_pr_auc": null,
+          "overall_detection_rate": 0.8061,
+          "zero_positive_transfer_isolated": 0.0,
+          "zero_positive_transfer_federated": 1.0,
+          "status": "EVALUATED"
+        },
+        "classical_baselines": {
+          "random_forest_pr_auc": null,
+          "logistic_regression_pr_auc": null,
+          "xgboost_pr_auc": null,
+          "status": "NOT_RUN"
+        }
+      }
+    }
+  }
+}
