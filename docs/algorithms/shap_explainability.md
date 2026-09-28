@@ -43,6 +43,7 @@ SHAP (SHapley Additive exPlanations; Lundberg & Lee, 2017) resolves this by comp
 ---
 
 ## 5. Test Suite Verification
-- **Unit Tests**: [`backend/tests/unit/test_explainability_service.py`](file:///backend/tests/unit/test_explainability_service.py)
+- **Mathematical Invariant Tests**: [`backend/tests/unit/test_shap_mathematical_invariants.py`](file:///backend/tests/unit/test_shap_mathematical_invariants.py) (Additivity axiom across 100 real transactions, symmetry, dummy player, reproducibility, and fraud cluster top-3 consistency)
+- **Unit & Hardening Tests**: [`backend/tests/unit/test_explainability_service.py`](file:///backend/tests/unit/test_explainability_service.py), [`backend/tests/unit/test_explainability_hardening.py`](file:///backend/tests/unit/test_explainability_hardening.py)
 - **Latency Benchmark**: [`benchmarks/runners/run_latency_benchmark.py`](file:///benchmarks/runners/run_latency_benchmark.py)
 - **Latency Output**: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](file:///benchmarks/results/raw/latency_concurrency_benchmark.json)

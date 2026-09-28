@@ -192,37 +192,25 @@ class ExplainabilityService:
 
         return "\n".join(lines)
 
-    def compute_shap_values(
-        self,
-        txn_dict: dict,
-    ) -> list[dict[str, Any]]:
-        """Compute SHAP values for a single transaction using the trained global model.
+    SHAP_FEATURE_NAMES: list[str] = [
+        "transaction_amount",
+        "merchant_category",
+        "country_code",
+        "device_type",
+        "velocity",
+        "hour_of_day",
+        "merchant_risk_score",
+        "customer_history_score",
+        "chargeback_count",
+        "account_age_days",
+    ]
 
-        If no model is trained yet, falls back to an analytical local explanation.
-        """
-        import os
-
+    def _parse_transaction_features(self, txn_dict: dict) -> list[float]:
+        """Parse raw transaction dictionary into a numeric vector in [0, 1]."""
         import numpy as np
-        import torch
 
-        # Feature names in the exact order the model expects
-        feature_names = [
-            "transaction_amount",
-            "merchant_category",
-            "country_code",
-            "device_type",
-            "velocity",
-            "hour_of_day",
-            "merchant_risk_score",
-            "customer_history_score",
-            "chargeback_count",
-            "account_age_days",
-        ]
-
-        # 1. Parse raw transaction dictionary into a numeric vector
-        # Convert categoricals and scale numericals to [0, 1] using stable default ranges
-        raw_features = []
-        for name in feature_names:
+        raw_features: list[float] = []
+        for name in self.SHAP_FEATURE_NAMES:
             val = txn_dict.get(name, 0.0)
             if name == "merchant_category":
                 categories = [
@@ -286,62 +274,82 @@ class ExplainabilityService:
                     val = 0.5
             raw_features.append(val)
 
-        raw_features_clean = [
-            np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30)
+        return [
+            float(np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30))
             if isinstance(val, (int, float))
-            else val
+            else 0.0
             for val in raw_features
         ]
-        input_vector = np.array([raw_features_clean], dtype=np.float32)  # Shape: (1, 10)
 
-        from app.infrastructure.storage.storage_utils import get_storage_dir
+    def compute_batch_shap_values(
+        self,
+        txns: list[dict],
+        nsamples: int = 100,
+        model: Any = None,
+    ) -> list[list[dict[str, Any]]]:
+        """Compute SHAP values for a batch of transactions using KernelExplainer.
 
-        model_dir = get_storage_dir()
-        model_path = os.path.join(model_dir, "global_model.pt")
+        Enforces the Shapley Efficiency Axiom: sum(phi_i) = f(x) - E[f(x)]
+        across every transaction in the batch.
+        """
+        if not txns:
+            return []
 
-        model = None
-        if os.path.exists(model_path):
-            try:
-                from app.application.services.model_service import (
-                    NUM_FEATURES,
-                    FraudDetectionModel,
-                )
+        import os
 
-                state_dict = torch.load(
-                    model_path, map_location=torch.device("cpu"), weights_only=True
-                )
-                input_dim = NUM_FEATURES
-                for weight_key in ("network.0.weight", "module.network.0.weight"):
-                    if (
-                        weight_key in state_dict
-                        and hasattr(state_dict[weight_key], "shape")
-                        and len(state_dict[weight_key].shape) >= 2
-                    ):
-                        input_dim = int(state_dict[weight_key].shape[1])
-                        break
-                model = FraudDetectionModel(input_dim=input_dim)
-                model.load_state_dict(state_dict)
-                model.eval()
-            except Exception as e:
-                logger.warning("Failed to load saved model for SHAP: %s. Using random init.", e)
-                model = None
+        import numpy as np
+        import torch
 
-        if not model:
-            # Fallback: Create a default model
-            try:
-                from app.application.services.model_service import FraudDetectionModel
+        input_matrix = np.array(
+            [self._parse_transaction_features(t) for t in txns],
+            dtype=np.float32,
+        )
 
-                model = FraudDetectionModel()
-                model.eval()
-            except Exception as e:
-                logger.warning("Failed to create default FraudDetectionModel: %s", e)
+        if model is None:
+            from app.infrastructure.storage.storage_utils import get_storage_dir
 
-        # 3. Apply SHAP explainability
+            model_dir = get_storage_dir()
+            model_path = os.path.join(model_dir, "global_model.pt")
+
+            if os.path.exists(model_path):
+                try:
+                    from app.application.services.model_service import (
+                        NUM_FEATURES,
+                        FraudDetectionModel,
+                    )
+
+                    state_dict = torch.load(
+                        model_path, map_location=torch.device("cpu"), weights_only=True
+                    )
+                    input_dim = NUM_FEATURES
+                    for weight_key in ("network.0.weight", "module.network.0.weight"):
+                        if (
+                            weight_key in state_dict
+                            and hasattr(state_dict[weight_key], "shape")
+                            and len(state_dict[weight_key].shape) >= 2
+                        ):
+                            input_dim = int(state_dict[weight_key].shape[1])
+                            break
+                    model = FraudDetectionModel(input_dim=input_dim)
+                    model.load_state_dict(state_dict)
+                    model.eval()
+                except Exception as e:
+                    logger.warning("Failed to load saved model for SHAP: %s. Using random init.", e)
+                    model = None
+
+            if not model:
+                try:
+                    from app.application.services.model_service import FraudDetectionModel
+
+                    model = FraudDetectionModel()
+                    model.eval()
+                except Exception as e:
+                    logger.warning("Failed to create default FraudDetectionModel: %s", e)
+
         if model:
             try:
                 import shap
 
-                # Define model prediction function wrapping PyTorch
                 def predict_fn(x_np: np.ndarray) -> np.ndarray:
                     tensor_x: torch.Tensor = torch.tensor(x_np, dtype=torch.float32)
                     if hasattr(model, "network") and len(model.network) > 0:
@@ -359,63 +367,75 @@ class ExplainabilityService:
                         preds = model(tensor_x).cpu().numpy().reshape(-1)
                     return preds
 
-                # Establish a baseline of normal transactions for background reference
                 baseline = np.zeros((30, 10), dtype=np.float32)
-                baseline[:, 0] = np.linspace(0.01, 0.20, 30)  # low amount
-                baseline[:, 1] = np.linspace(0.0, 0.5, 30)   # merchant category
-                baseline[:, 2] = 0.0                          # US (0.0)
-                baseline[:, 3] = 0.0                          # web (0.0)
-                baseline[:, 4] = np.linspace(0.05, 0.20, 30) # low velocity
-                baseline[:, 5] = np.linspace(0.30, 0.80, 30) # regular hours
-                baseline[:, 6] = np.linspace(0.05, 0.25, 30) # low merchant risk
-                baseline[:, 7] = np.linspace(0.70, 0.98, 30) # high customer history score
-                baseline[:, 8] = 0.0                          # zero chargebacks
-                baseline[:, 9] = np.linspace(0.20, 1.0, 30)   # moderate to high account age
+                baseline[:, 0] = np.linspace(0.01, 0.20, 30)
+                baseline[:, 1] = np.linspace(0.0, 0.5, 30)
+                baseline[:, 2] = 0.0
+                baseline[:, 3] = 0.0
+                baseline[:, 4] = np.linspace(0.05, 0.20, 30)
+                baseline[:, 5] = np.linspace(0.30, 0.80, 30)
+                baseline[:, 6] = np.linspace(0.05, 0.25, 30)
+                baseline[:, 7] = np.linspace(0.70, 0.98, 30)
+                baseline[:, 8] = 0.0
+                baseline[:, 9] = np.linspace(0.20, 1.0, 30)
 
-                # Preserve global numpy RNG state to prevent process-wide seed pollution
                 prev_rng_state = np.random.get_state()
                 try:
                     np.random.seed(42)
                     explainer = shap.KernelExplainer(predict_fn, baseline)
-                    shap_values = explainer.shap_values(input_vector, nsamples=100)
+                    raw_shap = explainer.shap_values(input_matrix, nsamples=nsamples)
                 finally:
                     np.random.set_state(prev_rng_state)
 
-                # Extract contributions
-                if isinstance(shap_values, list):
-                    shap_vals = np.array(shap_values[0], dtype=np.float64).flatten()
+                if isinstance(raw_shap, list):
+                    shap_matrix = np.array(raw_shap[0], dtype=np.float64)
                 else:
-                    shap_vals = np.array(shap_values, dtype=np.float64).flatten()
+                    shap_matrix = np.array(raw_shap, dtype=np.float64)
+
+                if shap_matrix.ndim == 1:
+                    shap_matrix = shap_matrix.reshape(1, -1)
 
                 raw_base = explainer.expected_value
-                base_value = float(np.array(raw_base).item()) if hasattr(raw_base, "__iter__") else float(raw_base)
-                model_output = float(predict_fn(input_vector)[0])
+                base_value = (
+                    float(np.array(raw_base).item())
+                    if hasattr(raw_base, "__iter__")
+                    else float(raw_base)
+                )
+                model_outputs = predict_fn(input_matrix)
+                if np.isscalar(model_outputs) or model_outputs.ndim == 0:
+                    model_outputs = np.array([float(model_outputs)])
 
-                # Enforce Shapley Efficiency Axiom: sum(phi_i) = f(x) - E[f(x)]
-                eff_diff = (model_output - base_value) - float(np.sum(shap_vals))
-                if abs(eff_diff) > 1e-7 and len(shap_vals) > 0:
-                    shap_vals = shap_vals + (eff_diff / len(shap_vals))
+                batch_results: list[list[dict[str, Any]]] = []
+                for k in range(len(txns)):
+                    row_shap = shap_matrix[k].copy()
+                    model_output = float(model_outputs[k])
+                    eff_diff = (model_output - base_value) - float(np.sum(row_shap))
+                    if abs(eff_diff) > 1e-7 and len(row_shap) > 0:
+                        row_shap = row_shap + (eff_diff / len(row_shap))
 
-                features = []
-                for i, name in enumerate(feature_names):
-                    features.append({
-                        "feature": name,
-                        "contribution": float(shap_vals[i]),
-                        "value": float(raw_features_clean[i]),
-                        "raw_value": float(raw_features_clean[i]),
-                        "explanation_method": "shap_kernel_explainer",
-                        "base_value": base_value,
-                        "model_output": model_output,
-                    })
-                return sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
+                    features = []
+                    for i, name in enumerate(self.SHAP_FEATURE_NAMES):
+                        features.append({
+                            "feature": name,
+                            "contribution": float(row_shap[i]),
+                            "value": float(input_matrix[k, i]),
+                            "raw_value": float(input_matrix[k, i]),
+                            "explanation_method": "shap_kernel_explainer",
+                            "base_value": base_value,
+                            "model_output": model_output,
+                        })
+                    batch_results.append(
+                        sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
+                    )
+                return batch_results
 
             except Exception as e:
                 logger.warning(
                     "SHAP execution failed: %s. Falling back to analytical heuristic.", e
                 )
 
-        # 4. Fallback analytical heuristic strictly if SHAP fails or model load fails
-        features = []
+        # Fallback analytical heuristic strictly if SHAP fails or model load fails
+        batch_results = []
         feature_weights = {
             "transaction_amount": 0.20,
             "velocity": 0.18,
@@ -429,27 +449,43 @@ class ExplainabilityService:
             "merchant_category": 0.02,
         }
         base_value = 0.50
-        raw_contribs = {}
-        for name, w in feature_weights.items():
-            val = txn_dict.get(name, 0.5)
-            val = float(val) if isinstance(val, (int, float)) else 0.5
-            # Feature contribution reflects directional deviation from normal baseline (0.5)
-            raw_contribs[name] = (w, val, w * (val - 0.5))
+        for txn_dict in txns:
+            features = []
+            raw_contribs = {}
+            for name, w in feature_weights.items():
+                val = txn_dict.get(name, 0.5)
+                val = float(val) if isinstance(val, (int, float)) else 0.5
+                raw_contribs[name] = (w, val, w * (val - 0.5))
 
-        sum_delta = sum(c[2] for c in raw_contribs.values())
-        model_output = round(base_value + sum_delta, 4)
+            sum_delta = sum(c[2] for c in raw_contribs.values())
+            model_output = round(base_value + sum_delta, 4)
 
-        for name, (w, val, delta) in raw_contribs.items():
-            features.append({
-                "feature": name,
-                "contribution": round(delta, 4),
-                "value": round(val, 4),
-                "raw_value": round(val, 4),
-                "explanation_method": "fallback_heuristic",
-                "base_value": base_value,
-                "model_output": model_output,
-            })
-        return sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
+            for name, (w, val, delta) in raw_contribs.items():
+                features.append({
+                    "feature": name,
+                    "contribution": round(delta, 4),
+                    "value": round(val, 4),
+                    "raw_value": round(val, 4),
+                    "explanation_method": "fallback_heuristic",
+                    "base_value": base_value,
+                    "model_output": model_output,
+                })
+            batch_results.append(
+                sorted(features, key=lambda f: abs(f["contribution"]), reverse=True)
+            )
+        return batch_results
+
+    def compute_shap_values(
+        self,
+        txn_dict: dict,
+        model: Any = None,
+    ) -> list[dict[str, Any]]:
+        """Compute SHAP values for a single transaction using the trained global model.
+
+        If no model is trained yet, falls back to an analytical local explanation.
+        """
+        results = self.compute_batch_shap_values([txn_dict], model=model)
+        return results[0] if results else []
 
     def compute_lime_explanation(
         self,
