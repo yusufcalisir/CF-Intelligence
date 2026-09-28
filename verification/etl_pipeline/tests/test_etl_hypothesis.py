@@ -38,16 +38,21 @@ def test_property_dirichlet_sample_conservation(
     assert total_partitioned == num_samples
 
 
-@given(raw_id=st.text(min_size=1, max_size=100))
+@given(raw_id=st.text(min_size=1, max_size=100).filter(lambda s: bool(s.strip())))
 @hyp_settings(max_examples=50)
 def test_property_hmac_sha256_anonymization_length(raw_id: str):
-    """Property: HMAC-SHA256 identity hashing produces 64-hex character deterministic hashes."""
+    """Property: HMAC-SHA256 identity hashing produces 64-hex character deterministic hashes for valid identifiers."""
     etl = RealWorldETLPipeline(salt="salt_test_123")
     hash1 = etl.anonymize_identifier(raw_id)
     hash2 = etl.anonymize_identifier(raw_id)
 
     assert len(hash1) == 64
     assert hash1 == hash2
+
+    # Whitespace and empty strings must cleanly evaluate to empty
+    assert etl.anonymize_identifier("") == ""
+    assert etl.anonymize_identifier("   \r\n\t") == ""
+    assert etl.anonymize_identifier(None) == ""
 
 
 def generate_hypothesis_report():

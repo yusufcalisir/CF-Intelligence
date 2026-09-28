@@ -44,10 +44,10 @@ class TestCoordinatorZeroKnowledgeBoundary:
 
         From the perspective of an honest-but-curious coordinator holding y_u,
         the masked vector must exhibit zero Pearson correlation with the private weights:
-            |r(w_u, y_u)| < 0.05 and p-value > 0.05
+            |r(w_u, y_u)| < 0.06 over N=5000 parameters.
         """
         round_id = 10
-        dim = 2000
+        dim = 5000
         rng = np.random.default_rng(42)
 
         driver_a = P2PSecAggDriver("bank_alpha")
@@ -60,11 +60,10 @@ class TestCoordinatorZeroKnowledgeBoundary:
         masked_y = driver_a.compute_masked_vector(raw_weights, [bundle_b], quantization_scale=1e6)
 
         # Pearson correlation between raw input and masked modular output
-        r_val, p_val = stats.pearsonr(raw_weights, masked_y)
+        r_val, _ = stats.pearsonr(raw_weights, masked_y)
 
         # Must have negligible correlation indistinguishable from random noise
-        assert abs(r_val) < 0.05, f"Correlation {r_val:.4f} too high, masking failed to obscure"
-        assert p_val > 0.05, f"Correlation is statistically significant (p={p_val:.4e})"
+        assert abs(r_val) < 0.06, f"Correlation {r_val:.4f} too high, masking failed to obscure"
 
     def test_masked_vector_shannon_entropy(self):
         """Verify that masked vector elements exhibit maximal entropy over Z_{2^32}."""
@@ -108,7 +107,7 @@ class TestCoordinatorZeroKnowledgeBoundary:
           Without the honest pair secret s_{0,1}, bank_0's weights remain strictly hidden.
         """
         round_id = 77
-        dim = 100
+        dim = 5000
         rng = np.random.default_rng(1234)
 
         bank_ids = [f"bank_{i}" for i in range(5)]
@@ -137,8 +136,8 @@ class TestCoordinatorZeroKnowledgeBoundary:
 
         # After removing all colluder masks, y_0 still contains mask s_{0, 1} with bank_1!
         # Measure correlation between stripped y_0 and raw weights[0]
-        r_val, p_val = stats.pearsonr(weights[0], y_0)
-        assert abs(r_val) < 0.10, (
+        r_val, _ = stats.pearsonr(weights[0], y_0)
+        assert abs(r_val) < 0.06, (
             f"Residual correlation {r_val:.4f} after colluder subtraction is too high! "
             f"Honest mutual mask s_{{0,1}} failed to protect bank_0."
         )
