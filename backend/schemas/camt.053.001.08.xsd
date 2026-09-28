@@ -10,64 +10,174 @@
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="BkToCstmrStmt">
-    <xs:sequence>
-      <xs:element name="Stmt" type="Stmt" maxOccurs="unbounded"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="GrpHdr" type="GrpHdr"/>
+      <xs:element name="Stmt" type="Stmt"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="GrpHdr">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="MsgId" type="xs:string"/>
+      <xs:element name="CreDtTm" type="xs:string"/>
+      <xs:element name="MsgPgntn" type="xs:anyType"/>
+      <xs:element name="NbOfTxs" type="xs:string"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="Stmt">
-    <xs:sequence>
-      <xs:element name="Id" type="xs:string" minOccurs="0"/>
-      <xs:element name="Acct" type="AccountIdentification" minOccurs="0"/>
-      <xs:element name="Ntry" type="Ntry" minOccurs="0" maxOccurs="unbounded"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Id" type="xs:string"/>
+      <xs:element name="StmtPgntn" type="xs:anyType"/>
+      <xs:element name="ElctrncSeqNb" type="xs:decimal"/>
+      <xs:element name="CreDtTm" type="xs:string"/>
+      <xs:element name="FrToDt" type="xs:anyType"/>
+      <xs:element name="Acct" type="AccountIdentification"/>
+      <xs:element name="Bal" type="Balance"/>
+      <xs:element name="TxsSummry" type="xs:anyType"/>
+      <xs:element name="Ntry" type="Ntry"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="Balance">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Tp" type="BalanceType"/>
+      <xs:element name="Amt" type="ActiveCurrencyAndAmount"/>
+      <xs:element name="CdtDbtInd" type="xs:string"/>
+      <xs:element name="Dt" type="DateChoice"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="BalanceType">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="CdOrPrtry" type="CodeOrProprietary"/>
+      <xs:element name="SubTp" type="xs:anyType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="CodeOrProprietary">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Cd" type="xs:string"/>
+      <xs:element name="Prtry" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="DateChoice">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Dt" type="xs:string"/>
+      <xs:element name="DtTm" type="xs:string"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="Ntry">
-    <xs:sequence>
-      <xs:element name="NtryRef" type="xs:string" minOccurs="0"/>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="NtryRef" type="xs:string"/>
       <xs:element name="Amt" type="ActiveCurrencyAndAmount"/>
-      <xs:element name="CdtDbtInd" type="xs:string" minOccurs="0"/>
-      <xs:element name="Sts" type="xs:string" minOccurs="0"/>
-      <xs:element name="NtryDtls" type="NtryDtls" minOccurs="0"/>
-    </xs:sequence>
+      <xs:element name="CdtDbtInd" type="xs:string"/>
+      <xs:element name="Sts" type="xs:string"/>
+      <xs:element name="BookgDt" type="DateChoice"/>
+      <xs:element name="ValDt" type="DateChoice"/>
+      <xs:element name="AcctSvcrRef" type="xs:string"/>
+      <xs:element name="BkTxCd" type="xs:anyType"/>
+      <xs:element name="NtryDtls" type="NtryDtls"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="NtryDtls">
-    <xs:sequence>
-      <xs:element name="TxDtls" type="TxDtls" minOccurs="0"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Btch" type="xs:anyType"/>
+      <xs:element name="TxDtls" type="TxDtls"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="TxDtls">
-    <xs:sequence>
-      <xs:element name="RltdPties" type="RltdPties" minOccurs="0"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Refs" type="TransactionReferences"/>
+      <xs:element name="Amt" type="ActiveCurrencyAndAmount"/>
+      <xs:element name="CdtDbtInd" type="xs:string"/>
+      <xs:element name="RltdPties" type="RltdPties"/>
+      <xs:element name="RmtInf" type="RemittanceInformation"/>
+      <xs:element name="Purp" type="xs:anyType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="TransactionReferences">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="EndToEndId" type="xs:string"/>
+      <xs:element name="TxId" type="xs:string"/>
+      <xs:element name="MsgId" type="xs:string"/>
+      <xs:element name="AcctSvcrRef" type="xs:string"/>
+      <xs:element name="PmtInfId" type="xs:string"/>
+      <xs:element name="InstrId" type="xs:string"/>
+      <xs:element name="UETR" type="xs:string"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="RltdPties">
-    <xs:sequence>
-      <xs:element name="Dbtr" type="PartyIdentification" minOccurs="0"/>
-      <xs:element name="DbtrAcct" type="AccountIdentification" minOccurs="0"/>
-      <xs:element name="Cdtr" type="PartyIdentification" minOccurs="0"/>
-      <xs:element name="CdtrAcct" type="AccountIdentification" minOccurs="0"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="InitgPty" type="PartyIdentification"/>
+      <xs:element name="Dbtr" type="PartyIdentification"/>
+      <xs:element name="DbtrAcct" type="AccountIdentification"/>
+      <xs:element name="DbtrAgt" type="BranchAndFinancialInstitutionIdentification"/>
+      <xs:element name="Cdtr" type="PartyIdentification"/>
+      <xs:element name="CdtrAcct" type="AccountIdentification"/>
+      <xs:element name="CdtrAgt" type="BranchAndFinancialInstitutionIdentification"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="PartyIdentification">
-    <xs:sequence>
-      <xs:element name="Nm" type="xs:string" minOccurs="0"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Nm" type="xs:string"/>
+      <xs:element name="PstlAdr" type="PostalAddress"/>
+      <xs:element name="Id" type="xs:anyType"/>
+      <xs:element name="CtryOfRes" type="xs:string"/>
+      <xs:element name="CtctDtls" type="xs:anyType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="PostalAddress">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="AdrTp" type="xs:anyType"/>
+      <xs:element name="Dept" type="xs:string"/>
+      <xs:element name="SubDept" type="xs:string"/>
+      <xs:element name="StrtNm" type="xs:string"/>
+      <xs:element name="BldgNb" type="xs:string"/>
+      <xs:element name="PstCd" type="xs:string"/>
+      <xs:element name="TwnNm" type="xs:string"/>
+      <xs:element name="CtrySubDvsn" type="xs:string"/>
+      <xs:element name="Ctry" type="xs:string"/>
+      <xs:element name="AdrLine" type="xs:string"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="AccountIdentification">
-    <xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element name="Id" type="AccountChoice"/>
-    </xs:sequence>
+      <xs:element name="Tp" type="xs:anyType"/>
+      <xs:element name="Ccy" type="xs:string"/>
+      <xs:element name="Nm" type="xs:string"/>
+      <xs:element name="Svcr" type="BranchAndFinancialInstitutionIdentification"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="AccountChoice">
-    <xs:sequence>
-      <xs:element name="IBAN" type="xs:string" minOccurs="0"/>
-      <xs:element name="Othr" type="OtherAccount" minOccurs="0"/>
-    </xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="IBAN" type="xs:string"/>
+      <xs:element name="Othr" type="OtherAccount"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="OtherAccount">
-    <xs:sequence>
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
       <xs:element name="Id" type="xs:string"/>
-    </xs:sequence>
+      <xs:element name="SchmeNm" type="xs:anyType"/>
+      <xs:element name="Issr" type="xs:string"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="BranchAndFinancialInstitutionIdentification">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="FinInstnId" type="FinancialInstitutionIdentification"/>
+      <xs:element name="BrnchId" type="xs:anyType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="FinancialInstitutionIdentification">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="BICFI" type="xs:string"/>
+      <xs:element name="ClrSysMmbId" type="xs:anyType"/>
+      <xs:element name="Nm" type="xs:string"/>
+      <xs:element name="PstlAdr" type="PostalAddress"/>
+      <xs:element name="Othr" type="xs:anyType"/>
+    </xs:choice>
+  </xs:complexType>
+  <xs:complexType name="RemittanceInformation">
+    <xs:choice minOccurs="0" maxOccurs="unbounded">
+      <xs:element name="Ustrd" type="xs:string"/>
+      <xs:element name="Strd" type="xs:anyType"/>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="ActiveCurrencyAndAmount">
     <xs:simpleContent>
