@@ -278,9 +278,9 @@ class FairnessAuditor:
     @classmethod
     def compute_fairness_metrics(
         cls,
-        y_true: np.ndarray,
-        y_pred: np.ndarray,
-        group_membership: np.ndarray,
+        y_true: np.ndarray | Any,
+        y_pred: np.ndarray | Any,
+        group_membership: np.ndarray | Any,
         privileged_val: Any,
         unprivileged_val: Any,
         proxy_dimension: str,
@@ -326,7 +326,7 @@ class FairnessAuditor:
         aod = float(0.5 * ((unpriv_fpr - priv_fpr) + (unpriv_tpr - priv_tpr)))
 
         # EEOC 80% Rule: 0.80 <= DIR <= 1.25 (or DIR >= 0.80 for adverse selection)
-        four_fifths_passed = bool(0.80 <= dir_ratio <= 1.25)
+        four_fifths_passed = 0.80 <= dir_ratio <= 1.25
 
         return ProxyFairnessMetrics(
             proxy_attribute=proxy_dimension,
