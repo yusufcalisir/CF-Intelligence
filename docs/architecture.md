@@ -158,6 +158,31 @@ Interactions with clients, compliance officers, investigators, and consortium ba
                                                         [React Flow Map]
 ```
 
+The Collaborative AML Screening subsystem evaluates high-throughput financial transactions against nine deterministic risk signals combined via an axiomatic weighted arithmetic linear formulation:
+
+$$S(x) = 1000 \cdot \frac{\sum_{i=1}^M w_i \cdot \operatorname{clamp}(s_i(x), 0, 1)}{\sum_{i=1}^M w_i}$$
+
+| Signal Identifier | Semantic Description | Default Weight ($w_i$) | Normalization Bounds |
+|:---|:---|:---:|:---:|
+| `ml_score` | FedGNN / Local ML Fraud Probability | $0.25$ | $[0.0, 1.0]$ |
+| `velocity_risk` | Rapid-Fire Transaction Velocity & Burst Ratio | $0.15$ | $[0.0, 1.0]$ |
+| `merchant_risk` | High-Risk Merchant Category & MCC Risk Index | $0.10$ | $[0.0, 1.0]$ |
+| `country_risk` | Sanctioned / High-Risk FATF Jurisdiction Cross-Border Corridor | $0.10$ | $[0.0, 1.0]$ |
+| `customer_risk` | Historical Profile & Baseline Behavior Deviation | $0.10$ | $[0.0, 1.0]$ |
+| `device_risk` | Device Fingerprint Anomaly, Proxy/VPN & Emulation Score | $0.08$ | $[0.0, 1.0]$ |
+| `previous_alerts` | Historical SAR / Internal Case Alert Precedent | $0.08$ | $[0.0, 1.0]$ |
+| `chargeback_history`| Historical Chargeback & Cardholder Dispute Frequency | $0.07$ | $[0.0, 1.0]$ |
+| `behavioral_anomaly`| Biometric Session, Typing Cadence & Navigational Anomaly | $0.07$ | $[0.0, 1.0]$ |
+
+The composite scalar $S(x) \in [0.0, 1000.0]$ is partitioned into mutually exclusive, collectively exhaustive half-open intervals mapped directly to supervisory policy actions:
+- **MINIMAL** ($[0.0, 200.0)$): `ALLOW` — Frictionless automated settlement.
+- **LOW** ($[200.0, 400.0)$): `REQUIRE_MFA` — Step-up biometric / OTP authentication challenge.
+- **MEDIUM** ($[400.0, 600.0)$): `HOLD_FOR_REVIEW` — Asynchronous tier-1 analyst queue placement.
+- **HIGH** ($[600.0, 800.0)$): `HOLD_FOR_REVIEW` — Immediate transaction pause & priority AML queue hold.
+- **CRITICAL** ($[800.0, 1000.0]$):
+  - If $S(x) \ge 900.0$: `BLOCK_TRANSACTION` — Hard inline gateway block & immediate asset freeze.
+  - If $800.0 \le S(x) < 900.0$: `ESCALATE_TO_SAR` — Immediate regulatory Suspicious Activity Report escalation.
+
 ### 3.3 High-Performance Bidirectional gRPC Transport Layer
 ```
 [Bank Node Client] ──(HTTP/2 Channel)──► [gRPC Server (50051)] ──► [FederatedLearningServicer]
@@ -620,15 +645,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (2,853 Backend + 399 Verification Automated Suites across 20 modules)
+     └── 6. pytest-security-and-compliance-suites (2,897 Backend + 399 Verification Automated Suites across 20 modules)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **2,853 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,631 total system tests) across unit, integration, and property-based suites:
+The entire codebase is validated by **2,897 backend automated tests** (and 399 scientific verification tests across 20 modules; 3,675 total system tests) across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 2,853 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 2,897 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -638,7 +663,7 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 2,836 automated backend tests (+ 399 scientific verification tests across 20 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Prometheus/SIEM Telemetry Export, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 2,897 automated backend tests (+ 399 scientific verification tests across 20 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Prometheus/SIEM Telemetry Export, and DR Failover |
 
 
 
