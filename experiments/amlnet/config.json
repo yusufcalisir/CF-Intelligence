@@ -1,0 +1,33 @@
+{
+  "experiment_id": "amlnet_fl_1790521210",
+  "experiment_name": "AMLNet Federated Extreme Imbalance Benchmark (Mode=institutional_split)",
+  "description": "Federated Laundering Detection & Extreme Imbalance Optimization on Australian AUSTRAC AMLNet Dataset",
+  "tags": [
+    "amlnet",
+    "federated_learning",
+    "extreme_imbalance",
+    "austrac",
+    "fedavg",
+    "fedprox",
+    "non_iid"
+  ],
+  "model_type": "AMLNetClassifier",
+  "strategy": "FedAvg",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 6,
+  "local_epochs": 2,
+  "batch_size": 64,
+  "learning_rate": 0.005,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "skew_mode": "institutional_split",
+    "alpha": null,
+    "fedprox_mu": 0.01
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlnet"
+}

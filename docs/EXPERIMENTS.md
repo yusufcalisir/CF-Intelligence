@@ -65,14 +65,40 @@ The **Unified Experiment Infrastructure** provides a rigorous, reproducible fram
 
 ## 2. Directory Layout & Artifact Specification
 
-Each experiment execution produces an isolated, self-contained run folder:
+### 2.1 Standardized Per-Dataset Experiment Directory Topology
+Every canonical financial crime benchmark in `experiments/<dataset>/` satisfies a strict **5-Artifact Standard**:
+
+```
+experiments/<dataset>/
+├── config.json           # Machine-readable hyperparameter configuration
+├── results.json          # Authoritative execution contract & final metrics
+├── metrics.csv           # Step-by-step tabular trajectory & round history
+├── report.md             # Publication-grade Markdown audit dossier
+└── plots/                # High-resolution 300 DPI publication figures (*.png)
+```
+
+#### Canonical Dataset Experiment Inventory
+
+| Dataset Directory | Benchmark Scope | Core Model / Strategy | Primary Metrics Captured | Status |
+| :--- | :--- | :--- | :--- | :---: |
+| [`experiments/paysim/`](file:///experiments/paysim/) | PaySim Mobile Money Remittance | `PaySimNeuralClassifier` (FedAvg) | PR-AUC: 0.1184, ROC-AUC: 0.8700 | `STANDARDIZED` |
+| [`experiments/ieee_cis/`](file:///experiments/ieee_cis/) | IEEE-CIS Card-Not-Present Fraud | `DeepFraudMLP` (FedAvg/FedProx) | PR-AUC: 0.0691, ROC-AUC: 0.6632 | `STANDARDIZED` |
+| [`experiments/credit_card/`](file:///experiments/credit_card/) | European Credit Card PCA Fraud | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.7750, ROC-AUC: 0.9837 | `STANDARDIZED` |
+| [`experiments/elliptic/`](file:///experiments/elliptic/) | Elliptic Bitcoin Blockchain Graph | `FedGNN-GraphSAGE` | PR-AUC: 0.4372, ROC-AUC: 0.8388 | `STANDARDIZED` |
+| [`experiments/amlsim/`](file:///experiments/amlsim/) | IBM AMLSim Graph Network | GraphSAGE vs Tabular MLP | PR-AUC: 0.6527, Cycle Rec: 67.4% | `STANDARDIZED` |
+| [`experiments/synthaml/`](file:///experiments/synthaml/) | Spar Nord SynthAML Lookback | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.9985, ROC-AUC: 0.9995 | `STANDARDIZED` |
+| [`experiments/amlnet/`](file:///experiments/amlnet/) | AUSTRAC Rare-Event AMLNet | `DeepFraudMLP` (FedAvg) | PR-AUC: 1.0000, ROC-AUC: 1.0000 | `STANDARDIZED` |
+| [`experiments/cross_bank/`](file:///experiments/cross_bank/) | CFI-CrossBank-01 Consortium | 3-Bank Consortium (FedAvg) | +55.59% Uplift, $836k Averted | `STANDARDIZED` |
+
+### 2.2 Execution Run Directory Topology (`experiments/results/`)
+Dynamic experiment runs initiated via the runner harness create isolated execution snapshots:
 
 ```
 experiments/results/<experiment_id>/
 ├── results.json          # Authoritative machine-readable execution contract
 ├── metrics.csv           # Step-by-step tabular trajectory
 ├── traces.parquet        # High-performance binary columnar traces (PyArrow)
-├── REPORT.md             # Senior-engineering Markdown audit dossier
+├── report.md             # Senior-engineering Markdown audit dossier
 ├── summary.json          # Multi-seed aggregate summary (for multi-seed runs)
 └── plots/                # 300 DPI publication figures
     ├── roc_curve.png
@@ -202,14 +228,20 @@ with ExperimentTracker(config, dataset_meta) as tracker:
 ### 5.2 Command-Line Interface
 
 ```bash
-# Run multi-seed experiment and compile dossier
+# 1. Standardize and compile report dossiers across all 8 canonical datasets
+python experiments/harness/compile_reports.py --all
+
+# 2. Verify artifact hierarchy compliance across all 8 datasets
+python experiments/harness/compile_reports.py --verify
+
+# 3. Standardize a specific dataset directory
+python experiments/harness/compile_reports.py --dataset paysim
+
+# 4. Run multi-seed experiment and compile execution snapshot
 python -m experiments.harness.runner --name FraudMLP_Production --rounds 5 --seeds 42 123 456
 
-# Generate all publication charts from raw benchmarks and experiments
+# 5. Generate all publication charts from raw benchmarks and experiments
 python scripts/generate_charts.py --include-experiments
-
-# Compile Markdown report from an existing results.json
-python -m experiments.harness.compile_reports experiments/results/fraudmlp_production_seed42/results.json
 ```
 
 ### 5.3 Make Targets
@@ -227,3 +259,11 @@ TypeScript interfaces mirroring all Pydantic v2 schemas are maintained in:
 - Exported via `frontend/src/types.ts`
 
 Any frontend component or dashboard consuming `results.json` receives fully typed, validated models ensuring zero schema drift across the full stack.
+
+---
+
+## 7. Verification Test Suites
+
+Artifact standardization, file schemas, report completeness, and verification CLI operations are validated by dedicated automated unit tests:
+- [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](file:///backend/tests/unit/test_experiment_artifact_hierarchy.py): 9 comprehensive unit tests asserting existence and integrity of all 5 artifacts across all 8 datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), `config.json` schema, `metrics.csv` headers/rows, `report.md` required sections, `plots/` image validity, and `--verify` CLI exit code (**9 tests, 100% passing**).
+

@@ -1,0 +1,33 @@
+{
+  "experiment_id": "exp-elliptic-graphsage-1790452183",
+  "experiment_name": "Elliptic Bitcoin GraphSAGE Inductive Benchmark",
+  "description": "Controlled ablation comparing 2-layer GraphSAGE against tabular baseline on Elliptic Bitcoin graph.",
+  "tags": [
+    "graphsage",
+    "elliptic",
+    "gnn",
+    "graph-intelligence",
+    "bitcoin"
+  ],
+  "model_type": "GraphSAGE",
+  "strategy": "InductiveNeighborhoodAggregation",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 15,
+  "local_epochs": 3,
+  "batch_size": 64,
+  "learning_rate": 0.005,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "in_dim": 165,
+    "hidden_dim": 128,
+    "embedding_dim": 64,
+    "split_timestep": 34,
+    "bidirectional_flow": true
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic"
+}

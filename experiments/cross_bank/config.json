@@ -1,0 +1,16 @@
+{
+  "benchmark_id": "CFI-CrossBank-01",
+  "dataset_name": "CFI-CrossBank-01",
+  "num_scenarios": 7,
+  "institutions": [
+    "bank_alpha",
+    "bank_beta",
+    "bank_gamma"
+  ],
+  "rounds": 5,
+  "local_epochs": 3,
+  "seed": 42,
+  "feature_count": 14,
+  "total_transactions": 19567,
+  "total_accounts": 10000
+}

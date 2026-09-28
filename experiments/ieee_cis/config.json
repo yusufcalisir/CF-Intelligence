@@ -1,0 +1,35 @@
+{
+  "experiment_id": "exp_ieee_cis_federated_benchmark",
+  "experiment_name": "IEEE-CIS Federated Benchmark (Dirichlet alpha=0.5)",
+  "description": "Multi-Bank Federated Training (FedAvg, FedProx) and Comparative Analysis on IEEE-CIS",
+  "tags": [
+    "ieee_cis",
+    "federated_learning",
+    "dirichlet",
+    "non_iid",
+    "fedprox",
+    "fedavg",
+    "fixed_fpr"
+  ],
+  "model_type": "IEEECISNeuralClassifier",
+  "strategy": "fedprox",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 5,
+  "local_epochs": 2,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "dirichlet_alpha": 0.5,
+    "num_clients": 3,
+    "fedprox_mu": 0.01,
+    "temporal_cutoff_dt": 344408.0,
+    "nrows_loaded": 15000
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\ieee_cis"
+}

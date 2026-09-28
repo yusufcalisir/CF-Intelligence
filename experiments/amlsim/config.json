@@ -1,0 +1,35 @@
+{
+  "experiment_id": "exp-amlsim-graphsage-1790494671",
+  "experiment_name": "IBM AMLSim Multi-Hop Pattern Detection Benchmark",
+  "description": "Controlled benchmark comparing Inductive GraphSAGE against tabular baselines on multi-hop money laundering typologies.",
+  "tags": [
+    "graphsage",
+    "amlsim",
+    "gnn",
+    "graph-intelligence",
+    "laundering-patterns",
+    "cycle",
+    "fan-in"
+  ],
+  "model_type": "GraphSAGE",
+  "strategy": "InductiveNeighborhoodAggregation",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 15,
+  "local_epochs": 1,
+  "batch_size": 930465,
+  "learning_rate": 0.005,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "hidden_dim": 64,
+    "embedding_dim": 32,
+    "num_hops": 2,
+    "num_accounts": 10000,
+    "temporal_split_cutoff": 140.0
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\amlsim"
+}

@@ -1,0 +1,35 @@
+{
+  "experiment_id": "exp_paysim_federated_benchmark",
+  "experiment_name": "PaySim Federated Benchmark (Dirichlet alpha=0.5)",
+  "description": "End-to-End Federated Optimization (FedAvg, FedProx, SCAFFOLD) and Comparative Analysis on PaySim",
+  "tags": [
+    "paysim",
+    "federated_learning",
+    "dirichlet",
+    "non_iid",
+    "scaffold",
+    "fedprox",
+    "fedavg"
+  ],
+  "model_type": "PaySimNeuralClassifier",
+  "strategy": "fedavg",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 10,
+  "local_epochs": 2,
+  "batch_size": 64,
+  "learning_rate": 0.001,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "dirichlet_alpha": 0.5,
+    "num_clients": 3,
+    "fedprox_mu": 0.01,
+    "temporal_cutoff_step": 8.0,
+    "nrows_loaded": 30000
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\paysim"
+}

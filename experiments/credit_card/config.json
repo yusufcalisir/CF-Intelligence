@@ -1,0 +1,35 @@
+{
+  "experiment_id": "exp_creditcard_extreme_imbalance_benchmark",
+  "experiment_name": "Credit Card Federated Benchmark (Mode=extreme_skew)",
+  "description": "Federated vs Local Imbalance Robustness & Precision-Recall Curve Generation on Credit Card Fraud",
+  "tags": [
+    "credit_card",
+    "federated_learning",
+    "extreme_imbalance",
+    "fedprox",
+    "fedavg",
+    "fixed_fpr"
+  ],
+  "model_type": "CreditCardImbalanceMLP",
+  "strategy": "fedavg",
+  "seeds": [
+    42
+  ],
+  "num_rounds": 5,
+  "local_epochs": 2,
+  "batch_size": 64,
+  "learning_rate": 0.002,
+  "dp_enabled": false,
+  "dp_epsilon": null,
+  "dp_delta": null,
+  "dp_max_grad_norm": null,
+  "hyperparameters": {
+    "skew_mode": "extreme_skew",
+    "alpha": 0.5,
+    "num_clients": 3,
+    "fedprox_mu": 0.01,
+    "pos_weight": 25.0,
+    "nrows_loaded": null
+  },
+  "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\credit_card"
+}
