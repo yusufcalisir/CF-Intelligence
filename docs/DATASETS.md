@@ -560,3 +560,37 @@ Pre-processing parameters (means $\mu_{\mathrm{train}}$, standard deviations $\s
 2. **Unseen Categorical Tokens**: Categories appearing in validation or test partitions that were absent in $X_{\mathrm{train}}$ are mapped to an all-zero indicator vector, preventing runtime key crashes or out-of-vocabulary data snooping.
 3. **Outlier Standard Deviation Bounding**: When `clip_outliers=True`, standardized features are bounded to $[-k\sigma, +k\sigma]$ (default $k=6.0$), insulating gradient optimization against destabilizing numerical spikes.
 
+### 8.3 Past-Present-Future Split Protocol & Out-of-Time Degradation Quantification (Phase 28 / Sub-Plan 28.1)
+
+Financial crime detection systems encounter continual adversarial adaptation and macroeconomic drift: fraudsters alter amounts to bypass static thresholds, rotate payment corridors, and deploy new money laundering typologies. Evaluating models with random $K$-fold cross-validation or uniform random sampling intermixes future evasion patterns into training partitions, producing **optimistic performance inflation (forward temporal leakage)**.
+
+CF-Intelligence enforces a formal 3-period chronological split protocol evaluated in [`experiments/temporal/temporal_generalization.py`](../experiments/temporal/temporal_generalization.py):
+
+$$\mathcal{D}_{\mathrm{past}} \; (t \in [t_0, t_1)) \quad \longrightarrow \quad \mathcal{D}_{\mathrm{present}} \; (t \in [t_1, t_2)) \quad \longrightarrow \quad \mathcal{D}_{\mathrm{future}} \; (t \in [t_2, t_3])$$
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                     PAST-PRESENT-FUTURE TEMPORAL SPLIT PROTOCOL                          │
+├─────────────────────┬───────────────────┬──────────────────┬─────────────────────────────┤
+│ EVALUATION PERIOD   │ TEMPORAL WINDOW   │ ROLE IN PIPELINE │ ADVERSARIAL DRIFT DYNAMICS  │
+├─────────────────────┼───────────────────┼──────────────────┼─────────────────────────────┤
+│ Period 1 (Past)     │ t in [0, 100)     │ Model Training   │ Baseline high-value bursts  │
+│                     │                   │ & In-Period Test │ and observable velocity     │
+├─────────────────────┼───────────────────┼──────────────────┼─────────────────────────────┤
+│ Period 2 (Present)  │ t in [100, 200)   │ Intermediate OOT │ Structuring drift (amounts  │
+│                     │                   │ Evaluation       │ lowered to evade cutoffs)   │
+├─────────────────────┼───────────────────┼──────────────────┼─────────────────────────────┤
+│ Period 3 (Future)   │ t in [200, 300]   │ Distant OOT      │ Multi-channel evasion and   │
+│                     │                   │ Evaluation       │ geolocation proxy hopping   │
+└─────────────────────┴───────────────────┴──────────────────┴─────────────────────────────┘
+```
+
+#### Optimistic Evaluation Bias Gap
+
+The platform quantifies the discrepancy between naive randomized $K$-fold cross-validation and rigorous chronological out-of-time evaluation:
+
+$$\Delta_{\mathrm{bias}} = \operatorname{PR-AUC}_{\mathrm{KFold}} - \operatorname{PR-AUC}_{\mathrm{OOT\,Period\,3}} = 0.6958 - 0.3234 = +0.3724\text{ PR-AUC Inflation}$$
+
+The empirical findings show that unmaintained models experience a **$-48.2\%$ relative PR-AUC decay** and a **$-27.82\text{ percentage point}$ collapse in strict Recall @ 0.1% FPR** over time. Continuous population drift tracking ($\mathrm{PSI}$) and automated retraining triggers are formally specified in [`docs/enterprise_benchmark_report.md`](enterprise_benchmark_report.md#22-temporal-generalization--out-of-time-degradation-benchmark-phase-28--sub-plan-281).
+
+
