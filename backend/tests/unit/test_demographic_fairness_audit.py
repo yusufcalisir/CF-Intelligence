@@ -8,12 +8,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from experiments.fairness.demographic_audit import (
-    DatasetDemographicAudit,
-    DemographicAuditReport,
     FairnessAuditor,
-    ProxyFairnessMetrics,
     run_demographic_fairness_audit,
 )
 
@@ -181,8 +177,9 @@ class TestDemographicAuditPipelineAndArtifacts:
                 output_path=target,
                 save_artifact=True,
             )
+            assert report.total_datasets_audited == 7
             assert target.exists()
-            with open(target, "r", encoding="utf-8") as f:
+            with open(target, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["total_datasets_audited"] == 7
             assert data["datasets_with_demographics"] == 0
@@ -198,7 +195,7 @@ class TestDemographicAuditPipelineAndArtifacts:
             / "demographic_fairness_audit.json"
         )
         assert golden_path.exists(), f"Golden artifact missing at {golden_path}"
-        with open(golden_path, "r", encoding="utf-8") as f:
+        with open(golden_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["total_datasets_audited"] == 7

@@ -14,12 +14,11 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 import numpy as np
-
 
 PROTECTED_CATEGORIES: dict[str, list[str]] = {
     "age": ["age", "dob", "birth_date", "birthdate", "year_of_birth"],
@@ -183,7 +182,7 @@ class DemographicAuditReport:
             "# Demographic Attribute Availability Assessment & Algorithmic Fairness Audit",
             "",
             f"**Audit Execution Timestamp:** `{self.timestamp}`  ",
-            f"**Regulatory Frameworks:** Federal Reserve SR 11-7 / OCC 2011-12, ECOA Reg B (12 CFR Part 1002), EU AI Act Art. 10(2)-(3)  ",
+            "**Regulatory Frameworks:** Federal Reserve SR 11-7 / OCC 2011-12, ECOA Reg B (12 CFR Part 1002), EU AI Act Art. 10(2)-(3)  ",
             f"**Datasets Audited:** {self.total_datasets_audited} standard AML/fraud benchmarks  ",
             f"**Demographic Attributes Detected:** {self.datasets_with_demographics} / {self.total_datasets_audited} datasets  ",
             f"**Audit Status:** `{self.audit_conclusion}`",
@@ -449,7 +448,7 @@ class FairnessAuditor:
             ),
         ]
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         sr11_7_disclaimer = (
             "FEDERAL RESERVE SR 11-7 / OCC 2011-12 FORMAL BIAS GOVERNANCE DISCLAIMER: "
             "All seven standard fraud and anti-money laundering benchmark datasets evaluated by CF-Intelligence "
