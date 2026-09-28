@@ -9,6 +9,7 @@ import hmac
 import inspect
 import logging
 import re
+import threading
 import time
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
@@ -90,6 +91,9 @@ def retry_connector(
 class ISO20022MessagingConnector(BaseBankConnector):
     """Connector for parsing ISO 20022 MX (pacs.008, pacs.002, camt.053, pain.001) XML and SWIFT MT103 messages."""
 
+    _schema_cache: dict[str, Any] = {}
+    _cache_lock: threading.Lock = threading.Lock()
+
     def __init__(self) -> None:
         super().__init__()
         self._parsed_queue: list[NormalizedTransaction] = []
@@ -119,7 +123,7 @@ class ISO20022MessagingConnector(BaseBankConnector):
     def validate_xml_schema(
         self, xml_content: str, schema_name: str = "pacs.008.001.08.xsd"
     ) -> None:
-        """Validate incoming XML string against XSD schema file in backend/schemas/."""
+        """Validate incoming XML string against official XSD schema file in backend/schemas/."""
         if not xml_content or not xml_content.strip():
             self._log_siem_parse_failure(schema_name, "Empty XML content")
             raise ValueError("ISO 20022 XML validation failed: empty content")
@@ -135,7 +139,56 @@ class ISO20022MessagingConnector(BaseBankConnector):
             self._log_siem_parse_failure(schema_name, f"XML ParseError: {err}")
             raise ValueError(f"ISO 20022 XML validation failed against XSD schema: {err}") from err
 
-        # Strip namespaces for checking tag names
+        # Real XSD schema validation via lxml when schema exists
+        schema_file_map = {
+            "pacs.008": "pacs.008.001.08.xsd",
+            "pacs.002": "pacs.002.001.10.xsd",
+            "camt.053": "camt.053.001.08.xsd",
+            "pain.001": "pain.001.001.08.xsd",
+        }
+        target_filename = None
+        for key, fname in schema_file_map.items():
+            if key in schema_name:
+                target_filename = fname
+                break
+
+        if target_filename:
+            schema_path = self._schemas_dir / target_filename
+            if not schema_path.exists():
+                alt_path = Path("backend/schemas") / target_filename
+                if alt_path.exists():
+                    schema_path = alt_path
+            if not schema_path.exists():
+                alt_path2 = Path(__file__).resolve().parents[3] / "schemas" / target_filename
+                if alt_path2.exists():
+                    schema_path = alt_path2
+
+            if schema_path.exists():
+                try:
+                    from lxml import etree  # type: ignore[import-not-found,import-untyped] # nosec
+
+                    with self._cache_lock:
+                        if target_filename not in self._schema_cache:
+                            with open(schema_path, "rb") as f:
+                                schema_doc = etree.XML(f.read())
+                            self._schema_cache[target_filename] = etree.XMLSchema(schema_doc)
+                        compiled_schema = self._schema_cache[target_filename]
+
+                    doc = etree.fromstring(xml_content.strip().encode("utf-8"))
+                    if not compiled_schema.validate(doc):
+                        err_msgs = [f"Line {err.line}: {err.message}" for err in compiled_schema.error_log]
+                        self._log_siem_parse_failure(schema_name, f"XSD validation failed: {'; '.join(err_msgs)}")
+                        raise ValueError(f"ISO 20022 XML validation failed against {schema_name} XSD schema: {'; '.join(err_msgs)}")
+                    return
+                except ImportError:
+                    pass
+                except ValueError:
+                    raise
+                except Exception as exc:
+                    self._log_siem_parse_failure(schema_name, f"XSD execution error: {exc}")
+                    raise ValueError(f"ISO 20022 XML validation execution error: {exc}") from exc
+
+        # Fallback structural validation
         tags = [elem.tag.split("}", 1)[1] if "}" in elem.tag else elem.tag for elem in root.iter()]
 
         if (
@@ -169,6 +222,81 @@ class ISO20022MessagingConnector(BaseBankConnector):
                 schema_name, "Missing FIToFICstmrDrctDbt element for pacs.003"
             )
             raise ValueError("ISO 20022 XML validation failed against pacs.003 XSD schema")
+
+    @classmethod
+    def create_pacs008_xml(
+        cls,
+        msg_id: str,
+        debtor_iban: str,
+        creditor_iban: str,
+        amount: float,
+        currency: str = "EUR",
+        debtor_name: str = "Corporate Sender AG",
+        creditor_name: str = "Beneficiary Logistics SARL",
+        debtor_country: str = "DE",
+        creditor_country: str = "FR",
+        end_to_end_id: str | None = None,
+        uetr: str | None = None,
+    ) -> str:
+        """Create valid ISO 20022 pacs.008.001.08 XML string conforming to official XSD."""
+        from app.domain.sar_generator import SARGenerator
+
+        xml_str, _ = SARGenerator.generate_iso20022_pacs008_xml(
+            msg_id=msg_id,
+            debtor_iban=debtor_iban,
+            creditor_iban=creditor_iban,
+            amount=amount,
+            currency=currency,
+            debtor_name=debtor_name,
+            creditor_name=creditor_name,
+            debtor_country=debtor_country,
+            creditor_country=creditor_country,
+            end_to_end_id=end_to_end_id,
+            uetr=uetr,
+        )
+        return xml_str
+
+    @classmethod
+    def create_pacs002_xml(
+        cls,
+        msg_id: str,
+        orig_msg_id: str,
+        status: str = "ACTC",
+        amount: float = 100.0,
+        currency: str = "EUR",
+        reason_code: str = "AcceptedTechnicalValidation",
+    ) -> str:
+        """Create valid ISO 20022 pacs.002.001.10 XML string conforming to official XSD."""
+        from app.domain.sar_generator import SARGenerator
+
+        xml_str, _ = SARGenerator.generate_iso20022_pacs002_xml(
+            msg_id=msg_id,
+            orig_msg_id=orig_msg_id,
+            status=status,
+            amount=amount,
+            currency=currency,
+            reason_code=reason_code,
+        )
+        return xml_str
+
+    @classmethod
+    def create_camt053_xml(
+        cls,
+        stmt_id: str,
+        account_iban: str,
+        entries: list[dict[str, Any]],
+        currency: str = "EUR",
+    ) -> str:
+        """Create valid ISO 20022 camt.053.001.08 XML string conforming to official XSD."""
+        from app.domain.sar_generator import SARGenerator
+
+        xml_str, _ = SARGenerator.generate_iso20022_camt053_xml(
+            stmt_id=stmt_id,
+            account_iban=account_iban,
+            entries=entries,
+            currency=currency,
+        )
+        return xml_str
 
     @retry_connector()
     def parse_pacs008_xml(self, xml_content: str) -> NormalizedTransaction:

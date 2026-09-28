@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           elementFormDefault="qualified">
+
+  <!-- Root Element for UNODC goAML 4.0 XML Reports -->
+  <xs:element name="report" type="ReportType"/>
+
+  <xs:complexType name="ReportType">
+    <xs:sequence>
+      <xs:element name="rentity_id" type="xs:string"/>
+      <xs:element name="rentity_branch" type="xs:string" minOccurs="0"/>
+      <xs:element name="submission_code" type="xs:string"/>
+      <xs:element name="report_code" type="xs:string"/>
+      <xs:element name="entity_reference" type="xs:string"/>
+      <xs:element name="fiu_ref_number" type="xs:string" minOccurs="0"/>
+      <xs:element name="report_date" type="xs:string"/>
+      <xs:element name="currency_code_local" type="CurrencyCodeType"/>
+      <xs:element name="reporting_user" type="xs:string"/>
+      <xs:element name="reason" type="xs:string"/>
+      <xs:element name="action" type="xs:string"/>
+      <xs:element name="legal_basis" type="LegalBasisType" minOccurs="0"/>
+      <xs:element name="transaction" type="TransactionType" minOccurs="0" maxOccurs="unbounded"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Currency Code: 3-letter ISO 4217 -->
+  <xs:simpleType name="CurrencyCodeType">
+    <xs:restriction base="xs:string">
+      <xs:pattern value="[A-Z]{3}"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <!-- Legal Basis Type -->
+  <xs:complexType name="LegalBasisType">
+    <xs:sequence>
+      <xs:element name="legal_basis_type" type="xs:string"/>
+      <xs:element name="regulatory_framework" type="xs:string"/>
+      <xs:element name="article_reference" type="xs:string"/>
+      <xs:element name="legitimate_interest_justification" type="xs:string"/>
+      <xs:element name="reporting_entity_role" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Transaction Type -->
+  <xs:complexType name="TransactionType">
+    <xs:sequence>
+      <xs:element name="transaction_number" type="xs:string"/>
+      <xs:element name="internal_ref_number" type="xs:string" minOccurs="0"/>
+      <xs:element name="transaction_location" type="xs:string" minOccurs="0"/>
+      <xs:element name="transaction_description" type="xs:string" minOccurs="0"/>
+      <xs:element name="date_transaction" type="xs:string"/>
+      <xs:element name="value_date" type="xs:string" minOccurs="0"/>
+      <xs:element name="transmode_code" type="xs:string"/>
+      <xs:element name="amount_local" type="xs:decimal"/>
+      <xs:element name="currency_code" type="CurrencyCodeType"/>
+      <xs:element name="t_from" type="PartyAccountType" minOccurs="0"/>
+      <xs:element name="t_to" type="PartyAccountType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Party Account (From / To) -->
+  <xs:complexType name="PartyAccountType">
+    <xs:sequence>
+      <xs:element name="from_funds_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="to_funds_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="from_account" type="AccountDetailType" minOccurs="0"/>
+      <xs:element name="to_account" type="AccountDetailType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Account Detail -->
+  <xs:complexType name="AccountDetailType">
+    <xs:sequence>
+      <xs:element name="institution_name" type="xs:string" minOccurs="0"/>
+      <xs:element name="institution_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="account" type="xs:string"/>
+      <xs:element name="currency_code" type="xs:string" minOccurs="0"/>
+      <xs:element name="signatory" type="SignatoryType" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <!-- Signatory Detail -->
+  <xs:complexType name="SignatoryType">
+    <xs:sequence>
+      <xs:element name="signatory_id" type="xs:string" minOccurs="0"/>
+      <xs:element name="name" type="xs:string" minOccurs="0"/>
+      <xs:element name="role" type="xs:string" minOccurs="0"/>
+      <xs:element name="id_type" type="xs:string" minOccurs="0"/>
+      <xs:element name="id_number_masked" type="xs:string" minOccurs="0"/>
+      <xs:element name="country_code" type="xs:string" minOccurs="0"/>
+    </xs:sequence>
+  </xs:complexType>
+
+</xs:schema>

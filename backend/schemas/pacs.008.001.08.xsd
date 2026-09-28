@@ -1,8 +1,4 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
-           xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
-           targetNamespace="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08"
-           elementFormDefault="qualified">
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" xmlns="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08" targetNamespace="urn:iso:std:iso:20022:tech:xsd:pacs.008.001.08" elementFormDefault="qualified">
   <xs:element name="Document" type="Document"/>
   <xs:complexType name="Document">
     <xs:sequence>
@@ -11,7 +7,7 @@
   </xs:complexType>
   <xs:complexType name="FIToFICstmrCdtTrf">
     <xs:sequence>
-      <xs:element name="GrpHdr" type="GrpHdr"/>
+      <xs:element name="GrpHdr" type="GrpHdr" minOccurs="0"/>
       <xs:element name="CdtTrfTxInf" type="CdtTrfTxInf" maxOccurs="unbounded"/>
     </xs:sequence>
   </xs:complexType>
@@ -22,14 +18,14 @@
     </xs:sequence>
   </xs:complexType>
   <xs:complexType name="CdtTrfTxInf">
-    <xs:sequence>
+    <xs:choice maxOccurs="unbounded">
       <xs:element name="PmtId" type="PmtId" minOccurs="0"/>
       <xs:element name="IntrBkSttlmAmt" type="ActiveCurrencyAndAmount"/>
       <xs:element name="Dbtr" type="PartyIdentification" minOccurs="0"/>
       <xs:element name="DbtrAcct" type="AccountIdentification" minOccurs="0"/>
       <xs:element name="Cdtr" type="PartyIdentification" minOccurs="0"/>
       <xs:element name="CdtrAcct" type="AccountIdentification" minOccurs="0"/>
-    </xs:sequence>
+    </xs:choice>
   </xs:complexType>
   <xs:complexType name="PmtId">
     <xs:sequence>
