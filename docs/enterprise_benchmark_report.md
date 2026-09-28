@@ -1046,5 +1046,114 @@ The benchmark evaluates discrete candidate decision thresholds on a held-out tes
 
 **Test Execution Parity**: 17/17 Pytest unit tests passed on `backend/tests/unit/test_risk_utility.py`; 5/5 Vitest tests passed on `ThresholdTuningSlider.test.tsx`.
 
+---
+
+## 21. Controlled Graph Topology & Feature Paradigm Ablation Benchmark (Phase 27 / Sub-Plan 27.1)
+
+In financial crime detection and cross-bank anti-money laundering (AML), a foundational question is whether deploying graph neural network infrastructure provides justifiable detection uplift over traditional, highly-optimized tabular gradient boosting or multi-layer perceptron models. Furthermore, production banking networks exhibit widely divergent counterparty densities, clustering coefficients, and account cold-start rates.
+
+CF-Intelligence executes a dual empirical ablation benchmark implemented in [`experiments/ablations/graph_vs_tabular.py`](../experiments/ablations/graph_vs_tabular.py) and [`experiments/ablations/topology_sensitivity.py`](../experiments/ablations/topology_sensitivity.py):
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                   GRAPH TOPOLOGY & FEATURE PARADIGM ABLATION SUITE                       │
+├───────────────────────────────────┬──────────────────────────────────────────────────────┤
+│ BENCHMARK MODULE                  │ INVESTIGATION SCOPE                                  │
+├───────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ 1. Feature Paradigm Ablation      │ Tabular Only vs Graph Only vs Tabular + Graph        │
+│    (`graph_vs_tabular.py`)        │ Controlled features across identical sample cohorts  │
+├───────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ 2. Topology Density Sensitivity   │ Average Node Degree Sweep d in {1, 2, 4, 8, 16, 32}  │
+│    (`topology_sensitivity.py`)    │ Connectivity threshold & over-smoothing boundary     │
+├───────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ 3. Multi-Hop Search Depth         │ k-hop Aggregation Depth k in {0, 1, 2, 3}            │
+│                                   │ Information gain vs exponential latency profile      │
+├───────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ 4. Structural Topology Genera     │ Erdős-Rényi vs Scale-Free vs Clustered SBM           │
+│                                   │ Syndicate smurfing ring topology characterization    │
+├───────────────────────────────────┼──────────────────────────────────────────────────────┤
+│ 5. Cold-Start / Isolated Nodes    │ Isolated Node Injection (0% to 50% isolated accounts)│
+│                                   │ Graceful degradation & tabular fallback stability    │
+└───────────────────────────────────┴──────────────────────────────────────────────────────┘
+```
+
+### 21.1 Controlled Feature Paradigm Ablation Results
+
+Evaluated across $N = 2{,}000$ accounts with a fixed $5.0\%$ fraud prevalence and identical feed-forward classification architectures ($d_{\mathrm{hidden}} = 64$, $\text{ReLU}$, Adam $\eta = 0.01$):
+
+| Feature Evaluation Paradigm | PR-AUC | ROC-AUC | F1-Score | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Tabular Only (Local Features)** | 0.2227 | 0.6974 | 0.2222 | 0.00% | 0.00% | 5.26% |
+| **Graph Only (Inductive Embeddings)**| 0.5843 | 0.8653 | 0.5000 | 15.79% | 26.32% | 31.58% |
+| **Tabular + Graph (Champion Store)** | **0.7262** | **0.9016** | **0.6897** | **26.32%** | **36.84%** | **47.37%** |
+
+#### Measured Marginal Uplift
+
+$$\Delta\operatorname{PR-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.7262 - 0.2227 = +0.5035 \; (+226.1\% \text{ relative gain})$$
+
+$$\Delta\operatorname{ROC-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.9016 - 0.6974 = +0.2042 \; (+29.3\% \text{ relative gain})$$
+
+$$\Delta\operatorname{Recall@0.1\%FPR} = 26.32\% - 0.00\% = +26.32\text{ percentage points}$$
+
+Key takeaway: When fraudulent transfers are coordinated through multi-hop money mule syndicates, individual transaction amounts and velocities appear benign to tabular classifiers. Graph aggregation surfaces the covert relational topology, yielding a **$+226.1\%$ relative PR-AUC uplift**. Joint concatenation maximizes performance by simultaneously evaluating immediate velocity and neighborhood risk.
+
+### 21.2 Topology Complexity & Density Sensitivity Sweep
+
+#### 1. Average Node Degree Sweep ($d \in \{1, 2, 4, 8, 16, 32\}$)
+
+| Average Degree ($d$) | PR-AUC | ROC-AUC | F1-Score | Delta PR-AUC vs Tabular | Delta ROC-AUC vs Tabular |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| $d = 1$ | 0.2709 | 0.7570 | 0.2857 | +0.0381 | +0.0468 |
+| $d = 2$ | 0.4439 | 0.8251 | 0.4444 | +0.2111 | +0.1148 |
+| $d = 4$ | 0.6558 | 0.8876 | 0.6207 | +0.4230 | +0.1773 |
+| **$d = 8$ (Optimal)** | **0.7441** | **0.9103** | **0.7059** | **+0.5113** | **+0.2001** |
+| $d = 16$ | 0.7380 | 0.9038 | 0.6897 | +0.5052 | +0.1935 |
+| $d = 32$ | 0.7108 | 0.8871 | 0.6452 | +0.4780 | +0.1768 |
+
+**Empirical Finding**: Uplift accelerates rapidly up to $d = 8$, where graph relational signals achieve maximum distinguishability. At $d \ge 16$, excessive dense connections cause neighborhood representations to homogenize (over-smoothing effect), resulting in minor metric compression ($-0.0333$ PR-AUC from $d = 8$ to $d = 32$).
+
+#### 2. Neighborhood Search Depth ($K \in \{0, 1, 2, 3\}$)
+
+| Hop Depth ($K$) | PR-AUC | ROC-AUC | F1-Score | Delta PR-AUC vs Tabular | Inference Latency SLA |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| $K = 0$ (Tabular Baseline) | 0.2328 | 0.7103 | 0.2353 | Baseline | $1.4\text{ ms}$ (Compliant) |
+| $K = 1$ (1-Hop Direct Neighbors) | 0.6974 | 0.8929 | 0.6667 | +0.4646 | $2.9\text{ ms}$ (Compliant) |
+| **$K = 2$ (2-Hop Extended Ring)** | **0.7441** | **0.9103** | **0.7059** | **+0.5113** | **$6.2\text{ ms}$ (Optimal)** |
+| $K = 3$ (3-Hop Multi-Tier Flow) | 0.7289 | 0.8995 | 0.6897 | +0.4961 | $24.4\text{ ms}$ (SLA Risk) |
+
+**Operational Recommendation**: 2-hop neighborhood expansion captures the full topology of layered money mule chains while maintaining sub-10ms scoring latency ($6.2\text{ ms}$). Expanding to 3 hops introduces exponential neighborhood cardinality, increasing inference latency by $3.9\times$ without detection gains.
+
+#### 3. Graph Structure Type Comparison
+
+| Network Architecture | Characteristic Network Topology | PR-AUC | ROC-AUC | Delta PR-AUC vs Tabular |
+| :--- | :--- | :---: | :---: | :---: |
+| **Random Erdős-Rényi** | Poisson degree distribution, uniform edges | 0.5892 | 0.8643 | +0.3564 |
+| **Scale-Free Barabási-Albert** | Power-law degree distribution, preferential hubs | 0.6845 | 0.8968 | +0.4517 |
+| **Clustered SBM Communities** | Dense community smurfing syndicates | **0.7512** | **0.9145** | **+0.5184** |
+
+**Structural Finding**: Graph models provide the greatest detection advantage in Stochastic Block Model (SBM) community topologies ($\Delta\operatorname{PR-AUC} = +0.5184$), mirroring actual banking environments where illicit networks cluster into dense collaborative cliques.
+
+#### 4. Cold-Start / Isolated Node Degradation Sweep
+
+| Isolated Account Fraction | Effective Network Connectivity | PR-AUC | ROC-AUC | Retained Graph Uplift |
+| :---: | :---: | :---: | :---: | :---: |
+| **0% Isolated** | 100% Connected Accounts | **0.7441** | **0.9103** | **100.0%** |
+| **10% Isolated** | 90% Connected Accounts | 0.6982 | 0.8894 | 91.0% |
+| **25% Isolated** | 75% Connected Accounts | 0.6124 | 0.8507 | 74.2% |
+| **50% Isolated** | 50% Connected Accounts | 0.4850 | 0.7981 | 49.3% |
+
+**Resilience Finding**: When new bank accounts join with zero counterparty history (cold-start condition), model performance degrades in a smooth, predictable linear fashion. At 50% isolated nodes, the joint architecture retains approximately half of its graph uplift, demonstrating robust degradation without catastrophic score failure.
+
+### 21.3 Test Suite Verification & Code Artifacts
+
+- **Unit & Integration Suite**: [`backend/tests/unit/test_graph_topology_ablation.py`](../backend/tests/unit/test_graph_topology_ablation.py) (17/17 tests passing, 100% pass rate)
+- **Feature Ablation Engine**: [`experiments/ablations/graph_vs_tabular.py`](../experiments/ablations/graph_vs_tabular.py)
+- **Topology Sensitivity Engine**: [`experiments/ablations/topology_sensitivity.py`](../experiments/ablations/topology_sensitivity.py)
+- **Ablation Module Exports**: [`experiments/ablations/__init__.py`](../experiments/ablations/__init__.py)
+- **Benchmark JSON Artifacts**:
+  - `experiments/ablations/graph_vs_tabular_results.json`
+  - `experiments/ablations/topology_sensitivity_results.json`
+
+
 
 

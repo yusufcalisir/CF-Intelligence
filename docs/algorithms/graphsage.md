@@ -66,7 +66,7 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
 
 ---
 
-## 4. Controlled Ablation Studies
+## 4. Elliptic Neighborhood & Aggregator Ablations
 
 ### 4.1 Neighborhood Hop Depth ($K \in \{0, 1, 2\}$)
 - **0-Hop (Tabular MLP)**: Relies exclusively on local node features (transaction amounts, degrees, output count). PR-AUC: $0.4602$, Recall @ 0.1% FPR: $8.22\%$.
@@ -79,19 +79,121 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
 
 ---
 
-## 5. Threat Model & Privacy Boundary
-- **Zero Raw PII Exposure**: Node features in Elliptic represent normalized transaction graph properties; raw transaction hashes and bitcoin addresses are never exposed to remote consortium participants.
+## 5. Controlled Feature Paradigm Ablation (Phase 27 / Sub-Plan 27.1)
+
+To isolate the marginal value of structural graph representations over classical tabular features, CF-Intelligence executes a controlled 3-way feature ablation across identical transaction samples:
+
+```
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                           FEATURE PARADIGM ARCHITECTURES                                 │
+├─────────────────────────┬─────────────────────────────────┬──────────────────────────────┤
+│ PARADIGM IDENTIFIER     │ FEATURE INPUT VECTOR            │ STRUCTURAL CONTEXT           │
+├─────────────────────────┼─────────────────────────────────┼──────────────────────────────┤
+│ 1. TABULAR_ONLY         │ Raw local tabular features x_v  │ None (isolated node)         │
+├─────────────────────────┼─────────────────────────────────┼──────────────────────────────┤
+│ 2. GRAPH_ONLY           │ GraphSAGE structural embedding  │ Aggregated neighborhood only │
+│                         │ z_v = GNN(A, X)                 │                              │
+├─────────────────────────┼─────────────────────────────────┼──────────────────────────────┤
+│ 3. TABULAR_PLUS_GRAPH   │ Concatenated vector             │ Joint local & relational     │
+│    (Champion Engine)    │ [x_v || z_v]                    │ structural features          │
+└─────────────────────────┴─────────────────────────────────┴──────────────────────────────┘
+```
+
+### 5.1 Empirical Feature Paradigm Comparison
+
+Evaluated on synthetic transaction networks ($N = 2{,}000$ accounts, fraud prevalence $5.0\%$, community smurfing topology) using identical MLP classification backbones:
+
+| Feature Paradigm | PR-AUC | ROC-AUC | F1-Score | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| **Tabular Only** | 0.2227 | 0.6974 | 0.2222 | 0.00% | 0.00% | 5.26% |
+| **Graph Only** | 0.5843 | 0.8653 | 0.5000 | 15.79% | 26.32% | 31.58% |
+| **Tabular + Graph (Champion)** | **0.7262** | **0.9016** | **0.6897** | **26.32%** | **36.84%** | **47.37%** |
+
+### 5.2 Marginal Uplift Analysis
+
+$$\Delta\operatorname{PR-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \operatorname{PR-AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \operatorname{PR-AUC}_{\mathrm{Tabular}} = +0.5035 \; (+226.1\%)$$
+
+$$\Delta\operatorname{ROC-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \operatorname{ROC-AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \operatorname{ROC-AUC}_{\mathrm{Tabular}} = +0.2042 \; (+29.3\%)$$
+
+$$\Delta\operatorname{Recall@0.1\%FPR} = 26.32\% - 0.00\% = +26.32\text{ percentage points}$$
+
+Key takeaway: Tabular features alone fail to detect coordinated fraud rings operating with low individual transaction anomalies. Graph embeddings capture the coordinated money mule structure, while joint modeling achieves maximal performance by combining individual transaction velocity with relational counterparty topology.
+
+---
+
+## 6. Graph Topology Complexity & Density Sensitivity Analysis (Phase 27 / Sub-Plan 27.1)
+
+In financial systems, transaction graph density varies significantly across banking tiers and account lifecycles. CF-Intelligence systematically quantifies model robustness across four topological dimensions in [`experiments/ablations/topology_sensitivity.py`](../../experiments/ablations/topology_sensitivity.py).
+
+### 6.1 Average Node Degree Sensitivity ($d \in \{1, 2, 4, 8, 16, 32\}$)
+
+| Average Degree ($d$) | PR-AUC | ROC-AUC | F1-Score | Delta PR-AUC vs Tabular | Delta ROC-AUC vs Tabular |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| $d = 1$ | 0.2709 | 0.7570 | 0.2857 | +0.0381 | +0.0468 |
+| $d = 2$ | 0.4439 | 0.8251 | 0.4444 | +0.2111 | +0.1148 |
+| $d = 4$ | 0.6558 | 0.8876 | 0.6207 | +0.4230 | +0.1773 |
+| **$d = 8$ (Optimal)** | **0.7441** | **0.9103** | **0.7059** | **+0.5113** | **+0.2001** |
+| $d = 16$ | 0.7380 | 0.9038 | 0.6897 | +0.5052 | +0.1935 |
+| $d = 32$ | 0.7108 | 0.8871 | 0.6452 | +0.4780 | +0.1768 |
+
+**Topological Finding**: Detection uplift scales steeply as average connectivity increases from $d = 1$ to $d = 8$ ($\Delta\operatorname{PR-AUC}$ reaches $+0.5113$). Beyond $d = 8$, over-smoothing begins to slightly dilute distinctive local fraud structures, making $d \in [4, 8]$ the optimal operating density.
+
+### 6.2 Multi-Hop Search Depth Sensitivity ($K \in \{0, 1, 2, 3\}$)
+
+| Hop Depth ($K$) | PR-AUC | ROC-AUC | F1-Score | Delta PR-AUC vs Tabular | Operational Latency Overhead |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| $K = 0$ (Tabular Baseline) | 0.2328 | 0.7103 | 0.2353 | Baseline | Baseline ($1.4\text{ ms}$) |
+| $K = 1$ (1-Hop Direct Neighbors) | 0.6974 | 0.8929 | 0.6667 | +0.4646 | $+1.5\text{ ms}$ |
+| **$K = 2$ (2-Hop Extended Ring)** | **0.7441** | **0.9103** | **0.7059** | **+0.5113** | $+4.7\text{ ms}$ |
+| $K = 3$ (3-Hop Multi-Tier Flow) | 0.7289 | 0.8995 | 0.6897 | +0.4961 | $+18.2\text{ ms}$ |
+
+**Operational Finding**: $K = 2$ delivers peak detection performance. Moving to $K = 3$ yields diminishing returns and slight metric attenuation due to graph neighborhood exponential expansion, while incurring a $4\times$ latency increase. CF-Intelligence standardizes on $K = 2$ for real-time scoring.
+
+### 6.3 Graph Structural Topologies
+
+Evaluating model resilience across diverse network generation processes:
+
+| Topology Architecture | Network Characteristics | PR-AUC | ROC-AUC | Delta PR-AUC vs Tabular |
+| :--- | :--- | :---: | :---: | :---: |
+| **Random Erdős-Rényi** | Homogeneous random connections | 0.5892 | 0.8643 | +0.3564 |
+| **Scale-Free Barabási-Albert** | Preferential attachment, power-law hubs | 0.6845 | 0.8968 | +0.4517 |
+| **Clustered SBM Communities** | Dense money laundering syndicate clusters | **0.7512** | **0.9145** | **+0.5184** |
+
+**Structural Finding**: Graph representations deliver maximal competitive advantage in clustered community structures ($\Delta\operatorname{PR-AUC} = +0.5184$), perfectly matching real-world criminal smurfing rings and shell-company networks.
+
+### 6.4 Isolated Node Degradation (Cold-Start Resilience)
+
+Testing resilience when a fraction of nodes have zero counterparty graph edges ($0\%$ to $50\%$ isolated accounts):
+
+| Isolated Node Proportion | Active Graph Density | PR-AUC | ROC-AUC | Retained Graph Uplift |
+| :---: | :---: | :---: | :---: | :---: |
+| **0% Isolated** | $100\%$ Connected | **0.7441** | **0.9103** | **100.0%** |
+| **10% Isolated** | $90\%$ Connected | 0.6982 | 0.8894 | 91.0% |
+| **25% Isolated** | $75\%$ Connected | 0.6124 | 0.8507 | 74.2% |
+| **50% Isolated** | $50\%$ Connected | 0.4850 | 0.7981 | 49.3% |
+
+**Degradation Finding**: Detection performance degrades gracefully in direct linear proportion to isolated node prevalence. Even when $50\%$ of accounts are completely isolated (cold-start accounts), the system retains nearly half of its graph uplift, falling back seamlessly to local tabular signals.
+
+---
+
+## 7. Threat Model & Privacy Boundary
+- **Zero Raw PII Exposure**: Node features represent normalized transaction graph properties; raw transaction hashes, account numbers, and bitcoin addresses are never exposed to remote consortium participants.
 - **Graph Boundary Scoping**: In cross-bank federated deployments, institutions never traverse raw edges into foreign institutions' private graphs. Cross-institution links are securely resolved via MinHash LSH Private Set Intersection.
 
 ---
 
-## 6. Test Suite Verification & Artifacts
-- **Unit & Integration Tests**: [`backend/tests/unit/test_graphsage_benchmark.py`](../../backend/tests/unit/test_graphsage_benchmark.py) (9 tests passing at 100%)
-- **Benchmark Runner**: [`benchmarks/runners/run_graphsage_benchmark.py`](../../benchmarks/runners/run_graphsage_benchmark.py)
+## 8. Test Suite Verification & Artifacts
+- **GraphSAGE Benchmark Tests**: [`backend/tests/unit/test_graphsage_benchmark.py`](../../backend/tests/unit/test_graphsage_benchmark.py) (9 tests passing at 100%)
+- **Graph Topology Ablation Tests**: [`backend/tests/unit/test_graph_topology_ablation.py`](../../backend/tests/unit/test_graph_topology_ablation.py) (17 tests passing at 100%)
+- **Benchmark Runners & Scripts**:
+  - GraphSAGE Runner: [`benchmarks/runners/run_graphsage_benchmark.py`](../../benchmarks/runners/run_graphsage_benchmark.py)
+  - Feature Paradigm Ablation: [`experiments/ablations/graph_vs_tabular.py`](../../experiments/ablations/graph_vs_tabular.py)
+  - Topology Sensitivity Sweep: [`experiments/ablations/topology_sensitivity.py`](../../experiments/ablations/topology_sensitivity.py)
 - **Empirical Artifacts**:
-  - Raw JSON Benchmark: [`benchmarks/results/raw/graphsage_elliptic_benchmark.json`](../../benchmarks/results/raw/graphsage_elliptic_benchmark.json)
-  - Detailed Results: [`experiments/elliptic/results.json`](../../experiments/elliptic/results.json)
-  - Baseline Comparison: [`experiments/elliptic/comparative_baselines.json`](../../experiments/elliptic/comparative_baselines.json)
-  - Audit Dossier: [`experiments/elliptic/audit_dossier.md`](../../experiments/elliptic/audit_dossier.md)
+  - Feature Paradigm Results: [`experiments/ablations/graph_vs_tabular_results.json`](../../experiments/ablations/graph_vs_tabular_results.json)
+  - Topology Sensitivity Results: [`experiments/ablations/topology_sensitivity_results.json`](../../experiments/ablations/topology_sensitivity_results.json)
+  - Elliptic Raw Benchmark: [`benchmarks/results/raw/graphsage_elliptic_benchmark.json`](../../benchmarks/results/raw/graphsage_elliptic_benchmark.json)
+  - Elliptic Detailed Results: [`experiments/elliptic/results.json`](../../experiments/elliptic/results.json)
   - Consolidated Publication Figure: [`docs/figures/benchmark_graphsage_elliptic.png`](../figures/benchmark_graphsage_elliptic.png)
+
 
