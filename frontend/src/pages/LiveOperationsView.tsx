@@ -69,6 +69,7 @@ const TOTAL_ROUNDS = 10;
 const SESSION_STORAGE_KEY = 'cfi_live_operations_session_v1';
 
 interface StoredLiveOpsState {
+  simId?: string;
   currentRound: number;
   championAuc: number;
   trainingPhase: TrainingPhase;
@@ -77,11 +78,16 @@ interface StoredLiveOpsState {
   selectedProfileKey?: string;
 }
 
-const loadStoredSession = (): StoredLiveOpsState | null => {
+const loadStoredSession = (targetSimId?: string, isAutostart?: boolean): StoredLiveOpsState | null => {
+  if (isAutostart) return null;
   try {
     const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw);
+    const parsed: StoredLiveOpsState = JSON.parse(raw);
+    if (targetSimId && parsed.simId && parsed.simId !== targetSimId) {
+      return null;
+    }
+    return parsed;
   } catch {
     return null;
   }
@@ -90,7 +96,8 @@ const loadStoredSession = (): StoredLiveOpsState | null => {
 export default function LiveOperationsView() {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
-  const storedSession = useRef(loadStoredSession()).current;
+  const isAutostartParam = location.search.includes('autostart=true');
+  const storedSession = useRef(loadStoredSession(id, isAutostartParam)).current;
 
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
   const [currentRound, setCurrentRound] = useState<number>(storedSession?.currentRound ?? 0);
@@ -347,6 +354,7 @@ export default function LiveOperationsView() {
     try {
       if (trainingPhase !== 'pending' || roundHistory.length > 0) {
         const payload: StoredLiveOpsState = {
+          simId: id,
           currentRound,
           championAuc,
           trainingPhase,
@@ -357,7 +365,7 @@ export default function LiveOperationsView() {
         sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
       }
     } catch { /* ignore storage errors */ }
-  }, [currentRound, championAuc, trainingPhase, roundHistory, gradientSubmissions, selectedProfile]);
+  }, [id, currentRound, championAuc, trainingPhase, roundHistory, gradientSubmissions, selectedProfile]);
 
   const handleQuarantineChange = (bankId: string | null) => {
     setBankNodes((prev) =>
@@ -695,9 +703,17 @@ export default function LiveOperationsView() {
   }, []);
 
   // Auto-start simulation when navigated from Dashboard or via simulation route
+  const prevIdRef = useRef(id);
   useEffect(() => {
-    const isAutoStart = id || location.pathname.startsWith('/simulation') || location.search.includes('autostart=true');
-    if (isAutoStart && !isTraining && trainingPhase === 'pending' && !hasAutoStartedRef.current) {
+    if (prevIdRef.current !== id) {
+      prevIdRef.current = id;
+      hasAutoStartedRef.current = false;
+    }
+    const hasAutostartParam = location.search.includes('autostart=true');
+    const isNewSimulationRun = hasAutostartParam || (Boolean(id) && (!storedSession || storedSession.simId !== id));
+    const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
+
+    if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
       hasAutoStartedRef.current = true;
       // Auto-start uses paysim defaults for backward compatibility
       startSimulatedTraining(DATASET_PROFILES.paysim);
