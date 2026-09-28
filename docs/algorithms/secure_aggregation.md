@@ -63,3 +63,44 @@ while remaining cryptographically blinded to any individual bank's contribution 
   - [`backend/tests/unit/test_p2p_secagg_driver.py`](file:///backend/tests/unit/test_p2p_secagg_driver.py): 16 unit tests covering Curve25519 ECDH key exchange, HMAC bundle signing, PRNG counter expansion, and modular arithmetic.
   - [`backend/tests/unit/test_p2p_secagg_dropout_recovery.py`](file:///backend/tests/unit/test_p2p_secagg_dropout_recovery.py): Dropout reconstruction using Shamir $(t, n)$ shares.
   - [`backend/tests/unit/test_shamir_engine.py`](file:///backend/tests/unit/test_shamir_engine.py): Polynomial secret sharing primitives over Galois fields.
+  - [`backend/tests/unit/test_compression_engine.py`](file:///backend/tests/unit/test_compression_engine.py): 22 unit tests verifying wire transfer measurements, Top-K gradient sparsification, FP16/INT8 quantization, and SecAgg protocol overhead bounds.
+
+---
+
+## 6. Communication Cost, Bandwidth Overhead & Wire Size Profiling
+
+### 6.1 Cryptographic Coordination Payload Breakdown
+
+Across the 4-round Curve25519 SecAgg lifecycle, the wire payload exchanged between $K$ client banks and the central coordinator consists of:
+
+1. **Round 0 (Advertise Keys)**:
+   Each client broadcasts its ephemeral Curve25519 public key ($32\text{ bytes}$) signed with an Ed25519 identity signature ($64\text{ bytes}$):
+
+   $$\text{Payload}_{\mathrm{R0}} = K \cdot 96 \quad (\text{bytes})$$
+
+2. **Round 1 (Share Encrypted Seeds)**:
+   Each client transmits $(K - 1)$ encrypted seed shares wrapped with recipient public keys ($\approx 48\text{ bytes}$ ciphertext per peer):
+
+   $$\text{Payload}_{\mathrm{R1}} = K(K - 1) \cdot 48 \quad (\text{bytes})$$
+
+3. **Round 2 (Masked Input Collection)**:
+   Each client transmits its blinded parameter vector $\widetilde{\Delta w}_i \in \mathbb{R}^d$ along with an HMAC-SHA256 message authentication code ($32\text{ bytes}$):
+
+   $$\text{Payload}_{\mathrm{R2}} = K \cdot (S_{\mathrm{model}} + 32) \quad (\text{bytes})$$
+
+4. **Round 3 (Unmasking Shares)**:
+   Clients reveal Shamir shares of the blinding seeds for dropped participants or self-masks ($\approx 32\text{ bytes}$ per peer):
+
+   $$\text{Payload}_{\mathrm{R3}} = K(K - 1) \cdot 32 \quad (\text{bytes})$$
+
+### 6.2 Total Wire Volume vs Baseline Protocols ($d = 1{,}969$ parameters, $K=3$ banks, $R=5$ rounds)
+
+| Protocol | Payload per Round | 5-Round Total Volume | Relative Overhead vs FedAvg | Security & Privacy Guarantee |
+| :--- | :---: | :---: | :---: | :--- |
+| `FED_AVG` | 31,504 B | **0.1502 MB** | **1.00\times** | No cryptographic blinding (plaintext parameters) |
+| `FED_PROX` | 31,504 B | **0.1502 MB** | **1.00\times** | Identical wire footprint; local proximal loss penalty |
+| `CURVE25519_SECAGG` | 32,752 B | **0.1562 MB** | **1.04\times** | Information-theoretic zero-knowledge server privacy ($+4.0\%$ overhead) |
+| `SCAFFOLD` | 63,008 B | **0.3004 MB** | **2.00\times** | Dual parameter + control variate exchange |
+| `TENSEAL_CKKS` | 330,792 B | **1.5773 MB** | **10.50\times** | Fully homomorphic ciphertext expansion ($10.5\times$ bandwidth) |
+
+The complete empirical benchmark analysis and 4-panel bandwidth visualization figure are documented in [`docs/enterprise_benchmark_report.md#24-federated-communication-cost--bandwidth-profiling-benchmark`](file:///docs/enterprise_benchmark_report.md) and [`docs/figures/benchmark_communication.png`](file:///docs/figures/benchmark_communication.png).

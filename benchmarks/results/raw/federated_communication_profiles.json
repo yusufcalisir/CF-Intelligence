@@ -1,0 +1,158 @@
+{
+  "model_name": "FraudDetectionMLP_1969params",
+  "num_parameters": 1969,
+  "serialization_profiles": {
+    "RAW_JSON": {
+      "format": "RAW_JSON",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 43041,
+      "compression_ratio_vs_fp32": 5.4648,
+      "bandwidth_savings_pct": -446.48,
+      "serialization_time_us": 1203.9,
+      "deserialization_time_us": 1033.0,
+      "reconstruction_mae": 0.0,
+      "reconstruction_max_err": 0.0
+    },
+    "RAW_FP32": {
+      "format": "RAW_FP32",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 7876,
+      "compression_ratio_vs_fp32": 1.0,
+      "bandwidth_savings_pct": 0.0,
+      "serialization_time_us": 149.9,
+      "deserialization_time_us": 35.2,
+      "reconstruction_mae": 0.0,
+      "reconstruction_max_err": 0.0
+    },
+    "QUANTIZED_FP16": {
+      "format": "QUANTIZED_FP16",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 3938,
+      "compression_ratio_vs_fp32": 0.5,
+      "bandwidth_savings_pct": 50.0,
+      "serialization_time_us": 184.0,
+      "deserialization_time_us": 91.6,
+      "reconstruction_mae": 1.1e-05,
+      "reconstruction_max_err": 0.000433
+    },
+    "QUANTIZED_INT8": {
+      "format": "QUANTIZED_INT8",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 1973,
+      "compression_ratio_vs_fp32": 0.2505,
+      "bandwidth_savings_pct": 74.95,
+      "serialization_time_us": 827.4,
+      "deserialization_time_us": 120.4,
+      "reconstruction_mae": 0.003382,
+      "reconstruction_max_err": 0.006668
+    },
+    "TOPK_SPARSE_COO": {
+      "format": "TOPK_SPARSE_COO",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 1582,
+      "compression_ratio_vs_fp32": 0.2009,
+      "bandwidth_savings_pct": 79.91,
+      "serialization_time_us": 688.6,
+      "deserialization_time_us": 45.7,
+      "reconstruction_mae": 0.024293,
+      "reconstruction_max_err": 0.074027
+    },
+    "ZSTD_COMPRESSED": {
+      "format": "ZSTD_COMPRESSED",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 7365,
+      "compression_ratio_vs_fp32": 0.9351,
+      "bandwidth_savings_pct": 6.49,
+      "serialization_time_us": 915.8,
+      "deserialization_time_us": 77.6,
+      "reconstruction_mae": 0.0,
+      "reconstruction_max_err": 0.0
+    },
+    "SPARSE_TOPK_ZSTD": {
+      "format": "SPARSE_TOPK_ZSTD",
+      "num_parameters": 1969,
+      "raw_uncompressed_bytes": 7876,
+      "wire_bytes": 1472,
+      "compression_ratio_vs_fp32": 0.1869,
+      "bandwidth_savings_pct": 81.31,
+      "serialization_time_us": 736.4,
+      "deserialization_time_us": 57.1,
+      "reconstruction_mae": 0.024293,
+      "reconstruction_max_err": 0.074027
+    }
+  },
+  "protocol_profiles": {
+    "FED_AVG": {
+      "protocol": "FED_AVG",
+      "num_clients": 3,
+      "num_rounds": 5,
+      "bytes_per_client_per_round": 15752,
+      "bytes_server_downstream_per_round": 7876,
+      "bytes_server_upstream_per_round": 23628,
+      "total_round_bytes": 31504,
+      "total_multi_round_bytes": 157520,
+      "total_multi_round_mb": 0.1502,
+      "relative_overhead_vs_fedavg": 1.0,
+      "bandwidth_efficiency_notes": "Standard federated averaging baseline with minimal communication footprint."
+    },
+    "FED_PROX": {
+      "protocol": "FED_PROX",
+      "num_clients": 3,
+      "num_rounds": 5,
+      "bytes_per_client_per_round": 15752,
+      "bytes_server_downstream_per_round": 7876,
+      "bytes_server_upstream_per_round": 23628,
+      "total_round_bytes": 31504,
+      "total_multi_round_bytes": 157520,
+      "total_multi_round_mb": 0.1502,
+      "relative_overhead_vs_fedavg": 1.0,
+      "bandwidth_efficiency_notes": "Identical bandwidth to FedAvg; proximal term computed entirely on-device."
+    },
+    "SCAFFOLD": {
+      "protocol": "SCAFFOLD",
+      "num_clients": 3,
+      "num_rounds": 5,
+      "bytes_per_client_per_round": 31504,
+      "bytes_server_downstream_per_round": 15752,
+      "bytes_server_upstream_per_round": 47256,
+      "total_round_bytes": 63008,
+      "total_multi_round_bytes": 315040,
+      "total_multi_round_mb": 0.3004,
+      "relative_overhead_vs_fedavg": 2.0,
+      "bandwidth_efficiency_notes": "Exact 2.0x bandwidth overhead due to dual parameter and control variate exchange."
+    },
+    "CURVE25519_SECAGG": {
+      "protocol": "CURVE25519_SECAGG",
+      "num_clients": 3,
+      "num_rounds": 5,
+      "bytes_per_client_per_round": 16253,
+      "bytes_server_downstream_per_round": 8004,
+      "bytes_server_upstream_per_round": 24748,
+      "total_round_bytes": 32752,
+      "total_multi_round_bytes": 163760,
+      "total_multi_round_mb": 0.1562,
+      "relative_overhead_vs_fedavg": 1.0396,
+      "bandwidth_efficiency_notes": "Zero-knowledge privacy with minor +4.0% coordination overhead."
+    },
+    "TENSEAL_CKKS": {
+      "protocol": "TENSEAL_CKKS",
+      "num_clients": 3,
+      "num_rounds": 5,
+      "bytes_per_client_per_round": 165396,
+      "bytes_server_downstream_per_round": 82698,
+      "bytes_server_upstream_per_round": 248094,
+      "total_round_bytes": 330792,
+      "total_multi_round_bytes": 1653960,
+      "total_multi_round_mb": 1.5773,
+      "relative_overhead_vs_fedavg": 10.5,
+      "bandwidth_efficiency_notes": "Homomorphic encryption ciphertext expansion (~10.5x bandwidth multiplier)."
+    }
+  },
+  "timestamp": "2026-09-28 16:45:17Z"
+}

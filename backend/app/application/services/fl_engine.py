@@ -34,6 +34,10 @@ if TYPE_CHECKING:
     from app.application.services.model_service import ModelService
     from app.application.services.privacy_service import PrivacyService
     from app.config import Settings
+    from app.infrastructure.security.compression_engine import (
+        ProtocolCommunicationProfile,
+        SerializationFormat,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -803,3 +807,42 @@ class FederatedLearningEngine:
             for k in keys:
                 aggregated[k] += counts.get(k, 0)
         return aggregated
+
+    def profile_communication_round(
+        self,
+        num_parameters: int | None = None,
+        num_clients: int | None = None,
+        method: AggregationMethod | None = None,
+        serialization_format: SerializationFormat | None = None,
+    ) -> ProtocolCommunicationProfile:
+        """Profiles network transmission bytes and bandwidth consumption for an aggregation round."""
+        from app.infrastructure.security.compression_engine import (
+            FederatedCommunicationProfiler,
+            FederatedProtocol,
+        )
+        from app.infrastructure.security.compression_engine import (
+            SerializationFormat as SerFormat,
+        )
+
+        n_params = num_parameters if num_parameters is not None else 1969
+        n_clients = num_clients if num_clients is not None else 3
+        if n_clients < 2:
+            n_clients = 3
+
+        ser_fmt = serialization_format if serialization_format is not None else SerFormat.RAW_FP32
+
+        if method == AggregationMethod.SCAFFOLD:
+            proto = FederatedProtocol.SCAFFOLD
+        elif method == AggregationMethod.FED_PROX:
+            proto = FederatedProtocol.FED_PROX
+        else:
+            proto = FederatedProtocol.FED_AVG
+
+        profiler = FederatedCommunicationProfiler()
+        return profiler.profile_protocol(
+            num_parameters=n_params,
+            num_clients=n_clients,
+            num_rounds=1,
+            protocol=proto,
+            serialization_format=ser_fmt,
+        )
