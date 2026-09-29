@@ -1,4 +1,25 @@
 {
+  "buildCommand": "cd frontend && npm install && npm run build",
+  "outputDirectory": "frontend/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/api/:path*"
+    },
+    {
+      "source": "/v1/:path*",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/v1/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/health"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
   "crons": [
     {
       "path": "/v1/cron/cleanup-sessions",
