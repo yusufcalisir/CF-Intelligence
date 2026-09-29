@@ -13,7 +13,7 @@ This document provides the authoritative, publication-grade, step-by-step reprod
 
 The platform guarantees three levels of reproducibility:
 1. **Bitwise Exact Software Determinism**: All non-convex stochastic optimizers (FedAvg, FedProx, DP-SGD), graph neighborhood samplers, and synthetic transaction generators utilize cryptographically initialized pseudo-random seeds ($S \in \{42, 123, 456, 789, 101112\}$) and PyTorch deterministic algorithms (`torch.use_deterministic_algorithms(True)`).
-2. **Empirical Metric Parity**: All reported evaluation metrics ($\operatorname{PR-AUC}$, $\operatorname{ROC-AUC}$, $\text{Recall @ 0.01% FPR}$, $\text{Recall @ 0.1% FPR}$, $\text{ECE}$, $\text{Brier Score}$) reconcile within documented floating-point confidence intervals ($95\%\text{ CI}$) across distinct CPU/GPU architectures.
+2. **Empirical Metric Parity**: All reported evaluation metrics ($\text{PR-AUC}$, $\text{ROC-AUC}$, $\text{Recall @ 0.01% FPR}$, $\text{Recall @ 0.1% FPR}$, $\text{ECE}$, $\text{Brier Score}$) reconcile within documented floating-point confidence intervals ($95\%\text{ CI}$) across distinct CPU/GPU architectures.
 3. **Immutable 5-Artifact Hierarchy**: Every executed experiment writes an identical, auditable artifact bundle (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/*.png`), ensuring external MLflow, Weights & Biases, or regulatory audit ingestion without proprietary tool lock-in.
 
 ---

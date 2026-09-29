@@ -45,7 +45,7 @@ This dossier documents the full factorial ablation experiment across four fundam
 
 Average marginal contribution of activating each component across all 8 orthogonal background combinations:
 
-| Architectural Factor | $\Delta\operatorname{PR-AUC}$ | $\Delta$ Recall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
+| Architectural Factor | ΔPR-AUC | ΔRecall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Graph** | **+0.3359** | **+0.2500** | +12.9% | +0.0% | Neighborhood structural features provide the largest single detection boost. |
 | **CrossBank** | **+0.4051** | **+0.4167** | -19.5% | +0.0% | Cross-bank consortium signals expose inter-institutional smurfing invisible to local banks. |
@@ -56,7 +56,7 @@ Average marginal contribution of activating each component across all 8 orthogon
 
 ## 4. Architectural Interaction Synergies
 
-| Component Pair | Interaction Effect ($\Delta\operatorname{PR-AUC}$) | Synergy Description |
+| Component Pair | Interaction Effect (ΔPR-AUC) | Synergy Description |
 | :--- | :---: | :--- |
 | **Graph x CrossBank** | **-0.6291** | Synergistic multi-hop inter-bank ring detection exceeding sum of parts |
 | **DP x Graph** | **-0.0168** | Graph structural signal robustness against DP Gaussian gradient noise |

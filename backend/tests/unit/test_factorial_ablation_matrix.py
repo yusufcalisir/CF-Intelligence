@@ -183,14 +183,14 @@ def test_documentation_section_30_in_enterprise_report() -> None:
         assert f"`C{i:02d}`" in content
 
 
-def test_readme_section_15_11_synchronization() -> None:
-    """Verify that Section 15.11 is present and complete in README.md."""
+def test_readme_section_15_12_synchronization() -> None:
+    """Verify that Section 15.12 is present and complete in README.md."""
     assert _README.is_file()
     content = _README.read_text(encoding="utf-8")
 
-    assert "### 15.11 Architectural Component Factorial Ablation Matrix ($2^4 = 16$ Grid)" in content
+    assert "### 15.12 Architectural Component Factorial Ablation Matrix ($2^4 = 16$ Grid)" in content
     assert "Statistical ANOVA Marginal Main Effects" in content
-    assert "### 15.12 Reproducible Benchmark CLI Commands" in content
+    assert "### 15.13 Reproducible Benchmark CLI Commands" in content
 
     # Verify table contains C01 through C16
     for i in range(1, 17):

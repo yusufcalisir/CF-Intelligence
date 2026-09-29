@@ -20,6 +20,25 @@
 
 ---
 
+## Architectural Specification Index (Table of Contents)
+
+| Core Production Architecture | Engineering Rationale & Validation | Research, Governance & Foundations |
+|:---|:---|:---|
+| [1. Executive Summary & Three-Tier Scope](#1-executive-summary--three-tier-architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Tier 2: Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations) |
+| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations](#14-limitations--what-this-is-not) / [14.1 Taxonomy](#141-dual-axis-verification-taxonomy-software-correctness-vs-scientific-generalization) | [20. Tier 3: Consortium Simulations](#20-tier-3-demonstrations--consortium-simulations) |
+| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Prerequisites & System Requirements](#21-prerequisites-and-system-requirements) |
+| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. Quick Start Guide](#22-step-by-step-operator-quick-start) |
+| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
+| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--core-specification) | [24. Related Work & References](#24-related-work-and-references) |
+| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Citation](#25-academic-citation-and-reference-format) |
+| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [26. Author & Maintenance](#26-author-and-maintenance) |
+| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
+| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) | [📖 Complete API Reference](docs/api_reference.md) |
+| [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |
+| [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
+
+---
+
 ## 1. Executive Summary & Three-Tier Architectural Scope
 
 Financial institutions often possess fragmented fraud intelligence. Sharing raw transaction or customer data creates privacy, regulatory, and competitive constraints. **CF-Intelligence** explores how institutions can collaborate on fraud intelligence while minimizing centralized exposure of sensitive data.
@@ -134,25 +153,6 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,308 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
-
----
-
-## Architectural Specification Index (Table of Contents)
-
-| Core Production Architecture | Engineering Rationale & Validation | Research, Governance & Foundations |
-|:---|:---|:---|
-| [1. Executive Summary & Three-Tier Scope](#1-executive-summary--three-tier-architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Tier 2: Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations) |
-| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations](#14-limitations--what-this-is-not) / [14.1 Taxonomy](#141-dual-axis-verification-taxonomy-software-correctness-vs-scientific-generalization) | [20. Tier 3: Consortium Simulations](#20-tier-3-demonstrations--consortium-simulations) |
-| [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Prerequisites & System Requirements](#21-prerequisites-and-system-requirements) |
-| [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. Quick Start Guide](#22-step-by-step-operator-quick-start) |
-| [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
-| [6. Core PET Security Perimeter](#6-core-privacy-enhancing-technologies-dp--secagg) | [18. API Blueprints](#18-api-endpoint-blueprints--core-specification) | [24. Related Work & References](#24-related-work-and-references) |
-| [7. Byzantine Defense](#7-byzantine-poisoning-defense--adversarial-robustness) | [🔬 Algorithm Specifications](docs/algorithms/README.md) | [25. Citation](#25-academic-citation-and-reference-format) |
-| [8. Graph Intelligence](#8-graph-intelligence--fuzzy-entity-resolution) | [🛡️ Formal Threat Model](docs/threat-model.md) | [26. Author & Maintenance](#26-author-and-maintenance) |
-| [9. Composite Risk Engine](#9-9-signal-composite-risk-engine--model-explainability) | [🔒 Formal Privacy Model](docs/privacy-model.md) | [📋 Engineering Audit Report](docs/engineering-audit.md) |
-| [10. Multi-Layer Defense & Gateway](#10-multi-layer-defense-gateway-broken-access-control--rate-limiting) | [📊 Benchmark Figures & Raw Data](benchmarks/results/summary.md) | [📖 Complete API Reference](docs/api_reference.md) |
-| [11. Case Management & European RegTech](#11-human-in-the-loop-workbench-european-finint--regulatory-regtech) | | |
-| [12. Database, HA & Disaster Recovery](#12-database-architecture-ha--disaster-recovery-operations) | | |
 
 ---
 
@@ -975,7 +975,7 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 ### 8.1 PyTorch GraphSAGE Inductive Graph Intelligence (`graph_embedding_service.py`, `experiments/elliptic/train_graphsage.py`, & `experiments/amlsim/evaluate_patterns.py`)
 Trains 2-layer inductive GraphSAGE models with skip projections, layer normalization, and neighborhood aggregators (Mean and GCN Symmetric) over transaction graphs.
 - **Elliptic Bitcoin Transaction Graph Benchmark**: Evaluated across $N = 203{,}769$ transaction nodes and $234{,}355$ directed edges under strict zero-leakage temporal split (timesteps 1–34 train vs 35–49 test). In ultra-strict false alarm regimes ($\le 0.1\%$ FPR), GraphSAGE achieves **Recall @ 0.1% FPR of 13.20% (and 14.96% for 1-hop)** vs **8.22% for Tabular MLP** (+4.99 percentage points, a **+60.7% relative improvement**). Latency: $6.16\text{ ms}$ per $1{,}000$ transactions. Artifacts: [`benchmarks/results/raw/graphsage_elliptic_benchmark.json`](benchmarks/results/raw/graphsage_elliptic_benchmark.json), [`docs/algorithms/graphsage.md`](docs/algorithms/graphsage.md), [`docs/figures/benchmark_graphsage_elliptic.png`](docs/figures/benchmark_graphsage_elliptic.png).
-- **IBM AMLSim Multi-Hop Laundering Topology Interception**: Evaluated on $1{,}323{,}234$ transactions across $10{,}000$ accounts under strict chronological split ($t \le 140$ train vs $t > 140$ test). GraphSAGE 2-Layer captures **67.36% of circular laundering loops (Cycles)** (+2.08 percentage points uplift vs Tabular MLP: 65.28%) and **70.50% of structured smurfing patterns (Fan-In)** (+5.75 percentage points uplift vs Tabular MLP: 64.75%), with overall PR-AUC of **0.6527** (+0.0434 $\Delta\operatorname{PR-AUC}$) and Recall @ 0.1% strict FPR of **64.12%** (+4.19% uplift). Sub-2ms inference: $1.11\text{ ms}$ per $1{,}000$ transactions. Artifacts: [`benchmarks/results/raw/fraud_benchmark_amlsim.json`](benchmarks/results/raw/fraud_benchmark_amlsim.json), [`experiments/amlsim/audit_dossier.md`](experiments/amlsim/audit_dossier.md), [`docs/figures/benchmark_amlsim_comparison.png`](docs/figures/benchmark_amlsim_comparison.png).
+- **IBM AMLSim Multi-Hop Laundering Topology Interception**: Evaluated on $1{,}323{,}234$ transactions across $10{,}000$ accounts under strict chronological split ($t \le 140$ train vs $t > 140$ test). GraphSAGE 2-Layer captures **67.36% of circular laundering loops (Cycles)** (+2.08 percentage points uplift vs Tabular MLP: 65.28%) and **70.50% of structured smurfing patterns (Fan-In)** (+5.75 percentage points uplift vs Tabular MLP: 64.75%), with overall PR-AUC of **0.6527** (+0.0434 $\Delta\text{PR-AUC}$) and Recall @ 0.1% strict FPR of **64.12%** (+4.19% uplift). Sub-2ms inference: $1.11\text{ ms}$ per $1{,}000$ transactions. Artifacts: [`benchmarks/results/raw/fraud_benchmark_amlsim.json`](benchmarks/results/raw/fraud_benchmark_amlsim.json), [`experiments/amlsim/audit_dossier.md`](experiments/amlsim/audit_dossier.md), [`docs/figures/benchmark_amlsim_comparison.png`](docs/figures/benchmark_amlsim_comparison.png).
 
 ### 8.2 Fuzzy Private Set Intersection (PSI) (`fuzzy_psi.py` & `entity_resolution.py`)
 Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer entities across institutions without sharing plain customer identifiers or raw database records.
@@ -983,7 +983,9 @@ Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer enti
 ### 8.3 Cross-Border Corporate UBO & Heterogeneous Graph Intelligence (`ubo_graph_service.py` & `ubo_graph.py`)
 - **Multi-Tier Beneficial Ownership Graph Traversal:** Ingests complex corporate ownership structures as directed property graphs, tracing shareholding pathways from target legal entities (`ORG_*`) to ultimate natural persons (`PER_*`).
 - **Compounded Indirect Shareholding Calculation:** Automatically compounds indirect equity stakes along directed paths across arbitrarily nested holding and nominee structures:
+
   $$\mathrm{Ownership}_{\mathrm{eff}}(u, e) = \sum_{p \in \mathcal{P}(u, e)} \prod_{(v, w) \in p} \mathrm{share}(v, w)$$
+
 - **EU AMLD6 / 4AMLD 25% Statutory Threshold Gate:** Automatically flags natural persons whose cumulative direct and indirect effective equity or voting rights reach or exceed $\ge 25.0\%$ as primary Ultimate Beneficial Owners (UBOs).
 - **Tarjan DFS Circular Ownership Loop Detection:** Applies depth-first cycle search algorithms to identify circular corporate layering rings ($\mathrm{Entity}_A \to \mathrm{Entity}_B \to \mathrm{Entity}_C \to \mathrm{Entity}_A$) engineered to obscure true controlling entities.
 - **Shell Company & Nominee Syndicate Risk Clustering:** Evaluates corporate structures for asset-shielding indicators, including high-risk FATF secrecy jurisdictions, single-director nominee saturation across unrelated corporations, and opaque multi-jurisdictional shell cascades.
@@ -1025,6 +1027,7 @@ The platform implements rigorous model explainability and actionable remediation
 $$
 \sum_{i=1}^{M} \phi_i(\mathbf{x}) + \mathbb{E}[f(X)] = f(\mathbf{x}) \quad (\text{Observed residual: } |\sum \phi_i + \text{base value} - f(\mathbf{x})| < 10^{-8})
 $$
+
    - Each returned explanation includes the exact attribution $\phi_i$, the normalized feature value, the model output, expected base value, and an explicit `explanation_method: "shap_kernel_explainer"` provenance tag. Analytical heuristics are retained strictly as an emergency secondary fallback and are always explicitly labeled with `explanation_method: "fallback_heuristic"`.
 
 2. **Real Counterfactual Remediation Simulator (`generate_counterfactuals`):**
@@ -1183,7 +1186,9 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 ### 11.4 Real-Time Multi-List Sanctions & PEP Screening Engine (`screening_service.py` & `screening.py`)
 - **Multi-List Global Registry:** Real-time screening against UN Consolidated List, EU Common Foreign and Security Policy (CFSP) List, US OFAC Specially Designated Nationals (SDN) List, and Politically Exposed Persons (PEP) registries.
 - **Dual-Algorithm Fuzzy String Matching:** Combines the Jaro-Winkler prefix-weighted metric ($p=0.10$) and normalized Levenshtein edit distance:
+
   $$S_{\mathrm{composite}} = 0.60 \cdot S_{\mathrm{jw}} + 0.40 \cdot S_{\mathrm{lev}}$$
+
 - **Secondary Demographic Disambiguation:** Candidates with $S_{\mathrm{composite}} \ge 0.70$ undergo secondary validation against Date of Birth (DOB) and ISO 3166-1 alpha-2 Nationality, boosting confidence by $+0.15$ for matched attributes.
 - **Audited Whitelist Bypass:** Compliance officers can register verified false positives in an institution-isolated whitelist with audit notes and dual sign-off, bypassing repetitive operational halts.
 
@@ -1195,7 +1200,9 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 ### 11.6 European AML Monitoring Scenario Library & Hybrid Rule Engine (`european_scenario_library.py` & `european_scenarios.py`)
 - **16 Pre-Configured European Banking AML Typologies:** Codifies 16 production scenarios aligned with European Banking Authority (EBA) mandates and FATF typologies, including Sub-€10,000 Structuring/Smurfing (`SCN_EUR_STRUCTURING_SUB_10K`), Rapid Pass-Through Mule Accounts (`SCN_EUR_PASS_THROUGH_MULE`), High-Risk Non-Cooperative Jurisdiction Flows (`SCN_EUR_HIGH_RISK_JURISDICTION`), Round Amount Velocity Layering (`SCN_EUR_ROUND_AMOUNT_LAYERING`), Dormant Account Sudden Awakening (`SCN_EUR_DORMANT_SUDDEN_ACTIVITY`), Fan-Out Disbursement (`SCN_EUR_FAN_OUT_DISBURSEMENT`), and Terrorist Financing Indicators.
 - **Hybrid Scoring Synthesis Engine:** Synthesizes deterministic regulatory rule breaches with federated machine learning anomaly scores to produce an authoritative composite risk score:
+
   $$S_{\mathrm{hybrid}} = \alpha \cdot S_{\mathrm{rules}} + (1 - \alpha) \cdot S_{\mathrm{ml}} \quad (\text{default } \alpha = 0.50)$$
+
 - **Explainability Narrative Compiler:** Automatically compiles human-readable investigative narratives summarizing exact rule trigger conditions, threshold deviations, and recommended statutory actions (`ALLOW`, `MANUAL_REVIEW`, `SAR_ESCALATION`, `IMMEDIATE_BLOCK`) to accelerate compliance officer triage.
 
 ### 11.7 Asset Recovery & Collaborative FININT Operational Hub (`asset_recovery_service.py` & `asset_recovery.py`)
@@ -1303,7 +1310,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Deterministic Implementation         │ Stochastic Empirical Learning        │
-│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+│ "Is code bug-free & contract-safe?"  │ "Does model generalize to data?"     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
 │   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │
@@ -1438,7 +1445,7 @@ Stress-testing the real-time scoring gateway under concurrent client loads ($C \
 
 *Host-calibration (20 warmup runs, AMD Ryzen / Windows 11 / PyTorch 2.12.0+cpu):* **p50 = 2.716 ms, p95 = 3.106 ms, p99 = 3.206 ms** single-stream.
 
-*Peak throughput: **1,791 req/s** at $C = 50$ (GIL saturation onset). Single-stream and standard-concurrency SLAs confirmed.*
+*Peak throughput:* **1,791 req/s** at concurrency $C = 50$ (GIL saturation onset). Single-stream and standard-concurrency SLAs confirmed.
 
 #### Disambiguating Model Inference vs API Layer Bottleneck:
 Under concurrency ($C \ge 100$), the PyTorch forward pass itself takes $< 0.5\mathrm{ms}$ (less than 25% of total request duration). Bottlenecks under load stem from connection pooling, threadpool context switching, and Redis async transport contention—not the neural network model.
@@ -1516,7 +1523,7 @@ To quantify collaborative value and privacy trade-offs, five distinct paradigms 
 
 ### 15.8 Multi-Seed Statistical Robustness & Confidence Intervals (`experiments/harness/multi_seed_runner.py`)
 
-To eliminate random initialization variance artifacts and establish statutory confidence bounds, benchmarks are evaluated across **5 deterministic seeds** ($\{42, 123, 456, 789, 1024\}$). Metrics report empirical mean, sample standard deviation ($\mu \pm \sigma$, $ddof=1$), and $95\%$ Student-$t$ confidence intervals ($t_{0.975, \, 4} = 2.776$):
+To eliminate random initialization variance artifacts and establish statutory confidence bounds, benchmarks are evaluated across **5 deterministic seeds** ($\{42, 123, 456, 789, 1024\}$). Metrics report empirical mean, sample standard deviation ($\mu \pm \sigma$, $ddof=1$), and $95\%$ Student-t confidence intervals ($t_{0.975, \, 4} = 2.776$):
 
 | Benchmark Suite | Paradigm / Strategy | Metric Dimension | Empirical Mean ($\mu \pm \sigma$) | 95% Confidence Interval | Observed [Min, Max] |
 | :--- | :--- | :--- | :---: | :---: | :---: |
@@ -1618,7 +1625,7 @@ Full factorial attribution ($N = 8{,}000, K = 5, \alpha = 0.5$) across four foun
 
 #### Statistical ANOVA Marginal Main Effects
 
-| Factor | $\Delta\operatorname{PR-AUC}$ | $\Delta\text{Recall @ 0.01% FPR}$ | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
+| Factor | ΔPR-AUC | ΔRecall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Graph** | **+0.3359** | **+0.2500** | +12.9% | +0.0% | Multi-hop structural embeddings offer the single highest individual detection uplift. |
 | **CrossBank** | **+0.4051** | **+0.4167** | -19.5% | +0.0% | Cross-bank transaction flow features expose distributed layering invisible to local silos. |
@@ -1695,7 +1702,7 @@ python scripts/verify_reproducibility.py --all
 - **Scope Breakdown:**
   1. *Empirical Datasets & Licensing (8/8)*: PaySim, IEEE-CIS, Credit Card, Elliptic, IBM AMLSim, SynthAML, AMLNet, CFI-CrossBank-01.
   2. *Standardized Experiment Artifacts (8/8)*: Canonical 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`) across all 8 datasets.
-  3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-$t$ 95% CIs).
+  3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
   6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 3,308 Backend Pytest tests, 355 Frontend Vitest tests, 409 Scientific Verification tests across 21 modules, 31 Smart Contract tests and clean static analysis (0 Ruff errors).
@@ -1974,7 +1981,11 @@ A comprehensive discrete-event multi-institution orchestration testbed that spin
 
 ### 20.2 Synthetic Clients & Heterogeneous Partitioning (Dirichlet Non-IID Skew)
 - **Synthetic Data Generation:** Generates synthetic transaction streams using generative probabilistic rules calibrated against public fraud datasets (PaySim, IEEE-CIS). Synthesizes credit transfers, merchant POS, wire transfers, and cross-border remittances.
-- **Dirichlet Distribution Partitioning:** Implements non-uniform class distribution across banks via Dirichlet allocation $\mathbf{p}_k \sim \mathrm{Dir}(\alpha \cdot \mathbf{p}_{\mathrm{global}})$. Demonstrates extreme class imbalance and non-IID conditions across banks ($\alpha = 0.1$ for severe retail/corporate specialization, $\alpha = 0.5$ for realistic cross-bank variance).
+- **Dirichlet Distribution Partitioning:** Implements non-uniform class distribution across banks via Dirichlet allocation:
+
+  $$\mathbf{p}_k \sim \mathrm{Dir}(\alpha \cdot \mathbf{p}_{\mathrm{global}})$$
+
+  Demonstrates extreme class imbalance and non-IID conditions across banks ($\alpha = 0.1$ for severe retail/corporate specialization, $\alpha = 0.5$ for realistic cross-bank variance).
 
 ### 20.3 Simulated Adversarial Poisoning Attacks (`test_attack_injector.py`)
 A rigorous adversarial evaluation harness implementing 4 standard distributed machine learning poisoning attack vectors:
