@@ -25,3 +25,17 @@ This directory contains the authoritative mathematical, algorithmic, and impleme
 1. **Zero Raw PII Transmission**: No raw customer names, account numbers, or plain transaction amounts leave local banking nodes.
 2. **Deterministic Seed Control**: All randomized mechanisms (Gaussian DP, Shamir secret sharing, stochastic mini-batching) support explicit seed initialization for reproducible testing.
 3. **Explicit Threat Boundaries**: Every algorithm document details the specific mathematical adversarial budget ($f < \frac{n-2}{2}$, $\epsilon \le \epsilon_{\max}$, $\delta = 10^{-5}$) under which guarantees hold.
+
+---
+
+### Mathematical & Empirical Evaluation Metric Standards
+
+All quantitative evaluations and model risk validations across these algorithms strictly adhere to the unified standard defined in **[`docs/METRICS.md`](../METRICS.md)**:
+
+| Metric Category | Standard Metrics | Formal Mathematical Target | Applicable Governance Framework |
+| :--- | :--- | :---: | :--- |
+| **Imbalance Detection** | $\operatorname{PR-AUC}$ (Average Precision), $\operatorname{Recall@0.1\%FPR}$ | $\operatorname{PR-AUC} \ge 0.75$, $\operatorname{Recall@0.1\%FPR} \ge 0.60$ | Federal Reserve SR 11-7 / OCC 2011-12 |
+| **Probability Calibration** | $\operatorname{ECE}$ ($M=10$ bins), $\operatorname{BS}$ (Brier Score) | $\operatorname{ECE} \le 0.030$, $\operatorname{BS} \le 0.020$ | EU AI Act Art. 15 (Accuracy & Robustness) |
+| **Population Drift** | $\operatorname{PSI}$ (Traffic-light matrix), $\operatorname{JSD}$ (Symmetric KL) | $\operatorname{PSI} < 0.10$ (stable), $\operatorname{JSD} \le 0.15$ | Basel Committee BCBS 32 Model Risk |
+| **Economic & Fairness** | $\mathcal{L}_{\mathrm{financial}}$ ($C_{\mathrm{FN}}=850$, $C_{\mathrm{FP}}=25$), $\operatorname{DIR}$ | $\theta^*_{\mathrm{cost}} = \arg\min \mathcal{L}$, $0.80 \le \operatorname{DIR} \le 1.25$ | ECOA Reg B / EEOC 80% Rule |
+

@@ -115,6 +115,9 @@ $$\Delta_{\mathrm{collab}} = M(\mathbf{w}_{\mathrm{fed}}^*; \mathcal{D}_{\mathrm
 
 $$\Delta_{\mathrm{privacy}} = M(\mathbf{w}_{\mathrm{pooled}}^*; \mathcal{D}_{\mathrm{global}}^{\mathrm{test}}) - M(\mathbf{w}_{\mathrm{fed}}^*; \mathcal{D}_{\mathrm{global}}^{\mathrm{test}})$$
 
+4. **Authoritative Metric Definitions & Threshold Governance**:
+   All reported quantitative evaluation metrics ($\operatorname{PR-AUC}$, $\operatorname{ROC-AUC}$, $\operatorname{Recall@0.1\%FPR}$, $\operatorname{BS}$, $\operatorname{ECE}$, $\operatorname{PSI}$, $\operatorname{JSD}$) strictly adhere to the formal mathematical definitions, finite-sample sums, and regulatory thresholds (Federal Reserve SR 11-7 / OCC 2011-12 & EU AI Act Article 15) documented in **[docs/METRICS.md](METRICS.md)**.
+
 ### 3.2 Empirical Multi-Paradigm Benchmark Results
 
 Evaluated across $150{,}000$ training transactions and an untouched global consortium test partition of $45{,}000$ transactions ($0.129\%$ fraud prevalence):
