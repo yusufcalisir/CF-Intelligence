@@ -81,10 +81,10 @@ $$
 ### 2.3 Recall at Fixed False Positive Rate (Recall@FPR)
 
 #### Mathematical Definition
-In production anti-fraud operations, human compliance investigator capacity is strictly bounded. Models cannot be evaluated at arbitrary probability thresholds (e.g. $\theta = 0.50$). Instead, the operational threshold $\theta^*$ is calibrated to guarantee that false alarms do not exceed a statutory ceiling $\alpha_{\mathrm{target}}$:
+In production anti-fraud operations, human compliance investigator capacity is strictly bounded. Models cannot be evaluated at arbitrary probability thresholds (e.g. $\theta = 0.50$). Instead, the operational threshold $\theta^{\ast}$ is calibrated to guarantee that false alarms do not exceed a statutory ceiling $\alpha_{\mathrm{target}}$:
 
 $$
-\theta^* = \inf \left\{ \theta \in [0, 1] : \mathrm{FPR}(\theta) \le \alpha_{\mathrm{target}} \right\}
+\theta^{\ast} = \inf \left\lbrace \theta \in [0, 1] : \mathrm{FPR}(\theta) \le \alpha_{\mathrm{target}} \right\rbrace
 $$
 
 where:
@@ -96,7 +96,7 @@ $$
 $\mathrm{Recall@FPR}$ is the sensitivity achieved at this operational threshold:
 
 $$
-\mathrm{Recall}(\alpha_{\mathrm{target}}) = \mathrm{TPR}(\theta^*) = \frac{\sum_{i: y_i = 1} \mathbb{I}(\hat{s}_i \ge \theta^*)}{\sum_{i} \mathbb{I}(y_i = 1)}
+\mathrm{Recall}(\alpha_{\mathrm{target}}) = \mathrm{TPR}(\theta^{\ast}) = \frac{\sum_{i: y_i = 1} \mathbb{I}(\hat{s}_i \ge \theta^{\ast})}{\sum_{i} \mathbb{I}(y_i = 1)}
 $$
 
 #### Standard Banking Operating Points
@@ -231,10 +231,10 @@ where empirical industry loss parameters are:
 - $C_{\mathrm{FP}} = 25\text{ USD}$ (investigator triage labor, SMS two-factor step-up challenge, friction cost).
 - $C_{\mathrm{admin}} = 5\text{ USD}$ (automated routing, database ingestion, compliance ledger overhead).
 
-The optimal economic operating threshold $\theta^*_{\mathrm{cost}}$ minimizes total loss:
+The optimal economic operating threshold $\theta^{\ast}_{\mathrm{cost}}$ minimizes total loss:
 
 $$
-\theta^*_{\mathrm{cost}} = \arg\min_{\theta \in [0, 1]} \mathcal{L}_{\mathrm{financial}}(\theta)
+\theta^{\ast}_{\mathrm{cost}} = \arg\min_{\theta \in [0, 1]} \mathcal{L}_{\mathrm{financial}}(\theta)
 $$
 
 ---

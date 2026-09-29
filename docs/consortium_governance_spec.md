@@ -56,7 +56,13 @@ where:
 
 Quorum threshold resolution follows two deterministic state transitions:
 
-$$\text{Status} = \begin{cases} \text{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\ \text{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\ \text{PENDING} & \text{otherwise} \end{cases}$$
+$$
+\mathrm{Status} = \begin{cases}
+\mathrm{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\
+\mathrm{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\
+\mathrm{PENDING} & \text{otherwise}
+\end{cases}
+$$
 
 - **Approval Condition**: If $\mathrm{ratio}_{\mathrm{for}}$ meets or exceeds the required quorum ratio $\theta_{\mathrm{quorum}}$ (e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
 - **Rejection Condition**: If $\mathrm{ratio}_{\mathrm{against}}$ exceeds the margin ($> 1.0 - \theta_{\mathrm{quorum}}$), reaching quorum is mathematically impossible; the proposal transitions immediately to `REJECTED`.
@@ -115,7 +121,15 @@ $$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} 
 
 Weighted quorum evaluation follows deterministic execution rules:
 
-$$\text{Status} = \begin{cases} \text{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\ \text{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\ \text{EXPIRED} & \text{if elapsed time} \ge \text{TTL} \\ \text{CANCELLED} & \text{if withdrawn by sponsor} \\ \text{PENDING} & \text{otherwise} \end{cases}$$
+$$
+\mathrm{Status} = \begin{cases}
+\mathrm{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\
+\mathrm{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\
+\mathrm{EXPIRED} & \text{if elapsed time} \ge \mathrm{TTL} \\
+\mathrm{CANCELLED} & \text{if withdrawn by sponsor} \\
+\mathrm{PENDING} & \text{otherwise}
+\end{cases}
+$$
 
 - **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}}$ meets or exceeds quorum threshold $\theta_{\mathrm{quorum}}$, status transitions immediately to `APPROVED` and the proposed action is executed.
 - **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}}$ exceeds the threshold ($> 1.0 - \theta_{\mathrm{quorum}}$), reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.

@@ -692,11 +692,11 @@ To quantify the exact utility trade-off under formal Differential Privacy guaran
 - **Noise Multipliers ($\sigma$)**: $\sigma \in \{0.5, 1.0, 1.5, 2.0\}$ with gradient L2 clipping bound $C = 1.0$.
 - **Federation Rounds ($T$)**: $T \in \{5, 10, 20, 50\}$ rounds with subsampling ratio $q = 0.05$.
 - **Formal Privacy Bound**: Computed via Rényi Differential Privacy (RDP) moments accountant with order search $\alpha \in [1.5, 512]$, converting to $(\epsilon, \delta = 10^{-5})$-DP.
-- **Controlled Noise Calibration**: Automated binary search solves for exact $\sigma^*$ satisfying target $\epsilon \le 2.0$ at $T = 50$ rounds ($\sigma^* = 0.8870$).
+- **Controlled Noise Calibration**: Automated binary search solves for exact $\sigma^{\ast}$ satisfying target $\epsilon \le 2.0$ at $T = 50$ rounds ($\sigma^{\ast} = 0.8870$).
 
 #### 16-Configuration Privacy-Utility Grid
 
-| $\sigma$ | $T$ (rounds) | $\epsilon$ | $\alpha^*$ | PR-AUC | ROC-AUC | Budget ($\epsilon \le 2.0$) |
+| $\sigma$ | $T$ (rounds) | $\epsilon$ | $\alpha^{\ast}$ | PR-AUC | ROC-AUC | Budget ($\epsilon \le 2.0$) |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
 | 0.5 | 5 | 1.1006 | 24 | 0.0176 | 0.3576 | ✅ OK |
 | 0.5 | 10 | 1.5675 | 16 | 0.0793 | 0.6672 | ✅ OK |
@@ -718,7 +718,7 @@ To quantify the exact utility trade-off under formal Differential Privacy guaran
 #### Key Empirical Findings & Production Guidelines
 
 1. **Strict Privacy Compliance**: $\sigma \ge 1.0$ guarantees zero budget overrun under $\epsilon \le 2.0$ for all round counts up to $T = 50$. At $\sigma = 1.0, T = 50$, the system achieves $\epsilon = 1.7675$ while retaining strong detection performance ($\mathrm{PR\text{-}AUC} = 0.3922$, $\mathrm{ROC\text{-}AUC} = 0.9452$).
-2. **Calibrated Noise Multiplier**: Analytical RDP calibration derives $\sigma^* = 0.8870$ for exact $\epsilon = 2.0000$ at $T = 50$ rounds.
+2. **Calibrated Noise Multiplier**: Analytical RDP calibration derives $\sigma^{\ast} = 0.8870$ for exact $\epsilon = 2.0000$ at $T = 50$ rounds.
 3. **Subsampled Gaussian Amplification**: Subsampling ratio $q = 0.05$ provides significant privacy amplification over naïve full-batch Gaussian mechanisms.
 4. **4-Panel Publication Figure**: [`docs/figures/benchmark_privacy_utility.png`](figures/benchmark_privacy_utility.png) visualizes: (1) Privacy-Utility Frontier ($\epsilon$ vs PR-AUC), (2) $\epsilon$ vs $\sigma$ Curves across round counts, (3) Utility Degradation vs Noise Level, and (4) Privacy Loss $\epsilon$ Heatmap.
 - Dossier: [`experiments/dp_evaluation/audit_dossier.md`](../experiments/dp_evaluation/audit_dossier.md).
@@ -1019,7 +1019,7 @@ $$\mathcal{S}(\tau) = \mathcal{C}_{\mathrm{baseline}} - \mathcal{C}(\tau)$$
 
 $$\mathrm{Efficiency}(\tau) = \frac{\mathcal{S}(\tau)}{\mathcal{C}_{\mathrm{baseline}}} \times 100$$
 
-The optimal operational decision cutoff $\tau^*$ minimizes aggregate financial expenditure:
+The optimal operational decision cutoff $\tau^{\ast}$ minimizes aggregate financial expenditure:
 
 $$\tau^* = \arg\min_{\tau} \mathcal{C}(\tau) \equiv \arg\max_{\tau} \mathcal{S}(\tau)$$
 
@@ -1039,13 +1039,13 @@ The benchmark evaluates discrete candidate decision thresholds on a held-out tes
 | `850` | `0.85` | 27 | 4 | 73 | 27.00% | 87.10% | 0.082% | $62,635.00 | $22,365.00 | 26.3% |
 | `900` | `0.90` | 10 | 0 | 90 | 10.00% | 100.00% | 0.000% | $76,650.00 | $8,350.00 | 9.8% |
 
-\* **Optimal Decision Operating Point**: $\tau^* = 600$ (normalized $\theta^* = 0.60$) minimizes total operational expenditure to **$24,070.00** and delivers maximal net financial savings of **$60,930.00** (efficiency ratio **71.7%**).
+\* **Optimal Decision Operating Point**: $\tau^{\ast} = 600$ (normalized $\theta^{\ast} = 0.60$) minimizes total operational expenditure to **$24,070.00** and delivers maximal net financial savings of **$60,930.00** (efficiency ratio **71.7%**).
 
 ### 20.3 Analysis & Key Financial Insights
 
-1. **Convexity of Financial Loss Function**: As decision threshold $\tau$ increases from 500 to 900, false alarms decrease monotonically ($434 \to 0$), reducing analyst overhead ($c_{\mathrm{FP}} \cdot \mathrm{FP}$). However, missed fraud cases accelerate ($7 \to 90$), with each missed case costing 850 USD ($c_{\mathrm{FN}}$). The cost curve exhibits a clear convex global minimum at $\tau^* = 600$.
-2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of 47,580.00 USD—representing **nearly double the operational cost** of $\tau^* = 600$, solely due to unmitigated false negative chargebacks.
-3. **Interactive Control (`ThresholdTuningSlider.tsx`)**: Risk officers can dynamically adjust both decision cutoffs ($\tau \in [500, 900]$) and institution-specific unit cost parameters ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}$) via the interactive `ThresholdTuningSlider` mounted on the Declarative Policy Engine (`frontend/src/pages/PoliciesPage.tsx`). The component projects live confusion matrices, sensitivity metrics, net savings, and provides one-click snapping to the Bayesian cost-optimal threshold $\tau^*$.
+1. **Convexity of Financial Loss Function**: As decision threshold $\tau$ increases from 500 to 900, false alarms decrease monotonically ($434 \to 0$), reducing analyst overhead ($c_{\mathrm{FP}} \cdot \mathrm{FP}$). However, missed fraud cases accelerate ($7 \to 90$), with each missed case costing 850 USD ($c_{\mathrm{FN}}$). The cost curve exhibits a clear convex global minimum at $\tau^{\ast} = 600$.
+2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of 47,580.00 USD—representing **nearly double the operational cost** of $\tau^{\ast} = 600$, solely due to unmitigated false negative chargebacks.
+3. **Interactive Control (`ThresholdTuningSlider.tsx`)**: Risk officers can dynamically adjust both decision cutoffs ($\tau \in [500, 900]$) and institution-specific unit cost parameters ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}$) via the interactive `ThresholdTuningSlider` mounted on the Declarative Policy Engine (`frontend/src/pages/PoliciesPage.tsx`). The component projects live confusion matrices, sensitivity metrics, net savings, and provides one-click snapping to the Bayesian cost-optimal threshold $\tau^{\ast}$.
 
 **Test Execution Parity**: 17/17 Pytest unit tests passed on `backend/tests/unit/test_risk_utility.py`; 5/5 Vitest tests passed on `ThresholdTuningSlider.test.tsx`.
 
@@ -1294,7 +1294,7 @@ CF-Intelligence implements a mathematically rigorous drift telemetry engine in [
 #### 1. Population Stability Index (PSI) with Laplace Smoothing
 Measures the divergence between the actual operational distribution $A$ and the baseline expected distribution $E$ across $K = 10$ quantile bins:
 
-$$\mathrm{PSI}(A \parallel E) = \sum_{k=1}^K (A_k - E_k) \ln\left( \frac{A_k}{E_k} \right)$$
+$$\mathrm{PSI}(A \mathbin{\Vert} E) = \sum_{k=1}^K (A_k - E_k) \ln\left( \frac{A_k}{E_k} \right)$$
 
 where $A_k, E_k$ are the empirical percentages of observations in bin $k$, normalized with additive Laplace smoothing ($\lambda = 10^{-4}$) to prevent undefined logarithmic evaluation on empty bins:
 
@@ -1312,7 +1312,7 @@ where $F_{1, n_1}$ and $F_{2, n_2}$ are the empirical cumulative distribution fu
 #### 3. Normalized Wasserstein-1 Distance (Earth Mover's Distance)
 Quantifies the minimum transport cost between current and reference feature distributions, normalized by reference standard deviation $\sigma_{\mathrm{ref}}$ for scale-invariant comparability:
 
-$$W_1^*(P, Q) = \frac{1}{\sigma_{\mathrm{ref}}} \int_{-\infty}^{\infty} \lvert F_P(x) - F_Q(x) \rvert \, dx$$
+$$W_1^{\ast}(P, Q) = \frac{1}{\sigma_{\mathrm{ref}}} \int_{-\infty}^{\infty} \lvert F_P(x) - F_Q(x) \rvert \, dx$$
 
 #### 4. Benjamini-Hochberg False Discovery Rate (FDR) Control
 Across $m$ monitored feature hypotheses, unadjusted testing at $\alpha = 0.05$ produces an inflated family-wise error rate ($\mathrm{FWER} \approx 1 - (1 - 0.05)^m \approx 0.401$ (40.1%) for $m = 10$). CF-Intelligence controls false discovery rate by ordering raw $p$-values $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$ and identifying significant features satisfying:
@@ -1332,7 +1332,7 @@ Quantifies reliability curve alignment between model confidence $\hat{p}_i$ and 
 
 Evaluated across $N = 600$ transactions per distribution under three operational regimes:
 
-| Monitored Feature / Concept | KS Stat ($D$) | KS $p$-value | Wasserstein ($W_1^*$) | PSI Divergence | Feature Status | Retraining Disposition |
+| Monitored Feature / Concept | KS Stat ($D$) | KS $p$-value | Wasserstein ($W_1^{\ast}$) | PSI Divergence | Feature Status | Retraining Disposition |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
 | `transaction_amount` (Stable) | 0.0245 | 0.7812 | 0.1205 | 0.0000 | `STABLE` | Baseline Maintained |
 | `velocity_1h` (Stable) | 0.0182 | 0.8945 | 0.0821 | 0.0000 | `STABLE` | Baseline Maintained |
@@ -1620,7 +1620,7 @@ C = 250: 1,286 r/s  (moderate degradation under heavy context switching)
 C = 500: 1,044 r/s  (further degradation; threadpool queuing dominates)
 ```
 
-**Throughput Saturation Point**: $C^* \approx 50$ concurrent workers, yielding peak throughput of **1,791 req/s** on this AMD Ryzen host. Beyond $C^*$, the Python GIL prevents additional CPU core utilization and OS context-switching overhead begins consuming a growing fraction of available CPU time.
+**Throughput Saturation Point**: $C^{\ast} \approx 50$ concurrent workers, yielding peak throughput of **1,791 req/s** on this AMD Ryzen host. Beyond $C^{\ast}$, the Python GIL prevents additional CPU core utilization and OS context-switching overhead begins consuming a growing fraction of available CPU time.
 
 #### Latency Scaling Model
 
@@ -1630,7 +1630,7 @@ $$p50(C) \approx p50(1) \cdot C, \quad C \le C^*$$
 
 For $C = 1$ to $C = 50$: $p50 = 2.39 \times 50 / 1 \approx 119.5\text{ ms}$ (linear prediction) vs empirical $17.94\text{ ms}$ — the sub-linear scaling ($7.5\times$ instead of $50\times$) confirms effective GIL time-sharing across threads below saturation, with short-circuit reuse of JIT-compiled paths reducing per-thread overhead.
 
-Beyond $C^* = 50$, tail latency escalates due to thread-pool queuing:
+Beyond $C^{\ast} = 50$, tail latency escalates due to thread-pool queuing:
 
 $$p99(500) = 361.49\text{ ms} = 102 \times p99(1) \quad \text{(vs linear prediction of } 1{,}765\text{ ms)}$$
 
@@ -1740,7 +1740,7 @@ This rigorous protocol replaces historical point estimates with statistical inte
 
 To ensure enterprise deployments do not mask localized vulnerabilities beneath monolithic summary metrics (e.g. global ROC-AUC = 0.942), the platform executes systematic residual stratification across four orthogonal banking operational dimensions:
 
-1. **Transaction Amount Stratification**: Evaluates model sensitivity across Micro ($<\$50$), Low ($\$50-\$250$), Medium ($\$250-\$1,000$), High ($\$1,000-\$9,000$), Near-Threshold Structuring ($\$9,000-\$10,000$), and Large/Jumbo ($>\$10,000$) bins to capture smurfing schemes designed to evade statutory currency reporting thresholds.
+1. **Transaction Amount Stratification**: Evaluates model sensitivity across Micro (< \$50), Low (\$50–\$250), Medium (\$250–\$1,000), High (\$1,000–\$9,000), Near-Threshold Structuring (\$9,000–\$10,000), and Large/Jumbo (> \$10,000) bins to capture smurfing schemes designed to evade statutory currency reporting thresholds.
 2. **Diurnal Temporal Stratification**: Slices transactions into four 6-hour quadrants (Late Night `00:00-05:59`, Morning Peak `06:00-11:59`, Afternoon Business `12:00-17:59`, Evening Leisure `18:00-23:59`) to detect diurnal distribution shifts and off-hours automated batch clearing anomalies.
 3. **Merchant Category Code (MCC) Grouping**: Aggregates transactions into commercial risk categories: ATM Cash (`6011`), Quasi-Cash & Financial Wires (`6012`/`4829`), Retail/Grocery (`5411`/`5311`), Dining (`5812`/`5814`), High-Risk/Gambling/Crypto (`7995`/`6051`), Specialty Retail (`5999`/`5967`), and Uncategorized (`0000`).
 4. **Graph Topological Degree Stratification**: Partitions nodes by graph degree $k$ (count of incident transactions and counterparties) into Isolated ($k=1$), Low Connectivity ($k=2-4$), Moderate Connectivity ($k=5-15$), Hub ($k=16-50$), and Super-Hub Aggregators ($k>50$) to evaluate inductive GNN neighborhood over-smoothing.
