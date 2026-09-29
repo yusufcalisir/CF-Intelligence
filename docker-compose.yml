@@ -213,7 +213,7 @@ services:
     networks:
       - cfi-network
     healthcheck:
-      test: ["CMD", "vault", "status"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8200/v1/sys/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
