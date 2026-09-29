@@ -11,7 +11,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from scripts.verify_reproducibility import REPO_ROOT, ReproducibilityVerifier, SweepItemResult
 
 

@@ -8,12 +8,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-
 from experiments.error_analysis.stratify_errors import (
-    ErrorStratificationAnalysis,
     ErrorStratifier,
-    FailureModeRecord,
-    StratumMetrics,
     run_error_stratification_analysis,
 )
 
@@ -238,14 +234,14 @@ class TestArtifactSerializationAndIntegrity:
     def test_custom_output_path_saves_valid_json(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             out_file = Path(tmpdir) / "test_error_analysis.json"
-            analysis = run_error_stratification_analysis(
+            run_error_stratification_analysis(
                 sample_size=500,
                 seed=42,
                 output_path=out_file,
                 save_artifact=True,
             )
             assert out_file.exists()
-            with open(out_file, "r", encoding="utf-8") as f:
+            with open(out_file, encoding="utf-8") as f:
                 data = json.load(f)
             assert data["sample_size"] == 500
             assert "amount_stratification" in data
@@ -263,7 +259,7 @@ class TestArtifactSerializationAndIntegrity:
             / "error_stratification_analysis.json"
         )
         assert golden_path.exists(), f"Golden artifact missing at {golden_path}"
-        with open(golden_path, "r", encoding="utf-8") as f:
+        with open(golden_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert data["sample_size"] == 10000

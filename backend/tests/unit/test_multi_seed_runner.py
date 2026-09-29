@@ -14,14 +14,10 @@ import json
 import math
 from pathlib import Path
 
-import numpy as np
-import pytest
-
 from experiments.harness.multi_seed_runner import (
     CANONICAL_SEEDS,
     MultiSeedBenchmarkRunner,
     MultiSeedReportManifest,
-    StatisticalMetric,
     compute_statistical_metric,
     get_t_critical_value,
 )
@@ -161,7 +157,7 @@ class TestMultiSeedArtifactSerializationAndIntegrity:
             output_file=custom_out,
             save_artifact=True,
         )
-        manifest = runner.run_all(fl_rounds=1, fraud_rounds=1, harness_rounds=1)
+        runner.run_all(fl_rounds=1, fraud_rounds=1, harness_rounds=1)
 
         assert custom_out.exists()
         with open(custom_out, encoding="utf-8") as f:
