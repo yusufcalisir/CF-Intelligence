@@ -535,6 +535,32 @@ app = FastAPI(
     redoc_url=None,
 )
 
+
+def custom_openapi() -> dict:
+    """Generate OpenAPI schema enriched with official brand x-logo metadata for ReDoc & Scalar."""
+    if app.openapi_schema:
+        return app.openapi_schema
+    from fastapi.openapi.utils import get_openapi
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        openapi_version=app.openapi_version,
+        description=app.description,
+        routes=app.routes,
+    )
+    openapi_schema["info"]["x-logo"] = {
+        "url": "/logo.svg",
+        "backgroundColor": "#0b0f19",
+        "altText": "CF-Intelligence Logo",
+        "href": "/",
+    }
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi  # type: ignore[method-assign]
+
 # ── Endpoint-Specific Rate Limiting (slowapi) ─────────────────────────────────
 from slowapi.errors import RateLimitExceeded
 
@@ -1125,9 +1151,7 @@ async def root() -> dict:
 _CFI_DOCS_TOPBAR_HTML = """
   <div class="cfi-topbar">
     <a href="/" class="cfi-brand">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      </svg>
+      <img src="/logo.svg" onerror="this.onerror=null;this.src='/logo.png'" alt="CF-Intelligence" width="24" height="24" class="cfi-logo-img" />
       <span style="font-weight: 700; font-size: 14px; letter-spacing: -0.01em;">CF-Intelligence</span>
       <span class="cfi-badge">OpenAPI 3.1</span>
     </a>
@@ -1161,6 +1185,15 @@ _CFI_DOCS_NAV_CSS = """
       gap: 10px;
       text-decoration: none;
       color: #fff;
+    }
+    .cfi-logo-img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      border-radius: 6px;
+      display: inline-block;
+      vertical-align: middle;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
     }
     .cfi-badge {
       font-size: 10px;
@@ -1217,6 +1250,8 @@ async def swagger_ui_html() -> HTMLResponse:
   <meta charset="UTF-8">
   <title>CF-Intelligence | Swagger UI</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="alternate icon" type="image/png" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1436,6 +1471,8 @@ async def redoc_html() -> HTMLResponse:
   <meta charset="UTF-8">
   <title>CF-Intelligence | ReDoc Technical Reference</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="alternate icon" type="image/png" href="/logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1520,6 +1557,8 @@ async def scalar_api_reference() -> HTMLResponse:
     <title>CF-Intelligence | Enterprise API Reference</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg">
+    <link rel="alternate icon" type="image/png" href="/logo.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1558,10 +1597,56 @@ async def scalar_api_reference() -> HTMLResponse:
 
 
 
+_STATIC_DIR = pathlib.Path(__file__).parent / "static"
+_FRONTEND_PUBLIC_DIR = pathlib.Path(__file__).parent.parent.parent / "frontend" / "public"
+
+
+def _resolve_asset_path(filename: str) -> pathlib.Path | None:
+    for candidate in (_STATIC_DIR / filename, _FRONTEND_PUBLIC_DIR / filename):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
+@app.get("/logo.svg", include_in_schema=False)
+async def get_logo_svg() -> Response:
+    """Serve the official CF-Intelligence SVG brand logo."""
+    p = _resolve_asset_path("logo.svg")
+    if p:
+        return Response(content=p.read_bytes(), media_type="image/svg+xml")
+    p_fav = _resolve_asset_path("favicon.svg")
+    if p_fav:
+        return Response(content=p_fav.read_bytes(), media_type="image/svg+xml")
+    return Response(status_code=404)
+
+
+@app.get("/logo.png", include_in_schema=False)
+async def get_logo_png() -> Response:
+    """Serve the official CF-Intelligence PNG brand logo."""
+    p = _resolve_asset_path("logo.png")
+    if p:
+        return Response(content=p.read_bytes(), media_type="image/png")
+    return Response(status_code=404)
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+async def favicon_svg() -> Response:
+    """Serve the official CF-Intelligence SVG favicon."""
+    p = _resolve_asset_path("favicon.svg") or _resolve_asset_path("logo.svg")
+    if p:
+        return Response(content=p.read_bytes(), media_type="image/svg+xml")
+    return Response(status_code=404)
+
+
 @app.get("/favicon.ico", include_in_schema=False)
 async def favicon() -> Response:
-    """Return empty 204 No Content for browser favicon requests."""
+    """Return official brand logo as favicon."""
+    p = _resolve_asset_path("logo.png") or _resolve_asset_path("logo.svg")
+    if p:
+        media_type = "image/png" if p.suffix == ".png" else "image/svg+xml"
+        return Response(content=p.read_bytes(), media_type=media_type)
     return Response(status_code=204)
+
 
 
 

@@ -98,8 +98,8 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     ) -> Response:
         response: Response = await call_next(request)
         path = request.url.path
-        is_docs_route = path in ("/openapi.json",) or any(
-            path.startswith(p) for p in ("/docs", "/redoc", "/scalar")
+        is_docs_route = path in ("/openapi.json", "/favicon.ico", "/favicon.svg") or any(
+            path.startswith(p) for p in ("/docs", "/redoc", "/scalar", "/logo")
         )
 
         headers_to_apply = dict(_SECURITY_HEADERS)

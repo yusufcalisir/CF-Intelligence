@@ -96,3 +96,42 @@ def test_scalar_html_dark_theme(client):
     assert "cfi-topbar" in resp.text
     assert "api-reference" in resp.text
 
+
+def test_portal_brand_logo_assets(client):
+    """Verify official brand logo endpoints (/logo.svg, /logo.png, /favicon.svg, /favicon.ico) serve valid assets."""
+    resp_svg = client.get("/logo.svg")
+    assert resp_svg.status_code == 200
+    assert "image/svg+xml" in resp_svg.headers["content-type"]
+    assert len(resp_svg.content) > 100
+
+    resp_png = client.get("/logo.png")
+    assert resp_png.status_code == 200
+    assert "image/png" in resp_png.headers["content-type"]
+    assert len(resp_png.content) > 100
+
+    resp_fav_svg = client.get("/favicon.svg")
+    assert resp_fav_svg.status_code == 200
+    assert "image/svg+xml" in resp_fav_svg.headers["content-type"]
+
+    resp_fav_ico = client.get("/favicon.ico")
+    assert resp_fav_ico.status_code == 200
+    assert len(resp_fav_ico.content) > 100
+
+
+def test_documentation_portals_brand_logo_integration(client):
+    """Verify /docs, /redoc, and /scalar embed official brand logo in topbar and head links."""
+    for portal in ("/docs", "/redoc", "/scalar"):
+        resp = client.get(portal)
+        assert resp.status_code == 200
+        assert 'src="/logo.svg"' in resp.text
+        assert 'class="cfi-logo-img"' in resp.text
+        assert 'href="/logo.svg"' in resp.text
+
+    # Verify openapi.json contains x-logo metadata for ReDoc & Scalar
+    resp_openapi = client.get("/openapi.json")
+    assert resp_openapi.status_code == 200
+    data = resp_openapi.json()
+    assert "x-logo" in data["info"]
+    assert data["info"]["x-logo"]["url"] == "/logo.svg"
+
+
