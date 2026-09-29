@@ -1,5 +1,6 @@
 .git
 .gitignore
+.gitattributes
 .venv
 venv
 env
@@ -10,16 +11,52 @@ __pycache__
 .pytest_cache
 .mypy_cache
 .ruff_cache
+.hypothesis
+.cache
 .coverage
+.coverage.*
 htmlcov
+coverage
 .env
+.env.*
+!*.env.example
+
+# Storage, Datasets & Run Artifacts
+storage/*
+!storage/README.md
 backend/storage/*
 !backend/storage/.gitkeep
+data/*
 backend/data/*
 !backend/data/.gitkeep
+mlruns
 backend/mlruns
-backend/.venv
+mlartifacts
+experiments/results/*
+!experiments/results/.gitkeep
+
+# Tests & Reports
 backend/tests/
+playwright-report/
+test-results/
+frontend/playwright-report/
+frontend/test-results/
+
+# Frontend Dependencies & Builds
+node_modules
 frontend/node_modules
 frontend/dist
+
+# Non-container infrastructure & governance
+.agents/
+.gemini/
+.claude/
+.cursor/
+contracts/
+helm/
+
+# Logs & Temporary Files
 *.log
+logs/
+*.bat
+
