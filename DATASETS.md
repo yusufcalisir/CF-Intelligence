@@ -200,7 +200,7 @@ $$\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount
 #### 3.4.3 Topological Properties & Discrete Timesteps
 - **Intra-Timestep DAG Invariant**: Every edge connects transactions within the exact same two-week timestep window:
 
-$$\forall (u, v) \in \mathcal{E}, \quad \operatorname{timestep}(u) = \operatorname{timestep}(v)$$
+$$\forall (u, v) \in \mathcal{E}, \quad \mathrm{timestep}(u) = \mathrm{timestep}(v)$$
 
 - The entire dataset consists of 49 completely disjoint directed acyclic subgraphs with zero cross-timestep edges.
 - **Node Feature Schema ($d = 166$)**:
@@ -321,7 +321,7 @@ $$\mathbb{I}_{\mathrm{structuring}} = \mathbb{I}(8{,}500 \le \mathrm{amount} < 1
 
 16. `category_high_risk`: Binary indicator for high-risk economic categories (Cryptocurrency, Shell Company, Luxury Goods, Gambling, Investment).
 17. `is_night_txn`: Unusual nocturnal transaction indicator ($\mathrm{hour} < 5 \lor \mathrm{hour} > 22$).
-18. `is_weekend_txn`: Weekend transaction indicator ($\mathrm{day\_of\_week} \ge 5$).
+18. `is_weekend_txn`: Weekend transaction indicator (`day_of_week` $\ge 5$).
 
 #### 3.7.4 Data Hygiene, Biases & Limitations
 - **Non-Commercial License Restriction**: CC BY-NC 4.0 permits research, academic benchmarking, and evaluation but prohibits commercial exploitation without separate licensing.

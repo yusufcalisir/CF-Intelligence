@@ -63,7 +63,7 @@ To eliminate central cleartext data exposure during inter-bank communication, FI
 Every ticket lifecycle transition (`SUBMITTED`, `ACKNOWLEDGED`, `IN_REVIEW`, `RESPONDED`, `CLOSED`) is recorded in a tamper-evident, append-only SHA-256 hash-chained audit log:
 
 $$
-\mathrm{block}_{\mathrm{hash},\,t} = \operatorname{SHA-256}(\mathrm{prev}_{\mathrm{hash},\,t-1} \parallel \mathrm{ticket}_{\mathrm{id}} \parallel \mathrm{status}_t \parallel \mathrm{timestamp}_t)
+\mathrm{block}_{\mathrm{hash},\,t} = \mathrm{SHA256}(\mathrm{prev}_{\mathrm{hash},\,t-1} \parallel \mathrm{ticket}_{\mathrm{id}} \parallel \mathrm{status}_t \parallel \mathrm{timestamp}_t)
 $$
 
 ### 3.3 Dual-Control Compliance Authorization
@@ -238,7 +238,7 @@ $$
 Every recovery, hold, or release event is cryptographically anchored into an append-only SHA-256 hash chain:
 
 $$
-H_t = \operatorname{SHA-256}\left(H_{t-1} \parallel \mathrm{event}_{\mathrm{id}} \parallel \mathrm{type} \parallel \mathrm{EUR} \parallel \mathrm{timestamp}\right)
+H_t = \mathrm{SHA256}\left(H_{t-1} \parallel \mathrm{event}_{\mathrm{id}} \parallel \mathrm{type} \parallel \mathrm{EUR} \parallel \mathrm{timestamp}\right)
 $$
 This ensures strict regulatory admissibility under European eIDAS and AMLD6 compliance mandates, preventing retroactive alteration or deletion of operational milestones.
 

@@ -134,7 +134,7 @@ The platform rejects fully autonomous adverse financial actions. Every escalated
 - **Separation of Duties**: Operational analysts (Tier 1) triage alerts; Senior Supervisors / MLROs (Tier 2) execute account restrictions or regulatory disclosures.
 - **Tamper-Evident Audit Chain**: Every state transition is appended to an immutable Merkle hash chain:
 
-$$H_i = \operatorname{SHA-256}(H_{i-1} \mathbin{\Vert} \mathrm{Timestamp} \mathbin{\Vert} \mathrm{AnalystID} \mathbin{\Vert} \mathrm{Action} \mathbin{\Vert} \mathrm{CaseID})$$
+$$H_i = \mathrm{SHA256}(H_{i-1} \mathbin{\Vert} \mathrm{Timestamp} \mathbin{\Vert} \mathrm{AnalystID} \mathbin{\Vert} \mathrm{Action} \mathbin{\Vert} \mathrm{CaseID})$$
 
 ---
 
