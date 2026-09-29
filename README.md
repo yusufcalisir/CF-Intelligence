@@ -964,7 +964,7 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 
 > **Simulation Notice & Metric Classification:** In alignment with platform-wide transparency principles (as applied to illustrative unlearning and dropout simulators), the model accuracy telemetry (`auc_protected`, `auc_compromised_baseline`) displayed in the Chaos Attack Injector HUD is a **continuous live demo indicator / simulation proxy** derived from gradient cosine alignment and boundary strain:
 > 
-> $$\text{AUC}_{\text{protected}} = \text{clamp}\Big(0.9100, 0.9600, 0.9418 - 1.5(1 - \cos\theta) - \frac{\|\Delta w\|_2}{1200 \cdot \tau}\Big)$$
+> $$\mathrm{AUC}_{\mathrm{protected}} = \operatorname{clamp}\Big(0.9100, 0.9600, 0.9418 - 1.5(1 - \cos\theta) - \frac{\|\Delta w\|_2}{1200 \cdot \tau}\Big)$$
 > 
 > This responsive continuous function provides operators with immediate visual feedback on gradient deviation and defense recovery under active adversarial stress. It is explicitly labeled in the UI as **`SIMULATED DEMO`** and **`Simulated Proxy`**, clearly distinguishing it from offline holdout dataset evaluations measured on static open benchmarks in the [Empirical Benchmarks](#15-empirical-performance--benchmark-suite).
 
@@ -984,7 +984,9 @@ Uses MinHash Locality-Sensitive Hashing (LSH) to identify matching customer enti
 - **Multi-Tier Beneficial Ownership Graph Traversal:** Ingests complex corporate ownership structures as directed property graphs, tracing shareholding pathways from target legal entities (`ORG_*`) to ultimate natural persons (`PER_*`).
 - **Compounded Indirect Shareholding Calculation:** Automatically compounds indirect equity stakes along directed paths across arbitrarily nested holding and nominee structures:
 
-  $$\mathrm{Ownership}_{\mathrm{eff}}(u, e) = \sum_{p \in \mathcal{P}(u, e)} \prod_{(v, w) \in p} \mathrm{share}(v, w)$$
+$$
+\mathrm{Ownership}_{\mathrm{eff}}(u, e) = \sum_{p \in \mathcal{P}(u, e)} \prod_{(v, w) \in p} \operatorname{share}(v, w)
+$$
 
 - **EU AMLD6 / 4AMLD 25% Statutory Threshold Gate:** Automatically flags natural persons whose cumulative direct and indirect effective equity or voting rights reach or exceed $\ge 25.0\%$ as primary Ultimate Beneficial Owners (UBOs).
 - **Tarjan DFS Circular Ownership Loop Detection:** Applies depth-first cycle search algorithms to identify circular corporate layering rings ($\mathrm{Entity}_A \to \mathrm{Entity}_B \to \mathrm{Entity}_C \to \mathrm{Entity}_A$) engineered to obscure true controlling entities.
@@ -1187,7 +1189,9 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 - **Multi-List Global Registry:** Real-time screening against UN Consolidated List, EU Common Foreign and Security Policy (CFSP) List, US OFAC Specially Designated Nationals (SDN) List, and Politically Exposed Persons (PEP) registries.
 - **Dual-Algorithm Fuzzy String Matching:** Combines the Jaro-Winkler prefix-weighted metric ($p=0.10$) and normalized Levenshtein edit distance:
 
-  $$S_{\mathrm{composite}} = 0.60 \cdot S_{\mathrm{jw}} + 0.40 \cdot S_{\mathrm{lev}}$$
+$$
+S_{\mathrm{composite}} = 0.60 \cdot S_{\mathrm{jw}} + 0.40 \cdot S_{\mathrm{lev}}
+$$
 
 - **Secondary Demographic Disambiguation:** Candidates with $S_{\mathrm{composite}} \ge 0.70$ undergo secondary validation against Date of Birth (DOB) and ISO 3166-1 alpha-2 Nationality, boosting confidence by $+0.15$ for matched attributes.
 - **Audited Whitelist Bypass:** Compliance officers can register verified false positives in an institution-isolated whitelist with audit notes and dual sign-off, bypassing repetitive operational halts.
@@ -1201,14 +1205,16 @@ The platform dispatches real-time event notifications (`ALERT_CREATED`, `MODEL_P
 - **16 Pre-Configured European Banking AML Typologies:** Codifies 16 production scenarios aligned with European Banking Authority (EBA) mandates and FATF typologies, including Sub-€10,000 Structuring/Smurfing (`SCN_EUR_STRUCTURING_SUB_10K`), Rapid Pass-Through Mule Accounts (`SCN_EUR_PASS_THROUGH_MULE`), High-Risk Non-Cooperative Jurisdiction Flows (`SCN_EUR_HIGH_RISK_JURISDICTION`), Round Amount Velocity Layering (`SCN_EUR_ROUND_AMOUNT_LAYERING`), Dormant Account Sudden Awakening (`SCN_EUR_DORMANT_SUDDEN_ACTIVITY`), Fan-Out Disbursement (`SCN_EUR_FAN_OUT_DISBURSEMENT`), and Terrorist Financing Indicators.
 - **Hybrid Scoring Synthesis Engine:** Synthesizes deterministic regulatory rule breaches with federated machine learning anomaly scores to produce an authoritative composite risk score:
 
-  $$S_{\mathrm{hybrid}} = \alpha \cdot S_{\mathrm{rules}} + (1 - \alpha) \cdot S_{\mathrm{ml}} \quad (\text{default } \alpha = 0.50)$$
+$$
+S_{\mathrm{hybrid}} = \alpha \cdot S_{\mathrm{rules}} + (1 - \alpha) \cdot S_{\mathrm{ml}} \quad (\text{default } \alpha = 0.50)
+$$
 
 - **Explainability Narrative Compiler:** Automatically compiles human-readable investigative narratives summarizing exact rule trigger conditions, threshold deviations, and recommended statutory actions (`ALLOW`, `MANUAL_REVIEW`, `SAR_ESCALATION`, `IMMEDIATE_BLOCK`) to accelerate compliance officer triage.
 
 ### 11.7 Asset Recovery & Collaborative FININT Operational Hub (`asset_recovery_service.py` & `asset_recovery.py`)
 - **Aggregated EUR Recovery & Containment Telemetry:** Tracks consortium-wide financial impact metrics across SEPA Instant Payment Recall (`camt.056`) events and inter-bank FININT account holds with high-precision `Decimal` EUR accounting.
 - **MTTR Alert-to-Freeze Latency Reduction:** Computes empirical Mean Time to Response (MTTR $P_{50}$, $P_{90}$, $P_{99}$) in minutes, evaluating operational performance against the legacy bilateral 48-hour (2,880-minute) inter-bank baseline, demonstrating a >98% latency reduction in cross-bank mule chain freezes.
-- **Tamper-Evident SHA-256 Audit Hash Chain:** Anchors every recall execution, provisional hold, and recovery event into an append-only cryptographic hash chain ($H_t = \mathrm{SHA256}(H_{t-1} \,\|\, \mathrm{payload})$), ensuring evidentiary admissibility for EU judicial proceedings and AMLA compliance audits.
+- **Tamper-Evident SHA-256 Audit Hash Chain:** Anchors every recall execution, provisional hold, and recovery event into an append-only cryptographic hash chain ($H_t = \operatorname{SHA-256}(H_{t-1} \parallel \mathrm{payload})$), ensuring evidentiary admissibility for EU judicial proceedings and AMLA compliance audits.
 
 ### 11.8 Data Retention, Erasure & PII Redaction
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
@@ -1983,9 +1989,11 @@ A comprehensive discrete-event multi-institution orchestration testbed that spin
 - **Synthetic Data Generation:** Generates synthetic transaction streams using generative probabilistic rules calibrated against public fraud datasets (PaySim, IEEE-CIS). Synthesizes credit transfers, merchant POS, wire transfers, and cross-border remittances.
 - **Dirichlet Distribution Partitioning:** Implements non-uniform class distribution across banks via Dirichlet allocation:
 
-  $$\mathbf{p}_k \sim \mathrm{Dir}(\alpha \cdot \mathbf{p}_{\mathrm{global}})$$
+$$
+\mathbf{p}_k \sim \operatorname{Dir}(\alpha \cdot \mathbf{p}_{\mathrm{global}})
+$$
 
-  Demonstrates extreme class imbalance and non-IID conditions across banks ($\alpha = 0.1$ for severe retail/corporate specialization, $\alpha = 0.5$ for realistic cross-bank variance).
+Demonstrates extreme class imbalance and non-IID conditions across banks ($\alpha = 0.1$ for severe retail/corporate specialization, $\alpha = 0.5$ for realistic cross-bank variance).
 
 ### 20.3 Simulated Adversarial Poisoning Attacks (`test_attack_injector.py`)
 A rigorous adversarial evaluation harness implementing 4 standard distributed machine learning poisoning attack vectors:
