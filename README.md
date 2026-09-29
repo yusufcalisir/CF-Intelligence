@@ -598,6 +598,7 @@ CF-Intelligence/
 │       └── property/                                # Hypothesis property-based mathematical invariance tests
 │
 ├── frontend/                                        # React 19 / Vite TypeScript Web Console
+│   ├── README.md                                    # Web console architecture, component topology, testing & operations
 │   ├── middleware.ts                                # Vercel Security Middleware (Node.js runtime & security guards)
 │   ├── e2e-workflows/                               # Playwright Real-Browser Multi-Device E2E Suite (10 Tests)
 │   ├── e2e-visual/                                  # Playwright Visual Regression Suite (Strict baseline comparison)

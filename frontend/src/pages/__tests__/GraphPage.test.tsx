@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter } from 'react-router-dom';
 import GraphPage from '../GraphPage';
 import * as queries from '../../api/queries';
 
@@ -109,7 +109,6 @@ describe('GraphPage (Entity Graph Visualization) Test Suite', () => {
   });
 
   it('reads entity_id and depth from URL parameters and displays deep-linked focus banner', () => {
-    const { MemoryRouter } = require('react-router-dom');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -127,7 +126,6 @@ describe('GraphPage (Entity Graph Visualization) Test Suite', () => {
 
   it('allows changing traversal depth hops and updates graph query', async () => {
     const user = userEvent.setup();
-    const { MemoryRouter } = require('react-router-dom');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -148,7 +146,6 @@ describe('GraphPage (Entity Graph Visualization) Test Suite', () => {
 
   it('allows resetting focus to clear entity selection', async () => {
     const user = userEvent.setup();
-    const { MemoryRouter } = require('react-router-dom');
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -168,7 +165,6 @@ describe('GraphPage (Entity Graph Visualization) Test Suite', () => {
 
   it('selects an entity from directory pills and activates ego network', async () => {
     const user = userEvent.setup();
-    const { MemoryRouter } = require('react-router-dom');
 
     render(
       <QueryClientProvider client={queryClient}>

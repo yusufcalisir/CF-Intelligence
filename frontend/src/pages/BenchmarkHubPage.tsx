@@ -54,7 +54,7 @@ export const BenchmarkHubPage: React.FC = () => {
       if (stored && ['paysim', 'ieee_cis', 'elliptic', 'creditcard'].includes(stored)) {
         return stored as any;
       }
-    } catch {}
+    } catch { /* ignore sessionStorage access failure */ }
     return 'paysim';
   });
 
@@ -64,7 +64,7 @@ export const BenchmarkHubPage: React.FC = () => {
     try {
       const stored = parseInt(sessionStorage.getItem(BENCHMARK_SAMPLE_SIZE_KEY) || '', 10);
       if (!isNaN(stored) && stored >= 1000 && stored <= 100000) return stored;
-    } catch {}
+    } catch { /* ignore sessionStorage access failure */ }
     return 10000;
   });
 
@@ -74,7 +74,7 @@ export const BenchmarkHubPage: React.FC = () => {
     try {
       const stored = parseInt(sessionStorage.getItem(BENCHMARK_DAILY_VOLUME_KEY) || '', 10);
       if (!isNaN(stored) && stored >= 10000 && stored <= 5000000) return stored;
-    } catch {}
+    } catch { /* ignore sessionStorage access failure */ }
     return 100000;
   });
 
@@ -90,7 +90,7 @@ export const BenchmarkHubPage: React.FC = () => {
       sessionStorage.setItem(BENCHMARK_DATASET_KEY, newDataset);
       sessionStorage.setItem(BENCHMARK_SAMPLE_SIZE_KEY, String(newSamples));
       sessionStorage.setItem(BENCHMARK_DAILY_VOLUME_KEY, String(newVolume));
-    } catch {}
+    } catch { /* ignore sessionStorage access failure */ }
 
     const nextParams = new URLSearchParams(searchParams);
     nextParams.set('dataset', newDataset);

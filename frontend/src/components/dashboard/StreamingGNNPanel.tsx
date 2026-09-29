@@ -162,16 +162,14 @@ export interface StreamingGNNPanelProps {
 }
 
 export default function StreamingGNNPanel({ simulation, datasetProfile, datasetId }: StreamingGNNPanelProps) {
-  if (!simulation?.config?.enable_streaming_gnn) {
-    return null;
-  }
+  const isEnabled = Boolean(simulation?.config?.enable_streaming_gnn);
 
   const {
     streaming_gnn_node_count = 0,
     streaming_gnn_edge_count = 0,
     streaming_gnn_loss_history = [],
     streaming_gnn_attention_weights,
-  } = simulation;
+  } = simulation || {};
 
   // Resolve active dataset identifier
   const activeDatasetId = (
@@ -185,7 +183,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
   const currentProfile = DATASET_PROFILES[activeDatasetId as keyof typeof DATASET_PROFILES] || DATASET_PROFILES.paysim;
 
   // Map loss history to charting structure
-  const chartData = streaming_gnn_loss_history.map((loss, idx) => ({
+  const chartData = (streaming_gnn_loss_history || []).map((loss, idx) => ({
     round: `Round ${idx + 1}`,
     loss: Number(loss.toFixed(4)),
   }));
@@ -196,6 +194,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
 
   // Dynamically compute GAT attention weights according to active dataset topology & telemetry
   const attentionWeights = useMemo(() => {
+    if (!isEnabled) return [];
     return computeDynamicGATAttentionWeights({
       datasetId: activeDatasetId,
       nodeCount: streaming_gnn_node_count,
@@ -204,6 +203,7 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
       backendWeights: streaming_gnn_attention_weights,
     });
   }, [
+    isEnabled,
     activeDatasetId,
     streaming_gnn_node_count,
     streaming_gnn_edge_count,
@@ -213,11 +213,16 @@ export default function StreamingGNNPanel({ simulation, datasetProfile, datasetI
 
   // Calculate Shannon entropy over attention distribution
   const entropyScore = useMemo(() => {
+    if (!isEnabled) return 0;
     return attentionWeights.reduce((acc, att) => {
       if (att.weight <= 0) return acc;
       return acc - att.weight * Math.log2(att.weight);
     }, 0);
-  }, [attentionWeights]);
+  }, [isEnabled, attentionWeights]);
+
+  if (!isEnabled) {
+    return null;
+  }
 
   return (
     <motion.div

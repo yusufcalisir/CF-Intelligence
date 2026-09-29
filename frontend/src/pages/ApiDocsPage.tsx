@@ -561,7 +561,7 @@ export default function ApiDocsPage() {
 
         await new Promise<void>((resolve, reject) => {
           const timeout = setTimeout(() => {
-            try { ws.close(); } catch {}
+            try { ws.close(); } catch { /* ignore close on timeout */ }
             reject(new Error('WebSocket connection timed out after 3000ms.'));
           }, 3000);
 

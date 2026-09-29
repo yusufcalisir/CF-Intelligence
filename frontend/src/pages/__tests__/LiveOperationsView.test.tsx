@@ -89,6 +89,7 @@ describe('LiveOperationsView Component', () => {
       onmessage: ((e: { data: string }) => void) | null = null;
 
       constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         instance = this;
       }
     }
@@ -136,6 +137,7 @@ describe('LiveOperationsView Component', () => {
       onmessage: ((e: { data: string }) => void) | null = null;
 
       constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         instance = this;
       }
     }
@@ -179,6 +181,7 @@ describe('LiveOperationsView Component', () => {
       onmessage: ((e: { data: string }) => void) | null = null;
 
       constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         instance = this;
       }
     }
@@ -214,6 +217,7 @@ describe('LiveOperationsView Component', () => {
 
       constructor(public url: string) {
         socketCount++;
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         instance = this;
       }
     }
@@ -398,6 +402,7 @@ describe('LiveOperationsView Component', () => {
       onmessage: ((e: { data: string }) => void) | null = null;
 
       constructor(public url: string) {
+        // eslint-disable-next-line @typescript-eslint/no-this-alias
         instance = this;
       }
     }
