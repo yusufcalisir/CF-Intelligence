@@ -1,4 +1,4 @@
-.PHONY: help dev test test-smoke lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
+.PHONY: help dev test test-smoke lint docker-up docker-down migrate clean benchmark benchmark-all reproduce-all reproduce-verify benchmark-matrix benchmark-verify benchmark-factorial benchmark-download benchmark-fraud benchmark-fl benchmark-fl-paysim benchmark-fl-ieeecis benchmark-fl-creditcard benchmark-graphsage benchmark-amlsim benchmark-synthaml benchmark-amlnet benchmark-crossbank benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency generate-charts benchmark-security experiment-all experiment-clean
 
 SHELL := /bin/bash
 
@@ -138,6 +138,10 @@ reproduce-all: ## Master one-line command to verify reproducibility, run tests, 
 	python scripts/run_all_tests.py
 	python -m experiments.harness.compile_reports --verify
 	python benchmarks/generate_master_benchmark_matrix.py --verify
+	python scripts/verify_reproducibility.py --all
+
+reproduce-verify: ## Master 38-item platform reproducibility and integrity verification sweep
+	python scripts/verify_reproducibility.py --all
 
 benchmark-all: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-crossbank benchmark-latency benchmark-factorial benchmark-matrix generate-charts ## Run complete reproducible benchmark suite
 

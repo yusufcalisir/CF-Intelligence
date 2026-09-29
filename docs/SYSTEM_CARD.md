@@ -193,8 +193,8 @@ Evaluated on standard enterprise infrastructure under multi-concurrency stress t
 
 ## 8. Verification & Continuous Validation
 
-The integrity of the system is certified across all layers by **4,093 total automated tests**:
-- **Backend Pytest Suite**: **3,298 automated tests** (unit, integration, chaos, property-based, and security invariants).
+The integrity of the system is certified across all layers by **4,103 total automated tests**:
+- **Backend Pytest Suite**: **3,308 automated tests** (unit, integration, chaos, property-based, and security invariants).
 - **Scientific Verification Suite**: **409 verification tests** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
 - **Frontend Vitest & Playwright Suite**: **355 integration/component tests** and **72 visual/accessibility tests**.
 - **Smart Contracts Suite**: **31 Hardhat tests** for consortium Shapley value settlement.

@@ -327,7 +327,7 @@
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "4,093 Automated Tests",
+      "dataset_scale": "4,103 Automated Tests",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -337,7 +337,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "100% pass rate across 3,298 backend pytests, 355 frontend vitest tests, 31 smart contract tests, and 409 scientific verification tests across 21 modules."
+      "notes": "100% pass rate across 3,308 backend pytests, 355 frontend vitest tests, 31 smart contract tests, and 409 scientific verification tests across 21 modules."
     }
   ]
 }

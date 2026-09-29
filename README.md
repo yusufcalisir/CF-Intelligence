@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-4093%2F4093_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-4103%2F4103_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -26,7 +26,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,278 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,308 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
@@ -591,7 +591,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,298 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,308 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1312,7 +1312,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 3,298 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ Validated by 3,308 Pytest unit tests,│ Evaluated across 8 canonical datasets│
 │ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
@@ -1353,7 +1353,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,684 / 3,684 Core, 4,093 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,694 / 3,694 Core, 4,103 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
 
 ---
 
@@ -1375,7 +1375,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,684 / 3,684 passing (4,093 total incl. verification)** | 100% | 3,298 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 409 Scientific Verification Tests across 21 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,694 / 3,694 passing (4,103 total incl. verification)** | 100% | 3,308 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 409 Scientific Verification Tests across 21 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1678,6 +1678,31 @@ python benchmarks/runners/run_amlsim_benchmark.py --all-rows --epochs 15 --hidde
 
 ---
 
+### 15.14 Master 38-Item Reproducibility & Integrity Verification Attestation
+
+The entire platform reproducibility architecture is programmatically audited via a master 38-item verification sweep ([`scripts/verify_reproducibility.py`](scripts/verify_reproducibility.py) / `make reproduce-verify`), validated by targeted regression tests ([`backend/tests/unit/test_reproducibility_verifier.py`](backend/tests/unit/test_reproducibility_verifier.py)):
+
+```bash
+# Execute master 38-item platform integrity and reproducibility verification sweep
+make reproduce-verify
+# or directly via python:
+python scripts/verify_reproducibility.py --all
+```
+
+- **Total Audited Items:** 38 / 38 items verified across 6 canonical categories
+- **Empirical Pass Rate:** **100.0%** (38 passed, 0 failed)
+- **Certification Attestation:** `CERTIFIED_REPRODUCIBLE`
+- **Scope Breakdown:**
+  1. *Empirical Datasets & Licensing (8/8)*: PaySim, IEEE-CIS, Credit Card, Elliptic, IBM AMLSim, SynthAML, AMLNet, CFI-CrossBank-01.
+  2. *Standardized Experiment Artifacts (8/8)*: Canonical 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`) across all 8 datasets.
+  3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-$t$ 95% CIs).
+  4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
+  5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 3,308 Backend Pytest tests, 355 Frontend Vitest tests, 409 Scientific Verification tests across 21 modules, 31 Smart Contract tests and clean static analysis (0 Ruff errors).
+- **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
+
+---
+
 ## 16. Regulatory Concepts Explored
 
 The technical architecture of CF-Intelligence explores how system design patterns can be structured around real-world regulatory and compliance principles across European and international jurisdictions (detailed in [`docs/european_finint_and_regtech_spec.md`](docs/european_finint_and_regtech_spec.md)):
@@ -1706,7 +1731,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,298 automated Pytest backend tests**, **355 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **409 mathematical self-verification tests** across 21 verification modules (totaling **4,093 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,308 automated Pytest backend tests**, **355 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **409 mathematical self-verification tests** across 21 verification modules (totaling **4,103 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 

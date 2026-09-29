@@ -50,7 +50,7 @@ When suspicious multi-bank patterns (e.g., smurfing syndicates, rapid mule accou
 The `MambuConnector` processes Mambu v2 event notifications:
 1. `deposit-transaction.created`: Ingests debit and credit transactions, maps `accountId`, `amount`, `currencyCode`, and `channel` to `NormalizedTransaction`.
 2. `client.created`: Onboarding customer profiles are immediately pseudonymized using type-salted HMAC-SHA256 (`CONSORTIUM_HMAC_SALT`):
-   $$\mathrm{Pseudonym} = \mathrm{SHA256}(\text{"CLIENT\_KEY"} \parallel \mathrm{RawID} \parallel \mathrm{Salt})[:16]$$
+   $$\mathrm{Pseudonym} = \operatorname{SHA-256}(\text{CLIENT-KEY} \parallel \mathrm{RawID} \parallel \mathrm{Salt})[:16]$$
    Customer names, email addresses, and national identifiers never enter process memory in cleartext.
 3. `account.hold`: Real-time notification of external balance blocks and reservations.
 
