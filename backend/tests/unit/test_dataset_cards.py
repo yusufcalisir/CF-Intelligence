@@ -130,8 +130,8 @@ def test_known_biases_and_limitations_documented():
     content = ROOT_DATASETS_MD.read_text(encoding="utf-8")
 
     bias_subheadings = content.count("Data Hygiene, Biases & Limitations")
-    assert bias_subheadings == 7, (
-        f"Expected exactly 7 'Data Hygiene, Biases & Limitations' sections, found {bias_subheadings}."
+    assert bias_subheadings == 8, (
+        f"Expected exactly 8 'Data Hygiene, Biases & Limitations' sections, found {bias_subheadings}."
     )
 
     specific_bias_factors = [
@@ -142,6 +142,7 @@ def test_known_biases_and_limitations_documented():
         "Rigid Geometric Typologies",  # AMLSim (cycle and fan-in templates)
         "Investigation Filter Conditioning",  # SynthAML (only flagged alerts)
         "Threshold Boundary Artifacts",  # AMLNet ($8,500-$9,950 structuring cluster)
+        "Simulated Cross-Bank Rails",  # CFI-CrossBank-01 (deterministic multi-agent orchestration)
     ]
 
     for factor in specific_bias_factors:

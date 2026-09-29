@@ -13,3 +13,5 @@
 *.pt filter=lfs diff=lfs merge=lfs -text
 # Exclude Playwright visual regression snapshots from Git LFS so they are committed as native binary assets
 frontend/e2e-visual/snapshots/** -filter -diff -merge
+# Exclude test fixtures from Git LFS so they are committed as native binary assets
+backend/tests/fixtures/** -filter -diff -merge
