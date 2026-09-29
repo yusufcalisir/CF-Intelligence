@@ -19,12 +19,12 @@ export default function ConsortiumPage() {
   const [selectedScenario, setSelectedScenario] = useState<string>('SCENARIO_3');
 
   return (
-    <div className="flex flex-col gap-8 p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
+    <div className="flex flex-col gap-6 sm:gap-8 p-3.5 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full overflow-x-hidden">
       {/* Page Header */}
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between border-b border-slate-800/80 pb-6">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between border-b border-slate-800/80 pb-6">
         <div>
-          <div className="flex items-center gap-2.5 mb-1.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+          <div className="flex items-center gap-2.5 mb-1.5 flex-wrap">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 shrink-0">
               <Network className="h-4 w-4" />
             </div>
             <span className="text-xs font-mono font-semibold uppercase tracking-wider text-cyan-400">
@@ -43,7 +43,7 @@ export default function ConsortiumPage() {
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <a
             href="/docs/enterprise_benchmark_report.md"
             target="_blank"
@@ -168,7 +168,7 @@ export default function ConsortiumPage() {
       </div>
 
       {/* 7 Canonical Scenarios Performance Breakdown Table */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 backdrop-blur-md shadow-xl">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl overflow-hidden">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
@@ -180,8 +180,8 @@ export default function ConsortiumPage() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
+          <table className="w-full text-left text-xs min-w-[700px]">
             <thead className="border-b border-slate-800 bg-slate-950/60 text-slate-400 uppercase font-mono">
               <tr>
                 <th className="py-3 px-4">Scenario</th>
