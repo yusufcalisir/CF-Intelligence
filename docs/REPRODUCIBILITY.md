@@ -318,4 +318,4 @@ The reproducibility pipeline is continuously verified by targeted unit and integ
 | **Experiment Artifact Standard** | [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](../backend/tests/unit/test_experiment_artifact_hierarchy.py) | Verifies 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`) across all 8 datasets |
 | **Authoritative Dataset Cards** | [`backend/tests/unit/test_dataset_cards.py`](../backend/tests/unit/test_dataset_cards.py) | Verifies `DATASETS.md` provenance, licensing, and 0/10 protected demographic PII scan |
 | **Model & System Cards** | [`backend/tests/unit/test_system_and_model_cards.py`](../backend/tests/unit/test_system_and_model_cards.py) | Verifies `MODEL_CARD.md` and `SYSTEM_CARD.md` regulatory conformity |
-| **Master Test Runner** | [`scripts/run_all_tests.py`](../scripts/run_all_tests.py) | Orchestrates all backend (3,288), frontend (355), verification (409), and contracts (31) tests |
+| **Master Test Runner** | [`scripts/run_all_tests.py`](../scripts/run_all_tests.py) | Orchestrates all backend (3,298), frontend (355), verification (409), and contracts (31) tests |

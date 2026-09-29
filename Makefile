@@ -139,7 +139,7 @@ reproduce-all: ## Master one-line command to verify reproducibility, run tests, 
 	python -m experiments.harness.compile_reports --verify
 	python benchmarks/generate_master_benchmark_matrix.py --verify
 
-benchmark-all: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-latency benchmark-factorial benchmark-matrix generate-charts ## Run complete reproducible benchmark suite
+benchmark-all: benchmark-fraud benchmark-fl benchmark-dp benchmark-byzantine benchmark-graph benchmark-crossbank benchmark-latency benchmark-factorial benchmark-matrix generate-charts ## Run complete reproducible benchmark suite
 
 benchmark: benchmark-all ## Alias for benchmark-all
 
@@ -170,6 +170,9 @@ benchmark-byzantine: ## Run Byzantine resilience benchmark under model poisoning
 
 benchmark-graph: ## Run GraphSAGE inductive graph intelligence benchmark
 	python benchmarks/runners/run_graph_benchmark.py
+
+benchmark-crossbank: ## Run CFI-CrossBank-01 flagship consortium cross-bank research benchmark
+	python experiments/cross_bank/run_flagship_experiment.py
 
 benchmark-latency: ## Run Inference Gateway concurrency and latency harness
 	python benchmarks/runners/run_latency_benchmark.py --mock-load

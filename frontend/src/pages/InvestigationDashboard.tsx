@@ -9,6 +9,7 @@ import {
 } from '../api/queries';
 import { BANK_NAMES, SEVERITY_COLORS } from '../api/types';
 import ComparativeModelWidget from '../components/dashboard/ComparativeModelWidget';
+import FlagshipConsortiumWidget from '../components/dashboard/FlagshipConsortiumWidget';
 
 export default function InvestigationDashboard() {
   const { data: stats, isLoading } = useDashboardStats();
@@ -475,12 +476,13 @@ export default function InvestigationDashboard() {
         <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 mb-3.5 flex items-center gap-2">
           ⚡ Operational Quick Shortcuts
         </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 w-full">
           {[
             { label: 'Run Fraud Ring Scenario', icon: '▶', href: '/scenarios', color: '#6366f1' },
             { label: 'View Ingestion Alerts',   icon: '🔍', href: '/alerts', color: '#f59e0b' },
             { label: 'Open Case Workbench',     icon: '📋', href: '/cases', color: '#14b8a6' },
             { label: 'Explore Identity Graph',  icon: '🕸️', href: '/graph', color: '#ec4899' },
+            { label: 'Consortium Benchmark',    icon: '🏛️', href: '/consortium', color: '#10b981' },
             { label: 'Return to Simulator',     icon: '🌐', href: '/', color: '#3b82f6' },
           ].map((link) => (
             <Link
@@ -498,6 +500,9 @@ export default function InvestigationDashboard() {
 
       {/* Multi-Paradigm Benchmark Baselines & Comparative Analysis */}
       <ComparativeModelWidget />
+
+      {/* Flagship Consortium Cross-Bank Empirical Benchmark Showcase (CFI-CrossBank-01) */}
+      <FlagshipConsortiumWidget />
 
       {/* Audit Logs */}
       <motion.div

@@ -2,10 +2,10 @@
 ## Cross-Bank Synthetic Consortium Benchmark (`CFI-CrossBank-01`)
 
 > **Dataset Identifier:** `CFI-CrossBank-01`  
-> **Evaluation Mode:** Zero-Leakage Chronological Test Set ($N = 4{,}000$ sequestered out-of-time transactions)  
+> **Evaluation Mode:** Zero-Leakage Chronological Test Set ($N = 460$ sequestered out-of-time transactions)  
 > **Consortium Topology:** 3 Banking Institutions (Bank Alpha 50%, Bank Beta 30%, Bank Gamma 20%)  
 > **Cryptographic Protocols Evaluated:** Plain FP32, FP16 Quantized, Top-k Sparsified, PQC Curve25519 SecAgg, TenSEAL CKKS  
-> **Timestamp:** `2026-09-27 16:13:18 UTC`
+> **Timestamp:** `2026-09-29T07:45:36.480611+00:00`
 
 ---
 
@@ -32,16 +32,16 @@ $$P(\mathcal{R} \mid \mathcal{H}_k) = P(\mathcal{R})$$
 
 | Observation Scope | Transactions Visible | Coverage Ratio | Shannon Entropy $H(Y)$ | Mutual Information $I(X; Y)$ | Information Gap $\Delta I$ |
 |:---|:---:|:---:|:---:|:---:|:---:|
-| **Consortium Global Union** | **19,567** | **100.00%** | **0.1344 bits** | **0.0461 bits** | **Baseline (Optimal)** |
-| Bank Alpha (Retail Core) | 11,052 | 56.48% | 0.1632 bits | 0.0837 bits | --0.0376 bits |
-| Bank Beta (Commercial) | 7,726 | 39.48% | 0.2010 bits | 0.0582 bits | --0.0121 bits |
-| Bank Gamma (Challenger) | 5,848 | 29.89% | 0.1510 bits | 0.0755 bits | --0.0294 bits |
+| **Consortium Global Union** | **2,287** | **100.00%** | **0.1344 bits** | **0.0461 bits** | **Baseline (Optimal)** |
+| Bank Alpha (Retail Core) | 11,052 | 56.48% | 0.1632 bits | 0.0837 bits | -0.0376 bits |
+| Bank Beta (Commercial) | 7,726 | 39.48% | 0.2010 bits | 0.0582 bits | -0.0121 bits |
+| Bank Gamma (Challenger) | 5,848 | 29.89% | 0.1510 bits | 0.0755 bits | -0.0294 bits |
 
 ---
 
 ## 2. Empirical Value at Risk (VaR) & Fraud Volume Quantification
 
-On the sequestered $4{,}000$-transaction test set, total illicit laundering attempts totaled **1,504,325.78 USD**.
+On the sequestered 460-transaction test set, total illicit laundering attempts totaled **1,504,325.78 USD**.
 
 ### 2.1 Scenario Breakdown
 
@@ -60,7 +60,7 @@ On the sequestered $4{,}000$-transaction test set, total illicit laundering atte
 
 ## 3. Communication Cost vs Value Return on Bandwidth (ROI)
 
-For the canonical neural architecture ($1{,}969$ parameters $\times 4\text{ bytes} = 7{,}876\text{ bytes}$ per model), total bandwidth consumed across $R=5$ rounds and $K=3$ banks:
+For the canonical neural architecture ($1{,}969$ parameters $\times 4\text{ bytes} = 7{,}876\text{ bytes}$ per model), total bandwidth consumed across $R=2$ rounds and $K=3$ banks:
 
 | Cryptographic / Compression Protocol | Payload per Round | 5-Round Total Volume | Relative Overhead | Bandwidth ROI ($/MB Averted) |
 |:---|:---:|:---:|:---:|:---:|
@@ -69,9 +69,6 @@ For the canonical neural architecture ($1{,}969$ parameters $\times 4\text{ byte
 | **Uncompressed FP32** | 46.15 KB | 0.2253 MB | 1.00x | **$3,711,956.59 / MB** |
 | **PQC Secure Aggregation (Curve25519)** | 48.90 KB | 0.2388 MB | 1.06x | **$3,502,109.80 / MB** |
 | **TenSEAL CKKS Homomorphic Encryption** | 378.42 KB | 1.8477 MB | 8.20x | **$452,618.83 / MB** |
-
-### Key Takeaway
-Even with TenSEAL CKKS Homomorphic Encryption ($8.2\times$ expansion factor), the platform averts **$452,618.83 USD** of money laundering per megabyte transferred, establishing overwhelming economic justification for cross-bank federated collaboration under strict zero-raw-PII cryptographic guarantees.
 
 ---
 
@@ -83,6 +80,7 @@ Even with TenSEAL CKKS Homomorphic Encryption ($8.2\times$ expansion factor), th
 | **Information Horizon Comparison** | [`plots/information_horizon_comparison.png`](plots/information_horizon_comparison.png) | Partial vs global information horizon coverage across consortium members (300 DPI) |
 | **Scenario Detection Rates** | [`plots/scenario_detection_rates.png`](plots/scenario_detection_rates.png) | Isolated vs Federated vs Pooled detection rates across Scenarios 1–7 (300 DPI) |
 | **Zero Positive Transfer** | [`plots/zero_positive_transfer.png`](plots/zero_positive_transfer.png) | Multi-bank zero-positive transfer learning and cold-start fraud detection (300 DPI) |
+| **Flagship Overview** | [`plots/flagship_consortium_overview.png`](plots/flagship_consortium_overview.png) | 4-panel consolidated consortium overview (300 DPI) |
 
 ---
 
@@ -92,5 +90,4 @@ Even with TenSEAL CKKS Homomorphic Encryption ($8.2\times$ expansion factor), th
 - **Federal Reserve SR 11-7 Compliance**: Multi-scenario evaluation confirms conceptual soundness, zero data leakage across banking perimeters, and absence of overfitting.
 
 ---
-*Dossier generated automatically by CF-Intelligence Experiment Harness v1.0.0 on 2026-09-27 16:13:18 UTC.*
-
+*Dossier generated automatically by CFI-CrossBank Flagship Engine on 2026-09-29T07:45:36.480611+00:00.*

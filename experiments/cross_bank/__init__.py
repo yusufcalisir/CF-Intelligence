@@ -10,6 +10,11 @@ from experiments.cross_bank.quantify_information_gain import (
     InformationHorizonAnalyzer,
     run_consortium_value_quantification,
 )
+from experiments.cross_bank.run_flagship_experiment import (
+    FlagshipConsortiumExperiment,
+    FlagshipMLPClassifier,
+    run_flagship_experiment,
+)
 from experiments.cross_bank.topology_generator import (
     DEFAULT_CONSORTIUM_NODES,
     FEATURE_COLUMNS,
@@ -26,4 +31,7 @@ __all__ = [
     "ConsortiumValueQuantifier",
     "CommunicationCostModel",
     "run_consortium_value_quantification",
+    "FlagshipConsortiumExperiment",
+    "FlagshipMLPClassifier",
+    "run_flagship_experiment",
 ]
