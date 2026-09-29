@@ -889,7 +889,13 @@ const FadeSection = memo(function FadeSection({ children, className = '', delay 
 // ── 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT ────────────────────────
 const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => (
   <img
-    src="/logo.svg"
+    src="/logo.png"
+    onError={(e) => {
+      const target = e.currentTarget;
+      if (!target.src.endsWith('/logo.svg')) {
+        target.src = '/logo.svg';
+      }
+    }}
     alt="CF-Intelligence Logo"
     className={`${className} object-contain shrink-0`}
   />
