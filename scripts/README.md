@@ -6,18 +6,20 @@ This directory houses the unified operational CLI, benchmarking harnesses, secur
 
 ## 1. Scripts Taxonomy & Directory Index
 
-The 32 scripts are organized into five primary engineering domains:
+The 36 scripts are organized into five primary engineering domains:
 
 ```text
 scripts/
 ├── [1. Master Runners & Orchestration]
 │   ├── run_all_tests.py                 # Master unified test runner across all test suites (Frontend, Backend, Contracts)
-│   ├── run_all_verifications.py         # Master runner for all 18 scientific verification audit modules
+│   ├── run_all_verifications.py         # Master runner for all 21 scientific verification audit modules
 │   └── cfi_cli.py                       # Self-service bank onboarding & consortium integration CLI
 │
 ├── [2. Benchmarking & Simulation Engines]
 │   ├── run_benchmark.py                 # 9-Configuration architectural evaluation runner (C1–C9 matrix)
 │   ├── benchmark_prepare_datasets.py    # Synthetic dataset generator & real-world dataset preprocessor
+│   ├── generate_amlnet_dataset.py       # AMLNet synthetic benchmark dataset generator (AUSTRAC specification)
+│   ├── generate_synthaml_dataset.py     # SynthAML synthetic benchmark dataset generator (Nature Scientific Data)
 │   ├── run_enterprise_stress_test.py    # High-throughput ISO 20022 payment stream stress test (>38k tx/s)
 │   ├── realtime_benchmark.py            # Sub-100ms in-process ASGI scoring latency benchmark
 │   ├── run_elliptic_benchmark.py        # Real Elliptic Bitcoin AML transaction graph benchmark runner
@@ -28,7 +30,8 @@ scripts/
 │   ├── run_load_test.py                 # Asynchronous HTTP & WebSocket load tester with SLA reports
 │   ├── download_real_benchmarks.py      # Automated downloader for IEEE-CIS, PaySim, and Elliptic datasets
 │   ├── etl_dataset_pipeline.py          # Pandera data contract ETL pipeline with distribution bounds
-│   └── generate_plots.py                # Generates publication-ready PR-AUC, ROC-AUC & convergence charts
+│   ├── generate_plots.py                # Generates publication-ready PR-AUC, ROC-AUC & convergence charts
+│   └── generate_charts.py               # Generates operational benchmark comparative figures and matrices
 │
 ├── [3. Quality, Integrity & Security Scanners]
 │   ├── codebase_integrity_scanner.py    # Autonomous 22-vector zero-mock and dead-code scanner
@@ -47,6 +50,7 @@ scripts/
 │   └── setup_cloudflare_waf.py          # Cloudflare WAF perimeter rules, rate limits & TLS 1.3 setup
 │
 └── [5. Deployment & Cloud Verification]
+    ├── verify_reproducibility.py        # 38-Item platform reproducibility & empirical parity sweep
     ├── verify_docker_deployment.py      # Automated Docker Compose pre-flight & runtime verification
     ├── validate_k8s_manifests.py        # Rendered Helm manifest dry-run validator (kubectl apply --dry-run=client)
     └── production_smoke_test.py         # Post-deployment end-to-end smoke test validating all live endpoints
@@ -122,6 +126,24 @@ python scripts/cfi_cli.py test-connection --host coordinator.cfi.internal --port
 
 # Run local self-service integration sandbox
 python scripts/cfi_cli.py sandbox run --transactions 5000
+```
+
+### 2.6 Platform Reproducibility & Empirical Parity Sweep (`verify_reproducibility.py`)
+```bash
+# Execute comprehensive 38-item empirical reproducibility verification
+python scripts/verify_reproducibility.py --all
+
+# Generate structured JSON attestation report
+python scripts/verify_reproducibility.py --json
+```
+
+### 2.7 Synthetic AML Benchmark Dataset Generation
+```bash
+# Generate AUSTRAC-compliant AMLNet synthetic benchmark dataset
+python scripts/generate_amlnet_dataset.py
+
+# Generate Nature Scientific Data calibrated SynthAML dataset
+python scripts/generate_synthaml_dataset.py
 ```
 
 ---
