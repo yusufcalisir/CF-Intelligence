@@ -207,7 +207,7 @@ Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_a
 
 | Failure Mode | Affected Operational Stratum | Empirical Rate | Root Cause | Engineering Mitigation |
 | :--- | :--- | :---: | :--- | :--- |
-| **FM-01: Micro-Structuring** | Amount $<\$250$, Degree $k \le 2$ | **47.67% FNR** | Single-bank velocity counters blind to cross-bank micro-bursts below CTR limits | DH-PSI anonymous cross-bank velocity linking and reduced anomaly threshold for new accounts |
+| **FM-01: Micro-Structuring** | Amount $< 250\text{ USD}$ (< 250 USD), Degree $k \le 2$ | **47.67% FNR** | Single-bank velocity counters blind to cross-bank micro-bursts below CTR limits | DH-PSI anonymous cross-bank velocity linking and reduced anomaly threshold for new accounts |
 | **FM-02: Nocturnal Batch Clearing** | Hours `00:00-05:59`, MCC `6012` | **14.98% FPR** | Diurnal sine/cosine cyclical encoding penalizes automated off-hours payroll/clearing | ISO 20022 `camt.053` corporate calendar whitelisting |
 | **FM-03: Super-Hub Aggregators** | Network Degree $k > 50$ | **90.00% FNR** | GNN neighborhood over-smoothing washes out fraud embeddings into clean centroid | Temporal edge-weight attention discounting routine high-volume flows |
 | **FM-04: Cross-Border Specialty** | MCC `5999`, Cross-Border | **43.48% FNR** | Differential privacy noise ($\epsilon=1.0$) attenuates low-frequency categorical weights | Deterministic triage routing borderline scores ($[0.45, 0.55]$) to Four-Eyes human review |
