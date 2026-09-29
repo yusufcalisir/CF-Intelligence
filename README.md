@@ -51,19 +51,19 @@ The system combines Federated Learning, Differential Privacy, Secure Aggregation
 │                                                                                  │
 │   [ Bank Alpha ]       [ Bank Beta ]       [ Bank Gamma ]    (Local Nodes)       │
 │         │                    │                    │                              │
-│         ▼                    ▼                    ▼                              │
+│         v                    v                    v                              │
 │   ┌────────────────────────────────────────────────────────┐                     │
 │   │ Local Privacy Boundary: Opacus DP + Curve25519 SecAgg  │ (Zero Raw PII)      │
 │   └──────────────────────────┬─────────────────────────────┘                     │
-│                              ▼                                                   │
+│                              v                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
 │   │ Byzantine Coordinator: FedProx/SCAFFOLD + Krum/Bulyan  │ (Drift & Poisoning) │
 │   └──────────────────────────┬─────────────────────────────┘                     │
-│                              ▼                                                   │
+│                              v                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
 │   │ Canary Gate & Champion/Challenger Model Registry       │ (Quality Gating)    │
 │   └──────────────────────────┬─────────────────────────────┘                     │
-│                              ▼                                                   │
+│                              v                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
 │   │ Real-Time Scoring (<14.2ms / ~308ms) + SHAP + Case WB  │ (Serving & SAR)     │
 │   └────────────────────────────────────────────────────────┘                     │
@@ -167,7 +167,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 │          (Retail / POS)          (Commercial Wires)         (Fintech / ACH)          │
 └──────────────────────────────────────────┬───────────────────────────────────────────┘
                                            │ Local SGD Updates
-                                           ▼
+                                           v
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                             Local Privacy Boundary (PETs)                            │
 │  - Opacus Differential Privacy Guard (L2 Norm Clipping C=1.0, Noise Scale sigma)     │
@@ -175,7 +175,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 │  - Shamir (t, n) Threshold Secret Sharing (Galois Field Z_p Dropout Recovery)        │
 └──────────────────────────────────────────┬───────────────────────────────────────────┘
                                            │ Masked Gradients (Zero Raw PII)
-                                           ▼
+                                           v
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                      Byzantine-Robust Server Coordinator Engine                      │
 │  - Aggregators: FedAvg / FedProx (mu=0.01) / SCAFFOLD (Control Variates) / Bulyan    │
@@ -183,13 +183,13 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 │  - Non-IID Partitioner: Dirichlet Dir(alpha) Distribution Modeling                   │
 └──────────────────────────────────────────┬───────────────────────────────────────────┘
                                            │ Candidate Global Weights
-                                           ▼
+                                           v
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                         Canary Quality Gate & Model Registry                         │
 │  - Holdout Verification (PR-AUC, ROC-AUC) -> Promote Champion / Auto-Rollback        │
 └──────────────────────────────────────────┬───────────────────────────────────────────┘
                                            │ Active Champion Model
-                                           ▼
+                                           v
 ┌──────────────────────────────────────────────────────────────────────────────────────┐
 │                       Real-Time Scoring & Operational Serving                        │
 │  - Real-Time Scoring Gateway (<14.2ms Fast-Path / ~308ms Ensemble SLA)               │
@@ -1556,7 +1556,7 @@ To ensure fraud detection models do not hide localized failure modes beneath hig
 
 | Operational Dimension | High-Risk Stratum Slice | Dominant Error | Empirical Rate | Financial Risk & Mitigation Mechanism |
 | :--- | :--- | :---: | :---: | :--- |
-| **Transaction Amount** | Low Amounts ($\$50-\$250$) | False Negative | **47.67% FNR** | Micro-structuring smurfing; mitigated via DH-PSI cross-bank anonymous velocity counters. |
+| **Transaction Amount** | Low Amounts (\$50–\$250) | False Negative | **47.67% FNR** | Micro-structuring smurfing; mitigated via DH-PSI cross-bank anonymous velocity counters. |
 | **Temporal (Hour of Day)**| Late Night (`00:00-05:59`) | False Positive | **14.98% FPR** | Automated nocturnal batch clearing; mitigated via ISO 20022 `camt.053` corporate calendar whitelist. |
 | **Merchant Category (MCC)**| Specialty Retail (`5999`) | False Negative | **43.48% FNR** | Cross-border arbitrage & DP noise; mitigated by routing $[0.45, 0.55]$ borderline scores to Four-Eyes review. |
 | **Graph Network Degree** | Super-Hubs ($k > 50$) | False Negative | **90.00% FNR** | Aggregator neighborhood over-smoothing in GNNs; mitigated via temporal edge-weight attention discounting. |
