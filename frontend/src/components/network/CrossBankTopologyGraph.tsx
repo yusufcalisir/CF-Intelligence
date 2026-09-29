@@ -495,7 +495,7 @@ export default function CrossBankTopologyGraph({
             <Lock className="h-4 w-4 text-indigo-400" /> Privacy & Information Horizon
           </span>
           <div className="text-2xl font-bold font-mono text-indigo-400">
-            100% SECURE
+            ZERO RAW PII
           </div>
           <span className="text-[11px] text-slate-400">Zero raw PII or cross-bank edge leakage</span>
         </div>

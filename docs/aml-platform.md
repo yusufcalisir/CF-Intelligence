@@ -178,7 +178,7 @@ To satisfy national Financial Intelligence Unit (FIU) mandates (FinCEN, MASAK, F
 ### 3. Cryptographic Timeline Audit Chain
 * Events are bound using sequential SHA-256 block hashing:
   $$H_i = \text{SHA-256}(\text{timestamp} \mathbin{\Vert} \text{type} \mathbin{\Vert} \text{description} \mathbin{\Vert} \text{actor} \mathbin{\Vert} H_{i-1})$$
-* Enforces an append-only, tamper-proof record of all investigator actions and status transitions, ensuring legal defensibility.
+* Enforces an append-only, tamper-evident, cryptographically verifiable record of all investigator actions and status transitions, ensuring legal defensibility.
 
 ---
 
@@ -241,7 +241,7 @@ To align institutional incentives and enforce accountability across commercial f
 * Programmatic on-chain clearing via [ConsortiumIncentiveSettlement.sol](../contracts/contracts/ConsortiumIncentiveSettlement.sol) and [smart_contract_driver.py](../backend/app/infrastructure/security/smart_contract_driver.py).
 * Disburses Wholesale CBDC (`wCBDC`), Fiat Stablecoins (`USDC`), or Digital Lira (`e-TRY`) in 18-decimal token precision based on LOO Shapley basis points (`bps`).
 * Quarantine status locks recipient wallets on-chain, zeroing out disbursements (`BLOCKED_QUARANTINE`).
-* Every transaction hash (`settlement_tx_hash`) and block number is chained to the tamper-proof audit ledger in [immutable_audit_chain.py](../backend/app/infrastructure/security/immutable_audit_chain.py).
+* Every transaction hash (`settlement_tx_hash`) and block number is chained to the tamper-evident audit ledger in [immutable_audit_chain.py](../backend/app/infrastructure/security/immutable_audit_chain.py).
 
 ---
 

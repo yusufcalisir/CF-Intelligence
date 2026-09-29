@@ -1,6 +1,6 @@
 # 🗑️ Enterprise Data Retention & GDPR Article 17 Erasure Specification
 
-The Automated Retention & Erasure Policy Engine ([`AutomatedRetentionEngine`](../backend/app/application/services/retention_engine.py)) enforces Time-To-Live (TTL) data purging and fulfills European GDPR Article 17 Right-to-be-Forgotten erasure requests with cryptographic zeroization, physical database table deletion, and tamper-proof SHA-256 audit trails.
+The Automated Retention & Erasure Policy Engine ([`AutomatedRetentionEngine`](../backend/app/application/services/retention_engine.py)) enforces Time-To-Live (TTL) data purging and fulfills European GDPR Article 17 Right-to-be-Forgotten erasure requests with cryptographic zeroization, physical database table deletion, and tamper-evident SHA-256 hash-chained audit trails.
 
 > [!NOTE]
 > For platform-wide data classification, multi-tenant isolation schemas, and encryption controls, refer to [`docs/security_controls_matrix.md`](security_controls_matrix.md), [`docs/production_infrastructure.md`](production_infrastructure.md), and [`docs/threat_model.md`](threat_model.md).

@@ -64,7 +64,7 @@ The platform couples sub-3ms pre-authorization transaction risk scoring (`DeepFr
 │                  │ Four-Eyes Case Management UI    │                                   │
 │                  │ - Tier 1 Triage & Fast Action   │                                   │
 │                  │ - Tier 2 Supervisor Approval    │                                   │
-│                  │ - SHA-256 Tamper-Proof Audit    │                                   │
+│                  │ - SHA-256 Tamper-Evident Audit  │                                   │
 │                  └─────────────────────────────────┘                                   │
 │                                                                                        │
 └────────────────────────────────────────────────────────────────────────────────────────┘

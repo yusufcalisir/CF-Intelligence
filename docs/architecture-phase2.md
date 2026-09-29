@@ -465,7 +465,7 @@ To satisfy enterprise banking security standards (ISO 27001, SOC2, PCI-DSS):
    - *Approval Tier Limit*: Limits high-value operations ($>\$50,000$) to qualified authorization tiers.
    - *Security Clearance*: Restricts classified intelligence by clearance level.
 4. **HashiCorp Vault & Live PKI Integration**: Centralizes secrets management via Vault KV v2 secret engine and provisions dynamic X.509 certificates via HashiCorp Vault PKI Secrets Engine (`/v1/pki/issue/cfi-bank-role`), backed by automated bootstrap script (`scripts/init_vault_pki.py`) and environment fallbacks.
-5. **Tamper-Proof Cryptographic Audit Chain**: Chains every system event using SHA-256 hash chaining ($H_i = \text{SHA-256}(L_i \mathbin{\Vert} H_{i-1})$) with a 1-click `verify_chain_integrity()` tool to detect retrospective log tampering.
+5. **Tamper-Evident Cryptographic Audit Chain**: Chains every system event using SHA-256 hash chaining ($H_i = \text{SHA-256}(L_i \mathbin{\Vert} H_{i-1})$) with a 1-click `verify_chain_integrity()` tool to detect retrospective log tampering.
 
 ### 2.8 Enterprise Observability, Log Aggregation & Model Drift Engine
 

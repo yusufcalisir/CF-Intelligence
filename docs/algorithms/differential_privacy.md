@@ -74,7 +74,7 @@ RDP composition is **tighter** than naïve basic composition at all tested order
 
 ## 3. Threat Model & Privacy Assumptions
 - **Adversary Capabilities**: Protects against arbitrary side information and unbounded post-processing (Post-Processing Theorem: $g(\mathcal{M}(D))$ remains $(\epsilon, \delta)$-DP).
-- **Guaranteed Defense**: Membership inference attacks, property inference attacks, and training sample reconstruction are strictly bounded by $e^\epsilon$.
+- **Information-Theoretic Defense Boundary**: Membership inference attacks, property inference attacks, and training sample reconstruction leakage are strictly bounded by $e^\epsilon$.
 
 ---
 
