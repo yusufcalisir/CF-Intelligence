@@ -9,12 +9,12 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-4053%2F4053_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-4063%2F4063_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
 
-**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)** | **[🔬 Reproducible Benchmarks](benchmarks/README.md)** | **[🔄 Reproducibility Guide](REPRODUCIBILITY.md)** | **[📐 Metric Standards](docs/METRICS.md)** | **[📋 Model Card](MODEL_CARD.md)** | **[🏛️ System Card](SYSTEM_CARD.md)** | **[📊 Dataset Cards](DATASETS.md)**
+**[🌐 Live Demo Deployment](https://cf-intelligence.vercel.app)** | **[📖 Interactive API Reference](https://cf-intelligence.vercel.app/developer)** | **[🔬 Reproducible Benchmarks](benchmarks/README.md)** | **[🔄 Reproducibility Guide](REPRODUCIBILITY.md)** | **[📐 Metric Standards](docs/METRICS.md)** | **[⚠️ Limitations & Negative Results](docs/LIMITATIONS.md)** | **[📋 Model Card](MODEL_CARD.md)** | **[🏛️ System Card](SYSTEM_CARD.md)** | **[📊 Dataset Cards](DATASETS.md)**
 
 ---
 
@@ -26,9 +26,9 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,268 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,278 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
-| **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [Section 14](#14-limitations--what-this-is-not), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
+| **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
 ---
 
@@ -591,7 +591,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,268 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,278 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1280,6 +1280,18 @@ For protecting parameter updates in transit between banks and the aggregation co
 > - **Evaluator Utilities & Empirical Attack Simulation:** The `security_evaluator.py` Byzantine resilience evaluator executes real empirical parameter vector aggregation simulations across clean consensus baselines and poisoned vectors for FedAvg, FedProx, Coordinate Median, Trimmed Mean, Krum, and Bulyan. Other evaluators (MIA, DLG) use simplified heuristic proxies rather than exhaustive shadow-model training.
 > - **Binary Model Serialization Protocol:** The gRPC model distribution transport packages global models using standardized `b"CFI1"` framed headers with UTF-8 metadata and raw 32-bit floating-point weight buffers.
 
+### 14.0 Anti-Metric Shopping Protocol & Unconditional Negative Result Preservation
+
+To satisfy **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and **EU AI Act Article 13**, CF-Intelligence enforces a binding Anti-Metric Shopping Protocol and maintains an unconditional Negative Result Ledger across all benchmarks (detailed in **[`docs/LIMITATIONS.md`](docs/LIMITATIONS.md)** and **[`docs/METRICS.md`](docs/METRICS.md)**):
+- **Pre-Registered Metric Hierarchy**: In imbalanced regimes (<= 0.15% prevalence), PR-AUC (Average Precision) and Recall@0.1%FPR are pre-registered as primary metrics. Standalone accuracy is strictly prohibited as an efficacy claim.
+- **Pre-Fixed Operational Thresholds**: Operating thresholds must be fixed a priori (alpha = 0.0010 for Recall@0.1%FPR), never tuned post-hoc on holdout test partitions.
+- **Unconditional Negative Result Preservation**: Empirical trade-offs, utility penalties, and failure modes are explicitly preserved with strict null representation:
+  - *DP Utility Collapse (NR-001)*: High DP noise (sigma = 3.0, epsilon approx 0.63) causes PR-AUC to collapse from 0.6272 to 0.1963 (-68.7% loss).
+  - *Centralization Gap (NR-002)*: Monolithic pooling achieves 0.8650 PR-AUC vs Federated Champion 0.8420 (Delta_privacy = -0.0230, 97.34% efficiency).
+  - *Neural Tabular Imbalance Vulnerability (NR-003)*: Uncalibrated MLPs on PaySim drop to 0.0014 PR-AUC without GBDT/GNN inductive bias.
+  - *SCAFFOLD Control Variate Lag (NR-004)*: SCAFFOLD achieves only 0.0009 PR-AUC on 10-round PaySim runs due to early control variate noise.
+  - *Byzantine Clean-Data Penalty (NR-005)*: Bulyan incurs a 4.0% utility tax on clean non-IID data (0.7070 vs 0.7366) to guarantee adversarial resilience.
+
 ### 14.1 Dual-Axis Verification Taxonomy: Software Correctness vs. Scientific Generalization
 
 To prevent the dangerous conflation of deterministic unit test execution with statistical machine learning effectiveness (as mandated by **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and **EU AI Act Annex IV**), the platform formally separates evaluation across two orthogonal axes (detailed in [`docs/verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md)):
@@ -1300,7 +1312,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 3,268 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ Validated by 3,278 Pytest unit tests,│ Evaluated across 8 canonical datasets│
 │ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
@@ -1341,7 +1353,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,654 / 3,654 Core, 4,053 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,664 / 3,664 Core, 4,063 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
 
 ---
 
@@ -1363,7 +1375,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,654 / 3,654 passing (4,053 total incl. verification)** | 100% | 3,268 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,664 / 3,664 passing (4,063 total incl. verification)** | 100% | 3,278 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 
@@ -1694,7 +1706,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,268 automated Pytest backend tests**, **355 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **399 mathematical self-verification tests** across 20 verification modules (totaling **4,053 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,278 automated Pytest backend tests**, **355 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **399 mathematical self-verification tests** across 20 verification modules (totaling **4,063 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 

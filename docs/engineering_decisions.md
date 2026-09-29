@@ -1047,4 +1047,39 @@ Implement [`RegulatoryDossierGenerator`](../backend/app/application/services/reg
 
 * Generates extensive documentation artifacts that require periodic caching to avoid redundant serialization overhead during high-frequency regulatory queries.
 
+---
+
+## ED-042: Anti-Metric Shopping Protocol, Metric Pre-Registration & Unconditional Negative Result Preservation
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+In applied machine learning and financial crime detection, "metric shopping" (p-hacking, cherry-picking flattering metrics post-hoc, optimizing thresholds on holdout test partitions, or suppressing failed experiments) poses severe model risk under Federal Reserve SR 11-7, OCC 2011-12, and EU AI Act Article 13. Under extreme class imbalance ($\le 0.15\%$ fraud prevalence), uncalibrated metrics (such as reporting $99.85\%$ accuracy or $0.96$ ROC-AUC while concealing a collapsed PR-AUC or high false-positive rates) create deceptive representations of model efficacy.
+
+### Decision
+
+Formally adopt the **Anti-Metric Shopping Protocol** and establish the **Negative Result Ledger** across all platform documentation and benchmark harnesses (detailed in [`docs/LIMITATIONS.md`](LIMITATIONS.md) and [`docs/METRICS.md`](METRICS.md)):
+1. **Pre-Registered Metric Hierarchy**: In imbalanced regimes ($\le 0.15\%$), $\operatorname{PR-AUC}$ (Average Precision) and $\operatorname{Recall@0.1\%FPR}$ are pre-registered as primary metrics. Accuracy is prohibited as a standalone efficacy claim.
+2. **Fixed Decision Thresholds**: Operational thresholds must be fixed a priori ($\alpha = 0.0010$ for $\operatorname{Recall@0.1\%FPR}$), never swept on test sets.
+3. **Unconditional Negative Result Preservation**: All empirical trade-offs, utility penalties, and failure modes must be explicitly documented and retained in benchmark tables:
+   - *NR-001 (DP Utility Collapse)*: High DP noise ($\sigma=3.0$) degrades PR-AUC from $0.6272$ to $0.1963$ ($-68.7\%$).
+   - *NR-002 (Decentralization Gap)*: Centralized pooling ($0.8650$) outperforms federated champion ($0.8420$) by $-0.0230$ $\Delta \operatorname{PR-AUC}$ ($97.34\%$ efficiency).
+   - *NR-003 (Neural Tabular Imbalance Vulnerability)*: Uncalibrated MLPs on PaySim drop to $0.0014$ PR-AUC without GBDT/GNN inductive bias.
+   - *NR-004 (SCAFFOLD Control Variate Lag)*: On short 10-round runs, SCAFFOLD achieves only $0.0009$ PR-AUC due to early control variate noise.
+   - *NR-005 (Byzantine Defense Clean Penalty)*: Bulyan incurs a $4.0\%$ utility tax on clean non-IID data ($0.7070$ vs $0.7366$).
+4. **Multi-Seed Distribution Reporting**: Claims must disclose mean $\pm$ standard deviation across $\ge 5$ seeds.
+
+### Rationale
+
+1. **Epistemic Rigor**: Eliminates reporting bias and ensures internal audit and external bank validators receive unvarnished empirical realities.
+2. **Regulatory Conformity**: Directly complies with SR 11-7 mandates to document model limitations, assumptions, and failure modes.
+3. **Automated Verification**: Fully asserted by `backend/tests/unit/test_anti_metric_shopping_spec.py`.
+
+### Tradeoff
+
+* Demands higher documentation maintenance and prevents using simplified marketing headlines that omit trade-offs.
+
+
 
