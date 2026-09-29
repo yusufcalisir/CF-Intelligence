@@ -27,6 +27,16 @@ def test_cron_cleanup_sessions_success() -> None:
     assert "timestamp_iso" in data
 
 
+def test_cron_cleanup_sessions_get_method_success() -> None:
+    """Verifies that GET requests (e.g. from Vercel Crons) successfully execute cleanup."""
+    headers = {"Authorization": "Bearer cfi_cron_secret_secure_token_2026"}
+    response = client.get("/v1/cron/cleanup-sessions", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "SUCCESS"
+    assert "timestamp_iso" in data
+
+
 def test_cron_health_check_unauthorized_without_secret() -> None:
     """Verifies that health check endpoint rejects unauthorized requests."""
     response = client.get("/v1/cron/health-check")

@@ -72,8 +72,12 @@ def verify_cron_authorization(
     return True
 
 
+@router.get("/cleanup-sessions", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
+@api_router.get("/cleanup-sessions", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
 @router.post("/cleanup-sessions", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
 @api_router.post("/cleanup-sessions", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
+@router.get("/run", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
+@api_router.get("/run", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
 @router.post("/run", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
 @api_router.post("/run", response_model=CronCleanupResponse, status_code=status.HTTP_200_OK)
 def execute_system_cleanup(

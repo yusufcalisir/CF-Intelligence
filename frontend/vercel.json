@@ -13,8 +13,38 @@
       "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/health"
     },
     {
+      "source": "/docs",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/docs"
+    },
+    {
+      "source": "/docs/:path*",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/docs/:path*"
+    },
+    {
+      "source": "/openapi.json",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/openapi.json"
+    },
+    {
+      "source": "/redoc",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/redoc"
+    },
+    {
+      "source": "/scalar",
+      "destination": "https://yusufcalisir-collaborative-fraud-intelligence-simulator.hf.space/scalar"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/v1/cron/cleanup-sessions",
+      "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/v1/cron/health-check",
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [
