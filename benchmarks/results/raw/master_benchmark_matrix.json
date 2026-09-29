@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "report_name": "Master Empirical Comparative Benchmark Matrix",
-  "generated_at_utc": "2026-09-28T20:46:57.427678+00:00",
+  "generated_at_utc": "2026-09-29T19:30:49.387576+00:00",
   "invariants": {
     "strict_null_representation": true,
     "zero_fake_defaults": true,
@@ -469,7 +469,7 @@
       "domain": "Cross-Institutional Multi-Jurisdiction Banking",
       "real_vs_synthetic": "SYNTHETIC_CONSORTIUM_TOPOLOGY",
       "provenance_scale": "100k txns, 1k accounts, 7 Attack Scenarios (CFI-CrossBank-01)",
-      "evaluated_samples": 19567,
+      "evaluated_samples": 2287,
       "fraud_prevalence_pct": 2.1,
       "feature_dim": 14,
       "paradigms": {
@@ -517,7 +517,7 @@
           "worst_silo_pr_auc": null,
           "mean_silo_pr_auc": 0.8832,
           "best_silo_pr_auc": null,
-          "overall_detection_rate": 0.8061,
+          "overall_detection_rate": 0.8095,
           "zero_positive_transfer_isolated": 0.0,
           "zero_positive_transfer_federated": 1.0,
           "status": "EVALUATED"

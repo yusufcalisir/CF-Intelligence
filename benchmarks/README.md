@@ -93,11 +93,15 @@ python benchmarks/runners/run_factorial_ablation.py --rounds 5 --local-epochs 2 
 Fraud detection suffers from severe class imbalance ($< 0.5\%$ positive labels). ROC-AUC is known to be overly optimistic because large True Negative counts mask hundreds of false alarms. Therefore, this platform prioritizes:
 
 ### Precision-Recall AUC (PR-AUC)
+
 $$\mathrm{PR\text{-}AUC} = \sum_{k=1}^{n} (R_k - R_{k-1}) P_k$$
+
 Directly quantifies the tradeoff between catching fraud (Recall) and minimizing false customer alert friction (Precision).
 
 ### Operational Recall @ Fixed False Positive Rates (FPR)
+
 $$\mathrm{Recall@0.1\%FPR}, \quad \mathrm{Recall@0.5\%FPR}, \quad \mathrm{Recall@1.0\%FPR}$$
+
 - **0.1% FPR**: The threshold below which transactions can be automatically declined without manual review.
 - **0.5% FPR**: The operational budget for SMS / 2FA step-up challenges.
 - **1.0% FPR**: Maximum load feasible for human AML compliance analyst queues.
