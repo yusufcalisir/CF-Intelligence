@@ -14,9 +14,11 @@ import {
   Sparkles
 } from 'lucide-react';
 import CrossBankTopologyGraph, { SCENARIO_PREVIEWS } from '../components/network/CrossBankTopologyGraph';
+import TechnicalReportModal from '../components/TechnicalReportModal';
 
 export default function ConsortiumPage() {
   const [selectedScenario, setSelectedScenario] = useState<string>('SCENARIO_3');
+  const [isReportOpen, setIsReportOpen] = useState(false);
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8 p-3.5 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full overflow-x-hidden">
@@ -44,14 +46,17 @@ export default function ConsortiumPage() {
 
         {/* Action Controls */}
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <a
-            href="/docs/enterprise_benchmark_report.md"
-            target="_blank"
-            rel="noreferrer"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800/80 px-3.5 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-white transition-all shadow-sm"
+          <button
+            type="button"
+            onClick={() => setIsReportOpen(true)}
+            className="flex items-center gap-1.5 rounded-xl border border-cyan-500/30 bg-gradient-to-r from-slate-800 to-slate-850 px-3.5 py-2 text-xs font-semibold text-cyan-300 hover:border-cyan-400 hover:text-white hover:shadow-lg hover:shadow-cyan-500/10 transition-all cursor-pointer group"
           >
-            <FileText className="h-3.5 w-3.5 text-cyan-400" /> Technical Report
-          </a>
+            <FileText className="h-3.5 w-3.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+            <span>Technical Report</span>
+            <span className="rounded-full bg-cyan-500/10 px-1.5 py-0.5 text-[9px] font-mono font-medium text-cyan-300 border border-cyan-500/20">
+              Interactive
+            </span>
+          </button>
           <button
             onClick={() => setSelectedScenario('SCENARIO_7')}
             className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-cyan-500/20 hover:from-cyan-400 hover:to-blue-500 transition-all"
@@ -267,6 +272,12 @@ export default function ConsortiumPage() {
           </p>
         </div>
       </div>
+
+      {/* Interactive Technical Report Modal */}
+      <TechnicalReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+      />
     </div>
   );
 }
