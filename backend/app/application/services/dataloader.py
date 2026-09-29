@@ -2064,17 +2064,18 @@ def _process_amlnet_dataframe(
         typologies = np.array(["normal" if val == 0 else "suspicious" for val in y], dtype=object)
 
     # 2. Amounts & Balances
-    amount = np.asarray(pd.to_numeric(df.get("amount", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    n = len(df)
+    amount = np.asarray(pd.to_numeric(df.get("amount", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
     log_amount = np.log1p(np.maximum(0.0, amount)).astype(np.float32)
-    old_bal = np.asarray(pd.to_numeric(df.get("oldbalanceOrg", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
-    new_bal = np.asarray(pd.to_numeric(df.get("newbalanceOrig", 0.0), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    old_bal = np.asarray(pd.to_numeric(df.get("oldbalanceOrg", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
+    new_bal = np.asarray(pd.to_numeric(df.get("newbalanceOrig", pd.Series([0.0] * n)), errors="coerce").fillna(0.0).values, dtype=np.float32)
 
     bal_delta = (new_bal + amount - old_bal).astype(np.float32)
     bal_ratio = (amount / (old_bal + 1.0)).astype(np.float32)
 
     # 3. Temporal
-    hour = np.asarray(pd.to_numeric(df.get("hour", 12), errors="coerce").fillna(12).values, dtype=np.float32)
-    dow = np.asarray(pd.to_numeric(df.get("day_of_week", 0), errors="coerce").fillna(0).values, dtype=np.float32)
+    hour = np.asarray(pd.to_numeric(df.get("hour", pd.Series([12] * n)), errors="coerce").fillna(12).values, dtype=np.float32)
+    dow = np.asarray(pd.to_numeric(df.get("day_of_week", pd.Series([0] * n)), errors="coerce").fillna(0).values, dtype=np.float32)
 
     # 4. Payment channel one-hot encoding
     type_col = df.get("type", pd.Series(["TRANSFER"] * len(df))).astype(str).str.upper()
@@ -2099,27 +2100,28 @@ def _process_amlnet_dataframe(
     is_weekend = (dow >= 5.0).astype(np.float32)
 
     X = np.column_stack([
-        amount,
-        log_amount,
-        old_bal,
-        new_bal,
-        bal_delta,
-        bal_ratio,
-        hour,
-        dow,
-        t_transfer,
-        t_osko,
-        t_bpay,
-        t_eftpos,
-        t_debit,
-        t_npp,
-        near_thresh,
-        high_risk,
-        is_night,
-        is_weekend,
+        np.asarray(amount, dtype=np.float32),
+        np.asarray(log_amount, dtype=np.float32),
+        np.asarray(old_bal, dtype=np.float32),
+        np.asarray(new_bal, dtype=np.float32),
+        np.asarray(bal_delta, dtype=np.float32),
+        np.asarray(bal_ratio, dtype=np.float32),
+        np.asarray(hour, dtype=np.float32),
+        np.asarray(dow, dtype=np.float32),
+        np.asarray(t_transfer, dtype=np.float32),
+        np.asarray(t_osko, dtype=np.float32),
+        np.asarray(t_bpay, dtype=np.float32),
+        np.asarray(t_eftpos, dtype=np.float32),
+        np.asarray(t_debit, dtype=np.float32),
+        np.asarray(t_npp, dtype=np.float32),
+        np.asarray(near_thresh, dtype=np.float32),
+        np.asarray(high_risk, dtype=np.float32),
+        np.asarray(is_night, dtype=np.float32),
+        np.asarray(is_weekend, dtype=np.float32),
     ]).astype(np.float32)
 
-    steps = np.asarray(pd.to_numeric(df.get("step", np.arange(len(df))), errors="coerce").fillna(0).values, dtype=np.float64)
+    step_default = pd.Series(np.arange(len(df), dtype=np.int64))
+    steps = np.asarray(pd.to_numeric(df.get("step", step_default), errors="coerce").fillna(0).values, dtype=np.float64)
 
     return {
         "X": X,
