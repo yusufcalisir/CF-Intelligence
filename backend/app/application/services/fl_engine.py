@@ -77,6 +77,54 @@ class FederatedLearningEngine:
             self._server_c_by_sim.pop(simulation_id, None)
         logger.info("Cleared in-memory simulation optimizer states for %s", simulation_id)
 
+    def verify_zero_leakage_contract(
+        self,
+        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        test_dataset: tuple[np.ndarray, np.ndarray],
+        client_indices: dict[int, Any] | list[Any] | None = None,
+        test_indices: Any | None = None,
+        client_timestamps: dict[int, np.ndarray] | list[np.ndarray] | None = None,
+        test_timestamps: np.ndarray | None = None,
+        preprocessor: Any | None = None,
+        raise_on_violation: bool = True,
+    ) -> Any:
+        """Verify zero-leakage federated partitioning contract across client partitions and global test set."""
+        from app.application.services.dataloader import ZeroLeakagePartitionContract
+
+        return ZeroLeakagePartitionContract.audit_federated_partitions(
+            client_datasets=client_train_datasets,
+            test_dataset=test_dataset,
+            client_indices=client_indices,
+            test_indices=test_indices,
+            client_timestamps=client_timestamps,
+            test_timestamps=test_timestamps,
+            preprocessor=preprocessor,
+            raise_on_violation=raise_on_violation,
+        )
+
+    def gate_training_zero_leakage(
+        self,
+        client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        test_dataset: tuple[np.ndarray, np.ndarray],
+        client_indices: dict[int, Any] | list[Any] | None = None,
+        test_indices: Any | None = None,
+        client_timestamps: dict[int, np.ndarray] | list[np.ndarray] | None = None,
+        test_timestamps: np.ndarray | None = None,
+        preprocessor: Any | None = None,
+    ) -> bool:
+        """Gate federated training execution: verifies zero-leakage contract and returns certification status."""
+        report = self.verify_zero_leakage_contract(
+            client_train_datasets=client_train_datasets,
+            test_dataset=test_dataset,
+            client_indices=client_indices,
+            test_indices=test_indices,
+            client_timestamps=client_timestamps,
+            test_timestamps=test_timestamps,
+            preprocessor=preprocessor,
+            raise_on_violation=True,
+        )
+        return bool(report.is_valid)
+
     def aggregate_parameters(
         self,
         client_weights: list[ModelWeights],

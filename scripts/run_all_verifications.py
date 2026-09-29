@@ -1,7 +1,7 @@
 """Master Automated Verification Suite Runner for Privacy-Preserving Cross-Bank Fraud Detection Platform.
 
 Discovers and executes reference verifications, Hypothesis property tests,
-adversarial robustness tests, and scalability benchmarks across all 16 verified subsystems.
+adversarial robustness tests, and scalability benchmarks across all 21 verified subsystems.
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ VERIFICATION_DIR = REPO_ROOT / "verification"
 
 def run_all_verifications() -> bool:
     logger.info("==========================================================================")
-    logger.info("STARTING MASTER SCIENTIFIC VERIFICATION SUITE ACROSS ALL 16 SUBSYSTEMS")
+    logger.info("STARTING MASTER SCIENTIFIC VERIFICATION SUITE ACROSS ALL 21 SUBSYSTEMS")
     logger.info("==========================================================================")
 
     subsystems = sorted([d for d in VERIFICATION_DIR.iterdir() if d.is_dir()])

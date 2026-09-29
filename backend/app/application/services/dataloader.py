@@ -14,7 +14,10 @@ regardless of whether the files are downloaded.
 
 from __future__ import annotations
 
+import hashlib
 import logging
+from collections.abc import Sequence
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -2387,5 +2390,421 @@ def load_dataset(
         return temporal_split_dataset(data, preprocess=preprocess, **clean_kwargs)
 
     return data
+
+
+# ===========================================================================
+# Strict Zero-Leakage Federated Partitioning Contract & Defense
+# ===========================================================================
+
+class FederatedDataLeakageError(ValueError):
+    """Raised when data leakage or partitioning contract violation is detected."""
+
+
+@dataclass(frozen=True)
+class ZeroLeakageAuditReport:
+    """Audit report attesting to zero-leakage federated partitioning contract compliance."""
+
+    is_valid: bool
+    train_sample_count: int
+    test_sample_count: int
+    num_clients: int
+    client_sample_counts: dict[int, int]
+    index_overlap_count: int
+    hash_collision_count: int
+    temporal_monotonic: bool
+    max_train_timestamp: float | None
+    min_test_timestamp: float | None
+    scaler_isolated: bool
+    violations: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        """Convert report to dictionary."""
+        return asdict(self)
+
+
+class ZeroLeakagePartitionContract:
+    """Enforces mathematical invariants guaranteeing zero data leakage in federated partitioning."""
+
+    @staticmethod
+    def verify_index_disjointness(
+        client_train_indices: dict[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray],
+        test_indices: Sequence[int] | np.ndarray,
+    ) -> tuple[bool, int, list[str]]:
+        """Verify that client training indices and test indices are strictly disjoint, and clients pairwise disjoint."""
+        violations: list[str] = []
+        test_set = set(int(idx) for idx in test_indices)
+        total_overlap = 0
+
+        if isinstance(client_train_indices, list):
+            client_map = {i: client_train_indices[i] for i in range(len(client_train_indices))}
+        else:
+            client_map = client_train_indices
+
+        # 1. Check client vs test disjointness
+        for client_id, indices in client_map.items():
+            client_set = set(int(idx) for idx in indices)
+            overlap = client_set.intersection(test_set)
+            if overlap:
+                total_overlap += len(overlap)
+                violations.append(
+                    f"Test leakage detected: Client {client_id} shares {len(overlap)} sample indices with the global test set."
+                )
+
+        # 2. Check pairwise client disjointness
+        client_ids = list(client_map.keys())
+        for i in range(len(client_ids)):
+            c_i = client_ids[i]
+            set_i = set(int(idx) for idx in client_map[c_i])
+            for j in range(i + 1, len(client_ids)):
+                c_j = client_ids[j]
+                set_j = set(int(idx) for idx in client_map[c_j])
+                inter = set_i.intersection(set_j)
+                if inter:
+                    total_overlap += len(inter)
+                    violations.append(
+                        f"Cross-client overlap detected: Client {c_i} and Client {c_j} share {len(inter)} sample indices."
+                    )
+
+        return (len(violations) == 0, total_overlap, violations)
+
+    @staticmethod
+    def verify_hash_disjointness(
+        client_train_features: dict[int, np.ndarray] | list[np.ndarray],
+        test_features: np.ndarray,
+    ) -> tuple[bool, int, list[str]]:
+        """Verify that no exact feature vectors in the global test set appear in client training sets."""
+        violations: list[str] = []
+        collision_count = 0
+
+        test_arr = np.asarray(test_features)
+        if len(test_arr) == 0:
+            return (True, 0, violations)
+
+        test_hashes: set[bytes] = set()
+        for row in test_arr:
+            test_hashes.add(hashlib.sha256(np.ascontiguousarray(row).tobytes()).digest())
+
+        if isinstance(client_train_features, list):
+            client_map = {i: client_train_features[i] for i in range(len(client_train_features))}
+        else:
+            client_map = client_train_features
+
+        for client_id, c_features in client_map.items():
+            c_arr = np.asarray(c_features)
+            if len(c_arr) == 0:
+                continue
+            client_collisions = 0
+            for row in c_arr:
+                row_h = hashlib.sha256(np.ascontiguousarray(row).tobytes()).digest()
+                if row_h in test_hashes:
+                    client_collisions += 1
+            if client_collisions > 0:
+                collision_count += client_collisions
+                violations.append(
+                    f"Feature hash collision detected: Client {client_id} contains {client_collisions} exact duplicate feature rows matching global test set."
+                )
+
+        return (len(violations) == 0, collision_count, violations)
+
+    @staticmethod
+    def verify_temporal_monotonicity(
+        client_train_timestamps: dict[int, np.ndarray] | list[np.ndarray],
+        test_timestamps: np.ndarray,
+    ) -> tuple[bool, float | None, float | None, list[str]]:
+        """Verify that max(train_timestamp) <= min(test_timestamp) across all clients."""
+        violations: list[str] = []
+        if isinstance(client_train_timestamps, list):
+            client_map = {i: client_train_timestamps[i] for i in range(len(client_train_timestamps))}
+        else:
+            client_map = client_train_timestamps
+
+        max_train: float | None = None
+        for _client_id, ts in client_map.items():
+            ts_arr = np.asarray(ts, dtype=np.float64)
+            if len(ts_arr) > 0:
+                c_max = float(np.max(ts_arr))
+                if max_train is None or c_max > max_train:
+                    max_train = c_max
+
+        test_ts_arr = np.asarray(test_timestamps, dtype=np.float64)
+        min_test: float | None = float(np.min(test_ts_arr)) if len(test_ts_arr) > 0 else None
+
+        if max_train is not None and min_test is not None and max_train > min_test:
+            violations.append(
+                f"Temporal leakage detected: Max client training timestamp ({max_train}) exceeds min global test timestamp ({min_test})."
+            )
+
+        return (len(violations) == 0, max_train, min_test, violations)
+
+    @staticmethod
+    def verify_scaler_isolation(
+        preprocessor: Any,
+        train_features: np.ndarray | pd.DataFrame,
+        test_features: np.ndarray | pd.DataFrame,
+        raw_train_features: np.ndarray | pd.DataFrame | None = None,
+    ) -> tuple[bool, list[str]]:
+        """Verify that preprocessor / normalization was fitted exclusively on training data without snooping test data."""
+        violations: list[str] = []
+        if preprocessor is None:
+            return (True, violations)
+
+        if not getattr(preprocessor, "is_fitted", False):
+            violations.append("Preprocessor is not marked as fitted.")
+            return (False, violations)
+
+        means = getattr(preprocessor, "means_", None)
+        if isinstance(means, dict) and means:
+            eval_feats = raw_train_features if raw_train_features is not None else train_features
+            is_std = getattr(preprocessor, "numeric_strategy", "") == "standardize"
+            if isinstance(eval_feats, pd.DataFrame):
+                for col, fit_val in means.items():
+                    if col in eval_feats.columns:
+                        series = pd.to_numeric(eval_feats[col], errors="coerce").dropna()
+                        if len(series) > 0:
+                            actual_mean = float(series.mean())
+                            if raw_train_features is None and is_std and abs(actual_mean) < 1e-2 and abs(fit_val) > 1e-2:
+                                expected_mean = 0.0
+                            else:
+                                expected_mean = fit_val
+                            if abs(actual_mean - expected_mean) > 1e-3:
+                                violations.append(
+                                    f"Scaler leakage: Training feature mean for column '{col}' ({actual_mean:.4f}) does not match expected ({expected_mean:.4f})."
+                                )
+                                break
+            elif isinstance(eval_feats, np.ndarray) and eval_feats.ndim == 2:
+                for idx, (col, fit_val) in enumerate(means.items()):
+                    if idx < eval_feats.shape[1]:
+                        actual_mean = float(np.mean(eval_feats[:, idx]))
+                        if raw_train_features is None and is_std and abs(actual_mean) < 1e-2 and abs(fit_val) > 1e-2:
+                            expected_mean = 0.0
+                        else:
+                            expected_mean = fit_val
+                        if abs(actual_mean - expected_mean) > 1e-3:
+                            violations.append(
+                                f"Scaler leakage: Training feature mean for '{col}' ({actual_mean:.4f}) does not match expected ({expected_mean:.4f})."
+                            )
+                            break
+
+        return (len(violations) == 0, violations)
+
+    @classmethod
+    def audit_federated_partitions(
+        cls,
+        client_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        test_dataset: tuple[np.ndarray, np.ndarray],
+        client_indices: dict[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray] | None = None,
+        test_indices: Sequence[int] | np.ndarray | None = None,
+        client_timestamps: dict[int, np.ndarray] | list[np.ndarray] | None = None,
+        test_timestamps: np.ndarray | None = None,
+        preprocessor: Any | None = None,
+        raw_train_features: np.ndarray | pd.DataFrame | None = None,
+        raise_on_violation: bool = True,
+    ) -> ZeroLeakageAuditReport:
+        """Run complete 4-pillar zero-leakage federated audit across partitions."""
+        all_violations: list[str] = []
+
+        if isinstance(client_datasets, list):
+            client_map = {i: client_datasets[i] for i in range(len(client_datasets))}
+        else:
+            client_map = client_datasets
+
+        num_clients = len(client_map)
+        client_sample_counts = {cid: len(client_map[cid][0]) for cid in client_map}
+        train_sample_count = sum(client_sample_counts.values())
+        test_sample_count = len(test_dataset[0])
+
+        # 1. Index disjointness
+        total_overlap = 0
+        if client_indices is not None and test_indices is not None:
+            _idx_ok, total_overlap, idx_viols = cls.verify_index_disjointness(client_indices, test_indices)
+            all_violations.extend(idx_viols)
+
+        # 2. Hash disjointness
+        client_feats = {cid: client_map[cid][0] for cid in client_map}
+        test_feats = test_dataset[0]
+        _hash_ok, collision_count, hash_viols = cls.verify_hash_disjointness(client_feats, test_feats)
+        all_violations.extend(hash_viols)
+
+        # 3. Temporal Monotonicity
+        temporal_ok = True
+        max_train_ts: float | None = None
+        min_test_ts: float | None = None
+        if client_timestamps is not None and test_timestamps is not None:
+            temporal_ok, max_train_ts, min_test_ts, temp_viols = cls.verify_temporal_monotonicity(
+                client_timestamps, test_timestamps
+            )
+            all_violations.extend(temp_viols)
+
+        # 4. Scaler Isolation
+        scaler_ok = True
+        if preprocessor is not None:
+            non_empty_train = [client_map[cid][0] for cid in client_map if len(client_map[cid][0]) > 0]
+            if non_empty_train:
+                train_feats_combined = np.vstack(non_empty_train)
+                scaler_ok, scaler_viols = cls.verify_scaler_isolation(
+                    preprocessor, train_feats_combined, test_feats, raw_train_features=raw_train_features
+                )
+                all_violations.extend(scaler_viols)
+
+        is_valid = len(all_violations) == 0
+
+        report = ZeroLeakageAuditReport(
+            is_valid=is_valid,
+            train_sample_count=train_sample_count,
+            test_sample_count=test_sample_count,
+            num_clients=num_clients,
+            client_sample_counts=client_sample_counts,
+            index_overlap_count=total_overlap,
+            hash_collision_count=collision_count,
+            temporal_monotonic=temporal_ok,
+            max_train_timestamp=max_train_ts,
+            min_test_timestamp=min_test_ts,
+            scaler_isolated=scaler_ok,
+            violations=all_violations,
+        )
+
+        if raise_on_violation and not is_valid:
+            violation_summary = "; ".join(all_violations)
+            raise FederatedDataLeakageError(
+                f"Zero-leakage federated partitioning contract violated: {violation_summary}"
+            )
+
+        return report
+
+
+def partition_and_isolate_federated_dataset(
+    features: np.ndarray | pd.DataFrame,
+    labels: np.ndarray | pd.Series,
+    timestamps: np.ndarray | Sequence[float] | None = None,
+    num_clients: int = 3,
+    test_ratio: float = 0.20,
+    alpha: float = 0.5,
+    min_size: int = 10,
+    temporal_split: bool = True,
+    preprocess: bool = False,
+    numeric_strategy: str = "standardize",
+    impute_strategy: str = "median",
+    seed: int | None = 42,
+) -> dict[str, Any]:
+    """Partition dataset across federated clients with strict zero-leakage global test isolation."""
+    from app.application.services.fl_dirichlet_partitioner import DirichletPartitioner
+    from app.application.services.preprocessor import DataPreprocessor
+
+    if isinstance(features, pd.DataFrame):
+        X_arr = features.to_numpy(dtype=np.float32)
+        feature_names = list(features.columns)
+    else:
+        X_arr = np.asarray(features, dtype=np.float32)
+        feature_names = [f"feat_{i}" for i in range(X_arr.shape[1])] if X_arr.ndim > 1 else ["feat_0"]
+
+    if isinstance(labels, pd.Series):
+        y_arr = labels.to_numpy(dtype=int)
+    else:
+        y_arr = np.asarray(labels, dtype=int)
+
+    n_samples = len(X_arr)
+    if n_samples == 0:
+        raise ValueError("Cannot partition empty dataset.")
+
+    # 1. Determine chronological or randomized split
+    if timestamps is not None and temporal_split:
+        ts_arr = np.asarray(timestamps, dtype=np.float64)
+        sort_order = np.argsort(ts_arr)
+        X_sorted = X_arr[sort_order]
+        y_sorted = y_arr[sort_order]
+        ts_sorted = ts_arr[sort_order]
+        indices_sorted = sort_order
+
+        n_test = int(n_samples * test_ratio)
+        n_train = n_samples - n_test
+
+        X_train_pool = X_sorted[:n_train]
+        y_train_pool = y_sorted[:n_train]
+        ts_train_pool = ts_sorted[:n_train]
+        train_indices_pool = indices_sorted[:n_train]
+
+        X_test_raw = X_sorted[n_train:]
+        y_test = y_sorted[n_train:]
+        ts_test = ts_sorted[n_train:]
+        test_indices = indices_sorted[n_train:]
+    else:
+        rng = np.random.default_rng(seed)
+        shuffled_indices = np.arange(n_samples)
+        rng.shuffle(shuffled_indices)
+
+        n_test = int(n_samples * test_ratio)
+        n_train = n_samples - n_test
+
+        train_indices_pool = shuffled_indices[:n_train]
+        test_indices = shuffled_indices[n_train:]
+
+        X_train_pool = X_arr[train_indices_pool]
+        y_train_pool = y_arr[train_indices_pool]
+        ts_train_pool = np.asarray(timestamps)[train_indices_pool] if timestamps is not None else None
+
+        X_test_raw = X_arr[test_indices]
+        y_test = y_arr[test_indices]
+        ts_test = np.asarray(timestamps)[test_indices] if timestamps is not None else None
+
+    # 2. Strict Preprocessor Isolation (fit exclusively on train pool)
+    raw_train_pool = X_train_pool.copy()
+    if preprocess:
+        prep = DataPreprocessor(numeric_strategy=numeric_strategy, impute_strategy=impute_strategy)
+        X_train_pool = prep.fit_transform(X_train_pool)
+        X_test = prep.transform(X_test_raw)
+    else:
+        prep = None
+        X_test = X_test_raw
+
+    # 3. Partition training pool across clients using Dirichlet Partitioner
+    client_indices_rel = DirichletPartitioner.partition_indices(
+        labels=y_train_pool,
+        num_clients=num_clients,
+        alpha=alpha,
+        min_size=min_size,
+        seed=seed,
+    )
+
+    client_train_datasets: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    client_train_indices: dict[int, list[int]] = {}
+    client_train_timestamps: dict[int, np.ndarray] | None = {} if ts_train_pool is not None else None
+
+    for cid in range(num_clients):
+        rel_idx = client_indices_rel[cid]
+        c_x = X_train_pool[rel_idx]
+        c_y = y_train_pool[rel_idx]
+        client_train_datasets[cid] = (c_x, c_y)
+        client_train_indices[cid] = [int(train_indices_pool[i]) for i in rel_idx]
+        if client_train_timestamps is not None and ts_train_pool is not None:
+            client_train_timestamps[cid] = ts_train_pool[rel_idx]
+
+    # 4. Run Zero-Leakage Partition Contract Audit
+    audit_report = ZeroLeakagePartitionContract.audit_federated_partitions(
+        client_datasets=client_train_datasets,
+        test_dataset=(X_test, y_test),
+        client_indices=client_train_indices,
+        test_indices=test_indices,
+        client_timestamps=client_train_timestamps,
+        test_timestamps=ts_test,
+        preprocessor=prep,
+        raw_train_features=raw_train_pool if preprocess else None,
+        raise_on_violation=True,
+    )
+
+    return {
+        "client_train_datasets": client_train_datasets,
+        "test_dataset": (X_test, y_test),
+        "client_train_indices": client_train_indices,
+        "test_indices": test_indices,
+        "client_train_timestamps": client_train_timestamps,
+        "test_timestamps": ts_test,
+        "audit_report": audit_report,
+        "preprocessor": prep,
+        "feature_names": feature_names,
+        "num_clients": num_clients,
+        "train_sample_count": len(X_train_pool),
+        "test_sample_count": len(X_test),
+    }
+
 
 

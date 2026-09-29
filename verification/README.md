@@ -63,6 +63,9 @@ verification/
 ├── mathematical/
 │   ├── scientific_audit_report.md
 │   └── tests/
+├── federated_convergence/
+│   ├── scientific_audit_report.md
+│   └── test_test_set_isolation.py
 └── real_data_benchmark/
     ├── README.md
     └── benchmark_report.json
@@ -108,6 +111,7 @@ Every report in this registry follows the same structure:
 | Zero Trust PKI & ABAC Infrastructure | [zero_trust_pki/scientific_audit_report.md](zero_trust_pki/scientific_audit_report.md) | ABAC Policy Engine & Vault PKI | Self-Verified |
 | Multi-Cloud Terraform IaC | [terraform_iac/scientific_audit_report.md](terraform_iac/scientific_audit_report.md) | Cloud Topology Static Analysis | Self-Verified |
 | Master Mathematical Protocol | [mathematical/scientific_audit_report.md](mathematical/scientific_audit_report.md) | 35 Formal Mathematical Invariants | Self-Verified |
+| Federated Convergence & Test Isolation | [federated_convergence/scientific_audit_report.md](federated_convergence/scientific_audit_report.md) | Set Disjointness & Zero Data Snooping | Self-Verified |
 | Real-World Graph Benchmark | [real_data_benchmark/README.md](real_data_benchmark/README.md) | Elliptic Bitcoin Dataset GNN Evaluation | Self-Verified |
 
 ---
