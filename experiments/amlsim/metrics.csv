@@ -1,3 +1,2 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:87c90f49cbd06ad7ad4b54837c919d75ec53f35974a3e6033fcdd8efb8617ca2
-size 291
+step,pr_auc,roc_auc,recall_at_01_fpr,recall_at_05_fpr,recall_at_10_fpr,cycle_recall,fan_in_recall,f1_score,brier_score,delta_pr_auc_vs_tabular,delta_cycle_recall_vs_tabular,delta_fan_in_recall_vs_tabular
+1,0.6527,0.9509,0.6412,0.6758,0.6922,0.6736,0.705,0.1689,0.0047,0.0434,0.0208,0.0575

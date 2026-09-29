@@ -1,3 +1,8 @@
-version https://git-lfs.github.com/spec/v1
-oid sha256:d0799ee4bf346c88a5e14337774f1e1c68162d4368a068676d7a1bb9281149bf
-size 1093
+scenario_id,scenario_name,isolated_detection_rate,federated_detection_rate,pooled_detection_rate,delta_detection_rate,isolated_pr_auc,federated_pr_auc,delta_pr_auc,isolated_recall_at_01_fpr,federated_recall_at_01_fpr
+SCENARIO_1,Scenario 1: Single-Bank Localized Fraud,1.0,1.0,1.0,0.0,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_2,Scenario 2: Two-Bank Cross-Institutional Layering Chain,1.0,1.0,1.0,0.0,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_3,Scenario 3: Three-Bank Cyclic Laundering Ring (A -> B -> C -> A),0.6667,1.0,1.0,0.3333,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_4,Scenario 4: Behavior-Shifting Multi-Bank Smurfing to High-Value Cash-Out,1.0,1.0,1.0,0.0,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_5,Scenario 5: Highly Non-IID Institutional Archetypes,1.0,1.0,1.0,0.0,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_6,Scenario 6: Extreme Positive Sample Rarity at Bank Gamma,1.0,1.0,1.0,0.0,0.9646,0.9992,0.0346,0.9022,0.9783
+SCENARIO_7,Scenario 7: Zero Positive Historical Examples at Bank Gamma (Zero-Positive Transfer),0.0,1.0,1.0,1.0,0.9646,0.9992,0.0346,0.9022,0.9783
