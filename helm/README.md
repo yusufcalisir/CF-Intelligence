@@ -27,7 +27,7 @@ The chart renders and deploys **4 validated Kubernetes resources**:
 
 | Resource | Kind | Name | Port / Config |
 |:---|:---|:---|:---|
-| **Deployment** | `apps/v1` | `cfi-platform-deployment` | Ports `8000` (HTTP), `50051` (gRPC), non-root UID `10001` |
+| **Deployment** | `apps/v1` | `cfi-platform-deployment` | Ports `8000` (HTTP), `50051` (gRPC), non-root UID `10001`, `/health` liveness & `/ready` readiness probes |
 | **Service** | `v1` | `cfi-platform-service` | `ClusterIP` exposing `8000` (HTTP) and `50051` (gRPC) |
 | **HPA** | `autoscaling/v2` | `cfi-platform-hpa` | Min `2`, Max `20`, Target CPU utilization `70%` |
 | **Ingress** | `networking.k8s.io/v1` | `cfi-platform-ingress` | Nginx Ingress with cert-manager Let's Encrypt TLS |
@@ -55,6 +55,10 @@ The chart renders and deploys **4 validated Kubernetes resources**:
 | `autoscaling.enabled` | `bool` | `true` | Enable HorizontalPodAutoscaler |
 | `autoscaling.minReplicas` | `int` | `2` | Minimum autoscaling replicas |
 | `autoscaling.maxReplicas` | `int` | `20` | Maximum autoscaling replicas |
+| `autoscaling.targetCPUUtilizationPercentage` | `int` | `70` | Target CPU utilization percentage for autoscaling |
+| `env.APP_ENV` | `string` | `production` | Application deployment environment identifier |
+| `env.REDIS_URL` | `string` | `redis://cfi-redis:6379/0` | Upstream Redis cluster connection URI |
+| `env.TELEMETRY_ENABLED` | `string` | `true` | OpenTelemetry and Prometheus metric collection flag |
 
 ---
 
