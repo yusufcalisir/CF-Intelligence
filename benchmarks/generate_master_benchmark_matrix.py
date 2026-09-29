@@ -689,10 +689,7 @@ class MasterBenchmarkMatrixGenerator:
         def _fmt(val: Any, bold: bool = False) -> str:
             if val is None:
                 return "—"
-            if isinstance(val, (int, float)):
-                res = f"{val:.4f}"
-            else:
-                res = str(val)
+            res = f"{val:.4f}" if isinstance(val, (int, float)) else str(val)
             return f"**{res}**" if bold else res
 
         lines: list[str] = []

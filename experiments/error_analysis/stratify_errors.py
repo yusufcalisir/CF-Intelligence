@@ -668,7 +668,7 @@ class ErrorStratifier:
             degree_strata=degree_strata,
         )
 
-        now_iso = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        now_iso = datetime.datetime.now(datetime.UTC).isoformat()
         return ErrorStratificationAnalysis(
             timestamp=now_iso,
             dataset_evaluated=dataset_name,

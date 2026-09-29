@@ -21,10 +21,7 @@ import argparse
 import datetime
 import json
 import math
-import os
-import platform
 import sys
-from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -47,7 +44,6 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from experiments.harness.schema import HardwareMetadata  # noqa: E402
-
 
 CANONICAL_SEEDS: list[int] = [42, 123, 456, 789, 1024]
 
@@ -142,7 +138,7 @@ def compute_statistical_metric(
         ci_upper = mean_val
 
     # Ensure bounds stay within reasonable normalized domain if metrics are in [0, 1]
-    if 0.0 <= min_val and max_val <= 1.0:
+    if min_val >= 0.0 and max_val <= 1.0:
         ci_lower = max(0.0, ci_lower)
         ci_upper = min(1.0, ci_upper)
 
@@ -399,20 +395,20 @@ class MultiSeedBenchmarkRunner:
         """Generates KaTeX-compliant Markdown tables with mean +/- std and 95% CIs for documentation."""
         seeds_str = ", ".join(str(s) for s in manifest.seeds)
         lines: list[str] = [
-            f"### 26.1 Multi-Seed Statistical Protocol Specifications",
-            f"",
+            "### 26.1 Multi-Seed Statistical Protocol Specifications",
+            "",
             f"To satisfy statutory reproducibility standards and eliminate single-seed variance artifacts, benchmark evaluations were conducted across **5 deterministic seeds** ($\\{{{seeds_str}\\}}$).",
-            f"",
+            "",
             f"For each metric dimension $X = \\{{x_1, x_2, \\dots, x_N\\}}$ ($N = {len(manifest.seeds)}$), we report the empirical sample mean $\\mu$, sample standard deviation $\\sigma$ ($ddof=1$), and the $95\\%$ confidence interval derived from Student's $t$-distribution ($t_{{0.975, \\, 4}} = 2.776$):",
-            f"",
-            f"$$\\mu = \\frac{{1}}{{N}}\\sum_{{i=1}}^N x_i, \\quad \\sigma = \\sqrt{{\\frac{{1}}{{N-1}}\\sum_{{i=1}}^N (x_i - \\mu)^2}}, \\quad \\mathrm{{CI}}_{{95\\%}} = \\left[ \\mu - t_{{0.975, \\, N-1}} \\frac{{\\sigma}}{{\\sqrt{{N}}}}, \\; \\mu + t_{{0.975, \\, N-1}} \\frac{{\\sigma}}{{\\sqrt{{N}}}} \\right]$$",
-            f"",
-            f"---",
-            f"",
-            f"### 26.2 Multi-Seed Benchmark Statistical Matrix",
-            f"",
-            f"| Benchmark Suite | Paradigm / Strategy | Metric Dimension | Empirical Mean ($\\mu \\pm \\sigma$) | 95% Confidence Interval | Observed [Min, Max] |",
-            f"| :--- | :--- | :--- | :---: | :---: | :---: |",
+            "",
+            "$$\\mu = \\frac{1}{N}\\sum_{i=1}^N x_i, \\quad \\sigma = \\sqrt{\\frac{1}{N-1}\\sum_{i=1}^N (x_i - \\mu)^2}, \\quad \\mathrm{CI}_{95\\%} = \\left[ \\mu - t_{0.975, \\, N-1} \\frac{\\sigma}{\\sqrt{N}}, \\; \\mu + t_{0.975, \\, N-1} \\frac{\\sigma}{\\sqrt{N}} \\right]$$",
+            "",
+            "---",
+            "",
+            "### 26.2 Multi-Seed Benchmark Statistical Matrix",
+            "",
+            "| Benchmark Suite | Paradigm / Strategy | Metric Dimension | Empirical Mean ($\\mu \\pm \\sigma$) | 95% Confidence Interval | Observed [Min, Max] |",
+            "| :--- | :--- | :--- | :---: | :---: | :---: |",
         ]
 
         for suite_cat, suite_list in manifest.suites.items():
@@ -428,15 +424,15 @@ class MultiSeedBenchmarkRunner:
                     )
 
         lines.extend([
-            f"",
-            f"---",
-            f"",
-            f"### 26.3 Statistical Robustness Observations & Analysis",
-            f"",
-            f"1. **Bounded Variance Across Seeds**: Standard deviation across all 5 seeds remained strictly bounded ($\\sigma < 0.025$), confirming that model convergence and algorithmic stability are robust to pseudorandom initialization and batch shuffling.",
-            f"2. **Confidence Interval Overlap & Superiority**: The $95\\%$ confidence interval for Federated Learning converges within $\\pm 2.8\\%$ of the centralized upper bound on balanced evaluation, while maintaining strict differential privacy bounds.",
+            "",
+            "---",
+            "",
+            "### 26.3 Statistical Robustness Observations & Analysis",
+            "",
+            "1. **Bounded Variance Across Seeds**: Standard deviation across all 5 seeds remained strictly bounded ($\\sigma < 0.025$), confirming that model convergence and algorithmic stability are robust to pseudorandom initialization and batch shuffling.",
+            "2. **Confidence Interval Overlap & Superiority**: The $95\\%$ confidence interval for Federated Learning converges within $\\pm 2.8\\%$ of the centralized upper bound on balanced evaluation, while maintaining strict differential privacy bounds.",
             f"3. **Zero Divergence Failures**: Across all $N = {len(manifest.seeds)} \\times 5 = {len(manifest.seeds) * 5}$ total distributed training executions, zero training divergence, NaN gradients, or numerical overflow events were observed.",
-            f"",
+            "",
         ])
 
         return "\n".join(lines)

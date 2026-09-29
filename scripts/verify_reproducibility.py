@@ -19,12 +19,11 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import json
+import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
-import json
 from pathlib import Path
-import re
-import sys
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -260,7 +259,7 @@ class ReproducibilityVerifier:
             "Quantitative Claim Registry (19 Claims)",
             cat,
             cr_ok,
-            f"19 empirical quantitative claims cataloged with explicit units and baselines",
+            "19 empirical quantitative claims cataloged with explicit units and baselines",
             "benchmarks/claim_registry.json",
         )
 
