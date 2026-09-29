@@ -69,6 +69,34 @@ The audit inspected all components across the full repository footprint:
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
+### 3.1 Dual-Axis Verification Taxonomy: Software Correctness vs. Scientific Generalization
+
+To prevent the dangerous conflation of deterministic unit test execution with statistical machine learning effectiveness (as mandated by Federal Reserve SR 11-7 and EU AI Act Annex IV), the platform enforces an orthogonal epistemological boundary across all audited components (detailed in [`docs/verification_taxonomy_spec.md`](verification_taxonomy_spec.md)):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DUAL-AXIS EVALUATION & GOVERNANCE FRAMEWORK                 │
+├──────────────────────────────────────┬──────────────────────────────────────┤
+│ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Deterministic Implementation         │ Stochastic Empirical Learning        │
+│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
+│   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │
+│ • Multi-tenant BOLA 403 enforcement  │ • Non-IID Dirichlet skew (alpha=0.5) │
+│ • State_dict serialization roundtrip │ • Rényi DP privacy-utility frontier  │
+│ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
+│ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Validated by 3,238 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
+│ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+```
+
 ---
 
 ## 4. What Was Changed

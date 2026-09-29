@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-4013%2F4013_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-4023%2F4023_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -23,7 +23,7 @@
 | Core Production Architecture | Engineering Rationale & Validation | Research, Governance & Foundations |
 |:---|:---|:---|
 | [1. Executive Summary & Three-Tier Architecture](#1-executive-summary--three-tier-architectural-scope) | [13. Design Decisions & Trade-Offs](#13-design-decisions--trade-offs) | [19. Tier 2: Research Prototypes](#19-tier-2-research--experimental-prototypes) |
-| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations & What This Is Not](#14-limitations--what-this-is-not) | [20. Tier 3: Consortium Simulations](#20-tier-3-demonstrations--consortium-simulations) |
+| [2. Master System Architecture](#2-master-system-architecture) | [14. Limitations](#14-limitations--what-this-is-not) / [14.1 Taxonomy](#141-dual-axis-verification-taxonomy-software-correctness-vs-scientific-generalization) | [20. Tier 3: Consortium Simulations](#20-tier-3-demonstrations--consortium-simulations) |
 | [3. Directory Structure](#3-clean-architecture-directory-structure) | [15. Empirical Benchmarks](#15-empirical-performance--benchmark-suite) | [21. Prerequisites & System Requirements](#21-prerequisites-and-system-requirements) |
 | [4. Data Ingestion & Parsing](#4-multi-bank-synthetic-data--multi-standard-ingestion) | [16. Regulatory Concepts Explored](#16-regulatory-concepts-explored) | [22. Quick Start Guide](#22-step-by-step-operator-quick-start) |
 | [5. Federated Learning](#5-federated-learning-engines--non-iid-optimization) | [17. Subsystem Self-Verification](#17-subsystem-self-verification-reports-verification) | [23. AI Collaboration Methodology](#23-development-methodology--ai-collaboration) |
@@ -577,7 +577,7 @@ CF-Intelligence/
 │   │           ├── streaming_ws.py                  # Live transaction stream & composite risk scoring feed
 │   │           └── training_ws.py                   # Real-time federated training round progress & weight metrics
 │   │
-│   └── tests/                                       # Comprehensive Backend Test Suite (3,228 Tests)
+│   └── tests/                                       # Comprehensive Backend Test Suite (3,238 Tests)
 │       ├── unit/                                    # Unit tests for domain invariants, services, security, attack injector & data contracts
 │       ├── integration/                             # End-to-end API, gRPC, database & multi-tenant integration tests
 │       ├── mutation/                                # AST boundary & fault injection mutant suites (86.2% backend AST kill rate)
@@ -1266,6 +1266,37 @@ For protecting parameter updates in transit between banks and the aggregation co
 > - **Evaluator Utilities & Empirical Attack Simulation:** The `security_evaluator.py` Byzantine resilience evaluator executes real empirical parameter vector aggregation simulations across clean consensus baselines and poisoned vectors for FedAvg, FedProx, Coordinate Median, Trimmed Mean, Krum, and Bulyan. Other evaluators (MIA, DLG) use simplified heuristic proxies rather than exhaustive shadow-model training.
 > - **Binary Model Serialization Protocol:** The gRPC model distribution transport packages global models using standardized `b"CFI1"` framed headers with UTF-8 metadata and raw 32-bit floating-point weight buffers.
 
+### 14.1 Dual-Axis Verification Taxonomy: Software Correctness vs. Scientific Generalization
+
+To prevent the dangerous conflation of deterministic unit test execution with statistical machine learning effectiveness (as mandated by **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and **EU AI Act Annex IV**), the platform formally separates evaluation across two orthogonal axes (detailed in [`docs/verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md)):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DUAL-AXIS EVALUATION & GOVERNANCE FRAMEWORK                 │
+├──────────────────────────────────────┬──────────────────────────────────────┤
+│ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Deterministic Implementation         │ Stochastic Empirical Learning        │
+│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
+│   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │
+│ • Multi-tenant BOLA 403 enforcement  │ • Non-IID Dirichlet skew (alpha=0.5) │
+│ • State_dict serialization roundtrip │ • Rényi DP privacy-utility frontier  │
+│ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
+│ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Validated by 3,238 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
+│ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+```
+
+- **Axis 1 (Software Correctness)**: Validates deterministic invariants, security boundaries, and schema contracts in `backend/tests/`. A 100% test pass rate proves the software implementation is robust, but does **not** prove the model will generalize to real-world financial fraud distributions.
+- **Axis 2 (Scientific Generalization)**: Evaluates statistical learning efficacy, out-of-time generalizability, and robustness against non-IID skew in `benchmarks/` and `experiments/` across 8 canonical datasets.
+
 ---
 
 ## 15. Empirical Performance & Benchmark Suite
@@ -1290,7 +1321,7 @@ All benchmark measurements are derived from the integrated test suite executed a
 | **Differential Privacy Budget** | $\epsilon = 1.0, \delta = 10^{-5}$ | $\epsilon \le 2.0$ | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | **3,614 / 3,614 passing (4,013 total incl. verification)** | 100% | 3,228 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
+| **Full Test Suite Pass Rate** | **3,624 / 3,624 passing (4,023 total incl. verification)** | 100% | 3,238 Backend Pytest + 355 Frontend Vitest + 31 Smart Contracts (+ 399 Scientific Verification Tests across 20 modules incl. MIA/DLG audit) | `Self-Verified (Internal Test Suite)` |
 
 ---
 

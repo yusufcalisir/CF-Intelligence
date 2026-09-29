@@ -427,7 +427,7 @@ The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant)
 │   │   └── presentation/         # API controllers & WebSocket streams
 │   │       ├── routers/             # 42 modular FastAPI REST endpoints (incl. FININT, SEPA Recalls, Sanctions, goAML, Open AML Adapter, Corporate UBO, European AML Scenarios, Asset Recovery)
 │   │       └── websockets/          # Real-time alert & training WebSockets
-│   └── tests/                    # 3,228 automated unit, integration, & security tests
+│   └── tests/                    # 3,238 automated unit, integration, & security tests
 ├── frontend/
 │   ├── src/
 │   │   ├── api/                  # TanStack Query clients & REST hooks
@@ -645,15 +645,15 @@ The automated enterprise security CI/CD workflow ([`.github/workflows/enterprise
      ├── 3. gitleaks-secret-scan (Automated credential & secret leak detection)
      ├── 4. trivy-container-security (Trivy scanner for OS/library CVEs)
      ├── 5. helm-and-terraform-security-audit (Helm lint + AWS/Azure/GCP terraform validate)
-     └── 6. pytest-security-and-compliance-suites (3,228 Backend + 399 Verification Automated Suites across 20 modules)
+     └── 6. pytest-security-and-compliance-suites (3,238 Backend + 399 Verification Automated Suites across 20 modules)
 ```
 
 ### Comprehensive Test Suite Verification
-The entire codebase is validated by **3,228 backend automated tests** (and 399 scientific verification tests across 20 modules; 4,013 total system tests) across unit, integration, and property-based suites:
+The entire codebase is validated by **3,238 backend automated tests** (and 399 scientific verification tests across 20 modules; 4,023 total system tests) across unit, integration, and property-based suites:
 
 ```bash
 pytest backend/tests/ -q
-# Result: 3,228 tests collected and passing across all domain, application, and infrastructure modules
+# Result: 3,238 tests collected and passing across all domain, application, and infrastructure modules
 ```
 
 | Security & Compliance Job | Technology / Tool | Security Scope |
@@ -663,7 +663,42 @@ pytest backend/tests/ -q
 | **Secret Scanning** | `gitleaks` | Automated detection of hardcoded credentials, tokens, and private keys |
 | **Container Scan** | `aquasecurity/trivy-action` | Base OS image & installed library CVE scanning (`CRITICAL`, `HIGH`) |
 | **IaC Security** | `Helm`, `Terraform` | Helm chart linting & AWS/Azure/GCP multi-cloud template validation |
-| **Full Automated Test Suite**| `Pytest` | 3,228 automated backend tests (+ 399 scientific verification tests across 20 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Temporal Generalization & Out-of-Time Degradation Quantification, Empirical Concept & Feature Drift Profiling & Automated Retraining Verification, Federated Communication Cost & Bandwidth Profiling (Payload Serialization, Zstandard Compression, Top-K Sparsification, INT8/FP16 Quantization, Protocol Overheads), Inference Gateway Scalability & Multi-Concurrency Latency Benchmark (Stage Decomposition, Bottleneck Analysis, p50/p95/p99 Percentile Scaling), Multi-Seed Statistical Robustness & Confidence Intervals (5 Seeds, Student-t 95% CIs, mu +/- sigma Matrix), Systematic Error Stratification & Failure Mode Diagnostics (Amount, Hour, MCC, Network Degree Strata, FM-01 to FM-04 Dossier), Demographic Attribute Availability Assessment & Algorithmic Fairness Governance (7 Benchmark Datasets Zero-Demographic PII Audit, SR 11-7 Bias Disclaimer, Proxy DIR/EOD Parity), Authoritative HuggingFace MODEL_CARD.md & Institutional EU AI Act SYSTEM_CARD.md Formalization, Authoritative Dataset Cards & Storage Architecture (DATASETS.md) Provenance & Licensing Formalization, Standardized Experiment Artifact Hierarchy & Automated Markdown Dossier Compilation (config.json, results.json, metrics.csv, report.md, plots/ across 8 benchmark datasets), Master Comparative Empirical Benchmark Matrix & Strict Null Representation, Architectural Component Factorial Ablation Matrix (16-Config Grid x ANOVA Main Effects), End-to-End Scientific Reproducibility Guide (REPRODUCIBILITY.md), Deterministic CI Smoke Gates & Decoupled Benchmark Workflows, Prometheus/SIEM Telemetry Export, and DR Failover |
+| **Full Automated Test Suite**| `Pytest` | 3,238 automated backend tests (+ 399 scientific verification tests across 20 modules) covering Interactive POC Sandbox Replay & Multi-Bank Simulator, EU AI Act & SR 11-7 Regulatory Dossier Generator, Differential Privacy & RDP Moments Accounting, DP-SGD Noise Calibration & Privacy-Utility Frontier Visualization, Secure Aggregation Pairwise Zero-Sum Invariants & Zero-Knowledge Boundary Verification, Byzantine Robustness & Adversarial Poisoning Breakdown Point Analysis (Sign-Flip, Scaled Outliers, Gaussian Noise, Label Flipping against Krum, Bulyan, Median, Trimmed Mean), Spectral Defense, Onboarding, Open Banking PSD2, SEPA Instant Recall, Sanctions Screening, UNODC goAML / AMLA Exporter, Enterprise Open AML Adapter, Corporate UBO Knowledge Graph, European AML Scenario Library, Asset Recovery & FININT Operational Hub, Enterprise CloudEvents 1.0 & Apache Kafka Streaming Bus, Cloud Core Banking Connectors (Mambu & Thought Machine Vault Core), Hardware Security Module (HSM) PKCS#11 & Vault Transit Zero-Trust Key Wrapper, Extended ISO 20022 Financial Rails (camt.053 / pacs.002 / pacs.003), Drift Retraining Feature Subset Bridge, Elliptic Bitcoin GraphSAGE Inductive Benchmark, IBM AMLSim Multi-Hop Graph & Topology Alert Benchmarking, SynthAML Spar Nord Bank Synthetic AML Benchmark, AMLNet Extreme Imbalance AUSTRAC Benchmark, Cross-Bank Synthetic Consortium Benchmark (CFI-CrossBank-01), Multi-Alpha FL Optimizer & Dirichlet Sensitivity Sweep, Architectural Component Factorial Ablation Matrix (Graph x DP x SecAgg x CrossBank), Temporal Generalization & Out-of-Time Degradation Quantification, Empirical Concept & Feature Drift Profiling & Automated Retraining Verification, Federated Communication Cost & Bandwidth Profiling (Payload Serialization, Zstandard Compression, Top-K Sparsification, INT8/FP16 Quantization, Protocol Overheads), Inference Gateway Scalability & Multi-Concurrency Latency Benchmark (Stage Decomposition, Bottleneck Analysis, p50/p95/p99 Percentile Scaling), Multi-Seed Statistical Robustness & Confidence Intervals (5 Seeds, Student-t 95% CIs, mu +/- sigma Matrix), Systematic Error Stratification & Failure Mode Diagnostics (Amount, Hour, MCC, Network Degree Strata, FM-01 to FM-04 Dossier), Demographic Attribute Availability Assessment & Algorithmic Fairness Governance (7 Benchmark Datasets Zero-Demographic PII Audit, SR 11-7 Bias Disclaimer, Proxy DIR/EOD Parity), Authoritative HuggingFace MODEL_CARD.md & Institutional EU AI Act SYSTEM_CARD.md Formalization, Authoritative Dataset Cards & Storage Architecture (DATASETS.md) Provenance & Licensing Formalization, Standardized Experiment Artifact Hierarchy & Automated Markdown Dossier Compilation (config.json, results.json, metrics.csv, report.md, plots/ across 8 benchmark datasets), Master Comparative Empirical Benchmark Matrix & Strict Null Representation, Architectural Component Factorial Ablation Matrix (16-Config Grid x ANOVA Main Effects), End-to-End Scientific Reproducibility Guide (REPRODUCIBILITY.md), Deterministic CI Smoke Gates & Decoupled Benchmark Workflows, Software Correctness vs Scientific Generalization Taxonomy, Prometheus/SIEM Telemetry Export, and DR Failover |
+
+---
+
+## 18. Software Correctness vs. Scientific Generalization Taxonomy
+
+To satisfy the stringent model risk governance mandates of **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and the **EU Artificial Intelligence Act (Regulation 2024/1689)** Annex IV, the platform formally establishes an epistemological delineation between software correctness and statistical machine learning generalization (detailed in [`docs/verification_taxonomy_spec.md`](verification_taxonomy_spec.md)):
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                 DUAL-AXIS EVALUATION & GOVERNANCE FRAMEWORK                 │
+├──────────────────────────────────────┬──────────────────────────────────────┤
+│ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Deterministic Implementation         │ Stochastic Empirical Learning        │
+│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
+│   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │
+│ • Multi-tenant BOLA 403 enforcement  │ • Non-IID Dirichlet skew (alpha=0.5) │
+│ • State_dict serialization roundtrip │ • Rényi DP privacy-utility frontier  │
+│ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
+│ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Validated by 3,238 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+├──────────────────────────────────────┼──────────────────────────────────────┤
+│ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
+│ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
+└──────────────────────────────────────┴──────────────────────────────────────┘
+```
+
+### 18.1 Architectural Segregation of Test and Evaluation Suites
+- **Software Correctness (`backend/tests/`)**: Unit, integration, chaos, and mutation tests execute deterministically against synthetic fixtures, asserting structural contracts, state machines, and security perimeters.
+- **Scientific Generalization (`benchmarks/`, `experiments/`)**: Decoupled statistical harnesses evaluate trained models against out-of-time splits across 8 canonical datasets (`paysim`, `ieee_cis`, `credit_card`, `elliptic`, `amlsim`, `synthaml`, `amlnet`, `cross_bank`), quantifying degradation under Dirichlet non-IID skew and Differential Privacy budgets.
+
 
 
 
