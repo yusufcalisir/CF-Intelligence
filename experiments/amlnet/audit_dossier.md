@@ -1,10 +1,10 @@
 # Empirical Benchmark Audit Dossier: AMLNet Extreme Imbalance Federated Benchmark
 
-**Document Reference:** `CF-INTEL-BENCH-AMLNET-001`
-**Standard Compliance:** Australian AUSTRAC AML/CTF Act 2006 / EBA Guidelines on AML / Federal Reserve SR 11-7
-**Execution Timestamp:** `2026-09-27T15:00:10.425718+00:00`
-**Dataset Provenance:** Sabin Huda et al., Griffith University (Zenodo DOI: `10.5281/zenodo.10058474`, CC BY-NC 4.0)
-**Evaluated Cohort:** $25,000$ total transactions ($20,000$ Train, $5,000$ Test, $pprox 0.15\%$ positive laundering prevalence)
+**Document Reference:** `CF-INTEL-BENCH-AMLNET-001`  
+**Standard Compliance:** Australian AUSTRAC AML/CTF Act 2006 / EBA Guidelines on AML / Federal Reserve SR 11-7  
+**Execution Timestamp:** `2026-09-27T15:00:10.425718+00:00`  
+**Dataset Provenance:** Sabin Huda et al., Griffith University (Zenodo DOI: `10.5281/zenodo.10058474`, CC BY-NC 4.0)  
+**Evaluated Cohort:** 25,000 total transactions (20,000 Train, 5,000 Test, $\approx 0.15\%$ positive laundering prevalence)
 
 ---
 
@@ -61,6 +61,6 @@ where $\mu = 0.01$ provides gradient damping.
 
 ## 4. Regulatory & Operational Significance
 
-1. **AUSTRAC Statutory Threshold Smurfing Detection:** The engineered feature `is_near_reporting_threshold` specifically isolates transactions in the $\$8,500–\$9,950\text{ AUD}$ corridor.
+1. **AUSTRAC Statutory Threshold Smurfing Detection:** The engineered feature `is_near_reporting_threshold` specifically isolates transactions in the 8,500–9,950 AUD corridor.
 2. **Workload Reduction at Strict Operational FPR:** At $\text{FPR} \le 0.1\%$, FedAvg and FedProx achieve high operational recall while rejecting $99.9\%$ of legitimate banking activity.
 3. **Data Protection & Privacy Sovereignty:** Model weights are aggregated without exposing raw payment message records, preserving cross-bank confidentiality.

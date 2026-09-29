@@ -238,7 +238,7 @@ $$
 Every recovery, hold, or release event is cryptographically anchored into an append-only SHA-256 hash chain:
 
 $$
-H_t = \mathrm{SHA256}\left(H_{t-1} \parallel \mathrm{event}_{\mathrm{id}} \parallel \mathrm{type} \parallel \mathrm{EUR} \parallel \mathrm{timestamp}\right)
+H_t = \mathrm{SHA256}\left(H_{t-1} \mathbin{\Vert} \mathrm{event}_{\mathrm{id}} \mathbin{\Vert} \mathrm{type} \mathbin{\Vert} \mathrm{EUR} \mathbin{\Vert} \mathrm{timestamp}\right)
 $$
 This ensures strict regulatory admissibility under European eIDAS and AMLD6 compliance mandates, preventing retroactive alteration or deletion of operational milestones.
 

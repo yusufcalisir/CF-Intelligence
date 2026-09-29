@@ -56,7 +56,7 @@ $$\sum_{i=1}^{K} \mathbf{m}_i = \mathbf{0} \implies \left\lVert \sum_{i=1}^{K} \
 - **Multi-Tenant Isolation**: Row-Level Security (RLS) and Tenant ID query scoping reject Cross-Tenant Broken Object Level Authorization (BOLA/IDOR) attempts with HTTP 403 Forbidden.
 - **Model Checkpoint Serialization**: PyTorch `state_dict` parameters, optimizer states, and Pydantic v2 schemas survive serialized disk roundtrips with bit-exact float equality:
 
-$$\mathrm{CosineSimilarity}\left(\mathbf{\Theta}_{\mathrm{pre}},\, \mathbf{\Theta}_{\mathrm{post}}\right) = 1.0000000$$$
+$$\mathrm{CosineSimilarity}\left(\mathbf{\Theta}_{\mathrm{pre}},\, \mathbf{\Theta}_{\mathrm{post}}\right) = 1.0000000$$
 
 ### 3.2 Verification Test Suites
 Software correctness is certified by 3,238 backend Pytest tests, 355 frontend Vitest tests, 72 Playwright browser tests, and 31 Hardhat smart contract tests:

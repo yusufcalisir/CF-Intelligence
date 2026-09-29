@@ -518,7 +518,7 @@ To move beyond heuristic relationship weights, the platform introduces a **Feder
 1. **Local Graph Representation**: Each bank constructs a graph mapping its entities to a 12-dimensional numerical feature representation (entity types, risk levels, alert logs, local degrees, and activity recency).
 2. **GraphSAGE Model**: A 2-layer GraphSAGE architecture performs message-passing:
 
-$$\mathbf{h}_{\mathcal{N}(v)}^{(k)} = \mathrm{AGGREGATE}\left(\left\{\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\right\}\right)$$
+$$\mathbf{h}_{\mathcal{N}(v)}^{(k)} = \mathrm{AGGREGATE}\left(\left\lbrace\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\right\rbrace\right)$$
 
 $$\mathbf{h}_v^{(k)} = \sigma\left(\mathbf{W}^{(k)} \cdot \left[\mathbf{h}_v^{(k-1)} \mathbin{\Vert} \mathbf{h}_{\mathcal{N}(v)}^{(k)}\right]\right)$$
 
