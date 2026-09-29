@@ -121,6 +121,6 @@ def test_epistemic_vulnerability_matrix_structure(limitations_content: str):
 
 def test_metric_hierarchy_imbalance_rules(limitations_content: str):
     """Test 10: Verify the protocol mandates PR-AUC / Recall@0.1%FPR and forbids standalone Accuracy."""
-    assert r"\operatorname{PR-AUC}" in limitations_content
-    assert r"\operatorname{Recall@0.1\%FPR}" in limitations_content
+    assert "PR-AUC" in limitations_content
+    assert "Recall@0.1%" in limitations_content
     assert "prohibited as a standalone" in limitations_content or "strictly prohibited" in limitations_content

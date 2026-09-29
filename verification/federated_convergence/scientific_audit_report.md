@@ -102,7 +102,7 @@ $$\mathcal{I}_{\mathrm{test}} \cap \left( \bigcup_{k=1}^K \mathcal{I}_{\mathrm{t
 
 $$\forall i, j \in [K], \quad i \ne j \implies \mathcal{I}_{\mathrm{train}}^{(i)} \cap \mathcal{I}_{\mathrm{train}}^{(j)} = \emptyset$$
 
-Furthermore, let $\mathcal{H}(x) = \operatorname{SHA-256}(\mathbf{x})$ denote the cryptographic digest of feature vector $\mathbf{x}$. The hash disjointness invariant requires:
+Furthermore, let $\mathcal{H}(x) = \mathrm{SHA256}(\mathbf{x})$ denote the cryptographic digest of feature vector $\mathbf{x}$. The hash disjointness invariant requires:
 
 $$\left\{ \mathcal{H}(\mathbf{x}) \mid \mathbf{x} \in \mathcal{D}_{\mathrm{test}} \right\} \cap \left\{ \mathcal{H}(\mathbf{x}) \mid \mathbf{x} \in \bigcup_{k=1}^K \mathcal{D}_{\mathrm{train}}^{(k)} \right\} = \emptyset$$
 
@@ -118,7 +118,7 @@ This ensures that the global evaluation score represents future generalized risk
 
 Let $\mathcal{P}$ denote a preprocessing function parameterized by statistics $\boldsymbol{\theta} = (\boldsymbol{\mu}, \boldsymbol{\sigma}, \mathbf{m}_{\min}, \mathbf{m}_{\max}, \mathcal{V}_{\mathrm{cat}})$. In zero-leakage preprocessing:
 
-$$\boldsymbol{\theta}^* = \operatorname{Fit}\left(\bigcup_{k=1}^K \mathcal{D}_{\mathrm{train}}^{(k)}\right)$$
+$$\boldsymbol{\theta}^* = \mathrm{Fit}\left(\bigcup_{k=1}^K \mathcal{D}_{\mathrm{train}}^{(k)}\right)$$
 
 $$\frac{\partial \boldsymbol{\theta}^*}{\partial \mathcal{D}_{\mathrm{test}}} = \mathbf{0}$$
 
@@ -126,7 +126,7 @@ $$\forall \mathbf{x}_{\mathrm{test}} \in \mathcal{D}_{\mathrm{test}}, \quad \mat
 
 For any category $c \in \mathcal{V}_{\mathrm{cat}}$ present in $\mathcal{D}_{\mathrm{test}}$ but absent in $\mathcal{D}_{\mathrm{train}}$:
 
-$$c \notin \mathcal{V}_{\mathrm{cat}}(\mathcal{D}_{\mathrm{train}}) \implies \operatorname{OneHot}(c; \boldsymbol{\theta}^*) = \mathbf{0}$$
+$$c \notin \mathcal{V}_{\mathrm{cat}}(\mathcal{D}_{\mathrm{train}}) \implies \mathrm{OneHot}(c; \boldsymbol{\theta}^*) = \mathbf{0}$$
 
 ---
 

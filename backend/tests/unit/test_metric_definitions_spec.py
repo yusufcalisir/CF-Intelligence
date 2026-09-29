@@ -32,13 +32,13 @@ def test_metrics_doc_exists_and_non_empty(metrics_content: str):
 def test_seven_core_metrics_defined(metrics_content: str):
     """Test 2: Verify all 7 core evaluation metrics are formally defined with math and descriptions."""
     core_metrics = [
-        r"\operatorname{PR-AUC}",
-        r"\operatorname{ROC-AUC}",
-        r"\operatorname{Recall@FPR}",
-        r"\operatorname{ECE}",
-        r"\operatorname{BS}",
-        r"\operatorname{PSI}",
-        r"\operatorname{JSD}",
+        "PR-AUC",
+        "ROC-AUC",
+        "Recall@FPR",
+        "ECE",
+        "BS",
+        "PSI",
+        "JSD",
     ]
     for metric in core_metrics:
         assert metric in metrics_content, f"Core metric {metric} must be present in docs/METRICS.md"
@@ -93,9 +93,9 @@ def test_cost_utility_and_fairness_definitions(metrics_content: str):
     assert r"\mathcal{L}_{\mathrm{financial}}" in metrics_content
     assert "850" in metrics_content  # C_FN
     assert "25" in metrics_content   # C_FP
-    assert r"\operatorname{DIR}" in metrics_content
-    assert r"\operatorname{EOD}" in metrics_content
-    assert r"\operatorname{DPD}" in metrics_content
+    assert "DIR" in metrics_content
+    assert "EOD" in metrics_content
+    assert "DPD" in metrics_content
     assert "ECOA" in metrics_content
 
 

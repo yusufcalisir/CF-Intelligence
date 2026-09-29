@@ -2,7 +2,7 @@
 
 > **CF-Intelligence Technical Audit Report**  
 > **Repository:** [`https://github.com/yusufcalisir/CF-Intelligence`](https://github.com/yusufcalisir/CF-Intelligence)  
-> **Audited Baseline:** 3,252 Automated Tests across Backend, Frontend, and Verification Suites.
+> **Audited Baseline:** 4,103 Automated Tests across Backend (3,308 Pytest), Scientific Verification (409 Tests / 21 Modules), Frontend (355 Vitest), and Smart Contracts (31 Hardhat).
 
 ---
 
@@ -25,7 +25,7 @@ The audit inspected all components across the full repository footprint:
 3. **API Presentation Layer** (`backend/app/presentation/routers/`): 35 FastAPI routers exposing 160+ endpoints, WebSocket handlers, and ABAC dependency injectors.
 4. **Machine Learning & Privacy** (`fl_engine.py`, `graph_embedding_model.py`, `privacy_service.py`): FedAvg, FedProx, SCAFFOLD implementations, PyTorch GraphSAGE mean aggregators, and Opacus Differential Privacy accounting.
 5. **Research Prototypes**: TenSEAL CKKS FHE driver, Groth16 zk-SNARK attestation verifier, software-emulated TEE driver, CRYSTALS-Kyber-768 PQC driver, and Solidity smart contracts (`contracts/`).
-6. **Test Suites** (`backend/tests/`, `verification/`, `frontend/tests/`): 237+ backend unit test modules, 18 self-contained scientific verification suites, and 600+ frontend Vitest components.
+6. **Test Suites** (`backend/tests/`, `verification/`, `frontend/tests/`, `contracts/`): 237+ backend test modules (3,308 Pytest tests), 21 self-contained scientific verification suites (409 tests), 86 frontend Vitest test files (355 tests), and 31 Hardhat smart contract tests.
 
 ---
 
@@ -80,7 +80,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Deterministic Implementation         │ Stochastic Empirical Learning        │
-│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+│ "Is code bug-free & contract-safe?"  │ "Does model generalize to new data?" │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
 │   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │
@@ -89,8 +89,9 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 3,238 Pytest unit tests,│ Evaluated across 8 canonical datasets│
-│ 355 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
+│ Validated by 3,308 Pytest tests,     │ Evaluated across 8 canonical datasets│
+│ (+ 409 verification modules/tests),  │ via benchmarks/runners/ & harness.   │
+│ 355 Vitest components, 31 Hardhat.   │ (Zero mock data or synthetic clamps) │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
 │ NOT prove fraud detection capability.│ if the gateway crashes or leaks PII. │
@@ -102,7 +103,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 ## 4. What Was Changed
 
 1. **Established Standalone Reproducible Benchmarking System** (`benchmarks/`):
-   - Created dataset acquisition, verification, and preprocessing pipelines for **PaySim**, **IEEE-CIS**, **Elliptic Bitcoin Graph**, **IBM AMLSim Multi-Hop Graph**, and **ULB Credit Card Fraud** with zero mock fallbacks and strict format enforcement.
+   - Created dataset acquisition, verification, and preprocessing pipelines across 8 canonical financial crime datasets: **PaySim**, **IEEE-CIS**, **ULB Credit Card Fraud**, **Elliptic Bitcoin Graph**, **IBM AMLSim Multi-Hop Graph**, **SynthAML (Spar Nord)**, **AMLNet (AUSTRAC)**, and **CFI-CrossBank-01 (Flagship Consortium Benchmark)** with zero mock fallbacks and strict format enforcement.
    - Implemented automated CLI runners for fraud evaluation, FL strategy comparison, DP privacy-utility frontier, Byzantine attack defense, GraphSAGE node classification, and gateway latency under concurrency ($C \in [1, 500]$).
    - Structured machine-readable JSON output schemas capturing hardware environment metadata.
 2. **Eliminated Marketing Buzzwords & Neutralized Overclaims**:
@@ -157,29 +158,30 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 
 ---
 
-## 8. Final Integrity Certification Attestation & 38-Item Verification Sweep Sign-Off
+## 8. Final Integrity Certification Attestation & 38-Point Verification Sweep Sign-Off
 
 ### 8.1 Verification Mandate & Certification Scope
-As the final capstone milestone of the platform engineering and scientific verification lifecycle, a master programmatic audit was codified in [`scripts/verify_reproducibility.py`](../scripts/verify_reproducibility.py) and verified via targeted regression tests in [`backend/tests/unit/test_reproducibility_verifier.py`](../backend/tests/unit/test_reproducibility_verifier.py). 
+As the final capstone milestone of the platform engineering and scientific verification lifecycle, an automated programmatic audit was codified in [`scripts/verify_reproducibility.py`](../scripts/verify_reproducibility.py) and verified via targeted regression tests in [`backend/tests/unit/test_reproducibility_verifier.py`](../backend/tests/unit/test_reproducibility_verifier.py). 
 
 The audit executes an automated, zero-mock, end-to-end verification sweep across all **38 canonical verification checklist items** spanning six foundational architectural categories:
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│               MASTER 38-ITEM REPRODUCIBILITY & INTEGRITY AUDIT SCORECARD               │
+│                   REPRODUCIBILITY & SYSTEM INTEGRITY AUDIT SCORECARD                   │
 ├─────┬─────────────────────────────────────────────────┬───────┬─────────┬──────────────┤
 │ CAT │ CATEGORY NAME                                   │ ITEMS │ PASSED  │ PASS RATE    │
 ├─────┼─────────────────────────────────────────────────┼───────┼─────────┼──────────────┤
 │  1  │ Empirical Dataset Integrity & Licensing         │   8   │  8 / 8  │ 100.0% [OK]  │
-│  2  │ Standardized 5-Artifact Experiment Hierarchy     │   8   │  8 / 8  │ 100.0% [OK]  │
-│  3  │ Master Benchmark Matrices & Invariant Rules     │   6   │  6 / 6  │ 100.0% [OK]  │
+│  2  │ Standardized 5-Artifact Experiment Hierarchy    │   8   │  8 / 8  │ 100.0% [OK]  │
+│  3  │ Platform Benchmark Matrices & Invariants        │   6   │  6 / 6  │ 100.0% [OK]  │
 │  4  │ Claim Registry, Governance & Anti-Hyping        │   6   │  6 / 6  │ 100.0% [OK]  │
 │  5  │ Cryptographic, Privacy & Multi-Tenant Invariants│   5   │  5 / 5  │ 100.0% [OK]  │
 │  6  │ Code Quality, CI/CD & Automated Test Suites     │   5   │  5 / 5  │ 100.0% [OK]  │
-├─────┴─────────────────────────────────────────────────┴───────┴─────────┼──────────────┤
-│ TOTAL VERIFIED PLATFORM INTEGRITY ITEMS                               │ 38 / 38 │ 100.0% [OK]  │
-│ FINAL MASTER CERTIFICATION ATTESTATION STATUS                         │ CERTIFIED_REPRODUCIBLE │
-└───────────────────────────────────────────────────────────────────────┴─────────┴──────────────┘
+├─────┴─────────────────────────────────────────────────┴───────┼─────────┼──────────────┤
+│ TOTAL VERIFIED PLATFORM INTEGRITY CHECKLIST ITEMS             │ 38 / 38 │ 100.0% [OK]  │
+├───────────────────────────────────────────────────────────────┴─────────┼──────────────┤
+│ PLATFORM REPRODUCIBILITY & SYSTEM INTEGRITY STATUS                      │  CERTIFIED   │
+└─────────────────────────────────────────────────────────────────────────┴──────────────┘
 ```
 
 ### 8.2 Category-by-Category Sweep Breakdown
@@ -199,8 +201,8 @@ All eight canonical datasets are verified with valid directory presence, provena
 Every dataset in `experiments/<dataset>/` strictly adheres to the canonical 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`):
 - **ITEM-09 through ITEM-16**: 100% presence and schema conformance across all 8 datasets — *VERIFIED [PASS]*
 
-#### Category 3: Master Benchmark Matrices & Invariant Enforcement (Items 17–22)
-- **ITEM-17**: Master Benchmark Matrix Schema (`master_benchmark_matrix.json` covers all 8 datasets) — *VERIFIED [PASS]*
+#### Category 3: Benchmark Matrices & Invariant Enforcement (Items 17–22)
+- **ITEM-17**: Benchmark Matrix Schema (`master_benchmark_matrix.json` covers all 8 datasets) — *VERIFIED [PASS]*
 - **ITEM-18**: Strict Null Representation Invariant (unexecuted architectures/metrics serialize strictly as `null`, zero fake zeros or heuristic defaults) — *VERIFIED [PASS]*
 - **ITEM-19**: Evaluated Zero Distinction (authentic zero metrics under extreme class imbalance clearly distinguished from unexecuted runs) — *VERIFIED [PASS]*
 - **ITEM-20**: Cross-Dataset Numerical Parity (exact float equivalence between raw JSON runners and compiled reports) — *VERIFIED [PASS]*

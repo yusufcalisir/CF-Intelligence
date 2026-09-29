@@ -27,7 +27,7 @@ ISO 20022 pacs.008 XML ──► PaymentTransactionGenerator ──► Enterpris
 | **Total Transactions Processed** | **`76,700`** | $\ge 10,000$ | ✅ **EXCEEDED** |
 | **Peak Throughput** | **`38,064.52 tx/sec`** | $> 10,000\text{ tx/s}$ | ✅ **3.8× TARGET** |
 | **Error Count** | `0` | $0$ | ✅ **ZERO DROPS** |
-| **Error Rate** | **`0.0000%`** | $< 0.1\%$ | ✅ **PASSED** |
+| **Error Rate** | **`0.0000%`** | < 0.1% | ✅ **PASSED** |
 | **p50 (Median) Ingestion Latency** | **`0.000 ms`** | $< 1.0\text{ ms}$ | ✅ **SUB-MILLISECOND** |
 | **p99 Ingestion Latency** | **`0.160 ms`** | $< 5.0\text{ ms}$ | ✅ **SUB-MILLISECOND** |
 
@@ -116,11 +116,11 @@ $$\Delta_{\mathrm{collab}} = M(\mathbf{w}_{\mathrm{fed}}^*; \mathcal{D}_{\mathrm
 $$\Delta_{\mathrm{privacy}} = M(\mathbf{w}_{\mathrm{pooled}}^*; \mathcal{D}_{\mathrm{global}}^{\mathrm{test}}) - M(\mathbf{w}_{\mathrm{fed}}^*; \mathcal{D}_{\mathrm{global}}^{\mathrm{test}})$$
 
 4. **Authoritative Metric Definitions & Threshold Governance**:
-   All reported quantitative evaluation metrics ($\operatorname{PR-AUC}$, $\operatorname{ROC-AUC}$, $\operatorname{Recall@0.1\%FPR}$, $\operatorname{BS}$, $\operatorname{ECE}$, $\operatorname{PSI}$, $\operatorname{JSD}$) strictly adhere to the formal mathematical definitions, finite-sample sums, and regulatory thresholds (Federal Reserve SR 11-7 / OCC 2011-12 & EU AI Act Article 15) documented in **[docs/METRICS.md](METRICS.md)**.
+   All reported quantitative evaluation metrics (PR-AUC, ROC-AUC, Recall @ 0.1% FPR, Brier Score, ECE, PSI, JSD) strictly adhere to the formal mathematical definitions, finite-sample sums, and regulatory thresholds (Federal Reserve SR 11-7 / OCC 2011-12 & EU AI Act Article 15) documented in **[docs/METRICS.md](METRICS.md)**.
 
 ### 3.2 Empirical Multi-Paradigm Benchmark Results
 
-Evaluated across $150{,}000$ training transactions and an untouched global consortium test partition of $45{,}000$ transactions ($0.129\%$ fraud prevalence):
+Evaluated across $150{,}000$ training transactions and an untouched global consortium test partition of $45{,}000$ transactions (0.129% fraud prevalence):
 
 | Evaluation Paradigm | Model Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Brier Score | Latency (ms) | Legal Viability & Privacy Perimeter |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :--- |
@@ -133,10 +133,10 @@ Evaluated across $150{,}000$ training transactions and an untouched global conso
 
 ### 3.3 Key Empirical Findings
 
-1. **Massive Collaborative Uplift ($+0.1480$ $\Delta \text{PR-AUC}$, $+19.2\%$ Recall @ 0.1% FPR)**:
-   Individual banks operating in isolation achieve an average PR-AUC of only $0.6940$ due to acute blindness to cross-institutional money laundering syndicates. Participating in the federated network elevates PR-AUC to $0.8420$ ($+21.3\%$ relative gain) and expands high-precision recall from $43.20\%$ to $62.40\%$.
-2. **Minimal Centralization Gap ($-0.0230$ $\Delta \text{PR-AUC}$, $97.34\%$ Federated Efficiency)**:
-   The privacy-preserving federated model captures $97.34\%$ of the theoretical ceiling achieved by illegally pooling all bank records into a single central database, proving that raw data centralization is technically unnecessary for frontier anti-fraud intelligence.
+1. **Massive Collaborative Uplift ($+0.1480$ $\Delta \text{PR-AUC}$, +19.2% Recall @ 0.1% FPR)**:
+   Individual banks operating in isolation achieve an average PR-AUC of only $0.6940$ due to acute blindness to cross-institutional money laundering syndicates. Participating in the federated network elevates PR-AUC to $0.8420$ (+21.3% relative gain) and expands high-precision recall from 43.20% to 62.40%.
+2. **Minimal Centralization Gap ($-0.0230$ $\Delta \text{PR-AUC}$, 97.34% Federated Efficiency)**:
+   The privacy-preserving federated model captures 97.34% of the theoretical ceiling achieved by illegally pooling all bank records into a single central database, proving that raw data centralization is technically unnecessary for frontier anti-fraud intelligence.
 3. **Sub-Millisecond Inference Profiling**:
    Neural MLP forward pass executes in $0.260\text{ ms}$, comfortably satisfying the $<15.0\text{ ms}$ real-time payment authorization SLA.
 
@@ -164,7 +164,7 @@ The PaySim benchmark runner generates five empirical visual artifacts saved unde
 2. **ROC Comparison Curves (`roc_curves.png`)**:
    Compares True Positive Rate vs False Positive Rate curves across federated optimizers and centralized upper bound.
 3. **Precision-Recall Trajectories (`pr_curves.png`)**:
-   Maps precision against coverage with empirical fraud prevalence baseline ($0.050\%$).
+   Maps precision against coverage with empirical fraud prevalence baseline (0.050%).
 4. **Platform Confusion Matrix (`confusion_matrices.png`)**:
    Empirical $2 \times 2$ classification matrix at the calibrated $0.50$ decision threshold.
 5. **Consolidated Performance Comparison (`docs/figures/benchmark_auc_comparison.png`)**:
@@ -174,7 +174,7 @@ The PaySim benchmark runner generates five empirical visual artifacts saved unde
 
 ### 3.5 IEEE-CIS Real-Data Multi-Bank Federated Benchmark
 
-Evaluated across $15{,}000$ real transactions from the IEEE-CIS Fraud Detection dataset (422 tabular numerical features, categorical identity features, card profiles, transaction amounts, and Vesta engineered signals), partitioned across 3 simulated banking institutions under a Dirichlet non-IID label skew ($\alpha = 0.50$, $80/20$ strict temporal split on `TransactionDT`, $3{,}000$ untouched future test records, $2.70\%$ fraud prevalence):
+Evaluated across $15{,}000$ real transactions from the IEEE-CIS Fraud Detection dataset (422 tabular numerical features, categorical identity features, card profiles, transaction amounts, and Vesta engineered signals), partitioned across 3 simulated banking institutions under a Dirichlet non-IID label skew ($\alpha = 0.50$, $80/20$ strict temporal split on `TransactionDT`, $3{,}000$ untouched future test records, 2.70% fraud prevalence):
 
 | Paradigm / Algorithm | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 1.0% FPR | Brier Score | Latency (ms) | Legal Viability & Privacy Perimeter |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
@@ -193,7 +193,7 @@ The IEEE-CIS benchmark runner generates five empirical visual artifacts saved un
 2. **ROC Comparison Curves (`experiments/ieee_cis/plots/roc_curves.png`)**:
    Compares True Positive Rate vs False Positive Rate curves across federated model and baselines.
 3. **Precision-Recall Trajectories (`experiments/ieee_cis/plots/pr_curves.png`)**:
-   Precision-recall curves calibrated with empirical fraud prevalence baseline ($2.70\%$).
+   Precision-recall curves calibrated with empirical fraud prevalence baseline (2.70%).
 4. **Classification Matrix (`experiments/ieee_cis/plots/confusion_matrices.png`)**:
    Empirical confusion matrix evaluated at optimal decision threshold.
 5. **Consolidated Performance Comparison (`docs/figures/benchmark_ieee_cis_comparison.png`)**:
@@ -201,11 +201,11 @@ The IEEE-CIS benchmark runner generates five empirical visual artifacts saved un
 
 ### 3.6 European Credit Card Fraud Extreme Imbalance Benchmark
 
-Evaluated across the full $N = 284{,}807$ transactions ($492$ fraud events, $0.1725\%$ prevalence, $578:1$ imbalance ratio) under zero-leakage partitions.
+Evaluated across the full $N = 284{,}807$ transactions ($492$ fraud events, 0.1725% prevalence, $578:1$ imbalance ratio) under zero-leakage partitions.
 
 #### 3.6.1 Validation Fixed-FPR Threshold Selection & Estimator Benchmark
 
-Under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} = 170{,}883$, $\mathcal{D}_{\mathrm{val}} = 56{,}962$, $\mathcal{D}_{\mathrm{test}} = 56{,}962$ with exactly $99$ positive fraud cases sequestered in the global test partition). `Time` and `Amount` features are scaled with `RobustScaler` (median-IQR) fitted strictly on $\mathcal{D}_{\mathrm{train}}$. Decision thresholds $\tau_{\alpha}$ were calibrated on the validation split $\mathcal{D}_{\mathrm{val}}$ to guarantee $\mathrm{FPR}_{\mathrm{val}} \le \alpha$ for operational targets $\alpha \in \{0.01\%, 0.05\%, 0.1\%, 0.5\%, 1.0\%\}$:
+Under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} = 170{,}883$, $\mathcal{D}_{\mathrm{val}} = 56{,}962$, $\mathcal{D}_{\mathrm{test}} = 56{,}962$ with exactly $99$ positive fraud cases sequestered in the global test partition). `Time` and `Amount` features are scaled with `RobustScaler` (median-IQR) fitted strictly on $\mathcal{D}_{\mathrm{train}}$. Decision thresholds $\tau_{\alpha}$ were calibrated on the validation split $\mathcal{D}_{\mathrm{val}}$ to guarantee $\mathrm{FPR}_{\mathrm{val}} \le \alpha$ for operational targets $\alpha \in \{0.0001, 0.0005, 0.0010, 0.0050, 0.0100\}$ (0.01%, 0.05%, 0.1%, 0.5%, 1.0% FPR):
 
 | Estimator / Architecture | Classification Paradigm | PR-AUC | ROC-AUC | Recall @ 0.05% FPR | Recall @ 0.1% FPR | Recall @ 1.0% FPR | Empirical FPR (@ 0.1% Target) | Brier Score | Fit Time (s) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -217,11 +217,11 @@ Under a zero-leakage $60/20/20$ stratified split ($\mathcal{D}_{\mathrm{train}} 
 #### 3.6.2 Federated vs. Local Imbalance Robustness & Collaborative Gain
 
 Under the 3-bank federated consortium benchmark, $227{,}845$ training transactions were partitioned across $K=3$ institutions using an extreme skew scenario:
-- **Bank A (Market Leader)**: $125{,}371$ transactions ($55.0\%$ volume), $273$ positive frauds ($0.218\%$ fraud rate).
-- **Bank B (Mid-Tier Bank)**: $68{,}353$ transactions ($30.0\%$ volume), $118$ positive frauds ($0.173\%$ fraud rate).
-- **Bank C (Challenger Bank / Starved Silo)**: $34{,}121$ transactions ($15.0\%$ volume), strictly **2 positive fraud cases** ($0.0059\%$ fraud rate — severe positive sample starvation).
+- **Bank A (Market Leader)**: $125{,}371$ transactions (55.0% volume), $273$ positive frauds (0.218% fraud rate).
+- **Bank B (Mid-Tier Bank)**: $68{,}353$ transactions (30.0% volume), $118$ positive frauds (0.173% fraud rate).
+- **Bank C (Challenger Bank / Starved Silo)**: $34{,}121$ transactions (15.0% volume), strictly **2 positive fraud cases** (0.0059% fraud rate — severe positive sample starvation).
 
-Models were evaluated against an untouched consortium global holdout test set of $56{,}961$ transactions ($98$ positive frauds, $0.172\%$ prevalence):
+Models were evaluated against an untouched consortium global holdout test set of $56{,}961$ transactions ($98$ positive frauds, 0.172% prevalence):
 
 | Evaluation Paradigm / Model | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.05% FPR | Recall @ 0.1% FPR | Recall @ 1.0% FPR | Brier Score | Collaborative Gain ($\Delta_{\mathrm{collab}}$) |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -236,18 +236,18 @@ Models were evaluated against an untouched consortium global holdout test set of
 #### Key Empirical Insights (Extreme Imbalance & Collaborative Gain)
 
 1. **Near-Zero Positive Starvation Rescue**:
-   At the standard $0.50$ decision threshold, Bank C's isolated model suffers complete collapse ($\mathrm{Precision} = 0.0$, $\mathrm{Recall} = 0.0$, $\mathrm{F1} = 0.0$) due to extreme sample starvation ($2$ frauds among $34{,}121$ transactions). Even with fixed-FPR thresholding, Bank C in isolation achieves only $0.6050$ PR-AUC. Federated consensus (`FedAvg`) rescues Bank C, elevating its effective model capability to $0.7750$ PR-AUC—a massive **$+0.1700$ PR-AUC (+28.1% relative uplift)** and expanding Recall @ 0.1% FPR from $78.57\%$ to $84.69\%$.
+   At the standard $0.50$ decision threshold, Bank C's isolated model suffers complete collapse ($\mathrm{Precision} = 0.0$, $\mathrm{Recall} = 0.0$, $\mathrm{F1} = 0.0$) due to extreme sample starvation ($2$ frauds among $34{,}121$ transactions). Even with fixed-FPR thresholding, Bank C in isolation achieves only $0.6050$ PR-AUC. Federated consensus (`FedAvg`) rescues Bank C, elevating its effective model capability to $0.7750$ PR-AUC—a massive **$+0.1700$ PR-AUC (+28.1% relative uplift)** and expanding Recall @ 0.1% FPR from 78.57% to 84.69%.
 2. **Federated Super-Convergence via Cross-Institutional Regularization**:
    `FedAvg` achieves $0.7750$ PR-AUC, outperforming not only the isolated silo mean ($0.6522$, $\Delta_{\mathrm{collab}} = +0.1228$), but also the monolithic centralized pooled neural network ($0.7021$). In extreme class imbalance regimes, decentralized client optimization combined with federated averaging functions as an implicit structural regularizer, mitigating the tendency of centralized stochastic gradient descent to overfit localized majority clusters.
 3. **Fixed-FPR Operational Superiority**:
-   Under a $578:1$ class imbalance, evaluating at default $0.50$ thresholds produces misleading outcomes. Enforcing a strict operational false alarm budget of $\le 0.1\%$ FPR ($1$ false alarm per $1{,}000$ legitimate transactions) yields an actionable fraud capture rate of $84.69\%$ ($83$ out of $98$ fraudulent chargebacks intercepted) while producing only $56$ false alarms across $56{,}863$ benign payments.
+   Under a $578:1$ class imbalance, evaluating at default $0.50$ thresholds produces misleading outcomes. Enforcing a strict operational false alarm budget of $\le 0.1$% FPR ($1$ false alarm per $1{,}000$ legitimate transactions) yields an actionable fraud capture rate of 84.69% ($83$ out of $98$ fraudulent chargebacks intercepted) while producing only $56$ false alarms across $56{,}863$ benign payments.
 
 #### Publication-Grade Visual Artifacts
 
 The Credit Card benchmark runner generates five empirical visual artifacts saved under `experiments/credit_card/plots/` and `docs/figures/`:
 
 1. **Precision-Recall Curves (`experiments/credit_card/plots/pr_curves.png`)**:
-   Precision-recall curves comparing FedAvg, FedProx, Centralized Pooled MLP, and Isolated Silos (Bank A, B, C) with the horizontal empirical prevalence baseline ($0.172\%$).
+   Precision-recall curves comparing FedAvg, FedProx, Centralized Pooled MLP, and Isolated Silos (Bank A, B, C) with the horizontal empirical prevalence baseline (0.172%).
 2. **ROC Curves (`experiments/credit_card/plots/roc_curves.png`)**:
    True Positive Rate vs. False Positive Rate curves across all models.
 3. **Optimizer Convergence Trajectories (`experiments/credit_card/plots/optimizer_convergence.png`)**:
@@ -273,7 +273,7 @@ Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ dire
 #### Key Empirical Insights (Elliptic Bitcoin Graph)
 
 1. **High-Confidence Operational Interception (+60.7% Relative Gain @ 0.1% Strict FPR)**:
-   In production anti-money laundering (AML) operations, compliance teams can investigate only a tiny fraction of flagged transactions (strict budget of $\le 0.1\%$ False Positive Rate). At this strict operating point, the Tabular MLP baseline captures only $8.22\%$ ($89$ illicit transactions), whereas 2-layer GraphSAGE intercepts **13.20%** ($143$ transactions), achieving a **+4.99 percentage point (+60.7% relative) uplift**. 1-layer GraphSAGE expands this further to **14.96%** ($162$ transactions, **+82.0% relative gain**), proving that immediate graph neighborhood context flags covert laundering syndicates that appear benign in isolation.
+   In production anti-money laundering (AML) operations, compliance teams can investigate only a tiny fraction of flagged transactions (strict budget of $\le 0.1$% False Positive Rate). At this strict operating point, the Tabular MLP baseline captures only 8.22% ($89$ illicit transactions), whereas 2-layer GraphSAGE intercepts **13.20%** ($143$ transactions), achieving a **+4.99 percentage point (+60.7% relative) uplift**. 1-layer GraphSAGE expands this further to **14.96%** ($162$ transactions, **+82.0% relative gain**), proving that immediate graph neighborhood context flags covert laundering syndicates that appear benign in isolation.
 2. **Topological Noise & Multi-Hop Bitcoin Mixing**:
    Over the unconstrained probability spectrum, 2-layer GraphSAGE exhibits slight PR-AUC compression ($-0.0229$ vs Tabular MLP). This reflects cryptocurrency transaction mixing (CoinJoin, peel chains), where 2-hop neighborhoods incorporate unrelated transactions. 1-hop GraphSAGE ($0.4604$) and symmetric GCN aggregation ($0.4655$) attenuate hub noise and restore PR-AUC parity.
 3. **Sub-10ms Inference Profile**:
@@ -284,7 +284,7 @@ Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ dire
 The Elliptic benchmark runner generates five empirical visual artifacts saved under `experiments/elliptic/plots/` and `docs/figures/`:
 
 1. **Precision-Recall Curves (`experiments/elliptic/plots/pr_curves.png`)**:
-   Precision-recall curves comparing 2-layer GraphSAGE, 1-layer GraphSAGE, GCN aggregator, and Tabular MLP against empirical illicit prevalence ($6.50\%$).
+   Precision-recall curves comparing 2-layer GraphSAGE, 1-layer GraphSAGE, GCN aggregator, and Tabular MLP against empirical illicit prevalence (6.50%).
 2. **ROC Curves (`experiments/elliptic/plots/roc_curves.png`)**:
    True Positive Rate vs. False Positive Rate curves across graph and tabular models.
 3. **Neighborhood Hop Ablation (`experiments/elliptic/plots/neighborhood_ablation.png`)**:
@@ -319,8 +319,8 @@ The IBM Research AMLSim agent-based financial transaction dataset provides a rea
 
 #### Chronological Temporal Splitting (Zero Lookahead Leakage)
 To enforce strict zero future leakage, transactions are partitioned chronologically along the simulation timestep axis:
-- **Training Set ($t \le 140.0$ simulation days)**: $930{,}465$ transactions ($1{,}170$ alerts, fraud prevalence $0.126\%$). Account historical features and normalized directed sparse adjacency tensors ($\mathbf{A}_{\mathrm{fwd}}, \mathbf{A}_{\mathrm{rev}}$) are constructed exclusively on this split.
-- **Evaluation Test Set ($t > 140.0$ simulation days)**: $392{,}769$ transactions ($549$ alerts: $288$ cycles, $261$ fan-in smurfing patterns, fraud prevalence $0.140\%$).
+- **Training Set ($t \le 140.0$ simulation days)**: $930{,}465$ transactions ($1{,}170$ alerts, fraud prevalence 0.126%). Account historical features and normalized directed sparse adjacency tensors ($\mathbf{A}_{\mathrm{fwd}}, \mathbf{A}_{\mathrm{rev}}$) are constructed exclusively on this split.
+- **Evaluation Test Set ($t > 140.0$ simulation days)**: $392{,}769$ transactions ($549$ alerts: $288$ cycles, $261$ fan-in smurfing patterns, fraud prevalence 0.140%).
 
 #### Inductive GraphSAGE vs. Tabular Empirical Matrix
 The benchmark evaluates 2-layer Inductive GraphSAGE against 1-layer GraphSAGE, 0-hop Tabular MLP, Balanced Random Forest, and Balanced Logistic Regression:
@@ -335,11 +335,11 @@ The benchmark evaluates 2-layer Inductive GraphSAGE against 1-layer GraphSAGE, 0
 
 #### Key Empirical Insights (IBM AMLSim Graph)
 1. **Multi-Hop Message Passing Resolves Circular Flow Dependencies (+2.08% Cycle Gain)**:
-   In isolated transaction scoring, cycle legs exhibit benign transaction amounts and normal account balances. Tabular MLP achieves $65.28\%$ cycle recall ($188$ cycles detected). 2-layer GraphSAGE intercepts **67.36%** ($194$ cycles detected, **+2.08 percentage points uplift**), proving bidirectional message passing reconstructs closed-loop flow topologies across intermediate accounts.
+   In isolated transaction scoring, cycle legs exhibit benign transaction amounts and normal account balances. Tabular MLP achieves 65.28% cycle recall ($188$ cycles detected). 2-layer GraphSAGE intercepts **67.36%** ($194$ cycles detected, **+2.08 percentage points uplift**), proving bidirectional message passing reconstructs closed-loop flow topologies across intermediate accounts.
 2. **Superior Smurfing Interception (+5.75% Fan-In Gain)**:
-   Structured gathering to a single aggregator account creates high in-degree concentration. GraphSAGE captures aggregated neighbor state, achieving **70.50%** fan-in recall ($184$ patterns) compared to $64.75\%$ ($169$ patterns) for Tabular MLP (**+5.75 percentage points uplift**).
-3. **Operational Precision-Recall Frontier (+0.0434 $\Delta\operatorname{PR-AUC}$, +4.19% Recall @ 0.1% Strict FPR)**:
-   At production operational thresholds ($\le 0.1\%$ False Positive Rate), GraphSAGE 2-Layer captures **64.12%** of laundering alerts vs **59.93%** for Tabular MLP (**+4.19 percentage points uplift**).
+   Structured gathering to a single aggregator account creates high in-degree concentration. GraphSAGE captures aggregated neighbor state, achieving **70.50%** fan-in recall ($184$ patterns) compared to 64.75% ($169$ patterns) for Tabular MLP (**+5.75 percentage points uplift**).
+3. **Operational Precision-Recall Frontier (+0.0434 $\Delta\mathrm{PR\text{-}AUC}$, +4.19% Recall @ 0.1% Strict FPR)**:
+   At production operational thresholds ($\le 0.1$% False Positive Rate), GraphSAGE 2-Layer captures **64.12%** of laundering alerts vs **59.93%** for Tabular MLP (**+4.19 percentage points uplift**).
 4. **Sub-2ms Relational Inference Latency**:
    With cached account embeddings computed via sparse matrix multiplication, edge classification executes in $1.11\text{ ms}$ per $1{,}000$ transactions.
 
@@ -355,7 +355,7 @@ The AMLSim benchmark compiles five empirical visual artifacts saved under `exper
 
 ### 3.9 Danish Spar Nord Bank SynthAML Synthetic AML Alert Benchmark (Phase 10)
 
-The Danish Spar Nord Bank & Aarhus University SynthAML benchmark dataset provides an empirical foundation for multi-institutional alert-level suspicious activity report (SAR) risk classification. The dataset comprises $N = 5{,}000$ historical anti-money laundering alerts synthesized from real banking operations, with $14$ engineered lookback features spanning 7-day to 90-day transaction windows (cash transaction velocity, cross-border remittance frequency, turnover volume, and high-risk counterparty counts) and an empirical SAR prevalence of $8.50\%$ ($425$ true positive cases).
+The Danish Spar Nord Bank & Aarhus University SynthAML benchmark dataset provides an empirical foundation for multi-institutional alert-level suspicious activity report (SAR) risk classification. The dataset comprises $N = 5{,}000$ historical anti-money laundering alerts synthesized from real banking operations, with $14$ engineered lookback features spanning 7-day to 90-day transaction windows (cash transaction velocity, cross-border remittance frequency, turnover volume, and high-risk counterparty counts) and an empirical SAR prevalence of 8.50% ($425$ true positive cases).
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────┐
@@ -374,7 +374,7 @@ The Danish Spar Nord Bank & Aarhus University SynthAML benchmark dataset provide
 ```
 
 #### Chronological Temporal Splitting (Zero Lookahead Invariant)
-To prevent temporal data leakage, alerts are chronologically partitioned along the transaction `step` axis ($80\%$ historical training alerts, $20\%$ sequestered future test alerts):
+To prevent temporal data leakage, alerts are chronologically partitioned along the transaction `step` axis (80% historical training alerts, 20% sequestered future test alerts):
 - **Consortium Training Split ($t \le t_{\mathrm{cutoff}}$)**: $4{,}000$ alerts distributed across Bank Alpha, Bank Beta, and Bank Gamma according to institutional volume and risk profiles. Feature standardizations ($\mu, \sigma$) are computed strictly on training data.
 - **Sequestered Future Test Split ($t > t_{\mathrm{cutoff}}$)**: $1{,}000$ future alerts ($245$ positive SAR cases) held strictly out-of-sample for unbiased cross-institutional evaluation.
 
@@ -394,7 +394,7 @@ The benchmark assesses the `AlertMLPClassifier` neural architecture (14-dim inpu
 
 #### Key Empirical Insights (SynthAML Benchmark)
 1. **Critical Protection for Small Institutions (+12.25% Recall @ 0.1% Strict FPR)**:
-   In isolated detection, Bank Gamma (the smallest digital challenger bank with only $20\%$ volume share) suffers severe blind spots under operational constraints: its local detector achieves only $82.04\%$ Recall @ $0.1\%$ False Positive Rate ($17.96\%$ of illicit money laundering escalations escape detection). By participating in the federated consortium with FedProx regularization, Bank Gamma's operational detection rate rises to **94.29%** (**+12.25 percentage points uplift**), closing the compliance deficit without exposing sensitive client data.
+   In isolated detection, Bank Gamma (the smallest digital challenger bank with only 20% volume share) suffers severe blind spots under operational constraints: its local detector achieves only 82.04% Recall @ 0.1% False Positive Rate (17.96% of illicit money laundering escalations escape detection). By participating in the federated consortium with FedProx regularization, Bank Gamma's operational detection rate rises to **94.29%** (**+12.25 percentage points uplift**), closing the compliance deficit without exposing sensitive client data.
 2. **Collaborative Consensus Outperforms Isolated Silo Average**:
    FedAvg ($0.9985\text{ PR-AUC}$) and FedProx ($0.9985\text{ PR-AUC}$) both outperform the isolated banking silo average ($0.9976\text{ PR-AUC}$), proving federated parameter consensus generalizes superior decision boundaries than fragmented local models.
 3. **Probability Calibration Stability**:
@@ -413,7 +413,7 @@ The SynthAML benchmark produces five high-resolution empirical visual artifacts 
 
 ### 3.10 Australian AUSTRAC AMLNet Extreme Imbalance Federated Benchmark (Phase 11)
 
-The Australian AUSTRAC synthetic AML dataset (Griffith University / Sabin Huda et al., Zenodo DOI: `10.5281/zenodo.10058474`, CC BY-NC 4.0) provides an empirical foundation for evaluating federated learning against extreme rare-event class imbalance in retail and commercial interbank payment corridors (`NPP`, `OSKO`, `BPAY`). The benchmark comprises $N = 25{,}000$ transactions with $18$ domain-engineered features (including AUSTRAC statutory threshold smurfing indicators in the $8{,}500–9{,}950\text{ AUD}$ band, rapid velocity bursts, and cross-border routing signals) with an empirical positive laundering prevalence of $0.15\%$ ($37$ true positive cases, $1:714$ imbalance ratio).
+The Australian AUSTRAC synthetic AML dataset (Griffith University / Sabin Huda et al., Zenodo DOI: `10.5281/zenodo.10058474`, CC BY-NC 4.0) provides an empirical foundation for evaluating federated learning against extreme rare-event class imbalance in retail and commercial interbank payment corridors (`NPP`, `OSKO`, `BPAY`). The benchmark comprises $N = 25{,}000$ transactions with $18$ domain-engineered features (including AUSTRAC statutory threshold smurfing indicators in the $8{,}500–9{,}950\text{ AUD}$ band, rapid velocity bursts, and cross-border routing signals) with an empirical positive laundering prevalence of 0.15% ($37$ true positive cases, $1:714$ imbalance ratio).
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────────────────┐
@@ -452,18 +452,18 @@ The benchmark evaluates the `AMLNetClassifier` neural architecture (18-dim input
 
 #### Key Empirical Insights (AMLNet Benchmark)
 1. **Low-FPR Operational Profiling & Alert Fatigue Elimination**:
-   Under production AUSTRAC compliance workloads, operational teams operate under strict false alarm limits ($\le 0.1\%$ False Positive Rate). Centralized, FedAvg, and FedProx all maintain **100.00% Recall @ 0.01% strict FPR** (intercepting all positive money laundering transactions while generating fewer than 1 false positive per 10,000 legitimate transfers).
+   Under production AUSTRAC compliance workloads, operational teams operate under strict false alarm limits ($\le 0.1$% False Positive Rate). Centralized, FedAvg, and FedProx all maintain **100.00% Recall @ 0.01% strict FPR** (intercepting all positive money laundering transactions while generating fewer than 1 false positive per 10,000 legitimate transfers).
 2. **Cost-Sensitive Loss Convexity & Starvation Defense**:
-   With positive-class weighting $w_{\mathrm{pos}} = N_{\mathrm{neg}} / N_{\mathrm{pos}} \approx 714.0$, stochastic gradient descent prevents backpropagation saturation against the overwhelming majority class ($99.85\%$ licit transactions), allowing federated rounds to converge rapidly without gradient vanishing.
+   With positive-class weighting $w_{\mathrm{pos}} = N_{\mathrm{neg}} / N_{\mathrm{pos}} \approx 714.0$, stochastic gradient descent prevents backpropagation saturation against the overwhelming majority class (99.85% licit transactions), allowing federated rounds to converge rapidly without gradient vanishing.
 3. **Probability Calibration Stability (ECE)**:
    FedProx achieves an Expected Calibration Error of only **0.0240** and Brier score of **0.01632**, ensuring risk scores emitted by the federated model are well-calibrated posterior probabilities compliant with Federal Reserve SR 11-7 model governance standards.
 
 #### Publication-Grade Visual Artifacts
 The AMLNet benchmark generates five high-resolution empirical visual artifacts saved under `experiments/amlnet/plots/` and `docs/figures/`:
-1. **Precision-Recall Curves (`experiments/amlnet/plots/pr_curves.png`)**: Precision-recall trade-offs comparing Centralized Pooled, FedAvg, FedProx, Random Forest, and isolated banking silos against the empirical test positive prevalence ($0.14\%$).
+1. **Precision-Recall Curves (`experiments/amlnet/plots/pr_curves.png`)**: Precision-recall trade-offs comparing Centralized Pooled, FedAvg, FedProx, Random Forest, and isolated banking silos against the empirical test positive prevalence (0.14%).
 2. **ROC Curves (`experiments/amlnet/plots/roc_curves.png`)**: False Positive Rate vs True Positive Rate trajectories showcasing near-zero false alarm operation.
 3. **Optimizer Convergence Trajectories (`experiments/amlnet/plots/optimizer_convergence.png`)**: Round-by-round global holdout PR-AUC progression across FedAvg and FedProx vs pooled and silo baselines.
-4. **Low-FPR Profiling (`experiments/amlnet/plots/low_fpr_profiling.png`)**: Recall at ultra-strict False Positive Rates ($0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1.0\%$).
+4. **Low-FPR Profiling (`experiments/amlnet/plots/low_fpr_profiling.png`)**: Recall at ultra-strict False Positive Rates (0.01%, 0.05%, 0.1%, 0.5%, 1.0%).
 5. **Consolidated Benchmark Comparison (`docs/figures/benchmark_amlnet_comparison.png`)**: Consolidated 2x2 publication figure showcasing PR curves, ROC curves, optimizer convergence, and low-FPR profiling.
 
 ---
@@ -494,11 +494,11 @@ The Cross-Bank Synthetic Consortium Benchmark (`CFI-CrossBank-01`) directly addr
 3. **Scenario 3 (Three-Bank Cyclic Ring: $A \to B \to C \to A$)**: Closed cyclic multi-hop ring where each bank observes only 1 entry and 1 exit. The intermediate $B \to C$ leg is completely invisible to Bank Alpha.
 4. **Scenario 4 (Behavior-Shifting Smurfing to Cash-Out)**: Sub-threshold structuring at Bank Alpha ($8.5\text{k}–9.8\text{k}$), consolidation at Bank Beta, and high-value wire ($180\text{k}$) at Bank Gamma.
 5. **Scenario 5 (Highly Non-IID Institutional Archetypes)**: Retail Consumer (Bank A), Commercial B2B (Bank B), and Cross-Border (Bank C) with divergent feature distributions.
-6. **Scenario 6 (Extreme Positive Sample Rarity at Bank Gamma)**: Bank Alpha and Beta have adequate historical training fraud, while Bank Gamma has only 2 positive incidents ($0.05\%$ prevalence).
+6. **Scenario 6 (Extreme Positive Sample Rarity at Bank Gamma)**: Bank Alpha and Beta have adequate historical training fraud, while Bank Gamma has only 2 positive incidents (0.05% prevalence).
 7. **Scenario 7 (Zero Positive Historical Examples at Bank Gamma - Zero-Positive Cold Start Transfer)**: Bank Gamma has exactly ZERO positive fraud cases in its historical training log ($y_{\mathrm{train, Bank C}} = \mathbf{0}$).
 
 #### Information Horizon Enforcement (Zero Cross-Bank Edge Leakage)
-In production compliance, GDPR and national banking secrecy laws prohibit institutions from sharing raw account ledgers. The benchmark strictly simulates each bank's **Partial Information Horizon**: Bank Alpha observes only transactions where $\operatorname{source} = \operatorname{Bank A}$ or $\operatorname{target} = \operatorname{Bank A}$. Internal transfers of other banks ($B \to C$) are completely omitted from Bank Alpha's view.
+In production compliance, GDPR and national banking secrecy laws prohibit institutions from sharing raw account ledgers. The benchmark strictly simulates each bank's **Partial Information Horizon**: Bank Alpha observes only transactions where $\mathrm{source} = \text{Bank A}$ or $\mathrm{target} = \text{Bank A}$. Internal transfers of other banks ($B \to C$) are completely omitted from Bank Alpha's view.
 
 #### Empirical Multi-Scenario Benchmark Matrix ($N = 20{,}000$ Transactions)
 
@@ -515,7 +515,7 @@ In production compliance, GDPR and national banking secrecy laws prohibit instit
 
 #### Key Empirical Insights (Consortium Benchmark)
 1. **Resolution of Hop Blindness on Cyclic Rings (+35.71% Gain in Scenario 3)**:
-   In Scenario 3, Bank Alpha observes an exit to Bank Beta and an entry from Bank Gamma. It is unaware of the $B \to C$ connecting edge. In isolation, silos miss $35.71\%$ of the cycle. Federated consensus links velocity signatures across institutions, recovering **100.00%** detection.
+   In Scenario 3, Bank Alpha observes an exit to Bank Beta and an entry from Bank Gamma. It is unaware of the $B \to C$ connecting edge. In isolation, silos miss 35.71% of the cycle. Federated consensus links velocity signatures across institutions, recovering **100.00%** detection.
 2. **Cold-Start Zero-Positive Transfer (+100.00% Gain in Scenario 7)**:
    In Scenario 7, Bank Gamma has never experienced a fraud incident in its historical logs ($y_{\mathrm{train}} = \mathbf{0}$). Its isolated model has an empirical detection rate of **0.00%** on incoming attacks. Through federated consensus, parameter aggregation from Banks Alpha and Beta grants Bank Gamma immediate **100.00% zero-shot protection**, solving the cold-start vulnerability for new or smaller institutions.
 3. **Zero Raw PII or Cross-Bank Edge Leakage**:
@@ -528,9 +528,9 @@ To rigorously substantiate the economic and detection justification for cross-ba
 ##### 1. Information-Theoretic Horizon Formalization & Unobservability Theorem
 In compliance with strict data residency and secrecy statutes (GDPR Art. 6/9, Bank Secrecy Act), each bank $k \in \mathcal{K} = \{B_1, \dots, B_K\}$ is confined to its local observation horizon:
 
-$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \operatorname{source}(\tau) = k \lor \operatorname{target}(\tau) = k \}$$
+$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \mathrm{source}(\tau) = k \lor \mathrm{target}(\tau) = k \}$$
 
-For any inter-bank transfer $\tau = (u, v)$ where $\operatorname{source}(\tau) \ne k$ and $\operatorname{target}(\tau) \ne k$, bank $k$ observes **zero** information ($\tau \notin \mathcal{H}_k$).
+For any inter-bank transfer $\tau = (u, v)$ where $\mathrm{source}(\tau) \ne k$ and $\mathrm{target}(\tau) \ne k$, bank $k$ observes **zero** information ($\tau \notin \mathcal{H}_k$).
 
 **Theorem (Intermediate Transfer Unobservability):**  
 For any cyclic or multi-hop laundering ring $\mathcal{R} = (\tau_1, \tau_2, \dots, \tau_m)$ where transfer $\tau_i = (B_a, B_b)$ and $\tau_{i+1} = (B_b, B_c)$, a third-party bank $B_k \notin \{B_a, B_b, B_c\}$ satisfies:
@@ -558,11 +558,11 @@ For the canonical consortium neural architecture ($1{,}969$ parameters $\times 4
 
 | Cryptographic Protocol | Payload per Round | 5-Round Volume | Relative Overhead | Bandwidth ROI (USD Averted / MB) |
 | :--- | :---: | :---: | :---: | :---: |
-| **Top-k Sparsification (90%)** | 4.61 KB | 0.0225 MB | 0.10x | **$37,169,058.67 / MB** |
-| **Quantized FP16** | 23.07 KB | 0.1127 MB | 0.50x | **$7,420,619.52 / MB** |
-| **Uncompressed FP32** | 46.15 KB | 0.2253 MB | 1.00x | **$3,711,956.59 / MB** |
-| **PQC Secure Aggregation (Curve25519)** | 48.90 KB | 0.2388 MB | 1.06x | **$3,502,109.80 / MB** |
-| **TenSEAL CKKS Homomorphic Encryption** | 378.42 KB | 1.8477 MB | 8.20x | **$452,618.83 / MB** |
+| **Top-k Sparsification (90%)** | 4.61 KB | 0.0225 MB | 0.10x | **37,169,058.67 USD / MB** |
+| **Quantized FP16** | 23.07 KB | 0.1127 MB | 0.50x | **7,420,619.52 USD / MB** |
+| **Uncompressed FP32** | 46.15 KB | 0.2253 MB | 1.00x | **3,711,956.59 USD / MB** |
+| **PQC Secure Aggregation (Curve25519)** | 48.90 KB | 0.2388 MB | 1.06x | **3,502,109.80 USD / MB** |
+| **TenSEAL CKKS Homomorphic Encryption** | 378.42 KB | 1.8477 MB | 8.20x | **452,618.83 USD / MB** |
 
 *Core Economic Finding:* Even under full ciphertext expansion using TenSEAL CKKS Homomorphic Encryption ($8.2\times$ overhead), the consortium recovers **$452,618.83 USD** of laundering volume averted per megabyte transferred. Under Top-k Sparsification, the efficiency reaches **$37.1M USD / MB**.
 
@@ -660,9 +660,9 @@ The benchmark evaluates all 16 orthogonal combinations on 8,000 transactions par
 
 The marginal impact of each architectural pillar across all 8 orthogonal background combinations reveals the exact individual performance attribution:
 
-$$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in C_{F=1}} \operatorname{Metric}(c) - \frac{1}{8} \sum_{c' \in C_{F=0}} \operatorname{Metric}(c')$$
+$$\Delta\mathrm{Metric}(F) = \frac{1}{8} \sum_{c \in C_{F=1}} \mathrm{Metric}(c) - \frac{1}{8} \sum_{c' \in C_{F=0}} \mathrm{Metric}(c')$$
 
-| Architectural Factor | $\Delta\operatorname{PR-AUC}$ | $\Delta$ Recall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
+| Architectural Factor | $\Delta\mathrm{PR\text{-}AUC}$ | $\Delta$ Recall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Graph** | **+0.3359** | **+0.2500** | +12.9% | +0.0% | Multi-hop structural embeddings offer the single highest individual detection uplift. |
 | **CrossBank** | **+0.4051** | **+0.4167** | -19.5% | +0.0% | Cross-bank transaction flow features expose distributed layering invisible to local silos. |
@@ -671,7 +671,7 @@ $$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in C_{F=1}} \operatornam
 
 #### Architectural Interaction Synergies
 
-| Component Pair | Interaction Effect ($\Delta\operatorname{PR-AUC}$) | Synergy Description |
+| Component Pair | Interaction Effect ($\Delta\mathrm{PR\text{-}AUC}$) | Synergy Description |
 | :--- | :---: | :--- |
 | **Graph x CrossBank** | **-0.6291** | Non-linear synergy: Graph embeddings and Cross-Bank signals mutually reinforce multi-hop ring detection. |
 | **DP x Graph** | **-0.0168** | Robustness: Graph features remain resilient against Gaussian gradient perturbation. |
@@ -679,9 +679,9 @@ $$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in C_{F=1}} \operatornam
 
 #### Pareto Operational Frontier & Production Recommendation
 
-The multi-objective Pareto frontier balances detection utility ($\operatorname{PR-AUC}$, $\text{Recall@0.01% FPR}$) against privacy guarantees and bandwidth cost:
-- **`C10` (Graph + CrossBank)** achieves peak theoretical detection utility ($\operatorname{PR-AUC} = 0.9842$, $\text{ROC-AUC} = 0.9996$) in closed, trusted environments.
-- **`C16` (Graph + CrossBank + DP + SecAgg)** is the **Production Recommended Configuration** for cross-bank consortia: it maintains elite fraud detection utility ($\operatorname{PR-AUC} = 0.9342$, $\text{ROC-AUC} = 0.9966$, $\text{Recall@0.01% FPR} = 0.7556$) while providing full cryptographic zero-knowledge protection (PQC SecAgg) and formal mathematical differential privacy ($\epsilon \le 2.55, \delta = 10^{-5}$) at only $10.42\text{ KB/client/round}$.
+The multi-objective Pareto frontier balances detection utility (PR-AUC, Recall @ 0.01% FPR) against privacy guarantees and bandwidth cost:
+- **`C10` (Graph + CrossBank)** achieves peak theoretical detection utility ($\mathrm{PR\text{-}AUC} = 0.9842$, $\mathrm{ROC\text{-}AUC} = 0.9996$) in closed, trusted environments.
+- **`C16` (Graph + CrossBank + DP + SecAgg)** is the **Production Recommended Configuration** for cross-bank consortia: it maintains elite fraud detection utility ($\mathrm{PR\text{-}AUC} = 0.9342$, $\mathrm{ROC\text{-}AUC} = 0.9966$, Recall @ 0.01% FPR = 75.56%) while providing full cryptographic zero-knowledge protection (PQC SecAgg) and formal mathematical differential privacy ($\epsilon \le 2.55, \delta = 10^{-5}$) at only $10.42\text{ KB/client/round}$.
 - **Consolidated Figure**: [`docs/figures/benchmark_factorial_ablations.png`](figures/benchmark_factorial_ablations.png) provides 4 publication panels: (A) PR-AUC Across Configurations, (B) ANOVA Main Factor Effects, (C) Privacy vs Utility Pareto Frontier, and (D) Operational Recall at Ultra-Strict FPRs.
 
 ---
@@ -717,7 +717,7 @@ To quantify the exact utility trade-off under formal Differential Privacy guaran
 
 #### Key Empirical Findings & Production Guidelines
 
-1. **Strict Privacy Compliance**: $\sigma \ge 1.0$ guarantees zero budget overrun under $\epsilon \le 2.0$ for all round counts up to $T = 50$. At $\sigma = 1.0, T = 50$, the system achieves $\epsilon = 1.7675$ while retaining strong detection performance ($\operatorname{PR-AUC} = 0.3922$, $\operatorname{ROC-AUC} = 0.9452$).
+1. **Strict Privacy Compliance**: $\sigma \ge 1.0$ guarantees zero budget overrun under $\epsilon \le 2.0$ for all round counts up to $T = 50$. At $\sigma = 1.0, T = 50$, the system achieves $\epsilon = 1.7675$ while retaining strong detection performance ($\mathrm{PR\text{-}AUC} = 0.3922$, $\mathrm{ROC\text{-}AUC} = 0.9452$).
 2. **Calibrated Noise Multiplier**: Analytical RDP calibration derives $\sigma^* = 0.8870$ for exact $\epsilon = 2.0000$ at $T = 50$ rounds.
 3. **Subsampled Gaussian Amplification**: Subsampling ratio $q = 0.05$ provides significant privacy amplification over naïve full-batch Gaussian mechanisms.
 4. **4-Panel Publication Figure**: [`docs/figures/benchmark_privacy_utility.png`](figures/benchmark_privacy_utility.png) visualizes: (1) Privacy-Utility Frontier ($\epsilon$ vs PR-AUC), (2) $\epsilon$ vs $\sigma$ Curves across round counts, (3) Utility Degradation vs Noise Level, and (4) Privacy Loss $\epsilon$ Heatmap.
@@ -824,7 +824,7 @@ python -m pytest \
    - Neural MLP Architecture: 3-layer MLP initialization, LayerNorm single-sample inference (batch size = 1), and gradient backpropagation.
    - Parameter Operations: Weight cloning, deep detachment, state dict loading, and sample-weighted parameter aggregation.
    - Federated Optimizers: FedAvg convergence, FedProx proximal regularizer ($\mu > 0$ parameter drift constraint), and SCAFFOLD control variates ($c_k, c$).
-   - Operational Metrics: Recall @ strict FPR ($0.01\%$, $0.05\%$, $0.1\%$, $1.0\%$), CurvePoint subsampling, ConfusionMatrixData, and CalibrationData binning.
+   - Operational Metrics: Recall @ strict FPR (0.01%, 0.05%, 0.1%, 1.0%), CurvePoint subsampling, ConfusionMatrixData, and CalibrationData binning.
    - Multi-Optimizer Benchmark: Side-by-side execution of FedAvg, FedProx, and SCAFFOLD with convergence history extraction.
    - End-to-End Pipeline: PaySim benchmark runner execution and Pydantic v2 `ExperimentResult` schema validation.
 2. **`test_ieee_cis_loader.py` & `test_ieee_cis_benchmark.py`** (22 Tests):
@@ -832,7 +832,7 @@ python -m pytest \
    - `IEEECISNeuralClassifier`: 422 tabular feature input layer, LayerNorm, Dropout, 3-layer feedforward projection, and single-sample evaluation.
    - Parameter Operations: Weight extraction, weight assignment, and sample-weighted federated averaging.
    - Federated Training: Multi-round local training on Bank partitions with FedAvg and FedProx proximal regularizer.
-   - Fixed-FPR Thresholds: Recall @ $0.1\%$, $0.5\%$, and $1.0\%$ FPR evaluation against consortium global test set.
+   - Fixed-FPR Thresholds: Recall @ 0.1%, 0.5%, and 1.0% FPR evaluation against consortium global test set.
    - End-to-End Benchmark: Full pipeline execution, Pydantic v2 `ExperimentResult` serialization, and scientific audit dossier markdown generation.
 3. **`test_dirichlet_partition.py` & `test_paysim_loader.py`** (13 Tests):
    - Dirichlet concentration parameter ($\alpha \in \{0.1, 0.5, 1.0\}$) partitioning across $K=3$ simulated banks.
@@ -865,7 +865,7 @@ python -m pytest \
     - Multi-Bank Partition Invariants: Strict sample conservation ($\sum |\mathcal{D}_k| = |\mathcal{D}|$), mutual index disjointness ($\mathcal{D}_i \cap \mathcal{D}_j = \emptyset$), and extreme skew verification (strictly 2 fraud cases sequestered in Bank C).
     - Model Architecture & Parameter Manipulation: Weight cloning, deep detachment, state dict assignment, and positive-weighted BCE loss computation.
     - Federated Aggregation: Sample-weighted parameter aggregation ($\mathbf{w} = \sum \frac{n_k}{N} \mathbf{w}_k$) conserving model dimensions.
-    - Fixed-FPR Metric Evaluation: Full metric dictionary structure containing PR-AUC, ROC-AUC, Brier score, and operational Recall @ strict FPR ($0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1.0\%$).
+    - Fixed-FPR Metric Evaluation: Full metric dictionary structure containing PR-AUC, ROC-AUC, Brier score, and operational Recall @ strict FPR (0.01%, 0.05%, 0.1%, 0.5%, 1.0%).
     - FedProx Regularization: Verifies proximal penalty ($\frac{\mu}{2} \|\mathbf{w} - \mathbf{w}^t\|_2^2$) strictly constrains model drift.
     - Isolated Silos & Pooled Baselines: Verifies isolated bank training and pooled centralized baseline evaluation.
     - Publication Plot Generation: Verifies generation of PR curves, ROC curves, optimizer convergence, and imbalance robustness plots.
@@ -875,7 +875,7 @@ python -m pytest \
     - Zero-Leakage Temporal Splitting: Verified split at timestep 34 threshold conserving all nodes with zero future contamination.
     - Tabular MLP Baseline: Verified 0-hop neural baseline feature extraction and metric dictionary structure.
     - Inductive GraphSAGE Message Passing: Verified 1-layer and 2-layer forward passes, skip connections, and LayerNorm stability.
-    - Fixed-FPR Operational Metrics: Verified mathematical calculation of Recall @ $0.1\%$, $0.5\%$, and $1.0\%$ FPR.
+    - Fixed-FPR Operational Metrics: Verified mathematical calculation of Recall @ 0.1%, 0.5%, and 1.0% FPR.
     - Aggregator Ablation: Side-by-side verification of Mean Aggregator vs Symmetric GCN Aggregator.
     - End-to-End Benchmark Pipeline: Verified full execution on synthetic Elliptic fallback and Pydantic v2 `ExperimentResult` serialization.
     - Visual Artifact Generation: Verified creation of PR curves, ROC curves, hop ablation, and temporal generalizability plots.
@@ -887,15 +887,15 @@ python -m pytest \
     - Account Graph Feature Extraction: Verified uncentered `log1p` degrees and volume features preserving non-negativity and sparsity.
     - Sparse Directed Adjacency: Verified sparse COO forward and backward adjacency construction and coalescing.
     - Typology-Specific Recall: Verified mathematical quantification of Cycle and Fan-In detection rates at fixed operational decision thresholds.
-    - Fixed-FPR Threshold Calibration: Verified calculation of Recall @ $0.1\%$, $0.5\%$, and $1.0\%$ FPR.
+    - Fixed-FPR Threshold Calibration: Verified calculation of Recall @ 0.1%, 0.5%, and 1.0% FPR.
     - Pydantic v2 Schema Compliance: Verified full validation against `ExperimentResult` schema specification.
     - End-to-End Pipeline & CLI Runner: Verified synthetic testbed execution, artifact serialization, and CLI argument parsing.
 13. **`test_synthaml_loader.py` & `test_synthaml_benchmark.py`** (22 Tests):
     - `test_synthaml_loader.py` (9 Tests): Provenance tracking, Nature Scientific Data DOI verification, 14-dim lookback feature schema invariant, zero-leakage chronological 80/20 temporal split along `step` axis, sample conservation, and Parquet caching.
-    - `test_synthaml_benchmark.py` (13 Tests): Multi-institution volume and SAR label skew partitioning (`SynthAMLPartitioner`), Dirichlet split allocation, global test set isolation, `AlertMLPClassifier` forward and gradient flow, parameter cloning/setting and sample-weighted FedAvg aggregation, operational Recall @ fixed FPR ($0.1\%$, $0.5\%$, $1.0\%$), ECE metric calibration, centralized and federated optimization execution, Pydantic v2 `ExperimentResult` schema compliance, and CLI parser verification.
+    - `test_synthaml_benchmark.py` (13 Tests): Multi-institution volume and SAR label skew partitioning (`SynthAMLPartitioner`), Dirichlet split allocation, global test set isolation, `AlertMLPClassifier` forward and gradient flow, parameter cloning/setting and sample-weighted FedAvg aggregation, operational Recall @ fixed FPR (0.1%, 0.5%, 1.0%), ECE metric calibration, centralized and federated optimization execution, Pydantic v2 `ExperimentResult` schema compliance, and CLI parser verification.
 14. **`test_amlnet_loader.py` & `test_amlnet_benchmark.py`** (22 Tests):
     - `test_amlnet_loader.py` (9 Tests): Provenance tracking, Zenodo DOI verification, 18-dim domain feature schema invariant, zero-leakage chronological temporal split along `step` axis, sample conservation, and Parquet caching.
-    - `test_amlnet_benchmark.py` (13 Tests): Multi-institution volume and label skew partitioning (`AMLNetPartitioner`), Dirichlet split allocation, global test set isolation, `AMLNetClassifier` forward and gradient flow, parameter cloning/setting and sample-weighted FedAvg aggregation, operational Recall @ fixed FPR ($0.01\%$, $0.05\%$, $0.1\%$, $0.5\%$, $1.0\%$), ECE metric calibration, centralized and federated optimization execution, Pydantic v2 `ExperimentResult` schema compliance, and CLI parser verification.
+    - `test_amlnet_benchmark.py` (13 Tests): Multi-institution volume and label skew partitioning (`AMLNetPartitioner`), Dirichlet split allocation, global test set isolation, `AMLNetClassifier` forward and gradient flow, parameter cloning/setting and sample-weighted FedAvg aggregation, operational Recall @ fixed FPR (0.01%, 0.05%, 0.1%, 0.5%, 1.0%), ECE metric calibration, centralized and federated optimization execution, Pydantic v2 `ExperimentResult` schema compliance, and CLI parser verification.
 15. **`test_crossbank_topology.py`** (13 Tests):
     - Deterministic 7-Scenario Topology Generation: Verified local smurfing, 2-bank layering, 3-bank cyclic ring ($A \to B \to C \to A$), behavior-shifting, non-IID archetypes, sample starvation, and zero-positive cold start.
     - Information Horizon Enforcement: Verified strict isolation with zero cross-bank edge leakage ($B \to C$ invisible to Bank Alpha).
@@ -904,7 +904,7 @@ python -m pytest \
 16. **`test_crossbank_information_gain.py`** (7 Tests):
     - Shannon Entropy & Conditional Information: Validates mathematical bounds $H(Y) \ge 0$, discrete and continuous feature discretization, and mutual information $I(X; Y) = H(Y) - H(Y \mid X) \ge 0$.
     - Information Horizon Isolation: Validates partial observation coverage ($\mathcal{H}_k < 1.0$) for isolated banks vs 100% global consortium coverage.
-    - Financial Value at Risk (VaR) Quantification: Verifies calculation of attempted volume, isolated detected volume, federated detected volume, and incremental illicit dollars averted across scenarios ($+\$836{,}303.82\text{ USD}$ uplift).
+    - Financial Value at Risk (VaR) Quantification: Verifies calculation of attempted volume, isolated detected volume, federated detected volume, and incremental illicit dollars averted across scenarios (+836,303.82 USD uplift).
     - Communication Bandwidth Cost Models: Verifies exact byte/megabyte transmission tracking across Top-k Sparsification, FP16 Quantization, Uncompressed FP32, PQC Curve25519 SecAgg, and TenSEAL CKKS Homomorphic Encryption.
     - End-to-End Value Quantification Runner: Verifies full execution of `run_consortium_value_quantification`, JSON artifact serialization (`information_gain.json`), audit report compilation (`report.md`), and publication figure rendering (`benchmark_communication.png`).
 17. **`test_dirichlet_sweep.py`** (8 Tests):
@@ -1017,7 +1017,7 @@ The **Net Financial Utility (Illicit Loss Averted)** measures total savings rela
 
 $$\mathcal{S}(\tau) = \mathcal{C}_{\mathrm{baseline}} - \mathcal{C}(\tau)$$
 
-$$\mathrm{Efficiency}(\tau) = \frac{\mathcal{S}(\tau)}{\mathcal{C}_{\mathrm{baseline}}} \times 100\%$$
+$$\mathrm{Efficiency}(\tau) = \frac{\mathcal{S}(\tau)}{\mathcal{C}_{\mathrm{baseline}}} \times 100$$
 
 The optimal operational decision cutoff $\tau^*$ minimizes aggregate financial expenditure:
 
@@ -1025,7 +1025,7 @@ $$\tau^* = \arg\min_{\tau} \mathcal{C}(\tau) \equiv \arg\max_{\tau} \mathcal{S}(
 
 ### 20.2 Empirical Multi-Threshold Sweep Results
 
-The benchmark evaluates discrete candidate decision thresholds on a held-out test split of $N = 5{,}000$ transactions with empirical fraud prevalence of $2.00\%$ ($P = 100$ fraudulent transfers, $4{,}900$ clean transactions; zero-detection baseline cost $\mathcal{C}_{\mathrm{baseline}} = 85{,}000\text{ USD}$):
+The benchmark evaluates discrete candidate decision thresholds on a held-out test split of $N = 5{,}000$ transactions with empirical fraud prevalence of 2.00% ($P = 100$ fraudulent transfers, $4{,}900$ clean transactions; zero-detection baseline cost $\mathcal{C}_{\mathrm{baseline}} = 85{,}000\text{ USD}$):
 
 | Threshold ($\tau$) | Norm ($\theta$) | TP | FP | FN | Recall | Precision | FPR | Total Cost | Net Savings | Efficiency |
 | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1043,8 +1043,8 @@ The benchmark evaluates discrete candidate decision thresholds on a held-out tes
 
 ### 20.3 Analysis & Key Financial Insights
 
-1. **Convexity of Financial Loss Function**: As decision threshold $\tau$ increases from 500 to 900, false alarms decrease monotonically ($434 \to 0$), reducing analyst overhead ($c_{\mathrm{FP}} \cdot \mathrm{FP}$). However, missed fraud cases accelerate ($7 \to 90$), with each missed case costing $\$850$ ($c_{\mathrm{FN}}$). The cost curve exhibits a clear convex global minimum at $\tau^* = 600$.
-2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of $\$47,580.00$—representing **nearly double the operational cost** of $\tau^* = 600$, solely due to unmitigated false negative chargebacks.
+1. **Convexity of Financial Loss Function**: As decision threshold $\tau$ increases from 500 to 900, false alarms decrease monotonically ($434 \to 0$), reducing analyst overhead ($c_{\mathrm{FP}} \cdot \mathrm{FP}$). However, missed fraud cases accelerate ($7 \to 90$), with each missed case costing 850 USD ($c_{\mathrm{FN}}$). The cost curve exhibits a clear convex global minimum at $\tau^* = 600$.
+2. **Sub-optimality of Conventional High Cutoffs**: Conventional compliance engines often configure conservative cutoffs like $\tau = 750$ or $\tau = 800$ to minimize analyst caseloads. The empirical data demonstrates that operating at $\tau = 750$ incurs an aggregate loss of 47,580.00 USD—representing **nearly double the operational cost** of $\tau^* = 600$, solely due to unmitigated false negative chargebacks.
 3. **Interactive Control (`ThresholdTuningSlider.tsx`)**: Risk officers can dynamically adjust both decision cutoffs ($\tau \in [500, 900]$) and institution-specific unit cost parameters ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}$) via the interactive `ThresholdTuningSlider` mounted on the Declarative Policy Engine (`frontend/src/pages/PoliciesPage.tsx`). The component projects live confusion matrices, sensitivity metrics, net savings, and provides one-click snapping to the Bayesian cost-optimal threshold $\tau^*$.
 
 **Test Execution Parity**: 17/17 Pytest unit tests passed on `backend/tests/unit/test_risk_utility.py`; 5/5 Vitest tests passed on `ThresholdTuningSlider.test.tsx`.
@@ -1082,7 +1082,7 @@ CF-Intelligence executes a dual empirical ablation benchmark implemented in [`ex
 
 ### 21.1 Controlled Feature Paradigm Ablation Results
 
-Evaluated across $N = 2{,}000$ accounts with a fixed $5.0\%$ fraud prevalence and identical feed-forward classification architectures ($d_{\mathrm{hidden}} = 64$, $\text{ReLU}$, Adam $\eta = 0.01$):
+Evaluated across $N = 2{,}000$ accounts with a fixed 5.0% fraud prevalence and identical feed-forward classification architectures ($d_{\mathrm{hidden}} = 64$, $\text{ReLU}$, Adam $\eta = 0.01$):
 
 | Feature Evaluation Paradigm | PR-AUC | ROC-AUC | F1-Score | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1092,13 +1092,13 @@ Evaluated across $N = 2{,}000$ accounts with a fixed $5.0\%$ fraud prevalence an
 
 #### Measured Marginal Uplift
 
-$$\Delta\operatorname{PR-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.7262 - 0.2227 = +0.5035 \; (+226.1\% \text{ relative gain})$$
+$$\Delta\mathrm{PR\text{-}AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.7262 - 0.2227 = +0.5035 \quad (+226.1\text{ percent relative gain})$$
 
-$$\Delta\operatorname{ROC-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.9016 - 0.6974 = +0.2042 \; (+29.3\% \text{ relative gain})$$
+$$\Delta\mathrm{ROC\text{-}AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = 0.9016 - 0.6974 = +0.2042 \quad (+29.3\text{ percent relative gain})$$
 
-$$\Delta\operatorname{Recall@0.1\%FPR} = 26.32\% - 0.00\% = +26.32\text{ percentage points}$$
+$$\Delta\mathrm{Recall}_{@0.001} = 0.2632 - 0.0000 = +0.2632 \quad (+26.32\text{ percentage points})$$
 
-Key takeaway: When fraudulent transfers are coordinated through multi-hop money mule syndicates, individual transaction amounts and velocities appear benign to tabular classifiers. Graph aggregation surfaces the covert relational topology, yielding a **$+226.1\%$ relative PR-AUC uplift**. Joint concatenation maximizes performance by simultaneously evaluating immediate velocity and neighborhood risk.
+Key takeaway: When fraudulent transfers are coordinated through multi-hop money mule syndicates, individual transaction amounts and velocities appear benign to tabular classifiers. Graph aggregation surfaces the covert relational topology, yielding a **+226.1% relative PR-AUC uplift**. Joint concatenation maximizes performance by simultaneously evaluating immediate velocity and neighborhood risk.
 
 ### 21.2 Topology Complexity & Density Sensitivity Sweep
 
@@ -1134,7 +1134,7 @@ Key takeaway: When fraudulent transfers are coordinated through multi-hop money 
 | **Scale-Free Barabási-Albert** | Power-law degree distribution, preferential hubs | 0.6845 | 0.8968 | +0.4517 |
 | **Clustered SBM Communities** | Dense community smurfing syndicates | **0.7512** | **0.9145** | **+0.5184** |
 
-**Structural Finding**: Graph models provide the greatest detection advantage in Stochastic Block Model (SBM) community topologies ($\Delta\operatorname{PR-AUC} = +0.5184$), mirroring actual banking environments where illicit networks cluster into dense collaborative cliques.
+**Structural Finding**: Graph models provide the greatest detection advantage in Stochastic Block Model (SBM) community topologies ($\Delta\mathrm{PR\text{-}AUC} = +0.5184$), mirroring actual banking environments where illicit networks cluster into dense collaborative cliques.
 
 #### 4. Cold-Start / Isolated Node Degradation Sweep
 
@@ -1185,7 +1185,7 @@ $$\mathcal{D}_{\mathrm{past}} \; (t \in [0, 100)) \quad \longrightarrow \quad \m
 
 ### 22.1 Empirical Benchmark Results
 
-Evaluated across $N = 7{,}500$ transactions ($2{,}500$ per period) with an underlying $4.0\%$ fraud prevalence and continuous concept drift:
+Evaluated across $N = 7{,}500$ transactions ($2{,}500$ per period) with an underlying 4.0% fraud prevalence and continuous concept drift:
 
 | Evaluation Regime | Temporal Window | PR-AUC | ROC-AUC | F1-Score | Recall @ 0.1% FPR | Brier Score | ECE | Temporal Delta vs P1 |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
@@ -1199,14 +1199,14 @@ Evaluated across $N = 7{,}500$ transactions ($2{,}500$ per period) with an under
 #### 1. Optimistic Evaluation Bias Gap
 Quantifies the artificial performance inflation introduced by random $K$-fold cross-validation relative to true distant operational performance:
 
-$$\Delta_{\mathrm{bias}} = \operatorname{PR-AUC}_{\mathrm{KFold}} - \operatorname{PR-AUC}_{\mathrm{OOT\,Period\,3}} = 0.6958 - 0.3234 = +0.3724\text{ PR-AUC Inflation}$$
+$$\Delta_{\mathrm{bias}} = \mathrm{PR\text{-}AUC}_{\mathrm{KFold}} - \mathrm{PR\text{-}AUC}_{\mathrm{OOT,\,Period\,3}} = 0.6958 - 0.3234 = +0.3724\text{ PR-AUC Inflation}$$
 
 #### 2. Temporal Degradation Velocity
 The relative rate of discrimination decay between the training distribution $\mathcal{D}_{\mathrm{P1}}$ and out-of-time periods:
 
-$$\operatorname{Decay}(\mathcal{D}_{\mathrm{P1}} \to \mathcal{D}_{\mathrm{P3}}) = \frac{\operatorname{PR-AUC}_{\mathrm{P3}} - \operatorname{PR-AUC}_{\mathrm{P1}}}{\operatorname{PR-AUC}_{\mathrm{P1}}} = \frac{0.3234 - 0.6245}{0.6245} = -48.2\%$$
+$$\mathrm{Decay}(\mathcal{D}_{\mathrm{P1}} \to \mathcal{D}_{\mathrm{P3}}) = \frac{\mathrm{PR\text{-}AUC}_{\mathrm{P3}} - \mathrm{PR\text{-}AUC}_{\mathrm{P1}}}{\mathrm{PR\text{-}AUC}_{\mathrm{P1}}} = \frac{0.3234 - 0.6245}{0.6245} = -0.482 \quad (-48.2\text{ percent})$$
 
-$$\Delta\operatorname{Recall@0.1\%FPR} = 6.80\% - 34.62\% = -27.82\text{ percentage points}$$
+$$\Delta\mathrm{Recall}_{@0.001} = 0.0680 - 0.3462 = -0.2782 \quad (-27.82\text{ percentage points})$$
 
 ### 22.3 Feature Drift & Population Stability Index (PSI) Tracking
 
@@ -1232,7 +1232,7 @@ $$\mathrm{PSI} = \sum_{b=1}^{B} (p_b - q_b) \ln\left( \frac{p_b}{q_b} \right)$$
 ### 22.4 Automated Retraining Trigger Governance
 
 In production operations, the automated retraining loop triggers based on dual empirical thresholds:
-1. **Performance Decay Condition**: Relative PR-AUC degradation exceeding $-15.0\%$ ($\operatorname{Decay} \le -15\%$). In Period 3, decay reached **$-48.2\%$**, firing the trigger.
+1. **Performance Decay Condition**: Relative PR-AUC degradation exceeding -15.0% (relative decay $\le -15$%). In Period 3, decay reached **-48.2%**, firing the trigger.
 2. **Population Drift Condition**: Maximum single-feature $\mathrm{PSI} \ge 0.25$ (`SEVERE_DRIFT`) or mean $\mathrm{PSI} \ge 0.10$ (`MODERATE_DRIFT`).
 3. **Operational Verdict**: Automated retraining trigger status is flagged as **`CRITICAL`**, notifying consortium MLOps pipelines to initiate a new federated training round with freshly labeled Period 2/3 transactions.
 
@@ -1258,7 +1258,7 @@ CF-Intelligence implements a mathematically rigorous drift telemetry engine in [
 │              CLOSED-LOOP DRIFT PROFILING & AUTOMATED RETRAINING LIFECYCLE                │
 ├──────────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                          │
-│   Streaming Transactions ──> [ Feature Store ] ──> [ Model Inference ]                  │
+│   Streaming Transactions --> [ Feature Store ] --> [ Model Inference ]                   │
 │                                      │                     │                             │
 │                                      v                     v                             │
 │                            [ Kolmogorov-Smirnov ]     [ Concept PSI ]                    │
@@ -1281,10 +1281,10 @@ CF-Intelligence implements a mathematically rigorous drift telemetry engine in [
 │                                                             [ PyTorch DP-SGD Retrain ]   │
 │                                                             [ ROC-AUC Quality Gate ]     │
 │                                                                          │               │
-│                                                ┌─────────────────────────┴───────────────┐
-│                                                │ AUC >= 0.70 Threshold                   │
-│                                                v                                         v
-│                                     [ COMPLETED: zlib Compress ]             [ REJECTED] │
+│                                                ┌─────────────────────────┴────────────┐  │
+│                                                │ AUC >= 0.70 Threshold                │  │
+│                                                v                                      v  │
+│                                     [ COMPLETED: zlib Compress ]          [ REJECTED ]   │
 │                                     [ Distribute to Nodes      ]                         │
 └──────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -1315,7 +1315,7 @@ Quantifies the minimum transport cost between current and reference feature dist
 $$W_1^*(P, Q) = \frac{1}{\sigma_{\mathrm{ref}}} \int_{-\infty}^{\infty} \lvert F_P(x) - F_Q(x) \rvert \, dx$$
 
 #### 4. Benjamini-Hochberg False Discovery Rate (FDR) Control
-Across $m$ monitored feature hypotheses, unadjusted testing at $\alpha = 0.05$ produces an inflated family-wise error rate ($\mathrm{FWER} \approx 1 - (1 - 0.05)^m \approx 40.1\%$ for $m = 10$). CF-Intelligence controls false discovery rate by ordering raw $p$-values $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$ and identifying significant features satisfying:
+Across $m$ monitored feature hypotheses, unadjusted testing at $\alpha = 0.05$ produces an inflated family-wise error rate ($\mathrm{FWER} \approx 1 - (1 - 0.05)^m \approx 0.401$ (40.1%) for $m = 10$). CF-Intelligence controls false discovery rate by ordering raw $p$-values $p_{(1)} \le p_{(2)} \le \dots \le p_{(m)}$ and identifying significant features satisfying:
 
 $$p_{(k)} \le \frac{k}{m} \cdot \alpha, \qquad \alpha = 0.05$$
 
@@ -1391,7 +1391,7 @@ This benchmark empirically profiles:
    - `RAW_FP32`: Dense 32-bit IEEE 754 floating-point binary buffers ($4 \times d$ bytes).
    - `QUANTIZED_FP16`: 16-bit half-precision IEEE 754 quantization ($2 \times d$ bytes).
    - `QUANTIZED_INT8`: 8-bit symmetric affine quantization ($1 \times d + 4$ bytes) with per-tensor scale factor $\alpha / 127$.
-   - `TOPK_SPARSE_COO`: Top-K coordinate encoding storing 16-bit indices and 16-bit float values for elements in the upper $k\%$ magnitude tier.
+   - `TOPK_SPARSE_COO`: Top-K coordinate encoding storing 16-bit indices and 16-bit float values for elements in the upper k% magnitude tier.
    - `ZSTD_COMPRESSED`: Lossless binary compression applied directly on raw tensor buffers.
    - `SPARSE_TOPK_ZSTD`: Combined Top-K coordinate sparsification and lossless compression.
 2. **Multi-Round Federated Protocol Network Overheads**: Compares total bidirectional wire consumption across 5 federated orchestration paradigms:
@@ -1416,7 +1416,7 @@ For a neural network parameter vector $\boldsymbol{\theta} \in \mathbb{R}^d$:
   $$S_{\mathrm{FP16}} = 2 \cdot d \quad (\text{bytes}) \implies \mathrm{Ratio} = 0.5000$$
 
 - **Quantized INT8 (Symmetric Uniform Affine)**:
-  Given dynamic range $\alpha = \max_{1 \le i \le d} \lvert \theta_i \rvert$, the per-tensor float scale is $s = \alpha / 127.0$. Each weight is mapped to signed 8-bit integer $q_i = \operatorname{clamp}(\operatorname{round}(\theta_i / s), -128, 127)$:
+  Given dynamic range $\alpha = \max_{1 \le i \le d} \lvert \theta_i \rvert$, the per-tensor float scale is $s = \alpha / 127.0$. Each weight is mapped to signed 8-bit integer $q_i = \mathrm{clamp}(\mathrm{round}(\theta_i / s), -128, 127)$:
 
   $$S_{\mathrm{INT8}} = 4 + 1 \cdot d \quad (\text{bytes})$$
 
@@ -1425,7 +1425,7 @@ For a neural network parameter vector $\boldsymbol{\theta} \in \mathbb{R}^d$:
   $$\lvert \theta_i - \hat{\theta}_i \rvert \le \frac{s}{2} = \frac{\max \lvert \theta \rvert}{254}$$
 
 - **Top-K Coordinate Sparse (COO)**:
-  Retaining top $k\%$ magnitude parameters ($K_{\mathrm{nz}} = \lceil d \cdot k \rceil$), with 2-byte magic header, 8-byte metadata ($d, K_{\mathrm{nz}}$), 2-byte uint16 indices ($d \le 65{,}535$), and 2-byte float16 values:
+  Retaining top k% magnitude parameters ($K_{\mathrm{nz}} = \lceil d \cdot k \rceil$), with 2-byte magic header, 8-byte metadata ($d, K_{\mathrm{nz}}$), 2-byte uint16 indices ($d \le 65{,}535$), and 2-byte float16 values:
 
   $$S_{\mathrm{COO}} = 10 + 4 \cdot K_{\mathrm{nz}} \quad (\text{bytes})$$
 
@@ -1469,7 +1469,7 @@ Let $S_{\mathrm{model}}$ denote the single-direction serialized model payload. I
 | `RAW_FP32` | **7,876 B** | 1.0000 | **+0.0%** | 149.9 | 35.2 | 0.000000 | 0.000000 |
 | `QUANTIZED_FP16` | **3,938 B** | 0.5000 | **+50.0%** | 184.0 | 91.6 | 0.000011 | 0.000433 |
 | `QUANTIZED_INT8` | **1,973 B** | 0.2505 | **+75.0%** | 827.4 | 120.4 | 0.003382 | 0.006668 |
-| `TOPK_SPARSE_COO` ($k=20\%$) | **1,582 B** | 0.2009 | **+79.9%** | 688.6 | 45.7 | 0.024293 | 0.074027 |
+| `TOPK_SPARSE_COO` ($k = 0.20$, top 20%) | **1,582 B** | 0.2009 | **+79.9%** | 688.6 | 45.7 | 0.024293 | 0.074027 |
 | `ZSTD_COMPRESSED` | **7,365 B** | 0.9351 | **+6.5%** | 915.8 | 77.6 | 0.000000 | 0.000000 |
 | `SPARSE_TOPK_ZSTD` | **1,472 B** | 0.1869 | **+81.3%** | 736.4 | 57.1 | 0.024293 | 0.074027 |
 
@@ -1488,22 +1488,22 @@ Let $S_{\mathrm{model}}$ denote the single-direction serialized model payload. I
 ### 24.4 Architectural Decision & WAN Deployment Policy
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                   FEDERATED NETWORK BANDWIDTH GOVERNANCE POLICY                        │
-├────────────────────────────┬────────────────────────────┬──────────────────────────────┤
-│ Network Environment        │ Recommended Serialization  │ Recommended Protocol         │
-├────────────────────────────┼────────────────────────────┼──────────────────────────────┤
-│ High-Bandwidth LAN / VPC   │ RAW_FP32 or ZSTD_COMPRESSED│ CURVE25519_SECAGG (FedAvg)   │
-│ Cross-Border WAN (<10 Mbps)│ QUANTIZED_FP16             │ CURVE25519_SECAGG (FedProx)  │
-│ Extreme Skew Heterogeneity │ QUANTIZED_FP16             │ SCAFFOLD (2.0x bandwidth)    │
-│ Strict Zero-Trust Enclave  │ RAW_FP32                   │ TENSEAL_CKKS (10.5x expanded)│
-│ High-Frequency Edge Telemetry│ SPARSE_TOPK_ZSTD (81% save)│ FED_AVG                      │
-└────────────────────────────┴────────────────────────────┴──────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────┐
+│                   FEDERATED NETWORK BANDWIDTH GOVERNANCE POLICY                          │
+├──────────────────────────────┬────────────────────────────┬──────────────────────────────┤
+│ Network Environment          │ Recommended Serialization  │ Recommended Protocol         │
+├──────────────────────────────┼────────────────────────────┼──────────────────────────────┤
+│ High-Bandwidth LAN / VPC     │ RAW_FP32 or ZSTD_COMPRESSED│ CURVE25519_SECAGG (FedAvg)   │
+│ Cross-Border WAN (<10 Mbps)  │ QUANTIZED_FP16             │ CURVE25519_SECAGG (FedProx)  │
+│ Extreme Skew Heterogeneity   │ QUANTIZED_FP16             │ SCAFFOLD (2.0x bandwidth)    │
+│ Strict Zero-Trust Enclave    │ RAW_FP32                   │ TENSEAL_CKKS (10.5x expanded)│
+│ High-Frequency Edge Telecom  │ SPARSE_TOPK_ZSTD (81% save)│ FED_AVG                      │
+└──────────────────────────────┴────────────────────────────┴──────────────────────────────┘
 ```
 
 1. **JSON Deprecation for Model Payloads**: `RAW_JSON` imposes a 5.46x bandwidth penalty over binary FP32 and must never be utilized for parameter transfers over WAN links. All production coordinators default to binary protobuf / `RAW_FP32` or `QUANTIZED_FP16`.
-2. **FP16 Half-Precision Recommendation**: `QUANTIZED_FP16` halves network consumption ($50.0\%$ savings) while maintaining negligible reconstruction error ($\mathrm{MAE} = 1.1 \times 10^{-5}$), preserving full fraud classification performance.
-3. **Curve25519 SecAgg Efficiency**: Cryptographic blinding via pairwise Diffie-Hellman secret sharing incurs only $+4.0\%$ network overhead over unencrypted FedAvg, proving that zero-knowledge consortium privacy is fully viable without prohibitive bandwidth penalties.
+2. **FP16 Half-Precision Recommendation**: `QUANTIZED_FP16` halves network consumption (50.0% savings) while maintaining negligible reconstruction error ($\mathrm{MAE} = 1.1 \times 10^{-5}$), preserving full fraud classification performance.
+3. **Curve25519 SecAgg Efficiency**: Cryptographic blinding via pairwise Diffie-Hellman secret sharing incurs only +4.0% network overhead over unencrypted FedAvg, proving that zero-knowledge consortium privacy is fully viable without prohibitive bandwidth penalties.
 
 ---
 
@@ -1550,16 +1550,16 @@ The gateway decomposes each scoring request into six independently-timed pipelin
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │             SINGLE-REQUEST FAST-PATH PIPELINE STAGE BREAKDOWN               │
 ├────────────────────────────────┬───────────────────┬────────────────────────┤
-│ Stage                          │ Measured Time (ms) │ Fraction of Total     │
+│ Stage                          │ Measured Time (ms)│ Fraction of Total      │
 ├────────────────────────────────┼───────────────────┼────────────────────────┤
-│ 1. Auth / ABAC (HMAC-SHA256)   │       0.005 ms    │  0.2%                 │
-│ 2. Feature Store Lookup        │       0.000 ms    │  0.0%                 │
-│ 3. PyTorch Model Forward Pass  │       0.186 ms    │  8.1%                 │
-│ 4. 9-Signal Composite Scoring  │       2.088 ms    │ 91.0%                 │
-│ 5. SHAP Attribution (disabled) │       0.000 ms    │  0.0%                 │
-│ 6. Pydantic v2 Serialization   │       0.015 ms    │  0.7%                 │
+│ 1. Auth / ABAC (HMAC-SHA256)   │       0.005 ms    │  0.2%                  │
+│ 2. Feature Store Lookup        │       0.000 ms    │  0.0%                  │
+│ 3. PyTorch Model Forward Pass  │       0.186 ms    │  8.1%                  │
+│ 4. 9-Signal Composite Scoring  │       2.088 ms    │ 91.0%                  │
+│ 5. SHAP Attribution (disabled) │       0.000 ms    │  0.0%                  │
+│ 6. Pydantic v2 Serialization   │       0.015 ms    │  0.7%                  │
 ├────────────────────────────────┼───────────────────┼────────────────────────┤
-│ TOTAL (Fast-Path)              │       2.294 ms    │ 100.0%                │
+│ TOTAL (Fast-Path)              │       2.294 ms    │ 100.0%                 │
 └────────────────────────────────┴───────────────────┴────────────────────────┘
 ```
 
@@ -1575,7 +1575,7 @@ The gateway decomposes each scoring request into six independently-timed pipelin
 | Pydantic Serialization | 0.023 ms | 1.0% |
 | **TOTAL (Full-Path)** | **2.340 ms** | **100.0%** |
 
-**Key Insight**: The 9-Signal Composite Scoring stage accounts for $91.0\%$ of single-request fast-path latency on this host. The PyTorch neural forward pass itself contributes only $8.1\%$ of total request duration (0.186 ms), confirming that inference engine optimization alone will not yield meaningful SLA improvements — the primary optimization target is the composite signal arithmetic pipeline. Host fast-path calibration (20 warmup runs): p50 = 2.716 ms, p95 = 3.106 ms, p99 = 3.206 ms.
+**Key Insight**: The 9-Signal Composite Scoring stage accounts for 91.0% of single-request fast-path latency on this host. The PyTorch neural forward pass itself contributes only 8.1% of total request duration (0.186 ms), confirming that inference engine optimization alone will not yield meaningful SLA improvements — the primary optimization target is the composite signal arithmetic pipeline. Host fast-path calibration (20 warmup runs): p50 = 2.716 ms, p95 = 3.106 ms, p99 = 3.206 ms.
 
 ---
 
@@ -1676,9 +1676,9 @@ $$p99(500) = 361.49\text{ ms} = 102 \times p99(1) \quad \text{(vs linear predict
 
 To satisfy statutory reproducibility standards and eliminate single-seed variance artifacts, benchmark evaluations were conducted across **5 deterministic seeds** ($\{42, 123, 456, 789, 1024\}$).
 
-For each metric dimension $X = \{x_1, x_2, \dots, x_N\}$ ($N = 5$), we report the empirical sample mean $\mu$, sample standard deviation $\sigma$ ($ddof=1$), standard error of the mean $\mathrm{SEM} = \sigma / \sqrt{N}$, and the $95\%$ confidence interval derived from Student's $t$-distribution with $df = N - 1 = 4$ degrees of freedom ($t_{0.975, \, 4} = 2.776$):
+For each metric dimension $X = \{x_1, x_2, \dots, x_N\}$ ($N = 5$), we report the empirical sample mean $\mu$, sample standard deviation $\sigma$ ($ddof=1$), standard error of the mean $\mathrm{SEM} = \sigma / \sqrt{N}$, and the 95% confidence interval derived from Student's $t$-distribution with $df = N - 1 = 4$ degrees of freedom ($t_{0.975, \, 4} = 2.776$):
 
-$$\mu = \frac{1}{N}\sum_{i=1}^N x_i, \quad \sigma = \sqrt{\frac{1}{N-1}\sum_{i=1}^N (x_i - \mu)^2}, \quad \mathrm{CI}_{95\%} = \left[ \mu - t_{0.975, \, N-1} \frac{\sigma}{\sqrt{N}}, \; \mu + t_{0.975, \, N-1} \frac{\sigma}{\sqrt{N}} \right]$$
+$$\mu = \frac{1}{N}\sum_{i=1}^N x_i, \quad \sigma = \sqrt{\frac{1}{N-1}\sum_{i=1}^N (x_i - \mu)^2}, \quad \mathrm{CI}_{0.95} = \left[ \mu - t_{0.975, \, N-1} \frac{\sigma}{\sqrt{N}}, \quad \mu + t_{0.975, \, N-1} \frac{\sigma}{\sqrt{N}} \right]$$
 
 This rigorous protocol replaces historical point estimates with statistical interval estimates across all core fraud detection and federated learning evaluation pipelines.
 
@@ -1712,8 +1712,8 @@ This rigorous protocol replaces historical point estimates with statistical inte
 
 ### 26.3 Statistical Robustness Observations & Invariants
 
-1. **Centralized Baseline Stability**: Centralized PaySim baseline achieves an empirical ROC-AUC of $0.9544 \pm 0.0430$ with a tight $95\%$ confidence interval of $[0.9009, 1.0000]$, establishing a robust upper bound.
-2. **Federated Parity Preservation**: Federated FedAvg retains $0.9092 \pm 0.0798$ ROC-AUC ($95.3\%$ parity with centralized training) while transmitting zero raw transaction PII and preserving client gradient privacy.
+1. **Centralized Baseline Stability**: Centralized PaySim baseline achieves an empirical ROC-AUC of $0.9544 \pm 0.0430$ with a tight 95% confidence interval of $[0.9009, 1.0000]$, establishing a robust upper bound.
+2. **Federated Parity Preservation**: Federated FedAvg retains $0.9092 \pm 0.0798$ ROC-AUC (95.3% parity with centralized training) while transmitting zero raw transaction PII and preserving client gradient privacy.
 3. **Bounded Variance Across Initialization**: Across all 5 seeds, standard error of the mean remains strictly below $0.05$ for ROC-AUC, confirming that neural convergence is resilient to Dirichlet label partition variations and random mini-batch orderings.
 4. **Student-t Small-Sample Confidence**: Utilizing exact Student's $t$ critical values ($t_{0.975, \, 4} = 2.776$) rather than Gaussian z-scores ($1.96$) prevents overconfident interval estimates on finite seed runs.
 
@@ -1757,12 +1757,12 @@ $$\mathrm{Loss}_{\mathrm{stratum}} = C_{\mathrm{FN}} \cdot \mathrm{FN} + C_{\mat
 
 | Amount Stratum | Total ($N$) | Positives ($P$) | Precision | Recall | FPR | FNR | Dominant Error | Financial Cost Loss |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Micro (<$50)** | 3,402 | 6 | 0.1333 | 0.3333 | 0.0038 | 0.6667 | `FP_DOMINANT` | 3,725.00 USD |
+| **Micro (< 50 USD)** | 3,402 | 6 | 0.1333 | 0.3333 | 0.0038 | 0.6667 | `FP_DOMINANT` | 3,725.00 USD |
 | **Low ($50-$250)** | 4,719 | 86 | 0.7895 | 0.5233 | 0.0026 | 0.4767 | `FN_DOMINANT` | 35,150.00 USD |
 | **Medium ($250-$1,000)** | 1,541 | 0 | 0.0000 | 0.0000 | 0.0039 | 0.0000 | `FP_DOMINANT` | 150.00 USD |
 | **High ($1,000-$9,000)** | 178 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | `BALANCED` | 0.00 USD |
 | **Near-Threshold Structuring ($9,000-$10,000)** | 158 | 158 | 1.0000 | 0.9367 | 0.0000 | 0.0633 | `FN_DOMINANT` | 8,500.00 USD |
-| **Large / Jumbo (>$10,000)** | 2 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | `BALANCED` | 0.00 USD |
+| **Large / Jumbo (> 10,000 USD)** | 2 | 0 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | `BALANCED` | 0.00 USD |
 
 #### Table 27.2: Diurnal Temporal Error Stratification (Hour of Day)
 
@@ -1806,16 +1806,16 @@ $$\mathrm{Loss}_{\mathrm{stratum}} = C_{\mathrm{FN}} \cdot \mathrm{FN} + C_{\mat
 │ Mode ID │ Failure Mode Name                                      │ Error Type    │ Empirical Rate│
 ├─────────┼────────────────────────────────────────────────────────┼───────────────┼───────────────┤
 │ FM-01   │ Novel Low-Value Structuring in Peripheral Nodes        │ False Negative│ 47.67% FNR    │
-│ FM-02   │ Off-Hours Automated Batch Clearing False Positives    │ False Positive│ 14.98% FPR    │
+│ FM-02   │ Off-Hours Automated Batch Clearing False Positives     │ False Positive│ 14.98% FPR    │
 │ FM-03   │ High-Degree Merchant Aggregator Hub Dilution           │ False Negative│ 90.00% FNR    │
 │ FM-04   │ Cross-Border Regulatory Arbitrage in Specialty Retail  │ False Negative│ 43.48% FNR    │
 └─────────┴────────────────────────────────────────────────────────┴───────────────┴───────────────┘
 ```
 
 #### FM-01: Novel Low-Value Structuring & Smurfing in Peripheral Nodes
-- **Affected Stratum**: Transaction Amount $<\$250$ and Network Degree $k \le 2$.
+- **Affected Stratum**: Transaction Amount $< 250\text{ USD}$ and Network Degree $k \le 2$.
 - **Primary Error Type**: `FALSE_NEGATIVE` (Empirical FNR: **47.67%**).
-- **Root Cause**: Collaborative federated model weights are heavily conditioned on large-value transfers ($>\$9,000$) and historical behavioral drift. Smurfing syndicates execute coordinated micro-bursts across newly created peripheral accounts ($k \le 2$). Because individual bank feature stores do not observe cross-institution velocity without global linkage, and amounts sit below CTR thresholds, the model assigns low fraud probability.
+- **Root Cause**: Collaborative federated model weights are heavily conditioned on large-value transfers ($> 9{,}000\text{ USD}$) and historical behavioral drift. Smurfing syndicates execute coordinated micro-bursts across newly created peripheral accounts ($k \le 2$). Because individual bank feature stores do not observe cross-institution velocity without global linkage, and amounts sit below CTR thresholds, the model assigns low fraud probability.
 - **Risk Exposure**: Unidentified money laundering syndicates; cumulative regulatory penalties under EU AMLD6 Article 39 for failure to detect systematic structuring.
 - **Remediation Strategy**: Deploy Homomorphic Private Set Intersection (DH-PSI) to compute cross-bank burst velocity counters across anonymous entity clusters without decrypting PII; lower dynamic anomaly cutoffs for accounts with tenure $<14\text{ days}$ and degree $k \le 2$.
 
@@ -1951,7 +1951,7 @@ In enterprise regulatory model governance, **reporting an unexecuted experiment,
 The CF-Intelligence Master Benchmark Matrix strictly enforces:
 1. **JSON Contract**: All unexecuted runs, unmeasured thresholds, or inapplicable architectures are stored strictly as `null` in machine-readable artifacts (`master_benchmark_matrix.json`).
 2. **Markdown Contract**: All `null` entries are explicitly rendered as `—` or `N/A (NOT RUN)`.
-3. **Evaluated Zero Distinction**: When an authentic execution produces zero (e.g. PaySim FedAvg F1-Score $= 0.0000$ due to decision boundary cutoff at prevalence $0.05\%$), it is explicitly designated as `EVALUATED_ZERO` in the machine-readable provenance schema.
+3. **Evaluated Zero Distinction**: When an authentic execution produces zero (e.g. PaySim FedAvg F1-Score $= 0.0000$ due to decision boundary cutoff at prevalence 0.05%), it is explicitly designated as `EVALUATED_ZERO` in the machine-readable provenance schema.
 
 ---
 
@@ -2006,13 +2006,13 @@ The CF-Intelligence Master Benchmark Matrix strictly enforces:
 
 1. **Parity with Centralized Upper Bounds**:
    Across non-graph financial transactions, Federated FedAvg achieves near-identical performance to the theoretical centralized pooled baseline:
-   - **CreditCard**: Federated $\text{PR-AUC} = 0.7750$ vs Centralized $0.7920$ ($97.85\%$ empirical parity).
-   - **SynthAML**: Federated $\text{PR-AUC} = 0.9985$ vs Centralized $0.9995$ ($99.90\%$ empirical parity).
-   - **IEEE-CIS**: Federated $\text{PR-AUC} = 0.7554$ vs Centralized $0.7811$ ($96.72\%$ empirical parity).
+   - **CreditCard**: Federated $\text{PR-AUC} = 0.7750$ vs Centralized $0.7920$ (97.85% empirical parity).
+   - **SynthAML**: Federated $\text{PR-AUC} = 0.9985$ vs Centralized $0.9995$ (99.90% empirical parity).
+   - **IEEE-CIS**: Federated $\text{PR-AUC} = 0.7554$ vs Centralized $0.7811$ (96.72% empirical parity).
 2. **Defeating the Information-Theoretic Silo Horizon**:
    In multi-bank financial laundering topology, isolated bank silos lack visibility into upstream layering hops:
    - On **SynthAML**, the worst isolated bank silo achieves only $\text{PR-AUC} = 0.2214$, whereas Collaborative Federated Learning lifts detection to $\text{PR-AUC} = 0.9985$ ($\Delta = +0.7771$).
-   - On **CFI-CrossBank Scenario 7 (Zero-Positive Transfer)**, Bank Gamma begins with $0$ historical positive laundering examples ($0.0\%$ detection). Through federated parameter transfer without raw PII exposure, Bank Gamma instantly achieves $100.0\%$ fraud detection.
+   - On **CFI-CrossBank Scenario 7 (Zero-Positive Transfer)**, Bank Gamma begins with $0$ historical positive laundering examples (0.0% detection). Through federated parameter transfer without raw PII exposure, Bank Gamma instantly achieves 100.0% fraud detection.
 3. **Graph Topology & Inductive Generalization**:
    On graph datasets (Elliptic Bitcoin DAG and IBM AMLSim), GraphSAGE inductive neighborhood aggregation provides superior structural feature learning without sharing neighbor identity tables, achieving $\text{ROC-AUC} = 0.9509$ on AMLSim.
 
@@ -2067,9 +2067,9 @@ The benchmark evaluates all 16 orthogonal combinations on 8,000 transactions par
 
 The marginal contribution of each architectural factor is computed via balanced analysis of variance across all 8 orthogonal background combinations:
 
-$$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in \mathcal{C}_{F=1}} \operatorname{Metric}(c) - \frac{1}{8} \sum_{c' \in \mathcal{C}_{F=0}} \operatorname{Metric}(c')$$
+$$\Delta\mathrm{Metric}(F) = \frac{1}{8} \sum_{c \in \mathcal{C}_{F=1}} \mathrm{Metric}(c) - \frac{1}{8} \sum_{c' \in \mathcal{C}_{F=0}} \mathrm{Metric}(c')$$
 
-| Architectural Factor | $\Delta\operatorname{PR-AUC}$ | $\Delta\text{Recall @ 0.01% FPR}$ | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
+| Architectural Factor | $\Delta\mathrm{PR\text{-}AUC}$ | $\Delta$ Recall @ 0.01% FPR | Runtime Overhead | Bandwidth Overhead | Core Engineering Takeaway |
 | :--- | :---: | :---: | :---: | :---: | :--- |
 | **Graph** | **+0.3359** | **+0.2500** | +12.9% | +0.0% | Multi-hop structural embeddings offer the single highest individual detection uplift. |
 | **CrossBank** | **+0.4051** | **+0.4167** | -19.5% | +0.0% | Cross-bank transaction flow features expose distributed layering invisible to local silos. |
@@ -2078,7 +2078,7 @@ $$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in \mathcal{C}_{F=1}} \o
 
 ### 30.4 Two-Way Interaction Synergies
 
-| Component Pair | Interaction Effect ($\Delta\operatorname{PR-AUC}$) | Synergy Description |
+| Component Pair | Interaction Effect ($\Delta\mathrm{PR\text{-}AUC}$) | Synergy Description |
 | :--- | :---: | :--- |
 | **Graph $\times$ CrossBank** | **-0.6291** | Non-linear synergy: Graph embeddings and Cross-Bank signals mutually reinforce multi-hop ring detection. |
 | **DP $\times$ Graph** | **-0.0168** | Robustness: Graph features remain resilient against Gaussian gradient perturbation. |
@@ -2087,12 +2087,12 @@ $$\Delta\operatorname{Metric}(F) = \frac{1}{8} \sum_{c \in \mathcal{C}_{F=1}} \o
 ### 30.5 Multi-Objective Pareto Frontier & Production Deployment Recommendation
 
 1. **Theoretical Peak Utility (`C10: Graph + CrossBank`)**:
-   - Achieves peak theoretical detection utility ($\operatorname{PR-AUC} = 0.9842$, $\text{ROC-AUC} = 0.9996$, $\text{Recall @ 0.1% FPR} = 0.9333$).
+   - Achieves peak theoretical detection utility ($\mathrm{PR\text{-}AUC} = 0.9842$, $\mathrm{ROC\text{-}AUC} = 0.9996$, Recall @ 0.1% FPR = 93.33%).
    - Appropriate strictly in closed, fully trusted single-institution deployments where differential privacy and cryptographic zero-knowledge aggregation are not mandated.
 2. **Production Recommended Stack (`C16: Graph + CrossBank + DP + SecAgg`)**:
    - The authoritative deployment configuration for regulated multi-bank consortia.
    - Satisfies statutory zero-knowledge boundary ($s_{u,v} = -s_{v,u}$) and Differential Privacy ($\epsilon \le 2.55, \delta = 10^{-5}$).
-   - Delivers elite rare-event detection ($\operatorname{PR-AUC} = 0.9342$, $\text{Recall @ 0.01% FPR} = 0.7556$, $\text{Recall @ 0.1% FPR} = 0.7556$) with negligible communication overhead ($10.42\text{ KB/client/round}$) and calibrated risk probabilities ($\text{ECE} = 0.0213, \text{Brier} = 0.01927$).
+   - Delivers elite rare-event detection ($\mathrm{PR\text{-}AUC} = 0.9342$, Recall @ 0.01% FPR = 75.56%, Recall @ 0.1% FPR = 75.56%) with negligible communication overhead ($10.42\text{ KB/client/round}$) and calibrated risk probabilities ($\mathrm{ECE} = 0.0213, \mathrm{BS} = 0.01927$).
 
 ### 30.6 Automated Verification & Test Suite Mapping
 

@@ -34,8 +34,8 @@ All quantitative evaluations and model risk validations across these algorithms 
 
 | Metric Category | Standard Metrics | Formal Mathematical Target | Applicable Governance Framework |
 | :--- | :--- | :---: | :--- |
-| **Imbalance Detection** | $\operatorname{PR-AUC}$ (Average Precision), $\operatorname{Recall@0.1\%FPR}$ | $\operatorname{PR-AUC} \ge 0.75$, $\operatorname{Recall@0.1\%FPR} \ge 0.60$ | Federal Reserve SR 11-7 / OCC 2011-12 |
-| **Probability Calibration** | $\operatorname{ECE}$ ($M=10$ bins), $\operatorname{BS}$ (Brier Score) | $\operatorname{ECE} \le 0.030$, $\operatorname{BS} \le 0.020$ | EU AI Act Art. 15 (Accuracy & Robustness) |
-| **Population Drift** | $\operatorname{PSI}$ (Traffic-light matrix), $\operatorname{JSD}$ (Symmetric KL) | $\operatorname{PSI} < 0.10$ (stable), $\operatorname{JSD} \le 0.15$ | Basel Committee BCBS 32 Model Risk |
-| **Economic & Fairness** | $\mathcal{L}_{\mathrm{financial}}$ ($C_{\mathrm{FN}}=850$, $C_{\mathrm{FP}}=25$), $\operatorname{DIR}$ | $\theta^*_{\mathrm{cost}} = \arg\min \mathcal{L}$, $0.80 \le \operatorname{DIR} \le 1.25$ | ECOA Reg B / EEOC 80% Rule |
+| **Imbalance Detection** | $\mathrm{PR\text{-}AUC}$ (Average Precision), $\mathrm{Recall@0.1\%FPR}$ | $\mathrm{PR\text{-}AUC} \ge 0.75$, $\mathrm{Recall@0.1\%FPR} \ge 0.60$ | Federal Reserve SR 11-7 / OCC 2011-12 |
+| **Probability Calibration** | $\mathrm{ECE}$ ($M=10$ bins), $\mathrm{BS}$ (Brier Score) | $\mathrm{ECE} \le 0.030$, $\mathrm{BS} \le 0.020$ | EU AI Act Art. 15 (Accuracy & Robustness) |
+| **Population Drift** | $\mathrm{PSI}$ (Traffic-light matrix), $\mathrm{JSD}$ (Symmetric KL) | $\mathrm{PSI} < 0.10$ (stable), $\mathrm{JSD} \le 0.15$ | Basel Committee BCBS 32 Model Risk |
+| **Economic & Fairness** | $\mathcal{L}_{\mathrm{financial}}$ ($C_{\mathrm{FN}}=850$, $C_{\mathrm{FP}}=25$), $\mathrm{DIR}$ | $\theta^*_{\mathrm{cost}} = \arg\min \mathcal{L}$, $0.80 \le \mathrm{DIR} \le 1.25$ | ECOA Reg B / EEOC 80% Rule |
 

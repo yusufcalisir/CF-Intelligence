@@ -35,13 +35,13 @@ where $n_k$ is the number of local transaction samples at Bank $k$, $N = \sum_{k
 
 ## 4. Non-IID Dirichlet Client Partitioning & Client Drift Dynamics
 
-Cross-bank federated fraud detection operates inherently under heterogeneous data distributions across financial institutions. In **CF-Intelligence**, this institutional heterogeneity is mathematically modeled using a Dirichlet distribution $\operatorname{Dir}(\alpha \cdot \mathbf{1}_K)$ implemented in [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py).
+Cross-bank federated fraud detection operates inherently under heterogeneous data distributions across financial institutions. In **CF-Intelligence**, this institutional heterogeneity is mathematically modeled using a Dirichlet distribution $\mathrm{Dir}(\alpha \cdot \mathbf{1}_K)$ implemented in [`experiments/paysim/partitioner.py`](file:///experiments/paysim/partitioner.py).
 
 ### 4.1 Dirichlet Allocation Formulation
 
 For each binary transaction class $c \in \{0, 1\}$ (legitimate transactions and fraudulent transfers), a probability vector $\mathbf{q}_c = (q_{c,1}, \dots, q_{c,K})$ is sampled independently:
 
-$$\mathbf{q}_c \sim \operatorname{Dir}(\alpha \cdot \mathbf{1}_K), \quad \text{where } \sum_{k=1}^K q_{c,k} = 1, \; q_{c,k} \ge 0$$
+$$\mathbf{q}_c \sim \mathrm{Dir}(\alpha \cdot \mathbf{1}_K), \quad \text{where } \sum_{k=1}^K q_{c,k} = 1, \; q_{c,k} \ge 0$$
 
 where $\alpha > 0$ denotes the Dirichlet concentration parameter and $K$ is the number of participating banking institutions (default $K=3$: Bank A, Bank B, Bank C).
 
@@ -65,7 +65,7 @@ The platform quantifies client distribution divergence via Kullback-Leibler (KL)
 
 $$D_{\mathrm{KL}}(P_k \parallel P_{\mathrm{global}}) = \sum_{c \in \{0, 1\}} P_k(c) \ln \frac{P_k(c) + \epsilon}{P_{\mathrm{global}}(c) + \epsilon}$$
 
-$$\operatorname{TVD}(P_k, P_{\mathrm{global}}) = \frac{1}{2} \sum_{c \in \{0, 1\}} \lvert P_k(c) - P_{\mathrm{global}}(c) \rvert$$
+$$\mathrm{TVD}(P_k, P_{\mathrm{global}}) = \frac{1}{2} \sum_{c \in \{0, 1\}} \lvert P_k(c) - P_{\mathrm{global}}(c) \rvert$$
 
 ---
 

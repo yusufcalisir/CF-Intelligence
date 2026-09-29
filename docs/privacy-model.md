@@ -18,7 +18,7 @@ Without rigorous cryptographic and perturbation layers, raw model updates (gradi
 
 Therefore, **CF-Intelligence** does not treat Federated Learning as an all-encompassing privacy silver bullet. Privacy is maintained through a **defense-in-depth perimeter** decoupling four orthogonal primitives:
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                       FOUR-PILLAR PRIVACY PERIMETER                         │
 ├──────────────────────┬──────────────────────────────────────────────────────┤
@@ -51,11 +51,7 @@ The following assets are permanently bound to the local bank node's security dom
 
 ### 2.2 Data Transmitted Outside the Bank
 Only mathematically transformed and blinded representations are permitted to transit the consortium network:
-- **Masked Perturbed Model Updates**:
-
-  $$\widetilde{\Delta w}_k = \operatorname{Clip}_C(\Delta w_k) + \mathcal{N}\left(0, \sigma^2 C^2 \mathbf{I}\right) + \sum_{j > k} s_{k,j} - \sum_{j < k} s_{j,k}$$
-
-  where $C$ is the L2 clipping norm, $\sigma$ is the DP noise multiplier, and $s_{k,j}$ are pairwise Diffie-Hellman zero-sum masks.
+- **Masked Perturbed Model Updates**: $\widetilde{\Delta \mathbf{w}}_k = \mathrm{Clip}_C(\Delta \mathbf{w}_k) + \mathcal{N}\left(0, \sigma^2 C^2 \mathbf{I}\right) + \sum_{j > k} \mathbf{s}_{k,j} - \sum_{j < k} \mathbf{s}_{j,k}$, where $C$ is the L2 clipping norm, $\sigma$ is the DP noise multiplier, and $\mathbf{s}_{k,j}$ are pairwise Diffie-Hellman zero-sum masks.
 - **Homomorphic Hash Commitments**: SHA-256 / Poseidon hash digests of weight vectors for Byzantine consensus verification.
 - **Consortium Metadata**: Bank node identifier, protocol version, active model epoch identifier, and sample count (if participating in weighted FedAvg, protected by differential privacy count perturbation).
 
@@ -66,19 +62,21 @@ Only mathematically transformed and blinded representations are permitted to tra
 The local privacy boundary implements local Differential Privacy via **PyTorch Opacus** and tracks composition using **Rényi Differential Privacy (RDP)**:
 
 ### 3.1 Mathematical Formulation
+
 A randomized mechanism $\mathcal{M}$ satisfies $(\epsilon, \delta)$-Differential Privacy if for any two neighboring datasets $D, D'$ differing by exactly one transaction:
 
-$$P(\mathcal{M}(D) \in \mathcal{S}) \le e^{\epsilon} P(\mathcal{M}(D') \in \mathcal{S}) + \delta$$
+$$\mathbb{P}(\mathcal{M}(D) \in \mathcal{S}) \le e^{\epsilon} \mathbb{P}(\mathcal{M}(D') \in \mathcal{S}) + \delta$$
 
 ### 3.2 RDP Accounting
+
 For Gaussian perturbation mechanism with noise scale $\sigma$ and subsampling ratio $q = \frac{B}{N}$:
 
-$$\mathcal{D}_{\alpha}(\mathcal{M}(D) \,\|\, \mathcal{M}(D')) \le \frac{q^2 \alpha}{2 \sigma^2} + O(q^3)$$
+$$\mathcal{D}_{\alpha}(\mathcal{M}(D) \parallel \mathcal{M}(D')) \le \frac{q^2 \alpha}{2 \sigma^2} + \mathcal{O}(q^3)$$
 
-- **Clipping Norm ($C$)**: Fixed at $C = 1.0$ L2 norm, bounding maximum sensitivity $\Delta_2 = C$.
+- **Clipping Norm** ($C$): Fixed at $C = 1.0$ L2 norm, bounding maximum sensitivity $\Delta_2 = C$.
 - **Target Budget**: Cumulative $(\epsilon \le 2.0, \delta = 10^{-5})$ over 50 communication rounds ($q = 0.05$).
-- **Calibrated Noise Multiplier**: Formally calibrated via binary search in `RDPMomentsAccountant` (`rdp_accountant.py`): $\sigma^* = 0.8870$ achieves $\epsilon \le 2.0$ at $T = 50$ federation rounds under analytical RDP conversion ($q=0.05, \delta=10^{-5}$).
-- **Empirical Utility Frontier**: Evaluated in `experiments/dp_evaluation/run_dp_noise_sweep.py` across $\sigma \in \{0.5, 1.0, 1.5, 2.0\} \times T \in \{5, 10, 20, 50\}$, maintaining $\operatorname{PR-AUC} = 0.3922$ ($\operatorname{ROC-AUC} = 0.9452$) at $\sigma=1.0, T=50$ ($\epsilon = 1.7675 \le 2.0$).
+- **Calibrated Noise Multiplier**: Formally calibrated via binary search in `RDPMomentsAccountant` (`rdp_accountant.py`): $\sigma^* = 0.8870$ achieves $\epsilon \le 2.0$ at $T = 50$ federation rounds under analytical RDP conversion ($q = 0.05, \delta = 10^{-5}$).
+- **Empirical Utility Frontier**: Evaluated in `experiments/dp_evaluation/run_dp_noise_sweep.py` across $\sigma \in \{0.5, 1.0, 1.5, 2.0\} \times T \in \{5, 10, 20, 50\}$, maintaining $\mathrm{PR\text{-}AUC} = 0.3922$ ($\mathrm{ROC\text{-}AUC} = 0.9452$) at $\sigma = 1.0, T = 50$ ($\epsilon = 1.7675 \le 2.0$).
 - **Exhaustion Enforcement**: If a bank node exhausts its allocated privacy budget ($\epsilon_{\mathrm{spent}} > \epsilon_{\mathrm{budget}}$), the local daemon automatically transitions to inference-only mode, terminating gradient transmission.
 
 ---
@@ -117,7 +115,7 @@ sequenceDiagram
 To maintain engineering integrity, the following limitations are explicitly documented:
 
 1. **No Defense Against Poisoning by Default**: Standard Federated Learning trusts all client updates. Without Byzantine defenses (Krum, Bulyan), a single compromised bank node can destroy model accuracy or install fraud evasion backdoors.
-2. **Topology & Intersection Leakage in Graph Intelligence**: When banks perform Private Set Intersection (PSI) on hashed customer identifiers (e.g., shared card numbers or mule phone numbers), the **cardinality of the intersection** ($|A \cap B|$) is revealed to both parties.
+2. **Topology & Intersection Leakage in Graph Intelligence**: When banks perform Private Set Intersection (PSI) on hashed customer identifiers (e.g., shared card numbers or mule phone numbers), the **cardinality of the intersection** ($\lvert A \cap B \rvert$) is revealed to both parties.
 3. **Membership Inference Residual Risk**: Empirically measured via Yeom et al. (2018) loss-threshold oracle (`mia_auditor.py`). Unprotected models: ASR = 0.949, advantage = 0.449. At $\sigma = 2.0$ ($\epsilon \approx 0.87$), DP-SGD reduces advantage to 0.039 — a **91% mitigation** (exceeds $\ge 50\%$ threshold). See `experiments/privacy/mia_results.json`.
 4. **Metadata Leakage**: Packet timing, update payload sizes, and communication timestamps are visible to network observers unless routed over Tor/I2P or padded with dummy traffic.
 

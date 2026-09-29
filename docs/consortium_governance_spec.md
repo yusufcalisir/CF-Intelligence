@@ -49,10 +49,17 @@ A governance proposal evaluates member votes dynamically across the consortium's
 
 $$\mathrm{ratio}_{\mathrm{for}} = \frac{|\mathcal{V}_{\mathrm{for}}|}{N_{\mathrm{members}}}, \quad \mathrm{ratio}_{\mathrm{against}} = \frac{|\mathcal{V}_{\mathrm{against}}|}{N_{\mathrm{members}}}$$
 
-where $|\mathcal{V}_{\mathrm{for}}|$ is the tally of affirmative votes (`votes_for`), $|\mathcal{V}_{\mathrm{against}}|$ is the tally of dissenting votes (`votes_against`), and $N_{\mathrm{members}}$ is the active voting member count.
+where:
+- $|\mathcal{V}_{\mathrm{for}}|$ is the affirmative vote tally.
+- $|\mathcal{V}_{\mathrm{against}}|$ is the dissenting vote tally.
+- $N_{\mathrm{members}}$ is the active voting member count.
 
-- **Approval Condition:** If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$ (where $\theta_{\mathrm{quorum}}$ is the required quorum ratio, e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
-- **Rejection Condition:** If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, the proposal transitions to `REJECTED`.
+Quorum threshold resolution follows two deterministic state transitions:
+
+$$\text{Status} = \begin{cases} \text{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\ \text{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\ \text{PENDING} & \text{otherwise} \end{cases}$$
+
+- **Approval Condition**: If $\mathrm{ratio}_{\mathrm{for}}$ meets or exceeds the required quorum ratio $\theta_{\mathrm{quorum}}$ (e.g. $0.51$ or $0.66$), the proposal transitions immediately to `APPROVED` and its action is executed.
+- **Rejection Condition**: If $\mathrm{ratio}_{\mathrm{against}}$ exceeds the margin ($> 1.0 - \theta_{\mathrm{quorum}}$), reaching quorum is mathematically impossible; the proposal transitions immediately to `REJECTED`.
 
 ---
 
@@ -100,16 +107,21 @@ class ProposalStatus(str, Enum):
      - `new_min_members_n`: raises or lowers participant floor $N_{\min}$.
      - `new_status`: transitions consortium status (`ACTIVE`, `SUSPENDED`, `ARCHIVED`).
 
-### Weighted Quorum Evaluation Engine
-Votes are evaluated based on institutions' allocated stake weights (`voting_power` $\ge 0.0$):
-$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}$$
-$$\mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}$$
+### 3.1 Weighted Quorum Evaluation Engine
 
-- **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}}$, status transitions to `APPROVED` and action is executed.
-- **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}} > (1.0 - \theta_{\mathrm{quorum}})$, reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.
+Votes are evaluated based on institutions' allocated stake weights (`voting_power` $\ge 0.0$):
+
+$$\mathrm{ratio}_{\mathrm{for}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{for}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}, \quad \mathrm{ratio}_{\mathrm{against}} = \frac{\sum_{b \in \mathcal{V}_{\mathrm{against}}} \mathrm{power}(b)}{\sum_{m \in \mathcal{M}_{\mathrm{eligible}}} \mathrm{power}(m)}$$
+
+Weighted quorum evaluation follows deterministic execution rules:
+
+$$\text{Status} = \begin{cases} \text{APPROVED} & \text{if } \mathrm{ratio}_{\mathrm{for}} \ge \theta_{\mathrm{quorum}} \\ \text{REJECTED} & \text{if } \mathrm{ratio}_{\mathrm{against}} > 1.0 - \theta_{\mathrm{quorum}} \\ \text{EXPIRED} & \text{if elapsed time} \ge \text{TTL} \\ \text{CANCELLED} & \text{if withdrawn by sponsor} \\ \text{PENDING} & \text{otherwise} \end{cases}$$
+
+- **Approval Rule**: If $\mathrm{ratio}_{\mathrm{for}}$ meets or exceeds quorum threshold $\theta_{\mathrm{quorum}}$, status transitions immediately to `APPROVED` and the proposed action is executed.
+- **Early Rejection Rule**: If $\mathrm{ratio}_{\mathrm{against}}$ exceeds the threshold ($> 1.0 - \theta_{\mathrm{quorum}}$), reaching quorum is mathematically impossible; status immediately transitions to `REJECTED`.
 - **TTL Expiration**: If `elapsed_time` $\ge$ `ttl_seconds` (default 24 hours), status transitions to `EXPIRED` and the voting window closes.
 - **Sponsor Cancellation**: The proposing bank can voluntarily withdraw a pending proposal before resolution, transitioning state to `CANCELLED`.
-- **Role Hierarchy**: `OBSERVER` institutions have $\mathrm{power}(m) = 0.0$ and cannot sponsor proposals or cast votes.
+- **Role Hierarchy**: `OBSERVER` institutions have `voting_power` $= 0.0$ and cannot sponsor proposals or cast votes.
 
 ---
 
@@ -121,8 +133,8 @@ Prior to launching any federated training round, [`ConsortiumPolicyEngine`](../b
    - Verifies that unique active participating banks meet or exceed `min_active_members` (default: 2 banks).
    - Enforces Sybil protection by rejecting participation manifests containing duplicate bank identities (`unique_banks != participating_banks`).
 2. **Differential Privacy Expenditure Cap**:
-   - Asserts that proposed round noise budget satisfies $\epsilon_{\text{round}} \le \min(\text{consortium}.\epsilon_{\max}, \text{policy}.\epsilon_{\max})$.
-   - Validates that $\epsilon_{\text{round}}$ is positive and mathematically finite ($\epsilon > 0.0, \epsilon \neq \infty, \epsilon \neq \text{NaN}$).
+   - Asserts that proposed round noise budget satisfies $\epsilon_{\mathrm{round}} \le \min(\epsilon_{\max}^{\mathrm{consortium}}, \epsilon_{\max}^{\mathrm{policy}})$.
+   - Validates that $\epsilon_{\mathrm{round}}$ is positive and mathematically finite ($\epsilon > 0.0, \epsilon \neq \infty, \epsilon \neq \mathrm{NaN}$).
 3. **Active Membership Authentication**:
    - Validates that all candidate bank nodes are active members of the consortium (`bank_id in consortium.members` with active status).
 4. **Model Architecture Whitelist**:

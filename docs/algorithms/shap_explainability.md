@@ -72,7 +72,7 @@ $$S(x') \le \tau^*$$
 
 $$x'_j = x_j \quad \forall j \in \mathcal{I}_{\mathrm{immutable}}$$
 
-$$x'_k \in \operatorname{Range}(k) \quad \forall k \in \mathcal{M}_{\mathrm{mutable}}$$
+$$x'_k \in \mathrm{Range}(k) \quad \forall k \in \mathcal{M}_{\mathrm{mutable}}$$
 
 where:
 - $\mathcal{I}_{\mathrm{immutable}}$ is the set of protected immutable features (e.g., entity identity, account age, historical chargebacks).
@@ -114,7 +114,7 @@ To eliminate false confidence from static heuristics, every counterfactual recom
 1. **Monotonic Risk Reduction**: $S(x') < S(x)$ (the risk score strictly decreases).
 2. **Threshold Satisfaction**: $S(x') \le \tau^*$ (the risk score reaches or drops below target clearance).
 3. **Policy Disposition Flip**: The policy disposition flips from `BLOCK_TRANSACTION` or `HOLD_FOR_REVIEW` to `ALLOW` or `REQUIRE_MFA`.
-4. **Feasibility Validation**: $\operatorname{validate\_counterfactual\_transition}(x, x') = \text{True}$.
+4. **Feasibility Validation**: `validate_counterfactual_transition(x, x') == True`.
 
 ### 6.6 Verification Test Suites
 - **Constraint & Boundary Tests**: [`backend/tests/unit/test_counterfactual_constraints.py`](file:///backend/tests/unit/test_counterfactual_constraints.py) (27 tests covering immutable attribute enforcement, domain feasibility bounds, invalid category rejection, re-inference prediction flips, and $L_0$ sparsity verification)

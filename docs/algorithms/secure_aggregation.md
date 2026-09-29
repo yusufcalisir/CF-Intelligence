@@ -16,18 +16,17 @@ while remaining cryptographically blinded to any individual bank's contribution 
 - **Key Exchange**: X25519 (Curve25519 Diffie-Hellman key agreement over $\mathbb{F}_{2^{255}-19}$).
 - **Pairwise Zero-Sum Masking**:
   For every pair of active banks $(i, j)$ with $i < j$:
-  1. Bank $i$ and Bank $j$ establish a shared secret via Diffie-Hellman:
-     $$k_{i,j} = \mathrm{X25519}(\mathrm{sk}_i, \mathrm{pk}_j) = \mathrm{X25519}(\mathrm{sk}_j, \mathrm{pk}_i)$$
+  1. Bank $i$ and Bank $j$ establish a shared secret via Diffie-Hellman: $k_{i,j} = \mathrm{X25519}(\mathrm{sk}_i, \mathrm{pk}_j) = \mathrm{X25519}(\mathrm{sk}_j, \mathrm{pk}_i)$.
   2. A pseudorandom mask vector $s_{i,j} \in \mathbb{R}^d$ is expanded using HMAC-SHA256 seeded with $k_{i,j}$.
   3. Bank $i$ adds $s_{i,j}$ to its update; Bank $j$ subtracts $s_{i,j}$:
 
-     $$\widetilde{\Delta w}_i = \Delta w_i + \sum_{j > i} s_{i,j} - \sum_{j < i} s_{j,i} + \mathbf{b}_i$$
+$$\widetilde{\Delta w}_i = \Delta w_i + \sum_{j > i} s_{i,j} - \sum_{j < i} s_{j,i} + \mathbf{b}_i$$
 
-     where $\mathbf{b}_i$ is Bank $i$'s local self-mask.
+  where $\mathbf{b}_i$ is Bank $i$'s local self-mask.
 - **Sum Cancellation**:
   When all $K$ clients submit their masked updates to the coordinator:
 
-  $$\sum_{i=1}^K \widetilde{\Delta w}_i = \sum_{i=1}^K \Delta w_i + \underbrace{\sum_{i=1}^K \left( \sum_{j > i} s_{i,j} - \sum_{j < i} s_{j,i} \right)}_{= 0} + \sum_{i=1}^K \mathbf{b}_i$$
+$$\sum_{i=1}^K \widetilde{\Delta w}_i = \sum_{i=1}^K \Delta w_i + \underbrace{\sum_{i=1}^K \left( \sum_{j > i} s_{i,j} - \sum_{j < i} s_{j,i} \right)}_{= 0} + \sum_{i=1}^K \mathbf{b}_i$$
 
 - **Dropout Resilience**:
   Self-masks $\mathbf{b}_i$ and pairwise seeds are split using $(t, n)$ Shamir's Secret Sharing. If a client drops out before round completion, remaining active peers reveal shares of the dropped client's pairwise keys, enabling the coordinator to subtract orphaned masks without unblinding honest clients.
@@ -54,8 +53,8 @@ while remaining cryptographically blinded to any individual bank's contribution 
 
 ## 5. Test Suite Verification & Scientific Proofs
 - **Scientific Verification Suite (53 Passing Tests)**:
-  - [`verification/secure_aggregation/tests/test_secagg_correctness.py`](file:///verification/secure_aggregation/tests/test_secagg_correctness.py): 27 mathematical tests proving exact pairwise mask cancellation $\sum_{u \in U} \text{masks}_u \equiv \mathbf{0} \pmod{2^{32}}$ for $N \in \{2, 3, 5, 8\}$ and dimensions $d \in \{1, 16, 256, 1024, 20000\}$, with floating-point equivalence $|w_{\text{secagg}} - w_{\text{plain}}| < 10^{-6}$.
-  - [`verification/secure_aggregation/tests/test_zero_server_knowledge.py`](file:///verification/secure_aggregation/tests/test_zero_server_knowledge.py): 7 statistical and cryptographic tests verifying $|r(w_u, y_u)| < 0.05$ (zero correlation), Shannon entropy $H(y_u) \ge 31.95\text{ bits}$, $N-2$ non-collusion protection, Shamir $(t, n)$ dropout privacy, and round isolation.
+  - [`verification/secure_aggregation/tests/test_secagg_correctness.py`](file:///verification/secure_aggregation/tests/test_secagg_correctness.py): 27 mathematical tests proving exact pairwise mask cancellation $\sum_{u \in U} \mathbf{m}_u \equiv \mathbf{0} \pmod{2^{32}}$ for $N \in \{2, 3, 5, 8\}$ and dimensions $d \in \{1, 16, 256, 1024, 20000\}$, with floating-point tolerance $\le 10^{-6}$ against unblinded model updates.
+  - [`verification/secure_aggregation/tests/test_zero_server_knowledge.py`](file:///verification/secure_aggregation/tests/test_zero_server_knowledge.py): 7 statistical and cryptographic tests verifying Pearson correlation $|r(w, y)| < 0.05$ (zero correlation), Shannon entropy $H(y) \ge 31.95\text{ bits}$, $N-2$ non-collusion protection, Shamir $(t, n)$ dropout privacy, and round isolation.
   - [`verification/secure_aggregation/tests/test_secagg_hypothesis.py`](file:///verification/secure_aggregation/tests/test_secagg_hypothesis.py): 6 Hypothesis property-based tests verifying unweighted and weighted zero-sum invariants.
   - [`verification/secure_aggregation/tests/test_secagg_robustness.py`](file:///verification/secure_aggregation/tests/test_secagg_robustness.py): 12 failure injection and protocol stress scenarios.
   - [`verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py`](file:///verification/secure_aggregation/tests/test_fhe_homomorphic_sum.py): TenSEAL CKKS homomorphic linearity verification.
@@ -76,31 +75,31 @@ Across the 4-round Curve25519 SecAgg lifecycle, the wire payload exchanged betwe
 1. **Round 0 (Advertise Keys)**:
    Each client broadcasts its ephemeral Curve25519 public key ($32\text{ bytes}$) signed with an Ed25519 identity signature ($64\text{ bytes}$):
 
-   $$\text{Payload}_{\mathrm{R0}} = K \cdot 96 \quad (\text{bytes})$$
+$$\mathrm{Payload}_{\mathrm{R0}} = K \cdot 96 \quad (\text{bytes})$$
 
 2. **Round 1 (Share Encrypted Seeds)**:
    Each client transmits $(K - 1)$ encrypted seed shares wrapped with recipient public keys ($\approx 48\text{ bytes}$ ciphertext per peer):
 
-   $$\text{Payload}_{\mathrm{R1}} = K(K - 1) \cdot 48 \quad (\text{bytes})$$
+$$\mathrm{Payload}_{\mathrm{R1}} = K(K - 1) \cdot 48 \quad (\text{bytes})$$
 
 3. **Round 2 (Masked Input Collection)**:
    Each client transmits its blinded parameter vector $\widetilde{\Delta w}_i \in \mathbb{R}^d$ along with an HMAC-SHA256 message authentication code ($32\text{ bytes}$):
 
-   $$\text{Payload}_{\mathrm{R2}} = K \cdot (S_{\mathrm{model}} + 32) \quad (\text{bytes})$$
+$$\mathrm{Payload}_{\mathrm{R2}} = K \cdot (S_{\mathrm{model}} + 32) \quad (\text{bytes})$$
 
 4. **Round 3 (Unmasking Shares)**:
    Clients reveal Shamir shares of the blinding seeds for dropped participants or self-masks ($\approx 32\text{ bytes}$ per peer):
 
-   $$\text{Payload}_{\mathrm{R3}} = K(K - 1) \cdot 32 \quad (\text{bytes})$$
+$$\mathrm{Payload}_{\mathrm{R3}} = K(K - 1) \cdot 32 \quad (\text{bytes})$$
 
 ### 6.2 Total Wire Volume vs Baseline Protocols ($d = 1{,}969$ parameters, $K=3$ banks, $R=5$ rounds)
 
 | Protocol | Payload per Round | 5-Round Total Volume | Relative Overhead vs FedAvg | Security & Privacy Guarantee |
 | :--- | :---: | :---: | :---: | :--- |
-| `FED_AVG` | 31,504 B | **0.1502 MB** | **1.00\times** | No cryptographic blinding (plaintext parameters) |
-| `FED_PROX` | 31,504 B | **0.1502 MB** | **1.00\times** | Identical wire footprint; local proximal loss penalty |
-| `CURVE25519_SECAGG` | 32,752 B | **0.1562 MB** | **1.04\times** | Information-theoretic zero-knowledge server privacy ($+4.0\%$ overhead) |
-| `SCAFFOLD` | 63,008 B | **0.3004 MB** | **2.00\times** | Dual parameter + control variate exchange |
-| `TENSEAL_CKKS` | 330,792 B | **1.5773 MB** | **10.50\times** | Fully homomorphic ciphertext expansion ($10.5\times$ bandwidth) |
+| `FED_AVG` | 31,504 B | **0.1502 MB** | **1.00×** | No cryptographic blinding (plaintext parameters) |
+| `FED_PROX` | 31,504 B | **0.1502 MB** | **1.00×** | Identical wire footprint; local proximal loss penalty |
+| `CURVE25519_SECAGG` | 32,752 B | **0.1562 MB** | **1.04×** | Information-theoretic zero-knowledge server privacy ($+4.0\%$ overhead) |
+| `SCAFFOLD` | 63,008 B | **0.3004 MB** | **2.00×** | Dual parameter + control variate exchange |
+| `TENSEAL_CKKS` | 330,792 B | **1.5773 MB** | **10.50×** | Fully homomorphic ciphertext expansion ($10.5\times$ bandwidth) |
 
 The complete empirical benchmark analysis and 4-panel bandwidth visualization figure are documented in [`docs/enterprise_benchmark_report.md#24-federated-communication-cost--bandwidth-profiling-benchmark`](file:///docs/enterprise_benchmark_report.md) and [`docs/figures/benchmark_communication.png`](file:///docs/figures/benchmark_communication.png).

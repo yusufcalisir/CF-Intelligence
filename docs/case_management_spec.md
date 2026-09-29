@@ -375,7 +375,7 @@ pytest backend/tests/unit/test_case_management_workbench.py \
 
 ---
 
-## 🎯 Cost-Sensitive Decision Threshold Integration & Case Triage (Phase 20)
+## 🎯 Cost-Sensitive Decision Threshold Integration & Case Triage
 
 In enterprise case management, investigation queues represent a scarce and costly operational resource ($c_{\mathrm{FP}} = 45\text{ USD}$ per analyst review). Conversely, unflagged fraudulent transactions that bypass triage directly inflict chargeback liabilities ($c_{\mathrm{FN}} = 850\text{ USD}$).
 
@@ -383,15 +383,15 @@ The Case Management subsystem interfaces directly with the `RiskUtilityService` 
 
 1. **Objective-Driven Queue Sizing**: Rather than applying arbitrary cutoff scores (e.g. 750 or 800), institutions configure the unit cost matrix ($c_{\mathrm{FN}}, c_{\mathrm{FP}}, c_{\mathrm{TP}}, c_{\mathrm{TN}}$) to determine the mathematically optimal triage cutoff:
    $$\tau^* = \arg\min_{\tau} \left( c_{\mathrm{FN}} \cdot \mathrm{FN}(\tau) + c_{\mathrm{FP}} \cdot \mathrm{FP}(\tau) + c_{\mathrm{TP}} \cdot \mathrm{TP}(\tau) \right)$$
-2. **Empirical Optimization**: At the calibrated optimal cutoff $\tau^* = 600$ (normalized $0.60$), the system captures 81.0% of true fraud while containing false alarms to 149 out of 4,900 clean transactions (3.04% FPR), achieving maximum net financial savings of **$60,930.00** per 5,000 transactions (71.7% efficiency).
+2. **Empirical Optimization**: At the calibrated optimal cutoff $\tau^* = 600$ (normalized $0.60$), the system captures 81.0% of true fraud while containing false alarms to 149 out of 4,900 clean transactions (3.04% FPR), achieving maximum net financial savings of **60,930.00 USD** per 5,000 transactions (71.7% efficiency).
 3. **Analyst Workload Balancing**: When investigation backlogs surge or analyst capacity fluctuates, risk officers dynamically adjust $\tau$ with live preview of projected case volumes, preventing queue starvation or SLA breaches under EU AMLD6 guidelines.
 
 ---
 
-## 🔬 Systematic Error Stratification & Failure Mode Governance (Phase 34)
+## 🔬 Systematic Error Stratification & Failure Mode Governance
 
 To guarantee that human investigators and automated screening pipelines do not operate under monolithic accuracy assumptions, the platform executes continuous systematic error stratification via [`experiments/error_analysis/stratify_errors.py`](../experiments/error_analysis/stratify_errors.py). Rather than relying on aggregate metrics, classification errors are decomposed across four operational axes:
-- **Transaction Amount Tiers**: Micro ($<\$50$), Low ($\$50-\$250$), Medium ($\$250-\$1,000$), High ($\$1,000-\$9,000$), Near-Threshold Structuring ($\$9,000-\$10,000$), and Jumbo ($>\$10,000$).
+- **Transaction Amount Tiers**: Micro (< 50 USD), Low (50–250 USD), Medium (250–1,000 USD), High (1,000–9,000 USD), Near-Threshold Structuring (9,000–10,000 USD), and Jumbo (> 10,000 USD).
 - **Diurnal Temporal Quadrants**: Late Night (`00:00-05:59`), Morning Peak (`06:00-11:59`), Afternoon Business (`12:00-17:59`), and Evening Leisure (`18:00-23:59`).
 - **Merchant Category Code (MCC) Clusters**: ATM Cash (`6011`), Quasi-Cash/Wires (`6012`/`4829`), Retail/Grocery (`5411`), Dining (`5812`), High-Risk/Crypto (`7995`/`6051`), and Specialty Retail (`5999`).
 - **Graph Topological Degree ($k$)**: Peripheral ($k=1$), Low ($k=2-4$), Moderate ($k=5-15$), Hub ($k=16-50$), and Super-Hub Aggregators ($k>50$).
@@ -400,7 +400,7 @@ To guarantee that human investigators and automated screening pipelines do not o
 
 | Mode ID | Failure Mode Name | Affected Stratum | Error Type | Empirical Rate | Root Cause & Workbench Mitigation Protocol |
 |:---|:---|:---|:---:|:---:|:---|
-| **FM-01** | **Low-Value Structuring & Smurfing** | Amount $<\$250$, Degree $k \le 2$ | False Negative | 47.67% FNR | **Cause**: Federated weights trained on large transfers dilute sparse micro-burst signals. Single-bank queues miss cross-bank smurfing.<br>**Protocol**: Workbench automatically triggers DH-PSI anonymous counterparty clustering and lowers anomaly threshold for accounts under 14 days old. |
+| **FM-01** | **Low-Value Structuring & Smurfing** | Amount < 250 USD, Degree $k \le 2$ | False Negative | 47.67% FNR | **Cause**: Federated weights trained on large transfers dilute sparse micro-burst signals. Single-bank queues miss cross-bank smurfing.<br>**Protocol**: Workbench automatically triggers DH-PSI anonymous counterparty clustering and lowers anomaly threshold for accounts under 14 days old. |
 | **FM-02** | **Off-Hours Automated Batch Clearing** | Hours `00:00-05:59`, MCC `6012` | False Positive | 14.98% FPR | **Cause**: Temporal cyclical feature transforms penalize nocturnal transactions, generating false positive spikes during corporate payroll and batch clearing.<br>**Protocol**: Pre-inference rule engine applies automated batch clearing whitelist tags via ISO 20022 `camt.053` metadata to suppress benign false alerts. |
 | **FM-03** | **High-Degree Merchant Hub Dilution** | Network Degree $k > 50$ | False Negative | 90.00% FNR | **Cause**: Inductive GNN (GraphSAGE) 2-hop neighborhood aggregation averages thousands of clean retail flows, collapsing fraud embeddings onto benign centroids.<br>**Protocol**: Edge-attributed temporal attention weights discount repetitive retail payments; analyst workbench renders bipartite subgraph decompositions isolating bursty counterparties. |
 | **FM-04** | **Specialty Retail Arbitrage** | MCC `5999`, Cross-Border | False Negative | 43.48% FNR | **Cause**: Differential Privacy Gaussian noise ($\epsilon=1.0$) masks low-frequency cross-border categorical weights, creating borderline probabilities ($0.48-0.52$).<br>**Protocol**: Deterministic triage policy routes any transaction in MCC `5999` with probability in the $[0.45, 0.55]$ zone directly to mandatory Four-Eyes review. |

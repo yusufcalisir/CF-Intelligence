@@ -160,7 +160,7 @@ Interactions with clients, compliance officers, investigators, and consortium ba
 
 The Collaborative AML Screening subsystem evaluates high-throughput financial transactions against nine deterministic risk signals combined via an axiomatic weighted arithmetic linear formulation:
 
-$$S(x) = 1000 \cdot \frac{\sum_{i=1}^M w_i \cdot \operatorname{clamp}(s_i(x), 0, 1)}{\sum_{i=1}^M w_i}$$
+$$S(x) = 1000 \cdot \frac{\sum_{i=1}^M w_i \cdot \mathrm{clamp}(s_i(x), 0, 1)}{\sum_{i=1}^M w_i}$$
 
 | Signal Identifier | Semantic Description | Default Weight ($w_i$) | Normalization Bounds |
 |:---|:---|:---:|:---:|
@@ -205,9 +205,9 @@ The gRPC transport layer handles high-throughput, low-latency node communication
   - **FedAsync Staleness Attenuation**: $S(\tau) = (1 + \tau)^{-\alpha}$ preserves $F_1 = 93.2\%$. Zero deadlocks.
 
 ### 3.4 Automated Optuna FL Hyperparameter Optimizer, Dirichlet Partitioner & Fidelity Auditor (`fl_hyperparameter_optimizer.py`, `fl_dirichlet_partitioner.py` & `distribution_fidelity_service.py`)
-- **Non-IID Dirichlet Partitioner** ($\operatorname{Dir}(\alpha)$): Simulates cross-bank label skew ($\alpha \in [0.01, 10.0]$) using class-wise Dirichlet sampling $\mathbf{p}_c \sim \operatorname{Dir}(\alpha \cdot \mathbf{1}_K)$. Rejection sampling (up to 100 attempts) paired with boundary donor rebalancing strictly guarantees $|D_i| \ge \mathrm{size}_{\mathrm{min}}$ even under extreme skew ($\alpha = 0.01$) without artificial proportion distortion.
-- **Partition Statistical Fidelity** (`compute_partition_stats`): Computes per-client sample counts, class distributions, fraud ratios, Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c |P_i(c) - P_{\mathrm{global}}(c)| \in [0, 1]$), Shannon label entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$), and cross-bank quantity skew ratio ($\max |D_i| / \min |D_i|$).
-- **Synthetic-to-Real Distribution Fidelity** (`distribution_fidelity_service.py`): Real-time empirical evaluation of generator fidelity vs. benchmark banking data using 1-Wasserstein distances ($W_1$), Jensen-Shannon divergences ($JS \in [0, 1]$), Kolmogorov-Smirnov goodness-of-fit ($D_{\mathrm{KS}}, p$), and Frobenius covariance drift ($\|\mathbf{\Sigma}_{\mathrm{real}} - \mathbf{\Sigma}_{\mathrm{synth}}\|_F$).
+- **Non-IID Dirichlet Partitioner** ($\mathrm{Dir}(\alpha)$): Simulates cross-bank label skew ($\alpha \in [0.01, 10.0]$) using class-wise Dirichlet sampling $\mathbf{p}_c \sim \mathrm{Dir}(\alpha \cdot \mathbf{1}_K)$. Rejection sampling (up to 100 attempts) paired with boundary donor rebalancing strictly guarantees $\lvert D_i \rvert \ge \mathrm{size}_{\min}$ even under extreme skew ($\alpha = 0.01$) without artificial proportion distortion.
+- **Partition Statistical Fidelity** (`compute_partition_stats`): Computes per-client sample counts, class distributions, fraud ratios, Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c \lvert P_i(c) - P_{\mathrm{global}}(c) \rvert \in [0, 1]$), Shannon label entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$), and cross-bank quantity skew ratio ($\max \lvert D_i \rvert / \min \lvert D_i \rvert$).
+- **Synthetic-to-Real Distribution Fidelity** (`distribution_fidelity_service.py`): Real-time empirical evaluation of generator fidelity vs. benchmark banking data using 1-Wasserstein distances ($W_1$), Jensen-Shannon divergences ($\mathrm{JS} \in [0, 1]$), Kolmogorov-Smirnov goodness-of-fit ($D_{\mathrm{KS}}, p$), and Frobenius covariance drift ($\Vert \mathbf{\Sigma}_{\mathrm{real}} - \mathbf{\Sigma}_{\mathrm{synth}} \Vert_F$).
 - **Strict Zero-Leakage Federated Partitioning Contract (`dataloader.py`, `ZeroLeakagePartitionContract`)**: Programmatically asserts 4 mathematical invariants before federated training: (1) Complete set disjointness between global test data and all client partitions $\mathcal{I}(\mathcal{D}_{\mathrm{test}}) \cap \left( \bigcup_k \mathcal{I}(\mathcal{D}_{\mathrm{train}}^{(k)}) \right) = \emptyset$; (2) Pairwise client partition independence ($\mathcal{I}_i \cap \mathcal{I}_j = \emptyset$); (3) Strict temporal monotonicity $\max_{k, x \in \mathcal{D}_{\mathrm{train}}^{(k)}} t(x) \le \min_{x \in \mathcal{D}_{\mathrm{test}}} t(x)$; and (4) Scaler/preprocessor isolation ($\frac{\partial \theta_{\mathrm{prep}}}{\partial \mathcal{D}_{\mathrm{test}}} = 0$). Gated pre-flight by `FederatedLearningEngine.gate_training_zero_leakage`.
 - **Optuna Bayesian TPE Engine:** Optimizes learning rates, local epochs, DP clip norms $C_{\text{max}}$, noise multipliers $\sigma$, staleness decay $\gamma$, and FedProx $\mu$ using `TPESampler` and early `MedianPruner`.
 - **Management API Endpoints:** Exposes `POST /v1/admin/optimization/tune` and `GET /v1/admin/optimization/studies/{study_name}`.
@@ -679,7 +679,7 @@ To satisfy the stringent model risk governance mandates of **Federal Reserve SR 
 │ AXIS 1: SOFTWARE CORRECTNESS         │ AXIS 2: SCIENTIFIC GENERALIZATION    │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Deterministic Implementation         │ Stochastic Empirical Learning        │
-│ "Is the code bug-free & contract-safe?"│ "Does the model generalize to data?" │
+│ "Is code bug-free & contract-safe?"  │ "Does model generalize to new data?" │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ • Zero-sum SecAgg algebraic mask sum │ • Collaborative Gain (ΔPR-AUC > 0)   │
 │   ||∑ m_i||_inf < 10^-4              │ • Recall @ 0.01% FPR >= 0.50         │

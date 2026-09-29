@@ -14,9 +14,9 @@
 ### 1.1 Partial Observation Horizon Definition
 In cross-institution banking networks governed by privacy regulations (GDPR Art. 6/9, Bank Secrecy Act, Swiss Banking Act), each participating institution $k \in \mathcal{K} = \{B_1, \dots, B_K\}$ observes an isolated information horizon $\mathcal{H}_k$:
 
-$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \operatorname{source}(\tau) = k \lor \operatorname{target}(\tau) = k \}$$
+$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \mathrm{source}(\tau) = k \lor \mathrm{target}(\tau) = k \}$$
 
-For any inter-bank transaction $\tau = (u, v)$ where $\operatorname{source}(\tau) \ne k$ and $\operatorname{target}(\tau) \ne k$, institution $k$ observes **zero** information: $\tau \notin \mathcal{H}_k$.
+For any inter-bank transaction $\tau = (u, v)$ where $\mathrm{source}(\tau) \ne k$ and $\mathrm{target}(\tau) \ne k$, institution $k$ observes **zero** information: $\tau \notin \mathcal{H}_k$.
 
 ### 1.2 Unobservability Theorem for Intermediate Multi-Hop Laundering
 Let $\mathcal{R} = (\tau_1, \tau_2, \dots, \tau_m)$ represent a cyclic or multi-hop laundering ring where transfer $\tau_i = (B_a, B_b)$ and $\tau_{i+1} = (B_b, B_c)$.

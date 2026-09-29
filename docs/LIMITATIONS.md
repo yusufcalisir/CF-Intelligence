@@ -9,7 +9,7 @@
 
 ### 1.1 The Problem of Metric Shopping in Machine Learning
 In applied machine learning, financial technology, and academic benchmarking, **metric shopping** (selective reporting, p-hacking, or post-hoc metric cherry-picking) presents a critical model risk:
-1. **Selective Highlighting**: Teams evaluate multiple evaluation metrics ($\operatorname{Accuracy}$, $\operatorname{ROC-AUC}$, $\operatorname{PR-AUC}$, $F_1$, $\operatorname{Recall@FPR}$) and publish only the flattering numbers. Under extreme class imbalance ($\le 0.15\%$ fraud prevalence), reporting an uncalibrated accuracy of $99.85\%$ or an inflated $\operatorname{ROC-AUC}$ of $0.96$ conceals catastrophic real-world failure, where thousands of false alarms drown human investigator queues and zero complex money laundering is detected.
+1. **Selective Highlighting**: Teams evaluate multiple evaluation metrics (Accuracy, ROC-AUC, PR-AUC, $F_1$, Recall@FPR) and publish only the flattering numbers. Under extreme class imbalance ($\le 0.15$% fraud prevalence), reporting an uncalibrated accuracy of 99.85% or an inflated ROC-AUC of 0.96 conceals catastrophic real-world failure, where thousands of false alarms drown human investigator queues and zero complex money laundering is detected.
 2. **Post-Hoc Threshold Optimization**: Selecting classification decision thresholds ($\theta$) by sweeping the test set to maximize an $F_1$-score artificially inflates claimed effectiveness while guaranteeing out-of-sample operational collapse.
 3. **Suppression of Negative Findings**: Omitting experiments where privacy noise destroyed model convergence, or concealing algorithms that lagged behind naive baselines, creates dangerous confirmation bias and deceives institutional risk committees.
 4. **Selective Seed Reporting**: Executing dozens of random initializations and reporting only the best-performing run without disclosing the variance distribution.
@@ -22,28 +22,28 @@ To enforce scientific transparency, CF-Intelligence mandates the following bindi
 │                    ANTI-METRIC SHOPPING PROTOCOL RULES                      │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ 1. Mandatory Metric Hierarchy Pre-Registration                              │
-│    • Extreme Imbalance (<=0.15%): Primary = PR-AUC & Recall@0.1%FPR.        │
-│    • ROC-AUC and Accuracy designated strictly as secondary diagnostic aids. │
+│    - Extreme Imbalance (<=0.15%): Primary = PR-AUC & Recall@0.1%FPR.        │
+│    - ROC-AUC and Accuracy designated strictly as secondary diagnostic aids. │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ 2. Pre-Fixed Decision Thresholds                                            │
-│    • Operational thresholds MUST be fixed a priori (e.g. alpha = 0.0010 for │
+│    - Operational thresholds MUST be fixed a priori (e.g. alpha = 0.0010 for │
 │      Recall@0.1%FPR, theta = 0.50 default), NEVER tuned on test sets.       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ 3. Unconditional Negative Result Preservation                               │
-│    • Utility collapse, baseline lag, or noise penalties MUST be published. │
-│    • Null results MUST use strict "-" representation, never omitted rows.   │
+│    - Utility collapse, baseline lag, or noise penalties MUST be published.  │
+│    - Null results MUST use strict "-" representation, never omitted rows.   │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ 4. Multi-Seed Robustness & Variance Disclosure                              │
-│    • Statistical claims MUST report mean +/- std over >= 5 distinct seeds.  │
+│    - Statistical claims MUST report mean +/- std over >= 5 distinct seeds.  │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 1. **Pre-Registered Metric Hierarchy**:
-   - For fraud and AML detection (imbalance $\le 0.15\%$), **Precision-Recall Area Under Curve ($\operatorname{PR-AUC}$ / Average Precision)** and **Recall at Fixed False Positive Rate ($\operatorname{Recall@0.1\%FPR}$)** are pre-registered as primary evaluation metrics.
-   - $\operatorname{ROC-AUC}$ and Brier Score ($\operatorname{BS}$) are classified as secondary diagnostic indicators.
-   - Overall $\operatorname{Accuracy}$ is strictly prohibited as a standalone efficacy claim.
+   - For fraud and AML detection (imbalance $\le 0.15$%), **Precision-Recall Area Under Curve (PR-AUC / Average Precision)** and **Recall at Fixed False Positive Rate (Recall @ 0.1% FPR)** are pre-registered as primary evaluation metrics.
+   - ROC-AUC and Brier Score ($\mathrm{BS}$) are classified as secondary diagnostic indicators.
+   - Overall Accuracy is strictly prohibited as a standalone efficacy claim.
 2. **Pre-Fixed Operational Thresholds**:
-   - Decision thresholds must be calibrated strictly on training/validation partitions or set to institutional operational SLAs ($\alpha_{\mathrm{target}} = 0.01\%$ or $0.1\%$). Sweeping thresholds on holdout test partitions to maximize post-hoc $F_1$ is strictly forbidden.
+   - Decision thresholds must be calibrated strictly on training/validation partitions or set to institutional operational SLAs ($\alpha_{\mathrm{target}} = 0.01$% or $0.1$%). Sweeping thresholds on holdout test partitions to maximize post-hoc $F_1$ is strictly forbidden.
 3. **Unconditional Negative Result Preservation**:
    - Any experimental configuration where federated learning, differential privacy, or Byzantine defenses lag behind baselines must be retained in public tables and reports with explicit negative deltas ($\Delta < 0$).
 4. **Multi-Seed Distribution Reporting**:
@@ -58,16 +58,16 @@ In compliance with the Anti-Metric Shopping Protocol, this section explicitly do
 ### 2.1 Negative Result NR-001: Differential Privacy Utility Collapse under Strong Noise ($\sigma \ge 3.0$)
 
 #### Empirical Observation
-In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmarks/results/raw/dp_privacy_utility_tradeoff.json), evaluating Gaussian DP-SGD noise multipliers $\sigma \in [0.0, 3.0]$ reveals a steep Pareto trade-off between privacy loss ($\epsilon$) and fraud detection power ($\operatorname{PR-AUC}$):
+In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmarks/results/raw/dp_privacy_utility_tradeoff.json), evaluating Gaussian DP-SGD noise multipliers $\sigma \in [0.0, 3.0]$ reveals a steep Pareto trade-off between privacy loss ($\epsilon$) and fraud detection power ($\mathrm{PR\text{-}AUC}$):
 
-| Noise Multiplier ($\sigma$) | RDP Privacy Loss ($\epsilon, \delta=10^{-5}$) | Holdout $\operatorname{PR-AUC}$ | Utility Delta ($\Delta \operatorname{PR-AUC}$) | Status & Trade-Off Analysis |
+| Noise Multiplier ($\sigma$) | RDP Privacy Loss ($\epsilon, \delta=10^{-5}$) | Holdout PR-AUC | Utility Delta ($\Delta \text{PR-AUC}$) | Status & Trade-Off Analysis |
 | :---: | :---: | :---: | :---: | :--- |
 | $\sigma = 0.0$ | $\infty$ (Non-Private Ceiling) | **0.6272** | Baseline | Full gradient utility; zero privacy defense |
-| $\sigma = 0.5$ | $\epsilon = 8.4210$ | **0.5891** | $-0.0381$ ($-6.1\%$) | Mild utility loss; weak privacy boundary |
-| $\sigma = 1.0$ | $\epsilon = 3.1450$ | **0.5124** | $-0.1148$ ($-18.3\%$) | Standard academic benchmark point |
-| $\sigma = 1.5$ | $\epsilon = 1.8920$ | **0.4208** | $-0.2064$ ($-32.9\%$) | Production operational boundary |
-| $\sigma = 2.0$ | $\epsilon = 1.2410$ | **0.3150** | $-0.3122$ ($-49.8\%$) | High privacy; severe detection degradation |
-| $\sigma = 3.0$ | $\epsilon = 0.6272$ | **0.1963** | **$-0.4309$ ($-68.7\%$)** | **Severe Utility Collapse**: $-68.7\%$ loss |
+| $\sigma = 0.5$ | $\epsilon = 8.4210$ | **0.5891** | $-0.0381$ (-6.1%) | Mild utility loss; weak privacy boundary |
+| $\sigma = 1.0$ | $\epsilon = 3.1450$ | **0.5124** | $-0.1148$ (-18.3%) | Standard academic benchmark point |
+| $\sigma = 1.5$ | $\epsilon = 1.8920$ | **0.4208** | $-0.2064$ (-32.9%) | Production operational boundary |
+| $\sigma = 2.0$ | $\epsilon = 1.2410$ | **0.3150** | $-0.3122$ (-49.8%) | High privacy; severe detection degradation |
+| $\sigma = 3.0$ | $\epsilon = 0.6272$ | **0.1963** | **$-0.4309$ (-68.7%)** | **Severe Utility Collapse**: -68.7% loss |
 
 #### Mathematical & Operational Reality
 - **Why It Happens:** Differential privacy injects spherical Gaussian noise $\mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$ into clipped gradient updates. In extreme class imbalance, the gradient signal corresponding to rare fraudulent samples is minuscule relative to majority legitimate traffic. At $\sigma \ge 3.0$, the perturbation variance swamps the minority gradient coordinates, destroying decision boundary refinement.
@@ -80,23 +80,23 @@ In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmark
 #### Empirical Observation
 In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_report.md) Section 3.2, comparing a theoretically pooled centralized database against the decentralized federated champion shows a persistent performance deficit:
 
-| Evaluation Paradigm | Privacy Perimeter | $\operatorname{PR-AUC}$ | $\operatorname{ROC-AUC}$ | $\operatorname{Recall@0.1\%FPR}$ | Centralization Gap ($\Delta_{\mathrm{privacy}}$) |
+| Evaluation Paradigm | Privacy Perimeter | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Centralization Gap ($\Delta_{\mathrm{privacy}}$) |
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **Centralized Upper Bound (GBDT)** | Illegal Raw Data Pooling | **0.8650** | 0.9840 | 66.50% | Baseline Upper Bound |
-| **Federated Champion (FedAvg/FedProx)** | Zero Raw PII (Decentralized) | **0.8420** | 0.9750 | 62.40% | **$-0.0230$ ($-2.7\%$ Gap)** |
+| **Federated Champion (FedAvg/FedProx)** | Zero Raw PII (Decentralized) | **0.8420** | 0.9750 | 62.40% | **$-0.0230$ (-2.7% Gap)** |
 
 #### Mathematical & Operational Reality
 - **Why It Happens:** Centralized gradient boosting has immediate, unconstrained access to joint feature co-occurrence matrices across all institutions. Federated learning must optimize across disparate local non-IID SGD steps with bounded local epochs and DP clipping, incurring an inherent decentralized optimization penalty ($\Delta_{\mathrm{privacy}} = -0.0230$).
-- **Honest Perspective:** While federated intelligence captures $97.34\%$ of the theoretical ceiling, decentralization does not match 100% of centralized pooling. Claims that federated learning completely matches centralized pooling without any penalty are scientifically unfounded.
+- **Honest Perspective:** While federated intelligence captures 97.34% of the theoretical ceiling, decentralization does not match 100% of centralized pooling. Claims that federated learning completely matches centralized pooling without any penalty are scientifically unfounded.
 
 ---
 
 ### 2.3 Negative Result NR-003: Deep Neural MLP Vulnerability to Extreme Imbalance on Tabular Data
 
 #### Empirical Observation
-In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_report.md) Section 3.4 (PaySim benchmark across $30{,}000$ transactions with $0.05\%$ fraud prevalence), deep multi-layer perceptrons without tree-based ensembling or specialized graph topology failed completely:
+In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_report.md) Section 3.4 (PaySim benchmark across $30{,}000$ transactions with 0.05% fraud prevalence), deep multi-layer perceptrons without tree-based ensembling or specialized graph topology failed completely:
 
-| Model Architecture | Optimization Paradigm | Holdout $\operatorname{PR-AUC}$ | Holdout $\operatorname{ROC-AUC}$ | $\operatorname{Recall@0.1\%FPR}$ | Verdict |
+| Model Architecture | Optimization Paradigm | Holdout PR-AUC | Holdout ROC-AUC | Recall @ 0.1% FPR | Verdict |
 | :--- | :--- | :---: | :---: | :---: | :--- |
 | **Centralized Deep MLP** | Pooled PyTorch Neural Net | **0.0014** | 0.6219 | **0.00%** | ❌ **Failure on Tabular Imbalance** |
 | **Centralized GBDT** | Pooled LightGBM / XGBoost | **0.6668** | 0.6677 | **66.67%** | ✅ **Robust Tabular Boundary** |
@@ -113,7 +113,7 @@ In [`docs/enterprise_benchmark_report.md`](file:///docs/enterprise_benchmark_rep
 #### Empirical Observation
 In PaySim federated optimization across 10 communication rounds with Dirichlet skew ($\alpha = 0.50$):
 
-| Federated Optimizer | Strategy Classification | 10-Round Holdout $\operatorname{PR-AUC}$ | Communication / Round | Convergence Stability |
+| Federated Optimizer | Strategy Classification | 10-Round Holdout PR-AUC | Communication / Round | Convergence Stability |
 | :--- | :--- | :---: | :---: | :--- |
 | **FedAvg** | Parameter Averaging | **0.1184** | $0.024\text{ MB}$ | Stable gradient progress |
 | **FedProx ($\mu=0.01$)** | Proximal Regularization | **0.0348** | $0.024\text{ MB}$ | Bounded drift |
@@ -130,16 +130,16 @@ In PaySim federated optimization across 10 communication rounds with Dirichlet s
 #### Empirical Observation
 In [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](file:///benchmarks/results/raw/byzantine_benchmark_sign_inversion.json), evaluating Byzantine-resilient aggregators on clean (uncompromised) data under natural statistical heterogeneity:
 
-| Aggregation Method | Clean Non-IID $\operatorname{PR-AUC}$ | Adversarial Attack Resilience | Clean Data Efficiency | Clean Penalty ($\Delta$) |
+| Aggregation Method | Clean Non-IID PR-AUC | Adversarial Attack Resilience | Clean Data Efficiency | Clean Penalty ($\Delta$) |
 | :--- | :---: | :---: | :---: | :---: |
 | **Naive FedAvg** | **0.7366** | 0.0000 (Collapses under Sign-Flip) | 100.0% | Baseline |
-| **Coordinate Trimmed Mean** | **0.7344** | 0.7344 (Tolerates 20% poisoned) | 99.7% | $-0.0022$ ($-0.3\%$) |
-| **Multi-Vector Krum** | **0.7257** | 0.7257 (Tolerates Byzantine nodes) | 98.5% | $-0.0109$ ($-1.5\%$) |
-| **Bulyan Aggregator** | **0.7070** | 0.7070 (Provable resilience) | 95.9% | **$-0.0296$ ($-4.0\%$)** |
+| **Coordinate Trimmed Mean** | **0.7344** | 0.7344 (Tolerates 20% poisoned) | 99.7% | $-0.0022$ (-0.3%) |
+| **Multi-Vector Krum** | **0.7257** | 0.7257 (Tolerates Byzantine nodes) | 98.5% | $-0.0109$ (-1.5%) |
+| **Bulyan Aggregator** | **0.7070** | 0.7070 (Provable resilience) | 95.9% | **$-0.0296$ (-4.0%)** |
 
 #### Mathematical & Operational Reality
 - **Why It Happens:** Byzantine-robust aggregators (Krum, Bulyan) filter out candidate vectors located in the geometric periphery of the client update manifold. Under Non-IID Dirichlet skew, a bank with a unique legitimate transaction specialty (e.g. high-volume cross-border wires) produces legitimate gradients that reside in the geometric tail. Bulyan and Krum periodically discard these honest updates as suspected poisoning attempts.
-- **Operational Reality:** Robustness against malicious poisoning acts as an insurance policy: it guarantees survival under attack, but incurs a $1.5\% - 4.0\%$ utility tax on clean data.
+- **Operational Reality:** Robustness against malicious poisoning acts as an insurance policy: it guarantees survival under attack, but incurs a 1.5% - 4.0% utility tax on clean data.
 
 ---
 
@@ -171,12 +171,12 @@ To satisfy the transparency requirements of **Federal Reserve SR 11-7** and **EU
 
 | Vulnerability Domain | Technical Failure Mode | Root Cause & Mechanism | Platform Safeguard & Mitigation | Residual Operational Risk |
 | :--- | :--- | :--- | :--- | :--- |
-| **Statistical Non-IID Skew** | Client gradient divergence / weight oscillation | Extreme Dirichlet parameter ($\alpha \le 0.05$) creates disjoint local label support | Proximal regularization (`FedProx`), learning rate decay, adaptive round quotas | Convergence delay; lower final $\operatorname{PR-AUC}$ on minority banks |
+| **Statistical Non-IID Skew** | Client gradient divergence / weight oscillation | Extreme Dirichlet parameter ($\alpha \le 0.05$) creates disjoint local label support | Proximal regularization (`FedProx`), learning rate decay, adaptive round quotas | Convergence delay; lower final PR-AUC on minority banks |
 | **Differential Privacy** | Complete utility destruction | Noise multiplier $\sigma > 2.0$ injected into low-magnitude minority coordinates | Adaptive DP auto-scaling, RDP moments accounting circuit breaker | Cannot achieve sub-unit $\epsilon$ without severe utility loss |
-| **Adversarial Poisoning** | Byzantine coordinator hijacking | Coordinated Sybil nodes submit sign-flipped gradients | Coordinate Trimmed Mean, Krum, Bulyan distance selection | Clean-data utility penalty ($1.5\% - 4.0\%$ loss); requires $n \ge 4f+3$ |
-| **Concept Drift** | Stale model decision boundaries | Fraudsters alter structuring velocity and account hops | Automated retraining triggers ($\operatorname{PSI} > 0.20$, KS test $p < 0.05$) | Retraining lag between alert trigger and global round aggregation |
+| **Adversarial Poisoning** | Byzantine coordinator hijacking | Coordinated Sybil nodes submit sign-flipped gradients | Coordinate Trimmed Mean, Krum, Bulyan distance selection | Clean-data utility penalty (1.5% - 4.0% loss); requires $n \ge 4f+3$ |
+| **Concept Drift** | Stale model decision boundaries | Fraudsters alter structuring velocity and account hops | Automated retraining triggers ($\mathrm{PSI} > 0.20$, KS test $p < 0.05$) | Retraining lag between alert trigger and global round aggregation |
 | **Entity Resolution** | False positive cross-bank graph links | MinHash LSH collision on sparse identity tokens | Type-salted HMAC-SHA256 hashing, secondary Jaro-Winkler disambiguation | Under-clustering on highly obfuscated mule account networks |
-| **Concurrency & Gateway** | ASGI event loop thread contention under load | Python GIL saturation during high-concurrency requests ($C \ge 100$) | Multi-worker Gunicorn deployment, Redis JIT caching, circuit breakers | Micro-latency spikes at peak burst traffic ($p99 > 80\text{ ms}$) |
+| **Concurrency & Gateway** | ASGI event loop thread contention under load | Python GIL saturation during high-concurrency requests ($C \ge 100$) | Multi-worker Gunicorn deployment, Redis JIT caching, circuit breakers | Micro-latency spikes at peak burst traffic ($p_{99} > 80\text{ ms}$) |
 
 ---
 

@@ -10,7 +10,7 @@ When suspicious multi-bank patterns (e.g., smurfing syndicates, rapid mule accou
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        CORE BANKING INTEGRATION ARCHITECTURE                          │
+│                         CORE BANKING INTEGRATION ARCHITECTURE                          │
 │                                                                                        │
 │   ┌─────────────────────┐               ┌────────────────────────────────────────┐     │
 │   │ Mambu Cloud Banking │               │   Thought Machine Vault Core Engine    │     │
@@ -28,7 +28,7 @@ When suspicious multi-bank patterns (e.g., smurfing syndicates, rapid mule accou
 │                                          │                                             │
 │                                          ▼                                             │
 │   ┌──────────────────────────────────────────────────────────────────────────────┐     │
-│   │          9-Signal Composite Risk Scoring Engine & GNN Graph Inference         │     │
+│   │          9-Signal Composite Risk Scoring Engine & GNN Graph Inference        │     │
 │   │   - Sub-15ms fast-path fraud scoring & multi-hop contagion detection         │     │
 │   └──────────────────────────────────────┬───────────────────────────────────────┘     │
 │                                          │                                             │
@@ -37,7 +37,7 @@ When suspicious multi-bank patterns (e.g., smurfing syndicates, rapid mule accou
 │                ▼                                                   ▼                   │
 │   ┌───────────────────────────┐                       ┌────────────────────────────┐   │
 │   │ Outbound Mambu Hold Block │                       │ Outbound Vault Restriction │   │
-│   │ `POST /api/deposits/hold` │                       │ `POST /v1/restrictions`   │   │
+│   │ `POST /api/deposits/hold` │                       │ `POST /v1/restrictions`    │   │
 │   └───────────────────────────┘                       └────────────────────────────┘   │
 └────────────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -50,20 +50,26 @@ When suspicious multi-bank patterns (e.g., smurfing syndicates, rapid mule accou
 The `MambuConnector` processes Mambu v2 event notifications:
 1. `deposit-transaction.created`: Ingests debit and credit transactions, maps `accountId`, `amount`, `currencyCode`, and `channel` to `NormalizedTransaction`.
 2. `client.created`: Onboarding customer profiles are immediately pseudonymized using type-salted HMAC-SHA256 (`CONSORTIUM_HMAC_SALT`):
-   $$\mathrm{Pseudonym} = \operatorname{SHA-256}(\text{CLIENT-KEY} \parallel \mathrm{RawID} \parallel \mathrm{Salt})[:16]$$
+
+$$\mathrm{Pseudonym} = \mathrm{SHA256}(\text{CLIENT-KEY} \parallel \mathrm{RawID} \parallel \mathrm{Salt})[:16]$$
+
    Customer names, email addresses, and national identifiers never enter process memory in cleartext.
 3. `account.hold`: Real-time notification of external balance blocks and reservations.
 
 ### 2.2 Inbound Security & Webhook Signatures
+
 Mambu webhooks are authenticated via HMAC-SHA256 (`X-Mambu-Signature` header):
+
 $$\mathrm{Sig}_{\mathrm{expected}} = \mathrm{HMAC}_{\mathrm{SHA256}}(\mathrm{Secret}, \mathrm{RawBodyBytes})$$
+
 Replay attacks and tampered payloads are rejected with HTTP 401 Unauthorized before parsing.
 
 ### 2.3 Outbound Provisional Holds
 When a fraud alert triggers automated containment, `MambuConnector.apply_provisional_hold()` executes:
 - Dispatches `POST /api/deposits/{accountId}/blocks` with an idempotency token.
 - Returns a cryptographic SHA-256 audit digest linking the hold action to the FININT case file:
-  $$\mathrm{AuditDigest} = \mathrm{SHA256}(\mathrm{HoldID} \parallel \mathrm{AccountID} \parallel \mathrm{Amount} \parallel \mathrm{Timestamp})$$
+
+$$\mathrm{AuditDigest} = \mathrm{SHA256}(\mathrm{HoldID} \parallel \mathrm{AccountID} \parallel \mathrm{Amount} \parallel \mathrm{Timestamp})$$
 
 ---
 

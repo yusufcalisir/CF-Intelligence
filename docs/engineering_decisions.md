@@ -420,16 +420,18 @@ Implement Byzantine-tolerant aggregation defenses with theoretical breakdown gua
 ### Context
 
 Applying Differential Privacy (DP) requires answering two critical engineering questions:
-1. *How is $\varepsilon$ mathematically calibrated?* ($\varepsilon > 10$ provides negligible protection against Membership Inference Attacks; $\varepsilon < 0.1$ destroys gradient signal utility, degrading fraud recall below $30\%$).
+1. *How is $\varepsilon$ mathematically calibrated?* ($\varepsilon > 10$ provides negligible protection against Membership Inference Attacks; $\varepsilon < 0.1$ destroys gradient signal utility, degrading fraud recall below 30%).
 2. *How is cumulative privacy budget tracked across multi-round federated training?*
 
-Naive linear composition over $T$ federated rounds yields cumulative privacy loss $\varepsilon_{\text{total}} = \sum_{t=1}^T \varepsilon_t$. For $T = 50$ rounds with local $\varepsilon_t = 0.5$, linear composition reports an astronomical $\varepsilon_{\text{total}} = 25.0$, incorrectly forcing the training engine to halt due to budget exhaustion.
+Naive linear composition over $T$ federated rounds yields cumulative privacy loss $\varepsilon_{\mathrm{total}} = \sum_{t=1}^T \varepsilon_t$. For $T = 50$ rounds with local $\varepsilon_t = 0.5$, linear composition reports an astronomical $\varepsilon_{\mathrm{total}} = 25.0$, incorrectly forcing the training engine to halt due to budget exhaustion.
 
 ### Decision
 
-1. **Parameter Calibration ($\varepsilon = 1.0, \delta = 10^{-5}$)**: We set $\delta < 1/N$ ($N \approx 100,000$ transactions per bank) to ensure negligible probability of catastrophic privacy failure. The target $\varepsilon = 1.0$ represents the empirical Gold Standard in financial machine learning, providing provable resistance against Membership Inference (MIA accuracy bounded $\le 52.4\% \approx$ random guess) while maintaining high fraud recall ($> 62.4\%$).
+1. **Parameter Calibration ($\varepsilon = 1.0, \delta = 10^{-5}$)**: We set $\delta < 1/N$ ($N \approx 100{,}000$ transactions per bank) to ensure negligible probability of catastrophic privacy failure. The target $\varepsilon = 1.0$ represents the empirical Gold Standard in financial machine learning, providing provable resistance against Membership Inference (MIA accuracy bounded $\le 52.4$\% $\approx$ random guess) while maintaining high fraud recall ($> 62.4$\%).
 2. **Rényi Differential Privacy (RDP) & Moments Accountant**: The privacy engine leverages Opacus RDP accounting:
-   $$\varepsilon(\alpha) = \frac{\alpha}{2 \sigma^2}, \quad \varepsilon_{\text{total}} = \min_{\alpha} \left( \sum_{t=1}^T \varepsilon_t(\alpha) + \frac{\ln(1/\delta)}{\alpha - 1} \right) \sim \mathcal{O}(\sigma^{-1} \sqrt{T \ln(1/\delta)})$$
+
+   $$\varepsilon(\alpha) = \frac{\alpha}{2 \sigma^2}, \quad \varepsilon_{\mathrm{total}} = \min_{\alpha} \left( \sum_{t=1}^T \varepsilon_t(\alpha) + \frac{\ln(1/\delta)}{\alpha - 1} \right) \sim \mathcal{O}\left(\sigma^{-1} \sqrt{T \ln(1/\delta)}\right)$$
+
    This provides tight sub-linear $\mathcal{O}(\sqrt{T})$ composition bounds, allowing up to $100+$ federated rounds under strict $\varepsilon \le 1.0$ limits.
 
 ### Tradeoff
@@ -445,7 +447,7 @@ Naive linear composition over $T$ federated rounds yields cumulative privacy los
 
 ### Context
 
-Traditional tabular models (e.g. standalone XGBoost or LightGBM) evaluate payment transactions in total isolation ($T_x = [\mathrm{amount}, \mathrm{velocity}, \mathrm{merchant}_{\mathrm{mcc}}, \dots]$). They are fundamentally blind to multi-hop financial smurfing rings, cyclic round-tripping, and synthetic identity networks spanning across multiple banking institutions.
+Traditional tabular models (e.g. standalone XGBoost or LightGBM) evaluate payment transactions in total isolation ($T_x = [\text{amount}, \text{velocity}, \text{mcc}, \dots]$). They are fundamentally blind to multi-hop financial smurfing rings, cyclic round-tripping, and synthetic identity networks spanning across multiple banking institutions.
 
 ### Decision
 
@@ -1033,7 +1035,7 @@ Implement [`RegulatoryDossierGenerator`](../backend/app/application/services/reg
 1. **Automated Dossier Compilation**: Generates standardized, regulator-ready technical dossiers in Markdown and structured JSON compiling:
    - FedGNN architectural specifications, non-IID Dirichlet distribution ($\alpha = 0.50$), and Opacus Rényi Differential Privacy proofs ($\varepsilon = 1.0, \delta = 10^{-5}$).
    - SR 11-7 3-Pillars audit coverage: Conceptual Soundness, Independent Model Validation (3 Lines of Defense), and Continuous Monitoring (KS test $p < 0.01$, PSI $\ge 0.25$ auto-retrain trigger, $<5\text{s}$ rollback SLA).
-   - EU AI Act Articles 9–15 compliance matrix including Byzantine adversarial attack tolerance metrics ($33.3\%$ Bulyan/Krum tolerance) and algorithmic fairness ($0.80 \le \mathrm{DI} \le 1.25$ under EEOC 80% rule).
+   - EU AI Act Articles 9–15 compliance matrix including Byzantine adversarial attack tolerance metrics (33.3% Bulyan/Krum tolerance) and algorithmic fairness ($0.80 \le \mathrm{DI} \le 1.25$ under EEOC 80% rule).
    - Classical baseline benchmark comparison (FedGNN vs XGBoost, Random Forest, MLP, Logistic Regression).
 2. **Dual-Control Cryptographic Sign-Off**: Enables certified officers (CRO, MRM Validators, Compliance Directors) to cryptographically sign off on dossier checkpoints, producing SHA-256 attestation seals.
 
@@ -1056,19 +1058,19 @@ Implement [`RegulatoryDossierGenerator`](../backend/app/application/services/reg
 
 ### Context
 
-In applied machine learning and financial crime detection, "metric shopping" (p-hacking, cherry-picking flattering metrics post-hoc, optimizing thresholds on holdout test partitions, or suppressing failed experiments) poses severe model risk under Federal Reserve SR 11-7, OCC 2011-12, and EU AI Act Article 13. Under extreme class imbalance ($\le 0.15\%$ fraud prevalence), uncalibrated metrics (such as reporting $99.85\%$ accuracy or $0.96$ ROC-AUC while concealing a collapsed PR-AUC or high false-positive rates) create deceptive representations of model efficacy.
+In applied machine learning and financial crime detection, "metric shopping" (p-hacking, cherry-picking flattering metrics post-hoc, optimizing thresholds on holdout test partitions, or suppressing failed experiments) poses severe model risk under Federal Reserve SR 11-7, OCC 2011-12, and EU AI Act Article 13. Under extreme class imbalance ($\le 0.15$\% fraud prevalence), uncalibrated metrics (such as reporting 99.85% accuracy or 0.96 ROC-AUC while concealing a collapsed PR-AUC or high false-positive rates) create deceptive representations of model efficacy.
 
 ### Decision
 
 Formally adopt the **Anti-Metric Shopping Protocol** and establish the **Negative Result Ledger** across all platform documentation and benchmark harnesses (detailed in [`docs/LIMITATIONS.md`](LIMITATIONS.md) and [`docs/METRICS.md`](METRICS.md)):
-1. **Pre-Registered Metric Hierarchy**: In imbalanced regimes ($\le 0.15\%$), $\operatorname{PR-AUC}$ (Average Precision) and $\operatorname{Recall@0.1\%FPR}$ are pre-registered as primary metrics. Accuracy is prohibited as a standalone efficacy claim.
-2. **Fixed Decision Thresholds**: Operational thresholds must be fixed a priori ($\alpha = 0.0010$ for $\operatorname{Recall@0.1\%FPR}$), never swept on test sets.
+1. **Pre-Registered Metric Hierarchy**: In imbalanced regimes ($\le 0.15$\%), PR-AUC (Average Precision, $\mathrm{PR\text{-}AUC}$) and Recall@0.1% FPR are pre-registered as primary metrics. Accuracy is prohibited as a standalone efficacy claim.
+2. **Fixed Decision Thresholds**: Operational thresholds must be fixed a priori ($\alpha = 0.0010$ for Recall@0.1% FPR), never swept on test sets.
 3. **Unconditional Negative Result Preservation**: All empirical trade-offs, utility penalties, and failure modes must be explicitly documented and retained in benchmark tables:
-   - *NR-001 (DP Utility Collapse)*: High DP noise ($\sigma=3.0$) degrades PR-AUC from $0.6272$ to $0.1963$ ($-68.7\%$).
-   - *NR-002 (Decentralization Gap)*: Centralized pooling ($0.8650$) outperforms federated champion ($0.8420$) by $-0.0230$ $\Delta \operatorname{PR-AUC}$ ($97.34\%$ efficiency).
-   - *NR-003 (Neural Tabular Imbalance Vulnerability)*: Uncalibrated MLPs on PaySim drop to $0.0014$ PR-AUC without GBDT/GNN inductive bias.
-   - *NR-004 (SCAFFOLD Control Variate Lag)*: On short 10-round runs, SCAFFOLD achieves only $0.0009$ PR-AUC due to early control variate noise.
-   - *NR-005 (Byzantine Defense Clean Penalty)*: Bulyan incurs a $4.0\%$ utility tax on clean non-IID data ($0.7070$ vs $0.7366$).
+   - *NR-001 (DP Utility Collapse)*: High DP noise ($\sigma=3.0$) degrades PR-AUC from 0.6272 to 0.1963 (-68.7%).
+   - *NR-002 (Decentralization Gap)*: Centralized pooling (0.8650) outperforms federated champion (0.8420) by $-0.0230$ $\Delta\mathrm{PR\text{-}AUC}$ (97.34% efficiency).
+   - *NR-003 (Neural Tabular Imbalance Vulnerability)*: Uncalibrated MLPs on PaySim drop to 0.0014 PR-AUC without GBDT/GNN inductive bias.
+   - *NR-004 (SCAFFOLD Control Variate Lag)*: On short 10-round runs, SCAFFOLD achieves only 0.0009 PR-AUC due to early control variate noise.
+   - *NR-005 (Byzantine Defense Clean Penalty)*: Bulyan incurs a 4.0% utility tax on clean non-IID data (0.7070 vs 0.7366).
 4. **Multi-Seed Distribution Reporting**: Claims must disclose mean $\pm$ standard deviation across $\ge 5$ seeds.
 
 ### Rationale
@@ -1080,6 +1082,201 @@ Formally adopt the **Anti-Metric Shopping Protocol** and establish the **Negativ
 ### Tradeoff
 
 * Demands higher documentation maintenance and prevents using simplified marketing headlines that omit trade-offs.
+
+---
+
+## ED-043: Strict Zero-Leakage Federated Partitioning Contract (`ZeroLeakagePartitionContract`)
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+In multi-bank federated fraud benchmarks and distributed training pipelines, inadvertent data leakage represents the primary source of artificial performance inflation. Traditional train/validation/test splitting suffers from three subtle forms of leakage:
+1. *Temporal Lookahead*: Future transaction patterns leak into training distributions if splits are random rather than chronologically ordered.
+2. *Entity Overlap*: Transactions belonging to the same cardholder, account, or IP cluster appearing in both train and test splits allow models to memorize entity identities rather than learning generalizable fraud topologies.
+3. *Global Preprocessing Drift*: Fitting scalers (e.g. RobustScaler, StandardScaler) or encoders on pooled datasets before partitioning leaks test set distribution statistics ($\mu, \sigma, \mathrm{IQR}$) into local bank training pipelines.
+
+### Decision
+
+Implement [`ZeroLeakagePartitionContract`](../backend/app/application/services/zero_leakage_partition_contract.py) enforcing 5 mandatory mathematical and operational invariants across all benchmark loaders and federation clients:
+1. **Temporal Ordering Invariant**: For time-series datasets (Credit Card, PaySim, IEEE-CIS), partition timestamps must strictly satisfy $\max(t \in \mathcal{D}_{\mathrm{train}}) < \min(t \in \mathcal{D}_{\mathrm{val}}) \le \max(t \in \mathcal{D}_{\mathrm{val}}) < \min(t \in \mathcal{D}_{\mathrm{test}})$.
+2. **Disjoint Entity Isolation**: Customer account and card identifiers must be strictly partitioned into disjoint sets ($\mathcal{U}_{\mathrm{train}} \cap \mathcal{U}_{\mathrm{test}} = \emptyset$).
+3. **Local Preprocessing Fitting**: Feature transformers, normalizers, and encoders must be fitted strictly on local bank training partitions $\mathcal{D}_{\mathrm{train}}^{(k)}$, never on pooled or test data.
+4. **Stratified Imbalance Preservation**: Class imbalance ($\le 0.15$\% fraud prevalence) must be strictly preserved across all splits without artificial rebalancing or test-set smote synthesis.
+5. **Partial Information Horizon**: Inter-bank edges connecting external institutions must be completely redacted from local observation graphs to prevent edge leakage across bank boundaries.
+
+### Rationale
+
+1. **Methodological Integrity**: Guarantees zero optimistic bias across all 8 empirical benchmarks, directly satisfying SR 11-7 conceptual soundness standards.
+2. **Automated Verification**: Fully validated by `backend/tests/unit/test_strict_zero_leakage_contract.py` (100% pass rate).
+
+### Tradeoff
+
+* Sequestering disjoint entity sets slightly reduces the effective training volume per institution, but produces truly generalizable out-of-distribution evaluation.
+
+---
+
+## ED-044: Cross-Bank Consortium Topology & Partial Information Horizon Benchmark (`CFI-CrossBank-01`)
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+Organized money laundering syndicates systematically exploit institutional boundaries. By routing transactions across multiple independent banking institutions (layering, structuring, and cyclic mule rings), criminals ensure no single institution has end-to-end visibility. Under strict banking secrecy laws (GDPR Art. 6/9, Bank Secrecy Act), banks cannot pool raw transaction ledgers, leaving siloed fraud models blind to cross-bank rings.
+
+### Decision
+
+Formalize and deploy the authoritative multi-bank consortium benchmark suite (`CFI-CrossBank-01`) across 7 canonical laundering topologies:
+1. **Scenario 1 (Localized Smurfing)**: Baseline single-bank internal structuring.
+2. **Scenario 2 (Two-Bank Layering)**: Rapid cross-institution transfer chain ($A \to B$).
+3. **Scenario 3 (Cyclic Mule Ring)**: 3-bank closed cycle ($A \to B \to C \to A$) where intermediate legs ($B \to C$) are completely invisible to Bank Alpha.
+4. **Scenario 4 (Behavior-Shifting)**: Smurfing at Bank A, consolidation at Bank B, and high-value cash-out at Bank C.
+5. **Scenario 5 (Highly Non-IID Archetypes)**: Divergent institution profiles (Retail Consumer, Commercial B2B, Cross-Border FX).
+6. **Scenario 6 (Sample Starvation)**: Rare positive fraud events at smaller participant banks ($0.05$\% prevalence).
+7. **Scenario 7 (Zero-Positive Cold Start Transfer)**: Target bank has exactly ZERO historical fraud incidents ($y_{\mathrm{train}} = 0$).
+
+Each institution operates strictly within its local Information Horizon:
+
+$$\mathcal{H}_k = \{ \tau \in \mathcal{D} \mid \mathrm{source}(\tau) = k \lor \mathrm{target}(\tau) = k \}$$
+
+Institutions participate in federated consensus exchanging strictly differentially private, encrypted gradient updates with zero raw PII transmission.
+
+### Rationale
+
+1. **Empirical Collaborative Uplift**: Demonstrates $+35.71$\% fraud recall recovery on cyclic mule rings (from $64.29$\% silo detection to $100.00$\% federated consensus) and $+100.00$\% zero-shot protection for cold-start institutions.
+2. **Regulatory & Secrecy Compliance**: Validates that cross-institution intelligence sharing is mathematically viable without compromising customer privacy or bank secrecy laws.
+3. **Automated Verification**: Fully asserted by `backend/tests/unit/test_cross_bank_synthetic_benchmark.py`.
+
+### Tradeoff
+
+* Demands multi-round federated training and cryptographic secure aggregation infrastructure (10.42 KB/client/round bandwidth overhead).
+
+---
+
+## ED-045: Deterministic CI Smoke Gates & Decoupled Benchmark Execution Architecture
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+Executing comprehensive federated learning benchmarks across 8 canonical datasets (GraphSAGE on Elliptic, PaySim, IEEE-CIS, SynthAML, AMLNet across 16 factorial configurations and 5 seeds) requires several hours of high-performance compute. Coupling full benchmark runs to pull request CI pipelines introduces unsustainable developer friction, timeout failures, and flaky builds.
+
+### Decision
+
+Decouple automated test verification into two strictly separated execution tiers:
+1. **Tier 1: Deterministic CI Smoke Gates**: Fast, lightweight verification (<3 minutes) executed on every commit and pull request (`.github/workflows/ci.yml`). Enforces 100% pass rates across unit, integration, property-based (Hypothesis), security scanning (`bandit`, `pip-audit`), and synthetic contract tests.
+2. **Tier 2: Decoupled Heavy Benchmark Workflows**: Deep empirical runs executed asynchronously on dedicated hardware or via scheduled GitHub Actions workflows (`.github/workflows/benchmarks.yml`). Benchmark outputs are frozen into canonical JSON artifacts (`benchmarks/results/raw/`) with deterministic SHA-256 digests.
+
+### Rationale
+
+1. **Developer Velocity**: CI feedback loops remain instantaneous (<3 minutes), maintaining high developer velocity without compromising software correctness.
+2. **Deterministic Governance**: CI verifies that active code adheres to committed benchmark schemas and frozen results without requiring redundant heavy re-computation on every line edit.
+3. **Automated Verification**: Tested across `.github/workflows/ci.yml` and `.github/workflows/benchmarks.yml`.
+
+### Tradeoff
+
+* Requires explicit release procedures and manual or nightly dispatch to refresh heavy empirical benchmarks upon core model architecture revisions.
+
+---
+
+## ED-046: Unified Scientific Metric Definition Standard & Statistical Robustness Protocol
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+In financial machine learning and model risk governance, disparate metric implementations (interpolated vs non-interpolated PR-AUC, uncalibrated thresholds, single-seed variance artifacts) lead to conflicting claims and reproducibility failures.
+
+### Decision
+
+Formally standardize all quantitative metric definitions, continuous loss functions, and statistical robustness protocols across the platform (codified in [`docs/METRICS.md`](METRICS.md)):
+1. **Non-Interpolated PR-AUC**: Standardize on finite-sample Average Precision:
+
+   $$\mathrm{PR\text{-}AUC} = \sum_{k=1}^K (R_k - R_{k-1}) P_k$$
+
+   prohibiting linear interpolation heuristics that artificially inflate precision in sparse recall regions.
+2. **Multi-Seed Distribution & Confidence Intervals**: Require all benchmark claims to report sample mean $\mu$, sample standard deviation $\sigma$ ($N-1=4$ degrees of freedom), and Student-t 95% Confidence Intervals across 5 deterministic seeds ($42, 123, 456, 789, 1024$):
+
+   $$\mathrm{CI}_{0.95} = \left[ \mu - t_{0.975,\,4} \frac{\sigma}{\sqrt{5}}, \; \mu + t_{0.975,\,4} \frac{\sigma}{\sqrt{5}} \right], \quad t_{0.975,\,4} = 2.776$$
+
+3. **Probabilistic Calibration Governance**: Mandate dual reporting of discrimination ($\mathrm{PR\text{-}AUC}$, $\mathrm{ROC\text{-}AUC}$) and calibration (Expected Calibration Error $\mathrm{ECE} \le 0.05$, Brier Score $\mathrm{BS} \le 0.02$).
+
+### Rationale
+
+1. **Regulatory Compliance**: Directly conforms to Federal Reserve SR 11-7 and EU AI Act Article 15 requirements for continuous error analysis and empirical stability.
+2. **Reproducibility**: Guarantees bit-level identical evaluation across independent bank audit teams.
+3. **Automated Verification**: Fully validated by `backend/tests/unit/test_metric_definitions_spec.py`.
+
+### Tradeoff
+
+* Disallows informal single-run performance reporting and requires maintaining 5-seed evaluation matrices for all published benchmark results.
+
+---
+
+## ED-047: Standardized Experiment Artifact Hierarchy & Automated Audit Dossier Compilation
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+Benchmarking complex federated systems across multiple datasets generates heterogeneous files (raw logs, metrics CSVs, Matplotlib charts, JSON checkpoints). Ad-hoc artifact layouts hinder automated validation and introduce human error when transcribing experimental results into regulatory filings.
+
+### Decision
+
+Enforce a standardized, deterministic directory hierarchy for every benchmark experiment:
+```
+experiments/<dataset_name>/
+├── config.json          # Complete hyperparameter, seed, and hardware configuration
+├── results.json         # Raw execution outputs with full statistical distributions
+├── metrics.csv          # Normalized epoch/round progression metrics
+├── report.md            # Human-readable experiment summary and takeaway analysis
+├── plots/               # Publication-grade vector graphics (PR curves, ROC, calibration)
+└── audit_dossier.md     # Regulator-ready compliance audit dossier
+```
+Automate documentation compilation via dedicated serialization scripts that parse `results.json` directly to update benchmark tables and markdown dossiers without manual copy-paste.
+
+### Rationale
+
+1. **Audit Traceability**: Every metric cited in documentation links directly to its source `results.json` artifact with full provenance.
+2. **Zero Transcription Error**: Automated markdown compilers eliminate discrepancies between code outputs and published numbers.
+3. **Automated Verification**: Asserted by `scripts/verify_reproducibility.py`.
+
+### Tradeoff
+
+* Imposes rigid output schema constraints on all new benchmark scripts and experimental harnesses.
+
+---
+
+## ED-048: Software Correctness vs Scientific Generalization Dual-Taxonomy
+
+**Date**: 2026-09-29  
+**Status**: Accepted
+
+### Context
+
+Engineering teams and external bank auditors often conflate software reliability defects with scientific learning limits. For instance, observing lower PR-AUC under high differential privacy noise ($\sigma=3.0$) or on out-of-time distribution shift is a predictable scientific property of statistical estimators, not a software bug or broken API. Treating scientific phenomena as code bugs leads to inappropriate code patches (e.g. artificial metric clamps, fake fallback constants, or swallowed exceptions).
+
+### Decision
+
+Formally establish an architectural Dual-Taxonomy boundary across all documentation, test suites, and audit procedures (codified in [`docs/verification_taxonomy_spec.md`](verification_taxonomy_spec.md)):
+1. **Software Correctness**: Governed by strict zero-tolerance engineering gates: 100% test pass rates, deterministic type safety (Pydantic v2 / TypeScript), zero unhandled exceptions, zero dead code, zero mocks in production paths, and sub-15ms fast-path inference SLAs.
+2. **Scientific Generalization**: Governed by empirical scientific protocols: the Anti-Metric Shopping Protocol, Negative Result Ledger, out-of-distribution evaluation, statistical confidence intervals, and differential privacy budget tracking. Utility penalties under adversarial attacks or privacy noise are cataloged as empirical findings rather than masked in software.
+
+### Rationale
+
+1. **Zero-Mock Engineering**: Prevents developers from masking model underperformance with hardcoded overrides, preserving production integrity.
+2. **Regulator Alignment**: Delivers unvarnished, mathematically transparent documentation to supervisory authorities (Federal Reserve, OCC, ECB).
+3. **Automated Verification**: Verified across `docs/verification_taxonomy_spec.md` and `backend/tests/unit/test_anti_metric_shopping_spec.py`.
+
+### Tradeoff
+
+* Requires educating cross-functional stakeholders on the distinction between code defects and scientific optimization boundaries.
+
 
 
 

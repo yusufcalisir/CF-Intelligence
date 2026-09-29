@@ -129,9 +129,9 @@ All benchmark evaluations enforce strict chronological splits ($t \le t_{\mathrm
 ## 4. Empirical Performance & Statistical Robustness
 
 ### 4.1 5-Seed Statistical Robustness Protocol
-Evaluated across canonical pseudo-random seeds $\mathcal{S} = \{42, 123, 456, 789, 1024\}$ using Student-$t$ distribution 95% Confidence Intervals with $N-1 = 4$ degrees of freedom ($t_{0.975, 4} = 2.776$):
+Evaluated across canonical pseudo-random seeds $\mathcal{S} = \{42, 123, 456, 789, 1024\}$ using Student's $t$-distribution 95% Confidence Intervals with $N-1 = 4$ degrees of freedom ($t_{0.975, 4} = 2.776$):
 
-$$\mathrm{CI}_{95\%} = \left[ \mu - t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}}, \; \mu + t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}} \right]$$
+$$\mathrm{CI}_{0.95} = \left[ \mu - t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}}, \quad \mu + t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}} \right]$$
 
 | Benchmark Suite | Strategy / Model | Metric | Mean ($\mu \pm \sigma$) | 95% Confidence Interval | Minimum | Maximum |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
@@ -147,11 +147,11 @@ $$\mathrm{CI}_{95\%} = \left[ \mu - t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}}
 
 ### 4.2 Multi-Hop Graph Detection Uplift
 On the IBM AMLSim benchmark, inductive GraphSAGE achieves significant detection uplift over Tabular MLP baselines:
-- **PR-AUC Uplift**: $+0.0434$ ($0.6527$ vs $0.6093$)
-- **Recall @ 0.1% Strict FPR**: $+4.19\text{ percentage points}$ ($64.12\%$ vs $59.93\%$)
-- **Complex Cycle Recall**: $+2.08\%$ ($67.36\%$ vs $65.28\%$)
-- **Fan-In Smurfing Recall**: $+5.75\%$ ($70.50\%$ vs $64.75\%$)
-- **Graph Inference Latency**: $1.11\text{ ms}$ per $1{,}000$ transactions
+- **PR-AUC Uplift**: +0.0434 (0.6527 vs 0.6093)
+- **Recall @ 0.1% Strict FPR**: +4.19 percentage points (64.12% vs 59.93%)
+- **Complex Cycle Recall**: +2.08% (67.36% vs 65.28%)
+- **Fan-In Smurfing Recall**: +5.75% (70.50% vs 64.75%)
+- **Graph Inference Latency**: 1.11 ms per 1,000 transactions
 
 ### 4.3 Inference Gateway Latency & Throughput
 Evaluated on production host hardware under multi-concurrency load testing ($C = 1 \dots 100$ concurrent clients):
@@ -180,7 +180,7 @@ Pursuant to EU GDPR Article 9 special-category prohibitions and ECOA Regulation 
 ### 5.3 Operational Proxy Attribute Fairness Evaluation
 Evaluated under the **EEOC 80% Four-Fifths Rule** ($0.80 \le \mathrm{DIR} \le 1.25$):
 
-$$\mathrm{DIR} = \frac{\mathbb{P}(\hat{Y}=1 \mid A=\text{unprivileged})}{\mathbb{P}(\hat{Y}=1 \mid A=\text{privileged})}, \quad \mathrm{EOD} = \mathrm{TPR}_{\text{unprivileged}} - \mathrm{TPR}_{\text{privileged}}$$
+$$\mathrm{DIR} = \frac{\mathbb{P}(\hat{Y} = 1 \mid A = \mathrm{unprivileged})}{\mathbb{P}(\hat{Y} = 1 \mid A = \mathrm{privileged})}, \quad \mathrm{EOD} = \mathrm{TPR}_{\mathrm{unprivileged}} - \mathrm{TPR}_{\mathrm{privileged}}$$
 
 | Operational Proxy Dimension | Privileged Group | Unprivileged Group | Disparate Impact (DIR) | Equal Opportunity (EOD) | Demographic Parity (DPD) | 80% Rule Compliance |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: |
@@ -207,10 +207,10 @@ Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_a
 
 | Failure Mode | Affected Operational Stratum | Empirical Rate | Root Cause | Engineering Mitigation |
 | :--- | :--- | :---: | :--- | :--- |
-| **FM-01: Micro-Structuring** | Amount $<\$250$, Degree $k \le 2$ | **47.67% FNR** | Single-bank velocity counters blind to cross-bank micro-bursts below CTR limits | DH-PSI anonymous cross-bank velocity linking and reduced anomaly threshold for new accounts |
+| **FM-01: Micro-Structuring** | Amount $< 250\text{ USD}$, Degree $k \le 2$ | **47.67% FNR** | Single-bank velocity counters blind to cross-bank micro-bursts below CTR limits | DH-PSI anonymous cross-bank velocity linking and reduced anomaly threshold for new accounts |
 | **FM-02: Nocturnal Batch Clearing** | Hours `00:00-05:59`, MCC `6012` | **14.98% FPR** | Diurnal sine/cosine cyclical encoding penalizes automated off-hours payroll/clearing | ISO 20022 `camt.053` corporate calendar whitelisting |
 | **FM-03: Super-Hub Aggregators** | Network Degree $k > 50$ | **90.00% FNR** | GNN neighborhood over-smoothing washes out fraud embeddings into clean centroid | Temporal edge-weight attention discounting routine high-volume flows |
-| **FM-04: Cross-Border Specialty** | MCC `5999`, Cross-Border | **43.48% FNR** | Differential privacy noise ($\epsilon=1.0$) attenuates low-frequency categorical weights | Deterministic triage routing borderline scores ($[0.45, 0.55]$) to Four-Eyes human review |
+| **FM-04: Cross-Border Specialty** | MCC `5999`, Cross-Border | **43.48% FNR** | Differential privacy noise ($\epsilon=1.0$) attenuates low-frequency categorical weights | Deterministic triage routing borderline scores ([0.45, 0.55]) to Four-Eyes human review |
 
 ---
 
@@ -218,7 +218,7 @@ Stratified residual diagnostics ([`benchmarks/results/raw/error_stratification_a
 
 - **Hardware Infrastructure**: Trained on NVIDIA RTX 4090 / A100 GPUs (training) and validated on x86-64 multi-core CPUs (inference edge).
 - **Energy Consumption**: Federated local training consumes $\approx 0.042\text{ kWh}$ per local round per banking node.
-- **Bandwidth Optimization**: Federated model communication overhead is reduced by **74.8%** via Zstandard compression, Top-$k$ sparsification ($k=20\%$), and INT8 quantization, enabling operation over standard commercial WAN connections.
+- **Bandwidth Optimization**: Federated model communication overhead is reduced by **74.8%** via Zstandard compression, Top-$k$ sparsification ($k = 0.20$, top 20%), and INT8 quantization, enabling operation over standard commercial WAN connections.
 
 ---
 

@@ -187,4 +187,4 @@ All air-gapped packaging, checksum attestation, database schema migrations, and 
 | :--- | :--- | :--- | :---: | :---: |
 | [test_perimeter_airgap.py](../backend/tests/unit/test_perimeter_airgap.py) | `perimeter_waf.py`, `airgap_installer.py` | IP whitelisting, SQLi/XSS rejection, manifest SHA-256 byte verification | 2 | ✅ 100% Pass |
 | [test_alembic_migrations.py](../backend/tests/unit/test_alembic_migrations.py) | Alembic migrations | Single linear branch, clean upgrade/downgrade, zero schema drift | 3 | ✅ 100% Pass |
-| **Total Verified** | **2 Dedicated Suites** | **Air-Gapped Banking Security & Deployment** | **5 Tests** | **100% Pass** |
+| **Total Verified** | **2 Dedicated Suites** | **Air-Gapped Banking Security & Deployment** | **5 Tests** | ✅ **100% Pass** |

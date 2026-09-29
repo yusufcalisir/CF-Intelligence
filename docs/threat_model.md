@@ -92,8 +92,8 @@ mindmap
 | :--- | :--- | :--- | :--- |
 | **Unprotected Gradient Baseline** | $r \approx 1.000$ | $\text{MSE} \approx 0.014$ | ⚠️ High feature leakage risk |
 | **Gradient Clipping Only** | $r \approx 0.812$ | $\text{MSE} \approx 0.271$ | 🟡 Partial feature degradation |
-| **Secure Aggregation (SecAgg Masks)** | **$r = 0.071$** | **$\text{MSE} = 1.033$** | ✅ Near-zero correlation floor |
-| **Differential Privacy ($\epsilon=1.0$)** | **$r = 0.059$** | **$\text{MSE} = 3.446$** | ✅ Near-zero correlation floor |
+| **Secure Aggregation (SecAgg Masks)** | $r = \mathbf{0.071}$ | $\mathrm{MSE} = \mathbf{1.033}$ | ✅ Near-zero correlation floor |
+| **Differential Privacy** ($\epsilon=1.0$) | $r = \mathbf{0.059}$ | $\mathrm{MSE} = \mathbf{3.446}$ | ✅ Near-zero correlation floor |
 
 ---
 
@@ -151,12 +151,12 @@ The platform evaluates global model convergence stability ($F_1$ score) across 6
 
 | Aggregator Scheme | Clean Baseline $F_1$ | Single Byzantine ($f=1$) $F_1$ | Colluding Byzantine ($f=2$) $F_1$ | Empirical Breakdown Point | Security Status |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Standard FedAvg** | $94.5\%$ | **$12.5\%$** (Collapses) | **$8.2\%$** (Collapses) | $f / N = 0$ | ❌ Vulnerable to single node |
-| **FedProx** | $94.5\%$ | **$14.2\%$** (Collapses) | **$9.5\%$** (Collapses) | $f / N = 0$ | ❌ Vulnerable to single node |
-| **Coordinate Median** | $94.5\%$ | $92.1\%$ | $91.5\%$ | $f / N < 0.50$ | ✅ Robust up to $50\%$ |
-| **Krum** | $94.5\%$ | $91.8\%$ | $88.2\%$ | $f / N < (N{-}2)/2$ | ✅ Robust under $f=1$ |
-| **Trimmed Mean** | $94.5\%$ | **$93.4\%$** | **$93.1\%$** | $f / N = \beta$ | ✅ Robust up to $\beta$ fraction |
-| **Bulyan** | $94.5\%$ | **$93.8\%$** | **$93.6\%$** | $f \le (N{-}3)/4$ | ✅ Robust against colluding nodes |
+| **Standard FedAvg** | 94.5% | **12.5%** (Collapses) | **8.2%** (Collapses) | $f / N = 0$ | ❌ Vulnerable to single node |
+| **FedProx** | 94.5% | **14.2%** (Collapses) | **9.5%** (Collapses) | $f / N = 0$ | ❌ Vulnerable to single node |
+| **Coordinate Median** | 94.5% | 92.1% | 91.5% | $f / N < 0.50$ | ✅ Robust up to 50% |
+| **Krum** | 94.5% | 91.8% | 88.2% | $f / N < (N{-}2)/2$ | ✅ Robust under $f=1$ |
+| **Trimmed Mean** | 94.5% | **93.4%** | **93.1%** | $f / N = \beta$ | ✅ Robust up to $\beta$ fraction |
+| **Bulyan** | 94.5% | **93.8%** | **93.6%** | $f \le (N{-}3)/4$ | ✅ Robust against colluding nodes |
 
 ---
 
@@ -171,9 +171,9 @@ The platform evaluates global model convergence stability ($F_1$ score) across 6
 
 | Aggregation Scheme | Backdoor Attack Success Rate (ASR) | Main Task Accuracy | Malicious Quarantine Recall |
 | :--- | :--- | :--- | :--- |
-| **Standard FedAvg** | **$88.5\%$** (Vulnerable) | $86.2\%$ | $0.0\%$ (No Detection) |
-| **Krum Aggregation** | $34.0\%$ (Partial Defense) | $89.5\%$ | $50.0\%$ |
-| **Spectral SVD Defense** | **$2.1\%$** (Complete Defense) | **$94.1\%$** | **$100.0\%$** (Perfect Recall) |
+| **Standard FedAvg** | **88.5%** (Vulnerable) | 86.2% | 0.0% (No Detection) |
+| **Krum Aggregation** | 34.0% (Partial Defense) | 89.5% | 50.0% |
+| **Spectral SVD Defense** | **2.1%** (Complete Defense) | **94.1%** | **100.0%** (Perfect Recall) |
 
 ---
 
@@ -245,7 +245,7 @@ With default settings (ε=1.0, δ=1e-5) over 10 rounds:
 | Private Set Intersection (PSI) | Simulated DH-PSI / **Secure TEE Enclave Matching** | **Hardware Enclave (Intel SGX)** or Multi-party Computation (MPC) |
 | DP accounting & Budgeting | Basic composition + **Strict Budget Limit Gating** | Rényi DP (moments accountant) + Budget limits |
 | Byzantine resilience | **Krum / Median Implemented** | Krum / Trimmed Mean |
-| Audit logging & Vulnerability Audits | **SHA-256 Cryptographic Hash Chain Ledger** ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) | Tamper-evident audit trail + Real-time vulnerability scanning |
+| Audit logging & Vulnerability Audits | **SHA-256 Cryptographic Hash Chain Ledger** ($H_i = \mathrm{SHA256}(L_i \parallel H_{i-1})$) | Tamper-evident audit trail + Real-time vulnerability scanning |
 | Key management & Secrets | **HashiCorp Vault KV v2 Secret Engine Client** | HSM-backed key infrastructure / HashiCorp Vault |
 
 This gap analysis is intentional — the simulator demonstrates the concepts and simulates hardware constraints. Production deployment requires hardening each layer.
@@ -259,8 +259,8 @@ The system architecture and interfaces are mapped against the **STRIDE** securit
 | Threat Category | Specific Threat Description | Affected Components | Active Mitigations | Production Gap / Residual Risk |
 |:---|:---|:---|:---|:---|
 | **Spoofing** | A compromised or malicious node masquerades as a verified participating bank to send false parameters or steal global weights, or exploits listening client ports. | FL Aggregation Coordinator, Client Network Interface | **mTLS 1.3 X.509 PKI** with SAN verification, HashiCorp Vault Root CA (`init_vault_pki.py`), dynamic cert rotation (`mtls_manager.py`), OIDC JWT validation, and **Zero-Inbound Port Standalone Bank Client Daemon (`cfi-bank-client`)** initiating outbound-only egress mTLS streams to coordinator port `50051` (zero listening ports on client subnet). | Certificate revocation propagation latency. |
-| **Tampering** | A participant alters local parameters to degrade model performance (Model Poisoning) or inject backdoors. | Pytorch Training, FedAvg Engine | Byzantine-Robust aggregation (Krum, Coordinate-wise Median), **SHA-256 Cryptographic Audit Chain** | Attack scale threshold limits. If $>50\%$ of nodes are compromised, median fails. |
-| **Repudiation** | An attacker performs malicious actions (e.g., model poisoning) and denies execution due to lack of non-repudiation logs. | Microservices Gateway | **Tamper-Evident SHA-256 Audit Chain** ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) with 1-click retrospective verification | Offline ledger backup frequency. |
+| **Tampering** | A participant alters local parameters to degrade model performance (Model Poisoning) or inject backdoors. | Pytorch Training, FedAvg Engine | Byzantine-Robust aggregation (Krum, Coordinate-wise Median), **SHA-256 Cryptographic Audit Chain** | Attack scale threshold limits. If > 50% of nodes are compromised, median fails. |
+| **Repudiation** | An attacker performs malicious actions (e.g., model poisoning) and denies execution due to lack of non-repudiation logs. | Microservices Gateway | **Tamper-Evident SHA-256 Audit Chain** ($H_i = \mathrm{SHA256}(L_i \parallel H_{i-1})$) with 1-click retrospective verification | Offline ledger backup frequency. |
 | **Information Disclosure** | Passive intercept of model weights allows gradient inversion, reconstructing raw transaction features or identity fields. | Network Gateway, Aggregation Engine | Differential Privacy (L2 clipping + noise), Secure Aggregation masking, **HashiCorp Vault KV v2 & PKI Secrets Engine Isolation** | Basic composition limits budget tracking. Requires advanced accounting. |
 | **Denial of Service** | A client drops offline or sends malformed weights, stalling coordinator aggregation routines. | flower_engine, Celery Workers | Quorum checks ($\ge$ Min Clients), timeout intervals, fallback state | Distributed denial of service on gateway endpoints. |
 | **Elevation of Privilege** | An unauthorized client gains access to case management records or starts scenarios via gateway. | gateway API router | **Dynamic ABAC Engine** (multi-tenant bank isolation, shift hour restrictions, approval tier limits, clearance levels), OIDC JWT claims | Policy misconfiguration risks. |
@@ -434,7 +434,9 @@ The platform implements fairness auditing and debiasing layers to comply with th
 * **Threat**: A GNN model trained across non-IID bank datasets learns systemic demographic biases, causing high false-positive fraud flags on specific nationalities or age groups (e.g., flagging international transactions).
 * **Mitigations**:
   * **Covariance Penalization Loss (Local Debiasing)**: If `enable_bias_mitigation` is active, client nodes compute the covariance between prediction probabilities ($p$) and sensitive attributes ($A$):
-    $$\mathcal{L}_{\text{fair}} = \lambda \cdot \text{cov}(p, A)^2$$
+
+$$\mathcal{L}_{\mathrm{fair}} = \lambda \cdot \mathrm{cov}(p, A)^2$$
+
     This penalizes parameter states that correlate fraud decisions with demographic slices.
   * **Decentralized Auditing**: Clients safely compute and send local count vectors to calculate global Disparate Impact and Equal Opportunity statistics without sharing raw sensitive attributes.
 
@@ -553,7 +555,7 @@ The Hardware Security Module Key Vault Engine (`hsm_signer.py`) anchors node pri
 * **Threat**: Adversary with root privileges on the bank node host attempts to extract private RSA-4096 or Ed25519 signing keys from container RAM or disk storage.
 * **Mitigations**:
   * **Zero-Disk Private Key Architecture (`HSMSignerEngine`)**: Private signing keys are generated directly inside FIPS 140-2 Level 3 hardware enclaves (`generate_key_pair`) with `is_exportable = False`.
-  * **In-Hardware Execution**: All digital signature operations ($S = \operatorname{Sign}_{\mathrm{HSM}}(H)$) execute within the hardware enclave boundaries via PKCS#11 standard calls (`sign_digest`). Plaintext private key material never touches host disk, swap, or container memory.
+  * **In-Hardware Execution**: All digital signature operations ($S = \mathrm{Sign}_{\mathrm{HSM}}(H)$) execute within the hardware enclave boundaries via PKCS#11 standard calls (`sign_digest`). Plaintext private key material never touches host disk, swap, or container memory.
 
 ### 17.2 Unauthorized Key Usage & Key Handle Forgery (Tampering & Elevation of Privilege)
 * **Threat**: Rogue process attempts to sign arbitrary payloads using unassigned HSM key handles.

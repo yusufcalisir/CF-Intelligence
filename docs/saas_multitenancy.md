@@ -6,19 +6,19 @@ The Collaborative Fraud Intelligence (CFI) platform operates as a multi-tenant S
 
 ## 🏗️ Multi-Tenant Architecture Overview
 
-```
+```text
                           ┌────────────────────────┐
                           │   Inbound API Gateway  │
                           │   (JWT / mTLS Auth)    │
                           └───────────┬────────────┘
                                       │ Tenant ID Extracted
-                                      ▼
+                                      v
                         ┌────────────────────────────┐
                         │ TenantAccessControl        │
                         │ Middleware (BOLA Defense)  │
                         └─────────────┬──────────────┘
                                       │ active_tenant.set("bank_a")
-                                      ▼
+                                      v
              ┌─────────────────────────────────────────────────┐
              │       AsyncEngine Multi-Tenant Pool             │
              ├────────────────────────┬────────────────────────┤
@@ -104,8 +104,7 @@ High-volume inference bursts and collaborative FL rounds require race-condition-
 
 Each institution maintains isolated cryptographic keys managed through `TenantKMSService`:
 
-- **Versioned Envelope Format:** Stored ciphertexts maintain explicit versioning headers:
-  $$\mathrm{Payload} = \mathtt{v}\{\mathrm{version}\} : \mathrm{iv}_{\mathrm{b64}} : \mathrm{tag}_{\mathrm{b64}} : \mathrm{ciphertext}_{\mathrm{b64}}$$
+- **Versioned Envelope Format:** Stored ciphertexts maintain explicit versioning headers: $\mathrm{Payload} = \mathtt{v}\{\mathrm{version}\} : \mathrm{iv}_{\mathrm{b64}} : \mathrm{tag}_{\mathrm{b64}} : \mathrm{ciphertext}_{\mathrm{b64}}$.
 - **Data Re-Encryption (`re_encrypt_tenant_data`):** Migrates historical encrypted records from retired keys to active version keys during scheduled maintenance.
 - **Revocation Fail-Closed (`invalidate_retired_keys`):** Un-migrated ciphertexts under revoked keys immediately fail closed with `DecryptionError`.
 - **Scheduled Maintenance Cron (`POST /v1/cron/rotate-keys`):** Protected endpoint authorized with `CRON_SECRET_KEY` for scheduled Kubernetes CronJob or CloudWatch Event execution.
@@ -114,24 +113,24 @@ Each institution maintains isolated cryptographic keys managed through `TenantKM
 
 ## 📊 6. Tenant Lifecycle State Machine
 
-```
+```text
       ┌────────────────┐
-      │  PROVISIONING  │ ──► DDL Migration & Schema Provisioning
+      │  PROVISIONING  │ ──> DDL Migration & Schema Provisioning
       └───────┬────────┘
               │ Schema Verified
-              ▼
+              v
       ┌────────────────┐
-      │     ACTIVE     │ ──► Full FL Training & Scoring Participation
+      │     ACTIVE     │ ──> Full FL Training & Scoring Participation
       └───────┬────────┘
               │ Compliance Flag / Sanctions
-              ▼
+              v
       ┌────────────────┐
-      │   SUSPENDED    │ ──► Quota Rejected (HTTP 403 / 429)
+      │   SUSPENDED    │ ──> Quota Rejected (HTTP 403 / 429)
       └───────┬────────┘
               │ Contract Termination
-              ▼
+              v
       ┌────────────────┐
-      │    DELETED     │ ──► Cryptographic Zeroization & GDPR Art. 17 Purge
+      │    DELETED     │ ──> Cryptographic Zeroization & GDPR Art. 17 Purge
       └────────────────┘
 ```
 
@@ -169,7 +168,7 @@ All SaaS multi-tenancy capabilities are verified by continuous automated test su
 
 | Test Suite | File Path | Verified Capabilities | Status |
 | :--- | :--- | :--- | :---: |
-| **Tenant Lifecycle** | `backend/tests/unit/test_saas_multi_tenancy.py` | State transitions (PROVISIONING $\to$ ACTIVE $\to$ SUSPENDED $\to$ DELETED) | `3/3 PASSED` |
+| **Tenant Lifecycle** | `backend/tests/unit/test_saas_multi_tenancy.py` | State transitions (PROVISIONING → ACTIVE → SUSPENDED → DELETED) | `3/3 PASSED` |
 | **Multi-Tenancy Hardening** | `backend/tests/unit/test_saas_multi_tenancy_hardening.py` | Invariants, thread concurrency, monthly rollover, fail-closed quota, storage | `9/9 PASSED` |
 | **KMS & DB Isolation** | `backend/tests/unit/test_multi_tenancy.py` | Engine isolation, KMS key persistence, model vault directories, log filtering | `18/18 PASSED` |
 | **BOLA / IDOR Security** | `backend/tests/unit/test_multi_tenant_security_audit.py` | Cross-tenant 403 isolation, ContextVar leakage prevention, Redis key prefixing | `4/4 PASSED` |

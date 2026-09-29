@@ -15,9 +15,9 @@ In high-volume payment processing, uncalibrated classification thresholds (such 
 
 To ensure operational viability, decision thresholds are strictly calibrated on an independent **Validation Split** for predefined **False Positive Rate (FPR)** budgets, and subsequently audited on an untouched **Global Test Set**:
 
-$$\tau_{\alpha} = \inf \{ \tau \in [0, 1] : \operatorname{FPR}(\tau; \mathcal{D}_{\mathrm{val}}) \le \alpha \}$$
+$$\tau_{\alpha} = \inf \{ \tau \in [0, 1] : \mathrm{FPR}(\tau; \mathcal{D}_{\mathrm{val}}) \le \alpha \}$$
 
-$$\operatorname{Recall}(\tau_{\alpha}; \mathcal{D}_{\mathrm{test}}) = \frac{\sum_{i: y_i = 1} \mathbb{I}(\hat{y}_i \ge \tau_{\alpha})}{N_{\mathrm{pos}}}$$
+$$\mathrm{Recall}(\tau_{\alpha}; \mathcal{D}_{\mathrm{test}}) = \frac{\sum_{i: y_i = 1} \mathbb{I}(\hat{y}_i \ge \tau_{\alpha})}{N_{\mathrm{pos}}}$$
 
 ---
 
@@ -26,7 +26,7 @@ $$\operatorname{Recall}(\tau_{\alpha}; \mathcal{D}_{\mathrm{test}}) = \frac{\sum
 1. **Robust Feature Normalization**:
    - `Amount` transacted currency values exhibit extreme positive skew (0.00 to 25,691.16 EUR). A standard z-score normalization would be corrupted by heavy-tailed anomalies. `RobustScaler` maps values via median and Interquartile Range:
 
-$$(x - \operatorname{median}) / \operatorname{IQR}$$
+$$(x - \mathrm{median}) / \mathrm{IQR}$$
 
    - `Time` elapsed seconds (0 to 172,792 s over 48 hours) is scaled identically.
    - **Zero-Leakage Invariant**: Scaler parameters are fitted strictly on the 60% training partition and transformed across validation (20%) and test (20%) subsets without lookahead bias.

@@ -21,31 +21,31 @@ The **Unified Experiment Infrastructure** provides a rigorous, reproducible fram
 │   │ (Hyperparams/Seeds) │              │ (SHA-256 / Partitions) │           │
 │   └──────────┬──────────┘              └───────────┬────────────┘           │
 │              │                                     │                        │
-│              ▼                                     ▼                        │
+│              v                                     v                        │
 │   ┌─────────────────────────────────────────────────────────────┐           │
 │   │                     ExperimentTracker                       │           │
-│   │  • Context Manager (__enter__ / __exit__)                   │           │
-│   │  • Automatic Hardware Environment Probing (CPU, RAM, Torch) │           │
-│   │  • Automated Git Provenance Capture (SHA-1 / Branch)        │           │
-│   │  • Step-by-Step Training & Validation Trajectory Logging    │           │
-│   │  • Evaluation Curve Synthesis (ROC, PR, Brier, Confusion)   │           │
+│   │  - Context Manager (__enter__ / __exit__)                   │           │
+│   │  - Automatic Hardware Environment Probing (CPU, RAM, Torch) │           │
+│   │  - Automated Git Provenance Capture (SHA-1 / Branch)        │           │
+│   │  - Step-by-Step Training & Validation Trajectory Logging    │           │
+│   │  - Evaluation Curve Synthesis (ROC, PR, Brier, Confusion)   │           │
 │   └──────────────────────────────┬──────────────────────────────┘           │
 │                                  │                                          │
-│                                  ▼                                          │
+│                                  v                                          │
 │   ┌─────────────────────────────────────────────────────────────┐           │
 │   │                     ExperimentExporter                      │           │
-│   │  • Atomic JSON Serialization (results.json)                 │           │
-│   │  • Tabular Trajectory Logging (metrics.csv)                 │           │
-│   │  • High-Performance Columnar Traces (traces.parquet)        │           │
+│   │  - Atomic JSON Serialization (results.json)                 │           │
+│   │  - Tabular Trajectory Logging (metrics.csv)                 │           │
+│   │  - High-Performance Columnar Traces (traces.parquet)        │           │
 │   └──────────────┬──────────────────────────────┬───────────────┘           │
 │                  │                              │                           │
-│                  ▼                              ▼                           │
+│                  v                              v                           │
 │   ┌──────────────────────────────┐ ┌────────────────────────────┐           │
 │   │    Publication Plot Suite    │ │      ReportCompiler        │           │
-│   │ • ROC Curve (300 DPI)        │ │ • Executive Summary Matrix │           │
-│   │ • PR Curve (Prevalence line) │ │ • Confusion Matrix Table   │           │
-│   │ • Reliability Diagram        │ │ • Hardware & Hyperparams   │           │
-│   │ • Confusion Matrix Heatmap   │ │ • REPORT.md Markdown Dossier│          │
+│   │ - ROC Curve (300 DPI)        │ │ - Executive Summary Matrix │           │
+│   │ - PR Curve (Prevalence line) │ │ - Confusion Matrix Table   │           │
+│   │ - Reliability Diagram        │ │ - Hardware & Hyperparams   │           │
+│   │ - Confusion Matrix Heatmap   │ │ - REPORT.md Audit Dossier  │           │
 │   └──────────────────────────────┘ └────────────────────────────┘           │
 │                                                                             │
 └─────────────────────────────────────────────────────────────────────────────┘
@@ -55,9 +55,9 @@ The **Unified Experiment Infrastructure** provides a rigorous, reproducible fram
 1. **Zero Fabrication & Deterministic Reproducibility**:
    - Every experiment run captures the exact `git_commit` SHA-1 hash, execution branch, dataset `sha256_hash`, evaluated random seeds, and host hardware environment.
 2. **Atomic Disk Operations**:
-   - Serialization to `results.json`, `metrics.csv`, and `traces.parquet` uses staged atomic file replacement (`.tmp` $\to$ target) to prevent corrupted states during unexpected halts.
+   - Serialization to `results.json`, `metrics.csv`, and `traces.parquet` uses staged atomic file replacement (`.tmp` → target) to prevent corrupted states during unexpected halts.
 3. **Multi-Seed Statistical Aggregation**:
-   - Rather than single-seed evaluations, the runner aggregates across multiple random seeds (e.g. $[42, 123, 456]$), reporting mean ($\mu$), sample standard deviation ($\sigma$), min, max, and exact 95% confidence intervals ($\mu \pm 1.96 \cdot \frac{\sigma}{\sqrt{N}}$).
+   - Rather than single-seed evaluations, the runner aggregates across multiple random seeds (e.g. [42, 123, 456]), reporting mean ($\mu$), sample standard deviation ($\sigma$), min, max, and exact 95% confidence intervals ($\mu \pm 1.96 \cdot \frac{\sigma}{\sqrt{N}}$).
 4. **Publication-Grade Visual Assets**:
    - Plots are generated directly from raw execution arrays using headless Matplotlib (`Agg` backend) at 300 DPI with tight bounding boxes, suitable for academic papers and regulatory dossiers.
 
@@ -88,7 +88,7 @@ experiments/<dataset>/
 | [`experiments/amlsim/`](file:///experiments/amlsim/) | IBM AMLSim Graph Network | GraphSAGE vs Tabular MLP | PR-AUC: 0.6527, Cycle Rec: 67.4% | `STANDARDIZED` |
 | [`experiments/synthaml/`](file:///experiments/synthaml/) | Spar Nord SynthAML Lookback | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.9985, ROC-AUC: 0.9995 | `STANDARDIZED` |
 | [`experiments/amlnet/`](file:///experiments/amlnet/) | AUSTRAC Rare-Event AMLNet | `DeepFraudMLP` (FedAvg) | PR-AUC: 1.0000, ROC-AUC: 1.0000 | `STANDARDIZED` |
-| [`experiments/cross_bank/`](file:///experiments/cross_bank/) | CFI-CrossBank-01 Consortium | 3-Bank Consortium (FedAvg) | +55.59% Uplift, $836k Averted | `STANDARDIZED` |
+| [`experiments/cross_bank/`](file:///experiments/cross_bank/) | CFI-CrossBank-01 Consortium | 3-Bank Consortium (FedAvg) | +55.59% Uplift, 836,000 USD Averted | `STANDARDIZED` |
 
 ### 2.2 Execution Run Directory Topology (`experiments/results/`)
 Dynamic experiment runs initiated via the runner harness create isolated execution snapshots:
@@ -155,7 +155,7 @@ When evaluating algorithms across varying seeds $S = \{s_1, s_2, \dots, s_n\}$:
 
 $$\mu = \frac{1}{n} \sum_{i=1}^n x_i, \quad s = \sqrt{\frac{1}{n-1} \sum_{i=1}^n (x_i - \mu)^2}$$
 
-$$\text{CI}_{95\%} = \left[ \max\left(0, \mu - 1.96 \cdot \frac{s}{\sqrt{n}}\right), \, \min\left(1, \mu + 1.96 \cdot \frac{s}{\sqrt{n}}\right) \right]$$
+$$\mathrm{CI}_{0.95} = \left[ \max\left(0, \mu - 1.96 \cdot \frac{s}{\sqrt{n}}\right), \quad \min\left(1, \mu + 1.96 \cdot \frac{s}{\sqrt{n}}\right) \right]$$
 
 Stored in `summary.json`:
 ```json

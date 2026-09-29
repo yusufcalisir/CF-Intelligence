@@ -44,7 +44,7 @@ Financial institutions currently evaluate five primary architectural paradigms:
 ```
 
 ### 2.1. Paradigm 1: Legacy On-Premises Monoliths & Relational Rule Engines
-* **Architectural Archetype:** Traditional on-premises relational databases (Oracle, DB2) executing scheduled SQL queries and static deterministic rules (e.g., `amount > $10,000 AND country != US`).
+* **Architectural Archetype:** Traditional on-premises relational databases (Oracle, DB2) executing scheduled SQL queries and static deterministic rules (e.g., `amount > 10000 AND country != 'US'`).
 * **Architecture:** Monolithic relational database executing scheduled batch jobs and heuristic threshold filters.
 * **Critical Limitations:**
   * **Zero Cross-Bank Intelligence:** Completely isolated behind each bank's firewall. Zero visibility into multi-hop layering or syndicate accounts operating simultaneously across peer banks.
@@ -153,7 +153,7 @@ A criminal syndicate orchestrating cross-bank smurfing operates across instituti
  Normal Transfer)              Normal Transfer)              Normal Inflow)
 ```
 
-* **Why Legacy Monoliths & Siloed Models Fail:** Bank 1, Bank 2, and Bank 3 each observe transactions below reporting thresholds ($<\$10,000$). Standalone models lack visibility into the directed acyclic graph (DAG) connecting Mule A to Sink C.
+* **Why Legacy Monoliths & Siloed Models Fail:** Bank 1, Bank 2, and Bank 3 each observe transactions below reporting thresholds ($< 10{,}000\text{ USD}$). Standalone models lack visibility into the directed acyclic graph (DAG) connecting Mule A to Sink C.
 * **CF-Intelligence Solution:**
   1. **MinHash LSH Fuzzy PSI:** [`fuzzy_psi.py`](../backend/app/domain/fuzzy_psi.py) computes character 3-gram MinHash signatures and LSH band bucket partitions. Peer banks match fuzzy entity references across perimeters without revealing non-matching account records.
   2. **FedGNN 512-dim Node Embeddings:** [`graph_embedding_service.py`](../backend/app/application/services/graph_embedding_service.py) trains localized Graph Attention Networks (GAT). Aggregated graph representations capture multi-hop structural topologies across the consortium, boosting illicit node detection on Elliptic from $0.2543$ to $0.8746$ PR-AUC (+62.0% absolute advantage).
@@ -229,11 +229,11 @@ Under empirical real-world distributions with calibrated differential privacy no
 
 Financial institutions quantify the economic impact using the **Financial Cost-Utility Function**:
 
-$$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right) + \left( FP(\tau) \cdot C_{\text{FP}} \right) + \left( TP(\tau) \cdot C_{\text{TP}} \right)$$
+$$\mathrm{Cost}_{\mathrm{total}}(\tau) = \left( \mathrm{FN}(\tau) \cdot C_{\mathrm{FN}} \right) + \left( \mathrm{FP}(\tau) \cdot C_{\mathrm{FP}} \right) + \left( \mathrm{TP}(\tau) \cdot C_{\mathrm{TP}} \right)$$
 
-* $C_{\text{FN}} = \$850$ (Direct unrecovered dollar chargeback and regulatory remediation per missed fraud event).
-* $C_{\text{FP}} = \$18$ (Customer SMS/OTP friction, phone support, blocked card re-issuance, and lost merchant GMV).
-* $C_{\text{TP}} = \$6$ (Compliance analyst SAR triage and automated FinCEN filing review).
+* $C_{\mathrm{FN}} = 850\text{ USD}$ (Direct unrecovered dollar chargeback and regulatory remediation per missed fraud event).
+* $C_{\mathrm{FP}} = 18\text{ USD}$ (Customer SMS/OTP friction, phone support, blocked card re-issuance, and lost merchant GMV).
+* $C_{\mathrm{TP}} = 6\text{ USD}$ (Compliance analyst SAR triage and automated FinCEN filing review).
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐

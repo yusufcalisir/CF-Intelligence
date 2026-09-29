@@ -18,9 +18,9 @@ To resolve these variations without compromising privacy or exposing raw PII, CF
 ### 2.1 Character Shingling ($n$-grams)
 Let an input attribute string be denoted $S \in \Sigma^*$. The string is first normalized through Unicode NFKC normalization, whitespace compression, and lowercase transformation:
 
-$$S_{\mathrm{norm}} = \operatorname{Normalize}(S)$$
+$$S_{\mathrm{norm}} = \mathrm{Normalize}(S)$$
 
-For a fixed shingle length $n \in \mathbb{N}$ (default $n=3$, character trigrams), the set of shingles $A = \operatorname{Shingles}_n(S_{\mathrm{norm}})$ is defined as:
+For a fixed shingle length $n \in \mathbb{N}$ (default $n=3$, character trigrams), the set of shingles $A = \mathrm{Shingles}_n(S_{\mathrm{norm}})$ is defined as:
 
 $$A = \{ S_{\mathrm{norm}}[i : i+n] \mid 0 \le i \le |S_{\mathrm{norm}}| - n \}$$
 
@@ -48,7 +48,7 @@ where $p = 2^{31} - 1$ is a Mersenne prime, $a_k \in \{1, 2, \dots, p-1\}$, and 
 
 $$a_k = 1 + (k \cdot 10007 \bmod (p - 1)), \quad b_k = (k \cdot 20011) \bmod p$$
 
-For each shingle $s \in A$, a baseline 32-bit token hash $x = \operatorname{CRC32}(s)$ is computed. The $K$-dimensional MinHash signature vector $\mathbf{s}(A) \in \mathbb{N}^K$ is:
+For each shingle $s \in A$, a baseline 32-bit token hash $x = \mathrm{CRC32}(s)$ is computed. The $K$-dimensional MinHash signature vector $\mathbf{s}(A) \in \mathbb{N}^K$ is:
 
 $$\mathbf{s}(A) = \left[ \min_{x \in A} h_1(x), \, \min_{x \in A} h_2(x), \, \dots, \, \min_{x \in A} h_K(x) \right]$$
 
@@ -67,11 +67,11 @@ $$\mathbb{E}[\hat{J}] = J$$
 
 The theoretical variance and standard error depend inversely on signature dimension $K$:
 
-$$\operatorname{Var}(\hat{J}) = \frac{J(1 - J)}{K}$$
+$$\mathrm{Var}(\hat{J}) = \frac{J(1 - J)}{K}$$
 
-$$\operatorname{SE}(\hat{J}) = \sqrt{\frac{J(1 - J)}{K}} \le \frac{1}{2\sqrt{K}}$$
+$$\mathrm{SE}(\hat{J}) = \sqrt{\frac{J(1 - J)}{K}} \le \frac{1}{2\sqrt{K}}$$
 
-| Signature Dimension ($K$) | Maximum Variance ($\operatorname{Var}_{\max}$) | Maximum Standard Error ($\operatorname{SE}_{\max}$) | 95% Confidence Interval ($\pm 1.96 \cdot \operatorname{SE}$) |
+| Signature Dimension ($K$) | Maximum Variance ($\mathrm{Var}_{\max}$) | Maximum Standard Error ($\mathrm{SE}_{\max}$) | 95% Confidence Interval ($\pm 1.96 \cdot \mathrm{SE}$) |
 |:---|:---:|:---:|:---:|
 | $K = 16$ | $0.0156$ | $0.1250$ | $\pm 0.2450$ |
 | $K = 32$ | $0.0078$ | $0.0884$ | $\pm 0.1732$ |

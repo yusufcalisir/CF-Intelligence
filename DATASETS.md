@@ -306,7 +306,7 @@ $$\forall (u, v) \in \mathcal{E}, \quad \mathrm{timestep}(u) = \mathrm{timestep}
 3. `oldbalanceOrg`: Originator pre-transaction balance.
 4. `newbalanceOrig`: Originator post-transaction balance.
 5. `balance_orig_delta`: Originator balance mismatch delta.
-6. `balance_orig_ratio`: Balance depletion fraction ($\mathrm{amount} / (\mathrm{bal} + 1)$).
+6. `balance_orig_ratio`: Balance depletion fraction (amount / (bal + 1)).
 7. `hour`: Hour of transaction ($0 \le h \le 23$).
 8. `day_of_week`: Day of week ($0 \le d \le 6$).
 9. `type_TRANSFER`: Indicator for electronic fund transfers.

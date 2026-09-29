@@ -1,4 +1,4 @@
-﻿# Scientific Verification Inventory — Differential Privacy Subsystem
+# Scientific Verification Inventory — Differential Privacy Subsystem
 
 This document presents a complete scientific audit and verification inventory of the Differential Privacy (DP), Private Set Intersection (PETs), and Privacy Audit subsystem within the privacy-preserving cross-bank fraud detection platform.
 
@@ -26,7 +26,7 @@ This document presents a complete scientific audit and verification inventory of
 * **Mathematical Formulation:**
   $$\sigma = \frac{\Delta f \sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{W} = W + \mathcal{N}(\mathbf{0}, \sigma^2 \mathbf{I})$$
 * **Privacy Claim:** Guarantees $(\epsilon, \delta)$-DP under bounded L2 global sensitivity $\Delta f \le C$.
-* **Expected Invariant:** Noise std-dev $\sigma > 0$; expected noise mean $\mathbb{E}[\tilde{W} - W] = \mathbf{0}$; variance $\operatorname{Var}(\tilde{W} - W) = \sigma^2 \mathbf{I}$.
+* **Expected Invariant:** Noise std-dev $\sigma > 0$; expected noise mean $\mathbb{E}[\tilde{W} - W] = \mathbf{0}$; variance $\mathrm{Var}(\tilde{W} - W) = \sigma^2 \mathbf{I}$.
 * **Possible Implementation Risks:** Division by zero if $\epsilon \le 0$; float overflow if $\delta \ge 1.25$; PRNG seed predictability if non-cryptographic RNG is used.
 * **Edge Cases:** $\epsilon \to 0^+$ ($\sigma \to \infty$); $\delta \to 1.25$ ($\sigma \to 0$).
 * **Scientific Claim:** Implements exact analytical Gaussian mechanism noise scale calibration.
@@ -141,7 +141,7 @@ This document presents a complete scientific audit and verification inventory of
 ### Component 10: Empirical Shadow Model MIA Evaluator
 * **Purpose:** Evaluates Membership Inference vulnerability across unprotected vs DP-protected models using shadow loss threshold classification.
 * **Mathematical Formulation:**
-  $$\text{Predict Member if } \mathcal{L}(y, f(x)) < \operatorname{median}(\mathcal{L}), \quad \text{Advantage} = 2 \cdot |\text{Accuracy} - 0.5|$$
+  $$\text{Predict Member if } \mathcal{L}(y, f(x)) < \mathrm{median}(\mathcal{L}), \quad \text{Advantage} = 2 \cdot |\text{Accuracy} - 0.5|$$
 * **Privacy Claim:** Un-clipped empirical MIA accuracy and attack advantage calculation.
 * **Expected Invariant:** DP protection ($\epsilon = 1.0$) degrades attack advantage toward zero ($\text{Adv} < 0.05$).
 * **Possible Implementation Risks:** Extreme probability inputs ($0.0$ or $1.0$) causing `log(0)` invalid math.

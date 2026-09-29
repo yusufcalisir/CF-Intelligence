@@ -12,10 +12,10 @@ The Vendor commits to providing continuous, high-availability execution for the 
 | Service SLA Dimension | Tier 2 (Growth FinTech) | Tier 3 (Enterprise Bank) | Tier 4 (Consortium Network) |
 | :--- | :---: | :---: | :---: |
 | **Monthly Uptime SLA** | **99.90%** | **99.99%** | **99.999% (Fault-Tolerant)** |
-| **Allowed Unscheduled Downtime** | $\approx 43.8\text{ min/month}$ | $\approx 4.38\text{ min/month}$ | $\approx 26.3\text{ sec/month}$ |
-| **Inference Latency SLA (p99)** | $< 15.0\text{ ms}$ | $< 14.2\text{ ms}$ | $< 12.0\text{ ms}$ (Local Edge) |
-| **Recovery Time Objective (RTO)** | $< 60\text{ seconds}$ | $< 30\text{ seconds}$ | $< 10\text{ seconds}$ (Active-Active) |
-| **Recovery Point Objective (RPO)** | $0\text{ data loss}$ (HA DB) | $0\text{ data loss}$ (Multi-Region) | $0\text{ data loss}$ (Raft Consensus)|
+| **Allowed Unscheduled Downtime** | ≈ 43.8 min/month | ≈ 4.38 min/month | ≈ 26.3 sec/month |
+| **Inference Latency SLA (p99)** | < 15.0 ms | < 14.2 ms | < 12.0 ms (Local Edge) |
+| **Recovery Time Objective (RTO)** | < 60 seconds | < 30 seconds | < 10 seconds (Active-Active) |
+| **Recovery Point Objective (RPO)** | 0 data loss (HA DB) | 0 data loss (Multi-Region) | 0 data loss (Raft Consensus)|
 
 ---
 
@@ -27,11 +27,11 @@ If the Vendor fails to meet the monthly availability SLA, the Customer is contra
 
 | Actual Monthly Availability Measured | Allowed Downtime Window | Service Credit Percentage Applied |
 | :--- | :--- | :---: |
-| **$\ge 99.99\%$** | $\le 4.38\text{ minutes}$ | **$0\%$ (Compliant)** |
-| **$99.90\% - 99.98\%$** | $4.39\text{ min} - 43.8\text{ min}$ | **$10\%$ Credit Discount** |
-| **$99.00\% - 99.89\%$** | $43.9\text{ min} - 7.2\text{ hours}$ | **$25\%$ Credit Discount** |
-| **$95.00\% - 98.99\%$** | $7.3\text{ hours} - 36.5\text{ hours}$ | **$50\%$ Credit Discount** |
-| **$< 95.00\%$** | $> 36.5\text{ hours}$ | **$100\%$ Credit Discount (Full Month Refund)** |
+| **≥ 99.99%** | ≤ 4.38 minutes | **0% (Compliant)** |
+| **99.90% – 99.98%** | 4.39 min – 43.8 min | **10% Credit Discount** |
+| **99.00% – 99.89%** | 43.9 min – 7.2 hours | **25% Credit Discount** |
+| **95.00% – 98.99%** | 7.3 hours – 36.5 hours | **50% Credit Discount** |
+| **< 95.00%** | > 36.5 hours | **100% Credit Discount (Full Month Refund)** |
 
 ---
 

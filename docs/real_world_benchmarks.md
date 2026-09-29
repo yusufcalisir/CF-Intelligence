@@ -4,18 +4,18 @@
 
 ## 1. Executive Summary & The Synthetic vs. Real-World Paradox
 
-In privacy-preserving federated fraud detection and AML research, standard synthetic data generators (e.g. independently simulated Gaussian, Poisson, or uniform distributions across bank nodes) frequently demonstrate artificially high performance metrics (e.g., theoretical lab targets of $\text{ROC-AUC} \ge 0.950$, versus currently measured empirical multi-seed mean of $0.835$ with range $0.563 - 0.952$ across 5 seeded runs). While useful for sanity-checking distributed optimization algorithms (such as FedAvg, FedProx, or SecAgg), **synthetic numbers fail to reflect production banking realities**:
+In privacy-preserving federated fraud detection and AML research, standard synthetic data generators (e.g. independently simulated Gaussian, Poisson, or uniform distributions across bank nodes) frequently demonstrate artificially high performance metrics (e.g., theoretical lab targets of $\mathrm{ROC\text{-}AUC} \ge 0.950$, versus currently measured empirical multi-seed mean of 0.835 with range 0.563 – 0.952 across 5 seeded runs). While useful for sanity-checking distributed optimization algorithms (such as FedAvg, FedProx, or SecAgg), **synthetic numbers fail to reflect production banking realities**:
 
-1. **Extreme Class Imbalance ($0.01\% - 0.1\%$)**: In Tier-1 production banking, fraudulent transactions represent between 1 in 1,000 to 1 in 10,000 operations. Conventional ROC-AUC evaluates the true positive rate against false positive rate across all decision thresholds, which is heavily distorted by the overwhelming majority of legitimate transactions ($TN \gg FP$).
+1. **Extreme Class Imbalance** (0.01% – 0.1%): In Tier-1 production banking, fraudulent transactions represent between 1 in 1,000 to 1 in 10,000 operations. Conventional ROC-AUC evaluates the true positive rate against false positive rate across all decision thresholds, which is heavily distorted by the overwhelming majority of legitimate transactions ($TN \gg FP$).
 2. **Operational Alert Fatigue & Triage Burden**: Fraud operations centers cannot investigate thousands of false alarms daily. The industry standard requirement is strict: **Recall at a fixed False Positive Rate ($\text{Recall @ } 0.01\% - 0.1\% \text{ FPR}$)** and **Precision-Recall AUC ($\text{PR-AUC}$)**.
-3. **Statistical Heterogeneity & Concept Drift**: Independent financial institutions experience non-identical transaction types, currency flows, merchant mixes, and regional behavioral patterns ($\text{Non-IID}$ distributions).
+3. **Statistical Heterogeneity & Concept Drift**: Independent financial institutions experience non-identical transaction types, currency flows, merchant mixes, and regional behavioral patterns (Non-IID distributions).
 4. **Institutional Secrecy & Benchmark Standards**: Because banking privacy regulations (GDPR, CCPA, Banking Secrecy Act, KVKK, MASAK) strictly prohibit cross-border sharing of raw customer PII, the international academic and industrial research community establishes credibility using four canonical benchmark datasets.
 
 ---
 
 ## 2. Canonical Real-World Benchmark Datasets
 
-```
+```text
 ┌───────────────────────────────────────────────────────────────────────────────────────────────────────┐
 │                           CFI PLATFORM BENCHMARK REGISTRY MATRIX (2026)                               │
 ├───────────────────────┬─────────────────────────┬──────────────────┬──────────────────────────────────┤
@@ -33,7 +33,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 ### 2.1. PaySim Mobile Money (Kenya M-Pesa Financial Simulation)
 * **Dataset Identifier**: Kaggle `ealaxi/paysim1`
 * **Real-World Origin**: Derived from an aggregated sample of 1 month of financial transaction logs from the **M-Pesa** mobile money service in Kenya.
-* **Scale**: $6,362,620$ transaction records containing $8,213$ confirmed fraud events ($\text{Fraud Rate} = 0.129\%$).
+* **Scale**: 6,362,620 transaction records containing 8,213 confirmed fraud events ($\mathrm{FraudRate} = 0.129\%$).
 * **Transaction Modalities**:
   * `CASH_OUT` ($35.1\%$ volume — target fraud sink)
   * `PAYMENT` ($33.8\%$ volume)
@@ -43,11 +43,8 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 * **Key Fraud Mechanics**:
   Fraudsters execute unauthorized `TRANSFER` actions followed immediately by `CASH_OUT` to liquidate illicit funds. The source account balance is systematically depleted to zero.
 * **Engineered Discrepancy Features**:
-
-  $$\mathrm{ErrorBal}_{\mathrm{orig}} = \mathrm{NewBal}_{\mathrm{orig}} + \mathrm{Amount} - \mathrm{OldBal}_{\mathrm{orig}}$$
-
-  $$\mathrm{ErrorBal}_{\mathrm{dest}} = \mathrm{OldBal}_{\mathrm{dest}} + \mathrm{Amount} - \mathrm{NewBal}_{\mathrm{dest}}$$
-
+  - **Source Account Discrepancy**: $\mathrm{ErrorBal}_{\mathrm{orig}} = \mathrm{NewBal}_{\mathrm{orig}} + \mathrm{Amount} - \mathrm{OldBal}_{\mathrm{orig}}$
+  - **Destination Account Discrepancy**: $\mathrm{ErrorBal}_{\mathrm{dest}} = \mathrm{OldBal}_{\mathrm{dest}} + \mathrm{Amount} - \mathrm{NewBal}_{\mathrm{dest}}$
 * **Implementation**: [`dataloader.py: load_paysim()`](../backend/app/application/services/dataloader.py#L221)
 
 ---
@@ -55,7 +52,7 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 ### 2.2. IEEE-CIS Fraud Detection (Vesta Corporation)
 * **Dataset Identifier**: Kaggle `ieee-fraud-detection`
 * **Real-World Origin**: Provided by **Vesta Corporation**, a leading global payment solution provider, representing real-world e-commerce transactions.
-* **Scale**: $590,540$ transaction records with $394$ anonymized and engineered numerical/categorical features.
+* **Scale**: 590,540 transaction records with 394 anonymized and engineered numerical/categorical features.
 * **Feature Schema**:
   * `TransactionAmt`: Log-normal payment value in USD.
   * `ProductCD`: Product code mapping.
@@ -72,14 +69,14 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 ### 2.3. Elliptic Bitcoin Transaction Graph (Elliptic AML Benchmark)
 * **Dataset Identifier**: Kaggle `ellipticco/elliptic-data-set`
 * **Real-World Origin**: Published by **Elliptic Science**; represents actual transaction topologies on the Bitcoin blockchain.
-* **Scale**: $203,769$ transaction nodes, $234,355$ directed payment edges across $49$ discrete timesteps (each timestep spans approximately 2 weeks).
-* **Graph Features ($d=166$)**:
+* **Scale**: 203,769 transaction nodes, 234,355 directed payment edges across 49 discrete timesteps (each timestep spans approximately 2 weeks).
+* **Graph Features** ($d=166$):
   * 94 local node features (transaction fee, inputs/outputs count, total BTC volume).
   * 72 aggregated neighborhood features (one-hop and two-hop structural neighbor statistics).
 * **Label Distribution**:
-  * Class 1 (Illicit / Laundering / Ransomware / Darknet): $4,545$ nodes ($2.1\%$).
-  * Class 2 (Licit / Exchanges / Miners / Merchants): $42,019$ nodes ($20.6\%$).
-  * Unknown / Unlabeled: $157,205$ nodes ($77.3\%$).
+* Class 1 (Illicit / Laundering / Ransomware / Darknet): 4,545 nodes (2.1%).
+* Class 2 (Licit / Exchanges / Miners / Merchants): 42,019 nodes (20.6%).
+* Unknown / Unlabeled: 157,205 nodes (77.3%).
 * **GNN Evaluation Role**:
   Validates multi-party **Graph Attention Networks (FedGNN / GraphSAGE)** for multi-hop money laundering detection without centralizing raw graph adjacency matrices.
 * **Implementation**: [`dataloader.py: load_elliptic()`](../backend/app/application/services/dataloader.py#L57)
@@ -88,17 +85,14 @@ In privacy-preserving federated fraud detection and AML research, standard synth
 
 ### 2.4. LEAF Dirichlet Non-IID Heterogeneity Engine
 * **Mathematical Formulation**:
-  To replicate non-homogeneous cross-bank data partitions, transaction proportions are drawn from a Dirichlet distribution:
-  $$\mathbf{p}_c \sim \text{Dirichlet}(\alpha \cdot \mathbf{1}_K)$$
-  where $K$ is the number of bank nodes ($K=3$ default) and $\alpha \in (0, \infty)$ governs heterogeneity:
+  To replicate non-homogeneous cross-bank data partitions, transaction proportions are drawn from a Dirichlet distribution: $\mathbf{p}_c \sim \mathrm{Dirichlet}(\alpha \cdot \mathbf{1}_K)$, where $K$ is the number of bank nodes ($K = 3$ default) and $\alpha \in (0, \infty)$ governs heterogeneity:
   * $\alpha \to \infty$: Uniform IID distribution (unrealistic laboratory scenario).
   * $\alpha = 0.50$: Extreme Non-IID skew mirroring retail vs. commercial vs. wealth management institutions.
 * **Implementation**: [`fl_dirichlet_partitioner.py: DirichletPartitioner`](../backend/app/application/services/fl_dirichlet_partitioner.py) & [`dataloader.py: partition_dataset_non_iid()`](../backend/app/application/services/dataloader.py#L480)
-* **Statistical Verification (`compute_partition_stats`)**:
-  - Total Variation Distance ($\mathrm{TVD}_i = \frac{1}{2}\sum_c |P_i(c) - P_{\text{global}}(c)| \in [0, 1]$).
-  - Shannon Label Entropy ($H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$).
-  - Boundary Donor Rebalancing: Strictly guarantees $|D_i| \ge \mathrm{size}_{\mathrm{min}}$ without distorting natural Dirichlet concentration.
-
+* **Statistical Verification** (`compute_partition_stats`):
+  - **Total Variation Distance**: $\mathrm{TVD}_i = \frac{1}{2} \sum_c \lvert P_i(c) - P_{\mathrm{global}}(c) \rvert \in [0, 1]$
+  - **Shannon Label Entropy**: $H_i(Y) = -\sum_c P_i(c) \log_2 P_i(c)$
+  - **Boundary Donor Rebalancing**: Strictly guarantees $\lvert D_i \rvert \ge \mathrm{size}_{\mathrm{min}}$ without distorting natural Dirichlet concentration.
 ---
 
 ## 3. Empirical Performance Results & Cross-Bank Federated Advantage
@@ -120,26 +114,25 @@ Under real-world distributions and calibrated noise injection ($\varepsilon = 1.
 
 The [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fidelity_service.py) module continuously quantifies the mathematical drift between synthetic generator distributions and empirical datasets:
 
-```
+```text
                   ┌─────────────────────────────────────────┐
                   │   SYNTHETIC vs REAL FIDELITY AUDITOR    │
                   └────────────────────┬────────────────────┘
                                        │
          ┌─────────────────────────────┼─────────────────────────────┐
-         ▼                             ▼                             ▼
+         v                             v                             v
 [1-Wasserstein Distance]      [Jensen-Shannon Divergence]   [Frobenius Covariance Drift]
   W₁(P_real, P_synth)           JS(P_real ∥ P_synth)          ∥Σ_real - Σ_synth∥_F
 ```
 
 1. **1-Wasserstein Distance (Earth Mover's Distance)**:
-   $$W_1(u, v) = \int_{-\infty}^{\infty} |F_u(x) - F_v(x)| \, dx$$
+   $W_1(u, v) = \int_{-\infty}^{\infty} \lvert F_u(x) - F_v(x) \rvert \, dx$
 2. **Jensen-Shannon Divergence**:
-   $$JS(P \parallel Q) = \frac{1}{2} D_{\text{KL}}\left(P \parallel \frac{P+Q}{2}\right) + \frac{1}{2} D_{\text{KL}}\left(Q \parallel \frac{P+Q}{2}\right) \in [0, 1]$$
-3. **Kolmogorov-Smirnov Test ($D_{\text{KS}}, p\text{-value}$)**:
-   $$D_{\text{KS}} = \sup_x |F_{\text{real}}(x) - F_{\text{synth}}(x)|$$
+   $JS(P \parallel Q) = \frac{1}{2} D_{\mathrm{KL}}\left(P \parallel \frac{P+Q}{2}\right) + \frac{1}{2} D_{\mathrm{KL}}\left(Q \parallel \frac{P+Q}{2}\right) \in [0, 1]$
+3. **Kolmogorov-Smirnov Test** ($D_{\mathrm{KS}}, p\text{-value}$):
+   $D_{\mathrm{KS}} = \sup_x \lvert F_{\mathrm{real}}(x) - F_{\mathrm{synth}}(x) \rvert$
 4. **Performance Degradation Index** ($\Delta_{\mathrm{deg}}$):
-
-   $$\Delta_{\mathrm{PR\text{-}AUC}} = \mathrm{PR\text{-}AUC}_{\mathrm{real\text{-}world}} - \mathrm{PR\text{-}AUC}_{\mathrm{synthetic\text{-}lab}} = 0.8420 - 0.9420 = -0.1000$$
+   $\Delta_{\mathrm{PR\text{-}AUC}} = \mathrm{PR\text{-}AUC}_{\mathrm{real\text{-}world}} - \mathrm{PR\text{-}AUC}_{\mathrm{synthetic\text{-}lab}} = 0.8420 - 0.9420 = -0.1000$
 
 ---
 
@@ -147,7 +140,7 @@ The [`distribution_fidelity_service.py`](../backend/app/domain/distribution_fide
 
 Rather than a static threshold ($\tau = 0.5$), the system computes confusion matrices across $\tau \in [0.1, 0.9]$:
 
-```
+```text
                                ACTUAL TRUTH
                          Fraud (1)       Legitimate (0)
                       ┌──────────────┬────────────────────┐
@@ -158,8 +151,8 @@ PREDICTED             ├──────────────┼───�
 ```
 
 ### Financial Cost-Utility Function:
-$$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right) + \left( FP(\tau) \cdot C_{\text{FP}} \right) + \left( TP(\tau) \cdot C_{\text{TP}} \right)$$
 
+$$\mathrm{Cost}_{\mathrm{Total}}(\tau) = \left( FN(\tau) \cdot C_{\mathrm{FN}} \right) + \left( FP(\tau) \cdot C_{\mathrm{FP}} \right) + \left( TP(\tau) \cdot C_{\mathrm{TP}} \right)$$
 * $C_{\mathrm{FN}} = 850\text{ USD}$ (\$850 direct unrecovered dollar chargeback per missed fraud).
 * $C_{\mathrm{FP}} = 18\text{ USD}$ (\$18 customer SMS/OTP friction, phone support, blocked card re-issuance).
 * $C_{\mathrm{TP}} = 6\text{ USD}$ (\$6 compliance analyst SAR triage & FinCEN automated filing review).
@@ -168,30 +161,30 @@ $$\text{Cost}_{\text{Total}}(\tau) = \left( FN(\tau) \cdot C_{\text{FN}} \right)
 
 ## 6. Institutional Design Partner Pilot Onboarding Architecture
 
-```
+```text
 ┌────────────────────────────────────────────────────────────────────────┐
 │               BANK ON-PREMISES / CLOUD VPC PERIMETER                   │
 │                                                                        │
 │  [Core Banking Ledger / ISO 20022 XML Messages]                        │
 │                         │                                              │
-│                         ▼                                              │
+│                         v                                              │
 │  [1. Zero-Raw-PII Regex Scanner Gate]                                  │
 │     - Checks: TCKN, SSN, IBAN, Credit Card (Luhn), Email, Phone        │
 │                         │                                              │
-│                         ▼                                              │
+│                         v                                              │
 │  [2. Type-Salted HMAC-SHA256 Tokenization]                             │
 │     - Salt = b"cf-intelligence-pilot-salt-2026" || EntityType          │
 │                         │                                              │
-│                         ▼                                              │
+│                         v                                              │
 │  [3. PyTorch Local Edge GNN Trainer]                                   │
 │     - Trains 512-dim GAT embeddings on local subgraphs only            │
 │                         │                                              │
-│                         ▼                                              │
+│                         v                                              │
 │  [4. Opacus Differential Privacy Calibration]                          │
 │     - L2 Gradient Clipping (C = 1.0) + Gaussian Noise Injection        │
 └─────────────────────────┬──────────────────────────────────────────────┘
                           │ (Only DP-Masked Parameter Updates)
-                          ▼ (mTLS 1.3 / FIPS 140-2 Level 3 HSM)
+                          v (mTLS 1.3 / FIPS 140-2 Level 3 HSM)
 ┌────────────────────────────────────────────────────────────────────────┐
 │             CF-INTELLIGENCE FEDERATED COORDINATOR                      │
 │  - Curve25519 Pairwise Masking SecAgg (Zero-Sum Cancellation)          │

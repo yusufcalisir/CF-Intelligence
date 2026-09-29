@@ -7,14 +7,14 @@
 CF-Intelligence addresses three distinct financial market segments, each characterized by different operational constraints, compliance mandates, and purchasing drivers:
 
 ```
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                        CF-INTELLIGENCE TARGET MARKET SEGMENTS                          │
-├───────────────────────────────┬───────────────────────────────┬────────────────────────┤
-│ SEGMENT A: NEOBANKS & REGIONAL│ SEGMENT B: FINTECHS & PSPs    │ SEGMENT C: CONSORTIA   │
-│  - Tier-2 & Tier-3 Banks      │  - E-Commerce Gateways & EMIs │  - National Switch/BKM │
-│  - Core Pain: Sparse Data     │  - Core Pain: Alert Friction  │  - Core Pain: Mule Rng │
-│  - Value: Consortium Defense  │  - Value: Sub-15ms Latency    │  - Value: FedGNN TEE   │
-└───────────────────────────────┴───────────────────────────────┴────────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                 CF-INTELLIGENCE TARGET MARKET SEGMENTS                 │
+├────────────────────────┬───────────────────────┬───────────────────────┤
+│ SEGMENT A: NEOBANKS    │ SEGMENT B: FINTECHS   │ SEGMENT C: CONSORTIA  │
+│  - Tier-2 & 3 Banks    │  - Gateways & EMIs    │  - National Switches  │
+│  - Pain: Sparse Data   │  - Pain: Friction     │  - Pain: Mule Rings   │
+│  - Value: Fed Defense  │  - Value: <15ms SLA   │  - Value: FedGNN TEE  │
+└────────────────────────┴───────────────────────┴───────────────────────┘
 ```
 
 ---
@@ -23,7 +23,7 @@ CF-Intelligence addresses three distinct financial market segments, each charact
 
 ### 2.1. Profile & Market Context
 * **Target Profile**: Tier-2 and Tier-3 commercial/retail banks, digital neobanks (e.g. Revolut, Monzo, Papara, N26), and regional savings banks.
-* **Economic Scale**: $100\text{k} - 2\text{M}$ daily transactions; $\$5\text{B} - \$50\text{B}$ Assets Under Management (AUM).
+* **Economic Scale**: 100k – 2M daily transactions; $5B – $50B Assets Under Management (AUM).
 * **Primary Decision Makers**: Chief Risk Officer (CRO), Head of Fraud Operations, Head of Financial Crime Compliance.
 
 ### 2.2. Core Pain Points & Institutional Vulnerabilities
@@ -46,7 +46,7 @@ CF-Intelligence addresses three distinct financial market segments, each charact
 
 ### 3.1. Profile & Market Context
 * **Target Profile**: Electronic Money Institutions (EMI), payment gateways, merchant acquiring PSPs, buy-now-pay-later (BNPL) platforms, and cross-border remittance providers.
-* **Economic Scale**: High transaction velocity ($500\text{k} - 10\text{M}$ daily transactions); small ticket sizes ($\$10 - \$500$).
+* **Economic Scale**: High transaction velocity (500k – 10M daily transactions); small ticket sizes ($10 – $500).
 * **Primary Decision Makers**: Chief Product Officer (CPO), VP of Engineering, Head of Trust & Safety.
 
 ### 3.2. Core Pain Points
@@ -58,7 +58,7 @@ CF-Intelligence addresses three distinct financial market segments, each charact
 * **Data Integration Requirement**: Fast, developer-friendly REST APIs and WebHooks rather than complex enterprise on-premise hardware deployments.
 
 ### 3.4. CF-Intelligence Solution & ROI Impact
-* **Solution**: Ultra-low latency inference engine ($p99 < 14.2\text{ms}$), SHAP feature attributions for instant automated transaction approval/rejection, and programmatic REST endpoints (`POST /v1/inference/score`).
+* **Solution**: Ultra-low latency inference engine ($p_{99} < 14.2\text{ ms}$), SHAP feature attributions for instant automated transaction approval/rejection, and programmatic REST endpoints (`POST /v1/inference/score`).
 * **Quantified ROI**:
   * Cuts checkout false rejections by **over 60%**, recovering top-line e-commerce GMV.
   * Rapid 1-day deployment via Docker and OpenAPI 3.0 SDKs.
@@ -69,7 +69,7 @@ CF-Intelligence addresses three distinct financial market segments, each charact
 
 ### 4.1. Profile & Market Context
 * **Target Profile**: Central bank clearing networks, national payment switches (e.g. BKM in Turkey, Euroclear in EU, FedNow in US), institutional interbank clearing houses, and international banking federations.
-* **Economic Scale**: $10\text{M} - 100\text{M}+$ daily transactions spanning dozens of member banks.
+* **Economic Scale**: 10M – 100M+ daily transactions spanning dozens of member banks.
 * **Primary Decision Makers**: Consortium Executive Board, Chief Information Security Officer (CISO), Central Bank Regulatory Committee.
 
 ### 4.2. Core Pain Points

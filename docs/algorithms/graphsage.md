@@ -16,14 +16,14 @@ In retail and cross-bank financial networks, thousands of new accounts, payment 
 ### Mathematical Formulation of Message Passing
 At search depth $k \in \{1, 2\}$, for node $v \in \mathcal{V}$:
 
-$$h_{\mathcal{N}(v)}^{(k)} = \operatorname{AGGREGATE}_k\left( \left\{ h_u^{(k-1)}, \, \forall u \in \mathcal{N}(v) \right\} \right)$$
+$$h_{\mathcal{N}(v)}^{(k)} = \mathrm{AGGREGATE}_k\left( \left\lbrace h_u^{(k-1)}, \, \forall u \in \mathcal{N}(v) \right\rbrace \right)$$
 
 $$h_v^{(k)} = \sigma\left( \mathbf{W}_{\mathrm{neigh}}^{(k)} h_{\mathcal{N}(v)}^{(k)} + \mathbf{W}_{\mathrm{self}}^{(k)} h_v^{(k-1)} \right)$$
 
 $$z_v = \frac{h_v^{(K)}}{\|h_v^{(K)}\|_2}$$
 
 where:
-- $\operatorname{AGGREGATE}_k$ is the Mean Aggregator: $\frac{1}{|\mathcal{N}(v)|} \sum_{u \in \mathcal{N}(v)} h_u^{(k-1)}$ or symmetric GCN aggregator: $\sum_{u \in \mathcal{N}(v)} \frac{1}{\sqrt{d_v d_u}} h_u^{(k-1)}$.
+- $\mathrm{AGGREGATE}_k$ is the Mean Aggregator: $\frac{1}{|\mathcal{N}(v)|} \sum_{u \in \mathcal{N}(v)} h_u^{(k-1)}$ or symmetric GCN aggregator: $\sum_{u \in \mathcal{N}(v)} \frac{1}{\sqrt{d_v d_u}} h_u^{(k-1)}$.
 - $\mathbf{W}_{\mathrm{self}}^{(k)}$ and $\mathbf{W}_{\mathrm{neigh}}^{(k)}$ are learnable transformation matrices ($d_{\mathrm{in}} = 165 \to d_{\mathrm{hidden}} = 128 \to d_{\mathrm{embed}} = 64$).
 - $\sigma$ is the non-linear activation (ReLU) with Dropout ($p = 0.20$) and Layer Normalization.
 - $z_v$ is the final $L_2$-normalized 64-dimensional inductive node embedding passed to the classification head.
@@ -111,11 +111,11 @@ Evaluated on synthetic transaction networks ($N = 2{,}000$ accounts, fraud preva
 
 ### 5.2 Marginal Uplift Analysis
 
-$$\Delta\operatorname{PR-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \operatorname{PR-AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \operatorname{PR-AUC}_{\mathrm{Tabular}} = +0.5035 \; (+226.1\%)$$
+$$\Delta\mathrm{PR\text{-}AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \mathrm{PR\text{-}AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \mathrm{PR\text{-}AUC}_{\mathrm{Tabular}} = +0.5035 \; (+226.1\%)$$
 
-$$\Delta\operatorname{ROC-AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \operatorname{ROC-AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \operatorname{ROC-AUC}_{\mathrm{Tabular}} = +0.2042 \; (+29.3\%)$$
+$$\Delta\mathrm{ROC\text{-}AUC}_{\mathrm{Tabular}\to\mathrm{Combined}} = \mathrm{ROC\text{-}AUC}_{\mathrm{Tabular}+\mathrm{Graph}} - \mathrm{ROC\text{-}AUC}_{\mathrm{Tabular}} = +0.2042 \; (+29.3\%)$$
 
-$$\Delta\operatorname{Recall@0.1\%FPR} = 26.32\% - 0.00\% = +26.32\text{ percentage points}$$
+$$\Delta\mathrm{Recall@0.1\%FPR} = 26.32\% - 0.00\% = +26.32\text{ percentage points}$$
 
 Key takeaway: Tabular features alone fail to detect coordinated fraud rings operating with low individual transaction anomalies. Graph embeddings capture the coordinated money mule structure, while joint modeling achieves maximal performance by combining individual transaction velocity with relational counterparty topology.
 
@@ -136,7 +136,7 @@ In financial systems, transaction graph density varies significantly across bank
 | $d = 16$ | 0.7380 | 0.9038 | 0.6897 | +0.5052 | +0.1935 |
 | $d = 32$ | 0.7108 | 0.8871 | 0.6452 | +0.4780 | +0.1768 |
 
-**Topological Finding**: Detection uplift scales steeply as average connectivity increases from $d = 1$ to $d = 8$ ($\Delta\operatorname{PR-AUC}$ reaches $+0.5113$). Beyond $d = 8$, over-smoothing begins to slightly dilute distinctive local fraud structures, making $d \in [4, 8]$ the optimal operating density.
+**Topological Finding**: Detection uplift scales steeply as average connectivity increases from $d = 1$ to $d = 8$ ($\Delta\mathrm{PR\text{-}AUC}$ reaches $+0.5113$). Beyond $d = 8$, over-smoothing begins to slightly dilute distinctive local fraud structures, making $d \in [4, 8]$ the optimal operating density.
 
 ### 6.2 Multi-Hop Search Depth Sensitivity ($K \in \{0, 1, 2, 3\}$)
 
@@ -159,7 +159,7 @@ Evaluating model resilience across diverse network generation processes:
 | **Scale-Free Barabási-Albert** | Preferential attachment, power-law hubs | 0.6845 | 0.8968 | +0.4517 |
 | **Clustered SBM Communities** | Dense money laundering syndicate clusters | **0.7512** | **0.9145** | **+0.5184** |
 
-**Structural Finding**: Graph representations deliver maximal competitive advantage in clustered community structures ($\Delta\operatorname{PR-AUC} = +0.5184$), perfectly matching real-world criminal smurfing rings and shell-company networks.
+**Structural Finding**: Graph representations deliver maximal competitive advantage in clustered community structures ($\Delta\mathrm{PR\text{-}AUC} = +0.5184$), perfectly matching real-world criminal smurfing rings and shell-company networks.
 
 ### 6.4 Isolated Node Degradation (Cold-Start Resilience)
 

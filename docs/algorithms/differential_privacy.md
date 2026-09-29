@@ -31,13 +31,13 @@ where:
 - **Rényi Differential Privacy (RDP) Composition**:
   Rather than using conservative advanced composition theorems, the accountant tracks Rényi divergence of order $\alpha > 1$:
 
-  $$D_\alpha(\mathcal{M}(D) \,||\, \mathcal{M}(D')) \le \frac{\alpha q^2}{2 \sigma^2} + O(q^3)$$
+  $$D_\alpha(\mathcal{M}(D) \parallel \mathcal{M}(D')) \le \frac{\alpha q^2}{2 \sigma^2} + O(q^3)$$
 
   for subsampling ratio $q = \frac{|\mathcal{B}|}{N}$.
   At step $T$, total RDP is composed linearly: $\epsilon_{\mathrm{total}}(\alpha) = \sum_{t=1}^T \epsilon_t(\alpha)$.
   Conversion to $(\epsilon, \delta)$-DP optimizes over order $\alpha$:
 
-  $$\epsilon(\delta) = \min_{\alpha > 1} \left\{ \epsilon_{\mathrm{total}}(\alpha) + \frac{\ln(1/\delta)}{\alpha - 1} \right\}$$
+  $$\epsilon(\delta) = \min_{\alpha > 1} \left\lbrace \epsilon_{\mathrm{total}}(\alpha) + \frac{\ln(1/\delta)}{\alpha - 1} \right\rbrace$$
 
 ### 2.2 Standalone RDP Moments Accountant (`rdp_accountant.py`)
 - **Location**: [`backend/app/infrastructure/security/rdp_accountant.py`](file:///backend/app/infrastructure/security/rdp_accountant.py)

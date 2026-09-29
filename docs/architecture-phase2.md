@@ -162,22 +162,30 @@ To satisfy strict data protection regulations (GDPR Art. 9/22, CCPA, Bank Secrec
 
 ### 2. Type-Salted HMAC-SHA256 Deterministic Hashing
 * Hashes are computed using keyed-hash message authentication codes:
-  $$\text{Privacy Hash} = \text{HMAC-SHA256}(\text{Shared Salt}, \text{Entity Type} \mathbin{\Vert} \text{Standardized Value})$$
+
+$$\mathrm{PrivacyHash} = \mathrm{HMAC\text{-}SHA256}(\mathrm{SharedSalt}, \mathrm{EntityType} \mathbin{\Vert} \mathrm{StandardizedValue})$$
+
 * Prefixing each value with its entity type (`customer:`, `phone:`, `email:`, `device:`, `iban:`) eliminates cross-attribute collision and prevents rainbow table matching across different identifier categories.
 * Output hashes are formatted as compact 16-character hexadecimal strings for simulation tracking and audit chaining.
 
 ### 3. Commutative Diffie-Hellman Private Set Intersection (DH-PSI)
 * Enables two banks ($A$ and $B$) to discover overlapping fraud identifiers ($x \in X_A \cap X_B$) without disclosing non-matching elements ($x \in X_A \setminus X_B$ or $x \in X_B \setminus X_A$):
-  $$\text{Bank A computes: } c_{A,i} = H(x_i)^{a} \pmod p$$
-  $$\text{Bank B computes: } c_{B,j} = H(y_j)^{b} \pmod p$$
-  $$\text{Bank A double-encrypts: } c_{BA,j} = (c_{B,j})^{a} = H(y_j)^{a \cdot b} \pmod p$$
-  $$\text{Bank B double-encrypts: } c_{AB,i} = (c_{A,i})^{b} = H(x_i)^{a \cdot b} \pmod p$$
+
+$$\begin{aligned}
+\text{Bank A computes: } & c_{A,i} = H(x_i)^{a} \pmod p \\
+\text{Bank B computes: } & c_{B,j} = H(y_j)^{b} \pmod p \\
+\text{Bank A double-encrypts: } & c_{BA,j} = (c_{B,j})^{a} = H(y_j)^{a \cdot b} \pmod p \\
+\text{Bank B double-encrypts: } & c_{AB,i} = (c_{A,i})^{b} = H(x_i)^{a \cdot b} \pmod p
+\end{aligned}$$
+
 * By modular exponentiation commutativity $(H(x)^a)^b \equiv (H(x)^b)^a \pmod p$, equality $c_{AB,i} = c_{BA,j}$ indicates an exact match while leaking zero information about unmatched values.
 
 ### 4. MinHash LSH Fuzzy Private Set Intersection
 * Extracts overlapping character 3-grams over standardized entity strings.
 * Applies $H = 16$ independent polynomial rolling hash seeds modulo a large prime $M$ to compute deterministic 16-dimensional MinHash signature vectors:
-  $$\text{sig}[i] = \min_{s \in S} \left( (a_i \cdot h(s) + b_i) \bmod M \right)$$
+
+$$\mathrm{sig}[i] = \min_{s \in S} \left( (a_i \cdot h(s) + b_i) \bmod M \right)$$
+
 * Enables near-duplicate detection and typo-resilient entity matching under strict zero raw PII policies.
 
 ### 5. Federated Learning Alignment
@@ -354,14 +362,18 @@ This ensures that `"Yusuf Çalışır"` and `"Yusuf Calisir"` both standardize t
 [value_objects_phase2.py](../backend/app/domain/value_objects_phase2.py) :: `compute_minhash_signature(text, num_hashes=16)` generates a compact probabilistic fingerprint:
 
 1. **3-gram Extraction**: The standardized name is decomposed into a set of overlapping character 3-grams:
-   $$S = \{ \text{text}[i:i+3] \mid 0 \le i \le \text{len(text)} - 3 \}$$
-   e.g., `"yusuf calisir"` → `{"yus", "usu", "suf", "uf ", ...}`
+
+$$S = \{ \mathrm{text}[i:i+3] \mid 0 \le i \le \mathrm{len}(\mathrm{text}) - 3 \}$$
+
+e.g., `"yusuf calisir"` → `{"yus", "usu", "suf", "uf ", ...}`
 
 2. **MinHash Signature**: $H=16$ independent hash seeds $i$ are applied to each shingle $s$ using a deterministic polynomial rolling hash modulo a large prime $M$:
-   $$\text{sig}[i] = \min_{s \in S} \left( \left( (a_i \cdot h(s) + b_i) \bmod M \right) \right)$$
+
+$$\mathrm{sig}[i] = \min_{s \in S} \left( (a_i \cdot h(s) + b_i) \bmod M \right)$$
 
 3. **Jaccard Approximation**: Similarity between two signatures is estimated as the fraction of matching positions:
-   $$\widehat{J}(S_1, S_2) = \frac{|\{ i \mid \text{sig}_1[i] = \text{sig}_2[i] \}|}{H}$$
+
+$$\widehat{J}(S_1, S_2) = \frac{|\{ i \mid \mathrm{sig}_1[i] = \mathrm{sig}_2[i] \}|}{H}$$
 
 The 16-dimensional MinHash vector is stored directly in the entity's `attributes["minhash_signature"]` field, eliminating the need for a separate LSH index store.
 
@@ -371,10 +383,14 @@ The 16-dimensional MinHash vector is stored directly in the entity's `attributes
 
 1. **Attribute Set**: 5 key PII attributes are evaluated per entity pair: `phone`, `email`, `device_id`, `birthdate`, `surname`.
 2. **Independent DH-PSI per Attribute**: Standard Diffie-Hellman commutative exponentiation is executed independently over each attribute's `PrivacyPreservingIdentifier` hash:
-   $$Z_a^{(\text{attr})} = \left( H(\text{attr}_a) \right)^{k_b \cdot k_a} \pmod p$$
+
+$$Z_a^{(\mathrm{attr})} = \left( H(\mathrm{attr}_a) \right)^{k_b \cdot k_a} \pmod p$$
+
 3. **k-of-n Threshold Gate**: A cross-bank pair is declared a match if:
-   $$\left| \text{matched attrs} \right| \ge k \quad (\text{default: } k = 3 \text{ of } n = 5)$$
-4. **Similarity Score**: The output match record includes a continuous overlap score $= |\text{matched attrs}| / n$.
+
+$$\left| \mathrm{matched\_attrs} \right| \ge k \quad (\text{default: } k = 3 \text{ of } n = 5)$$
+
+4. **Similarity Score**: The output match record includes a continuous overlap score $= |\mathrm{matched\_attrs}| / n$.
 
 #### Stage 4 — Central LSH Registry (`EntityResolutionService.resolve_fuzzy_entities()`)
 
@@ -462,10 +478,10 @@ To satisfy enterprise banking security standards (ISO 27001, SOC2, PCI-DSS):
 3. **Dynamic Attribute-Based Access Control (ABAC)**: Evaluates dynamic policy rules matching user attributes against resource properties:
    - *Tenant Isolation*: Restricts data access strictly to the user's home bank ID unless holding `cross_bank_investigator` or `super_admin` roles.
    - *Shift Hours Restriction*: Enforces access windows (e.g. `08:00-18:00`).
-   - *Approval Tier Limit*: Limits high-value operations ($>\$50,000$) to qualified authorization tiers.
+   - *Approval Tier Limit*: Limits high-value operations (> 50,000 USD) to qualified authorization tiers.
    - *Security Clearance*: Restricts classified intelligence by clearance level.
 4. **HashiCorp Vault & Live PKI Integration**: Centralizes secrets management via Vault KV v2 secret engine and provisions dynamic X.509 certificates via HashiCorp Vault PKI Secrets Engine (`/v1/pki/issue/cfi-bank-role`), backed by automated bootstrap script (`scripts/init_vault_pki.py`) and environment fallbacks.
-5. **Tamper-Evident Cryptographic Audit Chain**: Chains every system event using SHA-256 hash chaining ($H_i = \text{SHA-256}(L_i \mathbin{\Vert} H_{i-1})$) with a 1-click `verify_chain_integrity()` tool to detect retrospective log tampering.
+5. **Tamper-Evident Cryptographic Audit Chain**: Chains every system event using SHA-256 hash chaining ($H_i = \mathrm{SHA256}(L_i \mathbin{\Vert} H_{i-1})$) with a 1-click `verify_chain_integrity()` tool to detect retrospective log tampering.
 
 ### 2.8 Enterprise Observability, Log Aggregation & Model Drift Engine
 
@@ -480,7 +496,9 @@ To maintain continuous MLOps model quality and infrastructure health:
 3. **Statistical Model Drift Engine (`ModelDriftService`)**:
    - *Feature Drift*: Kolmogorov-Smirnov 2-sample test ($p$-value threshold $<0.05$) and Wasserstein distance across incoming features against reference baselines.
    - *Concept Drift*: Population Stability Index (PSI) over transaction risk scores:
-     $$PSI = \sum_{i=1}^k (A_i - E_i) \times \ln\left(\frac{A_i}{E_i}\right)$$
+
+$$\mathrm{PSI} = \sum_{i=1}^k (A_i - E_i) \times \ln\left(\frac{A_i}{E_i}\right)$$
+
 4. **Model Calibration Monitoring**: Evaluates probability calibration via Brier score ($\frac{1}{N}\sum (p_i - y_i)^2$), Expected Calibration Error (ECE), and 10-bin reliability curve generation.
 5. **Automated Re-training Triggers**: When concept drift $PSI \ge 0.20$, the platform automatically alerts MLOps engineers and triggers a new federated training round (`trigger_auto_retraining()`).
 
@@ -500,9 +518,9 @@ To move beyond heuristic relationship weights, the platform introduces a **Feder
 1. **Local Graph Representation**: Each bank constructs a graph mapping its entities to a 12-dimensional numerical feature representation (entity types, risk levels, alert logs, local degrees, and activity recency).
 2. **GraphSAGE Model**: A 2-layer GraphSAGE architecture performs message-passing:
 
-   $$\mathbf{h}_{\mathcal{N}(v)}^{(k)} = \operatorname{AGGREGATE}\left(\{\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\}\right)$$
+$$\mathbf{h}_{\mathcal{N}(v)}^{(k)} = \mathrm{AGGREGATE}\left(\left\{\mathbf{h}_u^{(k-1)}, \forall u \in \mathcal{N}(v)\right\}\right)$$
 
-   $$\mathbf{h}_v^{(k)} = \sigma\left(\mathbf{W}^{(k)} \cdot \left[\mathbf{h}_v^{(k-1)} \mathbin{\Vert} \mathbf{h}_{\mathcal{N}(v)}^{(k)}\right]\right)$$
+$$\mathbf{h}_v^{(k)} = \sigma\left(\mathbf{W}^{(k)} \cdot \left[\mathbf{h}_v^{(k-1)} \mathbin{\Vert} \mathbf{h}_{\mathcal{N}(v)}^{(k)}\right]\right)$$
 
 3. **Federated Aggregation**: Only GNN parameters ($\mathbf{W}^{(k)}$ projection weights) are sent to the coordinator. The coordinator aggregates GNN parameters using Krum or FedAvg, then redistributes the global GNN.
 4. **Downstream Analytics**:
@@ -558,7 +576,9 @@ graph TD
 ### 2. Mutual Auth & Cryptographic Payload Signing
 To protect the REST communication channel between the `fl-coordinator` and the `bank-client` nodes on `net-federation`, the API implements **end-to-end payload signing**:
 1. **Outbound Request Signing**: The coordinator computes an HMAC-SHA256 signature using the shared `PAYLOAD_SIGNING_SECRET`, the current Unix timestamp, and the request body:
-   $$\text{Signature} = \text{HMAC-SHA256}(\text{Secret}, \text{Timestamp} \mathbin{\Vert} \text{Payload Bytes})$$
+
+$$\mathrm{Signature} = \mathrm{HMAC\text{-}SHA256}(\mathrm{Secret}, \mathrm{Timestamp} \mathbin{\Vert} \mathrm{PayloadBytes})$$
+
 2. **Transmission**: The request is sent with the custom headers `X-Payload-Signature` and `X-Payload-Timestamp`.
 3. **Inbound Validation**: The bank client validates that:
    - The timestamp header is present and is within a $\pm 300\text{s}$ tolerance window (mitigating replay attacks).
@@ -767,8 +787,10 @@ To audit and protect aggregated model weights against adversarial attacks, the s
 ### Robust Aggregation Algorithms
 
 #### 1. Coordinate-wise Trimmed Mean
+
 For each parameter coordinate, sorts received weights from $N$ clients. Removes the $f$ lowest and $f$ highest updates, where $f$ represents the estimated number of Byzantine/malicious workers ($2f < N$). Computes the mean of the remaining $N - 2f$ values:
-$$\text{TrimmedMean}_i = \frac{1}{N - 2f} \sum_{k=f+1}^{N-f} w_{(k), i}$$
+
+$$\mathrm{TrimmedMean}_i = \frac{1}{N - 2f} \sum_{k=f+1}^{N-f} w_{(k), i}$$
 
 #### 2. Bulyan
 Defends against colluding attackers that Krum or Median alone cannot mitigate:
@@ -814,9 +836,11 @@ Real CSV files are looked up under `storage/datasets/<name>/`. When absent, synt
 
 FedYogi introduces a server-side adaptive second-moment update that prevents effective learning rates from collapsing in sparse gradient regimes:
 
-$$v_{t+1} = v_t - (1 - \beta_2) \cdot \text{sign}(v_t - \Delta_t^2) \cdot \Delta_t^2$$
-$$m_{t+1} = \beta_1 m_t + (1 - \beta_1) \Delta_t$$
-$$w_{t+1} = w_t + \eta \cdot \frac{m_{t+1}}{\sqrt{v_{t+1}} + \tau}$$
+$$\begin{aligned}
+v_{t+1} &= v_t - (1 - \beta_2) \cdot \mathrm{sign}(v_t - \Delta_t^2) \cdot \Delta_t^2 \\
+m_{t+1} &= \beta_1 m_t + (1 - \beta_1) \Delta_t \\
+w_{t+1} &= w_t + \eta \cdot \frac{m_{t+1}}{\sqrt{v_{t+1}} + \tau}
+\end{aligned}$$
 
 Compared to FedAdam, FedYogi slows variance growth and maintains larger effective updates on parameters where $v$ already exceeds $\Delta^2$, which is critical for highly skewed fraud distributions.
 
@@ -875,7 +899,7 @@ All Phase 2 components are continuously verified through unit and integration su
 | [test_explainability_hardening.py](../backend/tests/unit/test_explainability_hardening.py) | `explainability_service`, `realtime_explainer` | Shapley efficiency, LIME Ridge surrogate, R^2 fidelity, RNG non-pollution, thread caching & purged mock edges | 10 | ✅ 100% Pass |
 | [test_case_management_workbench.py](../backend/tests/unit/test_case_management_workbench.py) | `case_workbench` | Case FSM transitions, four-eyes supervisor signatures (`SIG_SUPERVISOR_<ID>`) | 4 | ✅ 100% Pass |
 | [test_regulatory_reporter.py](../backend/tests/unit/test_regulatory_reporter.py) | `regulatory_reporter` | FinCEN SAR XML 2.0 serialization, XML structure & XSD schema validation | 5 | ✅ 100% Pass |
-| **Total Verified** | **19 Dedicated Suites** | **Collaborative AML Platform Architecture** | **166 Tests** | **100% Pass** |
+| **Total Verified** | **19 Dedicated Suites** | **Collaborative AML Platform Architecture** | **166 Tests** | ✅ **100% Pass** |
 
 
 
