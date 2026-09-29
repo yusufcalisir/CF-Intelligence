@@ -2120,7 +2120,7 @@ def _process_amlnet_dataframe(
         np.asarray(is_weekend, dtype=np.float32),
     ]).astype(np.float32)
 
-    step_default = pd.Series(np.arange(len(df), dtype=np.int64))
+    step_default = pd.Series(range(len(df)))
     steps = np.asarray(pd.to_numeric(df.get("step", step_default), errors="coerce").fillna(0).values, dtype=np.float64)
 
     return {
