@@ -1,5 +1,5 @@
 # Grafana datasource provisioning
-# Auto-configures Prometheus and Jaeger on first boot
+# Auto-configures Prometheus, Jaeger and Loki on first boot
 
 apiVersion: 1
 
@@ -15,4 +15,10 @@ datasources:
     type: jaeger
     access: proxy
     url: http://jaeger:16686
+    editable: false
+
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
     editable: false

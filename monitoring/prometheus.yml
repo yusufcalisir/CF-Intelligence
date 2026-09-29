@@ -19,25 +19,25 @@ scrape_configs:
   - job_name: 'cfi-gateway'
     static_configs:
       - targets: ['gateway:8000']
-    metrics_path: /metrics/
+    metrics_path: /metrics
 
   # ── FL Coordinator Service ──
   - job_name: 'cfi-fl-coordinator'
     static_configs:
       - targets: ['fl-coordinator:8001']
-    metrics_path: /metrics/
+    metrics_path: /metrics
 
   # ── Identity & Graph Service ──
   - job_name: 'cfi-identity-graph'
     static_configs:
       - targets: ['identity-graph:8002']
-    metrics_path: /metrics/
+    metrics_path: /metrics
 
   # ── Fraud & Alert Engine ──
   - job_name: 'cfi-fraud-alert'
     static_configs:
       - targets: ['fraud-alert:8003']
-    metrics_path: /metrics/
+    metrics_path: /metrics
 
   # ── Prometheus self-monitoring ──
   - job_name: 'prometheus'

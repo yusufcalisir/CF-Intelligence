@@ -18,7 +18,7 @@ monitoring/
 ├── grafana/
 │   ├── provisioning/
 │   │   ├── datasources/
-│   │   │   └── datasources.yml        # Auto-provisioned Prometheus & Jaeger datasources
+│   │   │   └── datasources.yml        # Auto-provisioned Prometheus, Jaeger & Loki datasources
 │   │   └── dashboards/
 │   │       └── dashboards.yml         # Dashboard provider registration
 │   └── dashboards/
@@ -38,10 +38,10 @@ monitoring/
 ### 2.1 Prometheus Metrics Scraper (`prometheus.yml`)
 - **Scrape Interval**: 15s (`evaluation_interval: 15s`).
 - **Scrape Targets**:
-  - `cfi-gateway` (`gateway:8000/metrics/`): Reverse proxy and public REST endpoints.
-  - `cfi-fl-coordinator` (`fl-coordinator:8001/metrics/`): Federated Learning round progression and consensus.
-  - `cfi-identity-graph` (`identity-graph:8002/metrics/`): Inductive GraphSAGE embeddings & UBO topology.
-  - `cfi-fraud-alert` (`fraud-alert:8003/metrics/`): Real-time inference scoring, AML rules, and sanction screening.
+  - `cfi-gateway` (`gateway:8000/metrics`): Reverse proxy and public REST endpoints.
+  - `cfi-fl-coordinator` (`fl-coordinator:8001/metrics`): Federated Learning round progression and consensus.
+  - `cfi-identity-graph` (`identity-graph:8002/metrics`): Inductive GraphSAGE embeddings & UBO topology.
+  - `cfi-fraud-alert` (`fraud-alert:8003/metrics`): Real-time inference scoring, AML rules, and sanction screening.
   - `prometheus` (`localhost:9090`): Self-monitoring.
 
 ### 2.2 Alert Rules & SLA Invariants (`prometheus/alert_rules.yml`)
