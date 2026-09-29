@@ -304,7 +304,30 @@ export default function LiveOperationsView() {
   // Compute live Shapley on-chain payouts if not provided directly by backend
   const effectiveOnChainPayouts: OnChainPayout[] = useMemo(() => {
     if (currentSim?.on_chain_payouts && currentSim.on_chain_payouts.length > 0) {
-      return currentSim.on_chain_payouts;
+      return currentSim.on_chain_payouts.map((p: any, idx: number) => {
+        const bName = p.bank_name || (p.bank_id ? p.bank_id.replace('_', ' ').toUpperCase() : `Consortium Node ${idx + 1}`);
+        const lowerName = bName.toLowerCase();
+        const defaultWallet = lowerName.includes('alpha')
+          ? '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
+          : lowerName.includes('beta')
+          ? '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+          : '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc';
+        const wallet = p.wallet_address || defaultWallet;
+        const payoutUsd = Number(p.payout_usd ?? p.amount ?? 0);
+        const score = Number(p.shapley_score ?? (payoutUsd > 0 ? payoutUsd / 10000 : 0));
+        const isQuar = Boolean(p.is_quarantined || p.status === 'BLOCKED_QUARANTINE');
+        return {
+          bank_name: bName,
+          wallet_address: wallet,
+          shapley_score: score,
+          shapley_basis_points: Number(p.shapley_basis_points ?? Math.round(score * 10000)),
+          share_percent: Number(p.share_percent ?? (payoutUsd > 0 ? payoutUsd / 1000 : 0)),
+          payout_usd: payoutUsd,
+          payout_wei: p.payout_wei || (BigInt(Math.max(0, Math.round(payoutUsd))) * BigInt('1000000000000000000')).toString(),
+          is_quarantined: isQuar,
+          status: (isQuar ? 'BLOCKED_QUARANTINE' : 'DISTRIBUTED') as 'DISTRIBUTED' | 'BLOCKED_QUARANTINE',
+        };
+      });
     }
     const totalPositive = effectiveBanks.reduce(
       (sum, b) => (!b.quarantined && (b.contribution_score ?? 0) > 0 ? sum + (b.contribution_score ?? 0) : sum),

@@ -59,7 +59,7 @@ $$\sum_{i=1}^{K} \mathbf{m}_i = \mathbf{0} \implies \left\lVert \sum_{i=1}^{K} \
 $$\mathrm{CosineSimilarity}\left(\mathbf{\Theta}_{\mathrm{pre}},\, \mathbf{\Theta}_{\mathrm{post}}\right) = 1.0000000$$
 
 ### 3.2 Verification Test Suites
-Software correctness is certified by 3,238 backend Pytest tests, 355 frontend Vitest tests, 72 Playwright browser tests, and 31 Hardhat smart contract tests:
+Software correctness is certified by 3,238 backend Pytest tests, 356 frontend Vitest tests, 72 Playwright browser tests, and 31 Hardhat smart contract tests:
 
 ```bash
 # Execute rapid deterministic smoke gate (< 20 seconds)

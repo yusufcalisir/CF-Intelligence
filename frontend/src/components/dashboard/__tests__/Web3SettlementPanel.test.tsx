@@ -47,4 +47,34 @@ describe('Web3SettlementPanel Component', () => {
     expect(screen.getByText(/Nexus Digital/i)).toBeInTheDocument();
     expect(screen.getByText(/0.4500/i)).toBeInTheDocument();
   });
+
+  it('safely handles missing or undefined wallet_address and numeric fields without crashing', () => {
+    const malformedPayouts: any[] = [
+      {
+        bank_name: 'Bank Without Wallet',
+        wallet_address: undefined, // Missing wallet address
+        shapley_score: undefined,
+        share_percent: undefined,
+        payout_usd: undefined,
+      },
+      {
+        bank_id: 'bank_b',
+        wallet_address: null,
+      },
+    ];
+
+    expect(() => {
+      render(
+        <Web3SettlementPanel
+          enableWeb3Settlement={true}
+          settlementCurrency="wCBDC"
+          onChainPayouts={malformedPayouts}
+        />
+      );
+    }).not.toThrow();
+
+    expect(screen.getByText(/Bank Without Wallet/i)).toBeInTheDocument();
+    expect(screen.getAllByText('0x0000...0000').length).toBeGreaterThanOrEqual(1);
+  });
 });
+

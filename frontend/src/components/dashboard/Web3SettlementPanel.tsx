@@ -67,6 +67,13 @@ interface Web3SettlementPanelProps {
   onChainPayouts?: OnChainPayout[];
 }
 
+export const formatWalletAddress = (addr?: string | null): string => {
+  if (!addr || typeof addr !== 'string') return '0x0000...0000';
+  const trimmed = addr.trim();
+  if (trimmed.length <= 12) return trimmed;
+  return `${trimmed.substring(0, 8)}...${trimmed.substring(trimmed.length - 6)}`;
+};
+
 export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
   enableWeb3Settlement = true,
   settlementCurrency = 'wCBDC',
@@ -181,21 +188,21 @@ export const Web3SettlementPanel: React.FC<Web3SettlementPanelProps> = ({
                   }`}
                 >
                   <td className="py-2.5 px-3 font-sans font-medium text-white flex items-center space-x-2">
-                    <span>{payout.bank_name}</span>
+                    <span>{payout.bank_name || 'Consortium Bank'}</span>
                   </td>
-                  <td className="py-2.5 px-3 text-slate-400 text-[11px]" title={payout.wallet_address}>
-                    {payout.wallet_address.substring(0, 8)}...{payout.wallet_address.substring(34)}
+                  <td className="py-2.5 px-3 text-slate-400 text-[11px]" title={payout.wallet_address || 'Unspecified Address'}>
+                    {formatWalletAddress(payout.wallet_address)}
                   </td>
                   <td className="py-2.5 px-3 text-right font-semibold">
-                    <span className={payout.shapley_score < 0 ? 'text-rose-400' : 'text-emerald-400'}>
-                      {payout.shapley_score.toFixed(4)} ({payout.shapley_basis_points} bps)
+                    <span className={(payout.shapley_score ?? 0) < 0 ? 'text-rose-400' : 'text-emerald-400'}>
+                      {(payout.shapley_score ?? 0).toFixed(4)} ({payout.shapley_basis_points ?? 0} bps)
                     </span>
                   </td>
                   <td className="py-2.5 px-3 text-right font-medium text-slate-300">
-                    {payout.share_percent.toFixed(2)}%
+                    {(payout.share_percent ?? 0).toFixed(2)}%
                   </td>
                   <td className="py-2.5 px-3 text-right font-bold text-indigo-300">
-                    ${payout.payout_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    ${(payout.payout_usd ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </td>
                   <td className="py-2.5 px-3 text-center">
                     {payout.is_quarantined ? (
