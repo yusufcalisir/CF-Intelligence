@@ -1214,7 +1214,11 @@ $$
 ### 11.7 Asset Recovery & Collaborative FININT Operational Hub (`asset_recovery_service.py` & `asset_recovery.py`)
 - **Aggregated EUR Recovery & Containment Telemetry:** Tracks consortium-wide financial impact metrics across SEPA Instant Payment Recall (`camt.056`) events and inter-bank FININT account holds with high-precision `Decimal` EUR accounting.
 - **MTTR Alert-to-Freeze Latency Reduction:** Computes empirical Mean Time to Response (MTTR $P_{50}$, $P_{90}$, $P_{99}$) in minutes, evaluating operational performance against the legacy bilateral 48-hour (2,880-minute) inter-bank baseline, demonstrating a >98% latency reduction in cross-bank mule chain freezes.
-- **Tamper-Evident SHA-256 Audit Hash Chain:** Anchors every recall execution, provisional hold, and recovery event into an append-only cryptographic hash chain ($H_t = \mathrm{SHA256}(H_{t-1} \parallel \mathrm{payload})$), ensuring evidentiary admissibility for EU judicial proceedings and AMLA compliance audits.
+- **Tamper-Evident SHA-256 Audit Hash Chain:** Anchors every recall execution, provisional hold, and recovery event into an append-only cryptographic hash chain, ensuring evidentiary admissibility for EU judicial proceedings and AMLA compliance audits:
+
+$$
+H_t = \mathrm{SHA256}(H_{t-1} \parallel \mathrm{payload})
+$$
 
 ### 11.8 Data Retention, Erasure & PII Redaction
 - **Data Retention & Erasure Engine (`retention_engine.py`):** Enforces configurable TTL retention rules and cryptographically zeroizes expired records. Database purging (`purge_expired_records`) executes real SQL `DELETE` operations against physical database tables for alerts (`AlertModel` under `TRANSACTION_LOGS` and `INFERENCE_AUDITS`), graph relationships (`RelationshipModel` under `GRAPH_EDGES`), and shared intelligence reports (`SharedIntelligenceModel` under `EXPLAINABILITY_REPORTS`). GDPR Article 17 erasure (`execute_gdpr_right_to_be_forgotten`) executes real SQL deletions across `EntityModel`, `RelationshipModel`, and `AlertModel`. *Scope Limitation:* Other data categories (raw transaction batches, cases in `CaseModel`, SAR draft XML files, and federated model gradient checkpoints) are not yet wired to automated database purge tasks and remain managed by external storage/retention policies.
