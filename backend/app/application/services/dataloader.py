@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -2427,7 +2427,7 @@ class ZeroLeakagePartitionContract:
 
     @staticmethod
     def verify_index_disjointness(
-        client_train_indices: dict[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray],
+        client_train_indices: Mapping[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray],
         test_indices: Sequence[int] | np.ndarray,
     ) -> tuple[bool, int, list[str]]:
         """Verify that client training indices and test indices are strictly disjoint, and clients pairwise disjoint."""
@@ -2436,7 +2436,7 @@ class ZeroLeakagePartitionContract:
         total_overlap = 0
 
         if isinstance(client_train_indices, list):
-            client_map = {i: client_train_indices[i] for i in range(len(client_train_indices))}
+            client_map: Mapping[int, Sequence[int] | np.ndarray] = {i: client_train_indices[i] for i in range(len(client_train_indices))}
         else:
             client_map = client_train_indices
 
@@ -2508,13 +2508,13 @@ class ZeroLeakagePartitionContract:
 
     @staticmethod
     def verify_temporal_monotonicity(
-        client_train_timestamps: dict[int, np.ndarray] | list[np.ndarray],
+        client_train_timestamps: Mapping[int, np.ndarray] | list[np.ndarray],
         test_timestamps: np.ndarray,
     ) -> tuple[bool, float | None, float | None, list[str]]:
         """Verify that max(train_timestamp) <= min(test_timestamp) across all clients."""
         violations: list[str] = []
         if isinstance(client_train_timestamps, list):
-            client_map = {i: client_train_timestamps[i] for i in range(len(client_train_timestamps))}
+            client_map: Mapping[int, np.ndarray] = {i: client_train_timestamps[i] for i in range(len(client_train_timestamps))}
         else:
             client_map = client_train_timestamps
 
@@ -2590,11 +2590,11 @@ class ZeroLeakagePartitionContract:
     @classmethod
     def audit_federated_partitions(
         cls,
-        client_datasets: dict[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
+        client_datasets: Mapping[int, tuple[np.ndarray, np.ndarray]] | list[tuple[np.ndarray, np.ndarray]],
         test_dataset: tuple[np.ndarray, np.ndarray],
-        client_indices: dict[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray] | None = None,
+        client_indices: Mapping[int, Sequence[int] | np.ndarray] | list[Sequence[int] | np.ndarray] | None = None,
         test_indices: Sequence[int] | np.ndarray | None = None,
-        client_timestamps: dict[int, np.ndarray] | list[np.ndarray] | None = None,
+        client_timestamps: Mapping[int, np.ndarray] | list[np.ndarray] | None = None,
         test_timestamps: np.ndarray | None = None,
         preprocessor: Any | None = None,
         raw_train_features: np.ndarray | pd.DataFrame | None = None,
@@ -2604,7 +2604,7 @@ class ZeroLeakagePartitionContract:
         all_violations: list[str] = []
 
         if isinstance(client_datasets, list):
-            client_map = {i: client_datasets[i] for i in range(len(client_datasets))}
+            client_map: Mapping[int, tuple[np.ndarray, np.ndarray]] = {i: client_datasets[i] for i in range(len(client_datasets))}
         else:
             client_map = client_datasets
 
@@ -2707,6 +2707,9 @@ def partition_and_isolate_federated_dataset(
         raise ValueError("Cannot partition empty dataset.")
 
     # 1. Determine chronological or randomized split
+    ts_train_pool: np.ndarray | None = None
+    ts_test: np.ndarray | None = None
+
     if timestamps is not None and temporal_split:
         ts_arr = np.asarray(timestamps, dtype=np.float64)
         sort_order = np.argsort(ts_arr)
