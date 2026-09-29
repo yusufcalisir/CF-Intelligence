@@ -67,7 +67,7 @@ If you prefer email or do not have a GitHub account:
 - 🚨 **Emergency On-Call Escalation**: `secops@cfi-platform.org` (Subject: `[SECURITY-DISCLOSURE] <Short Vulnerability Summary>`)
 
 ### PGP Public Key Details
-For sensitive disclosure disclosures via email, please encrypt your communication with our operational PGP key:
+For sensitive security disclosures via email, please encrypt your communication with our operational PGP key:
 - **Key ID**: `0x4F9B8C7A2E109D3F`
 - **Fingerprint**: `4F9B 8C7A 2E10 9D3F 851B  C602 1A3E 7B90 8F24 5D1E`
 - **Key Server**: `hkps://keys.openpgp.org`
@@ -87,9 +87,9 @@ Our triage SLAs and resolution targets strictly mirror the [Enterprise Incident 
 
 | Severity Tier | CVSS v3.1 Range | Example Vulnerability Scenarios | Initial Acknowledgment | On-Call Triage SLA | Target Remediation Window |
 | :--- | :---: | :--- | :---: | :---: | :---: |
-| **`SEV1_CRITICAL`** | `9.0 – 10.0` | Raw PII plaintext leakage, unauthenticated Remote Code Execution (RCE), private key / HSM extraction, cross-tenant database bleed, zero-day cryptographic compromise. | **`< 24 Hours`** | **$\le 15\text{ Minutes}$** | **$\le 7\text{ Business Days}$** *(Hotfix MTTR $\le 1\text{ Hour}$)* |
-| **`SEV2_MAJOR`** | `7.0 – 8.9` | Differential privacy budget bypass, Byzantine aggregation filter bypass, authentication bypass, BOLA / IDOR case manipulation. | **`< 48 Hours`** | **$\le 1\text{ Hour}$** | **$\le 14\text{ Business Days}$** |
-| **`SEV3_MODERATE`** | `4.0 – 6.9` | Rate-limiting bypass, localized CSRF, minor information disclosure without PII exposure, non-exploitable timing anomalies. | **`< 72 Hours`** | **$\le 4\text{ Hours}$** | **$\le 30\text{ Business Days}$** |
+| **`SEV1_CRITICAL`** | `9.0 – 10.0` | Raw PII plaintext leakage, unauthenticated Remote Code Execution (RCE), private key / HSM extraction, cross-tenant database bleed, zero-day cryptographic compromise. | **`< 24 Hours`** | **<= 15 Minutes** | **<= 7 Business Days** *(Hotfix MTTR <= 1 Hour)* |
+| **`SEV2_MAJOR`** | `7.0 – 8.9` | Differential privacy budget bypass, Byzantine aggregation filter bypass, authentication bypass, BOLA / IDOR case manipulation. | **`< 48 Hours`** | **<= 1 Hour** | **<= 14 Business Days** |
+| **`SEV3_MODERATE`** | `4.0 – 6.9` | Rate-limiting bypass, localized CSRF, minor information disclosure without PII exposure, non-exploitable timing anomalies. | **`< 72 Hours`** | **<= 4 Hours** | **<= 30 Business Days** |
 | **`SEV4_LOW`** | `0.1 – 3.9` | Cosmetic UI issues, non-sensitive error messages with unique incident IDs, best-practice header recommendations. | **`< 5 Days`** | Next Business Day | Next Scheduled Minor Release |
 
 ---
@@ -99,13 +99,13 @@ Our triage SLAs and resolution targets strictly mirror the [Enterprise Incident 
 The CFI platform follows a standard 90-day Coordinated Vulnerability Disclosure (CVD) lifecycle:
 
 ```
-[ Researcher Submits PoC ] ──► [ Triage & Severity Classification (<24-48h) ]
-                                            │
-                                            ▼
-[ Patch Verification & Testing ] ◄── [ Engineering Hotfix Development ]
-            │
-            ▼
-[ CVE Assignment via GitHub CNA ] ──► [ 90-Day Embargo & Coordinated Public Advisory ]
+[ Researcher Submits PoC ] ---> [ Triage & Severity Classification (<24-48h) ]
+                                             |
+                                             v
+[ Patch Verification & Testing ] <--- [ Engineering Hotfix Development ]
+            |
+            v
+[ CVE Assignment via GitHub CNA ] ---> [ 90-Day Embargo & Coordinated Public Advisory ]
 ```
 
 1. **Initial Triage & Confirmation**: Within the SLA window, the security team validates the reproduction steps and assigns an internal tracking ID.
