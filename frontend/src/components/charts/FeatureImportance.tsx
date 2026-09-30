@@ -27,7 +27,7 @@ export default function FeatureImportance({ bank, modelType }: FeatureImportance
       <p className="text-[10px] text-[var(--color-text-muted)] mb-3">
         {bank.name} - {modelType === 'local' ? 'Local' : 'Federated'} | First-layer weight magnitude
       </p>
-      <div className="h-64 relative flex-1 min-h-0">
+      <div className="relative flex-1" style={{ minHeight: '256px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} layout="vertical" margin={{ top: 5, right: 20, bottom: 5, left: 90 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" horizontal={false} />
