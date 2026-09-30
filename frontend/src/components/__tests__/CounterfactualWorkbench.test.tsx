@@ -93,6 +93,9 @@ describe('CounterfactualWorkbench Component (User Interaction & Deep Linking)', 
 
     vi.spyOn(api, 'fetchCounterfactual').mockResolvedValue(mockReport);
 
+    const scrollIntoViewMock = vi.fn();
+    window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+
     renderWorkbench();
 
     const simulateBtn = screen.getByRole('button', { name: /Simulate Optimal Counterfactual Path/i });
@@ -111,6 +114,13 @@ describe('CounterfactualWorkbench Component (User Interaction & Deep Linking)', 
     expect(await screen.findByText(/Remediation Action Path/i)).toBeInTheDocument();
     expect(screen.getByText(/Reduce hourly transaction burst rate/i)).toBeInTheDocument();
     expect(screen.getByText(/Optimal minimal perturbation path/i)).toBeInTheDocument();
+
+    // Verify auto-scroll down to remediation action path result
+    await vi.waitFor(() => {
+      expect(scrollIntoViewMock).toHaveBeenCalledWith(
+        expect.objectContaining({ behavior: 'smooth', block: 'start' })
+      );
+    });
 
     // Verify "Apply Suggested Values" button is present and clickable
     const applyBtn = screen.getByRole('button', { name: /Apply Suggested Values/i });

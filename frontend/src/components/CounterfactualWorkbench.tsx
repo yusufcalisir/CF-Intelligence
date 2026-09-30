@@ -139,6 +139,23 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     setIsDropdownOpen(false);
   };
 
+  // Auto-scroll to remediation report when simulation completes
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (report && reportRef.current) {
+      const timer = setTimeout(() => {
+        if (reportRef.current && typeof reportRef.current.scrollIntoView === 'function') {
+          reportRef.current.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start',
+          });
+        }
+      }, 60);
+      return () => clearTimeout(timer);
+    }
+  }, [report]);
+
   const calculateDynamicScore = () => {
     const baseAmountRisk = Math.min(300, (amount / 20000) * 300);
     const velocityRisk = Math.min(250, (velocity / 30) * 250);
@@ -739,7 +756,11 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
           {/* Counterfactual Remediation Path Recommendations */}
           {report && (
-            <div className="glass-card rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-800 space-y-4 shadow-xl bg-slate-950/70 min-w-0">
+            <div
+              ref={reportRef}
+              id="remediation-action-path"
+              className="glass-card rounded-2xl p-4 sm:p-5 md:p-6 border border-slate-800 space-y-4 shadow-xl bg-slate-950/70 min-w-0 scroll-mt-20 sm:scroll-mt-24 transition-all duration-300"
+            >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2 min-w-0">
                   <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0" />
