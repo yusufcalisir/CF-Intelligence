@@ -2,7 +2,7 @@
 
 > **CF-Intelligence Technical Audit Report**  
 > **Repository:** [`https://github.com/yusufcalisir/CF-Intelligence`](https://github.com/yusufcalisir/CF-Intelligence)  
-> **Audited Baseline:** 4,105 Automated Tests across Backend (3,309 Pytest), Scientific Verification (409 Tests / 21 Modules), Frontend (356 Vitest), and Smart Contracts (31 Hardhat).
+> **Audited Baseline:** 4,107 Automated Tests across Backend (3,311 Pytest), Scientific Verification (409 Tests / 21 Modules), Frontend (356 Vitest), and Smart Contracts (31 Hardhat).
 
 ---
 
@@ -25,7 +25,7 @@ The audit inspected all components across the full repository footprint:
 3. **API Presentation Layer** (`backend/app/presentation/routers/`): 35 FastAPI routers exposing 160+ endpoints, WebSocket handlers, and ABAC dependency injectors.
 4. **Machine Learning & Privacy** (`fl_engine.py`, `graph_embedding_model.py`, `privacy_service.py`): FedAvg, FedProx, SCAFFOLD implementations, PyTorch GraphSAGE mean aggregators, and Opacus Differential Privacy accounting.
 5. **Research Prototypes**: TenSEAL CKKS FHE driver, Groth16 zk-SNARK attestation verifier, software-emulated TEE driver, CRYSTALS-Kyber-768 PQC driver, and Solidity smart contracts (`contracts/`).
-6. **Test Suites** (`backend/tests/`, `verification/`, `frontend/tests/`, `contracts/`): 237+ backend test modules (3,309 Pytest tests), 21 self-contained scientific verification suites (409 tests), 86 frontend Vitest test files (356 tests), and 31 Hardhat smart contract tests.
+6. **Test Suites** (`backend/tests/`, `verification/`, `frontend/tests/`, `contracts/`): 237+ backend test modules (3,311 Pytest tests), 21 self-contained scientific verification suites (409 tests), 86 frontend Vitest test files (356 tests), and 31 Hardhat smart contract tests.
 
 ---
 
@@ -89,7 +89,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 3,309 Pytest tests,     │ Evaluated across 8 canonical datasets│
+│ Validated by 3,311 Pytest tests,     │ Evaluated across 8 canonical datasets│
 │ (+ 409 verification modules/tests),  │ via benchmarks/runners/ & harness.   │
 │ 356 Vitest components, 31 Hardhat.   │ (Zero mock data or synthetic clamps) │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
@@ -226,7 +226,7 @@ Every dataset in `experiments/<dataset>/` strictly adheres to the canonical 5-ar
 
 #### Category 6: Code Quality, CI/CD & Automated Test Suites (Items 34–38)
 - **ITEM-34**: Deterministic CI Smoke Gates ($< 20\text{s}$ fast-fail dataloader, model serialization, schema validation) — *VERIFIED [PASS]*
-- **ITEM-35**: Backend Pytest Suite (3,309 automated tests, 100% passing) — *VERIFIED [PASS]*
+- **ITEM-35**: Backend Pytest Suite (3,311 automated tests, 100% passing) — *VERIFIED [PASS]*
 - **ITEM-36**: Frontend Vitest Suite (86 test files, 356 tests, 100% passing) — *VERIFIED [PASS]*
 - **ITEM-37**: Scientific Invariant Verification Suite (21 modules, 409 tests, 100% passing) — *VERIFIED [PASS]*
 - **ITEM-38**: Smart Contracts (31 tests, Hardhat) & Clean Static Analysis (0 Ruff errors) — *VERIFIED [PASS]*

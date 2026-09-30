@@ -95,7 +95,7 @@ The repository includes a comprehensive `Makefile` automating end-to-end executi
 # 1. Complete Environment Verification & Smoke Test
 make test
 
-# 2. Master One-Line Verification of All Automated Test Suites (3,309 Pytest + 356 Vitest + 31 Hardhat)
+# 2. Master One-Line Verification of All Automated Test Suites (3,311 Pytest + 356 Vitest + 31 Hardhat)
 make test-all
 
 # 3. Run All Empirical Benchmark Runners & Compile Master Matrix
@@ -318,4 +318,4 @@ The reproducibility pipeline is continuously verified by targeted unit and integ
 | **Experiment Artifact Standard** | [`backend/tests/unit/test_experiment_artifact_hierarchy.py`](../backend/tests/unit/test_experiment_artifact_hierarchy.py) | Verifies 5-artifact hierarchy (`config.json`, `results.json`, `metrics.csv`, `report.md`, `plots/`) across all 8 datasets |
 | **Authoritative Dataset Cards** | [`backend/tests/unit/test_dataset_cards.py`](../backend/tests/unit/test_dataset_cards.py) | Verifies `DATASETS.md` provenance, licensing, and 0/10 protected demographic PII scan |
 | **Model & System Cards** | [`backend/tests/unit/test_system_and_model_cards.py`](../backend/tests/unit/test_system_and_model_cards.py) | Verifies `MODEL_CARD.md` and `SYSTEM_CARD.md` regulatory conformity |
-| **Master Test Runner** | [`scripts/run_all_tests.py`](../scripts/run_all_tests.py) | Orchestrates all backend (3,309), frontend (355), verification (409), and contracts (31) tests |
+| **Master Test Runner** | [`scripts/run_all_tests.py`](../scripts/run_all_tests.py) | Orchestrates all backend (3,311), frontend (356), verification (409), and contracts (31) tests |

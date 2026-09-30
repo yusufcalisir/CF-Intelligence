@@ -119,8 +119,8 @@ class TestEvidenceCenteredReadmeIntegrity:
             "Software Correctness & Subsystem Self-Verification" in content
             or "Software Correctness" in content
         ), "README missing explicit Software Correctness heading"
-        assert "3,309" in content, "README missing updated 3,309 Backend Pytest count"
-        assert "4,104" in content, "README missing updated 4,104 total system test count"
+        assert "3,311" in content, "README missing updated 3,311 Backend Pytest count"
+        assert "4,107" in content, "README missing updated 4,107 total system test count"
 
     def test_research_prototypes_tier2_delineation(self) -> None:
         """Assert Research Prototypes section clearly delineates Tier 2 exploratory prototypes with disclaimers."""
