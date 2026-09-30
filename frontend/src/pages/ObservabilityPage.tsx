@@ -123,7 +123,7 @@ export default function ObservabilityPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-w-0 max-w-full">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -302,11 +302,11 @@ export default function ObservabilityPage() {
 
             {/* Feature Subset Selector Chips */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                 <span className="text-[var(--color-text-muted)] font-mono text-[11px]">
                   Target Retraining Feature Subset:
                 </span>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={handleSelectAllDrifted}
                     className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-cyan-300 border border-white/10 transition-colors"
@@ -517,43 +517,59 @@ export default function ObservabilityPage() {
 
       {/* Tab 3: Prometheus Alertmanager */}
       {activeTab === 'alerts' && (
-        <div className="glass-card p-4 sm:p-5 space-y-4">
+        <div className="glass-card p-4 sm:p-5 space-y-4 min-w-0">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h3 className="text-xs sm:text-sm font-bold uppercase text-[var(--color-text-muted)]">
               Active Prometheus Alertmanager Feed
             </h3>
-            <span className="text-xs font-mono text-[var(--color-text-muted)] shrink-0">Target: http://alertmanager:9093</span>
+            <span className="text-xs font-mono text-[var(--color-text-muted)] shrink-0">
+              Target: http://alertmanager:9093
+            </span>
           </div>
 
           {isAlertsLoading ? (
             <div className="py-6 text-center text-xs text-[var(--color-text-muted)]">Fetching alert feed...</div>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-3 min-w-0">
               {alertsData?.map((alert, i) => (
-                <div key={i} className="p-3 rounded-lg bg-[var(--color-bg-card)] border border-[var(--color-border)] flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-[var(--color-text-primary)]">{alert.alert_name}</span>
+                <div
+                  key={i}
+                  className="p-3.5 sm:p-4 rounded-xl bg-[var(--color-bg-card)] border border-[var(--color-border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 min-w-0"
+                >
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-bold text-sm text-[var(--color-text-primary)] break-words">
+                        {alert.alert_name}
+                      </span>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 ${
                           alert.severity === 'critical'
-                            ? 'bg-red-500/20 text-red-400'
+                            ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                             : alert.severity === 'warning'
-                            ? 'bg-amber-500/20 text-amber-400'
-                            : 'bg-blue-500/20 text-blue-400'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                            : 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
                         }`}
                       >
                         {alert.severity}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--color-text-muted)]">{alert.summary}</p>
+                    <p className="text-xs text-[var(--color-text-muted)] break-words leading-relaxed">
+                      {alert.summary}
+                    </p>
                   </div>
 
-                  <div className="text-right font-mono text-[10px]">
-                    <span className={`font-bold ${alert.status === 'firing' ? 'text-red-400' : 'text-emerald-400'}`}>
-                      ● {alert.status.toUpperCase()}
+                  <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-1.5 sm:gap-1 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-white/5 font-mono text-xs sm:text-[11px]">
+                    <span
+                      className={`font-bold inline-flex items-center gap-1.5 text-xs ${
+                        alert.status === 'firing' ? 'text-red-400' : 'text-emerald-400'
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${alert.status === 'firing' ? 'bg-red-400 animate-pulse' : 'bg-emerald-400'}`} />
+                      {alert.status.toUpperCase()}
                     </span>
-                    <div className="text-[var(--color-text-muted)]">{alert.started_at}</div>
+                    <span className="text-[var(--color-text-muted)] text-[10px] font-mono whitespace-nowrap">
+                      {alert.started_at}
+                    </span>
                   </div>
                 </div>
               ))}
@@ -622,18 +638,18 @@ export default function ObservabilityPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                 <button
                   onClick={() => refetchPrometheus()}
                   disabled={isPrometheusLoading}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-colors flex items-center gap-1.5 shrink-0"
                 >
                   <span>🔄</span>
                   <span>Refresh</span>
                 </button>
                 <button
                   onClick={() => prometheusData && copyToClipboard(prometheusData.metrics_text, 'prometheus')}
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition-colors flex items-center gap-1.5"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 border border-indigo-500/40 transition-colors flex items-center gap-1.5 shrink-0"
                 >
                   <span>{copiedPrometheus ? '✓ Copied' : '📋 Copy Plaintext'}</span>
                 </button>
@@ -641,40 +657,40 @@ export default function ObservabilityPage() {
             </div>
 
             {/* Metric Highlights Pill Row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5">
-                <span className="text-[10px] text-slate-400 block font-sans">Metric Count</span>
-                <span className="font-bold text-cyan-300">{prometheusData?.metric_count ?? 14} series</span>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono min-w-0">
+              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Metric Count</span>
+                <span className="font-bold text-cyan-300 truncate block">{prometheusData?.metric_count ?? 14} series</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5">
-                <span className="text-[10px] text-slate-400 block font-sans">cfi_concept_drift_psi</span>
-                <span className="font-bold text-indigo-300">{driftData?.concept_drift_psi.toFixed(4) ?? '0.0000'}</span>
+              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">cfi_concept_drift_psi</span>
+                <span className="font-bold text-indigo-300 truncate block">{driftData?.concept_drift_psi.toFixed(4) ?? '0.0000'}</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5">
-                <span className="text-[10px] text-slate-400 block font-sans">Retraining Counter</span>
-                <span className="font-bold text-emerald-400">active gauge</span>
+              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Retraining Counter</span>
+                <span className="font-bold text-emerald-400 truncate block">active gauge</span>
               </div>
-              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5">
-                <span className="text-[10px] text-slate-400 block font-sans">Scraped At</span>
+              <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 space-y-0.5 min-w-0">
+                <span className="text-[10px] text-slate-400 block font-sans truncate">Scraped At</span>
                 <span className="font-bold text-slate-300 text-[11px] truncate block">{prometheusData?.scraped_at ?? 'Live'}</span>
               </div>
             </div>
 
             {/* Terminal Pre Block */}
-            <div className="relative rounded-xl bg-[#060814] border border-white/10 p-3 max-h-56 overflow-y-auto font-mono text-[11px] text-slate-300 leading-relaxed">
-              <pre className="whitespace-pre">
+            <div className="relative rounded-xl bg-[#060814] border border-white/10 p-3 max-h-56 overflow-y-auto overflow-x-auto max-w-full font-mono text-[11px] text-slate-300 leading-relaxed min-w-0">
+              <pre className="whitespace-pre overflow-x-auto min-w-0">
                 {prometheusData?.metrics_text || `# HELP cfi_concept_drift_psi Population Stability Index\n# TYPE cfi_concept_drift_psi gauge\ncfi_concept_drift_psi 0.084500\n\n# HELP cfi_model_drift_retraining_triggered_total Retraining rounds triggered by drift\n# TYPE cfi_model_drift_retraining_triggered_total counter\ncfi_model_drift_retraining_triggered_total 1.000000`}
               </pre>
             </div>
           </div>
 
           {/* Interactive SIEM Metric Exporter (JSON & CEF) */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-500/5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cyan-500/20 pb-3">
-              <div className="flex items-center gap-2.5">
-                <span className="text-xl">🛡️</span>
-                <div>
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-100">
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/20 bg-cyan-500/5 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-cyan-500/20 pb-3 min-w-0">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="text-xl shrink-0">🛡️</span>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-100 truncate">
                     Enterprise SIEM / SOC Telemetry Exporter
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
@@ -683,8 +699,8 @@ export default function ObservabilityPage() {
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <div className="flex rounded-lg bg-black/40 p-1 border border-white/10">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                <div className="flex rounded-lg bg-black/40 p-1 border border-white/10 shrink-0">
                   <button
                     onClick={() => setSiemFormat('json')}
                     className={`px-2.5 py-1 rounded text-xs font-mono font-bold transition-all ${
@@ -710,7 +726,7 @@ export default function ObservabilityPage() {
                 <button
                   onClick={handleExportSiem}
                   disabled={exportSiem.isPending}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[40px]"
+                  className="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 min-h-[40px] shrink-0"
                 >
                   {exportSiem.isPending ? (
                     <>
@@ -749,17 +765,17 @@ export default function ObservabilityPage() {
 
             {/* Generated SIEM Payload Result Viewer */}
             {exportSiem.data && (
-              <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-xs font-mono">
-                    <span className="text-cyan-300 font-bold">● {exportSiem.data.event_count} Events Exported</span>
-                    <span className="text-slate-500">|</span>
-                    <span className="text-slate-400">Format: {exportSiem.data.format.toUpperCase()}</span>
-                    <span className="text-slate-500">|</span>
-                    <span className="text-slate-400">{exportSiem.data.exported_at}</span>
+              <div className="space-y-3 pt-2 min-w-0">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono min-w-0">
+                    <span className="text-cyan-300 font-bold shrink-0">● {exportSiem.data.event_count} Events Exported</span>
+                    <span className="text-slate-500 hidden sm:inline">|</span>
+                    <span className="text-slate-400 shrink-0">Format: {exportSiem.data.format.toUpperCase()}</span>
+                    <span className="text-slate-500 hidden sm:inline">|</span>
+                    <span className="text-slate-400 font-mono text-[11px] truncate">{exportSiem.data.exported_at}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => copyToClipboard(exportSiem.data!.payload, 'siem')}
                       className="px-2.5 py-1 rounded text-xs font-mono bg-white/5 hover:bg-white/10 text-cyan-300 border border-white/10 transition-colors"
@@ -775,20 +791,20 @@ export default function ObservabilityPage() {
                   </div>
                 </div>
 
-                <div className="rounded-xl bg-[#060814] border border-cyan-500/20 p-3 max-h-60 overflow-y-auto font-mono text-[11px] text-cyan-100 leading-relaxed">
-                  <pre className="whitespace-pre">{exportSiem.data.payload}</pre>
+                <div className="rounded-xl bg-[#060814] border border-cyan-500/20 p-3 max-h-60 overflow-y-auto overflow-x-auto max-w-full font-mono text-[11px] text-cyan-100 leading-relaxed min-w-0">
+                  <pre className="whitespace-pre overflow-x-auto min-w-0">{exportSiem.data.payload}</pre>
                 </div>
               </div>
             )}
           </div>
 
           {/* Flower Serverless P2P Peer Mesh Visualizer */}
-          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-500/5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                <span>🌸 Flower FL Framework — Serverless P2P Peer Mesh Topology</span>
+          <div className="glass-card p-5 space-y-4 border border-cyan-500/30 bg-cyan-500/5 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+              <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
+                <span className="truncate">🌸 Flower FL Framework — Serverless P2P Peer Mesh Topology</span>
               </h3>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30 shrink-0 self-start sm:self-auto font-mono">
                 ⚡ SERVERLESS P2P MESH (NO CENTRAL SERVER)
               </span>
             </div>
@@ -821,12 +837,12 @@ export default function ObservabilityPage() {
           </div>
 
           {/* Apache Flink Real-Time Graph Streaming Visualizer Card */}
-          <div className="glass-card p-5 space-y-4 border border-emerald-500/30 bg-emerald-500/5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2">
-                <span>⚡ Apache Flink — Sub-Second Real-Time Graph Streaming Engine</span>
+          <div className="glass-card p-5 space-y-4 border border-emerald-500/30 bg-emerald-500/5 min-w-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+              <h3 className="text-sm font-bold uppercase text-[var(--color-text-primary)] flex items-center gap-2 min-w-0">
+                <span className="truncate">⚡ Apache Flink — Sub-Second Real-Time Graph Streaming Engine</span>
               </h3>
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shrink-0 self-start sm:self-auto font-mono">
                 ● SUB-SECOND SLA (&lt; 50ms PROCESSING LATENCY)
               </span>
             </div>

@@ -141,7 +141,7 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
         </div>
 
         {/* Method Selector Pills */}
-        <div className="flex items-center gap-1.5 p-1 rounded-lg bg-[var(--color-surface-alt)] border border-white/10 shrink-0 self-start sm:self-auto">
+        <div className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-[var(--color-surface-alt)] border border-white/10 shrink-0 self-start sm:self-auto max-w-full">
           <button
             type="button"
             onClick={() => setSelectedMethod('raw')}
@@ -179,9 +179,9 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
       </div>
 
       {/* KPI Cards Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1">
-          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 min-w-0">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Expected Calib Error (ECE)
           </div>
           <div className="text-lg font-mono font-bold text-cyan-300">
@@ -192,8 +192,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1">
-          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Max Calib Error (MCE)
           </div>
           <div className="text-lg font-mono font-bold text-amber-300">
@@ -204,8 +204,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1">
-          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Brier Score (MSE)
           </div>
           <div className="text-lg font-mono font-bold text-emerald-300">
@@ -216,31 +216,31 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
           </div>
         </div>
 
-        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1">
-          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider">
+        <div className="p-3 rounded-lg bg-[var(--color-surface-alt)] border border-white/5 space-y-1 min-w-0">
+          <div className="text-[11px] text-[var(--color-text-muted)] font-medium uppercase tracking-wider truncate">
             Reliability Verdict
           </div>
-          <div className="flex items-center gap-1.5 pt-0.5">
+          <div className="flex items-center gap-1.5 pt-0.5 min-w-0">
             {metrics.isWellCalibrated ? (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                WELL-CALIBRATED
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 max-w-full truncate">
+                <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">WELL-CALIBRATED</span>
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30">
-                <AlertCircle className="w-3.5 h-3.5" />
-                DEGRADED CALIB
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] sm:text-xs font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30 max-w-full truncate">
+                <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">DEGRADED CALIB</span>
               </span>
             )}
           </div>
-          <div className="text-[10px] text-[var(--color-text-muted)]">
+          <div className="text-[10px] text-[var(--color-text-muted)] font-mono">
             {selectedMethod.toUpperCase()} active
           </div>
         </div>
       </div>
 
       {/* Main Diagram Area */}
-      <div className="h-72 w-full min-h-[280px] relative">
+      <div className="h-72 w-full min-h-[280px] relative min-w-0 overflow-hidden">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={chartData}
@@ -372,8 +372,8 @@ export const CalibrationReliabilityPlot: React.FC<CalibrationReliabilityPlotProp
 
       {/* 10-Bin Table Breakdown */}
       {showTable && (
-        <div className="pt-2 overflow-x-auto">
-          <table className="w-full text-left text-xs font-mono border-collapse">
+        <div className="pt-2 overflow-x-auto min-w-0">
+          <table className="w-full text-left text-xs font-mono border-collapse min-w-[480px]">
             <thead>
               <tr className="border-b border-white/10 text-[var(--color-text-muted)]">
                 <th className="py-1.5 px-2">Bin</th>

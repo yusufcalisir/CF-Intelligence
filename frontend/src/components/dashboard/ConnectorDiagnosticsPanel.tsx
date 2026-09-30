@@ -247,54 +247,54 @@ export default function ConnectorDiagnosticsPanel() {
               key={connector.connector_id}
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
-              className="glass-card p-4 sm:p-5 rounded-2xl border border-white/10 bg-slate-900/60 flex flex-col justify-between hover:border-indigo-500/40 transition-all shadow-lg"
+              className="glass-card p-4 sm:p-5 rounded-2xl border border-white/10 bg-slate-900/60 flex flex-col justify-between hover:border-indigo-500/40 transition-all shadow-lg min-w-0"
             >
-              <div>
+              <div className="min-w-0">
                 {/* Header Row */}
-                <div className="flex items-start justify-between gap-2 mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300">
+                <div className="flex items-start justify-between gap-2 mb-3 min-w-0">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 shrink-0">
                       <IconComponent className="w-5 h-5" />
                     </div>
-                    <div>
-                      <h4 className="text-sm font-bold text-slate-100 tracking-tight leading-snug">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-sm font-bold text-slate-100 tracking-tight leading-snug truncate">
                         {connector.name}
                       </h4>
-                      <span className="text-[11px] font-mono text-slate-400 block mt-0.5">
+                      <span className="text-[11px] font-mono text-slate-400 block mt-0.5 truncate">
                         {connector.category}
                       </span>
                     </div>
                   </div>
 
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 shrink-0">
                     {connector.status}
                   </span>
                 </div>
 
                 {/* Endpoint & Protocol specs */}
-                <div className="space-y-2 py-2.5 border-y border-white/5 text-xs">
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 font-mono text-[11px]">Endpoint</span>
-                    <span className="font-mono text-[11px] truncate max-w-[170px] text-indigo-300">
+                <div className="space-y-2 py-2.5 border-y border-white/5 text-xs min-w-0">
+                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
+                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Endpoint</span>
+                    <span className="font-mono text-[11px] truncate text-indigo-300 text-right min-w-0">
                       {connector.endpoint}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 font-mono text-[11px]">Protocol</span>
-                    <span className="font-mono text-[11px] text-slate-300">{connector.protocol}</span>
+                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
+                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Protocol</span>
+                    <span className="font-mono text-[11px] text-slate-300 text-right truncate min-w-0">{connector.protocol}</span>
                   </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 font-mono text-[11px]">Latency</span>
-                    <span className="font-mono text-[11px] font-bold text-cyan-300">{connector.latency_ms} ms</span>
+                  <div className="flex items-center justify-between text-slate-300 min-w-0 gap-2">
+                    <span className="text-slate-400 font-mono text-[11px] shrink-0">Latency</span>
+                    <span className="font-mono text-[11px] font-bold text-cyan-300 text-right shrink-0">{connector.latency_ms} ms</span>
                   </div>
                 </div>
 
                 {/* Specific Config Details */}
-                <div className="mt-3 space-y-1">
+                <div className="mt-3 space-y-1 min-w-0">
                   {Object.entries(connector.details).slice(0, 2).map(([key, val]) => (
-                    <div key={key} className="flex items-center justify-between text-[11px] font-mono text-slate-400">
-                      <span className="truncate">{key.replace(/_/g, ' ')}:</span>
-                      <span className="text-slate-200 truncate max-w-[140px]">
+                    <div key={key} className="flex items-center justify-between text-[11px] font-mono text-slate-400 min-w-0 gap-2">
+                      <span className="truncate shrink-0">{key.replace(/_/g, ' ')}:</span>
+                      <span className="text-slate-200 truncate text-right min-w-0">
                         {Array.isArray(val) ? val.join(', ') : String(val)}
                       </span>
                     </div>
