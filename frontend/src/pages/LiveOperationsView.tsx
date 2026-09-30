@@ -331,8 +331,8 @@ export default function LiveOperationsView() {
         const defaultWallet = lowerName.includes('alpha')
           ? '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
           : lowerName.includes('beta')
-          ? '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
-          : '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc';
+            ? '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+            : '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc';
         const wallet = p.wallet_address || defaultWallet;
         const payoutUsd = Number(p.payout_usd ?? p.amount ?? 0);
         const score = Number(p.shapley_score ?? (payoutUsd > 0 ? payoutUsd / 10000 : 0));
@@ -364,8 +364,8 @@ export default function LiveOperationsView() {
       const wallet = bName.includes('alpha')
         ? '0x90F79bf6EB2c4f870365E785982E1f101E93b906'
         : bName.includes('beta')
-        ? '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
-        : '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc';
+          ? '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65'
+          : '0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc';
       return {
         bank_name: b.name,
         wallet_address: wallet,
@@ -732,15 +732,14 @@ export default function LiveOperationsView() {
     setGradientSubmissions(0);
   };
 
-  // Cleanup simulation phase timers on component unmount
-  useEffect(() => {
-    return () => {
-      if (phaseTimerRef.current) {
-        clearTimeout(phaseTimerRef.current);
-        phaseTimerRef.current = null;
-      }
-    };
-  }, []);
+  // NOTE: phaseTimerRef is intentionally NOT cleared on unmount.
+  // React 18 StrictMode double-mounts (mount → unmount → remount) but preserves refs/state.
+  // If the timer is cleared during the "fake" unmount, the setTimeout chain that drives
+  // simulation phases dies permanently — hasAutoStartedRef blocks restart, leaving training
+  // stuck at "generating_data". Timer cleanup is handled explicitly by:
+  //   • resetTraining() — user-initiated reset
+  //   • ID-change effect — sim switch clears old timers before starting new ones
+  // In real (non-StrictMode) unmounts, stale timer callbacks become no-ops in React 18.
 
   // When the sim ID changes (user navigated to a different simulation), fully reset local state
   // so charts and metrics always reflect the newly selected simulation — never stale data.
@@ -825,11 +824,10 @@ export default function LiveOperationsView() {
                 Live Operations Dashboard
               </h1>
               <span
-                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
-                  wsStatus === 'CONNECTED' && !isOfflineDemoMode
+                className={`px-2.5 py-1 rounded-full text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${wsStatus === 'CONNECTED' && !isOfflineDemoMode
                     ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                     : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                }`}
+                  }`}
               >
                 <span className={`w-1.5 h-1.5 rounded-full ${wsStatus === 'CONNECTED' && !isOfflineDemoMode ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
                 {isOfflineDemoMode ? 'OFFLINE' : wsStatus}
@@ -932,11 +930,10 @@ export default function LiveOperationsView() {
             </span>
             {/* Training Mode Tag */}
             <span
-              className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${
-                trainingMode === 'mock'
+              className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-xs font-semibold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 border shadow-xs ${trainingMode === 'mock'
                   ? 'text-indigo-400 border-indigo-500/40 bg-indigo-500/10'
                   : 'text-amber-400 border-amber-500/40 bg-amber-500/10'
-              }`}
+                }`}
             >
               {trainingMode === 'mock' ? (
                 <>
@@ -1200,11 +1197,10 @@ export default function LiveOperationsView() {
             return (
               <div
                 key={bank.id}
-                className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 min-w-0 ${
-                  bank.status === 'QUARANTINED'
+                className={`p-4 rounded-xl border transition-all duration-300 flex flex-col justify-between gap-3 min-w-0 ${bank.status === 'QUARANTINED'
                     ? 'border-rose-500/80 bg-rose-950/30 shadow-[0_0_25px_rgba(244,63,94,0.3)] ring-1 ring-rose-500/40'
                     : 'border-[var(--color-border)] bg-slate-900/40'
-                }`}
+                  }`}
               >
                 <div className="flex items-start justify-between gap-2 min-w-0">
                   <div className="min-w-0 flex-1">
@@ -1212,13 +1208,12 @@ export default function LiveOperationsView() {
                     <p className="text-xs text-[var(--color-text-muted)] truncate">{bank.tier} • Last seen {bank.lastHeartbeat}</p>
                   </div>
                   <span
-                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${
-                      bank.status === 'ACTIVE'
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-bold shrink-0 whitespace-nowrap inline-flex items-center gap-1.5 ${bank.status === 'ACTIVE'
                         ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                         : bank.status === 'QUARANTINED'
                           ? 'bg-rose-500/30 text-rose-300 border border-rose-500/60 animate-pulse'
                           : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
-                    }`}
+                      }`}
                   >
                     ● {bank.status === 'QUARANTINED' ? 'QUARANTINED BY KRUM' : bank.status}
                   </span>
@@ -1284,22 +1279,20 @@ export default function LiveOperationsView() {
               <button
                 type="button"
                 onClick={() => setRocModelType('federated')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  rocModelType === 'federated'
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'federated'
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Federated
               </button>
               <button
                 type="button"
                 onClick={() => setRocModelType('local')}
-                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${
-                  rocModelType === 'local'
+                className={`px-2.5 py-1 rounded-md font-semibold transition-all ${rocModelType === 'local'
                     ? 'bg-indigo-600 text-white shadow-sm'
                     : 'text-slate-400 hover:text-slate-200'
-                }`}
+                  }`}
               >
                 Local Baselines
               </button>
