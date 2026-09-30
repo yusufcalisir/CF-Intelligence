@@ -35,7 +35,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
   const [searchParams, setSearchParams] = useSearchParams();
   const urlAlertId = searchParams?.get('alert_id') || '';
   const [selectedAlertId, setSelectedAlertId] = useState<string>(
-    initialAlertId || urlAlertId || 'alt_1001'
+    initialAlertId || urlAlertId || ''
   );
 
   // Synchronize when URL search param ?alert_id=... updates externally
@@ -49,7 +49,15 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
   const alertsQuery = useAlerts();
   const alertsList = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];
 
-  const alertQuery = useAlert(selectedAlertId);
+  // Effective alert identifier: selected -> first from alerts list -> initial/url fallback
+  const effectiveAlertId =
+    selectedAlertId ||
+    (alertsList.length > 0 ? alertsList[0]?.id : '') ||
+    initialAlertId ||
+    urlAlertId ||
+    '';
+
+  const alertQuery = useAlert(effectiveAlertId || undefined);
   const activeAlert = (alertQuery.data && typeof alertQuery.data === 'object' && !Array.isArray(alertQuery.data) && (alertQuery.data as any).id)
     ? alertQuery.data
     : null;
@@ -117,8 +125,9 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     setLoading(true);
     setError(null);
     try {
+      const targetAlertId = selectedAlertId || effectiveAlertId || 'alt_1001';
       const res = await fetchCounterfactual({
-        alert_id: selectedAlertId || 'alt_1001',
+        alert_id: targetAlertId,
         target_score: targetScore,
         amount,
         velocity,
@@ -178,7 +187,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
           </Link>
           <span className="text-xs text-slate-600 shrink-0">/</span>
           <span className="text-xs font-mono font-semibold text-cyan-400 truncate max-w-[140px] sm:max-w-none">
-            {selectedAlertId}
+            {effectiveAlertId || 'Select Target Alert'}
           </span>
         </div>
 
@@ -187,7 +196,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
           <span className="text-xs text-slate-400 font-medium shrink-0">Target Alert:</span>
           <div className="relative flex-1 sm:flex-initial min-w-0 max-w-full sm:max-w-xs md:max-w-sm">
             <select
-              value={selectedAlertId}
+              value={effectiveAlertId}
               onChange={(e) => handleSelectAlert(e.target.value)}
               className="appearance-none w-full min-w-0 max-w-full sm:max-w-xs md:max-w-sm truncate bg-slate-900/90 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-xs font-mono rounded-lg pl-3 pr-8 py-1.5 outline-none cursor-pointer transition-colors shadow-sm block"
               aria-label="Select Target Alert for Simulation"
@@ -199,8 +208,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                   </option>
                 ))
               ) : (
-                <option value={selectedAlertId}>
-                  {selectedAlertId.length > 18 ? `${selectedAlertId.slice(0, 8)}...${selectedAlertId.slice(-4)}` : selectedAlertId}
+                <option value={effectiveAlertId || 'alt_1001'}>
+                  {effectiveAlertId ? (effectiveAlertId.length > 18 ? `${effectiveAlertId.slice(0, 8)}...${effectiveAlertId.slice(-4)}` : effectiveAlertId) : 'alt_1001'}
                 </option>
               )}
             </select>
@@ -250,7 +259,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
           className="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs font-mono text-slate-200 flex items-center gap-2.5 shadow-sm min-w-0"
         >
           <span className="w-3.5 h-3.5 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin shrink-0" aria-hidden="true" />
-          <span className="truncate">Loading alert details and telemetry for {selectedAlertId}...</span>
+          <span className="truncate">Loading alert details and telemetry for {effectiveAlertId}...</span>
         </div>
       ) : activeAlert ? (
         <div className="p-3.5 sm:p-4 rounded-xl bg-slate-900/70 border border-indigo-500/25 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg min-w-0">

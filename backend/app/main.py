@@ -311,6 +311,7 @@ def seed_mock_data() -> None:
 
     # 3. Create mock alerts
     a1 = Alert(
+        id="alt_1001",
         bank_id="bank_b",
         transaction_id="tx_98234",
         risk_score=850.0,
@@ -335,6 +336,7 @@ def seed_mock_data() -> None:
     entity_svc.update_risk_level(c2.id, RiskLevel.HIGH)
 
     a2 = Alert(
+        id="alt_1002",
         bank_id="bank_c",
         transaction_id="tx_12049",
         risk_score=450.0,
@@ -355,6 +357,7 @@ def seed_mock_data() -> None:
     entity_svc.update_risk_level(c3.id, RiskLevel.MEDIUM)
 
     a3 = Alert(
+        id="alt_1003",
         bank_id="bank_a",
         transaction_id="tx_77821",
         risk_score=930.0,
