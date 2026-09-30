@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Sliders,
@@ -12,6 +12,7 @@ import {
   ChevronDown,
   ArrowLeft,
   Wand2,
+  Check,
 } from 'lucide-react';
 import { CounterfactualReport } from '../types';
 import { fetchCounterfactual } from '../services/api';
@@ -109,9 +110,33 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     }
   }, [activeAlert]);
 
+  // Quick Alert Switcher Dropdown State & Click-Outside Dismiss
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const handleSelectAlert = (newId: string) => {
     setSelectedAlertId(newId);
     setSearchParams({ alert_id: newId });
+    setIsDropdownOpen(false);
   };
 
   const calculateDynamicScore = () => {
@@ -175,6 +200,23 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     ? BANK_NAMES[activeAlert.bank_id] || activeAlert.bank_id
     : 'Consortium Node';
 
+  const currentSelectedAlert = useMemo(
+    () => alertsList.find((a: any) => a.id === effectiveAlertId) || activeAlert,
+    [alertsList, effectiveAlertId, activeAlert]
+  );
+
+  const displayAlertLabel = useMemo(() => {
+    if (!effectiveAlertId) return 'Select Target Alert';
+    const shortId =
+      effectiveAlertId.length > 18
+        ? `${effectiveAlertId.slice(0, 8)}...${effectiveAlertId.slice(-4)}`
+        : effectiveAlertId;
+    const bank = currentSelectedAlert?.bank_id
+      ? BANK_NAMES[currentSelectedAlert.bank_id] || currentSelectedAlert.bank_id
+      : '';
+    return bank ? `${shortId} (${bank})` : shortId;
+  }, [effectiveAlertId, currentSelectedAlert]);
+
   return (
     <div className="space-y-5 sm:space-y-6 w-full max-w-full min-w-0 overflow-x-hidden">
       {/* Top Breadcrumb & Return to Alerts Link */}
@@ -195,14 +237,16 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
         </div>
 
         {/* Quick Alert Switcher Dropdown */}
-        <div className="flex items-center gap-2 w-full sm:w-auto min-w-0">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto min-w-0">
           <span className="text-xs text-slate-400 font-medium shrink-0">Target Alert:</span>
-          <div className="relative flex-1 sm:flex-initial min-w-0 max-w-full sm:max-w-xs md:max-w-sm">
+          <div ref={dropdownRef} className="relative w-full sm:w-72 md:w-80 min-w-0">
+            {/* Native hidden select for form & automated test query parity */}
             <select
               value={effectiveAlertId}
               onChange={(e) => handleSelectAlert(e.target.value)}
-              className="appearance-none w-full min-w-0 max-w-full sm:max-w-xs md:max-w-sm truncate bg-slate-900/90 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-xs font-mono rounded-lg pl-3 pr-8 py-1.5 outline-none cursor-pointer transition-colors shadow-sm block"
+              className="sr-only"
               aria-label="Select Target Alert for Simulation"
+              tabIndex={-1}
             >
               {alertsList.length > 0 ? (
                 alertsList.map((alt) => (
@@ -216,7 +260,91 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
                 </option>
               )}
             </select>
-            <ChevronDown className="h-3.5 w-3.5 text-slate-400 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+
+            {/* Custom Interactive Dropdown Button */}
+            <button
+              type="button"
+              onClick={() => setIsDropdownOpen((prev) => !prev)}
+              aria-label="Target Alert Selector"
+              aria-haspopup="listbox"
+              aria-expanded={isDropdownOpen}
+              className="w-full flex items-center justify-between gap-2 bg-slate-900/90 border border-slate-700 hover:border-cyan-500/50 text-slate-200 text-xs font-mono rounded-lg px-3 py-1.5 outline-none cursor-pointer transition-colors shadow-sm focus:border-cyan-500 min-w-0"
+              title="Click to switch target alert"
+            >
+              <span className="truncate text-left flex-1 min-w-0">
+                {displayAlertLabel}
+              </span>
+              <ChevronDown
+                className={`h-3.5 w-3.5 text-slate-400 shrink-0 transition-transform duration-200 ${
+                  isDropdownOpen ? 'rotate-180 text-cyan-400' : ''
+                }`}
+              />
+            </button>
+
+            {/* Custom Responsive Dropdown Menu */}
+            {isDropdownOpen && (
+              <div
+                role="listbox"
+                aria-label="Target Alert Options"
+                className="absolute left-0 right-0 sm:left-auto sm:right-0 top-full mt-1.5 w-full sm:w-84 max-w-[calc(100vw-2rem)] bg-slate-900/98 backdrop-blur-xl border border-slate-700/80 rounded-xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-800/60 max-h-72 overflow-y-auto"
+              >
+                {alertsList.length > 0 ? (
+                  alertsList.map((alt) => {
+                    const isSelected = alt.id === effectiveAlertId;
+                    const scoreColor =
+                      alt.risk_score >= 800
+                        ? 'text-rose-400 bg-rose-500/10 border-rose-500/20'
+                        : alt.risk_score >= 600
+                        ? 'text-amber-400 bg-amber-500/10 border-amber-500/20'
+                        : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+
+                    return (
+                      <button
+                        key={alt.id}
+                        type="button"
+                        role="option"
+                        aria-selected={isSelected}
+                        onClick={() => handleSelectAlert(alt.id)}
+                        className={`w-full text-left px-3 py-2 flex items-center justify-between gap-2.5 transition-colors cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500/10 text-cyan-200'
+                            : 'hover:bg-slate-800/80 text-slate-300 hover:text-white'
+                        }`}
+                      >
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="font-mono text-xs font-semibold text-slate-200 truncate">
+                              {alt.id.length > 18 ? `${alt.id.slice(0, 8)}...${alt.id.slice(-4)}` : alt.id}
+                            </span>
+                            {isSelected && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-cyan-400 shrink-0" />
+                            )}
+                          </div>
+                          <span className="text-[11px] text-slate-400 truncate">
+                            {BANK_NAMES[alt.bank_id] || alt.bank_id}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold border ${scoreColor}`}
+                          >
+                            Score: {alt.risk_score}
+                          </span>
+                          {isSelected && (
+                            <Check className="h-3.5 w-3.5 text-cyan-400 shrink-0" />
+                          )}
+                        </div>
+                      </button>
+                    );
+                  })
+                ) : (
+                  <div className="px-3 py-2.5 text-xs text-slate-400 font-mono">
+                    {effectiveAlertId || 'alt_1001'} (Current Alert)
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>

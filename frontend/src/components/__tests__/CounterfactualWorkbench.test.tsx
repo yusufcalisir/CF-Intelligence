@@ -41,12 +41,26 @@ describe('CounterfactualWorkbench Component (User Interaction & Deep Linking)', 
     expect(screen.getByText(/Simulate Optimal Counterfactual Path/i)).toBeInTheDocument();
   });
 
-  it('reads ?alert_id=... from URL search params and updates active target alert', () => {
+  it('reads ?alert_id=... from URL search params and updates active target alert', async () => {
+    const user = userEvent.setup();
     renderWorkbench(['/workbench?alert_id=alt_9002']);
 
     expect(screen.getByText(/Counterfactual Remediation Workbench/i)).toBeInTheDocument();
     // Verify alert selector or alert identifier is active
     expect(screen.getByDisplayValue('alt_9002')).toBeInTheDocument();
+
+    // Verify custom responsive dropdown toggle works seamlessly
+    const dropdownTrigger = screen.getByRole('button', { name: /Target Alert Selector/i });
+    expect(dropdownTrigger).toBeInTheDocument();
+    expect(dropdownTrigger).toHaveAttribute('aria-expanded', 'false');
+
+    await user.click(dropdownTrigger);
+    expect(dropdownTrigger).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('listbox', { name: /Target Alert Options/i })).toBeInTheDocument();
+
+    await user.click(dropdownTrigger);
+    expect(dropdownTrigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByRole('listbox', { name: /Target Alert Options/i })).not.toBeInTheDocument();
   });
 
   it('allows user to simulate optimal counterfactual path on button click', async () => {
@@ -148,3 +162,5 @@ describe('CounterfactualWorkbench Component (User Interaction & Deep Linking)', 
     expect(screen.getByText(/4 txns/i)).toBeInTheDocument();
   });
 });
+
+
