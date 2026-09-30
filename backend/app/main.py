@@ -482,6 +482,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                             await _alt_r.ping()
                             await _alt_r.aclose()
                             _redis_available = True
+                            _redis_url = cand_url
                             logger.info("Redis: auto-recovered at %s", cand_url)
                             break
                         except Exception:
@@ -513,7 +514,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 from app.presentation.messaging.redis_listener import RedisBankClientListener
 
-                redis_url = settings.redis_url
+                redis_url = _redis_url
                 if redis_url:
                     target_id = service_name if service_name.startswith("bank-") else "bank_a"
                     listener = RedisBankClientListener(redis_url=redis_url, bank_id=target_id)
@@ -525,7 +526,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             try:
                 from app.presentation.messaging.redis_listener import RedisBankClientListener
 
-                redis_url = settings.redis_url
+                redis_url = _redis_url
                 if redis_url:
                     for b_id in ["bank_a", "bank_b", "bank_c"]:
                         listener = RedisBankClientListener(redis_url=redis_url, bank_id=b_id)
