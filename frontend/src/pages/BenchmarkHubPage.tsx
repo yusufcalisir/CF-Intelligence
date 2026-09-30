@@ -640,25 +640,25 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-indigo-500/20">
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">PR-AUC</div>
-                    <div className="text-xs font-bold text-emerald-400 font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
+                    <div className="text-xs font-bold text-emerald-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.pr_auc !== undefined
                         ? benchmarkData.performance_comparison.federated_learning.pr_auc.toFixed(4)
                         : (isLoading ? '...' : '—')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">ROC-AUC</div>
-                    <div className="text-xs font-bold text-white font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
+                    <div className="text-xs font-bold text-white font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.roc_auc !== undefined
                         ? benchmarkData.performance_comparison.federated_learning.roc_auc.toFixed(4)
                         : (isLoading ? '...' : '—')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
-                    <div className="text-xs font-bold text-indigo-300 font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
+                    <div className="text-xs font-bold text-indigo-300 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.federated_learning?.recall_at_01_fpr !== undefined
                         ? benchmarkData.performance_comparison.federated_learning.recall_at_01_fpr.toFixed(4)
                         : (isLoading ? '...' : '—')}
@@ -666,18 +666,18 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-300 pt-1 border-t border-indigo-500/20">
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">False Alarms:</span>
-                    <span>{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
+                <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-indigo-500/20">
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
+                    <span className="text-slate-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.federated_learning.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
-                    <span className="text-amber-300">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
+                    <span className="text-amber-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Total Cost:</span>
-                    <span className="text-emerald-400 font-bold">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
+                    <span className="text-emerald-400 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.federated_learning.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                 </div>
               </div>
@@ -694,25 +694,25 @@ export const BenchmarkHubPage: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-3 gap-2 text-center pt-1 border-t border-slate-800">
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">PR-AUC</div>
-                    <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">PR-AUC</div>
+                    <div className="text-xs font-bold text-rose-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.pr_auc !== undefined
                         ? benchmarkData.performance_comparison.isolated_local_model.pr_auc.toFixed(4)
                         : (isLoading ? '...' : '—')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">ROC-AUC</div>
-                    <div className="text-xs font-bold text-slate-300 font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">ROC-AUC</div>
+                    <div className="text-xs font-bold text-slate-300 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.roc_auc !== undefined
                         ? benchmarkData.performance_comparison.isolated_local_model.roc_auc.toFixed(4)
                         : (isLoading ? '...' : '—')}
                     </div>
                   </div>
-                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5">
-                    <div className="text-[10px] text-slate-400">Recall @ 0.1%</div>
-                    <div className="text-xs font-bold text-rose-400 font-mono mt-0.5">
+                  <div className="bg-slate-900/60 p-2 rounded-lg border border-white/5 flex flex-col justify-between h-full">
+                    <div className="text-[10px] text-slate-400 font-medium leading-tight h-7 flex items-center justify-center text-center">Recall @ 0.1%</div>
+                    <div className="text-xs font-bold text-rose-400 font-mono mt-1">
                       {benchmarkData?.performance_comparison?.isolated_local_model?.recall_at_01_fpr !== undefined
                         ? benchmarkData.performance_comparison.isolated_local_model.recall_at_01_fpr.toFixed(4)
                         : (isLoading ? '...' : '—')}
@@ -720,18 +720,18 @@ export const BenchmarkHubPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 text-[10.5px] font-mono text-slate-400 pt-1 border-t border-slate-800">
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">False Alarms:</span>
-                    <span className="text-rose-300">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
+                <div className="grid grid-cols-3 gap-2 text-center pt-1.5 border-t border-slate-800">
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">False Alarms</span>
+                    <span className="text-rose-300 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.false_positive_alerts_daily !== undefined ? `${benchmarkData.performance_comparison.isolated_local_model.cost_report.false_positive_alerts_daily} FP` : (isLoading ? '...' : '—')}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Daily Loss:</span>
-                    <span className="text-rose-400">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Daily Loss</span>
+                    <span className="text-rose-400 font-mono text-[11px] font-bold mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.estimated_daily_fraud_loss_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.estimated_daily_fraud_loss_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
-                  <div>
-                    <span className="text-slate-500 block text-[9px]">Total Cost:</span>
-                    <span className="text-rose-400 font-bold">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
+                  <div className="bg-slate-900/40 p-1.5 rounded-lg border border-white/[0.04] flex flex-col justify-between h-full">
+                    <span className="text-slate-400 block text-[9px] font-medium leading-tight h-5 flex items-center justify-center uppercase tracking-wider">Total Cost</span>
+                    <span className="text-rose-400 font-bold font-mono text-[11px] mt-0.5 truncate">{benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars !== undefined ? `$${benchmarkData.performance_comparison.isolated_local_model.cost_report.total_daily_cost_dollars.toLocaleString()}` : (isLoading ? '...' : '—')}</span>
                   </div>
                 </div>
               </div>
