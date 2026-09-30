@@ -439,10 +439,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Probe Redis availability once at startup (avoids per-connection WARNING spam)
     _redis_available = False
+    _redis_url: str = settings.redis_url or "redis://localhost:6379"
     try:
         import redis.asyncio as _aioredis
 
-        _redis_url = settings.redis_url or "redis://localhost:6379"
         _r = _aioredis.from_url(_redis_url, socket_connect_timeout=1.0)
         try:
             await _r.ping()
