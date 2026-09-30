@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
   Sliders,
@@ -43,11 +43,14 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     if (urlAlertId && urlAlertId !== selectedAlertId) {
       setSelectedAlertId(urlAlertId);
     }
-  }, [urlAlertId]);
+  }, [urlAlertId, selectedAlertId]);
 
   // 2. Load Real Alert Feed & Active Alert Telemetry
   const alertsQuery = useAlerts();
-  const alertsList = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];
+  const alertsList = useMemo(
+    () => (Array.isArray(alertsQuery.data) ? alertsQuery.data : []),
+    [alertsQuery.data]
+  );
 
   // Effective alert identifier: selected -> first from alerts list -> initial/url fallback
   const effectiveAlertId =
@@ -104,7 +107,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
       setReport(null);
       setError(null);
     }
-  }, [activeAlert?.id]);
+  }, [activeAlert]);
 
   const handleSelectAlert = (newId: string) => {
     setSelectedAlertId(newId);
