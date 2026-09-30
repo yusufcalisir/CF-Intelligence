@@ -34,15 +34,12 @@ from sklearn.metrics import (
 # Ensure backend in path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
-try:
-    import torch
-    import torch.nn as nn
-    from torch.utils.data import DataLoader, TensorDataset
-except ImportError:
-    torch = None  # type: ignore
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader, TensorDataset
 
 
-class SimpleMLP(nn.Module if torch else object):
+class SimpleMLP(nn.Module):
     def __init__(self, input_dim: int, hidden_dim: int = 64):
         super().__init__()
         self.network = nn.Sequential(
@@ -231,7 +228,7 @@ def run_fraud_benchmark(
             "os": platform.platform(),
             "cpu": platform.processor(),
             "python_version": platform.python_version(),
-            "torch_version": torch.__version__ if torch else "N/A",
+            "torch_version": torch.__version__,
         },
         "centralized_baseline": {
             "pr_auc": central_pr_auc,
