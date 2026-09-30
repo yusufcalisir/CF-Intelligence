@@ -1,9 +1,18 @@
-"""Fraud Detection Benchmark Runner — Evaluates Centralized vs Federated Models.
+"""Fraud Detection Benchmark Runner -- Evaluates Centralized vs Federated Models.
 
 Measures: PR-AUC, ROC-AUC, F1, Recall @ 0.1% FPR, Recall @ 0.5% FPR, Recall @ 1% FPR.
 Supports PaySim, IEEE-CIS, and synthetic datasets.
 Outputs machine-readable JSON metadata to benchmarks/results/raw/.
+
+CRITICAL -- Dataset mode is EXPLICIT:
+    --dataset-mode real     : Requires preprocessed client partitions to exist.
+                              Raises FileNotFoundError if missing. NEVER silently
+                              falls back to synthetic data.
+    --dataset-mode synthetic: Generates controlled synthetic data. Results artifact
+                              carries dataset_type='synthetic' and must NOT be
+                              presented as a real-data benchmark result.
 """
+
 
 from __future__ import annotations
 
@@ -62,7 +71,8 @@ def compute_recall_at_fpr(y_true: np.ndarray, y_pred_proba: np.ndarray, target_f
 
 def run_fraud_benchmark(
     dataset_name: str = "paysim",
-    synthetic_eval: bool = False,
+    dataset_mode: str = "real",
+    synthetic_eval: bool = False,  # DEPRECATED: use dataset_mode='synthetic'
     rounds: int = 10,
     epochs_per_round: int = 2,
     batch_size: int = 128,
@@ -78,10 +88,41 @@ def run_fraud_benchmark(
     base_dir = Path(__file__).resolve().parents[2]
     processed_dir = base_dir / "benchmarks" / "datasets" / dataset_name / "processed"
 
-    # Load partitions or generate synthetic
+    # Resolve effective mode (support legacy synthetic_eval kwarg)
+    if synthetic_eval:
+        import warnings
+        warnings.warn(
+            "synthetic_eval=True is deprecated; use dataset_mode='synthetic'.",
+            DeprecationWarning, stacklevel=2,
+        )
+        effective_mode = "synthetic"
+    elif dataset_mode not in ("real", "synthetic"):
+        raise ValueError(f"dataset_mode must be 'real' or 'synthetic', got '{dataset_mode}'")
+    else:
+        effective_mode = dataset_mode
+
+    # Load partitions -- EXPLICIT mode, no silent fallback
     client_files = sorted(list(processed_dir.glob("client_*.npz")))
-    if not client_files or synthetic_eval:
-        print(f"[*] Executing benchmark on controlled synthetic {dataset_name.upper()} environment...")
+    if effective_mode == "real":
+        if not client_files:
+            raise FileNotFoundError(
+                f"[run_fraud_benchmark] dataset_mode='real' requires preprocessed client "
+                f"partitions in: {processed_dir}\n"
+                f"Expected files matching: client_*.npz\n"
+                f"Use --dataset-mode synthetic for a smoke test, or run the "
+                f"preprocessing pipeline to generate real client partitions.\n"
+                f"For the canonical PaySim benchmark, use: "
+                f"experiments/paysim/run_paysim_canonical_benchmark.py"
+            )
+        print(f"[+] Found {len(client_files)} preprocessed client partitions for {dataset_name}...")
+        client_data = []
+        for cf in client_files:
+            data = np.load(cf)
+            client_data.append((data["X"], data["y"]))
+        _dataset_type = "real"
+    else:
+        print(f"[*] SYNTHETIC MODE: running controlled synthetic {dataset_name.upper()} "
+              "benchmark. This is NOT a canonical real-data result.")
         rng = np.random.default_rng(seed)
         n_clients = 5
         n_features = 10
@@ -93,12 +134,7 @@ def run_fraud_benchmark(
             X_i = rng.standard_normal((n_samples, n_features)).astype(np.float32)
             X_i[y_i == 1, :3] += 1.8  # separable fraud signal
             client_data.append((X_i, y_i))
-    else:
-        print(f"[+] Found {len(client_files)} preprocessed client partitions for {dataset_name}...")
-        client_data = []
-        for cf in client_files:
-            data = np.load(cf)
-            client_data.append((data["X"], data["y"]))
+        _dataset_type = "synthetic"
 
     input_dim = client_data[0][0].shape[1]
 
@@ -189,6 +225,8 @@ def run_fraud_benchmark(
     results = {
         "timestamp_utc": datetime.datetime.now(datetime.UTC).isoformat(),
         "dataset": dataset_name,
+        "dataset_type": _dataset_type,
+        "dataset_mode": effective_mode,
         "environment": {
             "os": platform.platform(),
             "cpu": platform.processor(),
@@ -224,6 +262,7 @@ def run_fraud_benchmark(
         print(f"Saved machine-readable results to: {out_file}")
 
     print("\n================== FRAUD BENCHMARK RESULTS ==================")
+    print(f"Dataset type:             {_dataset_type.upper()}")
     print(f"Dataset:                  {dataset_name.upper()}")
     print(f"Centralized PR-AUC:       {central_pr_auc:.4f} (Recall@0.1% FPR: {central_r_01:.4f})")
     print(f"Federated FedAvg PR-AUC:  {fl_pr_auc:.4f} (Recall@0.1% FPR: {fl_r_01:.4f})")
@@ -236,8 +275,24 @@ def run_fraud_benchmark(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run reproducible fraud detection benchmark")
     parser.add_argument("--dataset", type=str, default="paysim", choices=["paysim", "ieee_cis"])
-    parser.add_argument("--synthetic-eval", action="store_true", default=False)
+    parser.add_argument(
+        "--dataset-mode",
+        type=str,
+        default="real",
+        choices=["real", "synthetic"],
+        help=(
+            "'real': load preprocessed client partitions (FileNotFoundError if missing). "
+            "'synthetic': controlled smoke test, NOT a canonical benchmark."
+        ),
+    )
+    parser.add_argument("--synthetic-eval", action="store_true", default=False,
+                        help="DEPRECATED: use --dataset-mode synthetic.")
     parser.add_argument("--rounds", type=int, default=5)
     args = parser.parse_args()
 
-    run_fraud_benchmark(dataset_name=args.dataset, synthetic_eval=args.synthetic_eval, rounds=args.rounds)
+    run_fraud_benchmark(
+        dataset_name=args.dataset,
+        dataset_mode=args.dataset_mode,
+        synthetic_eval=args.synthetic_eval,
+        rounds=args.rounds,
+    )

@@ -28,8 +28,11 @@
     "dirichlet_alpha": 0.5,
     "num_clients": 3,
     "fedprox_mu": 0.01,
-    "temporal_cutoff_step": 8.0,
-    "nrows_loaded": 30000
+    "_LEGACY_nrows_loaded": 30000,
+    "_LEGACY_note": "nrows_loaded=30000 was a debug artifact. Full canonical experiment uses systematic every-10th-row sample (~636k rows). See experiments/paysim/run_paysim_canonical_benchmark.py",
+    "_LEGACY_temporal_cutoff_step": 8.0,
+    "_LEGACY_split_note": "temporal_cutoff_step=8 produced only 3 test fraud examples. Canonical split is stratified random 80/20 (179 test fraud)."
   },
+  "canonical_runner": "experiments/paysim/run_paysim_canonical_benchmark.py",
   "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\paysim"
-}
+}
