@@ -461,32 +461,38 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     else:
         logger.info("Seed skipped — sentinel exists, another worker already seeded")
 
-    # Start Redis Bank Client Listeners
+    # Start Redis Bank Client Listeners (only when Redis is reachable and authenticated)
     redis_listeners = []
-    if service_name.startswith("bank-") or service_name == "bank_client":
-        try:
-            from app.presentation.messaging.redis_listener import RedisBankClientListener
+    if _redis_available:
+        if service_name.startswith("bank-") or service_name == "bank_client":
+            try:
+                from app.presentation.messaging.redis_listener import RedisBankClientListener
 
-            redis_url = settings.redis_url
-            if redis_url:
-                target_id = service_name if service_name.startswith("bank-") else "bank_a"
-                listener = RedisBankClientListener(redis_url=redis_url, bank_id=target_id)
-                await listener.start()
-                redis_listeners.append(listener)
-        except Exception as exc:
-            logger.error("Failed to start Redis Bank Client Listener: %s", exc)
-    elif not service_name or service_name == "monolith":
-        try:
-            from app.presentation.messaging.redis_listener import RedisBankClientListener
-
-            redis_url = settings.redis_url
-            if redis_url:
-                for b_id in ["bank_a", "bank_b", "bank_c"]:
-                    listener = RedisBankClientListener(redis_url=redis_url, bank_id=b_id)
+                redis_url = settings.redis_url
+                if redis_url:
+                    target_id = service_name if service_name.startswith("bank-") else "bank_a"
+                    listener = RedisBankClientListener(redis_url=redis_url, bank_id=target_id)
                     await listener.start()
                     redis_listeners.append(listener)
-        except Exception as exc:
-            logger.error("Failed to start monolith Redis Bank Client Listeners: %s", exc)
+            except Exception as exc:
+                logger.error("Failed to start Redis Bank Client Listener: %s", exc)
+        elif not service_name or service_name == "monolith":
+            try:
+                from app.presentation.messaging.redis_listener import RedisBankClientListener
+
+                redis_url = settings.redis_url
+                if redis_url:
+                    for b_id in ["bank_a", "bank_b", "bank_c"]:
+                        listener = RedisBankClientListener(redis_url=redis_url, bank_id=b_id)
+                        await listener.start()
+                        redis_listeners.append(listener)
+            except Exception as exc:
+                logger.error("Failed to start monolith Redis Bank Client Listeners: %s", exc)
+    else:
+        logger.info(
+            "Redis Bank Client Listeners skipped — Redis not available / authenticated "
+            "(in-process message bus active)"
+        )
 
     yield
 
