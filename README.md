@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-4110%2F4110_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-4143%2F4143_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -82,7 +82,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
   - 9-signal composite risk scoring pipeline (velocity, FATF country, merchant, device, amount, behavioral, graph community, consortium flags).
   - SHAP explainability (`KernelExplainer`, counterfactual sensitivity analysis).
   - Federated optimization engines (`FedAvg`, `FedProx`, `SCAFFOLD`) handling Dirichlet Non-IID skew ($\alpha \le 0.50$).
-  - Differential Privacy via PyTorch Opacus with Rényi DP moments accounting (target $\epsilon \le 1.0, \delta = 10^{-5}$; measured $\epsilon = 1.858$ at $\sigma=3.0$).
+  - Differential Privacy via PyTorch Opacus with Rényi DP moments accounting (target $\epsilon \le 1.0, \delta = 10^{-5}$; measured $\epsilon = 0.3497$ at $\sigma=3.0$).
   - Secure Aggregation via Curve25519 pairwise Diffie-Hellman zero-sum masking and Shamir dropout recovery.
   - Byzantine consensus aggregators (`Krum`, `Coordinate-wise Trimmed Mean`, `Bulyan`) and Spectral SVD backdoor detection.
   - Relational graph intelligence via PyTorch `GraphSAGE` 2-hop neighborhood embeddings and MinHash LSH Fuzzy PSI.
@@ -133,7 +133,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
 |:---|:---|:---|:---|
 | **Real-Time Scoring Latency** | Target: < 15.0ms Fast Path, < 350ms Ensemble | Measured: 2.29 ms single-request fast-path (p99: 3.53 ms @ C=1, 79.34 ms @ C=100); throughput: 1,394.7 req/s @ C=100 ([`latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)) | **Verified** |
 | **Federated Non-IID Convergence** | Resilient under Dirichlet $\alpha = 0.50$ | `benchmarks/runners/run_fl_benchmark.py`, `backend/tests/unit/test_fl_engine.py` | **Verified** |
-| **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 1.858$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), RDP moments accounting | **Verified** |
+| **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), RDP moments accounting | **Verified** |
 | **Byzantine Fault Tolerance** | Tolerates up to $f < n/2$ malicious nodes | `benchmarks/runners/run_byzantine_benchmark.py` (Krum, Trimmed Mean, Bulyan) | **Verified** |
 | **Zero Raw PII Transmission** | No cleartext IBAN / SSN outside bank | AST static analyzer + `backend/tests/unit/test_data_contracts.py` | **Verified** |
 | **SSRF Perimeter Defense** | Private IP / AWS metadata blocking | `backend/tests/unit/test_perimeter_waf.py` (100% boundary probes blocked) | **Verified** |
@@ -153,7 +153,7 @@ To adhere to rigorous empirical standards (ACM/IEEE reproducibility guidelines, 
 | :--- | :--- | :--- | :--- |
 | **[1. Verified Empirical Results](#15-empirical-performance--benchmark-suite)** | Quantified performance metrics & benchmarks | [`claim_registry.json`](benchmarks/claim_registry.json), [`results/raw/`](benchmarks/results/raw/) | Exact JSON artifact reconciliation |
 | **[2. Experimental Suite](#1511-master-empirical-comparative-benchmark-matrix-strict-null-representation)** | 8 canonical datasets, factorial ablations, sweeps | [`experiments/`](experiments/), [`docs/EXPERIMENTS.md`](docs/EXPERIMENTS.md) | Standardized 5-artifact hierarchy |
-| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,311 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
+| **[3. Software Correctness](#17-software-correctness--subsystem-self-verification-reports-verification)** | Determinist implementation & contract safety | `backend/tests/` (3,347 tests), `ci.yml` | Binary PASS/FAIL, zero-mock |
 | **[4. Research Prototypes](#19-tier-2-research-prototypes--experimental-explorations)** | Exploratory algorithms & mathematical models | `experiments/`, GNN/PSI/CKKS drivers | Research proofs & simulation logs |
 | **[5. Limitations & Scope](#14-limitations--what-this-is-not)** | Real-world constraints, synthetic scope, caveats | [`LIMITATIONS.md`](docs/LIMITATIONS.md), [`verification_taxonomy_spec.md`](docs/verification_taxonomy_spec.md) | SR 11-7 model risk boundaries |
 
@@ -1329,7 +1329,7 @@ To satisfy **Federal Reserve SR 11-7**, **OCC Bulletin 2011-12**, and **EU AI Ac
 - **Pre-Registered Metric Hierarchy**: In imbalanced regimes (<= 0.15% prevalence), PR-AUC (Average Precision) and Recall@0.1%FPR are pre-registered as primary metrics. Standalone accuracy is strictly prohibited as an efficacy claim.
 - **Pre-Fixed Operational Thresholds**: Operating thresholds must be fixed a priori (alpha = 0.0010 for Recall@0.1%FPR), never tuned post-hoc on holdout test partitions.
 - **Unconditional Negative Result Preservation**: Empirical trade-offs, utility penalties, and failure modes are explicitly preserved with strict null representation:
-  - *DP Utility Collapse (NR-001)*: High DP noise (sigma = 3.0, epsilon approx 0.63) causes PR-AUC to collapse from 0.6272 to 0.1963 (-68.7% loss).
+  - *DP Utility Collapse (NR-001)*: High DP noise ($\sigma = 3.0, \epsilon = 0.3497$) causes PR-AUC to drop from 0.8965 to 0.3465 (-61.35% relative loss under genuine Opacus DP-SGD).
   - *Centralization Gap (NR-002)*: Monolithic pooling achieves 0.8650 PR-AUC vs Federated Champion 0.8420 (Delta_privacy = -0.0230, 97.34% efficiency).
   - *Neural Tabular Imbalance Vulnerability (NR-003)*: Uncalibrated MLPs on PaySim drop to 0.0014 PR-AUC without GBDT/GNN inductive bias.
   - *SCAFFOLD Control Variate Lag (NR-004)*: SCAFFOLD achieves only 0.0009 PR-AUC on 10-round PaySim runs due to early control variate noise.
@@ -1355,7 +1355,7 @@ To prevent the dangerous conflation of deterministic unit test execution with st
 │ • goAML 4.0 XML schema validation    │ • GraphSAGE inductive graph learning │
 │ • Fast CI Smoke Gates (< 20 seconds) │ • 16-Config Factorial ANOVA Grid     │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
-│ Validated by 3,311 Pytest unit tests,│ Evaluated across 8 canonical datasets│
+│ Validated by 4,143 Pytest unit tests,│ Evaluated across 8 canonical datasets│
 │ 356 Vitest components, 31 Hardhat.   │ via benchmarks/runners/ & harness.   │
 ├──────────────────────────────────────┼──────────────────────────────────────┤
 │ Epistemic Limit: 100% pass rate does │ Epistemic Limit: High AUC is useless │
@@ -1384,8 +1384,8 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-IEEE-RECALL-FPR`** | IEEE-CIS Recall @ 0.1% FPR | `0.5890` | `0.4308` | [`fraud_benchmark_ieee_cis.json`](benchmarks/results/raw/fraud_benchmark_ieee_cis.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --rounds 5 --clients 3` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-ELLIPTIC-PRAUC`** | Elliptic Bitcoin AML GraphSAGE PR-AUC | `0.8746` | `0.9001` | [`graphsage_elliptic_benchmark.json`](benchmarks/results/raw/graphsage_elliptic_benchmark.json) | `python benchmarks/runners/run_graph_benchmark.py --epochs 15` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-CREDITCARD-PRAUC`** | Credit Card Fraud Controlled-Budget Federated Benchmark | `0.8250` | `0.8248` (FedAvg, 10-pass equalized) / `0.8219` (Centralized equalized) | [`fraud_benchmark_credit_card.json`](benchmarks/results/raw/fraud_benchmark_credit_card.json) | `python experiments/credit_card/run_creditcard_benchmark.py --all-rows --require-real --centralized-epochs 10` | `EMPIRICAL_PARITY_VERIFIED` |
-| **`CLM-DP-SIGMA30`** | DP High-Noise Utility ($\sigma=3.0$) | `0.1963` | `0.1963` ($\epsilon=0.6272$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `EMPIRICAL_PARITY_VERIFIED` |
-| **`CLM-DP-SIGMA00`** | DP Non-Private Ceiling ($\sigma=0.0$) | `0.6272` | `0.6272` ($\epsilon=\infty$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-DP-SIGMA30`** | DP High-Noise Utility ($\sigma=3.0$) | `0.3465` | `0.3465` ($\epsilon=0.3497$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
+| **`CLM-DP-SIGMA00`** | DP Non-Private Ceiling ($\sigma=0.0$) | `0.8965` | `0.8965` ($\epsilon=\infty$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
 | **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($eta=0.20$) | `0.7344` | `0.7344` (99.7% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector | `0.7257` | `0.7257` (98.5% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator | `0.7070` | `0.7070` (95.9% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
@@ -1396,7 +1396,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,723 / 3,723 Core, 4,110 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,756 / 3,756 Core, 4,143 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
 
 ---
 
@@ -1415,10 +1415,10 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **SecAgg Throughput (NumPy Vectorized Masking)** | **~5,630,000 param/s** | > 1M param/s | `fl_engine.py` | `Empirical NumPy Array Vectorization Benchmark` |
 | **SecAgg Latency Scaling** | **O(n x d), R^2 = 0.9703** | Linear O(n x d) | `fl_engine.py` (NumPy masking path via `secagg_benchmark_scalability.py`) | `Empirical Vectorization Benchmark (see secagg_scalability_benchmark_report.md; variance range: 0.91–0.99)` |
 | **FL Synthetic ROC-AUC (FedAvg)** | **0.835 mean (range 0.563–0.952)** | > 0.80 measured / 0.950 lab design goal | `simulation_service.py` (5-seed empirical benchmark, 3-bank consortium, 5 rounds) | `Empirical Simulation Benchmark (5 seeds: [42, 123, 456, 789, 2026])` |
-| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 1.858$ at $\sigma=3.0, \delta=10^{-5}$** (Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite & RDP moments accounting)` |
+| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$** (Opacus RDP; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; RDP moments accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | 100% | **4,110 / 4,110 passing** (3,314 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
+| **Full Test Suite Pass Rate** | 100% | **4,143 / 4,143 passing** (3,347 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
 
 ---
 

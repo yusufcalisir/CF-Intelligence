@@ -170,34 +170,44 @@
       "category": "differential_privacy",
       "title": "Differential Privacy High-Noise Utility (sigma=3.0)",
       "dataset": "synthetic_banking",
-      "dataset_scale": "10k Transactions, 5 Clients",
-      "stated_value": 0.1963,
+      "dataset_scale": "20k Transactions, Centralized / Bank-Node Partition",
+      "stated_value": 0.3465,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.1963,
-      "centralized_baseline_value": 0.6272,
+      "empirical_measured_value": 0.3465,
+      "centralized_baseline_value": 0.8965,
       "evaluation_type": "PRIVACY_UTILITY_TRADE_OFF",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Strong DP guarantee (epsilon=1.858, delta=1e-5 via RDP accounting) yields PR-AUC 0.1963 and ROC-AUC 0.8301."
+      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine) with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via RDP accountant: epsilon=0.3497) yields PR-AUC 0.3465 ± 0.1290 and ROC-AUC 0.8719 ± 0.0450 across seeds [42, 123, 456], reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
+      "legacy_artifact": {
+        "pr_auc": 0.1963,
+        "source": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json (legacy commit f0705141 / 7e32f409)",
+        "dataset_type": "synthetic_10_feature_centroid_prototype",
+        "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype with hardcoded fixtures"
+      }
     },
     {
       "claim_id": "CLM-DP-SIGMA00",
       "category": "differential_privacy",
       "title": "Differential Privacy Non-Private Ceiling (sigma=0.0)",
       "dataset": "synthetic_banking",
-      "dataset_scale": "10k Transactions, 5 Clients",
-      "stated_value": 0.6272,
+      "dataset_scale": "20k Transactions, Centralized / Bank-Node Partition",
+      "stated_value": 0.8965,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.6272,
-      "centralized_baseline_value": 0.6272,
+      "empirical_measured_value": 0.8965,
+      "centralized_baseline_value": 0.8965,
       "evaluation_type": "PRIVACY_UTILITY_TRADE_OFF",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Unperturbed baseline (epsilon=infinity) achieves PR-AUC 0.6272 and ROC-AUC 0.9684."
+      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 ± 0.0064 and ROC-AUC 0.9872 ± 0.0041 across seeds [42, 123, 456].",
+      "legacy_artifact": {
+        "pr_auc": 0.6272,
+        "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype"
+      }
     },
     {
       "claim_id": "CLM-BYZ-TRIMMED",
@@ -374,7 +384,7 @@
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "4,110 Automated Tests",
+      "dataset_scale": "4,143 Automated Tests",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -384,7 +394,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "100% pass rate across 3,314 backend pytests, 356 frontend vitest tests, 31 smart contract tests, and 409 scientific verification tests across 21 modules."
+      "notes": "100% pass rate across 3,347 backend pytests, 356 frontend vitest tests, 31 smart contract tests, and 409 scientific verification tests across 21 modules."
     }
   ]
 }
