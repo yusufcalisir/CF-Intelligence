@@ -95,34 +95,36 @@ export default function BenchmarkLaunchModal({ isOpen, onClose, onComplete }: Be
       return;
     }
 
-    const progressInterval = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(progressInterval);
-          return 100;
-        }
-        return prev + 2.4;
-      });
-    }, 40);
+    const TOTAL_DURATION_MS = 850;
+    const UPDATE_INTERVAL_MS = 15;
+    const startTime = Date.now();
+    let completionTimeout: ReturnType<typeof setTimeout> | null = null;
 
-    const s1 = setTimeout(() => setCurrentStageIdx(1), 400);
-    const s2 = setTimeout(() => setCurrentStageIdx(2), 850);
-    const s3 = setTimeout(() => setCurrentStageIdx(3), 1350);
-    const s4 = setTimeout(() => setCurrentStageIdx(4), 1800);
+    const timer = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const rawPct = Math.min(100, 10 + (elapsed / TOTAL_DURATION_MS) * 90);
+      setProgress(rawPct);
 
-    const completion = setTimeout(() => {
-      setTimeout(() => {
-        onComplete();
-      }, 250);
-    }, 2350);
+      const computedIdx = Math.min(
+        BENCHMARK_STAGES.length - 1,
+        Math.floor((elapsed / TOTAL_DURATION_MS) * BENCHMARK_STAGES.length)
+      );
+      setCurrentStageIdx(computedIdx);
+
+      if (elapsed >= TOTAL_DURATION_MS) {
+        clearInterval(timer);
+        setProgress(100);
+        completionTimeout = setTimeout(() => {
+          onComplete();
+        }, 100);
+      }
+    }, UPDATE_INTERVAL_MS);
 
     return () => {
-      clearInterval(progressInterval);
-      clearTimeout(s1);
-      clearTimeout(s2);
-      clearTimeout(s3);
-      clearTimeout(s4);
-      clearTimeout(completion);
+      clearInterval(timer);
+      if (completionTimeout) {
+        clearTimeout(completionTimeout);
+      }
     };
   }, [isOpen, onComplete]);
 

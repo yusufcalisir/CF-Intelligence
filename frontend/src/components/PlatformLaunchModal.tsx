@@ -121,8 +121,8 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
       return;
     }
 
-    const TOTAL_DURATION_MS = 3500;
-    const UPDATE_INTERVAL_MS = 25;
+    const TOTAL_DURATION_MS = 950;
+    const UPDATE_INTERVAL_MS = 15;
     const startTime = Date.now();
     let completionTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -141,7 +141,7 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
         clearInterval(timer);
         completionTimeout = setTimeout(() => {
           onComplete();
-        }, 350);
+        }, 100);
       }
     }, UPDATE_INTERVAL_MS);
 
