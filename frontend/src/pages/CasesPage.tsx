@@ -250,46 +250,10 @@ export default function CasesPage() {
       </motion.div>
 
       {/* Filter and Create Controls */}
-      <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[var(--color-surface-subtle)] border border-[var(--color-border-subtle)]">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
-          {/* Status Filter */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <label htmlFor="case-status-filter" className="text-xs font-semibold text-[var(--color-text-muted)]">
-              Status:
-            </label>
-            <select
-              id="case-status-filter"
-              value={statusFilter}
-              onChange={(e) => handleStatusChange(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="">All Statuses</option>
-              {Object.entries(CASE_STATUS_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Priority Filter */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <label htmlFor="case-priority-filter" className="text-xs font-semibold text-[var(--color-text-muted)]">
-              Priority:
-            </label>
-            <select
-              id="case-priority-filter"
-              value={priorityFilter}
-              onChange={(e) => handlePriorityChange(e.target.value)}
-              className="px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
-            >
-              <option value="">All Priorities</option>
-              {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
-              ))}
-            </select>
-          </div>
-
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 p-3 sm:p-3.5 rounded-xl bg-[var(--color-surface-subtle)] border border-[var(--color-border-subtle)]">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
           {/* Search Input */}
-          <div className="relative flex-1 min-w-[180px] max-w-xs">
+          <div className="relative w-full sm:w-56 md:w-64 shrink-0">
             <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--color-text-muted)] pointer-events-none" />
             <input
               id="case-search-input"
@@ -311,27 +275,67 @@ export default function CasesPage() {
             )}
           </div>
 
-          {/* Clear Filters Button */}
-          {(statusFilter || priorityFilter || searchQuery) && (
-            <button
-              type="button"
-              id="clear-all-case-filters-btn"
-              onClick={handleClearAllFilters}
-              className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
-            >
-              Clear Filters
-            </button>
-          )}
+          {/* Status and Priority Dropdowns (2 columns on mobile, inline on sm+) */}
+          <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-3 w-full sm:w-auto">
+            {/* Status Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 min-w-0">
+              <label htmlFor="case-status-filter" className="text-[11px] sm:text-xs font-semibold text-[var(--color-text-muted)] shrink-0">
+                Status:
+              </label>
+              <select
+                id="case-status-filter"
+                value={statusFilter}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="w-full sm:w-auto px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer truncate"
+              >
+                <option value="">All Statuses</option>
+                {Object.entries(CASE_STATUS_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Priority Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 min-w-0">
+              <label htmlFor="case-priority-filter" className="text-[11px] sm:text-xs font-semibold text-[var(--color-text-muted)] shrink-0">
+                Priority:
+              </label>
+              <select
+                id="case-priority-filter"
+                value={priorityFilter}
+                onChange={(e) => handlePriorityChange(e.target.value)}
+                className="w-full sm:w-auto px-2.5 py-1.5 text-xs rounded-lg bg-[var(--color-surface-alt)] border border-[var(--color-border)] text-[var(--color-text)] focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer truncate"
+              >
+                <option value="">All Priorities</option>
+                {Object.entries(PRIORITY_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>{label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs text-[var(--color-text-muted)] font-mono">
-            {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
-            {(statusFilter || priorityFilter || searchQuery) && cases && ` (of ${cases.length})`}
-          </span>
+        {/* Counter, Clear Filters, and Action Group */}
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-3 shrink-0 pt-2.5 lg:pt-0 border-t border-[var(--color-border-subtle)] lg:border-t-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-[var(--color-text-muted)] font-mono whitespace-nowrap">
+              {filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}
+              {(statusFilter || priorityFilter || searchQuery) && cases && ` (of ${cases.length})`}
+            </span>
+            {(statusFilter || priorityFilter || searchQuery) && (
+              <button
+                type="button"
+                id="clear-all-case-filters-btn"
+                onClick={handleClearAllFilters}
+                className="text-[11px] sm:text-xs text-indigo-400 hover:text-indigo-300 font-semibold px-2 py-0.5 sm:py-1 rounded bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/30 transition-all shrink-0 cursor-pointer"
+              >
+                Clear Filters
+              </button>
+            )}
+          </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0"
+            className="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white shadow-sm transition-all flex items-center gap-1.5 cursor-pointer shrink-0 whitespace-nowrap"
           >
             + New Case
           </button>

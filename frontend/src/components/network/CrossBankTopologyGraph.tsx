@@ -474,12 +474,17 @@ export default function CrossBankTopologyGraph({
       
       {/* Top Controls: Scenario Selector & Responsive Horizon Switcher */}
       <div className="flex flex-col gap-3.5 lg:flex-row lg:items-center lg:justify-between w-full">
-        {/* Scenario Selector Pills with horizontal swipe on mobile */}
-        <div className="flex items-center gap-2 w-full lg:w-auto overflow-hidden">
-          <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 shrink-0 flex items-center gap-1.5">
-            <Layers className="h-3.5 w-3.5 text-cyan-400" /> Scenario:
-          </span>
-          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 w-full max-w-full">
+        {/* Scenario Selector Pills - Mobile-friendly responsive 7-column grid without horizontal scrolling */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
+          <div className="flex items-center justify-between sm:justify-start shrink-0">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+              <Layers className="h-3.5 w-3.5 text-cyan-400" /> Scenario:
+            </span>
+            <span className="text-[11px] font-mono text-cyan-400 font-medium sm:hidden">
+              {selectedScenario.replace('SCENARIO_', 'S')} Selected
+            </span>
+          </div>
+          <div className="grid grid-cols-7 sm:flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto">
             {Object.keys(SCENARIO_PREVIEWS).map((scId) => {
               const isSelected = selectedScenario === scId;
               const scNum = scId.replace('SCENARIO_', 'S');
@@ -487,26 +492,31 @@ export default function CrossBankTopologyGraph({
                 <button
                   key={scId}
                   onClick={() => onScenarioChange?.(scId)}
-                  className={`shrink-0 px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-200 ${
+                  className={`px-1 sm:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all duration-200 text-center flex items-center justify-center ${
                     isSelected
-                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm shadow-cyan-500/20'
+                      ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/50 shadow-sm shadow-cyan-500/20 font-bold'
                       : 'bg-slate-800/60 text-slate-400 border border-slate-700/50 hover:bg-slate-800 hover:text-slate-200'
                   }`}
                   title={SCENARIO_PREVIEWS[scId]?.title ?? scId}
                 >
-                  <span className="sm:hidden">{scNum}</span>
-                  <span className="hidden sm:inline">{scId.replace('_', ' ')}</span>
+                  <span className="lg:hidden">{scNum}</span>
+                  <span className="hidden lg:inline">{scId.replace('_', ' ')}</span>
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Responsive Information Horizon Filter */}
-        <div className="flex items-center gap-1 sm:gap-2 rounded-xl bg-slate-950/90 p-1 border border-slate-800 w-full lg:w-auto justify-between sm:justify-start">
-          <span className="text-[11px] sm:text-xs font-mono text-slate-400 px-1.5 sm:px-2 flex items-center gap-1 shrink-0">
-            <Lock className="h-3 w-3 text-amber-400" /> Horizon:
-          </span>
+        {/* Responsive Information Horizon Filter - Mobile-friendly layout preventing text clipping & overflow */}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 rounded-xl bg-slate-950/90 p-2 sm:p-1 border border-slate-800 w-full lg:w-auto">
+          <div className="flex items-center justify-between sm:justify-start px-0.5 sm:px-1 shrink-0">
+            <span className="text-[11px] sm:text-xs font-mono text-slate-400 flex items-center gap-1.5">
+              <Lock className="h-3 w-3 text-amber-400" /> Horizon:
+            </span>
+            <span className="text-[10px] font-mono text-amber-400/90 sm:hidden">
+              {horizon === 'global' ? 'Global View' : horizon === 'bank_a' ? 'Alpha View' : horizon === 'bank_b' ? 'Beta View' : 'Gamma View'}
+            </span>
+          </div>
           <div className="grid grid-cols-4 sm:flex items-center gap-1 w-full sm:w-auto">
             {(['global', 'bank_a', 'bank_b', 'bank_c'] as const).map((hKey) => {
               const isActive = horizon === hKey;
@@ -533,14 +543,14 @@ export default function CrossBankTopologyGraph({
                 <button
                   key={hKey}
                   onClick={() => setHorizon(hKey)}
-                  className={`px-2 py-1 rounded-lg text-xs font-mono transition-all text-center ${
+                  className={`px-1.5 sm:px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-mono transition-all text-center flex items-center justify-center truncate ${
                     isActive
                       ? activeColorClass
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                   }`}
                 >
-                  <span className="sm:hidden">{shortLabels[hKey]}</span>
-                  <span className="hidden sm:inline">{fullLabels[hKey]}</span>
+                  <span className="lg:hidden">{shortLabels[hKey]}</span>
+                  <span className="hidden lg:inline">{fullLabels[hKey]}</span>
                 </button>
               );
             })}
@@ -1151,7 +1161,7 @@ export default function CrossBankTopologyGraph({
           <span className="text-xs text-slate-400 flex items-center gap-1.5 mb-1 truncate">
             <Lock className="h-4 w-4 text-indigo-400 shrink-0" /> Information Horizon
           </span>
-          <div className="text-xl sm:text-2xl font-bold font-mono text-indigo-400">
+          <div className="text-base sm:text-2xl font-bold font-mono text-indigo-400 whitespace-nowrap">
             ZERO RAW PII
           </div>
           <span className="text-[11px] text-slate-400 block truncate">Zero raw PII or cross-bank edge leakage</span>

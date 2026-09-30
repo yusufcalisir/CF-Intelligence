@@ -228,22 +228,23 @@ export default function ChaosAttackInjectorPanel({
         {/* Attack 1: Smurfing Storm */}
         <div className="p-3.5 rounded-xl bg-[var(--color-bg-primary)]/80 border border-[var(--color-border)] flex flex-col justify-between gap-3">
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
-                <Zap size={14} /> AML Layering Storm
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 min-w-0">
+                <Zap size={14} className="shrink-0" />
+                <span className="truncate">AML Layering Storm</span>
               </span>
-              <span className="text-[10px] font-mono text-slate-400 bg-white/5 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-mono text-slate-400 bg-white/5 border border-white/10 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
                 Target: Bank Alpha
               </span>
             </div>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-1.5">
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
               Injects high-frequency ({intensity} tx/s) micro-transactions below the €10,000 reporting threshold to test autonomous LSH-PSI intersection.
             </p>
 
             {/* Defense Specification */}
-            <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-[10px] text-[var(--color-text-muted)] font-semibold">Defense:</span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+            <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+              <span className="text-[10px] text-[var(--color-text-muted)] font-semibold shrink-0">Defense:</span>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold whitespace-nowrap">
                 LSH-PSI + GRAPHSAGE
               </span>
             </div>
@@ -272,35 +273,49 @@ export default function ChaosAttackInjectorPanel({
         {/* Attack 2: Byzantine Poisoning */}
         <div className="p-3.5 rounded-xl bg-[var(--color-bg-primary)]/80 border border-[var(--color-border)] flex flex-col justify-between gap-3">
           <div>
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
-                <ShieldAlert size={14} /> Byzantine Gradient Poisoning
+            <div className="flex flex-wrap items-center justify-between gap-1.5">
+              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5 min-w-0">
+                <ShieldAlert size={14} className="shrink-0" />
+                <span className="truncate">Byzantine Gradient Poisoning</span>
               </span>
-              <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded">
+              <span className="text-[10px] font-mono text-rose-400 bg-rose-500/10 border border-rose-500/20 px-2 py-0.5 rounded whitespace-nowrap shrink-0">
                 Adversary: Bank Gamma
               </span>
             </div>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-1.5">
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 leading-relaxed">
               Bank Gamma uploads malicious sign-flipped gradient weights (Δw × -10.0). Krum evaluates Euclidean distances and drops the rogue update.
             </p>
 
             {/* Defense Selector */}
-            <div className="flex items-center gap-1.5 mt-2">
-              <span className="text-[10px] text-[var(--color-text-muted)] font-semibold">Defense:</span>
-              {(['krum', 'trimmed_mean', 'bulyan', 'spectral'] as const).map((def) => (
-                <button
-                  key={def}
-                  id={`defense-select-${def}`}
-                  onClick={() => setSelectedDefense(def)}
-                  className={`text-[10px] font-mono px-2 py-0.5 rounded transition-all cursor-pointer ${
-                    selectedDefense === def
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold'
-                      : 'text-[var(--color-text-muted)] bg-white/5 hover:bg-white/10'
-                  }`}
-                >
-                  {def.toUpperCase()}
-                </button>
-              ))}
+            <div className="mt-2.5 space-y-1.5">
+              <div className="flex items-center justify-between text-[10px]">
+                <span className="text-[var(--color-text-muted)] font-semibold">Defense Strategy:</span>
+                <span className="font-mono text-rose-400 font-bold uppercase">{selectedDefense}</span>
+              </div>
+              <div className="grid grid-cols-4 gap-1 w-full">
+                {(['krum', 'trimmed_mean', 'bulyan', 'spectral'] as const).map((def) => (
+                  <button
+                    key={def}
+                    id={`defense-select-${def}`}
+                    onClick={() => setSelectedDefense(def)}
+                    className={`text-[9px] sm:text-[10px] font-mono py-1 px-1 rounded-lg text-center transition-all cursor-pointer truncate ${
+                      selectedDefense === def
+                        ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-bold shadow-sm'
+                        : 'text-[var(--color-text-muted)] bg-white/5 hover:bg-white/10 border border-transparent'
+                    }`}
+                    title={def.toUpperCase()}
+                  >
+                    {def === 'trimmed_mean' ? (
+                      <>
+                        <span className="sm:hidden">TRIM_MEAN</span>
+                        <span className="hidden sm:inline">TRIMMED_MEAN</span>
+                      </>
+                    ) : (
+                      def.toUpperCase()
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

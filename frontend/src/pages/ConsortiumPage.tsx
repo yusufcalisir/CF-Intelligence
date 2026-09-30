@@ -173,29 +173,34 @@ export default function ConsortiumPage() {
       </div>
 
       {/* 7 Canonical Scenarios Performance Breakdown Table */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl overflow-hidden">
-        <div className="flex items-center justify-between mb-4">
+      <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 sm:p-6 backdrop-blur-md shadow-xl shrink-0 w-full min-h-fit">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
           <div>
-            <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <ShieldCheck className="h-5 w-5 text-indigo-400" /> Canonical Scenarios Empirical Matrix (Scenarios 1–7)
+            <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2 flex-wrap">
+              <ShieldCheck className="h-5 w-5 text-indigo-400 shrink-0" />
+              <span>Canonical Scenarios Empirical Matrix</span>
+              <span className="text-xs font-mono text-slate-400 font-normal">(Scenarios 1–7)</span>
             </h3>
-            <p className="text-xs text-slate-400 mt-0.5">
+            <p className="text-xs text-slate-400 mt-1">
               Empirical evaluation comparing Isolated Local Silos vs Federated Consensus (FedAvg) vs Theoretical Pooled Oracle.
             </p>
           </div>
+          <span className="text-[11px] font-mono text-cyan-400/80 sm:hidden flex items-center gap-1 shrink-0">
+            ← Swipe table horizontally to inspect all metrics →
+          </span>
         </div>
 
         <div className="overflow-x-auto -mx-1 px-1 sm:mx-0 sm:px-0">
           <table className="w-full text-left text-xs min-w-[700px]">
             <thead className="border-b border-slate-800 bg-slate-950/60 text-slate-400 uppercase font-mono">
               <tr>
-                <th className="py-3 px-4">Scenario</th>
-                <th className="py-3 px-4">Typology</th>
-                <th className="py-3 px-4">Institutions</th>
-                <th className="py-3 px-4 text-center">Isolated Recall</th>
-                <th className="py-3 px-4 text-center">Federated Recall</th>
-                <th className="py-3 px-4 text-center">Pooled Oracle</th>
-                <th className="py-3 px-4 text-right">Collaborative Uplift</th>
+                <th className="py-3 px-4 whitespace-nowrap">Scenario</th>
+                <th className="py-3 px-4 whitespace-nowrap">Typology</th>
+                <th className="py-3 px-4 whitespace-nowrap">Institutions</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Isolated Recall</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Federated Recall</th>
+                <th className="py-3 px-4 text-center whitespace-nowrap">Pooled Oracle</th>
+                <th className="py-3 px-4 text-right whitespace-nowrap">Collaborative Uplift</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60 font-mono">
@@ -211,28 +216,30 @@ export default function ConsortiumPage() {
                         : 'hover:bg-slate-800/40 text-slate-300'
                     }`}
                   >
-                    <td className="py-3 px-4 font-semibold text-slate-100 flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${isSelected ? 'bg-cyan-400' : 'bg-slate-600'}`} />
-                      {sc.title}
+                    <td className="py-3 px-4 font-semibold text-slate-100 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full shrink-0 ${isSelected ? 'bg-cyan-400' : 'bg-slate-600'}`} />
+                        <span>{sc.title}</span>
+                      </div>
                     </td>
-                    <td className="py-3 px-4 text-slate-400">
+                    <td className="py-3 px-4 text-slate-400 whitespace-nowrap">
                       <span className="rounded bg-slate-800/80 px-2 py-0.5 text-[10px] text-slate-300 border border-slate-700/50">
                         {sc.typology}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-slate-400 font-sans">
+                    <td className="py-3 px-4 text-slate-400 font-sans whitespace-nowrap">
                       {sc.participatingBanks.map(b => b.replace('_', ' ').toUpperCase()).join(', ')}
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-rose-400">
+                    <td className="py-3 px-4 text-center font-bold text-rose-400 whitespace-nowrap">
                       {sc.isolatedRecall.toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 text-center font-bold text-cyan-400">
+                    <td className="py-3 px-4 text-center font-bold text-cyan-400 whitespace-nowrap">
                       {sc.federatedRecall.toFixed(1)}%
                     </td>
-                    <td className="py-3 px-4 text-center text-emerald-400 font-semibold">
+                    <td className="py-3 px-4 text-center text-emerald-400 font-semibold whitespace-nowrap">
                       100.0%
                     </td>
-                    <td className="py-3 px-4 text-right font-extrabold text-emerald-400">
+                    <td className="py-3 px-4 text-right font-extrabold text-emerald-400 whitespace-nowrap">
                       +{sc.deltaUplift.toFixed(1)}%
                     </td>
                   </tr>

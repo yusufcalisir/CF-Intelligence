@@ -1075,20 +1075,20 @@ export default function PrivacyDefensePage() {
       <div className="glass-card p-4 sm:p-6 rounded-2xl bg-gradient-to-r from-[#07091e]/95 via-[#0b0e2d]/90 to-[#07091e]/95 border border-indigo-500/20 shadow-xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 relative overflow-hidden min-w-0">
         <div className="absolute top-0 inset-x-0 h-0.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-80" />
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0">
-              <Lock className="w-6 h-6 text-indigo-300" />
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 shadow-[0_0_15px_rgba(99,102,241,0.25)] shrink-0 mt-0.5 sm:mt-0">
+              <Lock className="w-5 h-5 sm:w-6 sm:h-6 text-indigo-300" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-lg sm:text-2xl font-black text-slate-100 tracking-tight truncate">
+                <h1 className="text-base sm:text-xl md:text-2xl font-black text-slate-100 tracking-tight leading-tight">
                   Privacy Defense & Byzantine Suite
                 </h1>
                 <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
                   Opacus DP + TenSEAL CKKS
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-0.5 leading-relaxed">
+              <p className="text-xs sm:text-sm text-[var(--color-text-muted)] mt-1 leading-relaxed">
                 Byzantine-robust aggregation catalog, adversarial leakage stress-testing, and enterprise Differential Privacy ledger
               </p>
             </div>
@@ -1096,7 +1096,7 @@ export default function PrivacyDefensePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 text-xs font-semibold whitespace-nowrap">
             <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
             <span>Zero Raw PII Verified</span>
           </div>
@@ -1114,7 +1114,7 @@ export default function PrivacyDefensePage() {
               key={tab.id}
               id={`tab-privacy-defense-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
-              className={`p-2.5 sm:p-3 rounded-xl text-center sm:text-left transition-all duration-200 cursor-pointer min-w-0 flex flex-col sm:flex-row items-center sm:items-start gap-1.5 sm:gap-3 border ${
+              className={`px-1.5 py-2 sm:p-3 rounded-xl transition-all duration-200 cursor-pointer min-w-0 w-full flex flex-col sm:flex-row items-center sm:items-center gap-1.5 sm:gap-3 border ${
                 isActive
                   ? 'bg-gradient-to-r from-indigo-600/30 to-purple-600/30 border-indigo-500/60 text-white shadow-md shadow-indigo-600/15'
                   : 'bg-white/[0.02] hover:bg-white/[0.05] border-white/5 text-slate-400 hover:text-slate-200'
@@ -1127,8 +1127,10 @@ export default function PrivacyDefensePage() {
               >
                 <Icon className="w-4 h-4" />
               </div>
-              <div className="min-w-0 text-center sm:text-left">
-                <span className="text-xs sm:text-sm font-bold block truncate">{tab.label}</span>
+              <div className="min-w-0 w-full text-center sm:text-left">
+                <span className="text-[11px] sm:text-sm font-bold block text-center sm:text-left leading-tight sm:leading-normal sm:whitespace-nowrap">
+                  {tab.label}
+                </span>
                 <span className="text-[10px] font-mono text-slate-400 hidden sm:block truncate mt-0.5">
                   {tab.desc}
                 </span>

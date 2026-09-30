@@ -38,9 +38,9 @@ export const AML_RULE_TEMPLATES: AMLRuleTemplate[] = [
   {
     id: 'velocity_spike',
     name: 'velocity_spike_burst_block',
-    badge: 'Hızlı Ardışık İşlem (Velocity Spike)',
+    badge: 'Velocity Spike (Burst Block)',
     action: 'BLOCK_TRANSACTION',
-    description: '1 saat içinde 5\'ten fazla transfer ve tutar >= 1.000 EUR/USD olan hesapları otomatik engeller.',
+    description: 'Automatically blocks accounts with > 5 transfers within 1 hour and transaction amount >= 1,000 EUR/USD.',
     condition: {
       and: [
         { field: 'composite_risk_score', operator: '>=', value: 750 },
@@ -54,16 +54,16 @@ export const AML_RULE_TEMPLATES: AMLRuleTemplate[] = [
       amount: 1850.0,
       currency: 'EUR',
       composite_risk_score: 790,
-      country_code: 'TR',
+      country_code: 'DE',
       is_new_device: true,
     },
   },
   {
     id: 'sanctions_evasion',
     name: 'sanctions_jurisdiction_evasion_flag',
-    badge: 'Yüksek Risk / Yaptırım',
+    badge: 'High Risk / Sanctions',
     action: 'FLAG_CRITICAL',
-    description: 'Yüksek Riskli Ülke / Yaptırım Atlama: FATF kara/gri listeli ülkeler (KP, IR, SY, RU, MM) veya ülke risk skoru > 0.85 olan transferleri kritik olarak işaretler.',
+    description: 'Sanctions Jurisdiction Evasion: Flags critical transactions involving FATF black/grey-listed jurisdictions (KP, IR, SY, RU, MM) or country risk score > 0.85.',
     condition: {
       or: [
         { field: 'country_code', operator: 'in', value: ['KP', 'IR', 'SY', 'RU', 'MM'] },
@@ -83,9 +83,9 @@ export const AML_RULE_TEMPLATES: AMLRuleTemplate[] = [
   {
     id: 'high_value_outlier',
     name: 'high_value_anomaly_review',
-    badge: 'Olağandışı Büyük Tutar',
+    badge: 'High-Value Anomaly',
     action: 'HOLD_FOR_REVIEW',
-    description: 'Olağandışı Büyük Tutar: 50.000 EUR/USD üzeri tutarlar ve kompozit risk skoru >= 750 olan transferleri Four-Eyes AML incelemesine alır.',
+    description: 'High-Value Anomaly: Holds transactions >= 50,000 EUR/USD with composite risk score >= 750 for Four-Eyes AML review.',
     condition: {
       and: [
         { field: 'amount', operator: '>=', value: 50000 },
@@ -105,9 +105,9 @@ export const AML_RULE_TEMPLATES: AMLRuleTemplate[] = [
   {
     id: 'smurfing_structuring',
     name: 'smurfing_structuring_threshold_sar',
-    badge: 'Smurfing / Yapılandırma',
+    badge: 'Smurfing / Structuring',
     action: 'ESCALATE_TO_SAR',
-    description: 'Smurfing / Yapılandırma: 10.000 zorunlu bildirim sınırının hemen altındaki (9.000 - 9.999) ve ardışık tekrarlanan şüpheli işlemleri doğrudan MASAK/FinCEN SAR sürecine yönlendirir.',
+    description: 'Smurfing & Structuring: Escalates rapid repeated transactions just below the 10,000 mandatory reporting threshold (9,000 - 9,999) directly to FinCEN/MASAK SAR filing.',
     condition: {
       and: [
         { field: 'amount', operator: 'between', min_value: 9000, max_value: 9999 },
@@ -120,7 +120,7 @@ export const AML_RULE_TEMPLATES: AMLRuleTemplate[] = [
       currency: 'EUR',
       velocity_1h: 3,
       composite_risk_score: 895,
-      country_code: 'TR',
+      country_code: 'DE',
       is_new_device: true,
     },
   },
@@ -234,7 +234,7 @@ export default function PoliciesPage() {
   const handleLoadAlertPayload = (alertItem?: Alert) => {
     const targetAlert = alertItem || suspiciousAlerts[0] || alertsData?.[0];
     if (!targetAlert) {
-      setErrorMessage('Sistemde test için yüklenebilecek şüpheli alarm bulunamadı. Lütfen veri akışını kontrol edin.');
+      setErrorMessage('No suspicious alerts available in the system for testing. Please verify data pipeline feed.');
       return;
     }
 
@@ -489,21 +489,30 @@ export default function PoliciesPage() {
 
             <div className="space-y-4">
               {/* Condition Section with Templates */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
                   <label htmlFor="test-condition-ast" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <FileCode className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Condition JSON AST</span>
                   </label>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-[10px] text-slate-500 uppercase tracking-wider mr-1">Şablon Yükle:</span>
+                  <span className="text-[10px] text-slate-500 font-mono uppercase tracking-wider">
+                    Declarative AST
+                  </span>
+                </div>
+
+                {/* Responsive Quick Template Grid */}
+                <div className="space-y-1">
+                  <span className="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
+                    Load Template:
+                  </span>
+                  <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                     {AML_RULE_TEMPLATES.map((tpl) => (
                       <button
                         key={tpl.id}
                         type="button"
                         aria-label={`Tester Template ${tpl.id}`}
                         onClick={() => handleApplyTemplateToTester(tpl)}
-                        className="text-[10px] font-medium px-2 py-0.5 rounded bg-slate-800 hover:bg-indigo-900/50 text-slate-300 hover:text-indigo-200 border border-slate-700 hover:border-indigo-500/40 transition-colors cursor-pointer"
+                        className="text-[10px] font-medium px-2 py-1 rounded bg-slate-800/90 hover:bg-indigo-900/50 text-slate-300 hover:text-indigo-200 border border-slate-700 hover:border-indigo-500/40 transition-colors cursor-pointer text-center truncate shadow-sm active:scale-95"
                         title={tpl.description}
                       >
                         {tpl.badge.split('(')[0]?.trim() ?? tpl.badge}
@@ -511,6 +520,7 @@ export default function PoliciesPage() {
                     ))}
                   </div>
                 </div>
+
                 <textarea
                   id="test-condition-ast"
                   aria-label="Condition JSON AST"
@@ -522,7 +532,7 @@ export default function PoliciesPage() {
 
               {/* Transaction Payload Section with Load Live Alert */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between flex-wrap gap-1.5">
+                <div className="flex items-center justify-between gap-2">
                   <label htmlFor="test-transaction-payload" className="text-xs font-semibold text-slate-300 flex items-center gap-1.5">
                     <Database className="w-3.5 h-3.5 text-emerald-400" />
                     <span>Transaction Payload</span>
@@ -530,12 +540,12 @@ export default function PoliciesPage() {
                   <button
                     type="button"
                     onClick={() => handleLoadAlertPayload()}
-                    aria-label="Son Şüpheli Alarmı Yükle"
-                    className="text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
-                    title="Sistemdeki en yüksek riskli gerçek alarmı test kutusuna yükler"
+                    aria-label="Load Live Alert"
+                    className="text-xs font-semibold text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/80 border border-emerald-500/40 hover:border-emerald-400 px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 shrink-0"
+                    title="Load highest-risk live alert from real-time ledger into test payload"
                   >
                     <Zap className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>Son Şüpheli Alarmı Yükle</span>
+                    <span>Load Live Alert</span>
                   </button>
                 </div>
 
@@ -544,13 +554,14 @@ export default function PoliciesPage() {
                     <div className="flex items-center gap-2 truncate">
                       <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
                       <span className="truncate">
-                        Canlı Alarm Yüklendi: <strong className="font-mono">{loadedAlertInfo.txId}</strong> (Skor: {loadedAlertInfo.score}, Banka: {loadedAlertInfo.bank})
+                        Live Alert Loaded: <strong className="font-mono">{loadedAlertInfo.txId}</strong> (Score: {loadedAlertInfo.score}, Bank: {loadedAlertInfo.bank})
                       </span>
                     </div>
                     <button
                       type="button"
                       onClick={() => setLoadedAlertInfo(null)}
-                      className="text-slate-400 hover:text-white ml-2 text-xs cursor-pointer"
+                      aria-label="Dismiss loaded alert banner"
+                      className="text-slate-400 hover:text-white ml-2 text-xs cursor-pointer p-0.5"
                     >
                       ✕
                     </button>
@@ -558,11 +569,14 @@ export default function PoliciesPage() {
                 )}
 
                 {suspiciousAlerts.length > 1 && (
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="text-[11px] text-slate-400 shrink-0">Veya Listeden Seç:</span>
+                  <div className="space-y-1 text-xs">
+                    <label htmlFor="test-alert-select" className="text-[11px] text-slate-400 font-medium block">
+                      Or select from recent alerts:
+                    </label>
                     <select
-                      aria-label="Şüpheli Alarm Seçimi"
-                      className="w-full text-xs p-1.5 rounded bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-emerald-500"
+                      id="test-alert-select"
+                      aria-label="Select Suspicious Alert"
+                      className="w-full text-xs p-2 rounded-lg bg-slate-900 border border-slate-700 text-slate-200 focus:outline-none focus:border-emerald-500 cursor-pointer"
                       onChange={(e) => {
                         const target = suspiciousAlerts.find((a) => a.id === e.target.value);
                         if (target) handleLoadAlertPayload(target);
@@ -570,11 +584,11 @@ export default function PoliciesPage() {
                       defaultValue=""
                     >
                       <option value="" disabled>
-                        Şüpheli alarmlardan birini seçin... ({suspiciousAlerts.length} alarm)
+                        Select suspicious alert... ({suspiciousAlerts.length} available)
                       </option>
                       {suspiciousAlerts.slice(0, 5).map((a) => (
                         <option key={a.id} value={a.id}>
-                          {a.transaction_id || a.id} — Skor: {a.risk_score} ({a.bank_id})
+                          {a.transaction_id || a.id} — Score: {a.risk_score} ({a.bank_id})
                         </option>
                       ))}
                     </select>
@@ -621,14 +635,14 @@ export default function PoliciesPage() {
                   </div>
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="font-bold text-sm">
-                      {testResult.matches ? 'Trigger Condition Met (Kural Tetiklendi)' : 'Passed Cleanly (Temiz Geçti)'}
+                      {testResult.matches ? 'Trigger Condition Met (Rule Triggered)' : 'Passed Cleanly (No Trigger)'}
                     </div>
                     <div className="text-xs opacity-90 leading-relaxed font-mono">
                       {testResult.message}
                     </div>
                     {testResult.matched_fields && testResult.matched_fields.length > 0 && (
                       <div className="flex items-center gap-1.5 flex-wrap pt-1">
-                        <span className="text-[10px] text-slate-400 uppercase font-sans">Eşleşen Alanlar:</span>
+                        <span className="text-[10px] text-slate-400 uppercase font-sans">Matched Fields:</span>
                         {testResult.matched_fields.map((f) => (
                           <span
                             key={f}
@@ -695,9 +709,9 @@ export default function PoliciesPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
                     <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Hazır AML Kural Şablonları (1-Tıkla Uygula)</span>
+                    <span>Pre-built AML Rule Templates (1-Click Apply)</span>
                   </span>
-                  <span className="text-[10px] text-slate-500">AST Otomatik Doldurulur</span>
+                  <span className="text-[10px] text-slate-500">Auto-populates AST</span>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {AML_RULE_TEMPLATES.map((tpl) => (
@@ -748,13 +762,13 @@ export default function PoliciesPage() {
                     value={newRuleAction}
                     onChange={(e) => setNewRuleAction(e.target.value)}
                   >
-                    <option value="BLOCK_TRANSACTION">BLOCK_TRANSACTION (Doğrudan İşlemi Durdur)</option>
-                    <option value="ESCALATE_TO_SAR">ESCALATE_TO_SAR (MASAK/FinCEN SAR Sevk)</option>
-                    <option value="HOLD_FOR_REVIEW">HOLD_FOR_REVIEW (Four-Eyes İnceleme Bekletme)</option>
-                    <option value="FLAG_CRITICAL">FLAG_CRITICAL (Kritik Öncelikli Alarm)</option>
-                    <option value="FLAG_HIGH_RISK">FLAG_HIGH_RISK (Yüksek Riskli İşlem İşareti)</option>
-                    <option value="REQUIRE_MFA">REQUIRE_MFA (Ekstra Güçlü Kimlik Doğrulama)</option>
-                    <option value="ALLOW">ALLOW (Açık İzin / Güvenli İstisna)</option>
+                    <option value="BLOCK_TRANSACTION">BLOCK_TRANSACTION (Direct Transaction Block)</option>
+                    <option value="ESCALATE_TO_SAR">ESCALATE_TO_SAR (FinCEN/MASAK SAR Filing)</option>
+                    <option value="HOLD_FOR_REVIEW">HOLD_FOR_REVIEW (Four-Eyes Investigation Hold)</option>
+                    <option value="FLAG_CRITICAL">FLAG_CRITICAL (Critical Priority Alert)</option>
+                    <option value="FLAG_HIGH_RISK">FLAG_HIGH_RISK (High-Risk Transaction Flag)</option>
+                    <option value="REQUIRE_MFA">REQUIRE_MFA (Step-Up Strong Authentication)</option>
+                    <option value="ALLOW">ALLOW (Explicit Permit / Safe Exception)</option>
                   </select>
                 </div>
 

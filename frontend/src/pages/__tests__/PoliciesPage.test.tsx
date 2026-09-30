@@ -145,7 +145,7 @@ describe('PoliciesPage (Rule Engine & AML Policies) Test Suite', () => {
 
     // Open Add Rule modal
     fireEvent.click(screen.getByRole('button', { name: /Add Policy Rule/i }));
-    expect(screen.getByText(/Hazır AML Kural Şablonları/i)).toBeInTheDocument();
+    expect(screen.getByText(/Pre-built AML Rule Templates/i)).toBeInTheDocument();
 
     // Click Smurfing / Structuring template button
     const smurfingBtn = screen.getByLabelText('Apply Template smurfing_structuring');
@@ -177,7 +177,7 @@ describe('PoliciesPage (Rule Engine & AML Policies) Test Suite', () => {
     });
   });
 
-  it('loads live suspicious alert into Dynamic Rule Tester when clicking Son Şüpheli Alarmı Yükle', () => {
+  it('loads live suspicious alert into Dynamic Rule Tester when clicking Load Live Alert', () => {
     render(
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
@@ -186,12 +186,12 @@ describe('PoliciesPage (Rule Engine & AML Policies) Test Suite', () => {
       </QueryClientProvider>
     );
 
-    // Click Son Şüpheli Alarmı Yükle button
-    const loadAlertBtn = screen.getByRole('button', { name: /Son Şüpheli Alarmı Yükle/i });
+    // Click Load Live Alert button
+    const loadAlertBtn = screen.getByRole('button', { name: /Load Live Alert/i });
     fireEvent.click(loadAlertBtn);
 
     // Check that live alert info banner is displayed
-    expect(screen.getByText(/Canlı Alarm Yüklendi:/i)).toBeInTheDocument();
+    expect(screen.getByText(/Live Alert Loaded:/i)).toBeInTheDocument();
     expect(screen.getAllByText(/TXN-LIVE-9921/i).length).toBeGreaterThanOrEqual(1);
 
     // Verify transaction textarea contains live alert parameters
@@ -265,7 +265,7 @@ describe('PoliciesPage (Rule Engine & AML Policies) Test Suite', () => {
       expect(mockTestMutate).toHaveBeenCalledTimes(1);
       expect(screen.getByText(/Trigger Condition Met/i)).toBeInTheDocument();
       expect(screen.getByText(/Rule condition matched test payload/i)).toBeInTheDocument();
-      expect(screen.getByText(/Eşleşen Alanlar:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Matched Fields:/i)).toBeInTheDocument();
     });
   });
 });

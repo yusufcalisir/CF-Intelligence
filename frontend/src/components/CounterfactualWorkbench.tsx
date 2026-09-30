@@ -75,6 +75,15 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
     // Rendered outside TanStack QueryClientProvider
   }
 
+  // Synchronize to the first active alert in the consortium feed if selected alert is absent
+  useEffect(() => {
+    if (!urlAlertId && !initialAlertId && alertsList.length > 0) {
+      if (!selectedAlertId || !alertsList.some((a: any) => a.id === selectedAlertId)) {
+        setSelectedAlertId(alertsList[0].id);
+      }
+    }
+  }, [alertsList, urlAlertId, initialAlertId, selectedAlertId]);
+
   // 3. Interactive Signal Sliders
   const [amount, setAmount] = useState<number>(initialAmount ?? 15000);
   const [velocity, setVelocity] = useState<number>(initialVelocity ?? 28);

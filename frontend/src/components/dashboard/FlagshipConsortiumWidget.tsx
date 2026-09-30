@@ -184,34 +184,37 @@ export default function FlagshipConsortiumWidget() {
 
       {/* Interactive Scenario Inspection Matrix */}
       <div className="p-4 rounded-xl bg-slate-900/40 border border-white/5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2">
           <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
             <span>🔬</span>
             <span>Scenario-by-Scenario Horizon Analysis</span>
           </h3>
-          <span className="text-[10px] font-mono text-slate-500">
-            Click scenario to inspect partial observation vulnerability
+          <span className="text-[10px] font-mono text-indigo-400 sm:text-slate-500">
+            {activeScenario.name} ({activeScenario.id.replace('SCENARIO_', 'S')})
           </span>
         </div>
 
-        {/* Scenario Pill Selectors */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-white/10">
+        {/* Scenario Pill Selectors - Mobile-friendly responsive 7-column grid without scrolling */}
+        <div className="grid grid-cols-7 lg:flex items-center gap-1 sm:gap-1.5 w-full lg:w-auto pb-1">
           {FLAGSHIP_SCENARIOS.map((sc) => {
             const isSelected = sc.id === selectedScenario;
+            const scNum = sc.id.replace('SCENARIO_', 'S');
             return (
               <button
                 key={sc.id}
                 onClick={() => setSelectedScenario(sc.id)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all shrink-0 flex items-center gap-1.5 ${
+                className={`px-1 sm:px-2.5 lg:px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-all text-center flex items-center justify-center gap-1 ${
                   isSelected
-                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                    ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-bold'
                     : 'bg-white/5 hover:bg-white/10 text-slate-300 border border-white/5'
                 }`}
+                title={sc.name}
               >
-                <span>{sc.id.replace('_', ' ')}</span>
+                <span className="lg:hidden">{scNum}</span>
+                <span className="hidden lg:inline">{sc.id.replace('_', ' ')}</span>
                 {sc.delta > 0 && (
                   <span
-                    className={`text-[9px] px-1 py-0.2 rounded font-bold ${
+                    className={`hidden xl:inline text-[9px] px-1 py-0.2 rounded font-bold ${
                       isSelected ? 'bg-white/20 text-white' : 'bg-emerald-500/20 text-emerald-400'
                     }`}
                   >
