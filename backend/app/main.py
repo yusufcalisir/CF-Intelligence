@@ -1221,10 +1221,14 @@ _CFI_DOCS_TOPBAR_HTML = """
 
 _CFI_DOCS_NAV_CSS = """
     /* Branded Top Navigation Bar */
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
     .cfi-topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
       padding: 10px 24px;
       background: rgba(11, 15, 25, 0.95);
       backdrop-filter: blur(12px);
@@ -1233,6 +1237,9 @@ _CFI_DOCS_NAV_CSS = """
       top: 0;
       z-index: 1000;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      width: 100%;
+      max-width: 100vw;
+      box-sizing: border-box;
     }
     .cfi-brand {
       display: flex;
@@ -1240,6 +1247,8 @@ _CFI_DOCS_NAV_CSS = """
       gap: 10px;
       text-decoration: none;
       color: #fff;
+      flex-shrink: 0;
+      min-width: 0;
     }
     .cfi-logo-img {
       width: 24px;
@@ -1249,6 +1258,7 @@ _CFI_DOCS_NAV_CSS = """
       display: inline-block;
       vertical-align: middle;
       box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+      flex-shrink: 0;
     }
     .cfi-badge {
       font-size: 10px;
@@ -1259,11 +1269,14 @@ _CFI_DOCS_NAV_CSS = """
       background: rgba(99, 102, 241, 0.15);
       color: #a5b4fc;
       border: 1px solid rgba(99, 102, 241, 0.3);
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .cfi-nav-links {
       display: flex;
       align-items: center;
       gap: 8px;
+      flex-shrink: 0;
     }
     .cfi-nav-link {
       display: inline-flex;
@@ -1275,6 +1288,8 @@ _CFI_DOCS_NAV_CSS = """
       font-weight: 600;
       text-decoration: none;
       transition: all 0.15s ease-in-out;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
     .cfi-nav-link.active {
       background: rgba(99, 102, 241, 0.2);
@@ -1289,6 +1304,33 @@ _CFI_DOCS_NAV_CSS = """
     .cfi-nav-link:not(.active):hover {
       background: rgba(255, 255, 255, 0.1);
       color: #f8fafc;
+    }
+
+    /* Mobile Responsive Topbar */
+    @media (max-width: 680px) {
+      .cfi-topbar {
+        padding: 8px 12px;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      .cfi-brand {
+        flex: 1 1 auto;
+      }
+      .cfi-nav-links {
+        width: 100%;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        gap: 6px;
+        padding: 2px 0 4px 0;
+        scrollbar-width: none;
+      }
+      .cfi-nav-links::-webkit-scrollbar {
+        display: none;
+      }
+      .cfi-nav-link {
+        padding: 5px 10px;
+        font-size: 11px;
+      }
     }
 """
 
@@ -1322,9 +1364,14 @@ async def swagger_ui_html() -> HTMLResponse:
       --accent-indigo: #6366f1;
       --accent-emerald: #10b981;
     }}
-    body {{
+    *, *::before, *::after {{
+      box-sizing: border-box;
+    }}
+    html, body {{
       margin: 0;
       padding: 0;
+      max-width: 100vw;
+      overflow-x: hidden;
       background-color: var(--bg-primary);
       color: var(--text-main);
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
@@ -1336,13 +1383,23 @@ async def swagger_ui_html() -> HTMLResponse:
 
     {_CFI_DOCS_NAV_CSS}
 
-    /* Swagger UI Dark Mode Overrides */
+    /* Swagger UI Dark Mode & Responsive Overrides */
+    #swagger-ui {{
+      max-width: 100vw;
+      overflow-x: hidden;
+      box-sizing: border-box;
+    }}
     .swagger-ui {{
       color: var(--text-main);
       font-family: 'Inter', sans-serif;
     }}
     .swagger-ui .topbar {{ display: none !important; }}
-    .swagger-ui .wrapper {{ max-width: 1300px; padding: 24px; }}
+    .swagger-ui .wrapper {{
+      max-width: 1300px;
+      padding: 24px;
+      margin: 0 auto;
+      box-sizing: border-box;
+    }}
     .swagger-ui .info {{ margin: 20px 0; }}
     .swagger-ui .info .title {{
       color: #f8fafc !important;
@@ -1436,12 +1493,15 @@ async def swagger_ui_html() -> HTMLResponse:
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       border-radius: 8px !important;
       font-family: 'JetBrains Mono', monospace !important;
+      max-width: 100% !important;
+      box-sizing: border-box !important;
     }}
     .swagger-ui select {{
       background: #0f172a !important;
       color: #f8fafc !important;
       border: 1px solid rgba(255, 255, 255, 0.15) !important;
       border-radius: 8px !important;
+      max-width: 100% !important;
     }}
     .swagger-ui .btn {{
       border-radius: 8px !important;
@@ -1463,12 +1523,16 @@ async def swagger_ui_html() -> HTMLResponse:
     .swagger-ui .responses-inner h4, .swagger-ui .responses-inner h5 {{ color: #f8fafc !important; }}
     .swagger-ui .response-col_status {{ color: #34d399 !important; font-family: 'JetBrains Mono', monospace; }}
     .swagger-ui .response-col_description {{ color: var(--text-muted) !important; }}
-    .swagger-ui pre.microlight, .swagger-ui .highlight-code {{
+    .swagger-ui pre.microlight, .swagger-ui .highlight-code, .swagger-ui pre {{
       background: #020617 !important;
       border: 1px solid var(--border-color) !important;
       border-radius: 8px !important;
       color: #f1f5f9 !important;
       font-family: 'JetBrains Mono', monospace !important;
+      max-width: 100% !important;
+      overflow-x: auto !important;
+      white-space: pre-wrap !important;
+      word-break: break-word !important;
     }}
     .swagger-ui section.models {{
       border: 1px solid var(--border-color) !important;
@@ -1479,6 +1543,39 @@ async def swagger_ui_html() -> HTMLResponse:
     .swagger-ui .model-box {{ background: var(--bg-card) !important; }}
     .swagger-ui .model {{ color: #cbd5e1 !important; font-family: 'JetBrains Mono', monospace; }}
     .swagger-ui .model-title {{ color: #f1f5f9 !important; }}
+
+    /* Mobile Responsive Overrides for Swagger UI */
+    @media (max-width: 680px) {{
+      .swagger-ui .wrapper {{
+        padding: 12px 10px !important;
+      }}
+      .swagger-ui .opblock .opblock-summary {{
+        flex-wrap: wrap !important;
+        gap: 6px !important;
+        padding: 8px 12px !important;
+      }}
+      .swagger-ui .opblock .opblock-summary-path {{
+        word-break: break-all !important;
+        font-size: 12px !important;
+      }}
+      .swagger-ui .info .title {{
+        font-size: 22px !important;
+      }}
+      .swagger-ui .table-container,
+      .swagger-ui .parameters-container,
+      .swagger-ui .responses-wrapper {{
+        overflow-x: auto !important;
+        max-width: 100% !important;
+        -webkit-overflow-scrolling: touch;
+      }}
+      .swagger-ui table {{
+        width: 100% !important;
+        min-width: 480px;
+      }}
+      .swagger-ui .scheme-container {{
+        padding: 12px !important;
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -1532,12 +1629,18 @@ async def redoc_html() -> HTMLResponse:
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
-    body {{
+    *, *::before, *::after {{
+      box-sizing: border-box;
+    }}
+    html, body {{
       margin: 0;
       padding: 0;
       background-color: #030712;
       color: #f8fafc;
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      max-width: 100vw;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
     }}
     ::-webkit-scrollbar {{ width: 8px; height: 8px; }}
     ::-webkit-scrollbar-track {{ background: #030712; }}
@@ -1545,6 +1648,187 @@ async def redoc_html() -> HTMLResponse:
     ::-webkit-scrollbar-thumb:hover {{ background: #334155; }}
 
     {_CFI_DOCS_NAV_CSS}
+
+    /* Container Constraints */
+    #redoc-container, .redoc-wrap {{
+      max-width: 100vw !important;
+      overflow-x: hidden !important;
+      box-sizing: border-box !important;
+    }}
+
+    /* ====================================================================
+       ReDoc Dark Mode Overrides & Contrast Fixes (Eliminate White Blank Buttons)
+       ==================================================================== */
+
+    /* 1. Request Samples & Payload Tabs */
+    .redoc-wrap [role="tab"],
+    .redoc-wrap button[role="tab"],
+    .redoc-wrap .tab-click,
+    .redoc-wrap .tab-header,
+    .redoc-wrap ul[role="tablist"] li,
+    .redoc-wrap ul[role="tablist"] li button,
+    .redoc-wrap div[data-tabs="true"] [role="tab"],
+    .redoc-wrap div[class*="tab"] button,
+    .redoc-wrap div[class*="Tab"] button,
+    .redoc-wrap button[class*="tab"],
+    .redoc-wrap button[class*="Tab"],
+    .redoc-wrap div[class*="Sample"] button,
+    .redoc-wrap div[class*="Payload"] button,
+    .redoc-wrap div[class*="Dropdown"] button,
+    .redoc-wrap button.dropdown-trigger,
+    .redoc-wrap .dropdown-selector {{
+      background-color: #0f172a !important;
+      background: #0f172a !important;
+      color: #cbd5e1 !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 8px !important;
+      font-family: 'JetBrains Mono', monospace !important;
+      font-size: 12px !important;
+      font-weight: 600 !important;
+      padding: 6px 12px !important;
+      margin-right: 6px !important;
+      margin-bottom: 6px !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+      transition: all 0.15s ease !important;
+      text-shadow: none !important;
+      outline: none !important;
+    }}
+
+    /* Tab Hover */
+    .redoc-wrap [role="tab"]:hover,
+    .redoc-wrap button[role="tab"]:hover,
+    .redoc-wrap .tab-click:hover,
+    .redoc-wrap ul[role="tablist"] li:hover,
+    .redoc-wrap ul[role="tablist"] li button:hover {{
+      background-color: #1e293b !important;
+      background: #1e293b !important;
+      color: #ffffff !important;
+      border-color: rgba(99, 102, 241, 0.4) !important;
+    }}
+
+    /* Active Request Sample Tab */
+    .redoc-wrap [role="tab"][aria-selected="true"],
+    .redoc-wrap button[role="tab"][aria-selected="true"],
+    .redoc-wrap .tab-click.active,
+    .redoc-wrap ul[role="tablist"] li.tab-active,
+    .redoc-wrap ul[role="tablist"] li.tab-active button,
+    .redoc-wrap div[data-tabs="true"] [role="tab"][aria-selected="true"],
+    .redoc-wrap .tab-active {{
+      background-color: #1e1b4b !important;
+      background: #1e1b4b !important;
+      color: #e0e7ff !important;
+      border: 1px solid #6366f1 !important;
+      box-shadow: 0 0 10px rgba(99, 102, 241, 0.25) !important;
+      font-weight: 700 !important;
+    }}
+
+    /* 2. Response Status Code Tabs */
+    /* 2xx Success */
+    .redoc-wrap [role="tab"][data-status="200"],
+    .redoc-wrap button[role="tab"][data-status="200"],
+    .redoc-wrap [role="tab"][data-status^="2"],
+    .redoc-wrap button[role="tab"][data-status^="2"],
+    .redoc-wrap ul[role="tablist"] li.tab-success,
+    .redoc-wrap ul[role="tablist"] li[data-status^="2"] {{
+      color: #34d399 !important;
+      border-color: rgba(16, 185, 129, 0.3) !important;
+      background: #022c22 !important;
+    }}
+    .redoc-wrap [role="tab"][data-status^="2"][aria-selected="true"],
+    .redoc-wrap button[role="tab"][data-status^="2"][aria-selected="true"],
+    .redoc-wrap ul[role="tablist"] li.tab-success.tab-active,
+    .redoc-wrap ul[role="tablist"] li[data-status^="2"].tab-active {{
+      background-color: #064e3b !important;
+      background: #064e3b !important;
+      color: #6ee7b7 !important;
+      border-color: #10b981 !important;
+      box-shadow: 0 0 12px rgba(16, 185, 129, 0.35) !important;
+    }}
+
+    /* 4xx & 5xx Errors */
+    .redoc-wrap [role="tab"][data-status^="4"],
+    .redoc-wrap button[role="tab"][data-status^="4"],
+    .redoc-wrap [role="tab"][data-status^="5"],
+    .redoc-wrap button[role="tab"][data-status^="5"],
+    .redoc-wrap ul[role="tablist"] li.tab-error,
+    .redoc-wrap ul[role="tablist"] li[data-status^="4"],
+    .redoc-wrap ul[role="tablist"] li[data-status^="5"] {{
+      color: #f87171 !important;
+      border-color: rgba(239, 68, 68, 0.3) !important;
+      background: #450a0a !important;
+    }}
+    .redoc-wrap [role="tab"][data-status^="4"][aria-selected="true"],
+    .redoc-wrap button[role="tab"][data-status^="4"][aria-selected="true"],
+    .redoc-wrap [role="tab"][data-status^="5"][aria-selected="true"],
+    .redoc-wrap button[role="tab"][data-status^="5"][aria-selected="true"],
+    .redoc-wrap ul[role="tablist"] li.tab-error.tab-active,
+    .redoc-wrap ul[role="tablist"] li[data-status^="4"].tab-active {{
+      background-color: #7f1d1d !important;
+      background: #7f1d1d !important;
+      color: #fca5a5 !important;
+      border-color: #ef4444 !important;
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.35) !important;
+    }}
+
+    /* Universal fallback: NEVER allow any button in ReDoc to have white background */
+    .redoc-wrap button:not([class*="cfi-"]) {{
+      background-color: #0f172a !important;
+      color: #e2e8f0 !important;
+    }}
+    .redoc-wrap button.copy-to-clipboard,
+    .redoc-wrap button[aria-label*="copy" i] {{
+      background: rgba(255, 255, 255, 0.08) !important;
+      color: #cbd5e1 !important;
+      border: 1px solid rgba(255, 255, 255, 0.12) !important;
+      padding: 4px 10px !important;
+    }}
+
+    /* ReDoc Dropdowns & Selects */
+    .redoc-wrap select,
+    .redoc-wrap .dropdown-wrapper select {{
+      background-color: #0b0f19 !important;
+      color: #f8fafc !important;
+      border: 1px solid rgba(255, 255, 255, 0.15) !important;
+      border-radius: 6px !important;
+      padding: 6px 12px !important;
+    }}
+
+    /* 3. ReDoc Mobile Responsiveness & Overflow Prevention */
+    @media (max-width: 900px) {{
+      .redoc-wrap {{
+        display: block !important;
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+      }}
+      div[class*="RightPanel"],
+      div[class*="right-panel"],
+      div[class*="SamplesWrapper"],
+      div[class*="samples"] {{
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        padding: 16px 12px !important;
+      }}
+      div[class*="MiddlePanel"],
+      div[class*="middle-panel"] {{
+        width: 100% !important;
+        max-width: 100vw !important;
+        box-sizing: border-box !important;
+        padding: 16px 12px !important;
+      }}
+      table, .params-wrap, .responses-table, div[class*="Table"] {{
+        display: block !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch;
+      }}
+      pre, code {{
+        max-width: 100% !important;
+        overflow-x: auto !important;
+        word-break: break-all !important;
+      }}
+    }}
   </style>
 </head>
 <body>
@@ -1553,6 +1837,9 @@ async def redoc_html() -> HTMLResponse:
   <script src="https://cdn.jsdelivr.net/npm/redoc@latest/bundles/redoc.standalone.js"></script>
   <script>
     Redoc.init('/openapi.json', {{
+      scrollYOffset: '.cfi-topbar',
+      hideDownloadButton: false,
+      expandResponses: '200,201',
       theme: {{
         colors: {{
           primary: {{ main: '#6366f1' }},
@@ -1565,6 +1852,11 @@ async def redoc_html() -> HTMLResponse:
             post: '#34d399',
             put: '#fbbf24',
             delete: '#f87171'
+          }},
+          responses: {{
+            success: {{ color: '#34d399', backgroundColor: '#022c22', tabTextColor: '#34d399' }},
+            error: {{ color: '#f87171', backgroundColor: '#450a0a', tabTextColor: '#f87171' }},
+            info: {{ color: '#38bdf8', backgroundColor: '#082f49', tabTextColor: '#38bdf8' }}
           }}
         }},
         sidebar: {{
@@ -1575,6 +1867,9 @@ async def redoc_html() -> HTMLResponse:
         rightPanel: {{
           backgroundColor: '#030712',
           textColor: '#f8fafc'
+        }},
+        codeBlock: {{
+          backgroundColor: '#020617'
         }},
         typography: {{
           fontSize: '14px',
@@ -1602,7 +1897,7 @@ async def redoc_html() -> HTMLResponse:
 
 @app.get("/scalar", include_in_schema=False, response_class=HTMLResponse)
 async def scalar_api_reference() -> HTMLResponse:
-    """Serve modern dark-themed Scalar API Reference documentation in 3-column layout."""
+    """Serve modern dark-themed Scalar API Reference documentation in responsive modern layout."""
     from app.infrastructure.security.security_headers import _DOCS_CSP_DIRECTIVES
 
     topbar = _CFI_DOCS_TOPBAR_HTML.replace("{docs_active}", "").replace("{redoc_active}", "").replace("{scalar_active}", "active")
@@ -1622,8 +1917,14 @@ async def scalar_api_reference() -> HTMLResponse:
         --scalar-font: 'Inter', system-ui, -apple-system, sans-serif;
         --scalar-font-code: 'JetBrains Mono', monospace;
       }}
-      body {{
+      *, *::before, *::after {{
+        box-sizing: border-box;
+      }}
+      html, body {{
         margin: 0;
+        padding: 0;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
         background-color: #0b0f19;
         font-family: var(--scalar-font);
       }}
@@ -1633,6 +1934,15 @@ async def scalar_api_reference() -> HTMLResponse:
       ::-webkit-scrollbar-thumb:hover {{ background: #334155; }}
 
       {_CFI_DOCS_NAV_CSS}
+
+      /* Scalar container containment */
+      .scalar-app,
+      .scalar-api-reference,
+      [data-scalar-app] {{
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+        box-sizing: border-box !important;
+      }}
     </style>
   </head>
   <body>
@@ -1640,7 +1950,7 @@ async def scalar_api_reference() -> HTMLResponse:
     <script
       id="api-reference"
       data-url="/openapi.json"
-      data-configuration='{{"theme":"deepSpace","layout":"classic","darkMode":true,"showSidebar":true,"hideModels":false,"searchHotKey":"k","defaultHttpClient":{{"targetKey":"python","clientKey":"httpx"}}}}'
+      data-configuration='{{"theme":"deepSpace","layout":"modern","darkMode":true,"showSidebar":true,"hideModels":false,"searchHotKey":"k","defaultHttpClient":{{"targetKey":"python","clientKey":"httpx"}}}}'
       src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@latest">
     </script>
   </body>

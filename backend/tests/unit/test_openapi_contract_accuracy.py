@@ -70,31 +70,42 @@ def test_fincen_xml_export_endpoint(client):
 
 
 def test_swagger_ui_html_dark_theme(client):
-    """Verify GET /docs serves dark-mode Swagger UI with CFI brand navigation."""
+    """Verify GET /docs serves dark-mode Swagger UI with responsive mobile containment and CFI brand navigation."""
     resp = client.get("/docs")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "cfi-topbar" in resp.text
     assert "SwaggerUIBundle" in resp.text
     assert "--bg-primary" in resp.text
+    assert "max-width: 100vw" in resp.text
+    assert "overflow-x: hidden" in resp.text
+    assert "@media (max-width: 680px)" in resp.text
 
 
 def test_redoc_html_dark_theme(client):
-    """Verify GET /redoc serves dark-mode ReDoc with CFI brand navigation."""
+    """Verify GET /redoc serves dark-mode ReDoc with responsive layout, CFI navigation, and dark tab buttons."""
     resp = client.get("/redoc")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "cfi-topbar" in resp.text
     assert "Redoc.init" in resp.text
+    assert 'role="tab"' in resp.text
+    assert 'data-status="200"' in resp.text
+    assert "scrollYOffset" in resp.text
+    assert "@media (max-width: 900px)" in resp.text
+    assert "max-width: 100vw" in resp.text
 
 
 def test_scalar_html_dark_theme(client):
-    """Verify GET /scalar serves dark-mode Scalar API Reference with CFI brand navigation."""
+    """Verify GET /scalar serves dark-mode Scalar API Reference with responsive modern layout and CFI navigation."""
     resp = client.get("/scalar")
     assert resp.status_code == 200
     assert "text/html" in resp.headers["content-type"]
     assert "cfi-topbar" in resp.text
     assert "api-reference" in resp.text
+    assert '"layout":"modern"' in resp.text
+    assert "max-width: 100vw" in resp.text
+    assert "scalar-app" in resp.text
 
 
 def test_portal_brand_logo_assets(client):

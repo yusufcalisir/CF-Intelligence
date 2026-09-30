@@ -15,9 +15,9 @@ To accelerate bank consortium onboarding, core banking connectivity, and SIEM in
 
 | Endpoint / Gateway | Protocol | Authentication | Description |
 | :--- | :---: | :---: | :--- |
-| `GET /scalar` | HTTP/1.1 | Public / SSO | Interactive dark-themed Scalar API Reference targeting `/openapi.json` with 3-column layout |
+| `GET /scalar` | HTTP/1.1 | Public / SSO | Interactive dark-themed Scalar API Reference targeting `/openapi.json` with modern responsive layout |
 | `GET /openapi.json` | HTTP/1.1 | Public | OpenAPI 3.1.0 compliant JSON schema specification (140+ active operations) |
-| `GET /docs` & `GET /redoc` | HTTP/1.1 | Public | Interactive Swagger UI and ReDoc documentation gateways with CSP headers |
+| `GET /docs` & `GET /redoc` | HTTP/1.1 | Public | Interactive Swagger UI and ReDoc documentation gateways with mobile-responsive containment and CSP headers |
 | `WS /ws/telemetry` | WebSocket / WSS | Bearer JWT | Real-time bi-directional telemetry: live scored transactions, critical fraud alerts & heartbeats |
 | `WS /ws/training/{simulation_id}` | WebSocket / WSS | Bearer JWT | Redis pub/sub streaming of federated training round convergence events & per-bank AUC |
 | `POST /api/v1/predict/score` | HTTP/1.1 | Bearer JWT / API Key | Real-time payment fraud inference (<10ms) with PyTorch GAT & SHAP attribution (alias `/api/v1/score-transaction`) |
@@ -295,9 +295,9 @@ The Developer Portal UI ([`frontend/src/pages/ApiDocsPage.tsx`](../frontend/src/
 
 - **Top Action Bar:**
   - **Export OpenAPI JSON:** Generates and downloads a client-side OpenAPI 3.1.0 specification bundle (`cfi-openapi-spec.json`).
-  - **Scalar Gateway Link (`/scalar`):** Opens the modern, dark-themed 3-column reference powered by `@scalar/api-reference`.
-  - **ReDoc Link (`/redoc`):** Accesses ReDoc documentation with deep response schema exploration.
-  - **Swagger UI Link (`/docs`):** Accesses standard OpenAPI interactive Swagger gateway.
+  - **Scalar Gateway Link (`/scalar`):** Opens the modern, dark-themed responsive reference powered by `@scalar/api-reference`.
+  - **ReDoc Link (`/redoc`):** Accesses mobile-responsive ReDoc documentation with deep response schema exploration and dark tab styling.
+  - **Swagger UI Link (`/docs`):** Accesses standard OpenAPI interactive Swagger gateway with responsive layout.
 - **Interactive Request Runner Sandbox:**
   - Enables developers to select any consortium endpoint, configure parameters or JSON payload, and execute live queries directly against the platform.
   - Measures execution latency (`performance.now()`), formats HTTP status badges (`200 OK`, `400 Bad Request`), and renders JSON syntax-highlighted responses.
