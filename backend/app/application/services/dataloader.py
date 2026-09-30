@@ -98,6 +98,18 @@ def _get_datasets_root() -> Path:
 _DATASETS_ROOT = _get_datasets_root()
 
 
+def compute_file_sha256(file_path: Path | str) -> str:
+    """Compute SHA-256 hex digest of a physical file by streaming 64KB chunks."""
+    p = Path(file_path)
+    if not p.is_file():
+        raise FileNotFoundError(f"File not found for SHA-256 computation: {p}")
+    hasher = hashlib.sha256()
+    with open(p, "rb") as f:
+        while chunk := f.read(65536):
+            hasher.update(chunk)
+    return hasher.hexdigest()
+
+
 # ===========================================================================
 # Elliptic Bitcoin Dataset
 # ===========================================================================
@@ -1450,11 +1462,13 @@ def load_creditcard_fraud(
     target_nrows = None if kwargs.get("all_rows", False) else (kwargs.get("nrows") or None)
 
     chosen_source = "mock_pca"
+    chosen_file_path: Path | None = None
     df: pd.DataFrame | None = None
 
     parquet_files = sorted(list(root.glob("*.parquet")))
     if parquet_files:
         chosen_parquet = parquet_files[0]
+        chosen_file_path = chosen_parquet
         logger.info("[CreditCard] Loading preprocessed Parquet from %s", chosen_parquet)
         df = pd.read_parquet(chosen_parquet)
         if target_nrows is not None:
@@ -1464,10 +1478,15 @@ def load_creditcard_fraud(
         csv_candidates = [root / "creditcard.csv"] + list(root.glob("*credit*.csv")) + list(root.glob("*.csv"))
         for csv_path in csv_candidates:
             if csv_path.exists():
+                chosen_file_path = csv_path
                 logger.info("[CreditCard] Loading real dataset from %s", csv_path)
                 df = pd.read_csv(csv_path, nrows=target_nrows)
                 chosen_source = "real_csv"
                 break
+
+    dataset_sha256: str | None = None
+    if chosen_file_path is not None and chosen_file_path.is_file():
+        dataset_sha256 = compute_file_sha256(chosen_file_path)
 
     if df is not None:
         if include_time and "Time" in df.columns:
@@ -1606,6 +1625,8 @@ def load_creditcard_fraud(
             "test": {"X": X_test, "y": y_test, "indices": test_idx},
             "feature_names": feature_cols,
             "source": chosen_source,
+            "file_path": str(chosen_file_path) if chosen_file_path else None,
+            "sha256_hash": dataset_sha256,
             "fraud_ratio": float(np.mean(y)),
             "imbalance_ratio": float(np.sum(y == 0) / max(1, np.sum(y == 1))),
             "scaling_params": scaling_params,
@@ -1638,6 +1659,8 @@ def load_creditcard_fraud(
         "y": y,
         "feature_names": feature_cols,
         "source": chosen_source,
+        "file_path": str(chosen_file_path) if chosen_file_path else None,
+        "sha256_hash": dataset_sha256,
         "fraud_ratio": float(np.mean(y)),
         "imbalance_ratio": float(np.sum(y == 0) / max(1, np.sum(y == 1))),
         "scaling_params": scaling_params_unsplit,

@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "report_name": "Master Empirical Comparative Benchmark Matrix",
-  "generated_at_utc": "2026-09-29T19:30:49.387576+00:00",
+  "generated_at_utc": "2026-09-30T17:59:16.046225+00:00",
   "invariants": {
     "strict_null_representation": true,
     "zero_fake_defaults": true,
@@ -159,7 +159,7 @@
       "domain": "Retail Credit Card Transactions",
       "real_vs_synthetic": "REAL_ANONYMIZED_PCA",
       "provenance_scale": "284,807 transactions (ULB Machine Learning Group)",
-      "evaluated_samples": 284806,
+      "evaluated_samples": 284807,
       "fraud_prevalence_pct": 0.173,
       "feature_dim": 30,
       "paradigms": {
@@ -178,13 +178,13 @@
           "architecture": "CreditCardImbalanceMLP (FedAvg)",
           "clients": 3,
           "rounds": 5,
-          "pr_auc": 0.77499,
-          "roc_auc": 0.98374,
-          "f1_score": 0.78818,
-          "precision": 0.7619,
-          "recall": 0.81633,
-          "recall_at_01_fpr": 0.84694,
-          "recall_at_001_fpr": 0.42857,
+          "pr_auc": 0.77875,
+          "roc_auc": 0.9839,
+          "f1_score": 0.79024,
+          "precision": 0.76415,
+          "recall": 0.81818,
+          "recall_at_01_fpr": 0.84848,
+          "recall_at_001_fpr": 0.43434,
           "status": "EVALUATED"
         },
         "federated_fedprox": {

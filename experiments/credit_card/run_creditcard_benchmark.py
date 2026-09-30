@@ -353,6 +353,7 @@ class FederatedCreditCardTrainer:
         y_k: Any,
         strategy: str = "fedavg",
         fedprox_mu: float = 0.01,
+        local_epochs: int | None = None,
     ) -> tuple[dict[str, torch.Tensor], float]:
         """Train a single bank model for local_epochs using PyTorch DataLoader."""
         model = self.create_model()
@@ -376,7 +377,8 @@ class FederatedCreditCardTrainer:
         if strategy.lower() == "fedprox" and fedprox_mu > 0.0:
             ref_weights = {k: v.to(self.device) for k, v in initial_weights.items()}
 
-        for _ in range(self.local_epochs):
+        epochs_to_run = local_epochs if local_epochs is not None else self.local_epochs
+        for _ in range(epochs_to_run):
             for batch_x, batch_y in loader:
                 batch_x = batch_x.to(self.device)
                 batch_y = batch_y.to(self.device)
@@ -629,9 +631,10 @@ class ComparativeCreditCardEvaluator:
         client_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
         X_test: np.ndarray,
         y_test: np.ndarray,
-        epochs: int = 4,
+        epochs: int | None = None,
     ) -> dict[str, Any]:
         """Train separate isolated models for each bank; evaluate on global test set."""
+        silo_epochs = epochs if epochs is not None else self.trainer.local_epochs
         silo_results = {}
         for cid, (x_k, y_k) in client_partitions.items():
             model = self.trainer.create_model()
@@ -641,6 +644,7 @@ class ComparativeCreditCardEvaluator:
                 X_k=x_k,
                 y_k=y_k,
                 strategy="fedavg",
+                local_epochs=silo_epochs,
             )
             set_weights(model, up_w, self.trainer.device)
             _, probs, metrics = self.trainer.evaluate_model(model, X_test, y_test)
@@ -680,9 +684,9 @@ class ComparativeCreditCardEvaluator:
         client_partitions: dict[str, tuple[np.ndarray, np.ndarray]],
         X_test: np.ndarray,
         y_test: np.ndarray,
-        epochs: int = 4,
+        epochs: int = 10,
     ) -> dict[str, Any]:
-        """Train monolithic centralized model on pooled partitions (upper bound ceiling)."""
+        """Train monolithic centralized model on pooled partitions (budget-controlled)."""
         all_x = np.concatenate([p[0] for p in client_partitions.values()], axis=0)
         all_y = np.concatenate([p[1] for p in client_partitions.values()], axis=0)
 
@@ -693,6 +697,7 @@ class ComparativeCreditCardEvaluator:
             X_k=all_x,
             y_k=all_y,
             strategy="fedavg",
+            local_epochs=epochs,
         )
         set_weights(model, up_w, self.trainer.device)
         _, probs, metrics = self.trainer.evaluate_model(model, X_test, y_test)
@@ -701,7 +706,8 @@ class ComparativeCreditCardEvaluator:
         fpr_arr, tpr_arr, _ = roc_curve(y_test, probs)
 
         logger.info(
-            "[Centralized Pooled] Test PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%%",
+            "[Centralized Pooled (%d epochs)] Test PR-AUC: %.4f | ROC-AUC: %.4f | Rec@0.1%%FPR: %.2f%%",
+            epochs,
             metrics["pr_auc"],
             metrics["roc_auc"],
             metrics["recall_at_01_fpr"] * 100,
@@ -712,6 +718,7 @@ class ComparativeCreditCardEvaluator:
             "probabilities": probs,
             "raw_pr": (rec_arr, prec_arr, metrics["pr_auc"]),
             "raw_roc": (fpr_arr, tpr_arr, metrics["roc_auc"]),
+            "epochs": epochs,
         }
 
 
@@ -1011,6 +1018,8 @@ def run_creditcard_benchmark(
     seed: int = 42,
     require_real: bool = False,
     output_dir: Path | str | None = None,
+    centralized_epochs: int = 10,
+    evaluate_legacy_centralized: bool = True,
 ) -> dict[str, Any]:
     """Execute end-to-end European Credit Card Fraud federated benchmark."""
     t_bench_start = time.perf_counter()
@@ -1068,10 +1077,17 @@ def run_creditcard_benchmark(
         )
         fed_results[strat] = res
 
-    # 3. Comparative Silos & Centralized Pooled Evaluator
+    # 3. Comparative Silos & Centralized Pooled Evaluator (Controlled Parity)
     evaluator = ComparativeCreditCardEvaluator(trainer=trainer)
     silo_results = evaluator.evaluate_isolated_silos(client_partitions, X_global_test, y_global_test)
-    pooled_results = evaluator.evaluate_centralized_pooled(client_partitions, X_global_test, y_global_test)
+    pooled_results = evaluator.evaluate_centralized_pooled(
+        client_partitions, X_global_test, y_global_test, epochs=centralized_epochs
+    )
+    legacy_pooled_results = None
+    if evaluate_legacy_centralized:
+        legacy_pooled_results = evaluator.evaluate_centralized_pooled(
+            client_partitions, X_global_test, y_global_test, epochs=2
+        )
 
     # 4. Generate Visual Artifacts
     logger.info("--- Generating Publication Figures ---")
@@ -1087,10 +1103,13 @@ def run_creditcard_benchmark(
 
     # Multi-paradigm PR curves
     pr_curves_dict = {
-        "Centralized Upper Bound": pooled_results["raw_pr"],
+        f"Centralized Equalized ({centralized_epochs} ep)": pooled_results["raw_pr"],
         "Federated Champion (FedAvg)": fed_results["fedavg"]["curves"]["raw_pr"],
         "Federated FedProx": fed_results["fedprox"]["curves"]["raw_pr"],
     }
+    if legacy_pooled_results is not None:
+        pr_curves_dict["Centralized Legacy (2 ep)"] = legacy_pooled_results["raw_pr"]
+
     for cid in ("bank_a", "bank_b", "bank_c"):
         if cid in silo_results["silos"]:
             lbl = f"Bank {cid[-1].upper()} Silo"
@@ -1103,10 +1122,12 @@ def run_creditcard_benchmark(
 
     # Multi-paradigm ROC curves
     roc_curves_dict = {
-        "Centralized Upper Bound": pooled_results["raw_roc"],
+        f"Centralized Equalized ({centralized_epochs} ep)": pooled_results["raw_roc"],
         "Federated Champion (FedAvg)": fed_results["fedavg"]["curves"]["raw_roc"],
         "Federated FedProx": fed_results["fedprox"]["curves"]["raw_roc"],
     }
+    if legacy_pooled_results is not None:
+        roc_curves_dict["Centralized Legacy (2 ep)"] = legacy_pooled_results["raw_roc"]
     for cid in ("bank_a", "bank_b", "bank_c"):
         if cid in silo_results["silos"]:
             lbl = f"Bank {cid[-1].upper()} Silo"
@@ -1162,11 +1183,56 @@ def run_creditcard_benchmark(
 
     # 6. Save comparative baselines JSON
     comp_json_path = out_dir / "comparative_baselines.json"
+    n_train_pool = partition_diagnostics["total_train_samples"]
+    centralized_steps = centralized_epochs * int(np.ceil(n_train_pool / batch_size))
+    legacy_centralized_steps = 2 * int(np.ceil(n_train_pool / batch_size))
+    total_fed_client_steps = rounds * sum(
+        local_epochs * int(np.ceil(len(p[1]) / batch_size)) for p in client_partitions.values()
+    )
+    total_fed_samples = rounds * local_epochs * n_train_pool
+
+    real_hash = partitioner.raw_data.get("sha256_hash")
+    source_uri_val = partitioner.raw_data.get("file_path") or partitioner.raw_data.get("source", "credit_card")
+    if require_real and not real_hash:
+        raise RuntimeError("Strict real-data mode required physical dataset, but no SHA-256 was computed.")
+    dataset_hash = real_hash or "UNAVAILABLE_MOCK_DATA"
+
     comp_data = {
         "dataset": "credit_card",
         "skew_mode": skew_mode,
         "diagnostics": partition_diagnostics,
+        "provenance": {
+            "dataset_name": "European Credit Card Fraud Detection",
+            "source_uri": str(source_uri_val),
+            "sha256_hash": dataset_hash,
+            "seed": seed,
+            "git_commit": commit_sha,
+            "timestamp_utc": start_time_utc,
+        },
+        "training_budget": {
+            "budget_equalized": (centralized_epochs == rounds * local_epochs),
+            "centralized_equalized": {
+                "epochs": centralized_epochs,
+                "optimizer_steps": centralized_steps,
+                "samples_processed": n_train_pool * centralized_epochs,
+                "dataset_passes": centralized_epochs,
+            },
+            "centralized_legacy_2ep": {
+                "epochs": 2,
+                "optimizer_steps": legacy_centralized_steps,
+                "samples_processed": n_train_pool * 2,
+                "dataset_passes": 2,
+            },
+            "federated": {
+                "rounds": rounds,
+                "local_epochs": local_epochs,
+                "effective_passes": rounds * local_epochs,
+                "total_client_optimizer_steps": total_fed_client_steps,
+                "total_samples_processed": total_fed_samples,
+            },
+        },
         "centralized_pooled": pooled_results["metrics"],
+        "centralized_pooled_legacy_2ep": legacy_pooled_results["metrics"] if legacy_pooled_results else None,
         "isolated_silos": {cid: res["metrics"] for cid, res in silo_results["silos"].items()},
         "consortium_silo_mean": silo_results["consortium_mean"],
         "federated_fedavg": fed_results["fedavg"]["final_metrics"],
@@ -1175,6 +1241,7 @@ def run_creditcard_benchmark(
             "mean_silo_delta_prauc": round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["consortium_mean"]["pr_auc"], 5),
             "bank_c_delta_prauc": round(fed_results["fedavg"]["final_metrics"]["pr_auc"] - silo_results["silos"].get("bank_c", {}).get("metrics", {}).get("pr_auc", 0.0), 5),
             "centralization_gap": round(pooled_results["metrics"]["pr_auc"] - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5),
+            "legacy_centralization_gap": round((legacy_pooled_results["metrics"]["pr_auc"] if legacy_pooled_results else 0.0) - fed_results["fedavg"]["final_metrics"]["pr_auc"], 5),
         },
     }
     comp_json_path.write_text(json.dumps(comp_data, indent=2), encoding="utf-8")
@@ -1185,8 +1252,8 @@ def run_creditcard_benchmark(
 
     dataset_meta = DatasetMetadata(
         dataset_name="European Credit Card Fraud Detection",
-        source_uri=partitioner.raw_data.get("source", "credit_card"),
-        sha256_hash="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        source_uri=str(source_uri_val),
+        sha256_hash=dataset_hash,
         total_samples=len(X_global_test) + partition_diagnostics["total_train_samples"],
         num_features=30,
         fraud_samples=partition_diagnostics["global_train_fraud_samples"] + partition_diagnostics["global_test_fraud_samples"],
@@ -1213,6 +1280,12 @@ def run_creditcard_benchmark(
             "fedprox_mu": fedprox_mu,
             "pos_weight": trainer.pos_weight,
             "nrows_loaded": nrows,
+            "centralized_epochs": centralized_epochs,
+            "centralized_legacy_epochs": 2,
+            "fl_rounds": rounds,
+            "fl_local_epochs": local_epochs,
+            "effective_dataset_passes": rounds * local_epochs,
+            "budget_equalized": (centralized_epochs == rounds * local_epochs),
         },
         output_dir=str(out_dir),
     )
@@ -1259,6 +1332,7 @@ def run_creditcard_benchmark(
     raw_data = {
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "dataset": "credit_card",
+        "dataset_sha256": dataset_hash,
         "environment": {
             "os": f"{platform.system()}-{platform.release()}-{platform.version()}",
             "cpu": platform.processor() or "AMD64",
@@ -1266,14 +1340,19 @@ def run_creditcard_benchmark(
             "torch_version": torch.__version__,
         },
         "centralized_baseline": {
+            "epochs": centralized_epochs,
+            "budget_equalized": (centralized_epochs == rounds * local_epochs),
             "pr_auc": pooled_results["metrics"]["pr_auc"],
             "roc_auc": pooled_results["metrics"]["roc_auc"],
             "recall_at_0_1_pct_fpr": pooled_results["metrics"]["recall_at_01_fpr"],
             "recall_at_0_5_pct_fpr": pooled_results["metrics"]["recall_at_05_fpr"],
             "recall_at_1_0_pct_fpr": pooled_results["metrics"]["recall_at_1_fpr"],
+            "legacy_2ep_pr_auc": legacy_pooled_results["metrics"]["pr_auc"] if legacy_pooled_results else None,
         },
         "federated_fedavg": {
             "rounds": rounds,
+            "local_epochs": local_epochs,
+            "effective_passes": rounds * local_epochs,
             "clients": num_clients,
             "pr_auc": fed_results["fedavg"]["final_metrics"]["pr_auc"],
             "roc_auc": fed_results["fedavg"]["final_metrics"]["roc_auc"],
@@ -1327,6 +1406,7 @@ if __name__ == "__main__":
     parser.add_argument("--fedprox-mu", type=float, default=0.01, help="FedProx proximal parameter mu")
     parser.add_argument("--test-ratio", type=float, default=0.20, help="Untouched test set ratio")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--centralized-epochs", type=int, default=10, help="Epochs for budget-equalized centralized training")
     parser.add_argument("--require-real", action="store_true", help="Require real physical dataset file")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory")
 
@@ -1346,4 +1426,5 @@ if __name__ == "__main__":
         seed=args.seed,
         require_real=args.require_real,
         output_dir=args.output_dir,
+        centralized_epochs=args.centralized_epochs,
     )

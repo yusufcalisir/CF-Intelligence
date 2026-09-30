@@ -78,8 +78,8 @@
 ---
 
 ## 5. Fraud Detection: Centralized vs Federated Baselines
-- **Runner**: `benchmarks/runners/run_fraud_benchmark.py`
-- **Raw Artifacts**: [`fraud_benchmark_paysim.json`](./raw/fraud_benchmark_paysim.json), [`fraud_benchmark_ieee_cis.json`](./raw/fraud_benchmark_ieee_cis.json)
+- **Runner**: `benchmarks/runners/run_fraud_benchmark.py`, `experiments/credit_card/run_creditcard_benchmark.py`
+- **Raw Artifacts**: [`fraud_benchmark_paysim.json`](./raw/fraud_benchmark_paysim.json), [`fraud_benchmark_ieee_cis.json`](./raw/fraud_benchmark_ieee_cis.json), [`fraud_benchmark_credit_card.json`](./raw/fraud_benchmark_credit_card.json)
 
 | Dataset | Evaluation Setting | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
 |:---|:---|:---:|:---:|:---:|:---:|:---:|
@@ -87,6 +87,10 @@
 | **PaySim** | Federated FedAvg (5 clients) | **0.1463** | 0.9712 | 0.2000 | 0.2000 | 0.2000 |
 | **IEEE-CIS** | Centralized Baseline | **0.7811** | 0.9892 | 0.3692 | 0.6154 | 0.6923 |
 | **IEEE-CIS** | Federated FedAvg (5 clients) | **0.7554** | 0.9859 | 0.4308 | 0.6308 | 0.6769 |
+| **Credit Card** | Centralized Equalized (10 ep, 35.6k steps) | **0.8219** (Seed 42: 0.7800) | 0.9802 | 0.8653 | 0.8889 | 0.8990 |
+| **Credit Card** | Federated FedAvg (5 rounds × 2 ep) | **0.8248** (Seed 42: 0.7788) | 0.9845 | 0.8653 | 0.8855 | 0.8990 |
+| **Credit Card** | Centralized Legacy (2 ep, 7.1k steps) | **0.7449** (Seed 42: 0.7059) | 0.9861 | 0.8519 | 0.8754 | 0.8822 |
+| **Credit Card** | Bank C Silo (Near-Zero Fraud: 2 cases) | **0.5428** (Seed 42: 0.6113) | 0.9630 | 0.6061 | 0.7879 | 0.7980 |
 
 ---
 

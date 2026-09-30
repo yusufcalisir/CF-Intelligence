@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115.0-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.4.0-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Passing Tests](https://img.shields.io/badge/tests-4107%2F4107_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Passing Tests](https://img.shields.io/badge/tests-4110%2F4110_passing-success.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -1383,7 +1383,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-IEEE-FED-PRAUC`** | IEEE-CIS Card Fraud Fed PR-AUC | `0.8120` | `0.7554` | [`fraud_benchmark_ieee_cis.json`](benchmarks/results/raw/fraud_benchmark_ieee_cis.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --rounds 5 --clients 3` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-IEEE-RECALL-FPR`** | IEEE-CIS Recall @ 0.1% FPR | `0.5890` | `0.4308` | [`fraud_benchmark_ieee_cis.json`](benchmarks/results/raw/fraud_benchmark_ieee_cis.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --rounds 5 --clients 3` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-ELLIPTIC-PRAUC`** | Elliptic Bitcoin AML GraphSAGE PR-AUC | `0.8746` | `0.9001` | [`graphsage_elliptic_benchmark.json`](benchmarks/results/raw/graphsage_elliptic_benchmark.json) | `python benchmarks/runners/run_graph_benchmark.py --epochs 15` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-CREDITCARD-PRAUC`** | Credit Card Dirichlet Skew PR-AUC | `0.8250` | `0.0757` (test) / `0.7750` (5-rnd) | [`fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json) | `python benchmarks/runners/run_fl_benchmark.py --alpha 0.5` | `DESIGN_TARGET_VS_LOCAL_RUN` |
+| **`CLM-CREDITCARD-PRAUC`** | Credit Card Fraud Controlled-Budget Federated Benchmark | `0.8250` | `0.8248` (FedAvg, 10-pass equalized) / `0.8219` (Centralized equalized) | [`fraud_benchmark_credit_card.json`](benchmarks/results/raw/fraud_benchmark_credit_card.json) | `python experiments/credit_card/run_creditcard_benchmark.py --all-rows --require-real --centralized-epochs 10` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-DP-SIGMA30`** | DP High-Noise Utility ($\sigma=3.0$) | `0.1963` | `0.1963` ($\epsilon=0.6272$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-DP-SIGMA00`** | DP Non-Private Ceiling ($\sigma=0.0$) | `0.6272` | `0.6272` ($\epsilon=\infty$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($eta=0.20$) | `0.7344` | `0.7344` (99.7% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
@@ -1396,7 +1396,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,698 / 3,698 Core, 4,107 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,723 / 3,723 Core, 4,110 Total) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
 
 ---
 
@@ -1418,7 +1418,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 1.858$ at $\sigma=3.0, \delta=10^{-5}$** (Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Internal Test Suite & RDP moments accounting)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | 100% | **4,107 / 4,107 passing** (3,311 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
+| **Full Test Suite Pass Rate** | 100% | **4,110 / 4,110 passing** (3,314 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
 
 ---
 
@@ -1529,14 +1529,14 @@ Under Non-IID Dirichlet distribution ($\alpha = 0.50$), the platform evaluates a
 | **[PaySim](https://www.kaggle.com/datasets/ealaxi/paysim1)** | Simulated Mobile Money (6.36M txns, calibrated on M-Pesa logs) | `0.8420` | **0.1463** (3-rnd) / **0.1184** (10-rnd) | 0.6940 (Pooled baseline: 0.4654) | 20.0% / 33.3% | Severe non-IID label skew causes client drift without GBDT inductive bias. |
 | **[IEEE-CIS](https://www.kaggle.com/competitions/ieee-fraud-detection)** | E-Commerce / Cards (590k txns, Vesta Corp) | `0.8120` | **0.7554** (5-rnd FedAvg) | 0.6510 (Pooled baseline: 0.7811) | 43.1% | Retains 96.7% of centralized performance; FedProx drops to 0.0691 under tabular noise. |
 | **[Elliptic AML Graph](https://www.kaggle.com/datasets/ellipticco/elliptic-data-set)** | Bitcoin Graph (203k nodes, 234k edges, MIT-IBM) | `0.8746` | **0.9001** (Centralized) / **0.4372** (Fed 15-rnd) | 0.2543 (Isolated GNN) | 13.2% | At operational threshold $p \ge 0.5$, Precision is 96.36% while Recall is 33.33% (ROC-AUC 0.9860). |
-| **[Credit Card Fraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)** | European Cards PCA (284k txns, ULB MLG) | `0.8250` | **0.0757** (Test) / **0.7750** (5-rnd) | 0.6430 (Centralized baseline: 0.7920) | 84.7% | High class imbalance (0.172% positive); FedAvg achieves 0.7882 F1 under calibrated threshold. |
+| **[Credit Card Fraud](https://www.kaggle.com/datasets/mlg-ulb/creditcardfraud)** | European Cards PCA (284k txns, ULB MLG) | `0.8250` | **0.8248 ± 0.0417** (FedAvg, equalized) / **0.8219 ± 0.0364** (Centralized equalized) | 0.5428 (Bank C silo, near-zero fraud) | 84.7% | Under controlled budget parity (10 dataset passes, 3 seeds), FedAvg and Centralized achieve statistical equivalence. Bank C collapses to 0.2468 in isolation vs 0.8599 in federation. |
 | **[IBM AMLSim Graph](https://github.com/IBM/AMLSim)** | Synthetic Banking Graph (1.32M txns, 1,719 alerts) | `0.7000` | **0.6527** (15-rnd GraphSAGE) | 0.4210 (Isolated GNN) | 64.1% | Multi-hop cycle and fan-in/fan-out graph neighborhood aggregation. |
 | **[Danish SynthAML](https://github.com/Spar-Nord-Bank/SynthAML)** | Synthetic AML Alert Triage (20k alerts, Spar Nord) | `0.9900` | **0.9985** (6-rnd AlertMLP) | 0.7245 (Worst isolated: 0.2214) | 98.8% | Alert-level triage model resolves isolated cold-start bank blind spots. |
 | **[AUSTRAC AMLNet](https://github.com/gitgriffith/AMLNet)** | Typology Networks (1.09M txns, Griffith Univ) | `0.9900` | **1.0000** (6-rnd AMLNetClassifier) | 0.7810 (Isolated) | 100.0% | Deterministic complex structuring and layering network topologies. |
 | **[CFI-CrossBank Consortium](experiments/cross_bank/report.md)** | Multi-Bank Consortium Topology (100k txns, 3 Banks) | `0.9500` | **0.9729** (Consortium Union) | 0.8832 (Isolated mean) | 98.8% | **+55.59% fraud volume averted**; 100% zero-positive cold-start detection at Bank Gamma. |
 
-> **Research Finding on Negative Results & Non-IID Optimization:**  
-> In contrast to marketing narratives that claim federated learning uniformly improves accuracy, empirical evaluation across PaySim and Credit Card benchmarks shows that **federated optimization can degrade significantly under severe Non-IID label skew** (PaySim FedAvg PR-AUC `0.1463` vs centralized `0.4654`; Credit Card FedAvg PR-AUC `0.0757` vs centralized `0.6272`). These negative results validate that federation introduces an optimization trade-off that requires algorithms like FedProx, SCAFFOLD, adaptive clipping, and graph neighborhood sharing rather than naive averaging.
+> **Research Finding on Budget Equalization & Collaborative Rescue:**  
+> Under the PaySim dataset, federated optimization degrades significantly under severe Non-IID label skew (FedAvg PR-AUC `0.1463` vs centralized `0.4654`), validating that naive averaging requires FedProx, SCAFFOLD, or adaptive clipping. For the Credit Card dataset, an earlier unequal-budget comparison (2 centralized epochs vs. 10 federated passes) appeared to favour FL (`0.7788` vs. `0.7059`). Under **controlled optimization budget parity** (10 dataset passes / ~35.6k optimizer steps across 3 seeds), Centralized (`0.8219 ± 0.0364`) and FedAvg (`0.8248 ± 0.0417`) achieve **empirical parity** ($\Delta = +0.0029$, fully overlapping 95% CIs). The primary demonstrated value of FL on Credit Card is **collaborative rescue of data-starved participants**: Bank C (2 fraud cases) collapses to PR-AUC 0.2468 in isolation but reaches 0.8599 under federation. Legacy unequal-budget artifacts are archived in `experiments/credit_card/legacy_unequal_budget/`.
 
 <div align="center">
   <img src="docs/figures/benchmark_auc_comparison.png" alt="Fraud Detection Performance AUC Comparison" width="750" />
@@ -1778,7 +1778,7 @@ The technical architecture of CF-Intelligence explores how system design pattern
 
 ## 17. Software Correctness & Subsystem Self-Verification Reports (`verification/`)
 
-Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,311 automated Pytest backend tests**, **356 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **409 mathematical self-verification tests** across 21 verification modules (totaling **4,107 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
+Representing **Pillar 3 (Software Correctness / Axis 1)**, this section documents the deterministic software verification suites asserting contract safety, cryptographic invariants, and multi-tenant isolation across **3,314 automated Pytest backend tests**, **356 Vitest frontend components**, **31 Hardhat EVM smart contracts**, and **409 mathematical self-verification tests** across 21 verification modules (totaling **4,110 tests** with a 100% pass rate). Deterministic smoke gates are enforced in `< 20 seconds` on every commit via `.github/workflows/ci.yml` (`make test-smoke`).
 
 The reports below document the internal scientific verification suites validating mathematical invariants, differential privacy bounds, cryptographic drivers, and algorithmic implementations:
 
@@ -2116,10 +2116,10 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,698 Tests Core / 4,107 Total)
+### Step 5: Master Test Suites Execution (3,723 Tests Core / 4,110 Total)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,311 tests)
+# 1. Run full backend pytest suite (3,314 tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
