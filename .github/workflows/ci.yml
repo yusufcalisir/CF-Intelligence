@@ -53,7 +53,7 @@ jobs:
           uv pip compile backend/requirements.txt -o /tmp/requirements.lock --quiet
           for i in 1 2 3; do
             echo "Running pip-audit dependency scan (attempt $i/3)..."
-            if pip-audit --no-deps -r /tmp/requirements.lock \
+            if pip-audit --no-deps --disable-pip -r /tmp/requirements.lock \
               --timeout 30 \
               --ignore-vuln GHSA-c5qf-59p4-3g47 \
               --ignore-vuln PYSEC-2026-3552 \
@@ -71,7 +71,7 @@ jobs:
             sleep 10
           done
           echo "⚠️ PyPI JSON API unavailable after 3 attempts. Executing resilient fallback via OSV vulnerability service..."
-          pip-audit --no-deps -s osv -r /tmp/requirements.lock \
+          pip-audit --no-deps --disable-pip -s osv -r /tmp/requirements.lock \
             --timeout 30 \
             --ignore-vuln GHSA-c5qf-59p4-3g47 \
             --ignore-vuln PYSEC-2026-3552 \
