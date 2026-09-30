@@ -66,7 +66,7 @@ const DEFAULT_BANKS: BankNode[] = [
 
 const TOTAL_ROUNDS = 10;
 
-const SESSION_STORAGE_KEY = 'cfi_live_operations_session_v1';
+const SESSION_STORAGE_KEY_PREFIX = 'cfi_live_ops_v2_';
 
 interface StoredLiveOpsState {
   simId?: string;
@@ -78,26 +78,45 @@ interface StoredLiveOpsState {
   selectedProfileKey?: string;
 }
 
+/** Load session state scoped to a specific simulation ID. Returns null for autostart or ID mismatch. */
 const loadStoredSession = (targetSimId?: string, isAutostart?: boolean): StoredLiveOpsState | null => {
   if (isAutostart) return null;
   try {
-    const raw = sessionStorage.getItem(SESSION_STORAGE_KEY);
+    // Use per-ID key so different simulations never share state
+    const key = targetSimId ? `${SESSION_STORAGE_KEY_PREFIX}${targetSimId}` : SESSION_STORAGE_KEY_PREFIX;
+    const raw = sessionStorage.getItem(key);
     if (!raw) return null;
-    const parsed: StoredLiveOpsState = JSON.parse(raw);
-    if (targetSimId && parsed.simId && parsed.simId !== targetSimId) {
-      return null;
-    }
-    return parsed;
+    return JSON.parse(raw) as StoredLiveOpsState;
   } catch {
     return null;
   }
+};
+
+/** Persist session state scoped to a specific simulation ID. */
+const saveStoredSession = (simId: string | undefined, payload: StoredLiveOpsState) => {
+  try {
+    const key = simId ? `${SESSION_STORAGE_KEY_PREFIX}${simId}` : SESSION_STORAGE_KEY_PREFIX;
+    sessionStorage.setItem(key, JSON.stringify(payload));
+  } catch { /* ignore storage errors */ }
+};
+
+/** Remove persisted session for a specific simulation ID. */
+const clearStoredSession = (simId?: string) => {
+  try {
+    const key = simId ? `${SESSION_STORAGE_KEY_PREFIX}${simId}` : SESSION_STORAGE_KEY_PREFIX;
+    sessionStorage.removeItem(key);
+  } catch { /* ignore */ }
 };
 
 export default function LiveOperationsView() {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
   const isAutostartParam = location.search.includes('autostart=true');
-  const storedSession = useRef(loadStoredSession(id, isAutostartParam)).current;
+
+  // Load session ONCE per component mount for the initial sim ID only.
+  // When `id` changes we reset all state via the effect below.
+  const initialIdRef = useRef(id);
+  const storedSession = useRef(loadStoredSession(initialIdRef.current, isAutostartParam)).current;
 
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
   const [currentRound, setCurrentRound] = useState<number>(storedSession?.currentRound ?? 0);
@@ -372,22 +391,20 @@ export default function LiveOperationsView() {
   const activeBank = effectiveBanks.find((b) => b.id === selectedBankId) || effectiveBanks[0] || null;
 
 
-  // Persist session state so navigating away and returning preserves completed simulation results
+  // Persist session state scoped to the current simulation ID
   useEffect(() => {
-    try {
-      if (trainingPhase !== 'pending' || roundHistory.length > 0) {
-        const payload: StoredLiveOpsState = {
-          simId: id,
-          currentRound,
-          championAuc,
-          trainingPhase,
-          roundHistory,
-          gradientSubmissions,
-          selectedProfileKey: selectedProfile.id,
-        };
-        sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(payload));
-      }
-    } catch { /* ignore storage errors */ }
+    if (trainingPhase !== 'pending' || roundHistory.length > 0) {
+      const payload: StoredLiveOpsState = {
+        simId: id,
+        currentRound,
+        championAuc,
+        trainingPhase,
+        roundHistory,
+        gradientSubmissions,
+        selectedProfileKey: selectedProfile.id,
+      };
+      saveStoredSession(id, payload);
+    }
   }, [id, currentRound, championAuc, trainingPhase, roundHistory, gradientSubmissions, selectedProfile]);
 
   const handleQuarantineChange = (bankId: string | null) => {
@@ -702,9 +719,7 @@ export default function LiveOperationsView() {
 
   const resetTraining = () => {
     if (phaseTimerRef.current) clearTimeout(phaseTimerRef.current);
-    try {
-      sessionStorage.removeItem(SESSION_STORAGE_KEY);
-    } catch { /* ignore */ }
+    clearStoredSession(id);
     hasAutoStartedRef.current = false;
     setIsTraining(false);
     setTrainingPhase('pending');
@@ -725,15 +740,41 @@ export default function LiveOperationsView() {
     };
   }, []);
 
-  // Auto-start simulation when navigated from Dashboard or via simulation route
+  // When the sim ID changes (user navigated to a different simulation), fully reset local state
+  // so charts and metrics always reflect the newly selected simulation — never stale data.
   const prevIdRef = useRef(id);
   useEffect(() => {
-    if (prevIdRef.current !== id) {
-      prevIdRef.current = id;
-      hasAutoStartedRef.current = false;
-    }
+    if (prevIdRef.current === id) return;
+    // ID changed: wipe all local simulation state before loading the new one
+    prevIdRef.current = id;
+    hasAutoStartedRef.current = false;
+    if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    setIsTraining(false);
+    setRoundHistory([]);
+    setCurrentRound(0);
+    setGradientSubmissions(0);
+    setChampionAuc(0.72);
+
+    // Restore persisted state for the new sim ID (if it exists and wasn't an autostart)
     const hasAutostartParam = location.search.includes('autostart=true');
-    const isNewSimulationRun = hasAutostartParam || (Boolean(id) && (!storedSession || storedSession.simId !== id));
+    const newSession = loadStoredSession(id, hasAutostartParam);
+    if (newSession) {
+      setCurrentRound(newSession.currentRound);
+      setChampionAuc(newSession.championAuc);
+      setTrainingPhase(newSession.trainingPhase);
+      setRoundHistory(newSession.roundHistory);
+      setGradientSubmissions(newSession.gradientSubmissions);
+    } else {
+      setTrainingPhase('pending');
+    }
+  }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-start simulation when navigated from Dashboard or via simulation route
+  useEffect(() => {
+    const hasAutostartParam = location.search.includes('autostart=true');
+    // Check whether there is a persisted (non-autostart) session for the current ID
+    const sessionForCurrentId = loadStoredSession(id, hasAutostartParam);
+    const isNewSimulationRun = hasAutostartParam || (Boolean(id) && !sessionForCurrentId);
     const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
 
     if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
