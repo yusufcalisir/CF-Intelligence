@@ -1426,9 +1426,12 @@ export default function LandingPage() {
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
-                  openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
-                }`}>
+                <div
+                  aria-hidden={openNavDropdown !== 'arch'}
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                    openNavDropdown === 'arch' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
+                  }`}
+                >
                   <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Security & Topology
                   </div>
@@ -1467,9 +1470,12 @@ export default function LandingPage() {
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
-                  openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
-                }`}>
+                <div
+                  aria-hidden={openNavDropdown !== 'bench'}
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                    openNavDropdown === 'bench' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
+                  }`}
+                >
                   <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Empirical Proof Suite
                   </div>
@@ -1508,9 +1514,12 @@ export default function LandingPage() {
                   <ChevronDown />
                 </button>
 
-                <div className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
-                  openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1' : 'opacity-0 pointer-events-none translate-y-0'
-                }`}>
+                <div
+                  aria-hidden={openNavDropdown !== 'dev'}
+                  className={`absolute top-full left-1/2 -translate-x-1/2 w-72 p-2 bg-[#09091b]/98 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl transition-all duration-200 ${
+                    openNavDropdown === 'dev' ? 'opacity-100 pointer-events-auto translate-y-1 visible' : 'opacity-0 pointer-events-none translate-y-0 invisible'
+                  }`}
+                >
                   <div className="text-[9.5px] font-mono text-slate-400 uppercase tracking-widest px-3 py-1.5 mb-1 border-b border-white/5">
                     Integration & Contracts
                   </div>
@@ -2511,6 +2520,7 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={handleLaunchBenchmark}
+                  aria-label="Launch Benchmark Sandbox Modal"
                   className="inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-bold text-xs sm:text-sm text-white bg-gradient-to-r from-indigo-600 via-indigo-500 to-purple-600 hover:from-indigo-500 hover:to-purple-500 border border-indigo-400/30 hover:border-indigo-300/60 shadow-[0_0_25px_rgba(99,102,241,0.35)] active:scale-[0.98] transition-all text-center cursor-pointer group"
                 >
                   <span>Launch Benchmark Sandbox</span>

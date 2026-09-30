@@ -45,22 +45,23 @@ test.describe('Modal Focus Trap & Keyboard Lifecycle E2E Test Suite', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const benchmarkBtn = page.getByRole('button', { name: /empirical benchmark/i }).first();
-    if (await benchmarkBtn.isVisible()) {
-      await benchmarkBtn.focus();
-      await expect(benchmarkBtn).toBeFocused();
-      await page.keyboard.press('Enter');
+    const benchmarkBtn = page.getByRole('button', { name: /launch benchmark sandbox/i }).first();
+    await benchmarkBtn.scrollIntoViewIfNeeded();
+    await expect(benchmarkBtn).toBeVisible();
 
-      const dialog = page.locator('[role="dialog"]');
-      await expect(dialog).toBeVisible();
+    await benchmarkBtn.focus();
+    await expect(benchmarkBtn).toBeFocused();
+    await page.keyboard.press('Enter');
 
-      // Escape dismiss
-      await page.keyboard.press('Escape');
-      await expect(dialog).not.toBeVisible();
+    const dialog = page.locator('[role="dialog"]');
+    await expect(dialog).toBeVisible();
 
-      // Restored focus
-      await expect(benchmarkBtn).toBeFocused();
-    }
+    // Escape dismiss
+    await page.keyboard.press('Escape');
+    await expect(dialog).not.toBeVisible();
+
+    // Restored focus
+    await expect(benchmarkBtn).toBeFocused();
   });
 
   test('Policies Page Create Rule Modal: keyboard open -> focus trap -> escape dismiss -> restore focus', async ({

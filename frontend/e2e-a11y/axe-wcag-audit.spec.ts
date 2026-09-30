@@ -76,7 +76,8 @@ test.describe('Automated Axe-Core WCAG 2.1 AA Accessibility Audits', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
 
-    const benchmarkBtn = page.getByRole('button', { name: /inspect benchmark suite|explore benchmark hub|empirical benchmark/i }).first();
+    const benchmarkBtn = page.getByRole('button', { name: /launch benchmark sandbox/i }).first();
+    await benchmarkBtn.scrollIntoViewIfNeeded();
     if (await benchmarkBtn.isVisible()) {
       await benchmarkBtn.click();
       await page.waitForSelector('[role="dialog"]');
