@@ -139,6 +139,8 @@ export default function LiveOperationsView() {
 
   const isTrainingRef = useRef(isTraining);
   isTrainingRef.current = isTraining;
+  /** True while the ID-change reset effect is writing new state — blocks auto-start from firing prematurely. */
+  const isResettingIdRef = useRef(false);
 
   const handleRetryLiveStream = () => {
     if (reconnectTimerRef.current) {
@@ -748,6 +750,7 @@ export default function LiveOperationsView() {
     // ID changed: wipe all local simulation state before loading the new one
     prevIdRef.current = id;
     hasAutoStartedRef.current = false;
+    isResettingIdRef.current = true; // block auto-start until reset is committed
     if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
     setIsTraining(false);
     setRoundHistory([]);
@@ -767,10 +770,14 @@ export default function LiveOperationsView() {
     } else {
       setTrainingPhase('pending');
     }
+    // Allow auto-start to run after this synchronous reset batch is flushed
+    setTimeout(() => { isResettingIdRef.current = false; }, 0);
   }, [id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-start simulation when navigated from Dashboard or via simulation route
   useEffect(() => {
+    // If the ID-change reset is still in progress, skip — auto-start will re-evaluate next render
+    if (isResettingIdRef.current) return;
     const hasAutostartParam = location.search.includes('autostart=true');
     // Check whether there is a persisted (non-autostart) session for the current ID
     const sessionForCurrentId = loadStoredSession(id, hasAutostartParam);
@@ -786,7 +793,7 @@ export default function LiveOperationsView() {
       setIsIngestModalOpen(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, location.pathname, location.search]);
+  }, [id, location.pathname, location.search, trainingPhase, isTraining]);
 
   // Tooltip style shared across charts
   const tooltipStyle = {
