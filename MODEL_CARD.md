@@ -154,11 +154,12 @@ On the IBM AMLSim benchmark, inductive GraphSAGE achieves significant detection 
 - **Graph Inference Latency**: $1.11\text{ ms}$ per $1{,}000$ transactions
 
 ### 4.3 Inference Gateway Latency & Throughput
-Evaluated on production host hardware under multi-concurrency load testing ($C = 1 \dots 100$ concurrent clients):
-- **Peak Sustained Throughput**: **1,394.7 req/s** ($C = 100$)
-- **p50 Latency**: **1.95 ms**
-- **p95 Latency**: **3.75 ms**
-- **p99 Latency**: **6.84 ms**
+Evaluated on production host hardware under multi-concurrency load testing ($C = 1 \dots 100$ concurrent clients; [`benchmarks/results/raw/latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)):
+- **Single-Request Fast-Path**: **2.29 ms** (well below $< 15\text{ ms}$ SLA; p50: 2.39 ms, p99: 3.53 ms at $C=1$)
+- **Peak Sustained Throughput**: **1,394.7 req/s** ($C = 100$; peak 1,791.0 req/s at $C = 50$)
+- **p50 Latency (C = 100 Load)**: **37.75 ms**
+- **p95 Latency (C = 100 Load)**: **64.72 ms**
+- **p99 Latency (C = 100 Load)**: **79.34 ms**
 
 ---
 

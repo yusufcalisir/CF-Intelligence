@@ -68,7 +68,7 @@ The system combines Federated Learning, Differential Privacy, Secure Aggregation
 │   └──────────────────────────┬─────────────────────────────┘                     │
 │                              v                                                   │
 │   ┌────────────────────────────────────────────────────────┐                     │
-│   │ Real-Time Scoring (1.77ms fast-path) + SHAP + Case WB  │ (Serving & SAR)     │
+│   │ Real-Time Scoring (2.29ms fast-path) + SHAP + Case WB  │ (Serving & SAR)     │
 │   └────────────────────────────────────────────────────────┘                     │
 └──────────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -78,7 +78,7 @@ The system combines Federated Learning, Differential Privacy, Secure Aggregation
 To prevent ambiguity between production-grade components, algorithmic research explorations, and test simulations, the repository enforces a strict three-tier classification:
 
 - **Tier 1 — Production-Oriented Core:**
-  - Real-time fraud scoring and inference gateway (`predict.py`, 1.77 ms fast-path, scaling with concurrency to 26.95 ms at C=100).
+  - Real-time fraud scoring and inference gateway (`predict.py`, 2.29 ms fast-path, scaling with concurrency to 79.34 ms at C=100).
   - 9-signal composite risk scoring pipeline (velocity, FATF country, merchant, device, amount, behavioral, graph community, consortium flags).
   - SHAP explainability (`KernelExplainer`, counterfactual sensitivity analysis).
   - Federated optimization engines (`FedAvg`, `FedProx`, `SCAFFOLD`) handling Dirichlet Non-IID skew ($\alpha \le 0.50$).
@@ -131,7 +131,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
 
 | Architectural Claim | Target Specification | Measured Benchmark Evidence | Audit Status |
 |:---|:---|:---|:---|
-| **Real-Time Scoring Latency** | Target: < 15.0ms Fast Path, < 350ms Ensemble | Measured: 1.77 ms single-request fast-path (p99: 2.29 ms @ C=1, 26.95 ms @ C=100); throughput: 1,394.7 req/s @ C=100 ([`latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)) | **Verified** |
+| **Real-Time Scoring Latency** | Target: < 15.0ms Fast Path, < 350ms Ensemble | Measured: 2.29 ms single-request fast-path (p99: 3.53 ms @ C=1, 79.34 ms @ C=100); throughput: 1,394.7 req/s @ C=100 ([`latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)) | **Verified** |
 | **Federated Non-IID Convergence** | Resilient under Dirichlet $\alpha = 0.50$ | `benchmarks/runners/run_fl_benchmark.py`, `backend/tests/unit/test_fl_engine.py` | **Verified** |
 | **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 1.858$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), RDP moments accounting | **Verified** |
 | **Byzantine Fault Tolerance** | Tolerates up to $f < n/2$ malicious nodes | `benchmarks/runners/run_byzantine_benchmark.py` (Krum, Trimmed Mean, Bulyan) | **Verified** |
@@ -1404,7 +1404,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 
 | Benchmark Dimension | Target Specification | Measured Benchmark Value | Verification Reference | Verification Status |
 | :--- | :---: | :---: | :--- | :---: |
-| **Inference Latency (Fast-Path Raw)** | < 15 ms | **1.77 ms fast-path** (p99: 2.29 ms @ C=1, 26.95 ms @ C=100) | `realtime_inference.py` | `Self-Verified (host-calibrated PyTorch benchmark, 1,394.7 req/s peak throughput)` |
+| **Inference Latency (Fast-Path Raw)** | < 15 ms | **2.29 ms fast-path** (p99: 3.53 ms @ C=1, 79.34 ms @ C=100) | `realtime_inference.py` | `Self-Verified (host-calibrated PyTorch benchmark, 1,394.7 req/s peak throughput)` |
 | **Concurrent Ensemble Latency (p50 / p99)** | **258.9 ms (p50) / 308.2 ms (p99)** | < 350 ms (Ensemble SLA) | `test_load_concurrency_verification.py` | `Empirical Load Benchmark (15 workers, 9-signal feature store)` |
 | **HTTP Endpoint Latency under Load (p50 / p99)** | **166 ms (p50) / 395 ms (p99) @ 97.6 req/s** | < 100 ms (p99 SLA) | [`scripts/realtime_benchmark.py`](scripts/realtime_benchmark.py) | `Empirical ASGI Load Test (1,500 real requests, 20-concurrency, 3 endpoints; GIL-bound single-process)` |
 | **Event-Driven Stream SLA (p50 / p99)** | **26.1 ms (p50) / 62.75 ms (p99) @ 62.4 tx/s** | < 100 ms (Stream SLA) | [`scripts/transaction_stream.py`](scripts/transaction_stream.py) | `Empirical ASGI Stream Pipeline (1,883 real transactions, 30s, asyncio.Queue producer→consumer, 0 errors, 100% utilization)` |

@@ -57,7 +57,7 @@ The platform couples sub-3ms pre-authorization transaction risk scoring (`DeepFr
 │                  ┌─────────────────────────────────┐                                   │
 │                  │ Enterprise Inference Gateway    │                                   │
 │                  │ - 1,394.7 req/s Peak Throughput │                                   │
-│                  │ - p50 1.95ms / p99 6.84ms       │                                   │
+│                  │ - 2.29ms Fast-Path Latency      │                                   │
 │                  └────────────────┬────────────────┘                                   │
 │                                   │                                                    │
 │                                   ▼                                                    │
@@ -176,13 +176,13 @@ The central aggregator incorporates robust Byzantine aggregation algorithms to n
 ## 7. Deployment Topology, Performance & Scalability
 
 ### 7.1 Production Hardware Benchmarks
-Evaluated on standard enterprise infrastructure under multi-concurrency stress testing:
-- **Peak Throughput**: **1,394.7 requests/second** at $C = 100$ concurrent client channels.
-- **Latency Distribution**:
-  - **p50**: **1.95 ms**
-  - **p90**: **3.12 ms**
-  - **p95**: **3.75 ms**
-  - **p99**: **6.84 ms**
+Evaluated on standard enterprise infrastructure under multi-concurrency stress testing ([`latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)):
+- **Single-Request Fast-Path**: **2.29 ms** (well below $< 15\text{ ms}$ SLA; p50: 2.39 ms, p99: 3.53 ms at $C=1$).
+- **Peak Throughput**: **1,394.7 requests/second** at $C = 100$ concurrent client channels (peak: 1,791.0 req/s at $C = 50$).
+- **Latency Distribution (C = 100 Stress Load)**:
+  - **p50**: **37.75 ms**
+  - **p95**: **64.72 ms**
+  - **p99**: **79.34 ms**
 - **Bandwidth Consumption**: Model gradient payloads are compressed by **74.8%** via Zstandard, Top-$k$ sparsification ($k=20\%$), and INT8 quantization.
 
 ### 7.2 Multi-Cloud Infrastructure as Code (IaC)

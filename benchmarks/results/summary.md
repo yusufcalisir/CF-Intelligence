@@ -13,20 +13,21 @@
 
 | Concurrency Level | Measured Throughput | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Error Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **551.3 req/s** | **1.71 ms** | **2.20 ms** | **2.29 ms** | 0.0% |
-| **10** | **3,866.6 req/s** | **2.21 ms** | **2.96 ms** | **3.17 ms** | 0.0% |
-| **50** | **4,786.5 req/s** | **7.53 ms** | **15.04 ms** | **17.77 ms** | 0.0% |
-| **100** | **4,821.6 req/s** | **10.33 ms** | **22.15 ms** | **26.95 ms** | 0.0% |
-| **250** | **4,789.8 req/s** | **18.22 ms** | **38.95 ms** | **49.06 ms** | 0.0% |
-| **500** | **4,450.8 req/s** | **27.03 ms** | **56.70 ms** | **71.99 ms** | 0.0% |
+| **1** | **377.2 req/s** | **2.39 ms** | **3.19 ms** | **3.53 ms** | 0.0% |
+| **10** | **1,452.0 req/s** | **5.94 ms** | **7.40 ms** | **7.96 ms** | 0.0% |
+| **50** | **1,791.0 req/s** | **17.94 ms** | **30.68 ms** | **35.45 ms** | 0.0% |
+| **100** | **1,394.7 req/s** | **37.75 ms** | **64.72 ms** | **79.34 ms** | 0.0% |
+| **250** | **1,286.4 req/s** | **71.80 ms** | **126.02 ms** | **147.07 ms** | 0.0% |
+| **500** | **1,043.6 req/s** | **116.28 ms** | **285.27 ms** | **361.49 ms** | 0.0% |
 
 ### Micro-Latency Component Breakdown (Single Request Fast-Path)
-- Token Auth & ABAC Authorization: **0.31 ms**
-- Redis Feature Store Vector Lookup: **0.81 ms**
-- 9-Signal Composite Risk Scoring Engine: **0.12 ms**
-- PyTorch Neural Network Forward Pass: **0.42 ms**
-- Pydantic v2 Serialization & Response: **0.11 ms**
-- **Total Fast-Path Serving Latency**: **~1.77 ms** (Well within <15ms SLA)
+- Token Auth & ABAC Authorization: **~0.005 ms**
+- Redis Feature Store Vector Lookup: **~0.000 ms** (in-memory fast cache)
+- PyTorch Neural Network Forward Pass: **~0.186 ms**
+- 9-Signal Composite Risk Scoring Engine: **~2.088 ms**
+- Pydantic v2 Serialization & Response: **~0.015 ms**
+- **Total Fast-Path Serving Latency**: **~2.294 ms** (Well within <15ms SLA)
+- **Full-Path with SHAP Attribution**: **~2.985 ms** (Well within <50ms SLA)
 
 ---
 
