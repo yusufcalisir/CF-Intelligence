@@ -46,7 +46,7 @@ Financial institutions often possess fragmented fraud intelligence. Sharing raw 
 The system combines Federated Learning, Differential Privacy, Secure Aggregation, Byzantine-resilient model aggregation, GraphSAGE-based graph intelligence, real-time risk scoring, SHAP explainability, and security-focused API infrastructure.
 
 > [!IMPORTANT]
-> **Data Locality vs. Privacy Guarantees:** Federated learning addresses data locality; it does not by itself guarantee privacy. Local model updates can still leak training signal or customer representations through gradient inversion and membership-inference attacks. CF-Intelligence therefore strictly evaluates federated optimization separately from its formal Differential Privacy ($arepsilon, \delta$) and Secure Aggregation (SecAgg) cryptographic layers.
+> **Data Locality vs. Privacy Guarantees:** Federated learning addresses data locality; it does not by itself guarantee privacy. Local model updates can still leak training signal or customer representations through gradient inversion and membership-inference attacks. CF-Intelligence therefore strictly evaluates federated optimization separately from its formal Differential Privacy ($\epsilon, \delta$) and Secure Aggregation (SecAgg) cryptographic layers.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
