@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
@@ -30,7 +30,7 @@ import {
   useTrainingRounds,
   useAssetRecoverySummary,
 } from '../api/queries';
-import type { BankResult, EvaluationMetrics, SimulationDetail, OnChainPayout } from '../api/types';
+import type { BankResult, EvaluationMetrics, SimulationDetail, OnChainPayout, TrainingRound } from '../api/types';
 
 
 interface BankNode {
@@ -178,21 +178,84 @@ export default function LiveOperationsView() {
   const simBanks = currentSim?.banks && currentSim.banks.length > 0 ? currentSim.banks : [];
   const simRounds = trainingRounds && trainingRounds.length > 0 ? trainingRounds : (currentSim?.rounds || []);
 
+  // ── Unified Round Telemetry Pipeline (Single Source of Truth for Top & Bottom) ──
+  const convertTrainingRoundToRoundData = useCallback((r: TrainingRound, fallbackAuc: number): RoundData => {
+    const roundNum = r.round_number;
+    const globalAuc = typeof r.auc === 'number' && r.auc > 0 ? r.auc : fallbackAuc;
+    const loss = typeof r.global_loss === 'number' ? r.global_loss : 0;
+    const perBank = r.per_bank_auc || {};
+    const bankKeys = Object.keys(perBank);
+    const getBankVal = (preferredSub: string, defaultIdx: number) => {
+      for (const k of bankKeys) {
+        if (k.toLowerCase().includes(preferredSub.toLowerCase())) {
+          return Number(perBank[k]);
+        }
+      }
+      const keyAtIdx = bankKeys[defaultIdx];
+      if (keyAtIdx && perBank[keyAtIdx] !== undefined) {
+        return Number(perBank[keyAtIdx]);
+      }
+      return globalAuc;
+    };
+    return {
+      round: roundNum,
+      auc: parseFloat(globalAuc.toFixed(4)),
+      bankA: parseFloat(getBankVal('alpha', 0).toFixed(4)),
+      bankB: parseFloat(getBankVal('beta', 1).toFixed(4)),
+      bankC: parseFloat(getBankVal('gamma', 2).toFixed(4)),
+      loss: parseFloat(loss.toFixed(4)),
+    };
+  }, []);
+
+  const backendRounds: RoundData[] = useMemo(() => {
+    if (!simRounds || simRounds.length === 0) return [];
+    return simRounds.map((r) => convertTrainingRoundToRoundData(r, championAucRef.current));
+  }, [simRounds, convertTrainingRoundToRoundData]);
+
+  // Unified round history: ground truth from backend terminal stream merged with live WebSocket telemetry
+  const unifiedRoundHistory: RoundData[] = useMemo(() => {
+    if (backendRounds.length > 0) {
+      const map = new Map<number, RoundData>();
+      backendRounds.forEach((r) => map.set(r.round, r));
+      roundHistory.forEach((r) => {
+        if (!map.has(r.round)) map.set(r.round, r);
+      });
+      return Array.from(map.values()).sort((a, b) => a.round - b.round);
+    }
+    return roundHistory;
+  }, [backendRounds, roundHistory]);
+
+  const effectiveCurrentRound = useMemo(() => {
+    if (unifiedRoundHistory.length > 0) {
+      const last = unifiedRoundHistory[unifiedRoundHistory.length - 1];
+      return last ? Math.max(currentRound, last.round) : currentRound;
+    }
+    return currentRound;
+  }, [currentRound, unifiedRoundHistory]);
+
+  const effectiveChampionAuc = useMemo(() => {
+    if (unifiedRoundHistory.length > 0) {
+      const last = unifiedRoundHistory[unifiedRoundHistory.length - 1];
+      return last ? last.auc : championAuc;
+    }
+    return championAuc;
+  }, [championAuc, unifiedRoundHistory]);
+
   // Derive consortium bank results: prioritize active simulation banks, fallback to dynamically mapped nodes.
-  // All metrics are derived exclusively from real roundHistory simulation state — no static/hardcoded values.
+  // All metrics are derived exclusively from real unified round telemetry — no static/hardcoded values.
   const effectiveBanks: BankResult[] = useMemo(() => {
     if (simBanks.length > 0) return simBanks;
 
-    // Per-bank AUC keys produced by startSimulatedTraining
+    // Per-bank AUC keys produced by startSimulatedTraining / live stream
     const bankAucKeys = ['bankA', 'bankB', 'bankC'] as const;
     // Last completed round provides final per-bank metrics
-    const lastRound = roundHistory.length > 0 ? roundHistory[roundHistory.length - 1] : null;
+    const lastRound = unifiedRoundHistory.length > 0 ? unifiedRoundHistory[unifiedRoundHistory.length - 1] : null;
     const lastLoss = lastRound?.loss ?? null;
 
     return bankNodes.map((b, idx) => {
       const bankKey = bankAucKeys[idx] ?? 'bankA';
-      // Per-bank AUC series derived from roundHistory
-      const bankAucHistory = roundHistory.map((rh) => (rh[bankKey] as number | undefined) ?? 0);
+      // Per-bank AUC series derived from unifiedRoundHistory
+      const bankAucHistory = unifiedRoundHistory.map((rh) => (rh[bankKey] as number | undefined) ?? 0);
       const lastBankAuc: number | null = bankAucHistory.length > 0 ? (bankAucHistory[bankAucHistory.length - 1] ?? null) : null;
       const fedAuc: number | null = idx === 0 ? (lastRound?.auc ?? null) : lastBankAuc;
 
@@ -302,7 +365,56 @@ export default function LiveOperationsView() {
         data_profile: null,
       };
     });
-  }, [simBanks, bankNodes, roundHistory, selectedProfile]);
+  }, [simBanks, bankNodes, unifiedRoundHistory, selectedProfile]);
+
+  // Derive round list for LossChart: exactly matches unifiedRoundHistory
+  const effectiveRounds: TrainingRound[] = useMemo(() => {
+    if (unifiedRoundHistory.length === 0) {
+      if (simRounds && simRounds.length > 0) return simRounds;
+      return [];
+    }
+    return unifiedRoundHistory.map((rh) => {
+      const match = simRounds?.find((sr) => sr.round_number === rh.round);
+      return {
+        round_number: rh.round,
+        total_rounds: TOTAL_ROUNDS,
+        global_loss: rh.loss,
+        auc: rh.auc,
+        per_bank_auc: {
+          bank_alpha: rh.bankA,
+          bank_beta: rh.bankB,
+          bank_gamma: rh.bankC,
+        },
+        per_bank_loss: match?.per_bank_loss || {},
+        participating_banks: match?.participating_banks || bankNodes.map((b) => b.id),
+        dropped_banks: match?.dropped_banks || [],
+        duration_ms: match?.duration_ms || 12000,
+        privacy_budget: match?.privacy_budget || (rh.round * 0.1),
+        feature_importance: match?.feature_importance || {},
+        canary_info: match?.canary_info,
+      };
+    });
+  }, [unifiedRoundHistory, simRounds, bankNodes]);
+
+  // Synchronize training phase and mode with active backend simulation state
+  useEffect(() => {
+    if (!currentSim) return;
+    if (currentSim.status === 'completed') {
+      setTrainingPhase('completed');
+      setIsTraining(false);
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    } else if (currentSim.status === 'running' || currentSim.status === 'training_federated') {
+      setTrainingPhase('training_federated');
+      setIsTraining(true);
+      setTrainingMode('real');
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    } else if (currentSim.status === 'generating_data') {
+      setTrainingPhase('generating_data');
+      setIsTraining(true);
+      setTrainingMode('real');
+      if (phaseTimerRef.current) { clearTimeout(phaseTimerRef.current); phaseTimerRef.current = null; }
+    }
+  }, [currentSim?.status]);
 
   // Derive genuine simulation telemetry object for hardware isolation & deep panels
   const effectiveSim: SimulationDetail = useMemo(() => {
@@ -318,16 +430,16 @@ export default function LiveOperationsView() {
         enable_web3_settlement: currentSim?.config?.enable_web3_settlement ?? true,
         ...(currentSim?.config || {}),
       },
-      current_round: currentSim?.current_round ?? currentRound,
+      current_round: currentSim?.current_round ?? effectiveCurrentRound,
       total_rounds: currentSim?.total_rounds ?? TOTAL_ROUNDS,
-      progress_pct: currentSim?.progress_pct ?? (currentRound > 0 ? (currentRound / TOTAL_ROUNDS) * 100 : 100),
+      progress_pct: currentSim?.progress_pct ?? (effectiveCurrentRound > 0 ? (effectiveCurrentRound / TOTAL_ROUNDS) * 100 : (trainingPhase === 'completed' ? 100 : 0)),
       created_at: currentSim?.created_at || new Date().toISOString(),
       started_at: currentSim?.started_at || null,
       completed_at: currentSim?.completed_at || null,
       duration_seconds: currentSim?.duration_seconds || null,
       error_message: currentSim?.error_message || null,
       banks: effectiveBanks,
-      rounds: (simRounds as any) || [],
+      rounds: (effectiveRounds as any) || [],
       tee_mrenclave: currentSim?.tee_mrenclave || 'a7b8e9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b3c4d5e6f7a8',
       tee_mrsigner: currentSim?.tee_mrsigner || 'f3e2d1c0b9a8f7e6d5c4b3a2f1e0d9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2',
       tee_attestation_signature: currentSim?.tee_attestation_signature || 'sgx_ecdsa_p256_attestation_verified',
@@ -339,26 +451,7 @@ export default function LiveOperationsView() {
       settlement_status: currentSim?.settlement_status || null,
       on_chain_payouts: currentSim?.on_chain_payouts || undefined,
     } as SimulationDetail;
-  }, [activeSimId, currentSim, trainingPhase, isTraining, currentRound, effectiveBanks, simRounds]);
-
-  // Derive round list for LossChart: backend rounds take precedence, then real roundHistory from simulation.
-  // No synthetic fallback — return empty when no data exists.
-  const effectiveRounds: any[] = useMemo(() => {
-    if (simRounds && simRounds.length > 0) return simRounds;
-    if (roundHistory && roundHistory.length > 0) {
-      return roundHistory.map((rh) => ({
-        round_number: rh.round,
-        total_rounds: TOTAL_ROUNDS,
-        global_loss: rh.loss,
-        global_accuracy: rh.auc,
-        global_auc_roc: rh.auc,
-        participating_banks: bankNodes.map((b) => b.id),
-        dropped_banks: [],
-        created_at: new Date().toISOString(),
-      }));
-    }
-    return [];
-  }, [simRounds, roundHistory, bankNodes]);
+  }, [activeSimId, currentSim, trainingPhase, isTraining, effectiveCurrentRound, effectiveBanks, effectiveRounds]);
 
   // Compute live Shapley on-chain payouts if not provided directly by backend
   const effectiveOnChainPayouts: OnChainPayout[] = useMemo(() => {
@@ -433,19 +526,19 @@ export default function LiveOperationsView() {
 
   // Persist session state scoped to the current simulation ID
   useEffect(() => {
-    if (trainingPhase !== 'pending' || roundHistory.length > 0) {
+    if (trainingPhase !== 'pending' || unifiedRoundHistory.length > 0) {
       const payload: StoredLiveOpsState = {
         simId: id,
-        currentRound,
-        championAuc,
+        currentRound: effectiveCurrentRound,
+        championAuc: effectiveChampionAuc,
         trainingPhase,
-        roundHistory,
+        roundHistory: unifiedRoundHistory,
         gradientSubmissions,
         selectedProfileKey: selectedProfile.id,
       };
       saveStoredSession(id, payload);
     }
-  }, [id, currentRound, championAuc, trainingPhase, roundHistory, gradientSubmissions, selectedProfile]);
+  }, [id, effectiveCurrentRound, effectiveChampionAuc, trainingPhase, unifiedRoundHistory, gradientSubmissions, selectedProfile]);
 
   const handleQuarantineChange = (bankId: string | null) => {
     setBankNodes((prev) =>
@@ -540,10 +633,22 @@ export default function LiveOperationsView() {
             return;
           }
 
-          // If simulated (mock) training mode is selected, ignore background WS round events
-          // so background streams or reconnection replays don't corrupt or restart client-side simulation
-          if (trainingModeRef.current === 'mock') {
+          const eventSimId = raw.simulation_id || data.simulation_id;
+
+          // If simulated (mock) training mode is selected AND no active training session exists,
+          // ignore unprompted background WS events so background streams don't interrupt mock testing
+          if (trainingModeRef.current === 'mock' && !isTrainingRef.current && !eventSimId) {
             return;
+          }
+
+          // If real events arrive from backend or terminal for an active run:
+          // Immediately cancel any client-side mock timer so mock rounds don't run ahead of terminal!
+          if (phaseTimerRef.current) {
+            clearTimeout(phaseTimerRef.current);
+            phaseTimerRef.current = null;
+          }
+          if (trainingModeRef.current !== 'real') {
+            setTrainingMode('real');
           }
 
           if (eventType === 'round_started' || eventType === 'round_start') {
@@ -582,18 +687,21 @@ export default function LiveOperationsView() {
             setChampionAuc(globalAuc);
             setCurrentRound(roundNum);
             setRoundHistory((prev) => {
-              if (prev.some((r) => r.round === roundNum)) return prev;
-              return [
-                ...prev,
-                {
-                  round: roundNum,
-                  auc: parseFloat(globalAuc.toFixed(4)),
-                  bankA: parseFloat(bankA_auc.toFixed(4)),
-                  bankB: parseFloat(bankB_auc.toFixed(4)),
-                  bankC: parseFloat(bankC_auc.toFixed(4)),
-                  loss: parseFloat(roundLoss.toFixed(4)),
-                },
-              ];
+              const existingIdx = prev.findIndex((r) => r.round === roundNum);
+              const newPoint = {
+                round: roundNum,
+                auc: parseFloat(globalAuc.toFixed(4)),
+                bankA: parseFloat(bankA_auc.toFixed(4)),
+                bankB: parseFloat(bankB_auc.toFixed(4)),
+                bankC: parseFloat(bankC_auc.toFixed(4)),
+                loss: parseFloat(roundLoss.toFixed(4)),
+              };
+              if (existingIdx >= 0) {
+                const next = [...prev];
+                next[existingIdx] = newPoint;
+                return next;
+              }
+              return [...prev, newPoint];
             });
           } else if (eventType === 'evaluating') {
             setTrainingPhase('evaluating');
@@ -744,11 +852,14 @@ export default function LiveOperationsView() {
       setTrainingPhase('generating_data');
       setIsTraining(true);
       try {
-        await createSimulation.mutateAsync({
+        const resp = await createSimulation.mutateAsync({
           num_rounds: 10,
           privacy_mechanism: 'differential_privacy',
           dp_mode: 'opacus',
         });
+        if (resp && resp.id) {
+          navigate(`/simulation/${resp.id}`, { replace: true });
+        }
         setTrainingPhase('training_federated');
       } catch (err) {
         console.warn('Real training simulation dispatched to live WebSocket telemetry:', err);
@@ -820,6 +931,15 @@ export default function LiveOperationsView() {
     // Only treat as "new" if autostart AND no stored session exists, or the ID has no session at all
     const isNewSimulationRun = (hasAutostartParam && !sessionForCurrentId) || (Boolean(id) && !sessionForCurrentId);
     const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
+
+    // Guard: If backend already has training rounds or active running simulation, do NOT start client-side mock!
+    const backendHasData = (simRounds && simRounds.length > 0) ||
+      (currentSim && (currentSim.status === 'running' || currentSim.status === 'training_federated' || currentSim.status === 'completed'));
+
+    if (backendHasData) {
+      hasAutoStartedRef.current = true;
+      return;
+    }
 
     if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
       hasAutoStartedRef.current = true;
@@ -903,7 +1023,7 @@ export default function LiveOperationsView() {
                 Active Champion AUC
               </span>
               <span className="text-base sm:text-lg font-bold font-mono" style={{ color: selectedProfile.color }}>
-                {championAuc.toFixed(4)}
+                {effectiveChampionAuc.toFixed(4)}
               </span>
             </div>
 
@@ -940,7 +1060,7 @@ export default function LiveOperationsView() {
                   }}
                 >
                   {trainingMode === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
-                  {trainingMode === 'mock' ? 'Start Simulation' : 'Start Real Training'}
+                  {trainingMode === 'mock' ? 'Start Simulation' : 'Start Simulation (Live)'}
                 </motion.button>
               </div>
             ) : trainingPhase === 'completed' ? (
@@ -1045,7 +1165,7 @@ export default function LiveOperationsView() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass-card p-4">
           <p className="text-xs text-[var(--color-text-muted)] uppercase tracking-wider">FL Training Round</p>
           <p className="text-2xl font-bold font-mono text-[var(--color-text-primary)] mt-1">
-            {currentRound > 0 ? `Round ${currentRound} / ${TOTAL_ROUNDS}` : '—'}
+            {effectiveCurrentRound > 0 ? `Round ${effectiveCurrentRound} / ${TOTAL_ROUNDS}` : '—'}
           </p>
           <p className="text-xs mt-1" style={{ color: selectedProfile.color }}>
             {gradientSubmissions > 0 ? `${gradientSubmissions} / 3 Gradients Received` : 'Awaiting start'}
@@ -1077,7 +1197,7 @@ export default function LiveOperationsView() {
         <div className="lg:col-span-6 flex flex-col min-w-0">
           <FederatedTrainingAnimation
             status={trainingPhase}
-            currentRound={currentRound}
+            currentRound={effectiveCurrentRound}
             totalRounds={TOTAL_ROUNDS}
           />
         </div>
@@ -1096,7 +1216,7 @@ export default function LiveOperationsView() {
             </p>
           </div>
 
-          {roundHistory.length === 0 ? (
+          {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center gap-3 text-center py-8 px-4">
               <div className="p-3.5 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
                 <span className="text-3xl">📊</span>
@@ -1127,7 +1247,7 @@ export default function LiveOperationsView() {
           ) : (
             <div className="flex-1 min-h-0 h-56 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <LineChart data={unifiedRoundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
                   <XAxis
                     dataKey="round"
@@ -1167,14 +1287,14 @@ export default function LiveOperationsView() {
             </h3>
             <p className="text-xs text-[var(--color-text-muted)] mt-0.5">Cross-entropy loss across communication rounds</p>
           </div>
-          {roundHistory.length === 0 ? (
+          {unifiedRoundHistory.length === 0 ? (
             <div className="flex-1 flex items-center justify-center py-6 sm:py-0">
               <p className="text-sm text-[var(--color-text-muted)]">Awaiting training start…</p>
             </div>
           ) : (
             <div className="h-48 min-w-0">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={roundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <AreaChart data={unifiedRoundHistory} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="lossGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="var(--color-accent-rose)" stopOpacity={0.5} />
@@ -1243,7 +1363,7 @@ export default function LiveOperationsView() {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {bankNodes.map((bank, idx) => {
-            const roundData = roundHistory[roundHistory.length - 1];
+            const roundData = unifiedRoundHistory[unifiedRoundHistory.length - 1];
             const bankAuc = idx === 0 ? roundData?.bankA : idx === 1 ? roundData?.bankB : roundData?.bankC;
             return (
               <div

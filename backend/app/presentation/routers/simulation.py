@@ -894,7 +894,7 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
                 _simulation_results.set(simulation_id, sim)
 
             # Store every event so the training router can serve them
-            event_envelope = {"event_type": event_type, "data": data}
+            event_envelope = {"event_type": event_type, "data": data, "simulation_id": simulation_id}
             _simulation_events.push_list(simulation_id, event_envelope)
 
             # Always broadcast in-process so clients receive events without Redis

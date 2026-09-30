@@ -269,6 +269,9 @@ export interface TrainingRound {
   privacy_budget: number;
   feature_importance?: Record<string, number>;
   canary_info?: CanaryEvaluation;
+  auc?: number;
+  per_bank_auc?: Record<string, number>;
+  per_bank_loss?: Record<string, number>;
 }
 
 export interface SimulationSummary {

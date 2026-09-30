@@ -710,6 +710,7 @@ Operational dashboards displaying federated training convergence, ROC curves, lo
    * Computes aggregated transaction scoring throughput, anomaly rates, latency percentiles, and node active/degraded states across all registered banking participants.
 4. **Zero-Mock Verification UI Architecture (`LiveOperationsView.tsx`, `MetricsComparisonBarChart.tsx`)**:
    * Wires operational HUD elements (multi-bank comparison bar charts, convergence loss charts, dynamic confusion matrix, SHAP feature importance) directly to backend WebSocket and REST endpoints with strict zero-mock data integrity.
+   * **Unified Round History Telemetry Synchronization**: Merges backend REST rounds (`/api/v1/simulation/{id}/rounds`) with live WebSocket round streams (`/ws/training`). When backend simulation rounds or terminal FL executions are detected, client-side simulated timers are automatically halted, synchronizing top-level KPI cards, Per-Round Model Performance line charts, and Federated Training Loss area charts 1:1 with the terminal's actual communication round pace.
 
 ### Tradeoff
 

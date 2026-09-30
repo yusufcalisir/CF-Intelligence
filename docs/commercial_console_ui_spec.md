@@ -132,6 +132,9 @@ The application shell provides access to 16 distinct production views organized 
 
 ### 5.3. Live Verification & HUD Grid (`/operations`)
 * **Component**: [`LiveOperationsView.tsx`](../frontend/src/pages/LiveOperationsView.tsx)
+* **Unified Telemetry Synchronization**:
+  * Top charts (Per-Round Model Performance LineChart, Federated Training Loss AreaChart, Active Champion AUC, and FL Training Round indicator) are unified with bottom empirical validation panels (`ROCCurve`, `LossChart`, `ConfusionMatrix`, and `FeatureImportance`).
+  * Live WebSocket round streams and backend REST telemetry take absolute precedence over client-side mock timers, ensuring all graphics advance synchronously with actual terminal communication rounds.
 * **Visual Verification Metrics**:
   * **ROC Performance Overlay (`ROCCurve.tsx`)**: Real-time comparison between Collaborative FedGNN ($0.912$) and Single-Bank Baselines ($0.835$).
   * **Loss Convergence Line (`LossChart.tsx`)**: Multi-round training and validation loss decay.
