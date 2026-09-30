@@ -1325,7 +1325,7 @@ def run_creditcard_benchmark(
     logger.info("[CreditCard Results] Written to %s", results_json_path)
 
     # 8. Raw Benchmark JSON for Benchmarks Suite
-    raw_benchmark_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
+    raw_benchmark_dir = out_dir if output_dir else REPO_ROOT / "benchmarks" / "results" / "raw"
     raw_benchmark_dir.mkdir(parents=True, exist_ok=True)
     raw_benchmark_path = raw_benchmark_dir / "fraud_benchmark_credit_card.json"
 

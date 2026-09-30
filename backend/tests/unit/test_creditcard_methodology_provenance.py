@@ -16,13 +16,13 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-
-from app.application.services.dataloader import compute_file_sha256, load_creditcard_fraud
 from experiments.credit_card.run_creditcard_benchmark import (
     ComparativeCreditCardEvaluator,
     FederatedCreditCardTrainer,
     run_creditcard_benchmark,
 )
+
+from app.application.services.dataloader import compute_file_sha256, load_creditcard_fraud
 
 EMPTY_STR_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
@@ -94,6 +94,7 @@ class TestCreditCardMethodologyAndProvenance:
             output_dir=out_dir,
             seed=42,
         )
+        assert res["experiment_result"].status == "COMPLETED"
 
         comp_path = out_dir / "comparative_baselines.json"
         assert comp_path.exists()
