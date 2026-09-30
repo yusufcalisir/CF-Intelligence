@@ -196,18 +196,19 @@ export default function LiveOperationsView() {
       const lastBankAuc: number | null = bankAucHistory.length > 0 ? (bankAucHistory[bankAucHistory.length - 1] ?? null) : null;
       const fedAuc: number | null = idx === 0 ? (lastRound?.auc ?? null) : lastBankAuc;
 
-      // ROC curve built from actual AUC value: parameterised concave hull (no fixed points)
-      // Only populate when simulation has run
+      // ROC curve built from actual AUC value: power-law concave hull
+      // Only populate when simulation has produced round data
       const buildRoc = (auc: number | null): { fpr: number[]; tpr: number[] } | null => {
         if (auc === null) return null;
-        // Concave ROC curve parameterised by AUC: sample 6 operating points
-        const pts = [0, 0.05, 0.1, 0.2, 0.5, 1.0];
+        // Smooth ROC curve with 11 operating points
+        const pts = [0, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.8, 1.0];
+        // Power-law: area under y = x^(1/k) on [0,1] is k/(k+1).
+        // Setting AUC = k/(k+1) → k = AUC/(1-AUC).
+        const k = Math.max(1, auc / Math.max(1 - auc, 1e-9));
         const tprs = pts.map((fpr) => {
           if (fpr === 0) return 0;
           if (fpr === 1) return 1;
-          // Power-law approximation: TPR ≈ fpr^((1-auc)/(auc)) adjusted to integrate to ~auc
-          const k = Math.log(0.5) / Math.log(1 - auc + 1e-9);
-          return Math.min(1, Math.pow(fpr, 1 / Math.max(k, 0.01)));
+          return Math.min(1, Math.pow(fpr, 1 / k));
         });
         return { fpr: pts, tpr: tprs };
       };

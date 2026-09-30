@@ -44,7 +44,7 @@ export default function LossChart({ rounds, totalRounds }: LossChartProps) {
           </span>
         )}
       </div>
-      <div className="h-64 relative flex-1 min-h-0">
+      <div className="relative flex-1" style={{ minHeight: '256px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, bottom: 20, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" />

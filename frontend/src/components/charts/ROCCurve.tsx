@@ -13,6 +13,12 @@ export default function ROCCurve({ banks, modelType }: ROCCurveProps) {
   // Build overlaid ROC curve data
   const maxPoints = 50; // Downsample for performance
 
+  // Check if any bank has actual metrics for the selected model type
+  const hasData = banks.some((bank) => {
+    const metrics = modelType === 'local' ? bank.local_metrics : bank.federated_metrics;
+    return metrics && metrics.roc_fpr && metrics.roc_fpr.length > 0;
+  });
+
   const buildCurveData = () => {
     // Collect all unique FPR values as x-axis
     const allFpr = new Set<number>();
@@ -57,8 +63,13 @@ export default function ROCCurve({ banks, modelType }: ROCCurveProps) {
     <div className="glass-card p-5 min-h-[420px] lg:h-[430px] flex flex-col">
       <div className="flex items-center justify-between mb-4 min-h-[22px]">
         <h3 className="text-sm font-semibold text-[var(--color-text-primary)]">{title}</h3>
+        {!hasData && (
+          <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--color-status-warning)]/15 text-[var(--color-status-warning)] font-medium animate-pulse">
+            Waiting for Round 1...
+          </span>
+        )}
       </div>
-      <div className="h-64 relative flex-1 min-h-0">
+      <div className="relative flex-1" style={{ minHeight: '256px' }}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 5, right: 20, bottom: 20, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border-subtle)" />
