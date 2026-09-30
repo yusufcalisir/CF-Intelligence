@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import {
   AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip,
@@ -78,11 +78,9 @@ interface StoredLiveOpsState {
   selectedProfileKey?: string;
 }
 
-/** Load session state scoped to a specific simulation ID. Returns null for autostart or ID mismatch. */
-const loadStoredSession = (targetSimId?: string, isAutostart?: boolean): StoredLiveOpsState | null => {
-  if (isAutostart) return null;
+/** Load session state scoped to a specific simulation ID. */
+const loadStoredSession = (targetSimId?: string): StoredLiveOpsState | null => {
   try {
-    // Use per-ID key so different simulations never share state
     const key = targetSimId ? `${SESSION_STORAGE_KEY_PREFIX}${targetSimId}` : SESSION_STORAGE_KEY_PREFIX;
     const raw = sessionStorage.getItem(key);
     if (!raw) return null;
@@ -111,12 +109,17 @@ const clearStoredSession = (simId?: string) => {
 export default function LiveOperationsView() {
   const { id } = useParams<{ id?: string }>();
   const location = useLocation();
-  const isAutostartParam = location.search.includes('autostart=true');
+  const navigate = useNavigate();
 
   // Load session ONCE per component mount for the initial sim ID only.
-  // When `id` changes we reset all state via the effect below.
+  // On page refresh with ?autostart=true, prefer stored session over re-starting.
   const initialIdRef = useRef(id);
-  const storedSession = useRef(loadStoredSession(initialIdRef.current, isAutostartParam)).current;
+  const initialStoredSession = loadStoredSession(initialIdRef.current);
+  const storedSession = useRef(
+    // If there's already a stored session for this sim ID, use it even if ?autostart=true
+    // This prevents page refresh from restarting the simulation
+    initialStoredSession
+  ).current;
 
   const [bankNodes, setBankNodes] = useState<BankNode[]>(DEFAULT_BANKS);
   const [currentRound, setCurrentRound] = useState<number>(storedSession?.currentRound ?? 0);
@@ -757,9 +760,8 @@ export default function LiveOperationsView() {
     setGradientSubmissions(0);
     setChampionAuc(0.72);
 
-    // Restore persisted state for the new sim ID (if it exists and wasn't an autostart)
-    const hasAutostartParam = location.search.includes('autostart=true');
-    const newSession = loadStoredSession(id, hasAutostartParam);
+    // Restore persisted state for the new sim ID (if any exists)
+    const newSession = loadStoredSession(id);
     if (newSession) {
       setCurrentRound(newSession.currentRound);
       setChampionAuc(newSession.championAuc);
@@ -778,9 +780,10 @@ export default function LiveOperationsView() {
     // If the ID-change reset is still in progress, skip — auto-start will re-evaluate next render
     if (isResettingIdRef.current) return;
     const hasAutostartParam = location.search.includes('autostart=true');
-    // Check whether there is a persisted (non-autostart) session for the current ID
-    const sessionForCurrentId = loadStoredSession(id, hasAutostartParam);
-    const isNewSimulationRun = hasAutostartParam || (Boolean(id) && !sessionForCurrentId);
+    // Always check stored session WITHOUT the autostart flag — if data already exists, don't restart
+    const sessionForCurrentId = loadStoredSession(id);
+    // Only treat as "new" if autostart AND no stored session exists, or the ID has no session at all
+    const isNewSimulationRun = (hasAutostartParam && !sessionForCurrentId) || (Boolean(id) && !sessionForCurrentId);
     const isAutoStart = id || location.pathname.startsWith('/simulation') || hasAutostartParam;
 
     if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
@@ -788,8 +791,21 @@ export default function LiveOperationsView() {
       // Auto-start uses paysim defaults for backward compatibility
       startSimulatedTraining(DATASET_PROFILES.paysim);
     }
+
+    // Strip ?autostart=true from URL after first use so page refresh doesn't re-trigger
+    if (hasAutostartParam) {
+      const cleanSearch = location.search
+        .replace(/[?&]autostart=true/, '')
+        .replace(/^&/, '?');
+      navigate(`${location.pathname}${cleanSearch || ''}`, { replace: true });
+    }
     if (location.search.includes('openIngest=true')) {
       setIsIngestModalOpen(true);
+      // Also strip openIngest from URL
+      const cleanSearch = location.search
+        .replace(/[?&]openIngest=true/, '')
+        .replace(/^&/, '?');
+      navigate(`${location.pathname}${cleanSearch || ''}`, { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, location.pathname, location.search, trainingPhase, isTraining]);
