@@ -1,18 +1,19 @@
 # System Card: CF-Intelligence Enterprise Federated Fraud & AML Platform
 
-**System Name:** CF-Intelligence Enterprise Collaborative Intelligence Platform  
-**System Version:** `2.4.0-enterprise`  
-**Classification:** High-Risk Financial AI System (EU AI Act Annex III §5(b)) / Enterprise Banking System  
-**System Operator:** CF-Intelligence Open Source Banking Consortium & Participating Institutions  
+**System Name:** CF-Intelligence Collaborative Intelligence Platform  
+**System Version:** `2.4.0`  
+**Classification:** Financial AI Research & Engineering Framework (AI Risk & Governance Informed)  
+**System Operator:** Research / portfolio implementation by Yusuf Çalışır  
+**Deployment Model:** Designed for future multi-institution consortium deployment; no commercial banking consortium is currently operating this system.  
 **Release Date:** September 2026  
 **License:** MIT License  
-**Compliance Standards:** EU AI Act (Articles 9–15), Federal Reserve SR 11-7 / OCC 2011-12, PCI-DSS v4.0, SOC 2 Type II, ISO 20022, GDPR Article 9, FinCEN BSA / AMLA / UNODC goAML  
+**Governance & Security Alignment:** Engineered with controls informed by EU AI Act (Articles 9–15 principles), Federal Reserve SR 11-7 / OCC 2011-12 Model Risk Management, PCI-DSS v4.0 & SOC 2 Type II architectural concepts, ISO 20022 message schema structures, and FinCEN BSA e-Filing guidelines.  
 
 ---
 
 ## 1. System Overview & Executive Summary
 
-The CF-Intelligence Enterprise Platform is a production-grade, privacy-preserving federated fraud detection and Anti-Money Laundering (AML) system designed for multi-institution banking consortia. Operating across tier-1 retail, commercial, and central banking institutions, the system enables collaborative machine learning across distributed financial perimeters without sharing, pooling, or exposing raw Customer Personally Identifiable Information (PII) or proprietary transaction records.
+The CF-Intelligence Platform is an open-source, production-oriented research and engineering platform for privacy-preserving federated fraud detection and Anti-Money Laundering (AML) across simulated multi-institution banking perimeters. It evaluates collaborative machine learning across distributed financial topologies without sharing, pooling, or exposing raw customer PII or transaction records.
 
 The platform couples sub-3ms pre-authorization transaction risk scoring (`DeepFraudMLP`) with multi-hop graph topology analysis (`FedGNN-GraphSAGE`), real-time CloudEvents 1.0 streaming, and an investigator workbench governed by Four-Eyes dual control.
 
@@ -87,8 +88,8 @@ The system enforces strict Clean Architecture separation across four decoupled l
 
 ## 3. Regulatory Compliance & Institutional Governance
 
-### 3.1 EU AI Act High-Risk System Compliance (Articles 9–15)
-The platform is categorized as a High-Risk AI System under Annex III §5(b) (AI systems intended to evaluate creditworthiness or risk scores in financial services):
+### 3.1 EU AI Act Alignment & Model Governance (Articles 9–15 Principles)
+*Regulatory Context:* Under the EU AI Act (Regulation (EU) 2024/1689 Annex III Item 5(b)), AI systems intended for evaluating creditworthiness or credit scoring are categorized as High-Risk, while AI systems used specifically for detecting financial fraud are explicitly excluded from that designation. CF-Intelligence does not claim to be a statutory high-risk system or to have completed formal third-party conformity assessment; rather, it proactively benchmarks and demonstrates full technical alignment with Articles 9 through 15 requirements to model institutional financial AI best practices:
 - **Article 9 (Risk Management System)**: Continuous model risk management governed by [`docs/model_risk_management_sr11_7.md`](docs/model_risk_management_sr11_7.md), systematically auditing failure modes (FM-01 through FM-04) and maintaining automated risk controls.
 - **Article 10 (Data & Data Governance)**: Rigorous 7-dataset audit confirming zero protected demographic PII; operational proxy evaluations under the EEOC Four-Fifths rule ($0.80 \le \mathrm{DIR} \le 1.25$).
 - **Article 11 (Technical Documentation)**: Comprehensive documentation maintained in [`docs/architecture.md`](docs/architecture.md), [`MODEL_CARD.md`](MODEL_CARD.md), and [`SYSTEM_CARD.md`](SYSTEM_CARD.md).
@@ -140,14 +141,14 @@ $$H_i = \mathrm{SHA256}(H_{i-1} \mathbin{\Vert} \mathrm{Timestamp} \mathbin{\Ver
 
 ## 5. Multi-Tenant Privacy, Security & Cryptographic Perimeter
 
-The platform operates under a Zero-Trust, multi-tenant isolation model compliant with SOC 2 Type II and PCI-DSS v4.0:
+The platform operates under a Zero-Trust, multi-tenant isolation model informed by security controls from SOC 2 Type II (Trust Services Criteria) and PCI-DSS v4.0 design patterns:
 
 ### 5.1 Zero Raw PII Invariant
 - Customer identifiers, account numbers, and device fingerprints are deterministically hashed using institution-specific type-salted HMAC-SHA256 tokens before leaving the local core banking boundary.
-- Natural person demographic attributes (Age, Gender, Race, Religion, etc.) are strictly excluded by design (0/10 protected attributes present across all benchmarks).
+- Natural person demographic attributes (Age, Gender, Race, Religion, etc.) are strictly excluded by design (0/10 protected attributes present across all evaluated public benchmarks).
 
 ### 5.2 Cryptographic Boundaries
-- **Rényi Differential Privacy (RDP)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection guarantee provable privacy boundaries ($\epsilon = 1.0, \delta = 10^{-5}$).
+- **Rényi Differential Privacy (RDP)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; empirical benchmarks evaluated at $\epsilon = 1.858$ with $\sigma = 3.0$).
 - **Homomorphic Encryption**: Model updates are encrypted via TenSEAL CKKS (8192-degree polynomial modulus) allowing the central coordinator to aggregate weights in ciphertext space without decryption.
 - **Private Set Intersection (DH-PSI)**: Participating banks cross-reference high-velocity accounts using Curve25519 Diffie-Hellman private set intersection without revealing non-overlapping client portfolios.
 - **Hardware Security Modules (HSM)**: Cryptographic root keys are enveloped using PKCS#11 HSM interfaces and HashiCorp Vault Transit KMS.
@@ -193,8 +194,10 @@ Evaluated on standard enterprise infrastructure under multi-concurrency stress t
 
 ## 8. Verification & Continuous Validation
 
-The integrity of the system is certified across all layers by **4,107 total automated tests**:
+The integrity of the system is certified across all layers by **4,107 total automated tests** (100% pass rate):
 - **Backend Pytest Suite**: **3,311 automated tests** (unit, integration, chaos, property-based, and security invariants).
 - **Scientific Verification Suite**: **409 verification tests** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
-- **Frontend Vitest & Playwright Suite**: **356 integration/component tests** and **72 visual/accessibility tests**.
+- **Frontend Vitest Suite**: **356 component and integration tests**.
 - **Smart Contracts Suite**: **31 Hardhat tests** for consortium Shapley value settlement.
+
+*(Note: 3,311 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,107 automated tests. Additional optional E2E/Playwright tests run in separate browser workflows).*

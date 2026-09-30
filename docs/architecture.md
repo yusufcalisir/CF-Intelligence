@@ -398,7 +398,7 @@ The inter-container parameter exchange, heartbeat liveness, and global model dis
 | `DownloadGlobalModel` | Server Streaming | Streams aggregated global model binary chunks with per-chunk SHA-256 checksum integrity verification. |
 
 ### 8.3 Enterprise Multi-Tenant Database Persistence Engine
-The platform implements multi-tenant database isolation (SOC2/PCI-DSS compliant) where each bank node operates against its own isolated database instance or schema:
+The platform implements multi-tenant database isolation informed by SOC 2 and PCI DSS segmentation concepts, where each bank node operates against its own isolated database instance or schema:
 - **AsyncEngine Connection Pooling**: Production PostgreSQL / CockroachDB AsyncEngine configured via `_make_engine_kwargs(tenant)` with `pool_size=20`, `max_overflow=10`, `pool_recycle=3600`, and `pool_pre_ping=True`.
 - **Serializable Isolation & Retry Loop**: `run_cockroach_transaction()` handles SQLSTATE `40001` transaction conflicts with exponential retry loops.
 - **Alembic Schema Migrations**: Managed via [`alembic.ini`](../backend/alembic.ini), [`env.py`](../backend/app/infrastructure/database/migrations/env.py), and [`migration_manager.py`](../backend/app/infrastructure/database/migration_manager.py) for programmatic `upgrade_head()` / `downgrade_revision()` auto-migrations.
@@ -544,7 +544,7 @@ The CFI Platform includes an automated compliance engine ([`backend/app/domain/a
 | **Article 10** | Data Governance & Management | ISO 13616 IBAN validation pass rate $\ge 99.9\%$, Differential Privacy $\epsilon \le 10.0$ ceiling, FL training round count $\ge 1$ |
 | **Article 11** | Technical Documentation | Hyperparameters SHA-256 hash traceability, model versioning, federated topology documentation |
 | **Article 12** | Record-Keeping | Append-only FL round audit log SHA-256 digest, 7-year audit retention policy |
-| **Article 13** | Transparency to Users | SHAP feature attribution explainability, Annex III high-risk AI classification disclosure |
+| **Article 13** | Transparency to Users | SHAP feature attribution explainability, financial AI governance classification disclosure |
 | **Article 14** | Human Oversight | Dual sign-off gate approval (ML Engineer + Compliance Officer per SR 11-7), automated AUC rollback |
 | **Article 15** | Accuracy & Cybersecurity | AUC $\ge 0.75$, F1 $\ge 0.70$, spectral anomaly defense count, gRPC mTLS 1.3 + HSM PKCS#11 |
 

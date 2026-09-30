@@ -1028,7 +1028,7 @@ coupled with independent Membership Inference Attack (MIA) verification audits e
 
 ### Context
 
-Under the EU AI Act (Regulation (EU) 2024/1689 Annex III Item 5(b)), AI models evaluating creditworthiness or fraud risk are designated as High-Risk AI Systems, requiring strict conformity with Articles 9 through 15 (Risk Management, Data Governance, Technical Documentation, Record-Keeping, Transparency, Human Oversight, and Robustness). In parallel, US and UK banking regulators enforce Federal Reserve SR 11-7 / OCC 2011-12 and PRA SS1/23 Model Risk Management standards. Preparing periodic or ad-hoc technical dossiers manually takes weeks of engineering effort and introduces documentation drift.
+Under the EU AI Act (Regulation (EU) 2024/1689 Annex III Item 5(b)), AI systems evaluating creditworthiness are classified as High-Risk, whereas AI systems used specifically for detecting financial fraud are explicitly excluded. Nonetheless, institutional financial deployments demand adherence to the rigorous governance standards set out in Articles 9 through 15 (Risk Management, Data Governance, Technical Documentation, Record-Keeping, Transparency, Human Oversight, and Robustness). In parallel, US and UK banking regulators enforce Federal Reserve SR 11-7 / OCC 2011-12 and PRA SS1/23 Model Risk Management standards. Preparing periodic or ad-hoc technical dossiers manually takes weeks of engineering effort and introduces documentation drift.
 
 ### Decision
 

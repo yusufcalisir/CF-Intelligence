@@ -115,7 +115,7 @@ $$\Delta \mathrm{bal}_{\mathrm{dest}} = \mathrm{oldbalanceDest} + \mathrm{amount
 
 #### 3.1.4 Data Hygiene, Biases & Limitations
 - **Selective Fraud Typologies**: Fraud occurs strictly within `TRANSFER` and `CASH_OUT` transaction types; zero fraud cases exist in `PAYMENT`, `CASH_IN`, or `DEBIT`. Models trained without type filtering may learn trivial shortcut heuristics.
-- **Absence of Real PII**: 0/10 protected demographic attributes. Satisfies GDPR Article 9 and ECOA Regulation B.
+- **Absence of Real PII**: No protected or special-category demographic attributes (0/10) are present in the evaluated public datasets (relevant to GDPR Article 9 and ECOA Regulation B exclusions).
 - **Deterministic Evasion**: Synthetic fraudsters execute simple double-step asset drain attacks without sophisticated multi-hop laundering chains.
 
 ---

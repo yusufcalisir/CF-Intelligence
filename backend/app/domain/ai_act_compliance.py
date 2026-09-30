@@ -285,7 +285,7 @@ class EUAIActComplianceEngine:
             compliant=compliant,
             evidence={
                 "explainability_method": self.explainability_method or "NOT_PROVIDED",
-                "risk_tier": "HIGH RISK — Article 6(2) Annex III (AI in financial services fraud detection)",
+                "risk_tier": "Financial AI — Proactive Alignment with Articles 9–15 (Annex III §5(b) Fraud Detection Carve-Out Noted)",
                 "user_information_format": "Human-readable fraud alert with SHAP feature attribution scores",
                 "transparency_standard": "GDPR Article 22 + EU AI Act Article 13 combined disclosure",
             },

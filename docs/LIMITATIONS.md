@@ -71,7 +71,7 @@ In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmark
 
 #### Mathematical & Operational Reality
 - **Why It Happens:** Differential privacy injects spherical Gaussian noise $\mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$ into clipped gradient updates. In extreme class imbalance, the gradient signal corresponding to rare fraudulent samples is minuscule relative to majority legitimate traffic. At $\sigma \ge 3.0$, the perturbation variance swamps the minority gradient coordinates, destroying decision boundary refinement.
-- **Operational Reality:** Banks cannot operate at $\epsilon < 1.0$ in real-time fraud scoring without surrendering more than two-thirds of their fraud detection capability. The platform calibrates its production default at $\epsilon = 1.0, \delta = 10^{-5}$ as the empirical sweet spot.
+- **Operational Reality:** Banks cannot operate at extreme differential privacy ($\epsilon < 1.0$) in real-time fraud scoring without surrendering more than two-thirds of their fraud detection capability. The platform defines $\epsilon \le 1.0, \delta = 10^{-5}$ as a research target / intended configuration, while empirical evaluations benchmark points from $\epsilon = 1.858$ down to strong utility-collapse regimes. Real-world production deployment remains subject to future institutional risk appetite.
 
 ---
 

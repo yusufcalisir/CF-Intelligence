@@ -127,7 +127,7 @@ def audit_distribution_fidelity(
     X_synth: np.ndarray,
     y_synth: np.ndarray,
     feature_names: list[str] | None = None,
-    dataset_name: str = "PaySim (M-Pesa Real Benchmark)",
+    dataset_name: str = "PaySim (M-Pesa Calibrated Simulation)",
     degradation_metrics: dict[str, Any] | None = None,
 ) -> DistributionFidelityReport:
     """Audit statistical fidelity between real benchmark data and synthetic generator data."""

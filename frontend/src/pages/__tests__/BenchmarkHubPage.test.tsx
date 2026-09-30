@@ -48,7 +48,7 @@ describe('BenchmarkHubPage', () => {
     if (paySimButton) {
       fireEvent.click(paySimButton);
     }
-    expect(screen.getByText(/Derived from real M-Pesa mobile transaction logs/i)).toBeInTheDocument();
+    expect(screen.getByText(/Agent-based simulation calibrated on 1 month of anonymized M-Pesa/i)).toBeInTheDocument();
   });
 
   it('allows navigating between sub-tabs (Confusion Matrix, Data Fidelity, Pilot Sandbox)', () => {

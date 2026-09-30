@@ -185,7 +185,7 @@ export const BenchmarkHubPage: React.FC = () => {
   const datasetDescriptions: Record<string, { title: string; subtitle: string; badge: string; sourceLink: string }> = {
     paysim: {
       title: 'PaySim Mobile Money Financial Fraud',
-      subtitle: 'Derived from real M-Pesa mobile transaction logs with 6.3M records, capturing synthetic money laundering & fraud smurfing.',
+      subtitle: 'Agent-based simulation calibrated on 1 month of anonymized M-Pesa logs with 6.36M records, capturing synthetic money laundering & fraud smurfing.',
       badge: 'Empirical Mobile Money Standard',
       sourceLink: 'https://www.kaggle.com/datasets/ealaxi/paysim1',
     },
