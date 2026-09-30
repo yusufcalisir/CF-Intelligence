@@ -52,15 +52,16 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pip-audit
-        run: pip install pip-audit
+      - name: Install pip-audit & uv
+        run: pip install pip-audit uv
 
       - name: Run pip-audit Dependency Vulnerability Scan
         working-directory: backend
         run: |
+          uv pip compile requirements.txt -o /tmp/requirements.lock --quiet
           for i in 1 2 3; do
             echo "Running pip-audit dependency scan (attempt $i/3)..."
-            if pip-audit -r requirements.txt \
+            if pip-audit --no-deps -r /tmp/requirements.lock \
               --timeout 30 \
               --ignore-vuln GHSA-c5qf-59p4-3g47 \
               --ignore-vuln PYSEC-2026-3552 \
@@ -78,7 +79,7 @@ jobs:
             sleep 10
           done
           echo "⚠️ PyPI JSON API unavailable after 3 attempts. Executing resilient fallback via OSV vulnerability service..."
-          pip-audit -s osv -r requirements.txt \
+          pip-audit --no-deps -s osv -r /tmp/requirements.lock \
             --timeout 30 \
             --ignore-vuln GHSA-c5qf-59p4-3g47 \
             --ignore-vuln PYSEC-2026-3552 \
