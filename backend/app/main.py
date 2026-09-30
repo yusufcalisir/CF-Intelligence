@@ -441,10 +441,55 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
         _redis_url = settings.redis_url or "redis://localhost:6379"
         _r = _aioredis.from_url(_redis_url, socket_connect_timeout=1.0)
-        await _r.ping()
-        await _r.aclose()
-        _redis_available = True
-        logger.info("Redis: available at %s", _redis_url)
+        try:
+            await _r.ping()
+            _redis_available = True
+            logger.info("Redis: available at %s", _redis_url)
+        except Exception:
+            # In development, try auto-healing candidates if host=redis or password differs
+            if getattr(settings, "app_env", "development") == "development":
+                import urllib.parse
+
+                parsed = urllib.parse.urlparse(_redis_url)
+                hosts = [parsed.hostname]
+                if parsed.hostname == "redis":
+                    hosts.append("127.0.0.1")
+                pwds = [
+                    parsed.password,
+                    getattr(settings, "redis_password", None),
+                    "cfi_redis_secure_pass_2026",
+                    "cfi_redis_secure_pass_2026_change_in_production",
+                    None,
+                ]
+                for h in hosts:
+                    if not h or _redis_available:
+                        continue
+                    for p in pwds:
+                        netloc = (
+                            f":{p}@{h}:{parsed.port or 6379}"
+                            if p
+                            else f"{h}:{parsed.port or 6379}"
+                        )
+                        cand_url = urllib.parse.urlunparse(
+                            parsed._replace(netloc=netloc)
+                        )
+                        if cand_url == _redis_url:
+                            continue
+                        try:
+                            _alt_r = _aioredis.from_url(
+                                cand_url, socket_connect_timeout=0.5
+                            )
+                            await _alt_r.ping()
+                            await _alt_r.aclose()
+                            _redis_available = True
+                            logger.info("Redis: auto-recovered at %s", cand_url)
+                            break
+                        except Exception:
+                            continue
+            if not _redis_available:
+                raise
+        finally:
+            await _r.aclose()
     except Exception as _re:
         logger.info(
             "Redis: not available (%s) — WebSocket will use in-process event bus "

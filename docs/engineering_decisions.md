@@ -1278,6 +1278,32 @@ Formally establish an architectural Dual-Taxonomy boundary across all documentat
 
 * Requires educating cross-functional stakeholders on the distinction between code defects and scientific optimization boundaries.
 
+---
 
+## ED-049: Dual-Layer Redis Credential Auto-Healing & Container Host Re-Routing in Development Environments
 
+**Date**: 2026-09-30  
+**Status**: Accepted
 
+### Context
+
+When developers launch the local full-stack stack via `run_local.bat`, Docker Compose provisions dedicated PostgreSQL 16, Redis 7.2, and Kafka 3.7 containers using values from `.env`. Because `.env` and `.env.example` historically utilized slightly differing password placeholders (`cfi_redis_secure_pass_2026` vs `cfi_redis_secure_pass_2026_change_in_production`), and Docker containers run under internal network hostname `redis` while local FastAPI/Uvicorn processes run on the host OS accessing `127.0.0.1:6379`, subtle credential or hostname mismatches caused Redis authentication failures (`AuthenticationError: invalid username-password pair or user is disabled`) and DNS resolution failures (`ConnectionError: getaddrinfo failed`), triggering unnecessary fallback to ephemeral in-memory storage.
+
+### Decision
+
+Implement dual-layer credential and connection auto-healing across the local orchestration and backend runtime layers:
+1. **Dynamic Launcher Environment Extraction:** `run_local.bat` dynamically parses `REDIS_PASSWORD` from `.env` and `backend/.env` rather than hardcoding static placeholder strings, ensuring local Uvicorn processes inherit the identical credential passed by Docker Compose to `redis-server --requirepass`.
+2. **Development-Gated Host & Credential Reconciliation:** In `app_env == "development"`, `RedisStore`, `CacheService`, and the application lifespan probe automatically intercept `AuthenticationError` and `ConnectionError` on container hostnames:
+   - When the configured host is `redis` but running outside the Docker network bridge, it automatically tries `127.0.0.1`.
+   - When authentication fails against a running local Redis instance, it probes candidate development credentials (`cfi_redis_secure_pass_2026`, `cfi_redis_secure_pass_2026_change_in_production`, or no-auth) before falling back to in-memory mode.
+3. **Strict Zero-Trust in Production:** In production environments (`app_env == "production"`), auto-healing candidates are disabled, enforcing strict fail-fast security policies.
+
+### Rationale
+
+1. **Elimination of Accidental In-Memory Degraded Mode:** Ensures developers and testers always connect to the actual Redis cache and message broker without manual environment variable juggling.
+2. **Developer Experience:** Seamless one-click startup via `run_local.bat` across Windows Terminal and standalone terminal environments.
+3. **Security Invariant Preservation:** Zero production fallback; production credentials must strictly match.
+
+### Tradeoff
+
+* Adds targeted retry logic during development initialization; execution path is completely bypassed when direct connection succeeds on first try.

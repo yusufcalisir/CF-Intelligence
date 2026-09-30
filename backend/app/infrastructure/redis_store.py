@@ -67,13 +67,74 @@ class RedisStore:
                 self._redis_client = r_client
                 self._redis_failed = False
             except Exception as e:
-                logger.warning(
-                    f"Redis connection failed for prefix '{self.prefix}': {e}. "
-                    "Falling back to local in-memory storage for all stores."
-                )
-                self._redis_client = None
-                self._redis_failed = True
-                RedisStore._global_redis_unavailable = True
+                recovered = False
+                if getattr(self.settings, "app_env", "development") == "development":
+                    import urllib.parse
+
+                    try:
+                        parsed = urllib.parse.urlparse(url)
+                        hosts_to_try = [parsed.hostname]
+                        if parsed.hostname == "redis":
+                            hosts_to_try.append("127.0.0.1")
+
+                        pwds_to_try = [
+                            parsed.password,
+                            self.settings.redis_password,
+                            "cfi_redis_secure_pass_2026",
+                            "cfi_redis_secure_pass_2026_change_in_production",
+                            None,
+                        ]
+                        seen_candidates = set()
+                        for h in hosts_to_try:
+                            if not h:
+                                continue
+                            for p in pwds_to_try:
+                                cand_key = (h, p)
+                                if cand_key in seen_candidates:
+                                    continue
+                                seen_candidates.add(cand_key)
+                                netloc = (
+                                    f":{p}@{h}:{parsed.port or 6379}"
+                                    if p
+                                    else f"{h}:{parsed.port or 6379}"
+                                )
+                                candidate_url = urllib.parse.urlunparse(
+                                    parsed._replace(netloc=netloc)
+                                )
+                                if candidate_url == url:
+                                    continue
+                                try:
+                                    alt_client = redis.Redis.from_url(
+                                        candidate_url,
+                                        decode_responses=True,
+                                        socket_connect_timeout=0.5,
+                                        socket_timeout=0.5,
+                                    )
+                                    alt_client.ping()
+                                    self._redis_client = alt_client
+                                    self._redis_failed = False
+                                    recovered = True
+                                    logger.info(
+                                        "RedisStore auto-recovered connection for prefix '%s' on %s",
+                                        self.prefix,
+                                        h,
+                                    )
+                                    break
+                                except Exception:
+                                    continue
+                            if recovered:
+                                break
+                    except Exception:
+                        pass
+
+                if not recovered:
+                    logger.warning(
+                        f"Redis connection failed for prefix '{self.prefix}': {e}. "
+                        "Falling back to local in-memory storage for all stores."
+                    )
+                    self._redis_client = None
+                    self._redis_failed = True
+                    RedisStore._global_redis_unavailable = True
         return self._redis_client
 
     def _make_key(self, key: str) -> str:

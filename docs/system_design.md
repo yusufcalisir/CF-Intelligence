@@ -94,7 +94,7 @@ The Collaborative Fraud Intelligence (CFI) platform supports 3 flexible deployme
 ```
 
 ### 3.2 State Management & Cache Resilience
-Services write states to `RedisStore`. If Redis goes offline, `RedisStore` catches the exception and routes reads/writes to a thread-safe, in-memory Python dictionary backend. This ensures the demo interface and local test suites remain stable under transient failures.
+Services write states to `RedisStore`. In development environments, `RedisStore`, `CacheService`, and the core lifespan startup probes implement dual-layer credential auto-healing and container host re-routing (mapping Docker container hostname `redis` to `127.0.0.1` and reconciling development credential variations between `.env` and local scripts). If Redis is completely offline or unconfigured, `RedisStore` catches the exception and routes reads/writes to a thread-safe, in-memory Python dictionary backend. This ensures the demo interface and local test suites remain stable under transient failures.
 
 ### 3.3 Enterprise Model Registry & Governance (SR 11-7 Compliance)
 *   **Active Symlinking:** Active models (`global_model.pt`) are symlinked on disk. A rollback request updates the symlink to the targeted historical manifest version atomically using temporary file generation (`tempfile.NamedTemporaryFile`) and atomic replacement (`os.replace`) to prevent partial read corruption.

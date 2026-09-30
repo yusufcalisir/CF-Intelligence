@@ -108,6 +108,53 @@ class CacheService:
         try:
             return bool(await c.ping())
         except Exception:
+            # In development, try auto-healing with alternate dev password or 127.0.0.1
+            settings = get_settings()
+            if getattr(settings, "app_env", "development") == "development":
+                import urllib.parse
+
+                try:
+                    url = getattr(settings, "redis_url", None) or ""
+                    parsed = urllib.parse.urlparse(url)
+                    hosts = [parsed.hostname]
+                    if parsed.hostname == "redis":
+                        hosts.append("127.0.0.1")
+                    pwds = [
+                        parsed.password,
+                        getattr(settings, "redis_password", None),
+                        "cfi_redis_secure_pass_2026",
+                        "cfi_redis_secure_pass_2026_change_in_production",
+                        None,
+                    ]
+                    for h in hosts:
+                        if not h:
+                            continue
+                        for p in pwds:
+                            netloc = (
+                                f":{p}@{h}:{parsed.port or 6379}"
+                                if p
+                                else f"{h}:{parsed.port or 6379}"
+                            )
+                            cand_url = urllib.parse.urlunparse(
+                                parsed._replace(netloc=netloc)
+                            )
+                            if cand_url == url:
+                                continue
+                            try:
+                                alt = aioredis.from_url(
+                                    cand_url,
+                                    decode_responses=True,
+                                    socket_connect_timeout=0.5,
+                                    socket_timeout=1.0,
+                                    retry_on_timeout=False,
+                                )
+                                if await alt.ping():
+                                    self.__class__._client = alt
+                                    return True
+                            except Exception:
+                                continue
+                except Exception:
+                    pass
             self.__class__._unavailable = True
             return False
 
