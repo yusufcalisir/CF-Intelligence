@@ -31,18 +31,8 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
   initialVelocity,
   initialMerchantRisk,
 }) => {
-  // 1. Safe Search Params Resolution (works in both Router and raw test harnesses)
-  let searchParams: URLSearchParams | null = null;
-  let setSearchParams: ((params: Record<string, string>) => void) | null = null;
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const [sp, ssp] = useSearchParams();
-    searchParams = sp;
-    setSearchParams = ssp;
-  } catch {
-    // Outside react-router context (e.g. isolated test without MemoryRouter)
-  }
-
+  // 1. URL Search Params Resolution
+  const [searchParams, setSearchParams] = useSearchParams();
   const urlAlertId = searchParams?.get('alert_id') || '';
   const [selectedAlertId, setSelectedAlertId] = useState<string>(
     initialAlertId || urlAlertId || 'alt_1001'
@@ -56,30 +46,23 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
   }, [urlAlertId]);
 
   // 2. Load Real Alert Feed & Active Alert Telemetry
-  let alertsList: any[] = [];
-  let activeAlert: any = null;
-  let isAlertLoading = false;
+  const alertsQuery = useAlerts();
+  const alertsList = Array.isArray(alertsQuery.data) ? alertsQuery.data : [];
 
-  try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const alertsQuery = useAlerts();
-    alertsList = alertsQuery.data || [];
-
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    const alertQuery = useAlert(selectedAlertId);
-    activeAlert = (alertQuery.data && typeof alertQuery.data === 'object' && !Array.isArray(alertQuery.data) && (alertQuery.data as any).id)
-      ? alertQuery.data
-      : null;
-    isAlertLoading = alertQuery.isLoading;
-  } catch {
-    // Rendered outside TanStack QueryClientProvider
-  }
+  const alertQuery = useAlert(selectedAlertId);
+  const activeAlert = (alertQuery.data && typeof alertQuery.data === 'object' && !Array.isArray(alertQuery.data) && (alertQuery.data as any).id)
+    ? alertQuery.data
+    : null;
+  const isAlertLoading = alertQuery.isLoading;
 
   // Synchronize to the first active alert in the consortium feed if selected alert is absent
   useEffect(() => {
     if (!urlAlertId && !initialAlertId && alertsList.length > 0) {
       if (!selectedAlertId || !alertsList.some((a: any) => a.id === selectedAlertId)) {
-        setSelectedAlertId(alertsList[0].id);
+        const firstAlert = alertsList[0];
+        if (firstAlert?.id) {
+          setSelectedAlertId(firstAlert.id);
+        }
       }
     }
   }, [alertsList, urlAlertId, initialAlertId, selectedAlertId]);
@@ -117,9 +100,7 @@ export const CounterfactualWorkbench: React.FC<CounterfactualWorkbenchProps> = (
 
   const handleSelectAlert = (newId: string) => {
     setSelectedAlertId(newId);
-    if (setSearchParams) {
-      setSearchParams({ alert_id: newId });
-    }
+    setSearchParams({ alert_id: newId });
   };
 
   const calculateDynamicScore = () => {
