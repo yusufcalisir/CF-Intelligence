@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const NAV_SECTIONS = [
@@ -71,6 +71,7 @@ interface SidebarProps {
 
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const [logoFailed, setLogoFailed] = useState(false);
 
   // Close sidebar on navigation change (for mobile viewport)
   useEffect(() => {
@@ -110,17 +111,25 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         <div className="p-3 border-b border-[var(--color-border)] flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <img 
-              src="/logo.png" 
-              onError={(e) => {
-                const target = e.currentTarget;
-                if (!target.src.endsWith('/logo.svg')) {
-                  target.src = '/logo.svg';
-                }
-              }}
-              className="w-8 h-8 object-contain shrink-0" 
-              alt="CFI Logo" 
-            />
+            {logoFailed ? (
+              <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-white text-[11px] tracking-wider select-none">
+                CFI
+              </div>
+            ) : (
+              <img 
+                src="/logo.png" 
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (!target.src.endsWith('/logo.svg')) {
+                    target.src = '/logo.svg';
+                  } else {
+                    setLogoFailed(true);
+                  }
+                }}
+                className="w-8 h-8 object-contain shrink-0" 
+                alt="CFI Logo" 
+              />
+            )}
             <div>
               <h1 className="text-xs font-bold text-[var(--color-text-primary)] leading-tight">
                 Fraud Intelligence

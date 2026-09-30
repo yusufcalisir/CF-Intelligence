@@ -17,3 +17,7 @@ frontend/e2e-visual/snapshots/** -filter -diff -merge
 backend/tests/fixtures/** -filter -diff -merge
 # Exclude experiment metrics CSV files from Git LFS so they are committed as native text assets
 experiments/**/metrics.csv -filter -diff -merge
+
+# Exclude frontend public web assets and backend static assets from Git LFS so CI/CD (Vercel, Docker) receives real files
+frontend/public/** -filter -diff -merge
+backend/app/static/** -filter -diff -merge

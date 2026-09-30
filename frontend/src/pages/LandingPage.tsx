@@ -1034,19 +1034,33 @@ const FadeSection = memo(function FadeSection({ children, className = '', delay 
 });
 
 // ── 2026 LUXURY GEOMETRIC CF MONOGRAM LOGO COMPONENT ────────────────────────
-const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => (
-  <img
-    src="/logo.png"
-    onError={(e) => {
-      const target = e.currentTarget;
-      if (!target.src.endsWith('/logo.svg')) {
-        target.src = '/logo.svg';
-      }
-    }}
-    alt="CF-Intelligence Logo"
-    className={`${className} object-contain shrink-0`}
-  />
-));
+const BrandLogo = memo(({ className = 'w-9 h-9' }: { className?: string }) => {
+  const [useFallback, setUseFallback] = useState(false);
+
+  if (useFallback) {
+    return (
+      <div className={`${className} rounded-lg bg-gradient-to-tr from-indigo-600 via-indigo-500 to-purple-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0 font-bold text-white text-xs tracking-wider select-none`}>
+        CFI
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src="/logo.png"
+      onError={(e) => {
+        const target = e.currentTarget;
+        if (!target.src.endsWith('/logo.svg')) {
+          target.src = '/logo.svg';
+        } else {
+          setUseFallback(true);
+        }
+      }}
+      alt="CF-Intelligence Logo"
+      className={`${className} object-contain shrink-0`}
+    />
+  );
+});
 
 
 
