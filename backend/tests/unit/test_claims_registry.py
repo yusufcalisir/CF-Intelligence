@@ -55,6 +55,11 @@ def test_claims_field_schema_and_types(claim_registry: dict[str, Any]) -> None:
         "EMPIRICAL_SUPERIOR_VERIFIED",
         "VERIFIED_MEASURED",
         "REQUIRES_RE_EVALUATION",
+        "MEASURED",
+        "MEASURED_TARGET_MET",
+        "MEASURED_TARGET_NOT_MET",
+        "SUPERSEDED",
+        "NOT_EVALUATED",
     }
 
     for claim in claims:

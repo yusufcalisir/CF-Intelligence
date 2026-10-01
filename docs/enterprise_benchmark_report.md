@@ -1520,11 +1520,12 @@ Let $S_{\mathrm{model}}$ denote the single-direction serialized model payload. I
 
 ## 25. In-Process Scoring Pipeline Microbenchmark & Local HTTP Service Benchmark
 
-This section documents the empirical performance of the scoring pipeline, distinguishing the in-process compute microbenchmark from the live end-to-end ASGI HTTP service benchmark:
-1. **In-Process Scoring Pipeline Microbenchmark** ([`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)): Evaluates CPU compute budget (PyTorch CPU forward computation through project model architecture, 9-signal composite risk engine, Pydantic response serialization; randomly initialized weights) across 3 independent repetitions ($N \ge 1{,}000$ per tier). Excludes network, ASGI, Uvicorn, Redis, PostgreSQL.
-2. **End-to-End Local HTTP Service Benchmark** ([`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)): Evaluates client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server on `127.0.0.1:8089/api/v1/score-transaction` over local loopback TCP sockets.
+This section documents the empirical performance of the scoring pipeline, distinguishing the in-process compute microbenchmark from the live end-to-end ASGI HTTP service benchmarks:
+1. **In-Process Scoring Pipeline Microbenchmark (Class A)** ([`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)): Evaluates CPU compute budget (PyTorch CPU forward computation through project model architecture, 9-signal composite risk engine, Pydantic response serialization; randomly initialized weights) across 3 independent repetitions ($N \ge 1{,}000$ per tier). Excludes network, ASGI, Uvicorn, Redis, PostgreSQL.
+2. **Local HTTP Successful-Inference Capacity Benchmark (Class B1)** ([`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)): Evaluates client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server on `127.0.0.1:8089/api/v1/score-transaction` over local loopback TCP sockets under benchmark mode (rate limiting controlled to isolate pure inference capacity: $p50 = 11.39\text{ ms}$ @ $C=1$, peak throughput $89.0\text{ req/s}$ @ $C=10$).
+3. **Rate-Limited Public-Endpoint Behavior Benchmark (Class B2)** ([`benchmarks/runners/run_http_ratelimit_benchmark.py`](../benchmarks/runners/run_http_ratelimit_benchmark.py)): Evaluates the public rate-limited endpoint under production SlowAPI policy (`60/minute`), isolating allowed 2xx vs. 429 rejection latency ($4.41\text{ ms}$ median 429 latency).
 
-**Methodology Repair Update:** Multi-repetition evaluation with $N \ge 1{,}000$ requests per tier replaces legacy small-sample ($N=10$) measurements. Artifacts: [`latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json) and [`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json).
+**Methodology Repair Update:** Multi-repetition evaluation with $N \ge 1{,}000$ requests per tier replaces legacy small-sample ($N=10$) measurements. Artifacts: [`latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json), [`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json), and [`rate_limit_behavior_benchmark.json`](../benchmarks/results/raw/rate_limit_behavior_benchmark.json).
 
 ### 25.1 Hardware & Runtime Environment
 
@@ -1665,15 +1666,20 @@ $$p99(500) = 361.49\text{ ms} = 102 \times p99(1) \quad \text{(vs linear predict
 
 ### 25.6 Test Suite Verification & Code Artifacts
 
-- **Microbenchmark Runner**: [`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)
-- **HTTP Service Benchmark Runner**: [`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)
+- **Microbenchmark Runner (Class A)**: [`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)
+- **HTTP Service Inference Capacity Runner (Class B1)**: [`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)
+- **HTTP Rate-Limiter Behavior Runner (Class B2)**: [`benchmarks/runners/run_http_ratelimit_benchmark.py`](../benchmarks/runners/run_http_ratelimit_benchmark.py)
 - **Serialized Artifacts**:
   - `benchmarks/results/raw/latency_microbenchmark.json` (microbenchmark metrics)
   - `benchmarks/results/raw/latency_microbenchmark_samples.json` (raw microbenchmark samples)
-  - `benchmarks/results/raw/latency_http_service_benchmark.json` (HTTP service metrics)
-  - `benchmarks/results/raw/latency_http_service_samples.json` (raw HTTP latency samples)
+  - `benchmarks/results/raw/latency_http_service_benchmark.json` (Class B1 HTTP service metrics)
+  - `benchmarks/results/raw/latency_http_service_samples.json` (raw Class B1 HTTP latency samples)
+  - `benchmarks/results/raw/rate_limit_behavior_benchmark.json` (Class B2 rate limiter behavior metrics)
+  - `benchmarks/results/raw/rate_limit_behavior_samples.json` (raw Class B2 samples)
   - `benchmarks/results/raw/latency_concurrency_benchmark.json` (golden compatibility)
-- **Unit Test Suite**: [`backend/tests/unit/test_latency_benchmark.py`](../backend/tests/unit/test_latency_benchmark.py) (**39 tests, 100% passing**)
+- **Unit Test Suites**:
+  - [`backend/tests/unit/test_latency_benchmark.py`](../backend/tests/unit/test_latency_benchmark.py) (**39 tests, 100% passing**)
+  - [`backend/tests/unit/test_http_benchmark_methodology.py`](../backend/tests/unit/test_http_benchmark_methodology.py) (**14 tests, 100% passing**)
 
 ---
 

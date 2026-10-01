@@ -181,9 +181,9 @@ Evaluated on standard host hardware distinguishing in-process compute microbench
   - **Single-Request Fast-Path Compute**: **2.57 ms** (well below internal $< 15\text{ ms}$ target; p50: 2.70 ms, p99: 8.87 ms at $C=1$).
   - **Peak Throughput**: **1,246.3 requests/second** at $C = 50$ (C=100: 1,109.9 req/s; 0.0% error rate).
   - **Latency Distribution (C = 100 Stress Load)**: p50: **47.49 ms**, p95: **87.31 ms**, p99: **105.02 ms**.
-- **Local HTTP Service Benchmark (ASGI / Uvicorn)** ([`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json)):
-  - **Single-Client Median Latency**: **2.60 ms** (p99: 13.73 ms at $C=1$).
-  - **Peak Service Throughput**: **72.9 requests/second** at $C = 10$ on single-worker Uvicorn over loopback TCP.
+- **Local HTTP Service Benchmark (Class B1 Inference Capacity)** ([`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json)):
+  - **Single-Client Median Latency**: **11.39 ms** (p99: 21.32 ms at $C=1$).
+  - **Peak Service Throughput**: **89.0 requests/second** at $C = 10$ on single-worker Uvicorn over loopback TCP (100% 2xx success).
 - **Bandwidth Consumption**: Model gradient payloads are compressed by **74.8%** via Zstandard, Top-$k$ sparsification ($k=20\%$), and INT8 quantization.
 
 ### 7.2 Multi-Cloud Infrastructure as Code (IaC)

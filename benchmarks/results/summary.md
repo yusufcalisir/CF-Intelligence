@@ -39,26 +39,41 @@ CF-Intelligence explicitly separates two fundamentally distinct benchmark classe
 
 ---
 
-### 1.2 End-to-End Local HTTP Service Benchmark
-- **Runner**: `benchmarks/runners/run_http_benchmark.py`
-- **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (`127.0.0.1:8089/api/v1/score-transaction`). Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation), SlowAPI rate limiting, Pydantic request validation, ModelService evaluation offloaded via `asyncio.to_thread`, and response serialization.
-- **Server Provenance**: Uvicorn 0.47.0 (single-worker ASGI process), Python 3.12.10, AMD Ryzen 16-core, Windows 11.
-- **Client Provenance**: `httpx` (0.28.1) async client with keep-alive connection pooling, closed-loop concurrency sweep.
-- **Raw Artifacts**: [`latency_http_service_benchmark.json`](./raw/latency_http_service_benchmark.json) | Raw Samples: [`latency_http_service_samples.json`](./raw/latency_http_service_samples.json)
+### 1.2 Local HTTP Service Capacity & Rate-Limiter Benchmarks
 
-| Concurrency Level | Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx (Rate-Limited) | Timeouts | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Max Latency (ms) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **16.6 $\pm$ 14.6 req/s** | 101 | 1,399 | 0 | **2.60 ms** | 11.71 ms | 13.73 ms | 47.98 ms |
-| **10** | **72.9 $\pm$ 63.3 req/s** | 876 | 624 | 0 | **60.91 ms** | 105.37 ms | 374.15 ms | 612.44 ms |
-| **50** | **69.6 $\pm$ 3.8 req/s** | 1,323 | 177 | 0 | **384.84 ms** | 1,671.15 ms | 2,842.80 ms | 3,421.10 ms |
-| **100** | **59.9 $\pm$ 2.4 req/s** | 1,406 | 94 | 0 | **992.25 ms** | 4,550.41 ms | 5,685.55 ms | 6,102.30 ms |
-| **250** | **51.4 $\pm$ 1.9 req/s** | 1,477 | 23 | 0 | **4,071.14 ms** | 6,141.72 ms | 6,697.44 ms | 7,105.40 ms |
-| **500** | **50.1 $\pm$ 1.2 req/s** | 2,971 | 29 | 0 | **8,655.79 ms** | 12,800.86 ms | 14,668.38 ms | 15,210.00 ms |
+The repository explicitly separates HTTP performance evaluation into two complementary benchmarks:
+
+#### Class B1: Local HTTP Successful-Inference Capacity Benchmark
+- **Runner**: enchmarks/runners/run_http_benchmark.py
+- **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (127.0.0.1:8089/api/v1/score-transaction). Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation), Pydantic request validation, ModelService evaluation offloaded via syncio.to_thread, and response serialization. Rate limiting is controlled at benchmark configuration level to isolate pure inference capacity.
+- **Server Provenance**: Uvicorn 0.47.0 (single-worker ASGI process), Python 3.12.10, AMD Ryzen 16-core, Windows 11.
+- **Client Provenance**: httpx (0.28.1) async client with keep-alive connection pooling, closed-loop concurrency sweep (=1000$ per repetition across 3 independent sweeps).
+- **Raw Artifacts**: [latency_http_service_benchmark.json](./raw/latency_http_service_benchmark.json) | Raw Samples: [latency_http_service_samples.json](./raw/latency_http_service_samples.json)
+
+| Concurrency Level | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | **83.0 $\pm$ 4.2 req/s** | 3,000 | 0 | 0 | **11.39 ms** | 16.27 ms | 21.32 ms | 39.43 ms | 100.0% |
+| **10** | **89.0 $\pm$ 46.9 req/s** | 3,000 | 0 | 0 | **139.94 ms** | 192.44 ms | 432.16 ms | 3,420.77 ms | 100.0% |
+| **50** | **71.4 $\pm$ 7.8 req/s** | 2,999 | 0 | 0 | **461.06 ms** | 1,886.43 ms | 3,126.24 ms | 6,268.55 ms | 99.9% |
+| **100** | **51.9 $\pm$ 18.5 req/s** | 2,999 | 0 | 0 | **1,338.76 ms** | 5,319.02 ms | 7,577.62 ms | 17,912.10 ms | 99.9% |
+| **250** | **51.3 $\pm$ 6.0 req/s** | 2,998 | 0 | 0 | **3,577.98 ms** | 9,915.45 ms | 12,793.41 ms | 16,839.23 ms | 99.9% |
+| **500** | **48.8 $\pm$ 2.3 req/s** | 2,991 | 0 | 0 | **9,091.82 ms** | 14,621.48 ms | 15,580.84 ms | 17,377.97 ms | 99.7% |
 
 > [!NOTE]
 > **Operational Observations**:
-> 1. **Rate Limiting**: The tested route enforces `@limiter.limit("60/minute")`. Under closed-loop single-worker load ($C=1$), rapid sequential requests from a single client IP trigger HTTP 429 Too Many Requests after the 60-request quota is exhausted, explaining the 4xx distribution.
-> 2. **Single-Worker Event Loop Saturation**: In a single Uvicorn process without horizontal worker scaling, concurrent requests queue on the ASGI event loop, increasing client-observed p50 from 2.60ms ($C=1$) to 8,655.79ms ($C=500$) while server throughput plateaus at ~50–73 req/s.
+> 1. **Single-Client Baseline**: At =1$, median 2xx inference transaction latency is .39\text{ ms}$ with peak throughput of .0\text{ req/s}$ (.97\text{ req/s}$ peak at =10$). Previous published numbers reporting  = 2.60\text{ ms}$ at =1$ were rate-limit contaminated by 429 serialization and have been superseded and archived.
+> 2. **High-Concurrency Queueing**: At =500$, approximately 99.7% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Client-observed HTTP tail latency increased substantially at =500$ ( \approx 15.58\text{ s}$); the benchmark establishes the observed behavior under single-worker concurrency but does not by itself isolate the responsible queueing layer.
+
+#### Class B2: Rate-Limited Public-Endpoint Behavior Benchmark
+- **Runner**: enchmarks/runners/run_http_ratelimit_benchmark.py
+- **Scope**: Exercises the production SlowAPI rate limiter (60/minute) under stable client identity to evaluate enforcement and rejection latency.
+- **Raw Artifacts**: [
+ate_limit_behavior_benchmark.json](./raw/rate_limit_behavior_benchmark.json) | Raw Samples: [
+ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
+- **Measured Outcomes**:
+  - Allowed 2xx Before Quota Exhaustion: 60 requests ( = 11.46\text{ ms}$, mean $= 12.16\text{ ms}$).
+  - Rate-Limited 429 Rejections: 60 requests rejected ( = 4.41\text{ ms}$, mean $= 4.06\text{ ms}$).
+  - Transition: Rejection occurs deterministically at request index 60 with RFC 7807 problem details and Retry-After: 60 headers.
 
 ---
 

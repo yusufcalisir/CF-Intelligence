@@ -1,0 +1,74 @@
+{
+  "timestamp_utc": "2026-10-01T17:26:29.411254+00:00",
+  "benchmark_type": "CLASS_B2_RATE_LIMITER_BEHAVIOR_BENCHMARK",
+  "benchmark_name": "Public-Endpoint Rate-Limiter Policy & Transition Benchmark",
+  "scope": "Measures endpoint behavior under the production SlowAPI rate-limiting policy (60/minute) from a single stable client identity. Distinguishes allowed 2xx transactions from 429 Too Many Requests rejections, measuring the exact transition point, RFC 7807 headers, and latency distributions for both populations.",
+  "scientific_question": "How does the endpoint behave when the configured SlowAPI policy is exercised? NOT intended to measure maximum neural inference capacity.",
+  "server_provenance": {
+    "server_implementation": "uvicorn (0.47.0)",
+    "worker_count": 1,
+    "server_mode": "single-worker ASGI process",
+    "host": "127.0.0.1",
+    "port": 8091,
+    "tested_endpoint": "/api/v1/score-transaction",
+    "rate_limiter_enabled": true,
+    "rate_limiter_policy": "60/minute (SlowAPI with MemoryStorage)"
+  },
+  "client_provenance": {
+    "client_library": "httpx (0.28.1)",
+    "identity_model": "single stable IP (198.51.100.42)",
+    "connection_reuse": "keep-alive enabled"
+  },
+  "environment": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_count": 16,
+    "machine": "AMD64",
+    "python_version": "3.12.10",
+    "device": "cpu",
+    "ram_total_gb": 7.34
+  },
+  "results": {
+    "total_attempted": 120,
+    "wall_clock_duration_seconds": 1.195,
+    "configured_rate_limit": "60/minute",
+    "client_identity": "single stable IP (198.51.100.42)",
+    "allowed_2xx_before_quota_exhaustion": 60,
+    "rate_limited_429_count": 60,
+    "other_status_count": 0,
+    "first_429_event": {
+      "request_index": 60,
+      "timestamp_utc": "2026-10-01T17:26:29.161129+00:00",
+      "headers": {
+        "retry-after": "60",
+        "x-ratelimit-exceeded": "true",
+        "content-type": "application/problem+json"
+      },
+      "response_body": {
+        "type": "https://cfi-platform.org/errors/RateLimitExceeded",
+        "title": "Endpoint Rate Limit Exceeded",
+        "status": 429,
+        "detail": "Rate limit exceeded: 60 per 1 minute",
+        "instance": "/api/v1/score-transaction"
+      }
+    },
+    "latency_2xx_successful_inference": {
+      "count": 60,
+      "mean_ms": 12.16,
+      "p50_ms": 11.46,
+      "p95_ms": 13.99,
+      "p99_ms": 27.17,
+      "min_ms": 10.05,
+      "max_ms": 45.51
+    },
+    "latency_429_rate_limited_rejections": {
+      "count": 60,
+      "mean_ms": 4.06,
+      "p50_ms": 4.41,
+      "p95_ms": 5.87,
+      "p99_ms": 6.8,
+      "min_ms": 1.88,
+      "max_ms": 7.49
+    }
+  }
+}

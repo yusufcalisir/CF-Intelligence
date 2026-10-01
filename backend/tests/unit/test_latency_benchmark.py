@@ -344,7 +344,7 @@ class TestRepairedBenchmarkMethodologyInvariants:
         assert http_file.exists()
         with open(http_file, encoding="utf-8") as f:
             data = json.load(f)
-        assert data["benchmark_type"] == "LOCAL_HTTP_SERVICE_BENCHMARK"
+        assert data["benchmark_type"] in ("LOCAL_HTTP_SERVICE_BENCHMARK", "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK")
         scope = data["scope"].lower()
         assert "uvicorn" in scope or "asgi" in scope
         assert "socket" in scope or "tcp" in scope

@@ -58,7 +58,11 @@ from app.dependencies import (
     enforce_tenant_isolation,
     enforce_tenant_quota,
 )
-from app.infrastructure.security.rate_limiter import limiter
+from app.infrastructure.security.rate_limiter import (
+    is_benchmark_mode,
+    limiter,
+    reset_rate_limiter,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1", tags=["prediction"])
@@ -1042,3 +1046,30 @@ async def score_transaction(
         related_entities=related_entities,
         latency_ms=latency_ms,
     )
+
+
+@router.post(
+    "/benchmark/reset",
+    status_code=status.HTTP_200_OK,
+    summary="Deterministic benchmark state reset",
+    include_in_schema=False,
+)
+async def reset_benchmark_state() -> dict[str, str]:
+    """Resets rate limiter storage and tenant metering quotas between benchmark tiers/repetitions.
+
+    Only functional when CFI_BENCHMARK_MODE=1 is set. Returns 404 in production.
+    """
+    if not is_benchmark_mode():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Benchmark state reset is only available when CFI_BENCHMARK_MODE=1",
+        )
+
+    import gc
+
+    from app.application.services.tenant_metering import get_tenant_metering_service
+
+    reset_rate_limiter()
+    get_tenant_metering_service().reset_all()
+    gc.collect()
+    return {"status": "ok", "message": "Benchmark state deterministically reset"}
