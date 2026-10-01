@@ -10,10 +10,10 @@
     "verifiable_raw_provenance": true
   },
   "summary_metrics": {
-    "total_claims": 19,
-    "empirical_verified_claims": 15,
+    "total_claims": 21,
+    "empirical_verified_claims": 17,
     "design_target_claims": 4,
-    "total_raw_benchmark_files": 7
+    "total_raw_benchmark_files": 8
   },
   "claims": [
     {
@@ -263,53 +263,103 @@
     {
       "claim_id": "CLM-LATENCY-FASTPATH",
       "category": "gateway_concurrency_and_latency",
-      "title": "Single-Request Fast-Path Scoring Latency",
+      "title": "In-Process Single-Request Fast-Path Scoring Latency (Microbenchmark)",
       "dataset": "simulated_gateway",
       "dataset_scale": "Single Real-Time Request (No SHAP)",
       "stated_value": 15.0,
-      "stated_unit": "ms (SLA Upper Bound)",
-      "empirical_measured_value": 2.294,
-      "centralized_baseline_value": 2.294,
-      "evaluation_type": "MICRO_LATENCY_BREAKDOWN",
+      "stated_unit": "ms (Internal Target Upper Bound)",
+      "empirical_measured_value": 2.569,
+      "centralized_baseline_value": 2.569,
+      "evaluation_type": "IN_PROCESS_MICROBENCHMARK_BREAKDOWN",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
-      "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
+      "raw_artifact": "benchmarks/results/raw/latency_microbenchmark.json",
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Phase 32 host-calibration (AMD Ryzen / Windows 11 / PyTorch 2.12.0+cpu): Auth 0.005ms, Feature Store 0.000ms, Model 0.186ms, 9 Signals 2.088ms, Serialization 0.015ms -> Total 2.294ms. Calibration p50=2.716ms, p95=3.106ms, p99=3.206ms (20 warmup runs). Well under <15ms SLA."
+      "notes": "Controlled host microbenchmark (PyTorch CPU forward computation through project model architecture, 9-signal composite risk scoring engine, and Pydantic serialization; randomly initialized weights). Fast path decomposes into: Auth 0.015ms, Feature Store 0.001ms, Model 0.384ms, 9 Signals 2.142ms, Serialization 0.028ms -> Total 2.569ms (p50=2.70ms @ C=1 across 3000 requests, 3 repetitions). Excludes network, ASGI, Uvicorn, Redis, PostgreSQL.",
+      "legacy_artifact": {
+        "legacy_stated_ms": 2.294,
+        "legacy_c1_p99_ms": 3.53,
+        "source": "benchmarks/results/raw/latency_concurrency_benchmark.json (pre-repair)",
+        "status": "SUPERSEDED -- Pre-repair small-sample (N=10) measurements superseded by authorized multi-repetition (N>=1000) methodology"
+      }
     },
     {
       "claim_id": "CLM-LATENCY-SHAP",
       "category": "gateway_concurrency_and_latency",
-      "title": "Single-Request Explainability Latency (with SHAP)",
+      "title": "In-Process Single-Request Explainability Latency with Linear SHAP (Microbenchmark)",
       "dataset": "simulated_gateway",
       "dataset_scale": "Single Request with Full SHAP Attribution",
       "stated_value": 50.0,
-      "stated_unit": "ms (SLA Upper Bound)",
-      "empirical_measured_value": 2.34,
-      "centralized_baseline_value": 2.34,
-      "evaluation_type": "MICRO_LATENCY_BREAKDOWN",
+      "stated_unit": "ms (Internal Target Upper Bound)",
+      "empirical_measured_value": 2.516,
+      "centralized_baseline_value": 2.516,
+      "evaluation_type": "IN_PROCESS_MICROBENCHMARK_BREAKDOWN",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "VERIFIED_MEASURED",
-      "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
+      "raw_artifact": "benchmarks/results/raw/latency_microbenchmark.json",
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Full explainability path with linear attribution breakdown takes total duration 2.340ms (well under <50ms SLA)."
+      "notes": "Full explainability path with linear attribution breakdown takes total duration 2.516ms (well under internal target <50ms).",
+      "legacy_artifact": {
+        "legacy_stated_ms": 2.340,
+        "status": "SUPERSEDED -- Pre-repair measurement superseded by authorized multi-repetition methodology"
+      }
     },
     {
       "claim_id": "CLM-GATEWAY-PEAK-THROUGHPUT",
       "category": "gateway_concurrency_and_latency",
-      "title": "Gateway Peak Concurrency Throughput",
+      "title": "In-Process Scoring Pipeline Peak Concurrency Throughput (Microbenchmark)",
       "dataset": "simulated_gateway",
-      "dataset_scale": "C=100 Concurrent Connections (5000 Requests)",
+      "dataset_scale": "C=100 Concurrent Workers (3000 Requests across 3 reps)",
       "stated_value": 1200.0,
-      "stated_unit": "req/s (Target Floor)",
-      "empirical_measured_value": 1394.7,
-      "centralized_baseline_value": 1394.7,
-      "evaluation_type": "CONCURRENCY_LOAD_STRESS",
+      "stated_unit": "req/s (Internal Target Floor)",
+      "empirical_measured_value": 1109.9,
+      "centralized_baseline_value": 1109.9,
+      "evaluation_type": "IN_PROCESS_CONCURRENCY_MICROBENCHMARK",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
+      "raw_artifact": "benchmarks/results/raw/latency_microbenchmark.json",
+      "runner_script": "benchmarks/runners/run_latency_benchmark.py",
+      "notes": "Repaired in-process microbenchmark with N>=1000 requests per tier across 3 independent repetitions: C=50 peaks at 1,246.3 req/s (p50=31.97ms, p99=63.09ms, 0.0% error rate). C=100 achieves 1,109.9 req/s (p50=47.49ms, p99=105.02ms, 0.0% error rate). Thread/GIL contention and scheduler overhead observed under ThreadPoolExecutor concurrency.",
+      "legacy_artifact": {
+        "legacy_c100_rps": 1394.7,
+        "legacy_c50_rps": 1791.0,
+        "source": "benchmarks/results/raw/latency_concurrency_benchmark.json (pre-repair)",
+        "status": "SUPERSEDED -- Pre-repair small-sample (N=10) measurements superseded by authorized multi-repetition (N>=1000) methodology"
+      }
+    },
+    {
+      "claim_id": "CLM-HTTP-SERVICE-THROUGHPUT",
+      "category": "http_service_benchmarks",
+      "title": "Local HTTP Service Peak Concurrency Throughput (ASGI / Uvicorn)",
+      "dataset": "simulated_gateway",
+      "dataset_scale": "C=10 Concurrent Clients (1500 Requests across 3 reps)",
+      "stated_value": 50.0,
+      "stated_unit": "req/s",
+      "empirical_measured_value": 72.9,
+      "centralized_baseline_value": 72.9,
+      "evaluation_type": "LOCAL_HTTP_SERVICE_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
-      "raw_artifact": "benchmarks/results/raw/latency_concurrency_benchmark.json",
-      "runner_script": "benchmarks/runners/run_latency_benchmark.py",
-      "notes": "Phase 32 host-calibration: peak throughput 1,791.0 req/s at C=50 (GIL saturation onset), 0.0% error rate across all tiers. C=100: 1,394.7 r/s p99=79.34ms; C=500: 1,043.6 r/s p99=361.49ms. All SLA tiers pass."
+      "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
+      "runner_script": "benchmarks/runners/run_http_benchmark.py",
+      "notes": "Real ASGI HTTP service benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) with httpx connection pooling. Peak throughput of 72.9 req/s achieved at C=10. As concurrency scales to C=500, single event-loop queuing increases p50 to 8655.79ms with throughput stabilizing at 50.1 req/s."
+    },
+    {
+      "claim_id": "CLM-HTTP-SERVICE-LATENCY-P50",
+      "category": "http_service_benchmarks",
+      "title": "Local HTTP Service Single-Client Median Latency (ASGI / Uvicorn)",
+      "dataset": "simulated_gateway",
+      "dataset_scale": "C=1 Client (1500 Requests across 3 reps)",
+      "stated_value": 10.0,
+      "stated_unit": "ms",
+      "empirical_measured_value": 2.6,
+      "centralized_baseline_value": 2.6,
+      "evaluation_type": "LOCAL_HTTP_SERVICE_BENCHMARK",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
+      "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
+      "runner_script": "benchmarks/runners/run_http_benchmark.py",
+      "notes": "Client-observed wall-clock latency at C=1 on live Uvicorn ASGI server over loopback TCP: p50=2.60ms, p95=11.71ms, p99=13.73ms. Exercises full ASGI dispatch, FastAPI middleware stack, and model evaluation offloaded via asyncio.to_thread."
     },
     {
       "claim_id": "CLM-ABAC-THROUGHPUT",

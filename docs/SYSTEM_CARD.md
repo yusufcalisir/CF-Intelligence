@@ -176,13 +176,14 @@ The central aggregator incorporates robust Byzantine aggregation algorithms to n
 ## 7. Deployment Topology, Performance & Scalability
 
 ### 7.1 Production Hardware Benchmarks
-Evaluated on standard enterprise infrastructure under multi-concurrency stress testing ([`latency_concurrency_benchmark.json`](../benchmarks/results/raw/latency_concurrency_benchmark.json)):
-- **Single-Request Fast-Path**: **2.29 ms** (well below $< 15\text{ ms}$ SLA; p50: 2.39 ms, p99: 3.53 ms at $C=1$).
-- **Peak Throughput**: **1,394.7 requests/second** at $C = 100$ concurrent client channels (peak: 1,791.0 req/s at $C = 50$).
-- **Latency Distribution (C = 100 Stress Load)**:
-  - **p50**: **37.75 ms**
-  - **p95**: **64.72 ms**
-  - **p99**: **79.34 ms**
+Evaluated on standard host hardware distinguishing in-process compute microbenchmark from live ASGI HTTP service:
+- **In-Process Scoring Pipeline Microbenchmark** ([`latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json)):
+  - **Single-Request Fast-Path Compute**: **2.57 ms** (well below internal $< 15\text{ ms}$ target; p50: 2.70 ms, p99: 8.87 ms at $C=1$).
+  - **Peak Throughput**: **1,246.3 requests/second** at $C = 50$ (C=100: 1,109.9 req/s; 0.0% error rate).
+  - **Latency Distribution (C = 100 Stress Load)**: p50: **47.49 ms**, p95: **87.31 ms**, p99: **105.02 ms**.
+- **Local HTTP Service Benchmark (ASGI / Uvicorn)** ([`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json)):
+  - **Single-Client Median Latency**: **2.60 ms** (p99: 13.73 ms at $C=1$).
+  - **Peak Service Throughput**: **72.9 requests/second** at $C = 10$ on single-worker Uvicorn over loopback TCP.
 - **Bandwidth Consumption**: Model gradient payloads are compressed by **74.8%** via Zstandard, Top-$k$ sparsification ($k=20\%$), and INT8 quantization.
 
 ### 7.2 Multi-Cloud Infrastructure as Code (IaC)

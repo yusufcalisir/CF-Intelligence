@@ -153,7 +153,7 @@ def test_raw_artifacts_exist_and_reconcile_with_registry(claim_registry: dict[st
     assert pytest.approx(claims_by_id["CLM-BYZ-KRUM"]["empirical_measured_value"], abs=1e-4) == results["Krum (Blanchard et al.)"]["pr_auc"]
     assert pytest.approx(claims_by_id["CLM-BYZ-BULYAN"]["empirical_measured_value"], abs=1e-4) == results["Bulyan (Guerraoui et al.)"]["pr_auc"]
 
-    # 6. Concurrency & Latency Raw Reconciliation
+    # 6. Concurrency & Latency Raw Reconciliation (In-Process Microbenchmark)
     lat_file = RAW_RESULTS_DIR / "latency_concurrency_benchmark.json"
     assert lat_file.exists(), f"Missing Latency raw artifact: {lat_file}"
     with open(lat_file, encoding="utf-8") as f:
@@ -163,3 +163,13 @@ def test_raw_artifacts_exist_and_reconcile_with_registry(claim_registry: dict[st
     # C=100 throughput
     c100_data = next(item for item in lat_raw["concurrency_scaling"] if item["concurrency"] == 100)
     assert pytest.approx(claims_by_id["CLM-GATEWAY-PEAK-THROUGHPUT"]["empirical_measured_value"], abs=1e-1) == c100_data["throughput_rps"]
+
+    # 7. Local HTTP Service Benchmark Reconciliation
+    http_file = RAW_RESULTS_DIR / "latency_http_service_benchmark.json"
+    assert http_file.exists(), f"Missing HTTP service benchmark raw artifact: {http_file}"
+    with open(http_file, encoding="utf-8") as f:
+        http_raw = json.load(f)
+    c10_http = next(item for item in http_raw["concurrency_scaling"] if item["concurrency"] == 10)
+    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-THROUGHPUT"]["empirical_measured_value"], abs=1e-1) == c10_http["throughput_rps"]
+    c1_http = next(item for item in http_raw["concurrency_scaling"] if item["concurrency"] == 1)
+    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-LATENCY-P50"]["empirical_measured_value"], abs=1e-1) == c1_http["p50_latency_ms"]

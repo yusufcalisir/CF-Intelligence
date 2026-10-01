@@ -1518,23 +1518,25 @@ Let $S_{\mathrm{model}}$ denote the single-direction serialized model payload. I
 
 ---
 
-## 25. Inference Gateway Scalability & Multi-Concurrency Latency Benchmark
+## 25. In-Process Scoring Pipeline Microbenchmark & Local HTTP Service Benchmark
 
-This section documents the empirical concurrency scalability and micro-latency decomposition of the real-time inference gateway under progressive thread-pool loads from $C = 1$ to $C = 500$ concurrent workers. The benchmark is executed by [`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py) and uses real PyTorch backend components (no mocks) to exercise each pipeline stage from authentication through Pydantic serialization.
+This section documents the empirical performance of the scoring pipeline, distinguishing the in-process compute microbenchmark from the live end-to-end ASGI HTTP service benchmark:
+1. **In-Process Scoring Pipeline Microbenchmark** ([`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)): Evaluates CPU compute budget (PyTorch CPU forward computation through project model architecture, 9-signal composite risk engine, Pydantic response serialization; randomly initialized weights) across 3 independent repetitions ($N \ge 1{,}000$ per tier). Excludes network, ASGI, Uvicorn, Redis, PostgreSQL.
+2. **End-to-End Local HTTP Service Benchmark** ([`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)): Evaluates client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server on `127.0.0.1:8089/api/v1/score-transaction` over local loopback TCP sockets.
 
-**Phase 32 Update (2026-09-28):** Host-calibration re-run on the development workstation confirms all previously reported SLA claims. Concurrency sweep conducted with 10 requests per worker ($C \times 10$ total requests per tier) for rapid host-validated reproduction. Artifact: [`benchmarks/results/raw/latency_concurrency_benchmark.json`](../benchmarks/results/raw/latency_concurrency_benchmark.json) (timestamp: 2026-09-28T17:48:42Z).
+**Methodology Repair Update:** Multi-repetition evaluation with $N \ge 1{,}000$ requests per tier replaces legacy small-sample ($N=10$) measurements. Artifacts: [`latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json) and [`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json).
 
 ### 25.1 Hardware & Runtime Environment
 
 ```
-OS:            Windows-11-10.0.26200-SP0
+OS:            Windows-11-10.0.26300-SP0
 CPU:           AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (Ryzen series, 8 physical / 16 logical cores)
 RAM:           7.34 GB total
 Python:        3.12.10
 PyTorch:       2.12.0+cpu (CPU-only, single GIL-bound process)
 Device:        cpu
-Execution Mode: ThreadPoolExecutor (concurrent.futures), in-process
-Benchmark Date: 2026-09-28
+Execution Mode: ThreadPoolExecutor (in-process microbenchmark) / Uvicorn ASGI (HTTP benchmark)
+Benchmark Date: 2026-10-01
 ```
 
 > [!NOTE]
@@ -1596,14 +1598,14 @@ Each concurrency level $C$ dispatches $10$ requests per worker thread for the Ph
 └─────────────┴─────────────┴─────────────┴─────────────┴─────────────┘
 ```
 
-| Concurrency ($C$) | Requests | Throughput (req/s) | p50 (ms) | p95 (ms) | p99 (ms) | Error Rate |
+| Concurrency ($C$) | Total Requests ($N$) | Measured Throughput (req/s) | p50 (ms) | p95 (ms) | p99 (ms) | Error Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | 10 | **377.2** | 2.39 | 3.19 | **3.53** | 0.00% |
-| **10** | 100 | **1,452.0** | 5.94 | 7.40 | **7.96** | 0.00% |
-| **50** | 500 | **1,791.0** | 17.94 | 30.68 | **35.45** | 0.00% |
-| **100** | 1,000 | **1,394.7** | 37.75 | 64.72 | **79.34** | 0.00% |
-| **250** | 2,500 | **1,286.4** | 71.80 | 126.02 | **147.07** | 0.00% |
-| **500** | 5,000 | **1,043.6** | 116.28 | 285.27 | **361.49** | 0.00% |
+| **1** | 3,000 | **338.5 $\pm$ 45.4** | **2.70** | 3.75 | **8.87** | 0.00% |
+| **10** | 3,000 | **1,231.0 $\pm$ 137.9** | **7.61** | 10.92 | **18.13** | 0.00% |
+| **50** | 3,000 | **1,246.3 $\pm$ 87.9** | **31.97** | 53.16 | **63.09** | 0.00% |
+| **100** | 3,000 | **1,109.9 $\pm$ 76.5** | **47.49** | 87.31 | **105.02** | 0.00% |
+| **250** | 3,000 | **1,149.2 $\pm$ 94.3** | **46.96** | 79.14 | **92.85** | 0.00% |
+| **500** | 3,000 | **1,013.4 $\pm$ 102.1** | **32.07** | 53.84 | **122.07** | 0.00% |
 
 ---
 
@@ -1663,10 +1665,15 @@ $$p99(500) = 361.49\text{ ms} = 102 \times p99(1) \quad \text{(vs linear predict
 
 ### 25.6 Test Suite Verification & Code Artifacts
 
-- **Benchmark Runner**: [`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)
-- **HTTP Load Test Runner**: [`scripts/run_load_test.py`](../scripts/run_load_test.py)
-- **Serialized Artifact**: `benchmarks/results/raw/latency_concurrency_benchmark.json`
-- **Unit Test Suite**: [`backend/tests/unit/test_latency_benchmark.py`](../backend/tests/unit/test_latency_benchmark.py) (**26 tests, 100% passing**)
+- **Microbenchmark Runner**: [`benchmarks/runners/run_latency_benchmark.py`](../benchmarks/runners/run_latency_benchmark.py)
+- **HTTP Service Benchmark Runner**: [`benchmarks/runners/run_http_benchmark.py`](../benchmarks/runners/run_http_benchmark.py)
+- **Serialized Artifacts**:
+  - `benchmarks/results/raw/latency_microbenchmark.json` (microbenchmark metrics)
+  - `benchmarks/results/raw/latency_microbenchmark_samples.json` (raw microbenchmark samples)
+  - `benchmarks/results/raw/latency_http_service_benchmark.json` (HTTP service metrics)
+  - `benchmarks/results/raw/latency_http_service_samples.json` (raw HTTP latency samples)
+  - `benchmarks/results/raw/latency_concurrency_benchmark.json` (golden compatibility)
+- **Unit Test Suite**: [`backend/tests/unit/test_latency_benchmark.py`](../backend/tests/unit/test_latency_benchmark.py) (**39 tests, 100% passing**)
 
 ---
 

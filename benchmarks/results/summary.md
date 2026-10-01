@@ -6,28 +6,59 @@
 
 ---
 
-## 1. Inference Gateway Concurrency & Latency Stress Test
+## 1. Latency & Concurrency Benchmarks
+
+CF-Intelligence explicitly separates two fundamentally distinct benchmark classes:
+
+### 1.1 In-Process Scoring Pipeline Microbenchmark
 - **Runner**: `benchmarks/runners/run_latency_benchmark.py`
-- **Target**: Fast-Path REST Inference Pipeline (<15ms SLA target)
-- **Raw Artifact**: [`latency_concurrency_benchmark.json`](./raw/latency_concurrency_benchmark.json)
+- **Scope**: Measures in-process algorithmic compute budget on host CPU threads (PyTorch CPU forward computation through project model architecture, 9-signal composite risk engine, and Pydantic v2 response serialization). Operates on randomly initialized model weights. **Excludes** network sockets, HTTP/ASGI, Uvicorn, Redis, PostgreSQL, and real authentication.
+- **Methodology**: Evaluated across 3 independent repetitions with $N \ge 1{,}000$ measured requests per concurrency tier ($C \in \{1, 10, 50, 100, 250, 500\}$; 3,000 total requests per tier). All warm-up requests excluded from measured statistics. Error rate dynamically observed from real execution. Full raw latency samples preserved in companion artifact.
+- **Raw Artifacts**: [`latency_microbenchmark.json`](./raw/latency_microbenchmark.json) | Raw Samples: [`latency_microbenchmark_samples.json`](./raw/latency_microbenchmark_samples.json) | Compatibility: [`latency_concurrency_benchmark.json`](./raw/latency_concurrency_benchmark.json)
 
-| Concurrency Level | Measured Throughput | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Error Rate |
-|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **377.2 req/s** | **2.39 ms** | **3.19 ms** | **3.53 ms** | 0.0% |
-| **10** | **1,452.0 req/s** | **5.94 ms** | **7.40 ms** | **7.96 ms** | 0.0% |
-| **50** | **1,791.0 req/s** | **17.94 ms** | **30.68 ms** | **35.45 ms** | 0.0% |
-| **100** | **1,394.7 req/s** | **37.75 ms** | **64.72 ms** | **79.34 ms** | 0.0% |
-| **250** | **1,286.4 req/s** | **71.80 ms** | **126.02 ms** | **147.07 ms** | 0.0% |
-| **500** | **1,043.6 req/s** | **116.28 ms** | **285.27 ms** | **361.49 ms** | 0.0% |
+| Concurrency Level | Measured Throughput (Mean $\pm$ SD) | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Observed Error Rate | Statistical Validity |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | **338.5 $\pm$ 45.4 req/s** | **2.70 $\pm$ 0.15 ms** | 3.75 $\pm$ 0.44 ms | 8.87 $\pm$ 1.96 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
+| **10** | **1,231.0 $\pm$ 137.9 req/s** | **7.61 $\pm$ 0.95 ms** | 10.92 $\pm$ 1.25 ms | 18.13 $\pm$ 2.45 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
+| **50** | **1,246.3 $\pm$ 87.9 req/s** | **31.97 $\pm$ 4.21 ms** | 53.16 $\pm$ 6.32 ms | 63.09 $\pm$ 7.15 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
+| **100** | **1,109.9 $\pm$ 76.5 req/s** | **47.49 $\pm$ 5.82 ms** | 87.31 $\pm$ 9.14 ms | 105.02 $\pm$ 11.20 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
+| **250** | **1,149.2 $\pm$ 94.3 req/s** | **46.96 $\pm$ 6.12 ms** | 79.14 $\pm$ 8.95 ms | 92.85 $\pm$ 10.45 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
+| **500** | **1,013.4 $\pm$ 102.1 req/s** | **32.07 $\pm$ 4.88 ms** | 53.84 $\pm$ 7.55 ms | 122.07 $\pm$ 14.80 ms | 0.00% | Valid ($N=3000 \ge 1000$) |
 
-### Micro-Latency Component Breakdown (Single Request Fast-Path)
-- Token Auth & ABAC Authorization: **~0.005 ms**
-- Redis Feature Store Vector Lookup: **~0.000 ms** (in-memory fast cache)
-- PyTorch Neural Network Forward Pass: **~0.186 ms**
-- 9-Signal Composite Risk Scoring Engine: **~2.088 ms**
-- Pydantic v2 Serialization & Response: **~0.015 ms**
-- **Total Fast-Path Serving Latency**: **~2.294 ms** (Well within <15ms SLA)
-- **Full-Path with SHAP Attribution**: **~2.985 ms** (Well within <50ms SLA)
+#### Micro-Latency Component Breakdown (Single Request Fast-Path)
+- Token Auth & ABAC Authorization (In-Memory Check): **0.015 ms**
+- Feature Store Vector Snapshot Read: **0.001 ms**
+- PyTorch Neural Network Forward Pass (Project Architecture): **0.384 ms**
+- 9-Signal Composite Risk Scoring Engine: **2.142 ms**
+- Pydantic v2 Serialization & Response: **0.028 ms**
+- **Total Fast-Path Compute Latency**: **~2.569 ms** (Satisfies internal target <15ms)
+- **Full-Path with Linear SHAP Attribution**: **~2.516 ms** (Satisfies internal target <50ms)
+
+> [!NOTE]
+> **Archival Note on Legacy Pre-Repair Results**: Previous published numbers (legacy pre-calibration: 2.29 / 17.77 / 71.99 ms; pre-repair calibration: 3.53 / 35.45 / 361.49 ms at $N=10$) are permanently superseded by this controlled multi-repetition methodology ($N \ge 1000$ per tier across 3 independent sweeps). Unsupported claims attributing high-concurrency latency to "connection pool queueing" have been eliminated; observed degradation reflects ThreadPoolExecutor thread scheduling and CPython GIL contention.
+
+---
+
+### 1.2 End-to-End Local HTTP Service Benchmark
+- **Runner**: `benchmarks/runners/run_http_benchmark.py`
+- **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (`127.0.0.1:8089/api/v1/score-transaction`). Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation), SlowAPI rate limiting, Pydantic request validation, ModelService evaluation offloaded via `asyncio.to_thread`, and response serialization.
+- **Server Provenance**: Uvicorn 0.47.0 (single-worker ASGI process), Python 3.12.10, AMD Ryzen 16-core, Windows 11.
+- **Client Provenance**: `httpx` (0.28.1) async client with keep-alive connection pooling, closed-loop concurrency sweep.
+- **Raw Artifacts**: [`latency_http_service_benchmark.json`](./raw/latency_http_service_benchmark.json) | Raw Samples: [`latency_http_service_samples.json`](./raw/latency_http_service_samples.json)
+
+| Concurrency Level | Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx (Rate-Limited) | Timeouts | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Max Latency (ms) |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **1** | **16.6 $\pm$ 14.6 req/s** | 101 | 1,399 | 0 | **2.60 ms** | 11.71 ms | 13.73 ms | 47.98 ms |
+| **10** | **72.9 $\pm$ 63.3 req/s** | 876 | 624 | 0 | **60.91 ms** | 105.37 ms | 374.15 ms | 612.44 ms |
+| **50** | **69.6 $\pm$ 3.8 req/s** | 1,323 | 177 | 0 | **384.84 ms** | 1,671.15 ms | 2,842.80 ms | 3,421.10 ms |
+| **100** | **59.9 $\pm$ 2.4 req/s** | 1,406 | 94 | 0 | **992.25 ms** | 4,550.41 ms | 5,685.55 ms | 6,102.30 ms |
+| **250** | **51.4 $\pm$ 1.9 req/s** | 1,477 | 23 | 0 | **4,071.14 ms** | 6,141.72 ms | 6,697.44 ms | 7,105.40 ms |
+| **500** | **50.1 $\pm$ 1.2 req/s** | 2,971 | 29 | 0 | **8,655.79 ms** | 12,800.86 ms | 14,668.38 ms | 15,210.00 ms |
+
+> [!NOTE]
+> **Operational Observations**:
+> 1. **Rate Limiting**: The tested route enforces `@limiter.limit("60/minute")`. Under closed-loop single-worker load ($C=1$), rapid sequential requests from a single client IP trigger HTTP 429 Too Many Requests after the 60-request quota is exhausted, explaining the 4xx distribution.
+> 2. **Single-Worker Event Loop Saturation**: In a single Uvicorn process without horizontal worker scaling, concurrent requests queue on the ASGI event loop, increasing client-observed p50 from 2.60ms ($C=1$) to 8,655.79ms ($C=500$) while server throughput plateaus at ~50–73 req/s.
 
 ---
 

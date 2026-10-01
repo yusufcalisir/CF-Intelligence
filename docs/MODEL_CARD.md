@@ -153,13 +153,17 @@ On the IBM AMLSim benchmark, inductive GraphSAGE achieves significant detection 
 - **Fan-In Smurfing Recall**: +5.75% (70.50% vs 64.75%)
 - **Graph Inference Latency**: 1.11 ms per 1,000 transactions
 
-### 4.3 Inference Gateway Latency & Throughput
-Evaluated on production host hardware under multi-concurrency load testing ($C = 1 \dots 100$ concurrent clients; [`benchmarks/results/raw/latency_concurrency_benchmark.json`](../benchmarks/results/raw/latency_concurrency_benchmark.json)):
-- **Single-Request Fast-Path**: **2.29 ms** (well below $< 15\text{ ms}$ SLA; p50: 2.39 ms, p99: 3.53 ms at $C=1$)
-- **Peak Sustained Throughput**: **1,394.7 req/s** ($C = 100$; peak 1,791.0 req/s at $C = 50$)
-- **p50 Latency (C = 100 Load)**: **37.75 ms**
-- **p95 Latency (C = 100 Load)**: **64.72 ms**
-- **p99 Latency (C = 100 Load)**: **79.34 ms**
+### 4.3 Scoring Pipeline Compute & Service Latency
+Evaluated on host hardware distinguishing in-process compute microbenchmark from live ASGI HTTP service:
+- **In-Process Scoring Pipeline Microbenchmark** ([`benchmarks/results/raw/latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json)):
+  - **Single-Request Fast-Path Compute**: **2.57 ms** (well below internal $< 15\text{ ms}$ target; p50: 2.70 ms, p99: 8.87 ms at $C=1$)
+  - **Peak Throughput**: **1,246.3 req/s** ($C = 50$; $C=100$: 1,109.9 req/s; 0.0% error rate)
+  - **p50 Latency (C = 100 Load)**: **47.49 ms**
+  - **p95 Latency (C = 100 Load)**: **87.31 ms**
+  - **p99 Latency (C = 100 Load)**: **105.02 ms**
+- **Local HTTP Service Benchmark (ASGI / Uvicorn)** ([`benchmarks/results/raw/latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json)):
+  - **Single-Client Median Latency**: **2.60 ms** (p99: 13.73 ms at $C=1$)
+  - **Peak Service Throughput**: **72.9 req/s** at $C = 10$ on single-worker Uvicorn over loopback TCP
 
 ---
 

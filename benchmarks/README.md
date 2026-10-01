@@ -15,7 +15,8 @@ The benchmark suite provides reproducible quantitative evaluation across five co
 | **Differential Privacy Tradeoff** | `benchmarks/runners/run_dp_tradeoff.py` | Opacus PRVAccountant (DP-SGD) | $\epsilon$ vs PR-AUC Frontier, Clipping Norm $C$ |
 | **Byzantine Adversarial Defense** | `benchmarks/runners/run_byzantine_benchmark.py` | Sign Inversion, Noise | Robust PR-AUC (Krum, Trimmed Mean, Bulyan) |
 | **Graph Intelligence (GraphSAGE)**| `benchmarks/runners/run_graph_benchmark.py` | Elliptic Bitcoin Graph | Node PR-AUC, ROC-AUC, Temporal Split (Timestep 34) |
-| **Inference Gateway Latency** | `benchmarks/runners/run_latency_benchmark.py` | HTTP Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s) |
+| **In-Process Scoring Pipeline** | `benchmarks/runners/run_latency_benchmark.py` | CPU Thread Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s) |
+| **HTTP Service Gateway** | `benchmarks/runners/run_http_benchmark.py` | HTTP Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s), Status Codes |
 | **Architectural Factorial Ablation** | `benchmarks/runners/run_factorial_ablation.py` | Synthetic Consortium ($2^4 = 16$ Grid) | PR-AUC, Recall @ 0.01% FPR, ANOVA Main Effects, Pareto Frontier |
 
 ---
@@ -79,10 +80,13 @@ python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion --b
 # 5. Run GraphSAGE Node Classification Benchmark
 python benchmarks/runners/run_graph_benchmark.py
 
-# 6. Run Real-Time Gateway Concurrency Stress Test
+# 6. Run In-Process Scoring Pipeline Microbenchmark
 python benchmarks/runners/run_latency_benchmark.py --workers 50
 
-# 7. Run Architectural Component Factorial Ablation Benchmark (Graph x DP x SecAgg x CrossBank)
+# 7. Run End-to-End Local HTTP Service Benchmark
+python benchmarks/runners/run_http_benchmark.py --concurrency 50
+
+# 8. Run Architectural Component Factorial Ablation Benchmark (Graph x DP x SecAgg x CrossBank)
 python benchmarks/runners/run_factorial_ablation.py --rounds 5 --local-epochs 2 --n-clients 5
 ```
 
@@ -121,6 +125,10 @@ benchmarks/results/
 │   ├── byzantine_benchmark_sign_inversion.json
 │   ├── graphsage_elliptic_benchmark.json
 │   ├── factorial_ablation_matrix.json
+│   ├── latency_microbenchmark.json
+│   ├── latency_microbenchmark_samples.json
+│   ├── latency_http_service_benchmark.json
+│   ├── latency_http_service_samples.json
 │   └── latency_concurrency_benchmark.json
 └── summary.md
 ```
