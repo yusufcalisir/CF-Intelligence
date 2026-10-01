@@ -330,12 +330,12 @@
     {
       "claim_id": "CLM-HTTP-SERVICE-THROUGHPUT",
       "category": "http_service_benchmarks",
-      "title": "Local HTTP Service Peak Concurrency Throughput (Class B1 Inference Capacity)",
+      "title": "Single-Worker Localhost HTTP Benchmark Peak Throughput (Class B1 v2 - aiohttp Load Generator)",
       "dataset": "simulated_gateway",
       "dataset_scale": "C=10 Concurrent Clients (3000 Requests across 3 reps)",
       "stated_value": 50.0,
       "stated_unit": "successful 2xx req/s",
-      "empirical_measured_value": 191.0,
+      "empirical_measured_value": 190.7,
       "centralized_baseline_value": 89.0,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -343,12 +343,19 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Class B1 Local HTTP Successful-Inference Capacity Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) with httpx connection pooling under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Under the controlled FeatureStore offload intervention (asyncio.to_thread), peak throughput reached 191.0 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success), up from 89.0 req/s in the pre-intervention baseline (preserved in latency_http_service_benchmark_pre_intervention.json). Rate-limited public endpoint behavior is evaluated separately in Class B2 benchmark.",
+      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 190.7 ± 6.9 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success, client loop lag p99=9.96ms, client CPU=0.12 cores). Historical HTTPX measurements (191.0 req/s at C=10, collapsing to 41.6 req/s at C=500 due to client event-loop starvation) are preserved in benchmarks/results/raw/latency_http_service_benchmark_httpx.json as VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS, SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
         "baseline_peak_rps": 89.0,
         "notes": "Pre-intervention synchronous FeatureStore execution on event loop yielded 89.0 req/s peak at C=10."
+      },
+      "historical_httpx_artifact": {
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
+        "historical_c10_throughput_rps": 191.0,
+        "historical_c500_throughput_rps": 55.8,
+        "reason": "HTTPX client-side event loop starvation under high concurrency suppressed client throughput to ~41-56 req/s while aiohttp achieved 118-141 req/s on the identical unchanged server."
       },
       "legacy_artifact": {
         "status": "SUPERSEDED — RATE-LIMIT CONTAMINATED",
@@ -360,12 +367,12 @@
     {
       "claim_id": "CLM-HTTP-SERVICE-LATENCY-P50",
       "category": "http_service_benchmarks",
-      "title": "Local HTTP Service Single-Client Median Latency (Class B1 Inference Capacity)",
+      "title": "Single-Worker Localhost HTTP Benchmark Single-Client Median Latency (Class B1 v2 - aiohttp Load Generator)",
       "dataset": "simulated_gateway",
       "dataset_scale": "C=1 Client (3000 Requests across 3 reps)",
       "stated_value": 10.0,
       "stated_unit": "ms",
-      "empirical_measured_value": 10.77,
+      "empirical_measured_value": 9.78,
       "centralized_baseline_value": 11.39,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -373,12 +380,18 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP: mean=10.97ms, p50=10.77ms, p95=12.41ms, p99=15.21ms (100% 2xx success across 3,000 requests) following FeatureStore threadpool offload. Improved from pre-intervention baseline p50=11.39ms, p95=16.27ms, p99=21.32ms (preserved in latency_http_service_benchmark_pre_intervention.json). Exercises full ASGI dispatch, FastAPI middleware stack, and risk scoring pipeline without rate-limit rejection distortion.",
+      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP using aiohttp load generator: mean=10.22ms, per-repetition p50 mean=9.78ms (pooled p50=9.77ms), p95=13.56ms, p99=16.94ms (100% 2xx success across 3,000 requests, client loop lag p99=7.02ms, client CPU=0.07 cores). Historical HTTPX measurement (mean=10.97ms, p50=10.77ms) is preserved in latency_http_service_benchmark_httpx.json.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
         "baseline_p50_ms": 11.39,
         "baseline_p99_ms": 21.32
+      },
+      "historical_httpx_artifact": {
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
+        "historical_p50_ms": 10.77,
+        "historical_p99_ms": 15.21
       },
       "legacy_artifact": {
         "status": "SUPERSEDED — RATE-LIMIT CONTAMINATED",

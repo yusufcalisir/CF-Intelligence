@@ -1,0 +1,663 @@
+{
+  "timestamp_utc": "2026-10-01T20:04:28.391776+00:00",
+  "benchmark_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
+  "benchmark_name": "Class B1 Local HTTP Service Inference Capacity Benchmark",
+  "scientific_question": "How does the actual HTTP scoring service behave under concurrent load when requests are allowed to reach and execute the inference/scoring path? Measures real 2xx transaction capacity without SlowAPI rate-limit rejections.",
+  "primary_metric_population": "HTTP 2xx successful inference transactions exclusively",
+  "scope": "Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (127.0.0.1:8089/api/v1/score-transaction) with SlowAPI rate-limiting isolated. Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack, Pydantic request validation, ModelService evaluation, RiskScoringEngine execution, and response transmission.",
+  "server_provenance": {
+    "server_implementation": "uvicorn (0.47.0)",
+    "worker_count": 1,
+    "server_mode": "single-worker ASGI process",
+    "host": "127.0.0.1",
+    "port": 8089,
+    "tested_endpoint": "/api/v1/score-transaction",
+    "rate_limiter_isolated": true,
+    "benchmark_mode_flag": "CFI_BENCHMARK_MODE=1",
+    "server_lifecycle": "restarted_per_repetition_with_pre_tier_deterministic_state_reset"
+  },
+  "client_provenance": {
+    "client_library": "httpx (0.28.1)",
+    "load_model": "closed-loop concurrent async workers",
+    "concurrency_semantics": "maximum simultaneously in-flight HTTP requests via closed-loop asynchronous worker pool",
+    "connection_reuse": "keep-alive enabled with pooled connections",
+    "max_connections": "c + 50",
+    "max_keepalive_connections": "c + 50",
+    "keepalive_expiry_seconds": 30.0,
+    "timeouts": {
+      "timeout": 60.0,
+      "connect": 10.0,
+      "read": 60.0,
+      "write": 10.0,
+      "pool": 30.0
+    }
+  },
+  "repetitions_count": 3,
+  "target_requests_per_tier": 1000,
+  "environment": {
+    "os": "Windows-11-10.0.26300-SP0",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_count": 16,
+    "machine": "AMD64",
+    "python_version": "3.12.10",
+    "device": "cpu",
+    "ram_total_gb": 7.34
+  },
+  "metadata": {
+    "concurrency_semantics": "maximum simultaneously in-flight HTTP requests via closed-loop asynchronous worker pool",
+    "server_lifecycle": "restarted_per_repetition_with_pre_tier_deterministic_state_reset",
+    "warmup_sequence": "server_initialization -> 10_warmup_requests -> deterministic_reset -> measured_repetition",
+    "tested_endpoint": "/api/v1/score-transaction",
+    "target_url": "http://127.0.0.1:8089/api/v1/score-transaction"
+  },
+  "concurrency_scaling": [
+    {
+      "concurrency": 1,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 3000,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 0,
+      "failed_total": 0,
+      "overall_success_rate": 1.0,
+      "overall_failure_rate": 0.0,
+      "successful_inference_rps": {
+        "mean": 91.1,
+        "std": 2.3,
+        "min": 88.5,
+        "max": 93.0
+      },
+      "throughput_rps": 91.1,
+      "p50_latency_ms": 10.77,
+      "p95_latency_ms": 12.41,
+      "p99_latency_ms": 15.21,
+      "mean_latency_ms": 10.98,
+      "max_latency_ms": 37.41,
+      "latency_2xx_p50_ms": {
+        "mean": 10.77,
+        "std": 0.12,
+        "min": 10.64,
+        "max": 10.88
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 12.41,
+        "std": 0.88,
+        "min": 11.87,
+        "max": 13.43
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 15.21,
+        "std": 2.53,
+        "min": 13.37,
+        "max": 18.1
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 10.98,
+        "std": 0.28
+      },
+      "latency_2xx_max_ms": 37.41,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 10.898,
+          "successful_inference_rps": 91.8,
+          "attempted_request_rps": 91.8,
+          "p50_ms": 10.8,
+          "p95_ms": 11.94,
+          "p99_ms": 14.17,
+          "mean_ms": 10.89,
+          "max_ms": 22.33
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 11.294,
+          "successful_inference_rps": 88.5,
+          "attempted_request_rps": 88.5,
+          "p50_ms": 10.88,
+          "p95_ms": 13.43,
+          "p99_ms": 18.1,
+          "mean_ms": 11.29,
+          "max_ms": 37.41
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 10.755,
+          "successful_inference_rps": 93.0,
+          "attempted_request_rps": 93.0,
+          "p50_ms": 10.64,
+          "p95_ms": 11.87,
+          "p99_ms": 13.37,
+          "mean_ms": 10.75,
+          "max_ms": 20.55
+        }
+      ]
+    },
+    {
+      "concurrency": 10,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 3000,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 0,
+      "failed_total": 0,
+      "overall_success_rate": 1.0,
+      "overall_failure_rate": 0.0,
+      "successful_inference_rps": {
+        "mean": 191.0,
+        "std": 1.9,
+        "min": 188.8,
+        "max": 192.5
+      },
+      "throughput_rps": 191.0,
+      "p50_latency_ms": 48.06,
+      "p95_latency_ms": 57.85,
+      "p99_latency_ms": 80.65,
+      "mean_latency_ms": 52.1,
+      "max_latency_ms": 436.65,
+      "latency_2xx_p50_ms": {
+        "mean": 48.06,
+        "std": 0.34,
+        "min": 47.75,
+        "max": 48.43
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 57.85,
+        "std": 4.46,
+        "min": 54.58,
+        "max": 62.93
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 80.65,
+        "std": 13.46,
+        "min": 67.55,
+        "max": 94.45
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 52.1,
+        "std": 0.61
+      },
+      "latency_2xx_max_ms": 436.65,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 5.216,
+          "successful_inference_rps": 191.7,
+          "attempted_request_rps": 191.7,
+          "p50_ms": 47.99,
+          "p95_ms": 54.58,
+          "p99_ms": 67.55,
+          "mean_ms": 51.93,
+          "max_ms": 436.65
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 5.297,
+          "successful_inference_rps": 188.8,
+          "attempted_request_rps": 188.8,
+          "p50_ms": 47.75,
+          "p95_ms": 62.93,
+          "p99_ms": 94.45,
+          "mean_ms": 52.78,
+          "max_ms": 434.1
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 5.195,
+          "successful_inference_rps": 192.5,
+          "attempted_request_rps": 192.5,
+          "p50_ms": 48.43,
+          "p95_ms": 56.05,
+          "p99_ms": 79.96,
+          "mean_ms": 51.6,
+          "max_ms": 343.13
+        }
+      ]
+    },
+    {
+      "concurrency": 50,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 3000,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 0,
+      "failed_total": 0,
+      "overall_success_rate": 1.0,
+      "overall_failure_rate": 0.0,
+      "successful_inference_rps": {
+        "mean": 120.6,
+        "std": 2.0,
+        "min": 118.4,
+        "max": 122.2
+      },
+      "throughput_rps": 120.6,
+      "p50_latency_ms": 231.56,
+      "p95_latency_ms": 1205.94,
+      "p99_latency_ms": 1918.5,
+      "mean_latency_ms": 372.82,
+      "max_latency_ms": 3322.54,
+      "latency_2xx_p50_ms": {
+        "mean": 231.56,
+        "std": 18.86,
+        "min": 212.15,
+        "max": 249.82
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 1205.94,
+        "std": 42.08,
+        "min": 1167.19,
+        "max": 1250.71
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 1918.5,
+        "std": 170.78,
+        "min": 1721.92,
+        "max": 2030.23
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 372.82,
+        "std": 14.11
+      },
+      "latency_2xx_max_ms": 3322.54,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 8.243,
+          "successful_inference_rps": 121.3,
+          "attempted_request_rps": 121.3,
+          "p50_ms": 232.7,
+          "p95_ms": 1167.19,
+          "p99_ms": 2030.23,
+          "mean_ms": 369.83,
+          "max_ms": 2938.05
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 8.449,
+          "successful_inference_rps": 118.4,
+          "attempted_request_rps": 118.4,
+          "p50_ms": 249.82,
+          "p95_ms": 1199.91,
+          "p99_ms": 1721.92,
+          "mean_ms": 388.18,
+          "max_ms": 3008.67
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 8.183,
+          "successful_inference_rps": 122.2,
+          "attempted_request_rps": 122.2,
+          "p50_ms": 212.15,
+          "p95_ms": 1250.71,
+          "p99_ms": 2003.36,
+          "mean_ms": 360.44,
+          "max_ms": 3322.54
+        }
+      ]
+    },
+    {
+      "concurrency": 100,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 3000,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 0,
+      "failed_total": 0,
+      "overall_success_rate": 1.0,
+      "overall_failure_rate": 0.0,
+      "successful_inference_rps": {
+        "mean": 82.7,
+        "std": 5.4,
+        "min": 78.6,
+        "max": 88.9
+      },
+      "throughput_rps": 82.7,
+      "p50_latency_ms": 648.51,
+      "p95_latency_ms": 3199.8,
+      "p99_latency_ms": 5152.51,
+      "mean_latency_ms": 1021.83,
+      "max_latency_ms": 6906.45,
+      "latency_2xx_p50_ms": {
+        "mean": 648.51,
+        "std": 80.47,
+        "min": 556.9,
+        "max": 707.76
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 3199.8,
+        "std": 95.95,
+        "min": 3139.01,
+        "max": 3310.42
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 5152.51,
+        "std": 206.23,
+        "min": 4922.95,
+        "max": 5322.15
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 1021.83,
+        "std": 52.19
+      },
+      "latency_2xx_max_ms": 6906.45,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 11.242,
+          "successful_inference_rps": 88.9,
+          "attempted_request_rps": 88.9,
+          "p50_ms": 556.9,
+          "p95_ms": 3149.98,
+          "p99_ms": 5322.15,
+          "mean_ms": 962.72,
+          "max_ms": 6791.16
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 12.728,
+          "successful_inference_rps": 78.6,
+          "attempted_request_rps": 78.6,
+          "p50_ms": 707.76,
+          "p95_ms": 3139.01,
+          "p99_ms": 4922.95,
+          "mean_ms": 1061.56,
+          "max_ms": 6906.45
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 12.399,
+          "successful_inference_rps": 80.7,
+          "attempted_request_rps": 80.7,
+          "p50_ms": 680.86,
+          "p95_ms": 3310.42,
+          "p99_ms": 5212.42,
+          "mean_ms": 1041.2,
+          "max_ms": 6875.23
+        }
+      ]
+    },
+    {
+      "concurrency": 250,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 2997,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 3,
+      "failed_total": 3,
+      "overall_success_rate": 0.999,
+      "overall_failure_rate": 0.001,
+      "successful_inference_rps": {
+        "mean": 68.0,
+        "std": 3.6,
+        "min": 64.2,
+        "max": 71.3
+      },
+      "throughput_rps": 68.0,
+      "p50_latency_ms": 2379.38,
+      "p95_latency_ms": 7885.0,
+      "p99_latency_ms": 10207.36,
+      "mean_latency_ms": 3010.07,
+      "max_latency_ms": 12851.4,
+      "latency_2xx_p50_ms": {
+        "mean": 2379.38,
+        "std": 168.07,
+        "min": 2209.31,
+        "max": 2545.37
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 7885.0,
+        "std": 731.4,
+        "min": 7294.96,
+        "max": 8703.31
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 10207.36,
+        "std": 732.26,
+        "min": 9369.81,
+        "max": 10726.56
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 3010.07,
+        "std": 24.8
+      },
+      "latency_2xx_max_ms": 12851.4,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 14.025,
+          "successful_inference_rps": 71.3,
+          "attempted_request_rps": 71.3,
+          "p50_ms": 2545.37,
+          "p95_ms": 7294.96,
+          "p99_ms": 9369.81,
+          "mean_ms": 2987.02,
+          "max_ms": 10933.51
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 1000,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 0,
+          "duration_seconds": 15.567,
+          "successful_inference_rps": 64.2,
+          "attempted_request_rps": 64.2,
+          "p50_ms": 2209.31,
+          "p95_ms": 8703.31,
+          "p99_ms": 10726.56,
+          "mean_ms": 3036.31,
+          "max_ms": 12350.69
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 997,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 3,
+          "duration_seconds": 14.525,
+          "successful_inference_rps": 68.6,
+          "attempted_request_rps": 68.8,
+          "p50_ms": 2383.45,
+          "p95_ms": 7656.74,
+          "p99_ms": 10525.72,
+          "mean_ms": 3006.89,
+          "max_ms": 12851.4
+        }
+      ]
+    },
+    {
+      "concurrency": 500,
+      "target_requests_per_rep": 1000,
+      "total_attempted_requests": 3000,
+      "status_2xx_total": 2989,
+      "status_4xx_total": 0,
+      "status_5xx_total": 0,
+      "timeouts_total": 0,
+      "exceptions_total": 11,
+      "failed_total": 11,
+      "overall_success_rate": 0.9963,
+      "overall_failure_rate": 0.0037,
+      "successful_inference_rps": {
+        "mean": 59.3,
+        "std": 0.2,
+        "min": 59.2,
+        "max": 59.5
+      },
+      "throughput_rps": 59.3,
+      "p50_latency_ms": 7358.68,
+      "p95_latency_ms": 11104.51,
+      "p99_latency_ms": 12729.72,
+      "mean_latency_ms": 6569.26,
+      "max_latency_ms": 14012.41,
+      "latency_2xx_p50_ms": {
+        "mean": 7358.68,
+        "std": 147.67,
+        "min": 7254.84,
+        "max": 7527.73
+      },
+      "latency_2xx_p95_ms": {
+        "mean": 11104.51,
+        "std": 512.79,
+        "min": 10513.39,
+        "max": 11429.87
+      },
+      "latency_2xx_p99_ms": {
+        "mean": 12729.72,
+        "std": 545.41,
+        "min": 12100.49,
+        "max": 13067.26
+      },
+      "latency_2xx_mean_ms": {
+        "mean": 6569.26,
+        "std": 84.82
+      },
+      "latency_2xx_max_ms": 14012.41,
+      "repetition_runs": [
+        {
+          "repetition": 1,
+          "attempted": 1000,
+          "status_2xx": 998,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 2,
+          "duration_seconds": 16.766,
+          "successful_inference_rps": 59.5,
+          "attempted_request_rps": 59.6,
+          "p50_ms": 7527.73,
+          "p95_ms": 11429.87,
+          "p99_ms": 13067.26,
+          "mean_ms": 6611.39,
+          "max_ms": 13659.59
+        },
+        {
+          "repetition": 2,
+          "attempted": 1000,
+          "status_2xx": 995,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 5,
+          "duration_seconds": 16.811,
+          "successful_inference_rps": 59.2,
+          "attempted_request_rps": 59.5,
+          "p50_ms": 7293.46,
+          "p95_ms": 11370.28,
+          "p99_ms": 13021.41,
+          "mean_ms": 6624.77,
+          "max_ms": 14012.41
+        },
+        {
+          "repetition": 3,
+          "attempted": 1000,
+          "status_2xx": 996,
+          "status_4xx": 0,
+          "status_5xx": 0,
+          "timeouts": 0,
+          "exceptions": 4,
+          "duration_seconds": 16.797,
+          "successful_inference_rps": 59.3,
+          "attempted_request_rps": 59.5,
+          "p50_ms": 7254.84,
+          "p95_ms": 10513.39,
+          "p99_ms": 12100.49,
+          "mean_ms": 6471.63,
+          "max_ms": 13325.45
+        }
+      ]
+    }
+  ],
+  "audit_status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS - SUPERSEDED FOR HIGH-CONCURRENCY CAPACITY INTERPRETATION",
+  "supersession_reason": "Load generator HTTPX event-loop starvation at C>=100 materially suppresses measured throughput and artificially inflates client-observed latency. Preserved as authoritative historical record of HTTPX harness behavior."
+}
