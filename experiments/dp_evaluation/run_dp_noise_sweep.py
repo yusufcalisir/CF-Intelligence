@@ -183,7 +183,7 @@ def train_and_evaluate_single_run(
 
     input_dim = X_train.shape[1]
     model = FraudDetectionModel(input_dim=input_dim, dp_compatible=True)
-    optimizer = torch.optim.Adam(list(model.parameters()), lr=lr)
+    optimizer = torch.optim.Adam(cast("Any", model.parameters()), lr=lr)
     criterion = nn.BCELoss()
 
     ds = TensorDataset(torch.tensor(X_train), torch.tensor(y_train))
