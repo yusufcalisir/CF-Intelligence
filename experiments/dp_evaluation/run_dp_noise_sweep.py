@@ -364,8 +364,13 @@ def run_canonical_dp_benchmark(
     baseline_mean_roc = float(np.mean([r["roc_auc"] for r in baseline_runs]))
     baseline_std_roc = float(np.std([r["roc_auc"] for r in baseline_runs], ddof=1 if len(baseline_runs) > 1 else 0))
 
-    logger.info("Non-Private Baseline established: PR-AUC = %.4f ± %.4f",
-                baseline_mean_pr, baseline_std_pr)
+    logger.info(
+        "Non-Private Baseline established: PR-AUC = %.4f ± %.4f, ROC-AUC = %.4f ± %.4f",
+        baseline_mean_pr,
+        baseline_std_pr,
+        baseline_mean_roc,
+        baseline_std_roc,
+    )
 
     # 2. Run DP sweeps for all sigmas in order
     for sigma in sigmas:
