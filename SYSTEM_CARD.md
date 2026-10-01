@@ -148,7 +148,7 @@ The platform operates under a Zero-Trust, multi-tenant isolation model informed 
 - Natural person demographic attributes (Age, Gender, Race, Religion, etc.) are strictly excluded by design (0/10 protected attributes present across all evaluated public benchmarks).
 
 ### 5.2 Cryptographic Boundaries
-- **Differential Privacy (Opacus PRV & RDP Accounting)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; canonical empirical benchmarks evaluated at $\epsilon = 0.3497$ with $\sigma = 3.0$ and $\epsilon = 1.7744$ with $\sigma = 1.0$ using `PRVAccountant`).
+- **Rényi Differential Privacy (Opacus PRV & RDP Accounting)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; canonical empirical benchmarks evaluated at $\epsilon = 0.3497$ with $\sigma = 3.0$ and $\epsilon = 1.7744$ with $\sigma = 1.0$ using `PRVAccountant`).
 - **Homomorphic Encryption**: Model updates are encrypted via TenSEAL CKKS (8192-degree polynomial modulus) allowing the central coordinator to aggregate weights in ciphertext space without decryption.
 - **Private Set Intersection (DH-PSI)**: Participating banks cross-reference high-velocity accounts using Curve25519 Diffie-Hellman private set intersection without revealing non-overlapping client portfolios.
 - **Hardware Security Modules (HSM)**: Cryptographic root keys are enveloped using PKCS#11 HSM interfaces and HashiCorp Vault Transit KMS.
@@ -194,10 +194,10 @@ Evaluated on standard enterprise infrastructure under multi-concurrency stress t
 
 ## 8. Verification & Continuous Validation
 
-The integrity of the system is certified across all layers by **4,110 total automated tests** (100% pass rate):
-- **Backend Pytest Suite**: **3,314 automated tests** (unit, integration, chaos, property-based, and security invariants).
+The integrity of the system is certified across all layers by **4,157 total automated tests** (100% pass rate):
+- **Backend Pytest Suite**: **3,361 automated tests** (unit, integration, chaos, property-based, and security invariants).
 - **Scientific Verification Suite**: **409 verification tests** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
 - **Frontend Vitest Suite**: **356 component and integration tests**.
 - **Smart Contracts Suite**: **31 Hardhat tests** for consortium Shapley value settlement.
 
-*(Note: 3,314 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,110 automated tests. Additional optional E2E/Playwright tests run in separate browser workflows).*
+*(Note: 3,361 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,157 automated tests. Additional optional E2E/Playwright tests run in separate browser workflows).*
