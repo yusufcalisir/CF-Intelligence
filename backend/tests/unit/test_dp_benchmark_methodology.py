@@ -12,33 +12,26 @@ from __future__ import annotations
 import inspect
 import json
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
 import torch
-from opacus import PrivacyEngine
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-RAW_RESULTS_DIR = REPO_ROOT / "benchmarks" / "results" / "raw"
-DP_ARTIFACT_PATH = RAW_RESULTS_DIR / "dp_privacy_utility_tradeoff.json"
-
-from app.application.services.model_service import FraudDetectionModel
-from experiments.dp_evaluation import run_dp_noise_sweep
 from experiments.dp_evaluation.run_dp_noise_sweep import (
     BATCH_SIZE,
-    DATA_SEED,
-    DEFAULT_SEEDS,
-    DEFAULT_SIGMAS,
-    DELTA,
     EPOCHS,
-    LEARNING_RATE,
     LEGACY_PROTOTYPE_POINTS,
     MAX_GRAD_NORM,
     N_FEATURES,
     generate_synthetic_fraud_dataset,
     train_and_evaluate_single_run,
 )
+from opacus import PrivacyEngine
+
+from app.application.services.model_service import FraudDetectionModel
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+RAW_RESULTS_DIR = REPO_ROOT / "benchmarks" / "results" / "raw"
+DP_ARTIFACT_PATH = RAW_RESULTS_DIR / "dp_privacy_utility_tradeoff.json"
 
 
 def test_no_static_canonical_fixtures() -> None:
@@ -55,6 +48,7 @@ def test_no_static_canonical_fixtures() -> None:
     # Legacy fixture values from f0705141 / 7e32f409
     legacy_pr_aucs = {0.1963, 0.0722, 0.3081, 0.2833, 0.6205, 0.6272}
     live_pr_aucs = {pt["pr_auc"] for pt in artifact["tradeoff_points"]}
+    assert not live_pr_aucs.intersection(legacy_pr_aucs)
 
     # The live results must reflect genuine DP-SGD runs, not the legacy fixtures
     baseline_pt = artifact["tradeoff_points"][-1]
@@ -106,8 +100,16 @@ def test_dp_engine_is_active() -> None:
 
     # Private run (sigma = 1.0, 1 epoch, small batch)
     res_private = train_and_evaluate_single_run(
-        X_tr, y_tr, X_te, y_te,
-        sigma=1.0, seed=42, epochs=1, batch_size=32, lr=1e-3, delta=1e-3,
+        X_tr,
+        y_tr,
+        X_te,
+        y_te,
+        sigma=1.0,
+        seed=42,
+        epochs=1,
+        batch_size=32,
+        lr=1e-3,
+        delta=1e-3,
     )
     assert res_private["epsilon"] < float("inf")
     assert res_private["epsilon"] > 0.0
@@ -115,8 +117,16 @@ def test_dp_engine_is_active() -> None:
 
     # Non-private run (sigma = 0.0)
     res_non_private = train_and_evaluate_single_run(
-        X_tr, y_tr, X_te, y_te,
-        sigma=0.0, seed=42, epochs=1, batch_size=32, lr=1e-3, delta=1e-3,
+        X_tr,
+        y_tr,
+        X_te,
+        y_te,
+        sigma=0.0,
+        seed=42,
+        epochs=1,
+        batch_size=32,
+        lr=1e-3,
+        delta=1e-3,
     )
     assert res_non_private["epsilon"] == float("inf")
     assert "pr_auc" in res_non_private
@@ -126,8 +136,16 @@ def test_live_accounting_integrity() -> None:
     """Verifies that epsilon is computed from the live PrivacyEngine instance after training."""
     X, y = generate_synthetic_fraud_dataset(n_samples=100, n_features=N_FEATURES, seed=123)
     res = train_and_evaluate_single_run(
-        X[:80], y[:80], X[80:], y[80:],
-        sigma=2.0, seed=42, epochs=1, batch_size=32, lr=1e-3, delta=1e-4,
+        X[:80],
+        y[:80],
+        X[80:],
+        y[80:],
+        sigma=2.0,
+        seed=42,
+        epochs=1,
+        batch_size=32,
+        lr=1e-3,
+        delta=1e-4,
     )
     # Epsilon must be finite and positive for private execution
     assert isinstance(res["epsilon"], float)
@@ -168,7 +186,9 @@ def test_per_sample_dp_semantics() -> None:
         for param in model_p.parameters():
             if param.requires_grad:
                 assert hasattr(param, "grad_sample"), "Missing per-sample grad_sample attribute"
-                assert param.grad_sample.shape[0] == xb.shape[0], "grad_sample batch dimension mismatch"
+                assert param.grad_sample.shape[0] == xb.shape[0], (
+                    "grad_sample batch dimension mismatch"
+                )
         break
 
 
@@ -229,7 +249,9 @@ def test_sample_standard_deviation_semantics() -> None:
         assert expected_sample_std > pop_std, (
             f"Sample std ({expected_sample_std}) must exceed population std ({pop_std})"
         )
-        assert pt.get("std_definition") == "sample standard deviation across training seeds (ddof=1)"
+        assert (
+            pt.get("std_definition") == "sample standard deviation across training seeds (ddof=1)"
+        )
 
 
 def test_artifact_provenance_and_schema() -> None:

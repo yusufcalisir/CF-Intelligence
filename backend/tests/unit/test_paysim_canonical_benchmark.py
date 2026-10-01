@@ -16,24 +16,12 @@ Tests protect:
 from __future__ import annotations
 
 import hashlib
-import sys
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pytest
-
-# Repo root on path
-REPO_ROOT = Path(__file__).resolve().parents[4]
-BACKEND_DIR = REPO_ROOT / "backend"
-for p in (REPO_ROOT, BACKEND_DIR):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-
 from experiments.paysim.run_paysim_canonical_benchmark import (
     DATA_SPLIT_SEED,
-    NUM_CLIENTS,
-    PAYSIM_FEATURE_COLS,
     SAMPLE_EVERY_NTH,
     _compute_sha256,
     _locate_paysim_csv,
@@ -60,10 +48,13 @@ requires_real = pytest.mark.skipif(
 # §1  Dataset mode enforcement
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestDatasetModeEnforcement:
     """Real mode must fail hard if CSV is absent; synthetic must NOT silently produce real SHA-256."""
 
-    def test_real_mode_raises_if_csv_missing(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_real_mode_raises_if_csv_missing(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """run_canonical_benchmark(dataset_mode='real') must raise FileNotFoundError
         when real CSV is not present — never silently fall back to synthetic."""
         import experiments.paysim.run_paysim_canonical_benchmark as mod
@@ -108,6 +99,7 @@ class TestDatasetModeEnforcement:
 # ─────────────────────────────────────────────────────────────────────────────
 # §2  Physical SHA-256 computation
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestSHA256Computation:
     """SHA-256 must be computed from actual file bytes."""
@@ -171,10 +163,13 @@ class TestSHA256Computation:
 # §3  Stratified random split
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestStratifiedRandomSplit:
     """Stratified split must be disjoint, size-correct, and prevalence-preserving."""
 
-    def _make_data(self, n: int = 5000, fraud_rate: float = 0.01, seed: int = 0) -> tuple[np.ndarray, np.ndarray]:
+    def _make_data(
+        self, n: int = 5000, fraud_rate: float = 0.01, seed: int = 0
+    ) -> tuple[np.ndarray, np.ndarray]:
         rng = np.random.default_rng(seed)
         y = (rng.uniform(size=n) < fraud_rate).astype(int)
         X = rng.standard_normal((n, 5)).astype("float32")
@@ -194,7 +189,9 @@ class TestStratifiedRandomSplit:
         # Use a unique feature fingerprint to detect row overlap
         # Concatenate and verify no duplicate rows
         all_X = np.vstack([X_tr, X_te])
-        assert all_X.shape[0] == len(X), "Train + test must equal full dataset (no duplicates/drops)"
+        assert all_X.shape[0] == len(X), (
+            "Train + test must equal full dataset (no duplicates/drops)"
+        )
 
     def test_fraud_prevalence_preserved_in_test(self) -> None:
         """Test fraud prevalence must be close to overall prevalence."""
@@ -229,6 +226,7 @@ class TestStratifiedRandomSplit:
 # ─────────────────────────────────────────────────────────────────────────────
 # §4  Dirichlet partition
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestDirichletPartition:
     """Partition must cover all train samples, produce non-empty clients."""
@@ -273,6 +271,7 @@ class TestDirichletPartition:
 # §5  Positive support in canonical test set
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestPositiveSupport:
     """Canonical test set must carry enough fraud for PR-AUC to be meaningful."""
 
@@ -307,6 +306,7 @@ class TestPositiveSupport:
 # §6  Sampling reproducibility
 # ─────────────────────────────────────────────────────────────────────────────
 
+
 class TestSamplingProtocol:
     """Systematic every-Nth row sampling must be deterministic."""
 
@@ -319,6 +319,7 @@ class TestSamplingProtocol:
     def test_real_sample_row_count_stable(self) -> None:
         """Row count of systematic sample must equal ceil(full_rows / SAMPLE_EVERY_NTH)."""
         from experiments.paysim.run_paysim_canonical_benchmark import load_real_paysim_sample
+
         csv_path = _locate_paysim_csv()
         raw = load_real_paysim_sample(csv_path)
         n_sampled = raw["n_rows"]
@@ -331,6 +332,7 @@ class TestSamplingProtocol:
 # ─────────────────────────────────────────────────────────────────────────────
 # §7  Budget accounting in artifact
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestBudgetAccounting:
     """Artifact must record enough info to audit training budget parity."""
@@ -378,6 +380,7 @@ class TestBudgetAccounting:
 # ─────────────────────────────────────────────────────────────────────────────
 # §8  Legacy results preserved in artifact
 # ─────────────────────────────────────────────────────────────────────────────
+
 
 class TestLegacyPreservation:
     """Historical results must be archived in the artifact, not deleted."""
