@@ -569,3 +569,230 @@ class TestEndToEndBenchmarkExecution:
             assert metric in agg["max"], f"Missing {metric} in max"
             assert agg["min"][metric] <= agg["mean"][metric] <= agg["max"][metric]
 
+
+# ===========================================================================
+# 11. Dual Canonical Artifact Fail-Closed Protection Tests (DEF-01 / DEF-02)
+# ===========================================================================
+class TestDualCanonicalArtifactIsolation:
+    """Verifies that non-canonical executions cannot mutate or overwrite either
+
+    canonical repository artifact:
+    1. benchmarks/results/raw/graphsage_elliptic_benchmark.json
+    2. experiments/elliptic/graphsage_elliptic_benchmark.json
+    """
+
+    @pytest.fixture
+    def dummy_run_environment(self):
+        """Generates deterministic mock data avoiding neural training."""
+        dummy_data = {
+            "X": np.zeros((10, 165), dtype=np.float32),
+            "y": np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1]),
+            "edge_index": np.zeros((2, 5), dtype=np.int64),
+            "train_mask": np.array([True, True, True, True, False, False, False, False, False, False]),
+            "val_mask": np.array([False, False, False, False, True, True, False, False, False, False]),
+            "test_mask": np.array([False, False, False, False, False, False, True, True, True, True]),
+            "train_labeled_mask": np.array([True, True, True, True, False, False, False, False, False, False]),
+            "test_labeled_mask": np.array([False, False, False, False, False, False, True, True, True, True]),
+            "val_labeled_mask": np.array([False, False, False, False, True, True, False, False, False, False]),
+            "timesteps": np.array([1, 1, 1, 1, 32, 32, 40, 40, 40, 40]),
+            "source": "real",
+            "file_hashes": {},
+            "n_train_labeled": 4,
+            "n_val_labeled": 2,
+            "n_test_labeled": 4,
+            "n_train_illicit": 2,
+            "n_val_illicit": 1,
+            "n_test_illicit": 2,
+            "n_train_licit": 2,
+            "n_val_licit": 1,
+            "n_test_licit": 2,
+        }
+        dummy_metrics = {
+            "pr_auc": 0.5, "roc_auc": 0.5, "precision": 0.5, "recall": 0.5, "f1_score": 0.5,
+            "recall_at_01_fpr": 0.05, "recall_at_05_fpr": 0.1, "recall_at_10_fpr": 0.2,
+            "brier_score": 0.2, "operating_threshold": 0.5,
+            "inference_latency_ms": 1.0, "inference_latency_per_1k_ms": 1.0,
+            "confusion_matrix": {"tn": 1, "fp": 1, "fn": 1, "tp": 1},
+            "non_canonical_05": {"precision": 0.5, "recall": 0.5, "f1_score": 0.5, "confusion_matrix": {"tn": 1, "fp": 1, "fn": 1, "tp": 1}},
+        }
+        preds = np.zeros(10, dtype=np.float32)
+        dummy_train_ret = (dummy_metrics, preds, [0.5], 15, 0.5, 0.5)
+        return dummy_data, dummy_train_ret
+
+    def test_non_canonical_real_run_output_dir_none_preserves_both_canonical_artifacts(self, dummy_run_environment) -> None:
+        """Verifies that an unparameterized non-canonical real run writes to diagnostic/ and touches neither canonical file."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+
+        raw_canonical = REPO_ROOT / "benchmarks" / "results" / "raw" / "graphsage_elliptic_benchmark.json"
+        exp_canonical = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+
+        raw_canonical_mtime = raw_canonical.stat().st_mtime_ns if raw_canonical.exists() else 0
+        exp_canonical_mtime = exp_canonical.stat().st_mtime_ns if exp_canonical.exists() else 0
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="real",
+            require_real=True,
+            all_rows=False,
+            nrows=10,
+            is_canonical=False,
+        )
+
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             patch.object(bench, "_generate_publication_plots", return_value={}):
+            res = bench.run_benchmark(epochs=15, is_canonical=False)
+
+        assert res["status"] == "COMPLETED"
+        written_path = Path(res["paths"]["raw_benchmark"])
+        assert "diagnostic" in written_path.parts
+        assert written_path != raw_canonical
+        assert written_path != exp_canonical
+
+        assert raw_canonical.stat().st_mtime_ns == raw_canonical_mtime
+        assert exp_canonical.stat().st_mtime_ns == exp_canonical_mtime
+
+    def test_synthetic_run_preserves_both_canonical_artifacts(self, dummy_run_environment) -> None:
+        """Verifies synthetic runs divert to synthetic/ and touch neither canonical file."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+        synth_data = dict(dummy_data)
+        synth_data["source"] = "synthetic"
+
+        raw_canonical = REPO_ROOT / "benchmarks" / "results" / "raw" / "graphsage_elliptic_benchmark.json"
+        exp_canonical = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+
+        raw_mtime = raw_canonical.stat().st_mtime_ns
+        exp_mtime = exp_canonical.stat().st_mtime_ns
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="synthetic",
+            require_real=False,
+            all_rows=False,
+            nrows=10,
+            is_canonical=False,
+        )
+
+        with patch.object(bench, "load_and_preprocess", return_value=synth_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             patch.object(bench, "_generate_publication_plots", return_value={}):
+            res = bench.run_benchmark(epochs=15, is_canonical=False)
+
+        written_path = Path(res["paths"]["raw_benchmark"])
+        assert "synthetic" in written_path.parts
+        assert raw_canonical.stat().st_mtime_ns == raw_mtime
+        assert exp_canonical.stat().st_mtime_ns == exp_mtime
+
+    def test_altered_mutable_parameter_preserves_both_canonical_artifacts(self, dummy_run_environment) -> None:
+        """Verifies modified hyperparameter (e.g. epochs=2) cannot write to canonical locations."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+
+        raw_canonical = REPO_ROOT / "benchmarks" / "results" / "raw" / "graphsage_elliptic_benchmark.json"
+        exp_canonical = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+        raw_mtime = raw_canonical.stat().st_mtime_ns
+        exp_mtime = exp_canonical.stat().st_mtime_ns
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="real",
+            require_real=True,
+            all_rows=True,
+            is_canonical=False,
+        )
+
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             patch.object(bench, "_generate_publication_plots", return_value={}):
+            res = bench.run_benchmark(epochs=2, is_canonical=False)
+
+        written_path = Path(res["paths"]["raw_benchmark"])
+        assert "diagnostic" in written_path.parts
+        assert raw_canonical.stat().st_mtime_ns == raw_mtime
+        assert exp_canonical.stat().st_mtime_ns == exp_mtime
+
+    def test_single_seed_run_preserves_both_canonical_artifacts(self, dummy_run_environment) -> None:
+        """Verifies single-seed run (seeds=[42]) cannot overwrite canonical multi-seed artifacts."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+
+        raw_canonical = REPO_ROOT / "benchmarks" / "results" / "raw" / "graphsage_elliptic_benchmark.json"
+        exp_canonical = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+        raw_mtime = raw_canonical.stat().st_mtime_ns
+        exp_mtime = exp_canonical.stat().st_mtime_ns
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            seeds=[42],
+            dataset_mode="real",
+            require_real=True,
+            all_rows=True,
+            is_canonical=False,
+        )
+
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             patch.object(bench, "_generate_publication_plots", return_value={}):
+            res = bench.run_benchmark(epochs=15, is_canonical=False)
+
+        written_path = Path(res["paths"]["raw_benchmark"])
+        assert "diagnostic" in written_path.parts
+        assert raw_canonical.stat().st_mtime_ns == raw_mtime
+        assert exp_canonical.stat().st_mtime_ns == exp_mtime
+
+    def test_adversarial_canonical_output_dir_fails_closed(self, dummy_run_environment) -> None:
+        """Verifies passing canonical directory as output_dir in non-canonical run raises ValueError."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="real",
+            require_real=False,
+            all_rows=False,
+            is_canonical=False,
+        )
+
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             pytest.raises(ValueError, match="Canonical repository artifact destinations .* are strictly protected"):
+            bench.run_benchmark(output_dir=REPO_ROOT / "experiments" / "elliptic", is_canonical=False)
+
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             pytest.raises(ValueError, match="Canonical repository artifact destinations .* are strictly protected"):
+            bench.run_benchmark(output_dir=REPO_ROOT / "benchmarks" / "results" / "raw", is_canonical=False)
+
+    def test_explicit_non_canonical_output_directory_succeeds_isolated(self, tmp_path, dummy_run_environment) -> None:
+        """Verifies caller-specified isolated output directory is respected and canonical files remain intact."""
+        from unittest.mock import patch
+        dummy_data, dummy_train_ret = dummy_run_environment
+
+        raw_canonical = REPO_ROOT / "benchmarks" / "results" / "raw" / "graphsage_elliptic_benchmark.json"
+        exp_canonical = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+        raw_mtime = raw_canonical.stat().st_mtime_ns
+        exp_mtime = exp_canonical.stat().st_mtime_ns
+
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="real",
+            require_real=False,
+            all_rows=False,
+            is_canonical=False,
+        )
+
+        custom_dest = tmp_path / "custom_elliptic_eval"
+        with patch.object(bench, "load_and_preprocess", return_value=dummy_data), \
+             patch.object(bench, "train_and_evaluate_model", return_value=dummy_train_ret), \
+             patch.object(bench, "_generate_publication_plots", return_value={}):
+            res = bench.run_benchmark(output_dir=custom_dest, is_canonical=False)
+
+        assert res["status"] == "COMPLETED"
+        assert Path(res["paths"]["raw_benchmark"]) == custom_dest / "graphsage_elliptic_benchmark.json"
+        assert (custom_dest / "graphsage_elliptic_benchmark.json").exists()
+        assert raw_canonical.stat().st_mtime_ns == raw_mtime
+        assert exp_canonical.stat().st_mtime_ns == exp_mtime
+
+

@@ -494,8 +494,10 @@
       "docs/algorithms/graphsage.md (DEF-03 causal claim replaced)"
     ],
     "repository_governance_commits": [
-      "1a80ce65ad93e9bb57bb72faca0f25021275c496"
+      "1a80ce65ad93e9bb57bb72faca0f25021275c496",
+      "01f6c705a481634fafd94f159dd2f9da8ef208c0",
+      "9af6da73134adbc4599335f9395caef97c322ec0"
     ],
-    "provenance_note": "Benchmark was executed from the remediation working tree on top of base commit aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e before changes were committed to git. Post-execution repository governance commits (1a80ce65 and subsequent closure commits) enforce write-guard invariants and documentation parity without modifying the verified scientific payload."
+    "provenance_note": "Benchmark was executed from the remediation working tree on top of base commit aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e before changes were committed to git. Post-execution repository governance commits (1a80ce65, 01f6c705, 9af6da73, and subsequent closure commits) enforce write-guard invariants, secondary artifact isolation, and documentation parity without modifying the verified scientific payload. Note: The final closure repair commit hash is excluded here to avoid circular self-referential hash generation."
   }
 }

@@ -1007,8 +1007,17 @@ class EllipticGraphSAGEBenchmark:
         )
         if output_dir:
             target_dir = Path(output_dir)
-        elif self.dataset_mode == "real":
+            canonical_exp_dir = (REPO_ROOT / "experiments" / "elliptic").resolve()
+            canonical_raw_dir = (REPO_ROOT / "benchmarks" / "results" / "raw").resolve()
+            if not is_canonical_real_run and target_dir.resolve() in (canonical_exp_dir, canonical_raw_dir):
+                raise ValueError(
+                    f"Canonical repository artifact destinations ({target_dir}) are strictly protected. "
+                    f"Non-canonical runs cannot write to canonical locations. Specify an isolated output directory."
+                )
+        elif is_canonical_real_run:
             target_dir = REPO_ROOT / "experiments" / "elliptic"
+        elif self.dataset_mode == "real":
+            target_dir = REPO_ROOT / "experiments" / "elliptic" / "diagnostic"
         else:
             target_dir = REPO_ROOT / "experiments" / "elliptic" / "synthetic"
 
@@ -1331,18 +1340,25 @@ class EllipticGraphSAGEBenchmark:
             },
         }
 
-        # Write output artifacts
-        target_raw_path = target_dir / "graphsage_elliptic_benchmark.json"
-        with open(target_raw_path, "w", encoding="utf-8") as f:
-            json.dump(raw_payload, f, indent=2)
-
+        # Write output artifacts:
+        # Both repository-owned canonical scientific artifacts:
+        #   1. benchmarks/results/raw/graphsage_elliptic_benchmark.json
+        #   2. experiments/elliptic/graphsage_elliptic_benchmark.json
+        # have equivalent fail-closed protection and are ONLY written when is_canonical_real_run is True.
         root_raw_path = raw_results_dir / "graphsage_elliptic_benchmark.json"
+        canonical_exp_raw_path = REPO_ROOT / "experiments" / "elliptic" / "graphsage_elliptic_benchmark.json"
+        target_raw_path = target_dir / "graphsage_elliptic_benchmark.json"
+
         if is_canonical_real_run:
+            with open(canonical_exp_raw_path, "w", encoding="utf-8") as f:
+                json.dump(raw_payload, f, indent=2)
             with open(root_raw_path, "w", encoding="utf-8") as f:
                 json.dump(raw_payload, f, indent=2)
             canonical_path_str = str(root_raw_path)
-            logger.info("Successfully serialized canonical benchmark artifacts to: %s and %s", target_dir, root_raw_path)
+            logger.info("Successfully serialized canonical benchmark artifacts to: %s and %s", canonical_exp_raw_path, root_raw_path)
         else:
+            with open(target_raw_path, "w", encoding="utf-8") as f:
+                json.dump(raw_payload, f, indent=2)
             canonical_path_str = str(target_raw_path)
             logger.info("Successfully serialized isolated benchmark artifacts to: %s", target_dir)
 
