@@ -301,7 +301,7 @@ class EllipticGraphSAGEClassifier(nn.Module):
             nn.Sigmoid(),
         )
 
-    def get_embeddings(self, x: torch.Tensor, adj_sparse: torch.Tensor) -> torch.Tensor:
+    def get_embeddings(self, x: torch.Tensor | Any, adj_sparse: torch.Tensor | Any) -> torch.Tensor:
         h = self.layer1(x, adj_sparse)
         h = self.dropout(h)
         if self.layer2 is not None:
@@ -309,7 +309,7 @@ class EllipticGraphSAGEClassifier(nn.Module):
             h = self.dropout(h)
         return F.normalize(h, p=2, dim=1)
 
-    def forward(self, x: torch.Tensor, adj_sparse: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor | Any, adj_sparse: torch.Tensor | Any) -> torch.Tensor:
         embeddings = self.get_embeddings(x, adj_sparse)
         return self.classifier(embeddings).squeeze(-1)
 
@@ -318,7 +318,7 @@ class EllipticGraphSAGEClassifier(nn.Module):
 # 3. Graph Adjacency Operators
 # ===========================================================================
 def build_normalized_adjacency(
-    edge_index: np.ndarray,
+    edge_index: np.ndarray | Any,
     num_nodes: int,
     mode: str = "mean",
     add_self_loops: bool = True,
@@ -384,8 +384,8 @@ def build_normalized_adjacency(
 # 4. Evaluation & Metric Engine
 # ===========================================================================
 def compute_fixed_fpr_recalls(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
+    y_true: np.ndarray | Any,
+    y_prob: np.ndarray | Any,
     target_fprs: Sequence[float] = (0.001, 0.005, 0.01),
 ) -> dict[str, float]:
     """Calculate operational True Positive Rate (Recall) at strict False Positive Rate bounds."""
@@ -407,8 +407,8 @@ def compute_fixed_fpr_recalls(
 
 
 def evaluate_predictions(
-    y_true: np.ndarray,
-    y_prob: np.ndarray,
+    y_true: np.ndarray | Any,
+    y_prob: np.ndarray | Any,
     threshold: float = 0.5,
 ) -> dict[str, Any]:
     """Extract full empirical evaluation metrics on binary fraud predictions.
@@ -510,7 +510,7 @@ class EllipticGraphSAGEBenchmark:
         seed: int = 42,
         seeds: Sequence[int] | None = None,
         data_dir: Path | str | None = None,
-        require_real: bool = False,
+        require_real: bool | None = None,
         dataset_mode: str = "real",
         all_rows: bool = True,
         nrows: int | None = None,
@@ -521,7 +521,11 @@ class EllipticGraphSAGEBenchmark:
         self.seed = seed
         self.seeds = list(seeds) if seeds is not None else [seed]
         self.data_dir = Path(data_dir) if data_dir is not None else None
-        self.require_real = require_real or (dataset_mode == "real")
+        if require_real is False and dataset_mode == "real":
+            dataset_mode = "synthetic"
+        if require_real is None:
+            require_real = (dataset_mode == "real")
+        self.require_real = bool(require_real and (dataset_mode == "real"))
         self.dataset_mode = dataset_mode
         self.all_rows = all_rows
         self.nrows = nrows
@@ -582,6 +586,7 @@ class EllipticGraphSAGEBenchmark:
             all_rows=self.all_rows,
             nrows=self.nrows,
             target_nodes=self.nrows or 5000,
+            force_mock=(self.dataset_mode == "synthetic"),
         )
 
         X_raw = raw_data["X"]
@@ -1656,7 +1661,7 @@ def run_graphsage_benchmark(
     lr: float = 0.005,
     hidden_dim: int = 128,
     embedding_dim: int = 64,
-    require_real: bool = True,
+    require_real: bool | None = None,
     dataset_mode: str = "real",
     all_rows: bool = True,
     nrows: int | None = None,
@@ -1681,6 +1686,10 @@ def run_graphsage_benchmark(
     Returns:
         Dictionary containing benchmark status, metrics, and artifact paths.
     """
+    if require_real is False and dataset_mode == "real":
+        dataset_mode = "synthetic"
+    if require_real is None:
+        require_real = (dataset_mode == "real")
     eval_seeds = list(seeds) if seeds is not None else [seed]
     bench = EllipticGraphSAGEBenchmark(
         seed=eval_seeds[0],

@@ -47,7 +47,13 @@ class TestEllipticDataAndSplits:
 
     def test_synthetic_fast_loading_and_preprocessing(self) -> None:
         """Verifies load_and_preprocess initializes cleanly on synthetic testbed."""
-        bench = EllipticGraphSAGEBenchmark(seed=42, require_real=False, all_rows=False, nrows=300)
+        bench = EllipticGraphSAGEBenchmark(
+            seed=42,
+            dataset_mode="synthetic",
+            require_real=False,
+            all_rows=False,
+            nrows=300,
+        )
         data = bench.load_and_preprocess()
 
         assert "X" in data
@@ -226,6 +232,7 @@ class TestEndToEndBenchmarkExecution:
         """Executes full benchmark on synthetic testbed and verifies all generated files."""
         result = run_graphsage_benchmark(
             seed=42,
+            dataset_mode="synthetic",
             epochs=2,
             lr=0.01,
             hidden_dim=32,
@@ -285,6 +292,7 @@ class TestEndToEndBenchmarkExecution:
         # 2. Execute synthetic benchmark using temporary output directory (NEVER mutating canonical path)
         res = run_graphsage_benchmark(
             seed=42,
+            dataset_mode="synthetic",
             epochs=1,
             hidden_dim=16,
             embedding_dim=8,

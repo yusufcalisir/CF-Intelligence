@@ -667,18 +667,23 @@ class MasterBenchmarkMatrixGenerator:
             ds_data = datasets[ds_id]
             paradigms = ds_data.get("paradigms", {})
 
-            # Invariant: FedAvg must be EVALUATED for all 8 datasets
+            # Invariant: FedAvg must be EVALUATED for tabular/transactional datasets,
+            # while Elliptic remains a centralized graph benchmark (NOT_EVALUATED for cross-bank subgraph partitioning).
             fedavg = paradigms.get("federated_fedavg", {})
-            if fedavg.get("status") != "EVALUATED":
-                errors.append(f"{ds_id}: federated_fedavg status is {fedavg.get('status')}, expected EVALUATED")
+            if ds_id == "elliptic":
+                if fedavg.get("status") != "NOT_EVALUATED":
+                    errors.append(f"{ds_id}: federated_fedavg status is {fedavg.get('status')}, expected NOT_EVALUATED")
+            else:
+                if fedavg.get("status") != "EVALUATED":
+                    errors.append(f"{ds_id}: federated_fedavg status is {fedavg.get('status')}, expected EVALUATED")
 
-            # Invariant: unexecuted runs must be NOT_RUN and have None metrics
+            # Invariant: unexecuted/unevaluated runs must be NOT_RUN/NOT_EVALUATED and have None metrics
             for p_name, p_data in paradigms.items():
                 status = p_data.get("status")
-                if status == "NOT_RUN":
+                if status in ("NOT_RUN", "NOT_EVALUATED"):
                     for metric_k in ["pr_auc", "roc_auc", "f1_score", "precision", "recall"]:
                         if p_data.get(metric_k) is not None:
-                            errors.append(f"{ds_id}.{p_name} has status NOT_RUN but {metric_k} is not None")
+                            errors.append(f"{ds_id}.{p_name} has status {status} but {metric_k} is not None")
 
         return len(errors) == 0, errors
 
@@ -717,16 +722,23 @@ class MasterBenchmarkMatrixGenerator:
             fa = paradigms.get("federated_fedavg", {})
             fa_clients = fa.get("clients")
             fa_rounds = fa.get("rounds")
+            fa_status = fa.get("status", "NOT_RUN")
             if fa_clients is not None and fa_rounds is not None:
                 c_r = f"{fa_clients} clients / {fa_rounds} rnds"
             elif fa_rounds is not None:
                 c_r = f"Graph / {fa_rounds} rnds"
             else:
                 c_r = "—"
+            if fa_status == "EVALUATED":
+                status_badge = "`FEDERATED [OK]`"
+            elif fa_status == "NOT_EVALUATED":
+                status_badge = "`N/A (NOT EVALUATED)`"
+            else:
+                status_badge = "`N/A (NOT RUN)`"
             lines.append(
                 f"| | **Federated FedAvg (Collaborative)** | {fa.get('architecture', 'FedAvg')} | {c_r} | "
                 f"{_fmt(fa.get('pr_auc'), bold=True)} | {_fmt(fa.get('roc_auc'), bold=True)} | {_fmt(fa.get('f1_score'))} | {_fmt(fa.get('precision'))} | "
-                f"{_fmt(fa.get('recall'))} | {_fmt(fa.get('recall_at_01_fpr'), bold=True)} | `FEDERATED [OK]` |"
+                f"{_fmt(fa.get('recall'))} | {_fmt(fa.get('recall_at_01_fpr'), bold=True)} | {status_badge} |"
             )
 
             # 3. Federated FedProx

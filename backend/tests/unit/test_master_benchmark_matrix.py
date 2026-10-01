@@ -77,15 +77,20 @@ def test_strict_null_representation_invariant(master_matrix_data: dict[str, Any]
     for ds_id, ds_data in datasets.items():
         paradigms = ds_data.get("paradigms", {})
 
-        # Federated FedAvg must be evaluated for all datasets
         fa = paradigms.get("federated_fedavg", {})
-        assert fa.get("status") == "EVALUATED", f"{ds_id}: FedAvg must have status EVALUATED"
-        assert fa.get("pr_auc") is not None, f"{ds_id}: FedAvg PR-AUC must not be None"
+        if ds_id == "elliptic":
+            # Elliptic is centralized GraphSAGE benchmark; cross-bank FL is NOT_EVALUATED
+            assert fa.get("status") == "NOT_EVALUATED", f"{ds_id}: FedAvg must have status NOT_EVALUATED"
+            assert fa.get("pr_auc") is None, f"{ds_id}: FedAvg PR-AUC must be None"
+        else:
+            # Federated FedAvg must be evaluated for all other datasets
+            assert fa.get("status") == "EVALUATED", f"{ds_id}: FedAvg must have status EVALUATED"
+            assert fa.get("pr_auc") is not None, f"{ds_id}: FedAvg PR-AUC must not be None"
 
-        # Check every paradigm with status NOT_RUN
+        # Check every paradigm with status NOT_RUN or NOT_EVALUATED
         for p_name, p_data in paradigms.items():
             status = p_data.get("status")
-            if status == "NOT_RUN":
+            if status in ("NOT_RUN", "NOT_EVALUATED"):
                 for metric_key in ["pr_auc", "roc_auc", "f1_score", "precision", "recall"]:
                     val = p_data.get(metric_key)
                     assert val is None, (
