@@ -11,31 +11,29 @@ from app.main import ContentTypeMiddleware
 @pytest.mark.asyncio
 async def test_pure_asgi_non_http_scope_passthrough():
     """Verify non-HTTP scopes (websocket, lifespan) pass through without validation."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append(scope["type"])
 
     mw = ContentTypeMiddleware(mock_app)
     scope: Scope = {"type": "websocket", "path": "/ws/alerts"}
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert call_log == ["websocket"]
 
-    inner_called = False
+    call_log.clear()
     scope_lifespan: Scope = {"type": "lifespan"}
     await mw(scope_lifespan, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert call_log == ["lifespan"]
 
 
 @pytest.mark.asyncio
 async def test_pure_asgi_get_options_passthrough():
     """Verify unmutating methods (GET, OPTIONS) pass through regardless of Content-Type."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append("app_executed")
 
     mw = ContentTypeMiddleware(mock_app)
     scope: Scope = {
@@ -45,17 +43,16 @@ async def test_pure_asgi_get_options_passthrough():
         "headers": [(b"content-type", b"text/plain")],
     }
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert len(call_log) == 1
 
 
 @pytest.mark.asyncio
 async def test_pure_asgi_post_valid_json_passthrough():
     """Verify POST with application/json or parameterized charset passes through."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append("app_executed")
 
     mw = ContentTypeMiddleware(mock_app)
 
@@ -67,23 +64,22 @@ async def test_pure_asgi_post_valid_json_passthrough():
         "headers": [(b"content-type", b"application/json")],
     }
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert len(call_log) == 1
 
     # Parameterized charset
-    inner_called = False
+    call_log.clear()
     scope["headers"] = [(b"content-type", b"application/json; charset=utf-8")]
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert len(call_log) == 1
 
 
 @pytest.mark.asyncio
 async def test_pure_asgi_post_missing_content_type_passthrough():
     """Verify POST without Content-Type header passes through (handled downstream by Pydantic)."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append("app_executed")
 
     mw = ContentTypeMiddleware(mock_app)
     scope: Scope = {
@@ -93,17 +89,16 @@ async def test_pure_asgi_post_missing_content_type_passthrough():
         "headers": [],
     }
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert len(call_log) == 1
 
 
 @pytest.mark.asyncio
 async def test_pure_asgi_post_exempt_prefix_passthrough():
     """Verify exempt prefixes (/docs, /redoc, /openapi.json, /ws/, /api/v1/banks/upload) pass through."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append("app_executed")
 
     mw = ContentTypeMiddleware(mock_app)
     scope: Scope = {
@@ -113,22 +108,21 @@ async def test_pure_asgi_post_exempt_prefix_passthrough():
         "headers": [(b"content-type", b"multipart/form-data; boundary=---")],
     }
     await mw(scope, None, None)  # type: ignore[arg-type]
-    assert inner_called is True
+    assert len(call_log) == 1
 
 
 @pytest.mark.asyncio
 async def test_pure_asgi_mutating_invalid_content_type_returns_415():
     """Verify mutating operations (POST/PUT/PATCH) with non-JSON Content-Type return 415 problem details."""
-    inner_called = False
+    call_log: list[str] = []
 
     async def mock_app(scope: Scope, receive: Receive, send: Send) -> None:
-        nonlocal inner_called
-        inner_called = True
+        call_log.append("inner_called")
 
     mw = ContentTypeMiddleware(mock_app)
 
     for method in ("POST", "PUT", "PATCH"):
-        inner_called = False
+        call_log.clear()
         sent_messages: list[Message] = []
 
         def make_sender(msg_list: list[Message]):
@@ -149,7 +143,7 @@ async def test_pure_asgi_mutating_invalid_content_type_returns_415():
             return {"type": "http.request", "body": b"data", "more_body": False}
 
         await mw(scope, mock_receive, mock_send)
-        assert inner_called is False
+        assert len(call_log) == 0
         assert len(sent_messages) == 2
         start_msg = sent_messages[0]
         body_msg = sent_messages[1]
