@@ -20,9 +20,11 @@ import json
 from pathlib import Path
 
 import numpy as np
+import pytest
 import torch
 from experiments.elliptic.train_graphsage import (
     CANONICAL_AGGREGATE_METRICS,
+    CANONICAL_CONFIG,
     REPO_ROOT,
     EllipticGraphSAGEBenchmark,
     EllipticGraphSAGEClassifier,
@@ -30,7 +32,9 @@ from experiments.elliptic.train_graphsage import (
     build_normalized_adjacency,
     compute_fixed_fpr_recalls,
     evaluate_predictions,
+    run_canonical_graphsage_benchmark,
     run_graphsage_benchmark,
+    validate_canonical_configuration,
 )
 from experiments.harness.schema import ExperimentResult
 
@@ -314,46 +318,170 @@ class TestEndToEndBenchmarkExecution:
         )
         assert bench_diag.is_canonical is False
         eff_diag = bool(getattr(bench_diag, "is_canonical", False))
-        is_canon_diag = (eff_diag and bench_diag.dataset_mode == "real" and bench_diag.all_rows is True and len(bench_diag.seeds) >= 3)
+        is_canon_diag = (
+            eff_diag
+            and bench_diag.dataset_mode == CANONICAL_CONFIG["dataset_mode"]
+            and bench_diag.all_rows is True
+            and tuple(bench_diag.seeds) == CANONICAL_CONFIG["seeds"]
+        )
         assert is_canon_diag is False
 
-        # Invariant 2: Single-seed real run CANNOT authorize canonical write (even if is_canonical=True)
-        bench_single = EllipticGraphSAGEBenchmark(
-            dataset_mode="real",
-            all_rows=True,
-            seeds=[42],
-            is_canonical=True,
-        )
-        eff_single = bool(getattr(bench_single, "is_canonical", False))
-        is_canon_single = (eff_single and bench_single.dataset_mode == "real" and bench_single.all_rows is True and len(bench_single.seeds) >= 3)
-        assert is_canon_single is False
+        # Invariant 2: Single-seed real run CANNOT authorize canonical write (rejected at init)
+        with pytest.raises(ValueError, match="seeds must match canonical"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42],
+                is_canonical=True,
+            )
 
-        # Invariant 3: Synthetic run CANNOT authorize canonical write (even if is_canonical=True)
-        bench_synth = EllipticGraphSAGEBenchmark(
-            dataset_mode="synthetic",
-            all_rows=True,
-            seeds=[42, 123, 456],
-            is_canonical=True,
-        )
-        eff_synth = bool(getattr(bench_synth, "is_canonical", False))
-        is_canon_synth = (eff_synth and bench_synth.dataset_mode == "real" and bench_synth.all_rows is True and len(bench_synth.seeds) >= 3)
-        assert is_canon_synth is False
+        # Invariant 3: Synthetic run CANNOT authorize canonical write (rejected at init)
+        with pytest.raises(ValueError, match="dataset_mode must be 'real'"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="synthetic",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                is_canonical=True,
+            )
 
-        # Invariant 4: Custom output directory CANNOT authorize canonical write
-        custom_out = tmp_path / "custom"
-        is_canon_custom = (True and "real" == "real" and custom_out is None and True and 3 >= 3)
-        assert is_canon_custom is False
+        # Invariant 4: Subsampled / partial dataset CANNOT authorize canonical write (rejected at init)
+        with pytest.raises(ValueError, match="all_rows must be True"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="real",
+                all_rows=False,
+                seeds=[42, 123, 456],
+                is_canonical=True,
+            )
 
-        # Invariant 5: Official canonical runner satisfies all authorization predicates
+        with pytest.raises(ValueError, match="nrows subsampling prohibited"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="real",
+                all_rows=True,
+                nrows=1000,
+                seeds=[42, 123, 456],
+                is_canonical=True,
+            )
+
+        # Invariant 5: Altered temporal split CANNOT authorize canonical write (rejected at init)
+        with pytest.raises(ValueError, match="val_start_timestep must be 31"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                val_start_timestep=32,
+                is_canonical=True,
+            )
+
+        with pytest.raises(ValueError, match="split_timestep must be 34"):
+            EllipticGraphSAGEBenchmark(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                split_timestep=35,
+                is_canonical=True,
+            )
+
+        # Invariant 6: Official canonical configuration satisfies all authorization predicates
         bench_canon = EllipticGraphSAGEBenchmark(
             dataset_mode="real",
             all_rows=True,
             seeds=[42, 123, 456],
             is_canonical=True,
         )
-        eff_canon = bool(getattr(bench_canon, "is_canonical", False))
-        is_canon_official = (eff_canon and bench_canon.dataset_mode == "real" and bench_canon.all_rows is True and len(bench_canon.seeds) >= 3)
-        assert is_canon_official is True
+        assert bench_canon.is_canonical is True
+        assert tuple(bench_canon.seeds) == CANONICAL_CONFIG["seeds"]
+
+    def test_adversarial_canonical_hyperparameter_rejections(self, tmp_path: Path) -> None:
+        """Adversarial validation: proves canonical authorization fails closed if any hyperparameter is modified."""
+        # 1. Altered epochs rejected before training
+        with pytest.raises(ValueError, match="epochs must be 15"):
+            validate_canonical_configuration(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                epochs=2,
+                lr=0.005,
+                hidden_dim=128,
+                embedding_dim=64,
+            )
+
+        # 2. Altered learning rate rejected before training
+        with pytest.raises(ValueError, match="lr must be 0.005"):
+            validate_canonical_configuration(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                epochs=15,
+                lr=0.123,
+                hidden_dim=128,
+                embedding_dim=64,
+            )
+
+        # 3. Altered hidden_dim rejected before training
+        with pytest.raises(ValueError, match="hidden_dim must be 128"):
+            validate_canonical_configuration(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                epochs=15,
+                lr=0.005,
+                hidden_dim=999,
+                embedding_dim=64,
+            )
+
+        # 4. Altered embedding_dim rejected before training
+        with pytest.raises(ValueError, match="embedding_dim must be 64"):
+            validate_canonical_configuration(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                epochs=15,
+                lr=0.005,
+                hidden_dim=128,
+                embedding_dim=7,
+            )
+
+        # 5. Custom output directory rejected from canonical authorization
+        with pytest.raises(ValueError, match="output_dir must be None"):
+            validate_canonical_configuration(
+                dataset_mode="real",
+                all_rows=True,
+                seeds=[42, 123, 456],
+                epochs=15,
+                lr=0.005,
+                hidden_dim=128,
+                embedding_dim=64,
+                output_dir=tmp_path / "custom",
+            )
+
+        # 6. Exact canonical configuration passes validation
+        validate_canonical_configuration(
+            dataset_mode="real",
+            all_rows=True,
+            seeds=[42, 123, 456],
+            epochs=15,
+            lr=0.005,
+            hidden_dim=128,
+            embedding_dim=64,
+            output_dir=None,
+        )
+
+    def test_canonical_runner_rejects_caller_overrides(self, tmp_path: Path) -> None:
+        """Verifies run_canonical_graphsage_benchmark rejects any noncanonical caller overrides."""
+        with pytest.raises(ValueError, match="Canonical runner rejects parameter override for 'epochs'"):
+            run_canonical_graphsage_benchmark(epochs=2)
+
+        with pytest.raises(ValueError, match="Canonical runner rejects parameter override for 'lr'"):
+            run_canonical_graphsage_benchmark(lr=0.123)
+
+        with pytest.raises(ValueError, match="Canonical runner rejects parameter override for 'seeds'"):
+            run_canonical_graphsage_benchmark(seeds=[1, 2, 3])
+
+        with pytest.raises(ValueError, match="Canonical runner rejects parameter override for 'hidden_dim'"):
+            run_canonical_graphsage_benchmark(hidden_dim=999)
+
+        with pytest.raises(ValueError, match="Canonical runner rejects non-None output_dir"):
+            run_canonical_graphsage_benchmark(output_dir=tmp_path / "custom")
 
     def test_canonical_artifact_integrity_and_federated_taxonomy(self) -> None:
         """Verifies canonical artifact metrics, sample SD ddof=1, Recall@0.1%FPR min/max, and federated taxonomy."""

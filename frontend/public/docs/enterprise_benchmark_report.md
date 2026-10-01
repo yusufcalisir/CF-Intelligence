@@ -265,7 +265,7 @@ Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ dire
 
 | Evaluation Paradigm / Model | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR | F1-Score | Latency / 1k Nodes | Evaluation Methodology |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Inductive GraphSAGE (2-Layer Mean)** | `GRAPH_INTELLIGENCE_CHAMPION` | **0.3761 ± 0.0482** | 0.8325 ± 0.0078 | 4.62% | 14.34% | 20.81% | **0.3555** | $6.16\text{ ms}$ | Canonical Multi-Seed Temporal Validation ($N=3$) |
+| **Inductive GraphSAGE (2-Layer Mean)** | `GRAPH_INTELLIGENCE_PRIMARY` | **0.3761 ± 0.0482** | 0.8325 ± 0.0078 | 4.62% | 14.34% | 20.81% | **0.3555** | $6.16\text{ ms}$ | Canonical Multi-Seed Temporal Validation ($N=3$) |
 | **Tabular MLP Baseline (0-Hop / No Graph)**| `TABULAR_BASELINE` | 0.5778 | 0.8722 | 25.21% | 34.63% | 40.26% | 0.5162 | **1.44 ms** | Tabular Baseline (Node Features Only) |
 | **GraphSAGE (1-Layer Mean Ablation)** | `GRAPH_ABLATION` | 0.4636 | 0.8659 | 23.45% | 33.15% | 39.80% | 0.3890 | $2.93\text{ ms}$ | 1-Hop Local Aggregation |
 | **Legacy Single-Run Baseline (Archived)**| `HISTORICAL_SINGLE_RUN` | 0.4372 | 0.8388 | 13.20% | 18.28% | 23.08% | 0.3804 | $6.16\text{ ms}$ | Historical single-run without validation split |

@@ -36,8 +36,8 @@ The benchmark was executed on the real **Elliptic Bitcoin Transaction Dataset** 
 
 ### 3.1 Strict Temporal Split (Zero-Leakage Invariant)
 To prevent temporal data leakage and future-lookahead bias, the transaction stream is partitioned strictly chronologically:
-- **Training Graph ($\mathcal{D}_{\mathrm{train}}$)**: Timesteps $1 \le t \le 30$ ($26{,}819$ labeled nodes: $3{,}036$ illicit, $23{,}783$ licit; $11.58\%$ illicit prevalence).
-- **Validation Graph ($\\mathcal{D}_{\\mathrm{val}}$)**: Timesteps  \\le t \\le 34$ ({,}075$ labeled nodes: $ illicit, {,}649$ licit; .85\\%$ illicit prevalence) used strictly for checkpoint and threshold calibration.
+- **Training Graph ($\mathcal{D}_{\mathrm{train}}$)**: Timesteps $1 \le t \le 30$ ($26{,}905$ labeled nodes: $2{,}954$ illicit, $23{,}951$ licit; $10.98\%$ illicit prevalence).
+- **Validation Graph ($\mathcal{D}_{\mathrm{val}}$)**: Timesteps $31 \le t \le 34$ ($2{,}989$ labeled nodes: $508$ illicit, $2{,}481$ licit; $17.00\%$ illicit prevalence) used strictly for checkpoint and threshold calibration.
 - **Test Graph ($\mathcal{D}_{\mathrm{test}}$)**: Timesteps $35 \le t \le 49$ ($16{,}670$ labeled nodes: $1{,}083$ illicit, $15{,}587$ licit; $6.50\%$ illicit prevalence).
 - **Temporal Edge Invariant**: All $234{,}355$ edges satisfy $t_v - t_u = 0$, guaranteeing zero edge traversals between past and future time intervals.
 
@@ -58,7 +58,7 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
    - Tabular MLP intercepts only **8.22%** ($89$ illicit transactions).
    - 2-Layer GraphSAGE intercepts **13.20%** ($143$ illicit transactions), yielding **+4.99 percentage points (+60.7% relative gain)**.
    - 1-Layer GraphSAGE intercepts **14.96%** ($162$ illicit transactions), achieving **+6.74 percentage points (+82.0% relative gain)**.
-   Graph message aggregation successfully pulls in immediate counterparty signals, allowing the model to flag covert laundering operations with high confidence.
+   GraphSAGE aggregates neighboring-node representations through message passing. The canonical benchmark evaluates the resulting model on the temporal Elliptic split; the experiment does not isolate a causal contribution from counterparty information.
 
 2. **Exploratory Topological Ablations (Noncanonical Diagnostic)**:
    In exploratory single-seed ablations on this temporal split, 2-layer GraphSAGE exhibited lower PR-AUC than 1-layer GraphSAGE and Tabular MLP across the unconstrained probability spectrum. The repository does not establish an empirical causal mechanism (such as specific transaction-level mixing or dilution) for this difference, and these exploratory ablations are not used for canonical model selection.
@@ -73,7 +73,7 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
 ### 4.1 Neighborhood Hop Depth ($K \in \{0, 1, 2\}$)
 - **0-Hop (Tabular MLP)**: Relies exclusively on local node features (transaction amounts, degrees, output count). PR-AUC: $0.4602$, Recall @ 0.1% FPR: $8.22\%$.
 - **1-Hop GraphSAGE**: Aggregates direct counterparties. Captures immediate suspicious fund transfers. PR-AUC: $0.4604$, Recall @ 0.1% FPR: **$14.96\%$** ($+82.0\%$ relative uplift).
-- **2-Hop GraphSAGE**: Aggregates multi-hop fund flows. Active canonical PR-AUC: .3761 \\pm 0.0482$ (3 seeds: 42, 123, 456; mean ± sample SD). (Historical single-run diagnostic: PR-AUC .4372$, F1 .3804$, noncanonical).
+- **2-Hop GraphSAGE**: Aggregates multi-hop fund flows. Active canonical PR-AUC: $0.3761 \pm 0.0482$ (3 seeds: 42, 123, 456; mean ± sample SD). (Historical single-run diagnostic: PR-AUC $0.4372$, F1 $0.3804$, noncanonical).
 
 ### 4.2 Aggregation Function (Mean vs GCN Symmetric)
 - **Mean Aggregator**: Computes unweighted average across incident neighbors. Demonstrates superior low-FPR recall ($13.20\%$ vs $7.85\%$).

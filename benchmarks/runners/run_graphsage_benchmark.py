@@ -23,7 +23,10 @@ BACKEND_DIR = REPO_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from experiments.elliptic.train_graphsage import run_graphsage_benchmark
+from experiments.elliptic.train_graphsage import (
+    run_graphsage_benchmark,
+    validate_canonical_configuration,
+)
 
 logger = logging.getLogger("benchmarks.runners.run_graphsage_benchmark")
 
@@ -61,6 +64,20 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    if args.canonical:
+        validate_canonical_configuration(
+            dataset_mode=args.dataset_mode,
+            all_rows=args.all_rows,
+            require_real=args.require_real,
+            seeds=args.seeds,
+            epochs=args.epochs,
+            lr=args.lr,
+            hidden_dim=args.hidden_dim,
+            embedding_dim=args.embedding_dim,
+            output_dir=args.output_dir,
+            nrows=args.nrows,
+        )
 
     results = run_graphsage_benchmark(
         seed=args.seed,

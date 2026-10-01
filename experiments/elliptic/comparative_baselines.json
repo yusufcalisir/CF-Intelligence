@@ -5,7 +5,7 @@
   "models": [
     {
       "paradigm": "Inductive GraphSAGE (2-Layer Mean Aggregator)",
-      "category": "GRAPH_INTELLIGENCE_CHAMPION",
+      "category": "GRAPH_INTELLIGENCE_PRIMARY",
       "pr_auc": 0.426475,
       "roc_auc": 0.840058,
       "recall_at_01_fpr": 0.088643,

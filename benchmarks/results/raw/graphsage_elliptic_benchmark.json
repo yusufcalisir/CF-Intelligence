@@ -493,7 +493,9 @@
       "docs/enterprise_benchmark_report.md (DEF-03 causal claim replaced)",
       "docs/algorithms/graphsage.md (DEF-03 causal claim replaced)"
     ],
-    "closure_remediation_commit_pending": true,
-    "provenance_note": "Benchmark was executed from the remediation working tree after DEF-01/DEF-02 code changes were applied on top of base commit aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e before those changes were committed to git. This distinguishes execution-time code state from later repository closure commits."
+    "repository_governance_commits": [
+      "1a80ce65ad93e9bb57bb72faca0f25021275c496"
+    ],
+    "provenance_note": "Benchmark was executed from the remediation working tree on top of base commit aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e before changes were committed to git. Post-execution repository governance commits (1a80ce65 and subsequent closure commits) enforce write-guard invariants and documentation parity without modifying the verified scientific payload."
   }
 }

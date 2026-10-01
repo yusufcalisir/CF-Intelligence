@@ -90,6 +90,106 @@ CANONICAL_AGGREGATE_METRICS: tuple[str, ...] = (
     "recall_at_01_fpr",
 )
 
+CANONICAL_CONFIG: dict[str, Any] = {
+    "dataset_mode": "real",
+    "require_real": True,
+    "all_rows": True,
+    "seeds": (42, 123, 456),
+    "epochs": 15,
+    "lr": 0.005,
+    "weight_decay": 1e-4,
+    "hidden_dim": 128,
+    "embedding_dim": 64,
+    "dropout": 0.2,
+    "num_layers": 2,
+    "val_start_timestep": 31,
+    "split_timestep": 34,
+    "checkpoint_criterion": "validation_pr_auc_maximization",
+    "threshold_selection_criterion": "validation_f1_maximization",
+    "threshold_grid_count": 99,
+    "class_weighting": "positive_class_prevalence_ratio",
+}
+
+
+def validate_canonical_configuration(
+    *,
+    dataset_mode: str,
+    all_rows: bool,
+    seeds: Sequence[int],
+    epochs: int,
+    lr: float,
+    hidden_dim: int,
+    embedding_dim: int,
+    val_start_timestep: int = 31,
+    split_timestep: int = 34,
+    output_dir: Path | str | None = None,
+    require_real: bool = True,
+    nrows: int | None = None,
+) -> None:
+    """Validate that provided configuration matches the immutable canonical protocol exactly.
+
+    Raises:
+        ValueError: If any parameter deviates from the accepted canonical scientific configuration.
+    """
+    if dataset_mode != CANONICAL_CONFIG["dataset_mode"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: dataset_mode must be "
+            f"'{CANONICAL_CONFIG['dataset_mode']}', received '{dataset_mode}'"
+        )
+    if not all_rows:
+        raise ValueError(
+            "Canonical write authorization rejected: all_rows must be True (full 203k graph required)"
+        )
+    if nrows is not None:
+        raise ValueError(
+            f"Canonical write authorization rejected: nrows subsampling prohibited, received {nrows}"
+        )
+    if not require_real:
+        raise ValueError(
+            "Canonical write authorization rejected: require_real must be True"
+        )
+    if tuple(seeds) != CANONICAL_CONFIG["seeds"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: seeds must match canonical {list(CANONICAL_CONFIG['seeds'])}, "
+            f"received {list(seeds)}"
+        )
+    if epochs != CANONICAL_CONFIG["epochs"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: epochs must be {CANONICAL_CONFIG['epochs']}, "
+            f"received {epochs}"
+        )
+    if abs(lr - CANONICAL_CONFIG["lr"]) > 1e-9:
+        raise ValueError(
+            f"Canonical write authorization rejected: lr must be {CANONICAL_CONFIG['lr']}, "
+            f"received {lr}"
+        )
+    if hidden_dim != CANONICAL_CONFIG["hidden_dim"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: hidden_dim must be {CANONICAL_CONFIG['hidden_dim']}, "
+            f"received {hidden_dim}"
+        )
+    if embedding_dim != CANONICAL_CONFIG["embedding_dim"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: embedding_dim must be {CANONICAL_CONFIG['embedding_dim']}, "
+            f"received {embedding_dim}"
+        )
+    if val_start_timestep != CANONICAL_CONFIG["val_start_timestep"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: val_start_timestep must be {CANONICAL_CONFIG['val_start_timestep']}, "
+            f"received {val_start_timestep}"
+        )
+    if split_timestep != CANONICAL_CONFIG["split_timestep"]:
+        raise ValueError(
+            f"Canonical write authorization rejected: split_timestep must be {CANONICAL_CONFIG['split_timestep']}, "
+            f"received {split_timestep}"
+        )
+    if output_dir is not None:
+        raise ValueError(
+            f"Canonical write authorization rejected: output_dir must be None (canonical writes serialize to "
+            f"benchmarks/results/raw/), received '{output_dir}'"
+        )
+
+
 
 # ===========================================================================
 # 1. Visualization Styling
@@ -429,6 +529,21 @@ class EllipticGraphSAGEBenchmark:
         self.val_start_timestep = val_start_timestep
         self.is_canonical = is_canonical
 
+        if is_canonical:
+            validate_canonical_configuration(
+                dataset_mode=self.dataset_mode,
+                all_rows=self.all_rows,
+                require_real=self.require_real,
+                seeds=self.seeds,
+                epochs=CANONICAL_CONFIG["epochs"],
+                lr=CANONICAL_CONFIG["lr"],
+                hidden_dim=CANONICAL_CONFIG["hidden_dim"],
+                embedding_dim=CANONICAL_CONFIG["embedding_dim"],
+                val_start_timestep=self.val_start_timestep,
+                split_timestep=self.split_timestep,
+                nrows=self.nrows,
+            )
+
         np.random.seed(seed)
         torch.manual_seed(seed)
 
@@ -631,6 +746,23 @@ class EllipticGraphSAGEBenchmark:
         is_canonical: bool = False,
     ) -> dict[str, Any]:
         """Execute full GraphSAGE vs Tabular MLP benchmark with multi-seed evaluation and controlled ablations."""
+        effective_canonical = bool(getattr(self, "is_canonical", False) or is_canonical)
+        if effective_canonical:
+            validate_canonical_configuration(
+                dataset_mode=self.dataset_mode,
+                all_rows=self.all_rows,
+                require_real=self.require_real,
+                seeds=self.seeds,
+                epochs=epochs,
+                lr=lr,
+                hidden_dim=hidden_dim,
+                embedding_dim=embedding_dim,
+                val_start_timestep=self.val_start_timestep,
+                split_timestep=self.split_timestep,
+                output_dir=output_dir,
+                nrows=self.nrows,
+            )
+
         start_time_utc = datetime.now(UTC).isoformat()
         t_start = time.perf_counter()
 
@@ -856,10 +988,17 @@ class EllipticGraphSAGEBenchmark:
         effective_canonical = bool(getattr(self, "is_canonical", False) or is_canonical)
         is_canonical_real_run = (
             effective_canonical is True
-            and self.dataset_mode == "real"
             and output_dir is None
+            and self.dataset_mode == CANONICAL_CONFIG["dataset_mode"]
             and self.all_rows is True
-            and len(self.seeds) >= 3
+            and self.nrows is None
+            and tuple(self.seeds) == CANONICAL_CONFIG["seeds"]
+            and epochs == CANONICAL_CONFIG["epochs"]
+            and abs(lr - CANONICAL_CONFIG["lr"]) <= 1e-9
+            and hidden_dim == CANONICAL_CONFIG["hidden_dim"]
+            and embedding_dim == CANONICAL_CONFIG["embedding_dim"]
+            and self.val_start_timestep == CANONICAL_CONFIG["val_start_timestep"]
+            and self.split_timestep == CANONICAL_CONFIG["split_timestep"]
         )
         if output_dir:
             target_dir = Path(output_dir)
@@ -901,7 +1040,7 @@ class EllipticGraphSAGEBenchmark:
             "models": [
                 {
                     "paradigm": "Inductive GraphSAGE (2-Layer Mean Aggregator)",
-                    "category": "GRAPH_INTELLIGENCE_CHAMPION",
+                    "category": "GRAPH_INTELLIGENCE_PRIMARY",
                     "pr_auc": sage2_metrics["pr_auc"],
                     "roc_auc": sage2_metrics["roc_auc"],
                     "recall_at_01_fpr": sage2_metrics["recall_at_01_fpr"],
@@ -1563,10 +1702,55 @@ def run_graphsage_benchmark(
 
 
 def run_canonical_graphsage_benchmark(**kwargs: Any) -> dict[str, Any]:
-    """Authoritative canonical benchmark runner authorized to write repository benchmark artifacts."""
-    kwargs.setdefault("is_canonical", True)
-    kwargs.setdefault("dataset_mode", "real")
-    kwargs.setdefault("all_rows", True)
-    kwargs.setdefault("seeds", [42, 123, 456])
-    return run_graphsage_benchmark(**kwargs)
+    """Authoritative canonical benchmark runner executing the immutable canonical protocol.
+
+    Rejects any parameter overrides that deviate from the accepted canonical scientific configuration.
+    """
+    for param, canon_val in CANONICAL_CONFIG.items():
+        if param in kwargs:
+            val = kwargs[param]
+            if param == "seeds":
+                if tuple(val) != canon_val:
+                    raise ValueError(
+                        f"Canonical runner rejects parameter override for '{param}': "
+                        f"expected {list(canon_val)}, received {list(val)}"
+                    )
+            elif param == "lr":
+                if abs(float(val) - float(canon_val)) > 1e-9:
+                    raise ValueError(
+                        f"Canonical runner rejects parameter override for '{param}': "
+                        f"expected {canon_val}, received {val}"
+                    )
+            elif val != canon_val:
+                raise ValueError(
+                    f"Canonical runner rejects parameter override for '{param}': "
+                    f"expected {canon_val}, received {val}"
+                )
+
+    if "output_dir" in kwargs and kwargs["output_dir"] is not None:
+        raise ValueError(
+            f"Canonical runner rejects non-None output_dir: received '{kwargs['output_dir']}'"
+        )
+    if "nrows" in kwargs and kwargs["nrows"] is not None:
+        raise ValueError(
+            f"Canonical runner rejects nrows subsampling: received {kwargs['nrows']}"
+        )
+
+    canonical_kwargs: dict[str, Any] = {
+        "dataset_mode": CANONICAL_CONFIG["dataset_mode"],
+        "require_real": CANONICAL_CONFIG["require_real"],
+        "all_rows": CANONICAL_CONFIG["all_rows"],
+        "seeds": list(CANONICAL_CONFIG["seeds"]),
+        "epochs": CANONICAL_CONFIG["epochs"],
+        "lr": CANONICAL_CONFIG["lr"],
+        "hidden_dim": CANONICAL_CONFIG["hidden_dim"],
+        "embedding_dim": CANONICAL_CONFIG["embedding_dim"],
+        "is_canonical": True,
+        "output_dir": None,
+    }
+    for k, v in kwargs.items():
+        if k not in canonical_kwargs:
+            canonical_kwargs[k] = v
+
+    return run_graphsage_benchmark(**canonical_kwargs)
 
