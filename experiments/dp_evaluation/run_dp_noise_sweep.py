@@ -29,7 +29,7 @@ import sys
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import torch
@@ -183,7 +183,7 @@ def train_and_evaluate_single_run(
 
     input_dim = X_train.shape[1]
     model = FraudDetectionModel(input_dim=input_dim, dp_compatible=True)
-    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(list(model.parameters()), lr=lr)
     criterion = nn.BCELoss()
 
     ds = TensorDataset(torch.tensor(X_train), torch.tensor(y_train))
@@ -191,15 +191,19 @@ def train_and_evaluate_single_run(
 
     t0 = time.perf_counter()
 
+    eval_model: Any
     if sigma > 0.0:
         privacy_engine = PrivacyEngine(accountant="prv")
-        model_p, opt_p, loader_p = privacy_engine.make_private(
-            module=model,
+        priv_res: Any = privacy_engine.make_private(
+            module=cast("Any", model),
             optimizer=optimizer,
             data_loader=loader,
             noise_multiplier=sigma,
             max_grad_norm=max_grad_norm,
         )
+        model_p: Any = priv_res[0]
+        opt_p: Any = priv_res[1]
+        loader_p: Any = priv_res[2]
         model_p.train()
         for _ep in range(epochs):
             for xb, yb in loader_p:
