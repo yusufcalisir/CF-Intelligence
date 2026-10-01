@@ -33,6 +33,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from app.config import get_settings
 from app.infrastructure.security.error_handler import format_safe_error_response
@@ -679,20 +680,38 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 # ── Content-Type Enforcement Middleware ───────────────────────────────────────
 # POST / PUT / PATCH requests that do not send Content-Type: application/json
 # receive HTTP 415 Unsupported Media Type instead of a cryptic HTTP 500.
-class ContentTypeMiddleware(BaseHTTPMiddleware):
-    """Reject non-JSON bodies on mutating endpoints with HTTP 415."""
+class ContentTypeMiddleware:
+    """Reject non-JSON bodies on mutating endpoints with HTTP 415 (Pure ASGI)."""
 
     _MUTATING_METHODS = frozenset({"POST", "PUT", "PATCH"})
     # Paths exempt from the check (form-data uploads, WebSocket upgrades, etc.)
     _EXEMPT_PREFIXES = ("/ws/", "/docs", "/redoc", "/openapi.json", "/api/v1/banks/upload")
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        if request.method in self._MUTATING_METHODS and not any(
-            request.url.path.startswith(p) for p in self._EXEMPT_PREFIXES
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        method = scope.get("method", "")
+        path = scope.get("path", "")
+
+        if method in self._MUTATING_METHODS and not any(
+            path.startswith(p) for p in self._EXEMPT_PREFIXES
         ):
-            ct = request.headers.get("content-type", "")
+            ct = ""
+            for name, value in scope.get("headers", []):
+                if name.lower() == b"content-type":
+                    try:
+                        ct = value.decode("latin-1")
+                    except Exception:
+                        ct = value.decode("utf-8", errors="replace")
+                    break
+
             if ct and not ct.startswith("application/json"):
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=415,
                     content={
                         "type": "https://cfi-platform.org/errors/UnsupportedMediaType",
@@ -700,10 +719,13 @@ class ContentTypeMiddleware(BaseHTTPMiddleware):
                         "status": 415,
                         "detail": "Only 'application/json' bodies are supported for mutating operations.",
                         "received": ct.split(";")[0].strip(),
-                        "instance": request.url.path,
+                        "instance": path,
                     },
                 )
-        return await call_next(request)
+                await response(scope, receive, send)
+                return
+
+        await self.app(scope, receive, send)
 
 
 app.add_middleware(ContentTypeMiddleware)
