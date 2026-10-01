@@ -23,6 +23,7 @@ Executes the GraphSAGE Neighborhood Aggregator benchmark on the Elliptic Bitcoin
 # ruff: noqa: E402
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 import logging
@@ -63,7 +64,11 @@ BACKEND_DIR = REPO_ROOT / "backend"
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
-from app.application.services.dataloader import load_elliptic
+from app.application.services.dataloader import (
+    compute_file_sha256,
+    load_elliptic,
+    resolve_dataset_dir,
+)
 from experiments.harness.schema import (
     ConfusionMatrixData,
     CurvePoint,
@@ -292,8 +297,21 @@ def compute_fixed_fpr_recalls(
     return results
 
 
-def evaluate_predictions(y_true: np.ndarray, y_prob: np.ndarray) -> dict[str, Any]:
-    """Extract full empirical evaluation metrics on binary fraud predictions."""
+def evaluate_predictions(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    threshold: float = 0.5,
+) -> dict[str, Any]:
+    """Extract full empirical evaluation metrics on binary fraud predictions.
+
+    Args:
+        y_true: Ground truth binary labels (0 or 1).
+        y_prob: Continuous prediction scores/probabilities in [0.0, 1.0].
+        threshold: Frozen decision threshold for binary classification metrics.
+
+    Returns:
+        Dictionary with ranking metrics (continuous) and operational metrics (thresholded).
+    """
     # Ensure binary labels are strictly 0 and 1
     valid_mask = np.isin(y_true, [0, 1])
     y_t = y_true[valid_mask].astype(int)
@@ -306,29 +324,44 @@ def evaluate_predictions(y_true: np.ndarray, y_prob: np.ndarray) -> dict[str, An
             "f1_score": 0.0,
             "precision": 0.0,
             "recall": 0.0,
+            "operating_threshold": round(threshold, 4),
             "brier_score": 0.0,
             "recall_at_01_fpr": 0.0,
             "recall_at_05_fpr": 0.0,
             "recall_at_10_fpr": 0.0,
             "confusion_matrix": {"tn": int(len(y_t)), "fp": 0, "fn": 0, "tp": 0},
+            "non_canonical_05": {
+                "precision": 0.0,
+                "recall": 0.0,
+                "f1_score": 0.0,
+                "confusion_matrix": {"tn": int(len(y_t)), "fp": 0, "fn": 0, "tp": 0},
+            },
         }
 
+    # Threshold-independent continuous ranking metrics
     pr_auc = float(average_precision_score(y_t, y_p))
     roc_auc = float(roc_auc_score(y_t, y_p))
     brier = float(brier_score_loss(y_t, y_p))
 
-    # Binary metrics at standard 0.5 decision threshold
-    bin_preds = (y_p >= 0.5).astype(int)
+    # Binary metrics at evaluated operating threshold
+    bin_preds = (y_p >= threshold).astype(int)
     f1 = float(f1_score(y_t, bin_preds, zero_division=0))
     prec = float(precision_score(y_t, bin_preds, zero_division=0))
     rec = float(recall_score(y_t, bin_preds, zero_division=0))
 
-    # Fixed-FPR metrics
+    # Fixed-FPR operational metrics
     fixed_fprs = compute_fixed_fpr_recalls(y_t, y_p, [0.001, 0.005, 0.01])
 
-    # Confusion matrix
+    # Confusion matrix at operating threshold
     cm = confusion_matrix(y_t, bin_preds, labels=[0, 1])
     tn, fp, fn, tp = int(cm[0, 0]), int(cm[0, 1]), int(cm[1, 0]), int(cm[1, 1])
+
+    # Secondary diagnostic at non-canonical 0.5 threshold
+    bin_05 = (y_p >= 0.5).astype(int)
+    cm_05 = confusion_matrix(y_t, bin_05, labels=[0, 1])
+    prec_05 = float(precision_score(y_t, bin_05, zero_division=0))
+    rec_05 = float(recall_score(y_t, bin_05, zero_division=0))
+    f1_05 = float(f1_score(y_t, bin_05, zero_division=0))
 
     return {
         "pr_auc": round(pr_auc, 6),
@@ -336,11 +369,24 @@ def evaluate_predictions(y_true: np.ndarray, y_prob: np.ndarray) -> dict[str, An
         "f1_score": round(f1, 6),
         "precision": round(prec, 6),
         "recall": round(rec, 6),
+        "operating_threshold": round(threshold, 4),
         "brier_score": round(brier, 6),
         "recall_at_01_fpr": fixed_fprs.get("recall_at_0001_fpr", 0.0),
         "recall_at_05_fpr": fixed_fprs.get("recall_at_0005_fpr", 0.0),
         "recall_at_10_fpr": fixed_fprs.get("recall_at_001_fpr", 0.0),
         "confusion_matrix": {"tn": tn, "fp": fp, "fn": fn, "tp": tp},
+        "non_canonical_05": {
+            "threshold": 0.5,
+            "precision": round(prec_05, 6),
+            "recall": round(rec_05, 6),
+            "f1_score": round(f1_05, 6),
+            "confusion_matrix": {
+                "tn": int(cm_05[0, 0]),
+                "fp": int(cm_05[0, 1]),
+                "fn": int(cm_05[1, 0]),
+                "tp": int(cm_05[1, 1]),
+            },
+        },
     }
 
 
@@ -353,26 +399,59 @@ class EllipticGraphSAGEBenchmark:
     def __init__(
         self,
         seed: int = 42,
+        seeds: Sequence[int] | None = None,
+        data_dir: Path | str | None = None,
         require_real: bool = False,
+        dataset_mode: str = "real",
         all_rows: bool = True,
         nrows: int | None = None,
+        split_timestep: int = 34,
+        val_start_timestep: int = 31,
     ):
         self.seed = seed
-        self.require_real = require_real
+        self.seeds = list(seeds) if seeds is not None else [seed]
+        self.data_dir = Path(data_dir) if data_dir is not None else None
+        self.require_real = require_real or (dataset_mode == "real")
+        self.dataset_mode = dataset_mode
         self.all_rows = all_rows
         self.nrows = nrows
+        self.split_timestep = split_timestep
+        self.val_start_timestep = val_start_timestep
 
         np.random.seed(seed)
         torch.manual_seed(seed)
 
+    def load_dataset(self) -> dict[str, Any]:
+        """Alias for load_and_preprocess."""
+        return self.load_and_preprocess()
+
     def load_and_preprocess(self) -> dict[str, Any]:
         """Ingest Elliptic Bitcoin data and fit zero-leakage preprocessor on train partition."""
-        logger.info("[Elliptic] Loading dataset (require_real=%s, all_rows=%s)...", self.require_real, self.all_rows)
+        logger.info(
+            "[Elliptic] Loading dataset (dataset_mode=%s, require_real=%s, all_rows=%s)...",
+            self.dataset_mode,
+            self.require_real,
+            self.all_rows,
+        )
+
+        root = self.data_dir or resolve_dataset_dir("elliptic")
+        features_csv = root / "elliptic_txs_features.csv"
+        classes_csv = root / "elliptic_txs_classes.csv"
+        parquet_cache = root / "elliptic_cache.parquet"
+        has_real_files = parquet_cache.exists() or (features_csv.exists() and classes_csv.exists())
+
+        if self.dataset_mode == "real" and not has_real_files:
+            raise FileNotFoundError(
+                f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
+                f"Expected 'elliptic_cache.parquet' or ('elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'). "
+                f"Silent synthetic fallback is strictly disabled in canonical real-data mode."
+            )
+
         raw_data = load_elliptic(
             require_real=self.require_real,
             include_unknown=True,
             temporal_split=True,
-            split_timestep=34,
+            split_timestep=self.split_timestep,
             construct_graph=True,
             all_rows=self.all_rows,
             nrows=self.nrows,
@@ -382,10 +461,6 @@ class EllipticGraphSAGEBenchmark:
         X_raw = raw_data["X"]
         y = raw_data["y"]
         edge_index = raw_data["edge_index"]
-        train_mask = raw_data["train_mask"]
-        test_mask = raw_data["test_mask"]
-        train_labeled_mask = raw_data["train_labeled_mask"]
-        test_labeled_mask = raw_data["test_labeled_mask"]
         timesteps = raw_data["timesteps"]
 
         # If col 0 is timestep, isolate features 1..end (165 features), otherwise use all features
@@ -394,26 +469,52 @@ class EllipticGraphSAGEBenchmark:
         else:
             features = X_raw.astype(np.float32)
 
-        # Standard scale fitted strictly on train split avoiding test distribution leakage
-        train_feat = features[train_mask]
+        # Strict past-to-future temporal partitions:
+        # Train: timesteps < val_start_timestep (1 to 30)
+        # Validation: val_start_timestep <= timesteps <= split_timestep (31 to 34)
+        # Test: timesteps > split_timestep (35 to 49)
+        train_mask = (timesteps < self.val_start_timestep) & (y != -1)
+        val_mask = (timesteps >= self.val_start_timestep) & (timesteps <= self.split_timestep) & (y != -1)
+        test_mask = (timesteps > self.split_timestep) & (y != -1)
+
+        # Standard scale fitted strictly on train split avoiding val/test distribution leakage
+        train_feat = features[train_mask] if np.any(train_mask) else features
         feat_mean = np.mean(train_feat, axis=0)
         feat_std = np.std(train_feat, axis=0)
         feat_std[feat_std < 1e-6] = 1.0
 
         features_normalized = (features - feat_mean) / feat_std
 
+        # Compute physical dataset file hashes if real files exist
+        file_hashes: dict[str, str] = {}
+        for fname in ["elliptic_cache.parquet", "elliptic_txs_classes.csv", "elliptic_txs_edgelist.csv", "elliptic_txs_features.csv"]:
+            fpath = root / fname
+            if fpath.exists():
+                with contextlib.suppress(Exception):
+                    file_hashes[fname] = compute_file_sha256(fpath)
+
         return {
             "X": features_normalized,
             "y": y,
             "edge_index": edge_index,
             "train_mask": train_mask,
+            "val_mask": val_mask,
             "test_mask": test_mask,
-            "train_labeled_mask": train_labeled_mask,
-            "test_labeled_mask": test_labeled_mask,
+            "train_labeled_mask": train_mask,
+            "test_labeled_mask": test_mask,
+            "val_labeled_mask": val_mask,
             "timesteps": timesteps,
             "source": raw_data.get("source", "real"),
-            "n_train_labeled": int(np.sum(train_labeled_mask)),
-            "n_test_labeled": int(np.sum(test_labeled_mask)),
+            "file_hashes": file_hashes,
+            "n_train_labeled": int(np.sum(train_mask)),
+            "n_val_labeled": int(np.sum(val_mask)),
+            "n_test_labeled": int(np.sum(test_mask)),
+            "n_train_illicit": int(np.sum(train_mask & (y == 1))),
+            "n_val_illicit": int(np.sum(val_mask & (y == 1))),
+            "n_test_illicit": int(np.sum(test_mask & (y == 1))),
+            "n_train_licit": int(np.sum(train_mask & (y == 0))),
+            "n_val_licit": int(np.sum(val_mask & (y == 0))),
+            "n_test_licit": int(np.sum(test_mask & (y == 0))),
         }
 
     def train_and_evaluate_model(
@@ -423,17 +524,20 @@ class EllipticGraphSAGEBenchmark:
         y: np.ndarray,
         train_mask: np.ndarray,
         test_mask: np.ndarray,
+        val_mask: np.ndarray | None = None,
         adj_sparse: torch.Tensor | None = None,
-        epochs: int = 20,
+        epochs: int = 15,
         lr: float = 0.005,
         weight_decay: float = 1e-4,
-    ) -> tuple[dict[str, Any], np.ndarray, list[float]]:
-        """Train candidate architecture and evaluate on untouched test partition."""
+    ) -> tuple[dict[str, Any], np.ndarray, list[float], int, float, float | None]:
+        """Train candidate architecture, select checkpoint and threshold via validation split, and evaluate on untouched test partition."""
         x_t = torch.from_numpy(X).float()
         y_t = torch.from_numpy(y).float()
         tr_mask_t = torch.from_numpy(train_mask)
+        has_val = val_mask is not None and np.any(val_mask) and np.sum(y[val_mask] == 1) > 0
+        val_mask_t = torch.from_numpy(val_mask) if has_val else None
 
-        # Compute positive class re-weighting to combat class imbalance
+        # Compute positive class re-weighting on training partition to combat class imbalance
         y_train = y[train_mask]
         num_pos = int(np.sum(y_train == 1))
         num_neg = int(np.sum(y_train == 0))
@@ -443,14 +547,35 @@ class EllipticGraphSAGEBenchmark:
         optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
         loss_history: list[float] = []
 
-        model.train()
-        for _ in range(epochs):
+        best_val_prauc = -1.0
+        best_epoch = epochs
+        best_state = None
+
+        for epoch in range(epochs):
+            model.train()
             optimizer.zero_grad()
             preds = model(x_t, adj_sparse) if adj_sparse is not None else model(x_t)
             loss = F.binary_cross_entropy(preds[tr_mask_t], y_t[tr_mask_t], weight=weight_tensor)
             loss.backward()
             optimizer.step()
             loss_history.append(float(loss.item()))
+
+            # Validation checkpoint tracking (PR-AUC on validation split)
+            if has_val:
+                model.eval()
+                with torch.no_grad():
+                    val_preds_ep = model(x_t, adj_sparse) if adj_sparse is not None else model(x_t)
+                    val_y_arr = y[val_mask]
+                    val_preds_arr = val_preds_ep[val_mask_t].cpu().numpy()
+                    val_pr = float(average_precision_score(val_y_arr, val_preds_arr))
+                    if val_pr > best_val_prauc:
+                        best_val_prauc = val_pr
+                        best_epoch = epoch + 1
+                        best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+
+        # Restore best checkpoint if validation was enabled
+        if best_state is not None:
+            model.load_state_dict(best_state)
 
         model.eval()
         t0 = time.perf_counter()
@@ -461,24 +586,39 @@ class EllipticGraphSAGEBenchmark:
                 all_preds = model(x_t).cpu().numpy()
         latency_ms = (time.perf_counter() - t0) * 1000.0
 
+        # Threshold selection: sweep on validation predictions to maximize F1 (deterministic tie-breaking: pick lowest)
+        best_threshold = 0.5
+        if has_val:
+            val_preds = all_preds[val_mask]
+            val_y = y[val_mask]
+            thresholds = np.linspace(0.01, 0.99, 99)
+            best_val_f1 = -1.0
+            for th in thresholds:
+                f1 = float(f1_score(val_y, (val_preds >= th).astype(int), zero_division=0))
+                if f1 > best_val_f1:
+                    best_val_f1 = f1
+                    best_threshold = float(th)
+
         test_preds = all_preds[test_mask]
         test_y = y[test_mask]
 
-        metrics = evaluate_predictions(test_y, test_preds)
+        metrics = evaluate_predictions(test_y, test_preds, threshold=best_threshold)
         metrics["inference_latency_ms"] = round(latency_ms, 2)
         metrics["inference_latency_per_1k_ms"] = round(latency_ms / (len(y) / 1000.0), 3)
+        metrics["best_epoch"] = best_epoch
+        metrics["val_pr_auc"] = round(best_val_prauc, 6) if best_val_prauc >= 0 else None
 
-        return metrics, all_preds, loss_history
+        return metrics, all_preds, loss_history, best_epoch, best_threshold, (best_val_prauc if best_val_prauc >= 0 else None)
 
     def run_benchmark(
         self,
-        epochs: int = 20,
+        epochs: int = 15,
         lr: float = 0.005,
         hidden_dim: int = 128,
         embedding_dim: int = 64,
         output_dir: Path | str | None = None,
     ) -> dict[str, Any]:
-        """Execute full GraphSAGE vs Tabular MLP benchmark with controlled ablations."""
+        """Execute full GraphSAGE vs Tabular MLP benchmark with multi-seed evaluation and controlled ablations."""
         start_time_utc = datetime.now(UTC).isoformat()
         t_start = time.perf_counter()
 
@@ -486,18 +626,27 @@ class EllipticGraphSAGEBenchmark:
         X = data["X"]
         y = data["y"]
         edge_index = data["edge_index"]
-        train_mask = data["train_labeled_mask"]
-        test_mask = data["test_labeled_mask"]
+        train_mask = data["train_mask"]
+        val_mask = data["val_mask"]
+        test_mask = data["test_mask"]
         timesteps = data["timesteps"]
         num_nodes = len(y)
         in_dim = X.shape[1]
 
         logger.info(
-            "[Elliptic Benchmark] Nodes: %d, Features: %d, Train Labeled: %d, Test Labeled: %d",
+            "[Elliptic Benchmark] Total Nodes: %d, Features: %d, Train Labeled (ts 1-%d): %d (illicit: %d), Val Labeled (ts %d-%d): %d (illicit: %d), Test Labeled (ts %d-49): %d (illicit: %d)",
             num_nodes,
             in_dim,
+            self.val_start_timestep - 1,
             data["n_train_labeled"],
+            data["n_train_illicit"],
+            self.val_start_timestep,
+            self.split_timestep,
+            data["n_val_labeled"],
+            data["n_val_illicit"],
+            self.split_timestep + 1,
             data["n_test_labeled"],
+            data["n_test_illicit"],
         )
 
         # Build sparse adjacency operators
@@ -505,12 +654,105 @@ class EllipticGraphSAGEBenchmark:
         adj_gcn = build_normalized_adjacency(edge_index, num_nodes, mode="gcn", bidirectional=True)
 
         # -----------------------------------------------------------------------
+        # Multi-Seed GraphSAGE 2-Layer Champion Execution
+        # -----------------------------------------------------------------------
+        seed_results: list[dict[str, Any]] = []
+        for s in self.seeds:
+            logger.info("[Elliptic Benchmark] Running GraphSAGE 2-Layer with Seed %d...", s)
+            np.random.seed(s)
+            torch.manual_seed(s)
+            sage_seed_model = EllipticGraphSAGEClassifier(
+                in_dim=in_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim, num_layers=2
+            )
+            s_metrics, s_preds, s_losses, s_epoch, s_th, s_val_pr = self.train_and_evaluate_model(
+                sage_seed_model, X, y, train_mask, test_mask, val_mask=val_mask, adj_sparse=adj_mean, epochs=epochs, lr=lr
+            )
+            seed_results.append({
+                "seed": s,
+                "best_epoch": s_epoch,
+                "val_pr_auc": s_val_pr,
+                "threshold": s_th,
+                "metrics": s_metrics,
+                "losses": s_losses,
+                "preds": s_preds,
+            })
+            logger.info(
+                "[Seed %d] Epoch: %d, Val PR-AUC: %s, Threshold: %.4f | Test PR-AUC: %.4f, ROC-AUC: %.4f, Precision: %.4f, Recall: %.4f, F1: %.4f",
+                s,
+                s_epoch,
+                f"{s_val_pr:.4f}" if s_val_pr is not None else "N/A",
+                s_th,
+                s_metrics["pr_auc"],
+                s_metrics["roc_auc"],
+                s_metrics["precision"],
+                s_metrics["recall"],
+                s_metrics["f1_score"],
+            )
+
+        # Champion primary seed results (first seed, typically 42)
+        primary_res = seed_results[0]
+        sage2_metrics = primary_res["metrics"]
+        sage2_all_preds = primary_res["preds"]
+        sage2_losses = primary_res["losses"]
+
+        # Aggregate statistics across seeds
+        pr_aucs = [r["metrics"]["pr_auc"] for r in seed_results]
+        roc_aucs = [r["metrics"]["roc_auc"] for r in seed_results]
+        precs = [r["metrics"]["precision"] for r in seed_results]
+        recs = [r["metrics"]["recall"] for r in seed_results]
+        f1s = [r["metrics"]["f1_score"] for r in seed_results]
+        r01s = [r["metrics"]["recall_at_01_fpr"] for r in seed_results]
+        r05s = [r["metrics"]["recall_at_05_fpr"] for r in seed_results]
+        r10s = [r["metrics"]["recall_at_10_fpr"] for r in seed_results]
+        ths = [r["threshold"] for r in seed_results]
+
+        ddof = 1 if len(self.seeds) > 1 else 0
+        aggregate_metrics = {
+            "mean": {
+                "pr_auc": round(float(np.mean(pr_aucs)), 4),
+                "roc_auc": round(float(np.mean(roc_aucs)), 4),
+                "precision": round(float(np.mean(precs)), 4),
+                "recall": round(float(np.mean(recs)), 4),
+                "f1_score": round(float(np.mean(f1s)), 4),
+                "recall_at_01_fpr": round(float(np.mean(r01s)), 4),
+                "recall_at_05_fpr": round(float(np.mean(r05s)), 4),
+                "recall_at_10_fpr": round(float(np.mean(r10s)), 4),
+                "threshold": round(float(np.mean(ths)), 4),
+            },
+            "std": {
+                "definition": f"sample standard deviation across {len(self.seeds)} training seeds, ddof={ddof}",
+                "pr_auc": round(float(np.std(pr_aucs, ddof=ddof)), 4),
+                "roc_auc": round(float(np.std(roc_aucs, ddof=ddof)), 4),
+                "precision": round(float(np.std(precs, ddof=ddof)), 4),
+                "recall": round(float(np.std(recs, ddof=ddof)), 4),
+                "f1_score": round(float(np.std(f1s, ddof=ddof)), 4),
+                "recall_at_01_fpr": round(float(np.std(r01s, ddof=ddof)), 4),
+            },
+            "min": {
+                "pr_auc": round(float(np.min(pr_aucs)), 4),
+                "roc_auc": round(float(np.min(roc_aucs)), 4),
+                "precision": round(float(np.min(precs)), 4),
+                "recall": round(float(np.min(recs)), 4),
+                "f1_score": round(float(np.min(f1s)), 4),
+            },
+            "max": {
+                "pr_auc": round(float(np.max(pr_aucs)), 4),
+                "roc_auc": round(float(np.max(roc_aucs)), 4),
+                "precision": round(float(np.max(precs)), 4),
+                "recall": round(float(np.max(recs)), 4),
+                "f1_score": round(float(np.max(f1s)), 4),
+            },
+        }
+
+        # -----------------------------------------------------------------------
         # Model 1: Tabular MLP Baseline (0-Hop)
         # -----------------------------------------------------------------------
         logger.info("[Elliptic Benchmark] Training Tabular MLP Baseline (0-hop)...")
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
         mlp_model = TabularMLPBaseline(in_dim=in_dim, hidden_dim=hidden_dim)
-        mlp_metrics, mlp_all_preds, mlp_losses = self.train_and_evaluate_model(
-            mlp_model, X, y, train_mask, test_mask, adj_sparse=None, epochs=epochs, lr=lr
+        mlp_metrics, mlp_all_preds, mlp_losses, _, _, _ = self.train_and_evaluate_model(
+            mlp_model, X, y, train_mask, test_mask, val_mask=val_mask, adj_sparse=None, epochs=epochs, lr=lr
         )
         logger.info(
             "[Tabular MLP] PR-AUC: %.4f, ROC-AUC: %.4f, Recall@0.1%%FPR: %.4f, F1: %.4f",
@@ -521,43 +763,29 @@ class EllipticGraphSAGEBenchmark:
         )
 
         # -----------------------------------------------------------------------
-        # Model 2: GraphSAGE 2-Layer (Champion Neighborhood Aggregator)
-        # -----------------------------------------------------------------------
-        logger.info("[Elliptic Benchmark] Training GraphSAGE 2-Layer (Mean Aggregator)...")
-        sage2_model = EllipticGraphSAGEClassifier(
-            in_dim=in_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim, num_layers=2
-        )
-        sage2_metrics, sage2_all_preds, sage2_losses = self.train_and_evaluate_model(
-            sage2_model, X, y, train_mask, test_mask, adj_sparse=adj_mean, epochs=epochs, lr=lr
-        )
-        logger.info(
-            "[GraphSAGE 2-Layer] PR-AUC: %.4f, ROC-AUC: %.4f, Recall@0.1%%FPR: %.4f, F1: %.4f",
-            sage2_metrics["pr_auc"],
-            sage2_metrics["roc_auc"],
-            sage2_metrics["recall_at_01_fpr"],
-            sage2_metrics["f1_score"],
-        )
-
-        # -----------------------------------------------------------------------
         # Ablation 1: GraphSAGE 1-Layer (1-Hop Neighborhood)
         # -----------------------------------------------------------------------
         logger.info("[Elliptic Benchmark] Training GraphSAGE 1-Layer (1-hop ablation)...")
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
         sage1_model = EllipticGraphSAGEClassifier(
             in_dim=in_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim, num_layers=1
         )
-        sage1_metrics, sage1_all_preds, sage1_losses = self.train_and_evaluate_model(
-            sage1_model, X, y, train_mask, test_mask, adj_sparse=adj_mean, epochs=epochs, lr=lr
+        sage1_metrics, sage1_all_preds, sage1_losses, _, _, _ = self.train_and_evaluate_model(
+            sage1_model, X, y, train_mask, test_mask, val_mask=val_mask, adj_sparse=adj_mean, epochs=epochs, lr=lr
         )
 
         # -----------------------------------------------------------------------
         # Ablation 2: Aggregator Type (GCN Symmetric Adjacency)
         # -----------------------------------------------------------------------
         logger.info("[Elliptic Benchmark] Training GraphSAGE with GCN Aggregator...")
+        np.random.seed(self.seed)
+        torch.manual_seed(self.seed)
         gcn_model = EllipticGraphSAGEClassifier(
             in_dim=in_dim, hidden_dim=hidden_dim, embedding_dim=embedding_dim, num_layers=2
         )
-        gcn_metrics, gcn_all_preds, _ = self.train_and_evaluate_model(
-            gcn_model, X, y, train_mask, test_mask, adj_sparse=adj_gcn, epochs=epochs, lr=lr
+        gcn_metrics, gcn_all_preds, _, _, _, _ = self.train_and_evaluate_model(
+            gcn_model, X, y, train_mask, test_mask, val_mask=val_mask, adj_sparse=adj_gcn, epochs=epochs, lr=lr
         )
 
         # -----------------------------------------------------------------------
@@ -585,7 +813,7 @@ class EllipticGraphSAGEBenchmark:
         # Temporal Generalization Breakdown across Timesteps 35 to 49
         # -----------------------------------------------------------------------
         temporal_breakdown: list[dict[str, Any]] = []
-        for ts in range(35, 50):
+        for ts in range(self.split_timestep + 1, 50):
             ts_mask = test_mask & (timesteps == ts)
             if np.sum(ts_mask & (y == 1)) > 0:
                 y_ts = y[ts_mask]
@@ -633,7 +861,7 @@ class EllipticGraphSAGEBenchmark:
         comparative_baselines = {
             "dataset_name": "Elliptic Bitcoin Transaction Graph",
             "evaluated_at_utc": end_time_utc,
-            "temporal_split": "Timesteps 1-34 Train vs 35-49 Test",
+            "temporal_split": f"Timesteps 1-{self.val_start_timestep - 1} Train, {self.val_start_timestep}-{self.split_timestep} Val, {self.split_timestep + 1}-49 Test",
             "models": [
                 {
                     "paradigm": "Inductive GraphSAGE (2-Layer Mean Aggregator)",
@@ -702,16 +930,23 @@ class EllipticGraphSAGEBenchmark:
         git_commit = self._get_git_commit()
         hardware_meta = HardwareMetadata.capture()
 
+        dataset_sha256 = (
+            data["file_hashes"].get("elliptic_cache.parquet")
+            or data["file_hashes"].get("elliptic_txs_features.csv")
+            or hashlib.sha256(b"elliptic_dataset_v1").hexdigest()
+        )
+
         dataset_meta = DatasetMetadata(
             dataset_name="Elliptic Bitcoin Transaction Graph",
             source_uri="backend/storage/datasets/elliptic",
-            sha256_hash=hashlib.sha256(b"elliptic_dataset_v1").hexdigest(),
+            sha256_hash=dataset_sha256,
             total_samples=num_nodes,
             num_features=in_dim,
             fraud_samples=int(np.sum(y == 1)),
             fraud_rate=round(float(np.mean(y[y != -1] == 1)), 6),
             split_ratios={
                 "train_nodes": round(float(np.mean(train_mask)), 4),
+                "val_nodes": round(float(np.mean(val_mask)), 4),
                 "test_nodes": round(float(np.mean(test_mask)), 4),
             },
         )
@@ -719,19 +954,23 @@ class EllipticGraphSAGEBenchmark:
         exp_config = ExperimentConfig(
             experiment_id=f"exp-elliptic-graphsage-{int(time.time())}",
             experiment_name="Elliptic Bitcoin GraphSAGE Inductive Benchmark",
-            description="Controlled ablation comparing 2-layer GraphSAGE against tabular baseline on Elliptic Bitcoin graph.",
-            tags=["graphsage", "elliptic", "gnn", "graph-intelligence", "bitcoin"],
+            description="Canonical multi-seed benchmark evaluating GraphSAGE on physical Elliptic Bitcoin graph with strict temporal validation.",
+            tags=["graphsage", "elliptic", "gnn", "graph-intelligence", "bitcoin", "multi-seed"],
             model_type="GraphSAGE",
             strategy="InductiveNeighborhoodAggregation",
-            seeds=[self.seed],
+            seeds=self.seeds,
             num_rounds=epochs,
             learning_rate=lr,
             hyperparameters={
                 "in_dim": in_dim,
                 "hidden_dim": hidden_dim,
                 "embedding_dim": embedding_dim,
-                "split_timestep": 34,
+                "split_timestep": self.split_timestep,
+                "val_start_timestep": self.val_start_timestep,
                 "bidirectional_flow": True,
+                "loss": "BinaryCrossEntropy (pos_weight)",
+                "checkpoint_criterion": "validation_pr_auc",
+                "threshold_criterion": "validation_f1_maximization",
             },
             output_dir=str(target_dir),
         )
@@ -784,7 +1023,18 @@ class EllipticGraphSAGEBenchmark:
             start_time_utc=start_time_utc,
             end_time_utc=end_time_utc,
             total_duration_seconds=duration_sec,
-            final_metrics={k: float(v) for k, v in sage2_metrics.items() if isinstance(v, (int, float))},
+            final_metrics={
+                "pr_auc": aggregate_metrics["mean"]["pr_auc"],
+                "roc_auc": aggregate_metrics["mean"]["roc_auc"],
+                "precision": aggregate_metrics["mean"]["precision"],
+                "recall": aggregate_metrics["mean"]["recall"],
+                "f1_score": aggregate_metrics["mean"]["f1_score"],
+                "recall_at_01_fpr": aggregate_metrics["mean"]["recall_at_01_fpr"],
+                "threshold": aggregate_metrics["mean"]["threshold"],
+                "pr_auc_std": aggregate_metrics["std"]["pr_auc"],
+                "roc_auc_std": aggregate_metrics["std"]["roc_auc"],
+                "inference_latency_per_1k_ms": sage2_metrics["inference_latency_per_1k_ms"],
+            },
             history=history_steps,
             curves=curve_data,
             confusion_matrix=cm_data,
@@ -808,38 +1058,125 @@ class EllipticGraphSAGEBenchmark:
         with open(baselines_json_path, "w", encoding="utf-8") as f:
             json.dump(comparative_baselines, f, indent=2)
 
-        raw_benchmark_path = target_dir / "graphsage_elliptic_benchmark.json"
+        # Build comprehensive canonical benchmark raw payload
         raw_payload = {
             "timestamp_utc": end_time_utc,
             "benchmark": "GraphSAGE Elliptic Bitcoin Inductive Node Classification",
+            "model": "GraphSAGE (2-layer Mean Aggregator)",
+            "dataset": "Elliptic Bitcoin Transaction Graph (Real)",
+            "dataset_mode": self.dataset_mode,
             "git_commit": git_commit,
-            "temporal_split": "Timesteps 1-34 Train vs 35-49 Test",
-            "train_labeled_nodes": data["n_train_labeled"],
-            "test_labeled_nodes": data["n_test_labeled"],
+            "dataset_metadata": {
+                "name": "Elliptic Bitcoin Transaction Graph (Weber et al., 2019)",
+                "source_uri": "backend/storage/datasets/elliptic",
+                "total_nodes": num_nodes,
+                "total_edges": int(edge_index.shape[1]),
+                "total_features": in_dim,
+                "total_labeled_nodes": data["n_train_labeled"] + data["n_val_labeled"] + data["n_test_labeled"],
+                "total_illicit_nodes": data["n_train_illicit"] + data["n_val_illicit"] + data["n_test_illicit"],
+                "total_licit_nodes": data["n_train_licit"] + data["n_val_licit"] + data["n_test_licit"],
+                "total_unknown_nodes": num_nodes - (data["n_train_labeled"] + data["n_val_labeled"] + data["n_test_labeled"]),
+                "sha256_hashes": data["file_hashes"],
+            },
+            "temporal_split": {
+                "split_policy": "Strict Out-of-Time Past-to-Future Temporal Partitioning",
+                "train_timesteps": f"1-{self.val_start_timestep - 1}",
+                "val_timesteps": f"{self.val_start_timestep}-{self.split_timestep}",
+                "test_timesteps": f"{self.split_timestep + 1}-49",
+                "train_labeled_nodes": data["n_train_labeled"],
+                "train_illicit_nodes": data["n_train_illicit"],
+                "train_licit_nodes": data["n_train_licit"],
+                "val_labeled_nodes": data["n_val_labeled"],
+                "val_illicit_nodes": data["n_val_illicit"],
+                "val_licit_nodes": data["n_val_licit"],
+                "test_labeled_nodes": data["n_test_labeled"],
+                "test_illicit_nodes": data["n_test_illicit"],
+                "test_licit_nodes": data["n_test_licit"],
+                "zero_future_leakage_enforced": True,
+            },
+            "validation_methodology": {
+                "checkpoint_selection_criterion": "validation_pr_auc_maximization",
+                "operating_threshold_selection_criterion": "validation_f1_maximization",
+                "tie_breaking": "lowest_threshold",
+                "test_set_isolation": "final_test_labels_never_used_for_checkpoint_or_threshold_selection",
+            },
+            "seeds": self.seeds,
+            "metrics": aggregate_metrics["mean"],
+            "metrics_std": aggregate_metrics["std"],
+            "metrics_min": aggregate_metrics["min"],
+            "metrics_max": aggregate_metrics["max"],
+            "per_seed_results": [
+                {
+                    "seed": r["seed"],
+                    "best_epoch": r["best_epoch"],
+                    "val_pr_auc": round(r["val_pr_auc"], 4) if r["val_pr_auc"] is not None else None,
+                    "operating_threshold": r["threshold"],
+                    "test_pr_auc": r["metrics"]["pr_auc"],
+                    "test_roc_auc": r["metrics"]["roc_auc"],
+                    "precision": r["metrics"]["precision"],
+                    "recall": r["metrics"]["recall"],
+                    "f1_score": r["metrics"]["f1_score"],
+                    "recall_at_01_fpr": r["metrics"]["recall_at_01_fpr"],
+                    "confusion_matrix": r["metrics"]["confusion_matrix"],
+                    "non_canonical_05": r["metrics"]["non_canonical_05"],
+                }
+                for r in seed_results
+            ],
+            "non_canonical_threshold_05": {
+                "description": "Secondary diagnostic only; arbitrary 0.5 threshold evaluated without validation calibration",
+                "precision": round(float(np.mean([r["metrics"]["non_canonical_05"]["precision"] for r in seed_results])), 4),
+                "recall": round(float(np.mean([r["metrics"]["non_canonical_05"]["recall"] for r in seed_results])), 4),
+                "f1_score": round(float(np.mean([r["metrics"]["non_canonical_05"]["f1_score"] for r in seed_results])), 4),
+            },
             "graphsage_2layer_champion": sage2_metrics,
             "graphsage_1layer_ablation": sage1_metrics,
             "tabular_mlp_baseline": mlp_metrics,
             "uplift": uplift,
+            "legacy_synthetic_benchmark": {
+                "status": "RETIRED_SYNTHETIC_SMOKE_BENCHMARK",
+                "pr_auc": 0.9001,
+                "roc_auc": 0.9860,
+                "precision": 0.9636,
+                "recall": 0.3333,
+                "f1_score": 0.4953,
+                "note": "Measured on synthetic 1500-node smoke fallback testbed in run_graph_benchmark.py; superseded by canonical real-data multi-seed benchmark.",
+            },
+            "legacy_real_data_single_run": {
+                "status": "HISTORICAL_CENTRALIZED_SINGLE_RUN_BASELINE",
+                "pr_auc": 0.4372,
+                "roc_auc": 0.8388,
+                "precision": 0.2711,
+                "recall": 0.6371,
+                "note": "Initial single-seed run without pre-test validation split; superseded by canonical 3-seed temporal validation benchmark.",
+            },
         }
-        with open(raw_benchmark_path, "w", encoding="utf-8") as f:
+
+        # Write to both target_dir and benchmarks/results/raw
+        target_raw_path = target_dir / "graphsage_elliptic_benchmark.json"
+        with open(target_raw_path, "w", encoding="utf-8") as f:
+            json.dump(raw_payload, f, indent=2)
+
+        root_raw_path = raw_results_dir / "graphsage_elliptic_benchmark.json"
+        with open(root_raw_path, "w", encoding="utf-8") as f:
             json.dump(raw_payload, f, indent=2)
 
         audit_dossier_path = target_dir / "audit_dossier.md"
         self._write_audit_dossier(audit_dossier_path, comparative_baselines, exp_result)
 
-        logger.info("Successfully serialized all benchmark artifacts to: %s", target_dir)
+        logger.info("Successfully serialized all benchmark artifacts to: %s and %s", target_dir, root_raw_path)
 
         return {
             "status": "COMPLETED",
             "duration_seconds": duration_sec,
             "graphsage_metrics": sage2_metrics,
+            "aggregate_metrics": aggregate_metrics,
             "tabular_metrics": mlp_metrics,
             "uplift": uplift,
             "paths": {
                 "results_json": str(results_json_path),
                 "comparative_baselines": str(baselines_json_path),
                 "audit_dossier": str(audit_dossier_path),
-                "raw_benchmark": str(raw_benchmark_path),
+                "raw_benchmark": str(root_raw_path),
                 **plot_paths,
             },
         }
@@ -1127,19 +1464,41 @@ class EllipticGraphSAGEBenchmark:
 
 def run_graphsage_benchmark(
     seed: int = 42,
-    epochs: int = 20,
+    seeds: Sequence[int] | None = None,
+    epochs: int = 15,
     lr: float = 0.005,
     hidden_dim: int = 128,
     embedding_dim: int = 64,
-    require_real: bool = False,
+    require_real: bool = True,
+    dataset_mode: str = "real",
     all_rows: bool = True,
     nrows: int | None = None,
     output_dir: Path | str | None = None,
 ) -> dict[str, Any]:
-    """Top-level entry point to execute the Elliptic GraphSAGE benchmark."""
+    """Top-level entry point to execute the Elliptic GraphSAGE benchmark.
+
+    Args:
+        seed: Default random seed if seeds is None.
+        seeds: Sequence of seeds for multi-seed statistical evaluation.
+        epochs: Number of training epochs per seed.
+        lr: Learning rate.
+        hidden_dim: Dimension of first GraphSAGE layer.
+        embedding_dim: Dimension of second GraphSAGE layer.
+        require_real: Whether to require real dataset files (fail closed if missing).
+        dataset_mode: 'real' (fail closed if missing) or 'synthetic' (smoke tests).
+        all_rows: Whether to load entire graph (203k nodes).
+        nrows: Subsampled rows if not all_rows.
+        output_dir: Output directory for benchmark artifacts.
+
+    Returns:
+        Dictionary containing benchmark status, metrics, and artifact paths.
+    """
+    eval_seeds = list(seeds) if seeds is not None else [seed]
     bench = EllipticGraphSAGEBenchmark(
-        seed=seed,
+        seed=eval_seeds[0],
+        seeds=eval_seeds,
         require_real=require_real,
+        dataset_mode=dataset_mode,
         all_rows=all_rows,
         nrows=nrows,
     )
@@ -1150,3 +1509,8 @@ def run_graphsage_benchmark(
         embedding_dim=embedding_dim,
         output_dir=output_dir,
     )
+
+
+# Canonical alias for authoritative benchmark execution
+run_canonical_graphsage_benchmark = run_graphsage_benchmark
+

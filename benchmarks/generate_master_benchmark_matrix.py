@@ -273,7 +273,7 @@ class MasterBenchmarkMatrixGenerator:
         # 4. Elliptic
         ell_exp = self._safe_load_json(self.experiments_dir / "elliptic" / "results.json") or {}
         ell_raw = self._safe_load_json(self.raw_results_dir / "graphsage_elliptic_benchmark.json") or {}
-        ell_fm = ell_exp.get("final_metrics", {})
+        ell_metrics = ell_raw.get("metrics") or ell_exp.get("aggregate_metrics", {}).get("mean") or {}
         datasets_matrix["elliptic"] = {
             "dataset_id": "elliptic",
             "dataset_name": "Elliptic Bitcoin AML Graph",
@@ -285,28 +285,29 @@ class MasterBenchmarkMatrixGenerator:
             "feature_dim": 165,
             "paradigms": {
                 "centralized_pooled": {
-                    "architecture": "GraphSAGE Centralized Oracle",
-                    "pr_auc": ell_raw.get("centralized_pr_auc", 0.9001),
+                    "architecture": "GraphSAGE Centralized Inductive (Multi-Seed Temporal Mean)",
+                    "pr_auc": ell_metrics.get("pr_auc", 0.3761),
+                    "roc_auc": ell_metrics.get("roc_auc", 0.8325),
+                    "f1_score": ell_metrics.get("f1_score", 0.3555),
+                    "precision": ell_metrics.get("precision", 0.2757),
+                    "recall": ell_metrics.get("recall", 0.5583),
+                    "recall_at_01_fpr": ell_metrics.get("recall_at_01_fpr", 0.0886),
+                    "recall_at_001_fpr": None,
+                    "status": "EVALUATED",
+                },
+                "federated_fedavg": {
+                    "architecture": "GraphSAGE FedAvg (Cross-Bank Subgraph Partitioning)",
+                    "clients": None,
+                    "rounds": None,
+                    "pr_auc": None,
                     "roc_auc": None,
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
                     "recall_at_01_fpr": None,
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
-                },
-                "federated_fedavg": {
-                    "architecture": "GraphSAGE Inductive Neighborhood (Federated/Temporal)",
-                    "clients": None,
-                    "rounds": 15,
-                    "pr_auc": ell_fm.get("pr_auc", 0.437225),
-                    "roc_auc": ell_fm.get("roc_auc", 0.838842),
-                    "f1_score": ell_fm.get("f1_score", 0.380375),
-                    "precision": ell_fm.get("precision", 0.271120),
-                    "recall": ell_fm.get("recall", 0.637119),
-                    "recall_at_01_fpr": ell_fm.get("recall_at_01_fpr", 0.132041),
-                    "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "NOT_EVALUATED",
+                    "note": "Decentralized cross-bank Bitcoin graph partitioning not evaluated; centralized inductive GraphSAGE benchmarked on full transaction DAG.",
                 },
                 "federated_fedprox": {
                     "architecture": "GraphSAGE FedProx",

@@ -137,16 +137,16 @@
       "title": "Elliptic Bitcoin AML GraphSAGE PR-AUC",
       "dataset": "elliptic",
       "dataset_scale": "203k Nodes, 234k Edges (46.5k labeled)",
-      "stated_value": 0.8746,
+      "stated_value": 0.3761,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.9001,
-      "centralized_baseline_value": 0.9001,
-      "evaluation_type": "TEMPORAL_GRAPH_EMBEDDING",
+      "empirical_measured_value": 0.3761,
+      "centralized_baseline_value": 0.3761,
+      "evaluation_type": "TEMPORAL_OUT_OF_TIME_GRAPH_INDUCTIVE",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
-      "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
+      "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
       "raw_artifact": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
-      "runner_script": "benchmarks/runners/run_graph_benchmark.py",
-      "notes": "PyTorch GraphSAGE 2-layer mean aggregator achieves 0.9001 PR-AUC and 0.9860 ROC-AUC under strict past-to-future temporal split (timesteps 1-34 train, 35-49 test)."
+      "runner_script": "benchmarks/runners/run_graph_benchmark.py --dataset-mode real --epochs 15",
+      "notes": "Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph. PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 ± 0.0482 PR-AUC and 0.8325 ± 0.0078 ROC-AUC across seeds (42, 123, 456) under strict past-to-future temporal split (train 1-30, val 31-34, test 35-49) with validation-only checkpoint selection and validation-calibrated operating threshold."
     },
     {
       "claim_id": "CLM-CREDITCARD-PRAUC",

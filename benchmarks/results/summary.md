@@ -70,17 +70,24 @@
 ---
 
 ## 4. GraphSAGE Inductive Node Classification
-- **Runner**: `benchmarks/runners/run_graph_benchmark.py`
-- **Dataset / Graph**: 2-Layer PyTorch GraphSAGE with Mean Aggregator (166 node features, temporal split)
+- **Runner**: `benchmarks/runners/run_graph_benchmark.py --dataset-mode real --epochs 15`
+- **Dataset / Graph**: 2-Layer PyTorch GraphSAGE with Mean Aggregator on physical Elliptic Bitcoin Graph (203k nodes, 234k edges, 165 node features)
+- **Evaluation Design**: Strict out-of-time temporal split (Train: timesteps 1–30, Validation: 31–34, Test: 35–49) evaluated across 3 training seeds (42, 123, 456)
+- **Validation Calibration**: Checkpoint selection by validation PR-AUC maximization; operating threshold calibrated by validation F1 maximization (test set strictly untouched)
 - **Raw Artifact**: [`graphsage_elliptic_benchmark.json`](./raw/graphsage_elliptic_benchmark.json)
 
-| Evaluation Metric | Measured Value | Operational Significance |
-|:---|:---:|:---|
-| **PR-AUC (Illicit Node Class)** | **0.9001** | Primary metric under severe graph label imbalance |
-| **ROC-AUC** | **0.9860** | Global ranking separation across graph nodes |
-| **Precision** | **0.9636** | High confidence on flagged suspicious entity accounts |
-| **Recall** | **0.3333** | Conservative threshold (p >= 0.5) prior to threshold tuning |
-| **F1-Score** | **0.4953** | Harmonic mean on minority illicit class |
+| Evaluation Metric | Canonical Real-Data Mean | Sample Std ($ddof=1$) | Min | Max | Operational Significance |
+|:---|:---:|:---:|:---:|:---:|:---|
+| **PR-AUC (Illicit Class)** | **0.3761** | 0.0482 | 0.3304 | 0.4265 | Primary ranking metric on continuous test scores under severe temporal fraud shift |
+| **ROC-AUC** | **0.8325** | 0.0078 | 0.8245 | 0.8401 | Global distribution separation on continuous test scores |
+| **Precision** | **0.2757** | 0.0956 | 0.2068 | 0.3848 | Measured at frozen validation-calibrated operating threshold (mean $t^* = 0.65$) |
+| **Recall** | **0.5583** | 0.0871 | 0.4580 | 0.6150 | Illicit transaction capture at frozen validation-calibrated threshold |
+| **F1-Score** | **0.3555** | 0.0567 | 0.3078 | 0.4182 | Harmonic mean on minority illicit class at frozen validation threshold |
+| **Recall @ 0.1% Strict FPR** | **0.0462** | 0.0375 | 0.0000 | 0.0886 | High-precision regime illicit catch rate |
+
+> [!NOTE]
+> **Historical Artifact Context**: The legacy values (PR-AUC 0.9001, ROC-AUC 0.9860, Precision 0.9636, Recall 0.3333) originated from an artificial 1,500-node synthetic chain graph smoke fallback. That synthetic run has been retired and isolated to `graphsage_synthetic_smoke_benchmark.json`. The numbers above represent the canonical, reproducible benchmark on the physical Elliptic dataset.
+
 
 ---
 

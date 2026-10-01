@@ -84,7 +84,7 @@ experiments/<dataset>/
 | [`experiments/paysim/`](file:///experiments/paysim/) | PaySim Mobile Money Remittance | `PaySimNeuralClassifier` (FedAvg) | PR-AUC: 0.1184, ROC-AUC: 0.8700 | `STANDARDIZED` |
 | [`experiments/ieee_cis/`](file:///experiments/ieee_cis/) | IEEE-CIS Card-Not-Present Fraud | `DeepFraudMLP` (FedAvg/FedProx) | PR-AUC: 0.0691, ROC-AUC: 0.6632 | `STANDARDIZED` |
 | [`experiments/credit_card/`](file:///experiments/credit_card/) | European Credit Card PCA Fraud | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.7750, ROC-AUC: 0.9837 | `STANDARDIZED` |
-| [`experiments/elliptic/`](file:///experiments/elliptic/) | Elliptic Bitcoin Blockchain Graph | `FedGNN-GraphSAGE` | PR-AUC: 0.4372, ROC-AUC: 0.8388 | `STANDARDIZED` |
+| [`experiments/elliptic/`](file:///experiments/elliptic/) | Elliptic Bitcoin Blockchain Graph | `Inductive GraphSAGE (Multi-Seed)` | PR-AUC: 0.3761, ROC-AUC: 0.8325 | `STANDARDIZED` |
 | [`experiments/amlsim/`](file:///experiments/amlsim/) | IBM AMLSim Graph Network | GraphSAGE vs Tabular MLP | PR-AUC: 0.6527, Cycle Rec: 67.4% | `STANDARDIZED` |
 | [`experiments/synthaml/`](file:///experiments/synthaml/) | Spar Nord SynthAML Lookback | `DeepFraudMLP` (FedAvg) | PR-AUC: 0.9985, ROC-AUC: 0.9995 | `STANDARDIZED` |
 | [`experiments/amlnet/`](file:///experiments/amlnet/) | AUSTRAC Rare-Event AMLNet | `DeepFraudMLP` (FedAvg) | PR-AUC: 1.0000, ROC-AUC: 1.0000 | `STANDARDIZED` |

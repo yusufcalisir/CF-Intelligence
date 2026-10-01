@@ -23,9 +23,9 @@ model-index:
           name: Elliptic Bitcoin Transaction Graph
         metrics:
           - type: roc_auc
-            value: 0.9860
+            value: 0.8325
           - type: pr_auc
-            value: 0.9001
+            value: 0.3761
       - task:
           type: tabular-classification
           name: E-Commerce Card Payment Fraud Detection
@@ -140,8 +140,8 @@ $$\mathrm{CI}_{95\%} = \left[ \mu - t_{0.975, \nu} \cdot \frac{\sigma}{\sqrt{N}}
 | **PaySim Fraud Benchmark** | Federated FedAvg | ROC-AUC | **0.9092 ± 0.0798** | `[0.8101, 1.0000]` | 0.7709 | 0.9880 |
 | **PaySim Fraud Benchmark** | Federated FedAvg | PR-AUC | **0.2051 ± 0.1362** | `[0.0360, 0.3742]` | 0.0402 | 0.3720 |
 | **Synthetic AML Baseline** | Centralized Tabular | ROC-AUC | **0.9416 ± 0.0034** | `[0.9374, 0.9458]` | 0.9382 | 0.9465 |
-| **Elliptic Bitcoin Graph** | GraphSAGE GNN | ROC-AUC | **0.9860** | Single-run baseline | 0.9860 | 0.9860 |
-| **Elliptic Bitcoin Graph** | GraphSAGE GNN | PR-AUC | **0.9001** | Single-run baseline | 0.9001 | 0.9001 |
+| **Elliptic Bitcoin Graph** | GraphSAGE GNN (Multi-Seed Mean) | ROC-AUC | **0.8325 ± 0.0078** | `[0.8131, 0.8519]` | 0.8245 | 0.8401 |
+| **Elliptic Bitcoin Graph** | GraphSAGE GNN (Multi-Seed Mean) | PR-AUC | **0.3761 ± 0.0482** | `[0.2563, 0.4959]` | 0.3304 | 0.4265 |
 
 *Raw Statistical Artifact: [`benchmarks/results/raw/multi_seed_statistical_summary.json`](benchmarks/results/raw/multi_seed_statistical_summary.json)*
 

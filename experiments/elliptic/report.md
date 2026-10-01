@@ -9,16 +9,16 @@
 
 ## 1. Executive Summary & Core Results
 
-| Evaluation Dimension | Measured Value | Target SLA / Baseline | Status |
-| :--- | :---: | :---: | :---: |
-| **Precision-Recall AUC (PR-AUC)** | **0.4372** | Primary Imbalanced Metric | `CONFIRMED` |
-| **ROC-AUC** | **0.8388** | Area Under Receiver Operating Characteristic | `CONFIRMED` |
-| **F1-Score (Optimal Threshold)** | **0.3804** | Harmonic Mean of Precision & Recall | `CONFIRMED` |
-| **Precision (PPV)** | **0.2711** | Operational False Positive Ceiling | `CONFIRMED` |
-| **Recall (Sensitivity)** | **0.6371** | True Positive Fraud Detection Floor | `CONFIRMED` |
-| **Brier Calibration Score** | **0.1916** | Probability Calibration Fidelity | `CONFIRMED` |
-| **Recall @ 0.1% FPR** | **13.2041%** | Low-FPR Operational Boundary | `CONFIRMED` |
-| **Recall @ 1.0% FPR** | **23.0840%** | Strict Bank Operational Tier | `CONFIRMED` |
+| Evaluation Dimension | Canonical 3-Seed Mean | Sample Std ($ddof=1$) | Observed [Min, Max] | Status |
+| :--- | :---: | :---: | :---: | :---: |
+| **Precision-Recall AUC (PR-AUC)** | **0.3761** | 0.0482 | [0.3304, 0.4265] | `CONFIRMED` |
+| **ROC-AUC** | **0.8325** | 0.0078 | [0.8245, 0.8401] | `CONFIRMED` |
+| **F1-Score (Validation Calibrated)** | **0.3555** | 0.0567 | [0.3078, 0.4182] | `CONFIRMED` |
+| **Precision (PPV)** | **0.2757** | 0.0956 | [0.2068, 0.3848] | `CONFIRMED` |
+| **Recall (Sensitivity)** | **0.5583** | 0.0871 | [0.4580, 0.6150] | `CONFIRMED` |
+| **Recall @ 0.1% Strict FPR** | **4.62%** | 3.75% | [0.00%, 8.86%] | `CONFIRMED` |
+| **Recall @ 0.5% FPR** | **14.34%** | 4.60% | [10.25%, 20.31%] | `CONFIRMED` |
+| **Recall @ 1.0% FPR** | **20.81%** | 1.83% | [18.74%, 22.53%] | `CONFIRMED` |
 
 ---
 

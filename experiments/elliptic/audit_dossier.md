@@ -1,8 +1,8 @@
 # Elliptic Bitcoin GraphSAGE Inductive Benchmark Audit Dossier
 
 > **Dataset**: Elliptic Bitcoin Transaction Graph (Weber et al., 2019)  
-> **Execution Timestamp**: `2026-09-26T19:49:40.308490+00:00`  
-> **Git Commit**: `229c2623bbafc042d625b320cae770b9de2c97fd`  
+> **Execution Timestamp**: `2026-10-01T07:00:28.449284+00:00`  
+> **Git Commit**: `aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e`  
 > **Temporal Invariant**: Strict past-to-future split (Timesteps 1-34 Train vs 35-49 Test)  
 > **Hardware**: AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (16 vCPUs), 7.3 GB RAM, Windows 11  
 
@@ -12,10 +12,10 @@
 
 | Evaluation Paradigm | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | F1-Score | Brier Score | Latency (ms/1k) | $\Delta$ PR-AUC vs Tabular |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Inductive GraphSAGE (2-Layer Mean Aggregator)** | `0.4372` | `0.8388` | `0.1320` | `0.1828` | `0.3804` | `0.1916` | `6.16` ms | **-0.0229** |
-| **Inductive GraphSAGE (1-Layer Mean Aggregator)** | `0.4604` | `0.8430` | `0.1496` | `0.2909` | `0.2739` | `0.1933` | `2.93` ms | **+0.0003** |
-| **Tabular MLP Baseline (No Graph / 0-Hop)** | `0.4602` | `0.8613` | `0.0822` | `0.2041` | `0.3580` | `0.1143` | `1.44` ms | **Baseline (0.0)** |
-| **GraphSAGE (GCN Symmetric Aggregator)** | `0.4655` | `0.8337` | `0.0785` | `0.2844` | `0.3587` | `0.1912` | `5.71` ms | **+0.0053** |
+| **Inductive GraphSAGE (2-Layer Mean Aggregator)** | `0.4265` | `0.8401` | `0.0886` | `0.2031` | `0.3405` | `0.1649` | `5.95` ms | **-0.1513** |
+| **Inductive GraphSAGE (1-Layer Mean Aggregator)** | `0.4556` | `0.8368` | `0.1293` | `0.2225` | `0.3992` | `0.2394` | `5.82` ms | **-0.1223** |
+| **Tabular MLP Baseline (No Graph / 0-Hop)** | `0.5778` | `0.8722` | `0.2521` | `0.3897` | `0.5162` | `0.1720` | `1.25` ms | **Baseline (0.0)** |
+| **GraphSAGE (GCN Symmetric Aggregator)** | `0.4922` | `0.8504` | `0.1043` | `0.2862` | `0.3845` | `0.1524` | `5.53` ms | **-0.0856** |
 
 ---
 
@@ -24,19 +24,19 @@
 To isolate the exact causal impact of graph topology from raw node features:
 
 ```
-0-Hop (Tabular MLP Baseline)       PR-AUC: 0.4602  |  ROC-AUC: 0.8613  |  Recall@0.1%FPR: 0.0822
-1-Hop (GraphSAGE Immediate Neigh)   PR-AUC: 0.4604  |  ROC-AUC: 0.8430  |  Recall@0.1%FPR: 0.1496
-2-Hop (GraphSAGE Full Champion)    PR-AUC: 0.4372  |  ROC-AUC: 0.8388  |  Recall@0.1%FPR: 0.1320
+0-Hop (Tabular MLP Baseline)       PR-AUC: 0.5778  |  ROC-AUC: 0.8722  |  Recall@0.1%FPR: 0.2521
+1-Hop (GraphSAGE Immediate Neigh)   PR-AUC: 0.4556  |  ROC-AUC: 0.8368  |  Recall@0.1%FPR: 0.1293
+2-Hop (GraphSAGE Full Champion)    PR-AUC: 0.4265  |  ROC-AUC: 0.8401  |  Recall@0.1%FPR: 0.0886
 ```
 
-- **Neighborhood Aggregation Uplift ($\Delta$ PR-AUC)**: `-0.0229`
-- **Discriminative Separation Uplift ($\Delta$ ROC-AUC)**: `-0.0225`
-- **Low-FPR Operational Safety Uplift ($\Delta$ Recall @ 0.1% FPR)**: `+0.0499`
+- **Neighborhood Aggregation Uplift ($\Delta$ PR-AUC)**: `-0.1513`
+- **Discriminative Separation Uplift ($\Delta$ ROC-AUC)**: `-0.0321`
+- **Low-FPR Operational Safety Uplift ($\Delta$ Recall @ 0.1% FPR)**: `-0.1634`
 
 ### Aggregator Function Invariants
 
-- **Mean Aggregator**: PR-AUC `0.4372`, ROC-AUC `0.8388`.
-- **GCN Symmetric Aggregator**: PR-AUC `0.4655`, ROC-AUC `0.8337`.
+- **Mean Aggregator**: PR-AUC `0.4265`, ROC-AUC `0.8401`.
+- **GCN Symmetric Aggregator**: PR-AUC `0.4922`, ROC-AUC `0.8504`.
 
 ---
 
@@ -51,10 +51,10 @@ To isolate the exact causal impact of graph topology from raw node features:
 
 ## 4. Empirical Confusion Matrix (GraphSAGE 2-Layer)
 
-- **True Negatives (TN)**: `13,732` (Correctly identified licit Bitcoin transactions)
-- **False Positives (FP)**: `1,855` (Benign transactions flagged as suspicious)
-- **False Negatives (FN)**: `393` (Missed illicit transactions)
-- **True Positives (TP)**: `690` (Successfully intercepted money laundering transactions)
+- **True Negatives (TN)**: `13,424` (Correctly identified licit Bitcoin transactions)
+- **False Positives (FP)**: `2,163` (Benign transactions flagged as suspicious)
+- **False Negatives (FN)**: `417` (Missed illicit transactions)
+- **True Positives (TP)**: `666` (Successfully intercepted money laundering transactions)
 
 ---
 
@@ -62,6 +62,6 @@ To isolate the exact causal impact of graph topology from raw node features:
 
 - **Result Payload**: [`results.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\results.json)
 - **Comparative Baselines**: [`comparative_baselines.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\comparative_baselines.json)
-- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\benchmarks\results\raw\graphsage_elliptic_benchmark.json)
+- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\graphsage_elliptic_benchmark.json)
 - **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\docs\figures\benchmark_graphsage_elliptic.png)
 

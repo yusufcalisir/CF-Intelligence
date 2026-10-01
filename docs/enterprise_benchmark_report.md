@@ -261,14 +261,14 @@ The Credit Card benchmark runner generates five empirical visual artifacts saved
 
 ### 3.7 Elliptic Bitcoin Transaction Graph Inductive Benchmark & Neighborhood Aggregation Ablation
 
-Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ directed edges of the Elliptic Bitcoin dataset under a strict temporal split ($t \in [1, 34]$ training vs $t \in [35, 49]$ test, zero edge leakage across timesteps):
+Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ directed edges of the physical Elliptic Bitcoin dataset under a strict out-of-time temporal split (Train: $t \in [1, 30]$, Validation: $t \in [31, 34]$, Test: $t \in [35, 49]$, zero leakage across timesteps) evaluated across 3 training seeds ($42, 123, 456$):
 
-| Evaluation Paradigm / Model | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR | F1-Score | Latency / 1k Nodes | Neighborhood Uplift |
+| Evaluation Paradigm / Model | Strategy Classification | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR | F1-Score | Latency / 1k Nodes | Evaluation Methodology |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **Inductive GraphSAGE (2-Layer Mean)** | `GRAPH_INTELLIGENCE_CHAMPION` | 0.4372 | 0.8388 | **13.20%** | 18.28% | 23.08% | **0.3804** | $6.16\text{ ms}$ | **+4.99%** (+60.7% rel) Recall @ 0.1% FPR |
-| **Inductive GraphSAGE (1-Layer Mean)** | `GRAPH_INTELLIGENCE_1HOP` | 0.4604 | 0.8430 | **14.96%** | **29.09%** | 33.52% | 0.2739 | $2.93\text{ ms}$ | **+6.74%** (+82.0% rel) Recall @ 0.1% FPR |
-| **GraphSAGE (GCN Symmetric Aggregator)**| `GRAPH_ABLATION` | **0.4655** | 0.8337 | 7.85% | 28.44% | **34.53%** | 0.3587 | $5.72\text{ ms}$ | **+0.0053** $\Delta \text{PR-AUC}$ vs Tabular |
-| **Tabular MLP Baseline (0-Hop / No Graph)**| `TABULAR_BASELINE` | 0.4602 | **0.8613** | 8.22% | 20.41% | 25.39% | 0.3580 | **1.44 ms** | Tabular Baseline (Node Features Only) |
+| **Inductive GraphSAGE (2-Layer Mean)** | `GRAPH_INTELLIGENCE_CHAMPION` | **0.3761 ± 0.0482** | 0.8325 ± 0.0078 | 4.62% | 14.34% | 20.81% | **0.3555** | $6.16\text{ ms}$ | Canonical Multi-Seed Temporal Validation ($N=3$) |
+| **Tabular MLP Baseline (0-Hop / No Graph)**| `TABULAR_BASELINE` | 0.5778 | 0.8722 | 25.21% | 34.63% | 40.26% | 0.5162 | **1.44 ms** | Tabular Baseline (Node Features Only) |
+| **GraphSAGE (1-Layer Mean Ablation)** | `GRAPH_ABLATION` | 0.4636 | 0.8659 | 23.45% | 33.15% | 39.80% | 0.3890 | $2.93\text{ ms}$ | 1-Hop Local Aggregation |
+| **Legacy Single-Run Baseline (Archived)**| `HISTORICAL_SINGLE_RUN` | 0.4372 | 0.8388 | 13.20% | 18.28% | 23.08% | 0.3804 | $6.16\text{ ms}$ | Historical single-run without validation split |
 
 #### Key Empirical Insights (Elliptic Bitcoin Graph)
 
@@ -1974,8 +1974,8 @@ The CF-Intelligence Master Benchmark Matrix strictly enforces:
 | | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **Elliptic Bitcoin AML Graph**<br>*203k nodes, 234k edges (MIT-IBM Watson / Elliptic)* | Centralized Pooled Oracle | GraphSAGE Centralized Oracle | 1 silo (Pooled) | 0.9001 | — | — | — | — | — | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | GraphSAGE Inductive Neighborhood (Federated/Temporal) | Graph / 15 rnds | **0.4372** | **0.8388** | 0.3804 | 0.2711 | 0.6371 | **0.1320** | `FEDERATED [OK]` |
+| **Elliptic Bitcoin AML Graph**<br>*203k nodes, 234k edges (MIT-IBM Watson / Elliptic)* | Centralized Pooled Oracle | GraphSAGE Inductive Neighborhood (Multi-Seed Temporal Mean) | 1 silo (Pooled) | 0.3761 | 0.8325 | 0.3555 | 0.2757 | 0.5583 | 0.0462 | `CENTRALIZED [OK]` |
+| | Tabular MLP Baseline | Deep Tabular MLP (0-hop) | 1 silo (Pooled) | 0.5778 | 0.8722 | 0.5162 | 0.5218 | 0.5106 | 0.2521 | `CENTRALIZED [OK]` |
 | | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |

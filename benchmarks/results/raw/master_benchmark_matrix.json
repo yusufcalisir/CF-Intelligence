@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "report_name": "Master Empirical Comparative Benchmark Matrix",
-  "generated_at_utc": "2026-09-30T17:59:16.046225+00:00",
+  "generated_at_utc": "2026-10-01T07:01:01.103323+00:00",
   "invariants": {
     "strict_null_representation": true,
     "zero_fake_defaults": true,
@@ -226,28 +226,29 @@
       "feature_dim": 165,
       "paradigms": {
         "centralized_pooled": {
-          "architecture": "GraphSAGE Centralized Oracle",
-          "pr_auc": 0.9001,
+          "architecture": "GraphSAGE Centralized Inductive (Multi-Seed Temporal Mean)",
+          "pr_auc": 0.3761,
+          "roc_auc": 0.8325,
+          "f1_score": 0.3555,
+          "precision": 0.2757,
+          "recall": 0.5583,
+          "recall_at_01_fpr": 0.0462,
+          "recall_at_001_fpr": null,
+          "status": "EVALUATED"
+        },
+        "federated_fedavg": {
+          "architecture": "GraphSAGE FedAvg (Cross-Bank Subgraph Partitioning)",
+          "clients": null,
+          "rounds": null,
+          "pr_auc": null,
           "roc_auc": null,
           "f1_score": null,
           "precision": null,
           "recall": null,
           "recall_at_01_fpr": null,
           "recall_at_001_fpr": null,
-          "status": "EVALUATED"
-        },
-        "federated_fedavg": {
-          "architecture": "GraphSAGE Inductive Neighborhood (Federated/Temporal)",
-          "clients": null,
-          "rounds": 15,
-          "pr_auc": 0.437225,
-          "roc_auc": 0.838842,
-          "f1_score": 0.380375,
-          "precision": 0.27112,
-          "recall": 0.637119,
-          "recall_at_01_fpr": 0.132041,
-          "recall_at_001_fpr": null,
-          "status": "EVALUATED"
+          "status": "NOT_EVALUATED",
+          "note": "Decentralized cross-bank Bitcoin graph partitioning not evaluated; centralized inductive GraphSAGE benchmarked on full transaction DAG."
         },
         "federated_fedprox": {
           "architecture": "GraphSAGE FedProx",
