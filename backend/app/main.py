@@ -33,7 +33,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import get_settings
 from app.infrastructure.security.error_handler import format_safe_error_response
@@ -756,23 +756,43 @@ app.add_middleware(W3CTraceContextMiddleware)
 
 # ── API Version Lifecycle Headers Middleware ──────────────────────────────────
 # Adds RFC 8594 Deprecation and Sunset headers to all responses so that clients
-# and gateways can handle version lifecycle transitions programmatically.
-class APIVersionLifecycleMiddleware(BaseHTTPMiddleware):
-    """Attach RFC 8594 Deprecation / Sunset headers to every API response."""
+# and gateways can handle version lifecycle transitions programmatically (Pure ASGI).
+class APIVersionLifecycleMiddleware:
+    """Attach RFC 8594 Deprecation / Sunset headers to every API response (Pure ASGI)."""
 
     # Update these dates when planning a version deprecation cycle.
     _DEPRECATION_DATE: str | None = None  # e.g. "Sat, 01 Jan 2026 00:00:00 GMT"
     _SUNSET_DATE: str | None = None  # e.g. "Sat, 01 Jul 2026 00:00:00 GMT"
     _API_VERSION = "v1"
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        response = await call_next(request)
-        response.headers["X-API-Version"] = self._API_VERSION
-        if self._DEPRECATION_DATE:
-            response.headers["Deprecation"] = self._DEPRECATION_DATE
-        if self._SUNSET_DATE:
-            response.headers["Sunset"] = self._SUNSET_DATE
-        return response
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                raw_headers: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                new_headers: list[tuple[bytes, bytes]] = [
+                    (k, v)
+                    for k, v in raw_headers
+                    if k.lower() != b"x-api-version"
+                    and (self._DEPRECATION_DATE is None or k.lower() != b"deprecation")
+                    and (self._SUNSET_DATE is None or k.lower() != b"sunset")
+                ]
+                new_headers.append((b"x-api-version", self._API_VERSION.encode("latin-1")))
+                if self._DEPRECATION_DATE:
+                    new_headers.append((b"deprecation", self._DEPRECATION_DATE.encode("latin-1")))
+                if self._SUNSET_DATE:
+                    new_headers.append((b"sunset", self._SUNSET_DATE.encode("latin-1")))
+                message = {**message, "headers": new_headers}
+
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
 app.add_middleware(APIVersionLifecycleMiddleware)

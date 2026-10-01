@@ -335,7 +335,7 @@
       "dataset_scale": "C=10 Concurrent Clients (3000 Requests across 3 reps)",
       "stated_value": 50.0,
       "stated_unit": "successful 2xx req/s",
-      "empirical_measured_value": 200.7,
+      "empirical_measured_value": 233.7,
       "centralized_baseline_value": 89.0,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -343,7 +343,7 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 200.7 ± 23.3 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success, client loop lag p99=8.52ms, client CPU=0.12 cores). Following the pure-ASGI conversion of ContentTypeMiddleware, throughput improved across multiple concurrency tiers (e.g. C=10: 200.7 req/s vs 190.7 req/s; C=50: 195.4 req/s vs 170.7 req/s; C=500: 127.2 req/s vs 118.2 req/s with median latency dropping by -804ms from 4,340ms to 3,536ms). Historical HTTPX measurements (191.0 req/s at C=10, collapsing to 41.6 req/s at C=500 due to client event-loop starvation) are preserved in benchmarks/results/raw/latency_http_service_benchmark_httpx.json as VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS, SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION.",
+      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 233.7 ± 3.9 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success, client loop lag p99=7.99ms, client CPU=0.12 cores). Following the pure-ASGI conversions of ContentTypeMiddleware and APIVersionLifecycleMiddleware, throughput improved across all concurrency tiers: C=1: 104.8 ± 3.1 req/s; C=10: 233.7 ± 3.9 req/s; C=50: 204.3 ± 6.9 req/s; C=100: 197.4 ± 4.7 req/s; C=250 recovered completely to 176.6 ± 2.8 req/s (+57.5%); C=500 reached 174.4 ± 4.8 req/s (+37.1%) with median latency dropping by -836.8ms from 3,536.11ms to 2,699.36ms and p99 tail latency falling by -1,808.86ms to 3,758.08ms. Historical HTTPX measurements (191.0 req/s at C=10, collapsing to 41.6 req/s at C=500 due to client event-loop starvation) are preserved in benchmarks/results/raw/latency_http_service_benchmark_httpx.json as VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS, SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
@@ -372,7 +372,7 @@
       "dataset_scale": "C=1 Client (3000 Requests across 3 reps)",
       "stated_value": 10.0,
       "stated_unit": "ms",
-      "empirical_measured_value": 10.16,
+      "empirical_measured_value": 9.22,
       "centralized_baseline_value": 11.39,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -380,7 +380,7 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP using aiohttp load generator: mean=10.89ms, per-repetition p50 mean=10.16ms (pooled p50=9.90ms), p95=15.09ms, p99=22.07ms (100% 2xx success across 3,000 requests, client loop lag p99=8.28ms, client CPU=0.08 cores). Historical HTTPX measurement (mean=10.97ms, p50=10.77ms) is preserved in latency_http_service_benchmark_httpx.json.",
+      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP using aiohttp load generator: mean=9.85ms, per-repetition p50 mean=9.22ms (pooled p50=9.20ms), p95=11.94ms, p99=14.24ms (100% 2xx success across 3,000 requests, client loop lag p99=8.95ms, client CPU=0.08 cores). Historical HTTPX measurement (mean=10.97ms, p50=10.77ms) is preserved in latency_http_service_benchmark_httpx.json.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
@@ -473,7 +473,7 @@
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "4,198 Collected Tests Across 4 Suites",
+      "dataset_scale": "4,206 Collected Tests Across 4 Suites",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -483,7 +483,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "Automated test inventory comprises 4,198 uniquely collected tests across 4 disjoint suites: 3,402 backend pytests, 409 scientific verification tests across 21 modules, 356 frontend vitest tests, and 31 smart contract tests. Core Python suites (3,811 tests) maintain 100% pass rate in CI."
+      "notes": "Automated test inventory comprises 4,206 uniquely collected tests across 4 disjoint suites: 3,410 backend pytests, 409 scientific verification tests across 21 modules, 356 frontend vitest tests, and 31 smart contract tests. Core Python suites (3,819 tests) maintain 100% pass rate in CI."
     }
   ]
 }
