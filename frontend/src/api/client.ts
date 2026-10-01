@@ -29,10 +29,15 @@ apiClient.interceptors.response.use(
       // Normal React / TanStack Query query cancellation on unmount or re-render
       return Promise.reject(error);
     }
-    if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
-      console.warn('[API Warning] Request timed out, using cached/fallback state:', error.config?.url);
-    } else {
-      console.warn('[API Warning]', error.response?.data ?? error.message);
+    const isTest =
+      (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') ||
+      (typeof import.meta !== 'undefined' && import.meta.env?.MODE === 'test');
+    if (!isTest) {
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout')) {
+        console.warn('[API Warning] Request timed out, using cached/fallback state:', error.config?.url);
+      } else {
+        console.warn('[API Warning]', error.response?.data ?? error.message);
+      }
     }
     return Promise.reject(error);
   },
