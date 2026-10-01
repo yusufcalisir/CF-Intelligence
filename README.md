@@ -133,7 +133,7 @@ To prevent ambiguity between production-grade components, algorithmic research e
 |:---|:---|:---|:---|
 | **Real-Time Scoring Latency** | Target: < 15.0ms Fast Path, < 350ms Ensemble | Measured: 2.29 ms single-request fast-path (p99: 3.53 ms @ C=1, 79.34 ms @ C=100); throughput: 1,394.7 req/s @ C=100 ([`latency_concurrency_benchmark.json`](benchmarks/results/raw/latency_concurrency_benchmark.json)) | **Verified** |
 | **Federated Non-IID Convergence** | Resilient under Dirichlet $\alpha = 0.50$ | `benchmarks/runners/run_fl_benchmark.py`, `backend/tests/unit/test_fl_engine.py` | **Verified** |
-| **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), RDP moments accounting | **Verified** |
+| **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), Opacus PRV accounting (Gopi et al. 2021) | **Verified** |
 | **Byzantine Fault Tolerance** | Tolerates up to $f < n/2$ malicious nodes | `benchmarks/runners/run_byzantine_benchmark.py` (Krum, Trimmed Mean, Bulyan) | **Verified** |
 | **Zero Raw PII Transmission** | No cleartext IBAN / SSN outside bank | AST static analyzer + `backend/tests/unit/test_data_contracts.py` | **Verified** |
 | **SSRF Perimeter Defense** | Private IP / AWS metadata blocking | `backend/tests/unit/test_perimeter_waf.py` (100% boundary probes blocked) | **Verified** |
@@ -1378,7 +1378,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 
 | Claim ID | Category & Description | Target Specification | Measured Benchmark Value | Raw Artifact JSON | Reproduction CLI Command | Evaluation Classification |
 | :--- | :--- | :---: | :---: | :--- | :--- | :--- |
-| **`CLM-PAYSIM-FED-PRAUC`** | PaySim Federated Learning PR-AUC (Calibrated Simulation) | `0.8420` (Target) | `0.1463` (3-round) | [`fraud_benchmark_paysim.json`](benchmarks/results/raw/fraud_benchmark_paysim.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --rounds 3 --clients 5` | `DESIGN_TARGET_VS_LOCAL_RUN` |
+| **`CLM-PAYSIM-FED-PRAUC`** | PaySim Federated Learning PR-AUC (Canonical Real-Data Benchmark) | `0.8420` (Target) | `0.9545` (3-seed mean) | [`canonical_results.json`](experiments/paysim/canonical_results.json) | `python experiments/paysim/run_paysim_canonical_benchmark.py` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-PAYSIM-RECALL-FPR`** | PaySim Recall @ 0.1% FPR (Calibrated Simulation) | `0.6240` (Target) | `0.2000` | [`fraud_benchmark_paysim.json`](benchmarks/results/raw/fraud_benchmark_paysim.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset paysim --rounds 3 --clients 5` | `DESIGN_TARGET_VS_LOCAL_RUN` |
 | **`CLM-IEEE-FED-PRAUC`** | IEEE-CIS Card Fraud Fed PR-AUC | `0.8120` | `0.7554` | [`fraud_benchmark_ieee_cis.json`](benchmarks/results/raw/fraud_benchmark_ieee_cis.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --rounds 5 --clients 3` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-IEEE-RECALL-FPR`** | IEEE-CIS Recall @ 0.1% FPR | `0.5890` | `0.4308` | [`fraud_benchmark_ieee_cis.json`](benchmarks/results/raw/fraud_benchmark_ieee_cis.json) | `python benchmarks/runners/run_fraud_benchmark.py --dataset ieee_cis --rounds 5 --clients 3` | `EMPIRICAL_PARITY_VERIFIED` |
@@ -1415,7 +1415,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **SecAgg Throughput (NumPy Vectorized Masking)** | **~5,630,000 param/s** | > 1M param/s | `fl_engine.py` | `Empirical NumPy Array Vectorization Benchmark` |
 | **SecAgg Latency Scaling** | **O(n x d), R^2 = 0.9703** | Linear O(n x d) | `fl_engine.py` (NumPy masking path via `secagg_benchmark_scalability.py`) | `Empirical Vectorization Benchmark (see secagg_scalability_benchmark_report.md; variance range: 0.91–0.99)` |
 | **FL Synthetic ROC-AUC (FedAvg)** | **0.835 mean (range 0.563–0.952)** | > 0.80 measured / 0.950 lab design goal | `simulation_service.py` (5-seed empirical benchmark, 3-bank consortium, 5 rounds) | `Empirical Simulation Benchmark (5 seeds: [42, 123, 456, 789, 2026])` |
-| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$** (Opacus RDP; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; RDP moments accounting via `run_dp_tradeoff.py`)` |
+| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$** (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
 | **Full Test Suite Pass Rate** | 100% | **4,143 / 4,143 passing** (3,347 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
@@ -1424,22 +1424,25 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 
 ### 15.3 Empirical Differential Privacy Utility Frontier (`benchmarks/runners/run_dp_tradeoff.py`)
 
-Using Rényi Differential Privacy (RDP) moments accounting (`RDPMomentsAccountant`, Mironov 2017) and Gaussian gradient perturbation across $\sigma \in \{0.5, 1.0, 1.5, 2.0\} \times T \in \{5, 10, 20, 50\}$ ($q=0.05, \delta=10^{-5}$), the platform empirically evaluates the privacy-utility Pareto frontier and calibrates noise multiplier $\sigma^* = 0.8870$ for statutory target $\epsilon \le 2.0$:
+Using genuine per-sample DP-SGD via PyTorch Opacus (`PrivacyEngine(accountant='prv')`, per-sample gradient clipping $C = 1.0$) and Numerical Privacy Random Variables accounting (`PRVAccountant`, Gopi et al., 2021) at $\delta = 10^{-5}$, the platform evaluates the empirical privacy-utility frontier across a fixed-noise-multiplier sweep ($\sigma \in \{3.0, 2.0, 1.0, 0.5, 0.0\}$) over a canonical banking fraud dataset ($N = 20{,}000$ transactions, 15 features, $2.1\%$ fraud prevalence; 16,000 train / 4,000 test with 84 test fraud cases):
 
-| Noise Scale ($\sigma$) | Rounds ($T$) | RDP Privacy Loss ($\epsilon$) | Optimal Order ($\alpha^*$) | Risk Model PR-AUC | Risk Model ROC-AUC | Privacy Compliance ($\epsilon \le 2.0$) |
+| Noise Multiplier ($\sigma$) | Accounted Privacy Budget ($\epsilon, \delta=10^{-5}$) | Test PR-AUC (Mean $\pm$ Sample Std) | Test ROC-AUC (Mean $\pm$ Sample Std) | Absolute Utility Loss | Relative Utility Loss | Operational / Compliance Status ($\epsilon \le 2.0$ Target) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| $\sigma = 0.5$ | 5 | $\epsilon = 1.1006$ | $\alpha = 24$ | **0.0176** | 0.3576 | ✅ Compliant |
-| $\sigma = 0.5$ | 10 | $\epsilon = 1.5675$ | $\alpha = 16$ | **0.0793** | 0.6672 | ✅ Compliant |
-| $\sigma = 0.5$ | 20 | $\epsilon = 2.2466$ | $\alpha = 12$ | **0.2944** | 0.8525 | ⚠️ Budget Exceeded |
-| $\sigma = 0.5$ | 50 | $\epsilon = 3.6447$ | $\alpha = 8$ | **0.6599** | 0.9810 | ⚠️ Budget Exceeded |
-| $\sigma = 1.0$ | 5 | $\epsilon = 0.5450$ | $\alpha = 48$ | **0.0141** | 0.2317 | ✅ Compliant (High Privacy) |
-| $\sigma = 1.0$ | 10 | $\epsilon = 0.7714$ | $\alpha = 32$ | **0.0255** | 0.3996 | ✅ Compliant |
-| $\sigma = 1.0$ | 20 | $\epsilon = 1.1006$ | $\alpha = 24$ | **0.0566** | 0.5557 | ✅ Compliant |
-| $\sigma = 1.0$ | 50 | $\epsilon = 1.7675$ | $\alpha = 16$ | **0.3922** | 0.9452 | ✅ Compliant (Recommended $\sigma$) |
-| $\sigma = 1.5$ | 20 | $\epsilon = 0.7269$ | $\alpha = 32$ | **0.0236** | 0.3834 | ✅ Compliant |
-| $\sigma = 1.5$ | 50 | $\epsilon = 1.1672$ | $\alpha = 24$ | **0.2075** | 0.8942 | ✅ Compliant |
-| $\sigma = 2.0$ | 20 | $\epsilon = 0.5450$ | $\alpha = 48$ | **0.0183** | 0.3055 | ✅ Compliant |
-| $\sigma = 2.0$ | 50 | $\epsilon = 0.8714$ | $\alpha = 32$ | **0.1106** | 0.8368 | ✅ Compliant (Maximum Defense) |
+| **$\sigma = 3.0$** | $\epsilon = 0.3497$ | **0.3465 $\pm$ 0.1580** | 0.8720 $\pm$ 0.0551 | 0.5500 | -61.35% | ✅ Compliant (High Privacy Regime, $\epsilon \le 1.0$) |
+| **$\sigma = 2.0$** | $\epsilon = 0.5725$ | **0.4710 $\pm$ 0.1752** | 0.8990 $\pm$ 0.0431 | 0.4255 | -47.46% | ✅ Compliant (Strong Privacy, $\epsilon \le 1.0$) |
+| **$\sigma = 1.0$** | $\epsilon = 1.7744$ | **0.7088 $\pm$ 0.1155** | 0.9514 $\pm$ 0.0184 | 0.1877 | -20.94% | ✅ Compliant (Balanced Production Target, $\epsilon \le 2.0$) |
+| **$\sigma = 0.5$** | $\epsilon = 12.1989$ | **0.8457 $\pm$ 0.0429** | 0.9777 $\pm$ 0.0047 | 0.0509 | -5.67% | ⚠️ Target Exceeded ($\epsilon > 2.0$, High-Utility Weak-Privacy Point) |
+| **$\sigma = 0.0$** | $\infty$ (Non-Private Baseline) | **0.8965 $\pm$ 0.0078** | 0.9872 $\pm$ 0.0050 | 0.0000 | 0.00% | Non-Private Baseline Ceiling |
+
+> [!NOTE]
+> **Operational Target vs. Empirically Measured Configurations:**  
+> The consortium specification defines $\epsilon \le 2.0$ as an **operational / regulatory design target**. The benchmark points $\sigma = 1.0$ ($\epsilon \approx 1.7744$), $\sigma = 2.0$ ($\epsilon \approx 0.5725$), and $\sigma = 3.0$ ($\epsilon \approx 0.3497$) strictly comply with this boundary. The point $\sigma = 0.5$ ($\epsilon \approx 12.199$) deliberately exceeds the target to measure the upper utility envelope under relaxed privacy.
+>
+> **Statistical Limitations & Disclosure:**  
+> Reported uncertainties represent the sample standard deviation across 3 independent training seeds ($42, 123, 456$, with $\text{ddof}=1$), capturing model training stochasticity. The dataset realization is fixed ($N = 20{,}000$, $\text{seed}=42$) and evaluated on a fixed 80/20 partition ($N_{\text{test}} = 4{,}000$ containing 84 positive fraud cases). While 84 test fraud cases provide robust comparative signal across noise scales, three training seeds do not capture dataset-sampling uncertainty.
+>
+> **Archival Note on Legacy Prototype Data:**  
+> Earlier prototype values published in historical commits (`0.1963`, `0.0722`, `0.3081`, `0.2833`, `0.6205`, `0.6272`) originated from an obsolete 10-feature algebraic centroid prototype without per-sample clipping semantics. They are preserved strictly for historical audit trail in `experiments/dp_evaluation/audit_dossier.md` and are superseded by this canonical neural benchmark.
 
 <div align="center">
   <img src="docs/figures/benchmark_privacy_utility.png" alt="Differential Privacy vs Model Utility Frontier" width="750" />

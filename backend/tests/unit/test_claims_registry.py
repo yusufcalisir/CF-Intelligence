@@ -54,6 +54,7 @@ def test_claims_field_schema_and_types(claim_registry: dict[str, Any]) -> None:
         "EMPIRICAL_PARITY_VERIFIED",
         "EMPIRICAL_SUPERIOR_VERIFIED",
         "VERIFIED_MEASURED",
+        "REQUIRES_RE_EVALUATION",
     }
 
     for claim in claims:
@@ -105,11 +106,15 @@ def test_raw_artifacts_exist_and_reconcile_with_registry(claim_registry: dict[st
     claims_by_id = {c["claim_id"]: c for c in claim_registry["claims"]}
 
     # 1. PaySim Raw Reconciliation
-    paysim_file = RAW_RESULTS_DIR / "fraud_benchmark_paysim.json"
+    raw_rel = claims_by_id["CLM-PAYSIM-FED-PRAUC"]["raw_artifact"]
+    paysim_file = REPO_ROOT / raw_rel
     assert paysim_file.exists(), f"Missing PaySim raw artifact: {paysim_file}"
     with open(paysim_file, encoding="utf-8") as f:
         paysim_raw = json.load(f)
-    paysim_fed_pr_auc = paysim_raw["federated_fedavg"]["pr_auc"]
+    if "aggregate" in paysim_raw and "fedavg_pr_auc" in paysim_raw["aggregate"]:
+        paysim_fed_pr_auc = paysim_raw["aggregate"]["fedavg_pr_auc"]["mean"]
+    else:
+        paysim_fed_pr_auc = paysim_raw["federated_fedavg"]["pr_auc"]
     assert pytest.approx(claims_by_id["CLM-PAYSIM-FED-PRAUC"]["empirical_measured_value"], abs=1e-4) == paysim_fed_pr_auc
 
     # 2. IEEE-CIS Raw Reconciliation

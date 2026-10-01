@@ -32,18 +32,25 @@
 ---
 
 ## 2. Differential Privacy Utility Frontier Sweep
-- **Runner**: `benchmarks/runners/run_dp_tradeoff.py`
-- **Methodology**: Subsampled Gaussian mechanism with Rényi DP (RDP) moments composition
+- **Runner**: `benchmarks/runners/run_dp_tradeoff.py` (canonical engine: `experiments/dp_evaluation/run_dp_noise_sweep.py`)
+- **Methodology**: Genuine DP-SGD via PyTorch Opacus (`PrivacyEngine(accountant='prv')`) with per-sample gradient clipping ($C = 1.0$), Gaussian perturbation mechanism, and Privacy Random Variables (PRV) accounting (`PRVAccountant`, Gopi et al., 2021). Fixed-noise-multiplier sweep across $\sigma \in \{3.0, 2.0, 1.0, 0.5, 0.0\}$.
+- **Dataset**: Canonical synthetic banking fraud dataset ($N = 20{,}000$ transactions, 15 features, 2.1% prevalence, 84 test fraud cases).
+- **Evaluation**: 3 independent seeds (`[42, 123, 456]`), reporting mean $\pm$ sample standard deviation ($\text{ddof}=1$).
 - **Raw Artifact**: [`dp_privacy_utility_tradeoff.json`](./raw/dp_privacy_utility_tradeoff.json)
+- **Visual Artifact**: [`docs/figures/benchmark_privacy_utility.png`](../../docs/figures/benchmark_privacy_utility.png)
 
-| Gaussian Noise Multiplier ($\sigma$) | Rényi DP Privacy Budget ($\epsilon$) | Model PR-AUC | Model ROC-AUC | Guarantee Interpretation |
-|:---:|:---:|:---:|:---:|:---|
-| **$\sigma = 3.0$** | $\epsilon = 1.858$ ($\delta=10^{-5}$) | **0.1963** | 0.8301 | Strong Privacy Regime |
-| **$\sigma = 2.0$** | $\epsilon = 2.839$ ($\delta=10^{-5}$) | **0.0722** | 0.7470 | Moderate-Strong Privacy |
-| **$\sigma = 1.2$** | $\epsilon = 4.910$ ($\delta=10^{-5}$) | **0.3081** | 0.8944 | Balanced Tradeoff |
-| **$\sigma = 0.8$** | $\epsilon = 7.696$ ($\delta=10^{-5}$) | **0.2833** | 0.9244 | Moderate Privacy |
-| **$\sigma = 0.4$** | $\epsilon = 17.323$ ($\delta=10^{-5}$) | **0.6205** | 0.9687 | Weak Privacy (Low Noise) |
-| **$\sigma = 0.0$** | $\infty$ (Non-Private Baseline) | **0.6272** | 0.9684 | Zero Privacy (Pure Baseline) |
+| Gaussian Noise Multiplier ($\sigma$) | Accounted Privacy Budget ($\epsilon, \delta=10^{-5}$) | Model PR-AUC (Mean $\pm$ Sample Std) | Model ROC-AUC (Mean $\pm$ Sample Std) | Relative Utility Loss | Operational / Compliance Status ($\epsilon \le 2.0$ Target) |
+|:---:|:---:|:---:|:---:|:---:|:---|
+| **$\sigma = 3.0$** | $\epsilon = 0.3497$ | **0.3465 $\pm$ 0.1580** | 0.8720 $\pm$ 0.0551 | -61.35% | Strict Privacy Regime ($\epsilon \le 1.0$, Compliant) |
+| **$\sigma = 2.0$** | $\epsilon = 0.5725$ | **0.4710 $\pm$ 0.1752** | 0.8990 $\pm$ 0.0431 | -47.46% | Moderate-Strong Privacy ($\epsilon \le 1.0$, Compliant) |
+| **$\sigma = 1.0$** | $\epsilon = 1.7744$ | **0.7088 $\pm$ 0.1155** | 0.9514 $\pm$ 0.0184 | -20.94% | Balanced Production Target ($\epsilon \le 2.0$, Compliant) |
+| **$\sigma = 0.5$** | $\epsilon = 12.1989$ | **0.8457 $\pm$ 0.0429** | 0.9777 $\pm$ 0.0047 | -5.67% | High Utility / Weak Privacy (Target $\epsilon \le 2.0$ Exceeded) |
+| **$\sigma = 0.0$** | $\infty$ (Non-Private Baseline) | **0.8965 $\pm$ 0.0078** | 0.9872 $\pm$ 0.0050 | 0.00% (Ceiling) | Zero Privacy (Identical Baseline Schedule) |
+
+> [!NOTE]
+> **Statistical Limitations & Operational Target Clarification**: Reported uncertainties represent the sample standard deviation across 3 independent training seeds ($\text{ddof}=1$), capturing model training stochasticity under a fixed dataset realization ($N_{\mathrm{total}}=20{,}000$, 15 features, seed 42) and fixed split ($N_{\mathrm{test}}=4{,}000$ with 84 test fraud positives). The $\epsilon \le 2.0$ threshold represents a statutory / consortium design target: configurations $\sigma=1.0$ ($\epsilon \approx 1.7744$), $\sigma=2.0$ ($\epsilon \approx 0.5725$), and $\sigma=3.0$ ($\epsilon \approx 0.3497$) comply with this target. Configuration $\sigma=0.5$ ($\epsilon \approx 12.199$) deliberately exceeds the target to illustrate the upper utility boundary.
+>
+> **Archival Note on Legacy Prototype Data**: Previous values published in legacy commits (`0.1963`, `0.0722`, `0.3081`, `0.2833`, `0.6205`, `0.6272`) originated from an obsolete 10-feature algebraic centroid prototype that lacked per-sample clipping semantics and used disconnected static constants. They have been permanently superseded by the above multi-seed Opacus DP-SGD benchmark and archived in `experiments/dp_evaluation/audit_dossier.md`.
 
 ---
 

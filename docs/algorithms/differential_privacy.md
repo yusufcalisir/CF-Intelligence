@@ -90,6 +90,7 @@ RDP composition is **tighter** than naïve basic composition at all tested order
 | Test File | Coverage | Tests |
 | :--- | :--- | :---: |
 | [`backend/tests/unit/test_privacy_service.py`](file:///backend/tests/unit/test_privacy_service.py) | `PrivacyService`, `PrivacyBudget`, RDP composition, clipping, thread safety | 22 |
+| [`backend/tests/unit/test_dp_benchmark_methodology.py`](file:///backend/tests/unit/test_dp_benchmark_methodology.py) | Canonical Opacus DP-SGD benchmark methodology, PRV accountant, sample std (ddof=1) | 10 |
 | [`verification/differential_privacy/tests/test_dp_bounds.py`](file:///verification/differential_privacy/tests/test_dp_bounds.py) | `RDPMomentsAccountant` — per-step, composition, calibration, sweep, exhaustion | 26 |
 | [`verification/differential_privacy/tests/test_dp_robustness.py`](file:///verification/differential_privacy/tests/test_dp_robustness.py) | Adversarial injection, NaN/Inf, edge cases | 25 |
 | [`verification/differential_privacy/tests/test_dp_hypothesis.py`](file:///verification/differential_privacy/tests/test_dp_hypothesis.py) | Property-based Hypothesis tests | — |
@@ -99,4 +100,5 @@ RDP composition is **tighter** than naïve basic composition at all tested order
 - **Output Artifacts**:
   - `experiments/dp_evaluation/dp_sweep_results.json`
   - `benchmarks/results/raw/dp_privacy_utility_tradeoff.json`
+  - `experiments/dp_evaluation/audit_dossier.md`
   - `docs/figures/benchmark_privacy_utility.png`

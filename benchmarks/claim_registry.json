@@ -180,7 +180,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine) with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via RDP accountant: epsilon=0.3497) yields PR-AUC 0.3465 ± 0.1290 and ROC-AUC 0.8719 ± 0.0450 across seeds [42, 123, 456], reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
+      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine, accountant='prv') with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via PRVAccountant [Gopi et al. 2021]: epsilon=0.3497) yields PR-AUC 0.3465 ± 0.1580 and ROC-AUC 0.8720 ± 0.0551 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1), reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
       "legacy_artifact": {
         "pr_auc": 0.1963,
         "source": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json (legacy commit f0705141 / 7e32f409)",
@@ -203,7 +203,7 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 ± 0.0064 and ROC-AUC 0.9872 ± 0.0041 across seeds [42, 123, 456].",
+      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 ± 0.0078 and ROC-AUC 0.9872 ± 0.0050 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1).",
       "legacy_artifact": {
         "pr_auc": 0.6272,
         "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype"

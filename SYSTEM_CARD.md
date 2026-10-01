@@ -148,7 +148,7 @@ The platform operates under a Zero-Trust, multi-tenant isolation model informed 
 - Natural person demographic attributes (Age, Gender, Race, Religion, etc.) are strictly excluded by design (0/10 protected attributes present across all evaluated public benchmarks).
 
 ### 5.2 Cryptographic Boundaries
-- **Rényi Differential Privacy (RDP)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; empirical benchmarks evaluated at $\epsilon = 1.858$ with $\sigma = 3.0$).
+- **Differential Privacy (Opacus PRV & RDP Accounting)**: Opacus gradient clipping ($C = 1.0$) and calibrated Gaussian noise injection provide provable formal privacy boundaries (target budget $\epsilon \le 1.0, \delta = 10^{-5}$; canonical empirical benchmarks evaluated at $\epsilon = 0.3497$ with $\sigma = 3.0$ and $\epsilon = 1.7744$ with $\sigma = 1.0$ using `PRVAccountant`).
 - **Homomorphic Encryption**: Model updates are encrypted via TenSEAL CKKS (8192-degree polynomial modulus) allowing the central coordinator to aggregate weights in ciphertext space without decryption.
 - **Private Set Intersection (DH-PSI)**: Participating banks cross-reference high-velocity accounts using Curve25519 Diffie-Hellman private set intersection without revealing non-overlapping client portfolios.
 - **Hardware Security Modules (HSM)**: Cryptographic root keys are enveloped using PKCS#11 HSM interfaces and HashiCorp Vault Transit KMS.

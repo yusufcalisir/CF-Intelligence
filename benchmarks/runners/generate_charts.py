@@ -172,7 +172,7 @@ def generate_privacy_utility(results_dir: Path, output_dir: Path):
 
     ax.set_xlabel("Privacy Budget Epsilon (delta = 1e-5)")
     ax.set_ylabel("Validation Utility Metric")
-    ax.set_title("Differential Privacy vs Model Utility Frontier (Opacus RDP)")
+    ax.set_title("Differential Privacy vs Model Utility Frontier (Opacus PRVAccountant)")
     ax.set_ylim(0, 1.05)
     ax.legend(loc="lower right")
     ax.grid(True, linestyle="--", alpha=0.6)

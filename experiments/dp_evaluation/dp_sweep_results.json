@@ -1,264 +1,463 @@
 {
+  "schema_version": "2.1.0",
+  "benchmark_id": "dp_privacy_utility_tradeoff_opacus",
+  "timestamp_utc": "2026-09-30T20:48:54Z",
+  "privacy_engine": "PyTorch Opacus (PrivacyEngine, accountant='prv')",
+  "accountant": "PRVAccountant (Privacy Random Variables, Gopi et al. 2021)",
+  "sweep_type": "fixed_noise_multiplier",
+  "dataset": {
+    "name": "synthetic_banking",
+    "n_samples": 20000,
+    "n_features": 15,
+    "fraud_rate": 0.02,
+    "data_seed": 42,
+    "train_samples": 16000,
+    "test_samples": 4000,
+    "train_fraud_count": 316,
+    "test_fraud_count": 84,
+    "test_fraud_support": "84 positive instances (2.1% prevalence)",
+    "preprocessing": "StandardScaler(fit_train, transform_test)"
+  },
+  "seeds": [
+    42,
+    123,
+    456
+  ],
+  "tradeoff_points": [
+    {
+      "noise_multiplier": 3.0,
+      "epsilon": 0.3497,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "pr_auc": 0.3465,
+      "roc_auc": 0.872,
+      "pr_auc_std": 0.158,
+      "roc_auc_std": 0.0551,
+      "pr_auc_min": 0.2077,
+      "pr_auc_max": 0.5185,
+      "absolute_loss": 0.55,
+      "relative_loss_pct": 61.35,
+      "per_seed_pr_auc": {
+        "42": 0.313433,
+        "123": 0.518464,
+        "456": 0.207687
+      },
+      "std_definition": "sample standard deviation across training seeds (ddof=1)"
+    },
+    {
+      "noise_multiplier": 2.0,
+      "epsilon": 0.5725,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "pr_auc": 0.471,
+      "roc_auc": 0.899,
+      "pr_auc_std": 0.1752,
+      "roc_auc_std": 0.0431,
+      "pr_auc_min": 0.3292,
+      "pr_auc_max": 0.6668,
+      "absolute_loss": 0.4255,
+      "relative_loss_pct": 47.46,
+      "per_seed_pr_auc": {
+        "42": 0.416928,
+        "123": 0.666834,
+        "456": 0.329208
+      },
+      "std_definition": "sample standard deviation across training seeds (ddof=1)"
+    },
+    {
+      "noise_multiplier": 1.0,
+      "epsilon": 1.7744,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "pr_auc": 0.7088,
+      "roc_auc": 0.9514,
+      "pr_auc_std": 0.1155,
+      "roc_auc_std": 0.0184,
+      "pr_auc_min": 0.5835,
+      "pr_auc_max": 0.8109,
+      "absolute_loss": 0.1877,
+      "relative_loss_pct": 20.94,
+      "per_seed_pr_auc": {
+        "42": 0.732107,
+        "123": 0.81086,
+        "456": 0.583475
+      },
+      "std_definition": "sample standard deviation across training seeds (ddof=1)"
+    },
+    {
+      "noise_multiplier": 0.5,
+      "epsilon": 12.1989,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "pr_auc": 0.8457,
+      "roc_auc": 0.9777,
+      "pr_auc_std": 0.0429,
+      "roc_auc_std": 0.0047,
+      "pr_auc_min": 0.7975,
+      "pr_auc_max": 0.8795,
+      "absolute_loss": 0.0509,
+      "relative_loss_pct": 5.67,
+      "per_seed_pr_auc": {
+        "42": 0.879494,
+        "123": 0.86004,
+        "456": 0.797456
+      },
+      "std_definition": "sample standard deviation across training seeds (ddof=1)"
+    },
+    {
+      "noise_multiplier": 0.0,
+      "epsilon": "infinity (non-private)",
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "pr_auc": 0.8965,
+      "roc_auc": 0.9872,
+      "pr_auc_std": 0.0078,
+      "roc_auc_std": 0.005,
+      "pr_auc_min": 0.8879,
+      "pr_auc_max": 0.9031,
+      "absolute_loss": 0.0,
+      "relative_loss_pct": 0.0,
+      "per_seed_pr_auc": {
+        "42": 0.898652,
+        "123": 0.903073,
+        "456": 0.887853
+      },
+      "std_definition": "sample standard deviation across training seeds (ddof=1)"
+    }
+  ],
   "configurations": [
     {
-      "sigma": 0.5,
-      "num_rounds": 5,
-      "epsilon": 1.100562,
-      "optimal_alpha": 24.0,
+      "seed": 42,
+      "sigma": 0.0,
+      "epsilon": Infinity,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.017553,
-      "roc_auc": 0.357561,
-      "runtime_seconds": 6.385,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.898652,
+      "roc_auc": 0.98887,
+      "runtime_seconds": 1.41,
+      "dp_enabled": false
     },
     {
-      "sigma": 0.5,
-      "num_rounds": 10,
-      "epsilon": 1.567528,
-      "optimal_alpha": 16.0,
+      "seed": 123,
+      "sigma": 0.0,
+      "epsilon": Infinity,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.07933,
-      "roc_auc": 0.667204,
-      "runtime_seconds": 8.479,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.903073,
+      "roc_auc": 0.98152,
+      "runtime_seconds": 1.47,
+      "dp_enabled": false
     },
     {
-      "sigma": 0.5,
-      "num_rounds": 20,
-      "epsilon": 2.24663,
-      "optimal_alpha": 12.0,
+      "seed": 456,
+      "sigma": 0.0,
+      "epsilon": Infinity,
       "delta": 1e-05,
-      "budget_exhausted": true,
-      "pr_auc": 0.294406,
-      "roc_auc": 0.852488,
-      "runtime_seconds": 13.952,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.887853,
+      "roc_auc": 0.991147,
+      "runtime_seconds": 1.142,
+      "dp_enabled": false
     },
     {
-      "sigma": 0.5,
-      "num_rounds": 50,
-      "epsilon": 3.644704,
-      "optimal_alpha": 8.0,
+      "seed": 42,
+      "sigma": 3.0,
+      "epsilon": 0.3497151423427945,
       "delta": 1e-05,
-      "budget_exhausted": true,
-      "pr_auc": 0.659856,
-      "roc_auc": 0.980998,
-      "runtime_seconds": 35.508,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.313433,
+      "roc_auc": 0.870607,
+      "runtime_seconds": 2.363,
+      "dp_enabled": true
     },
     {
-      "sigma": 1.0,
-      "num_rounds": 5,
-      "epsilon": 0.544956,
-      "optimal_alpha": 48.0,
+      "seed": 123,
+      "sigma": 3.0,
+      "epsilon": 0.3497151423427945,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.014091,
-      "roc_auc": 0.231688,
-      "runtime_seconds": 2.729,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.518464,
+      "roc_auc": 0.927678,
+      "runtime_seconds": 2.437,
+      "dp_enabled": true
     },
     {
-      "sigma": 1.0,
-      "num_rounds": 10,
-      "epsilon": 0.771385,
-      "optimal_alpha": 32.0,
+      "seed": 456,
+      "sigma": 3.0,
+      "epsilon": 0.3497151423427945,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.025453,
-      "roc_auc": 0.399559,
-      "runtime_seconds": 5.429,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.207687,
+      "roc_auc": 0.817565,
+      "runtime_seconds": 2.719,
+      "dp_enabled": true
     },
     {
-      "sigma": 1.0,
-      "num_rounds": 20,
-      "epsilon": 1.100562,
-      "optimal_alpha": 24.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.056606,
-      "roc_auc": 0.555727,
-      "runtime_seconds": 10.993,
-      "noise_injected": true
-    },
-    {
-      "sigma": 1.0,
-      "num_rounds": 50,
-      "epsilon": 1.767528,
-      "optimal_alpha": 16.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.392155,
-      "roc_auc": 0.945241,
-      "runtime_seconds": 27.836,
-      "noise_injected": true
-    },
-    {
-      "sigma": 1.5,
-      "num_rounds": 5,
-      "epsilon": 0.360523,
-      "optimal_alpha": 64.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.013713,
-      "roc_auc": 0.200625,
-      "runtime_seconds": 2.566,
-      "noise_injected": true
-    },
-    {
-      "sigma": 1.5,
-      "num_rounds": 10,
-      "epsilon": 0.511623,
-      "optimal_alpha": 48.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.021044,
-      "roc_auc": 0.323139,
-      "runtime_seconds": 5.075,
-      "noise_injected": true
-    },
-    {
-      "sigma": 1.5,
-      "num_rounds": 20,
-      "epsilon": 0.72694,
-      "optimal_alpha": 32.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.023557,
-      "roc_auc": 0.383383,
-      "runtime_seconds": 10.55,
-      "noise_injected": true
-    },
-    {
-      "sigma": 1.5,
-      "num_rounds": 50,
-      "epsilon": 1.167229,
-      "optimal_alpha": 24.0,
-      "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.20753,
-      "roc_auc": 0.894197,
-      "runtime_seconds": 30.577,
-      "noise_injected": true
-    },
-    {
+      "seed": 42,
       "sigma": 2.0,
-      "num_rounds": 5,
-      "epsilon": 0.282745,
-      "optimal_alpha": 64.0,
+      "epsilon": 0.5725218488388423,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.013824,
-      "roc_auc": 0.188042,
-      "runtime_seconds": 3.139,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.416928,
+      "roc_auc": 0.907191,
+      "runtime_seconds": 2.332,
+      "dp_enabled": true
     },
     {
+      "seed": 123,
       "sigma": 2.0,
-      "num_rounds": 10,
-      "epsilon": 0.382745,
-      "optimal_alpha": 64.0,
+      "epsilon": 0.5725218488388423,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.023051,
-      "roc_auc": 0.294268,
-      "runtime_seconds": 5.009,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.666834,
+      "roc_auc": 0.937321,
+      "runtime_seconds": 2.282,
+      "dp_enabled": true
     },
     {
+      "seed": 456,
       "sigma": 2.0,
-      "num_rounds": 20,
-      "epsilon": 0.544956,
-      "optimal_alpha": 48.0,
+      "epsilon": 0.5725218488388423,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.018307,
-      "roc_auc": 0.305471,
-      "runtime_seconds": 9.893,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.329208,
+      "roc_auc": 0.852373,
+      "runtime_seconds": 2.335,
+      "dp_enabled": true
     },
     {
-      "sigma": 2.0,
-      "num_rounds": 50,
-      "epsilon": 0.871385,
-      "optimal_alpha": 32.0,
+      "seed": 42,
+      "sigma": 1.0,
+      "epsilon": 1.7744029100297911,
       "delta": 1e-05,
-      "budget_exhausted": false,
-      "pr_auc": 0.110553,
-      "roc_auc": 0.836801,
-      "runtime_seconds": 30.325,
-      "noise_injected": true
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.732107,
+      "roc_auc": 0.964778,
+      "runtime_seconds": 2.535,
+      "dp_enabled": true
+    },
+    {
+      "seed": 123,
+      "sigma": 1.0,
+      "epsilon": 1.7744029100297911,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.81086,
+      "roc_auc": 0.959066,
+      "runtime_seconds": 2.419,
+      "dp_enabled": true
+    },
+    {
+      "seed": 456,
+      "sigma": 1.0,
+      "epsilon": 1.7744029100297911,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.583475,
+      "roc_auc": 0.930383,
+      "runtime_seconds": 2.406,
+      "dp_enabled": true
+    },
+    {
+      "seed": 42,
+      "sigma": 0.5,
+      "epsilon": 12.19893318838794,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.879494,
+      "roc_auc": 0.982973,
+      "runtime_seconds": 2.63,
+      "dp_enabled": true
+    },
+    {
+      "seed": 123,
+      "sigma": 0.5,
+      "epsilon": 12.19893318838794,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.86004,
+      "roc_auc": 0.975969,
+      "runtime_seconds": 2.57,
+      "dp_enabled": true
+    },
+    {
+      "seed": 456,
+      "sigma": 0.5,
+      "epsilon": 12.19893318838794,
+      "delta": 1e-05,
+      "clip_norm": 1.0,
+      "epochs": 5,
+      "batch_size": 256,
+      "optimizer_steps": 315,
+      "sample_rate_q": 0.016,
+      "pr_auc": 0.797456,
+      "roc_auc": 0.974015,
+      "runtime_seconds": 2.705,
+      "dp_enabled": true
     }
   ],
-  "calibrated_sigma": 0.887007,
-  "target_epsilon": 2.0,
-  "delta": 1e-05,
-  "q": 0.05,
-  "rounds_list": [
-    5,
-    10,
-    20,
-    50
-  ],
-  "pareto_frontier": [
+  "frontier_summary": [
     {
-      "epsilon": 0.28,
-      "pr_auc": 0.013824106225219889
+      "noise_multiplier": 3.0,
+      "epsilon": 0.3497,
+      "pr_auc_mean": 0.3465,
+      "pr_auc_std": 0.158,
+      "pr_auc_std_definition": "sample std (ddof=1)",
+      "roc_auc_mean": 0.872,
+      "relative_loss_pct": 61.35
     },
     {
-      "epsilon": 0.36,
-      "pr_auc": 0.013713342410263498
+      "noise_multiplier": 2.0,
+      "epsilon": 0.5725,
+      "pr_auc_mean": 0.471,
+      "pr_auc_std": 0.1752,
+      "pr_auc_std_definition": "sample std (ddof=1)",
+      "roc_auc_mean": 0.899,
+      "relative_loss_pct": 47.46
     },
     {
-      "epsilon": 0.38,
-      "pr_auc": 0.02305093982693201
+      "noise_multiplier": 1.0,
+      "epsilon": 1.7744,
+      "pr_auc_mean": 0.7088,
+      "pr_auc_std": 0.1155,
+      "pr_auc_std_definition": "sample std (ddof=1)",
+      "roc_auc_mean": 0.9514,
+      "relative_loss_pct": 20.94
     },
     {
-      "epsilon": 0.51,
-      "pr_auc": 0.021043850849728412
+      "noise_multiplier": 0.5,
+      "epsilon": 12.1989,
+      "pr_auc_mean": 0.8457,
+      "pr_auc_std": 0.0429,
+      "pr_auc_std_definition": "sample std (ddof=1)",
+      "roc_auc_mean": 0.9777,
+      "relative_loss_pct": 5.67
     },
     {
-      "epsilon": 0.54,
-      "pr_auc": 0.018307376614199664
-    },
-    {
-      "epsilon": 0.73,
-      "pr_auc": 0.023556812944899638
-    },
-    {
-      "epsilon": 0.77,
-      "pr_auc": 0.025452706717206314
-    },
-    {
-      "epsilon": 0.87,
-      "pr_auc": 0.11055324977788274
-    },
-    {
-      "epsilon": 1.1,
-      "pr_auc": 0.056605543089012667
-    },
-    {
-      "epsilon": 1.17,
-      "pr_auc": 0.20752983570706754
-    },
-    {
-      "epsilon": 1.57,
-      "pr_auc": 0.07932990317448489
-    },
-    {
-      "epsilon": 1.77,
-      "pr_auc": 0.3921549730597187
-    },
-    {
-      "epsilon": 2.25,
-      "pr_auc": 0.29440591031719027
-    },
-    {
-      "epsilon": 3.64,
-      "pr_auc": 0.659855550389893
+      "noise_multiplier": 0.0,
+      "epsilon": "infinity (non-private)",
+      "pr_auc_mean": 0.8965,
+      "pr_auc_std": 0.0078,
+      "pr_auc_std_definition": "sample std (ddof=1)",
+      "roc_auc_mean": 0.9872,
+      "relative_loss_pct": 0.0
     }
-  ]
+  ],
+  "legacy_prototype_metadata": {
+    "status": "ARCHIVED -- non-DP-SGD centroid vector prototype",
+    "origin_commit": "f0705141 (2026-09-26)",
+    "description": "Legacy 10-feature centroid difference with single output noise vector, superseded by genuine Opacus DP-SGD neural benchmark.",
+    "values": [
+      {
+        "noise_multiplier": 3.0,
+        "epsilon": 1.858,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.1963,
+        "roc_auc": 0.8301,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      },
+      {
+        "noise_multiplier": 2.0,
+        "epsilon": 2.839,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.0722,
+        "roc_auc": 0.747,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      },
+      {
+        "noise_multiplier": 1.2,
+        "epsilon": 4.91,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.3081,
+        "roc_auc": 0.8944,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      },
+      {
+        "noise_multiplier": 0.8,
+        "epsilon": 7.696,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.2833,
+        "roc_auc": 0.9244,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      },
+      {
+        "noise_multiplier": 0.4,
+        "epsilon": 17.323,
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.6205,
+        "roc_auc": 0.9687,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      },
+      {
+        "noise_multiplier": 0.0,
+        "epsilon": "infinity (non-private)",
+        "delta": 1e-05,
+        "clip_norm": 1.0,
+        "pr_auc": 0.6272,
+        "roc_auc": 0.9684,
+        "classification": "LEGACY_NON_DP_SGD_PROTOTYPE"
+      }
+    ]
+  }
 }

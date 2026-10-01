@@ -88,7 +88,7 @@ CF-Intelligence deploys a production-grade, two-tier collaborative machine learn
 ### 1.2 Computational Frameworks & Libraries
 - **Deep Learning**: PyTorch `2.4.0+cpu` / CUDA, PyTorch Geometric (PyG) `2.5.0`
 - **Federated Consensus**: Federated Averaging (`FedAvg`), Federated Proximal (`FedProx`, $\mu=0.01$), and Stochastic Controlled Averaging (`SCAFFOLD`)
-- **Privacy & Cryptography**: Opacus `1.4.1` (Rényi Differential Privacy Moments Accountant), TenSEAL `0.3.14` (CKKS Homomorphic Encryption with 8192-degree polynomial modulus), Curve25519 Diffie-Hellman Private Set Intersection (DH-PSI), Shamir-masked pairwise Secure Aggregation (`p2p_secagg`)
+- **Privacy & Cryptography**: Opacus `1.4.1` (PRVAccountant / Privacy Random Variables & Rényi DP), TenSEAL `0.3.14` (CKKS Homomorphic Encryption with 8192-degree polynomial modulus), Curve25519 Diffie-Hellman Private Set Intersection (DH-PSI), Shamir-masked pairwise Secure Aggregation (`p2p_secagg`)
 - **Serving & Transport**: FastAPI `0.115.0`, gRPC `1.62.0`, WebSockets, Apache Kafka CloudEvents 1.0
 
 ---

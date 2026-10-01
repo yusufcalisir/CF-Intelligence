@@ -12,7 +12,7 @@ The benchmark suite provides reproducible quantitative evaluation across five co
 |:---|:---|:---|:---|
 | **Fraud Detection Performance** | `benchmarks/runners/run_fraud_benchmark.py` | PaySim, IEEE-CIS | PR-AUC, ROC-AUC, Recall @ 0.1% / 0.5% / 1% FPR |
 | **Federated Optimization** | `benchmarks/runners/run_fl_benchmark.py` | Dirichlet $\mathrm{Dir}(\alpha)$ Skew | Convergence Rounds, Communication MB, PR-AUC |
-| **Differential Privacy Tradeoff** | `benchmarks/runners/run_dp_tradeoff.py` | Subsampled Gaussian / RDP | $\epsilon$ vs PR-AUC Frontier, Clipping Norm $C$ |
+| **Differential Privacy Tradeoff** | `benchmarks/runners/run_dp_tradeoff.py` | Opacus PRVAccountant (DP-SGD) | $\epsilon$ vs PR-AUC Frontier, Clipping Norm $C$ |
 | **Byzantine Adversarial Defense** | `benchmarks/runners/run_byzantine_benchmark.py` | Sign Inversion, Noise | Robust PR-AUC (Krum, Trimmed Mean, Bulyan) |
 | **Graph Intelligence (GraphSAGE)**| `benchmarks/runners/run_graph_benchmark.py` | Elliptic Bitcoin Graph | Node PR-AUC, ROC-AUC, Temporal Split (Timestep 34) |
 | **Inference Gateway Latency** | `benchmarks/runners/run_latency_benchmark.py` | HTTP Concurrency $C \in [1, 500]$ | p50, p95, p99 Latency (ms), Throughput (req/s) |
