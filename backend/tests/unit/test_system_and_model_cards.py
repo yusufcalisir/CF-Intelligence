@@ -156,7 +156,7 @@ class TestModelAndSystemCardFormalization:
         assert "Curve25519" in content
         assert "Bulyan" in content
         assert "Spectral Defense" in content
-        assert "1,394.7 requests/second" in content
+        assert "1,246.3 requests/second" in content
         assert "15.01 seconds" in content  # RTO
 
     def test_model_and_system_card_dataset_consistency(self) -> None:

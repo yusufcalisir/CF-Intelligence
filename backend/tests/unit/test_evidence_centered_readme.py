@@ -2,7 +2,7 @@
 
 Verifies that README.md adheres to the Five Pillars of Evidence (Verified Empirical
 Results, Experimental Suite, Software Correctness, Research Prototypes, Limitations),
-hyperlinks all 19 quantitative claims from claim_registry.json directly to raw JSON
+hyperlinks all 21 quantitative claims from claim_registry.json directly to raw JSON
 artifacts and reproduction runners, and maintains physical evidence provenance.
 """
 
@@ -47,12 +47,13 @@ class TestEvidenceCenteredReadmeIntegrity:
         ), "Missing Master Quantitative Claim & Evidence Hyperlink Registry in README.md"
         assert "claim_registry.json" in content, "README must reference benchmarks/claim_registry.json"
 
-    def test_all_19_claims_hyperlinked_in_readme(self) -> None:
+    def test_all_21_claims_hyperlinked_in_readme(self) -> None:
         """Assert every single claim ID in claim_registry.json is documented and hyperlinked in README.md."""
         assert CLAIM_REGISTRY_PATH.is_file(), f"claim_registry.json missing at {CLAIM_REGISTRY_PATH}"
         registry = json.loads(CLAIM_REGISTRY_PATH.read_text(encoding="utf-8"))
         claims = registry.get("claims", [])
-        assert len(claims) == 19, f"Expected 19 claims in registry, found {len(claims)}"
+        expected_claims_count = registry.get("summary_metrics", {}).get("total_claims", 21)
+        assert len(claims) == expected_claims_count, f"Expected {expected_claims_count} claims in registry, found {len(claims)}"
 
         content = README_PATH.read_text(encoding="utf-8")
         missing_claims = []

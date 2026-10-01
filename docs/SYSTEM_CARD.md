@@ -56,7 +56,7 @@ The platform couples sub-3ms pre-authorization transaction risk scoring (`DeepFr
 │                                   ▼                                                    │
 │                  ┌─────────────────────────────────┐                                   │
 │                  │ Enterprise Inference Gateway    │                                   │
-│                  │ - 1,394.7 req/s Peak Throughput │                                   │
+│                  │ - 1,246.3 req/s Peak Throughput │                                   │
 │                  │ - 2.29ms Fast-Path Latency      │                                   │
 │                  └────────────────┬────────────────┘                                   │
 │                                   │                                                    │
