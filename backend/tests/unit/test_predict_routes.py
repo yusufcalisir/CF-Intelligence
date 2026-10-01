@@ -6,11 +6,14 @@ dual prefix routing, and multi-tenant isolation.
 
 from __future__ import annotations
 
+import threading
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
 
+import app.presentation.routers.predict as predict_module
 from app.dependencies import get_session
 from app.main import app
 
@@ -276,12 +279,10 @@ def test_score_transaction_routes_parity() -> None:
         assert "latency_ms" in data
 
 
-def test_feature_store_offload_thread_execution_and_exception_resilience(monkeypatch: Any) -> None:
+def test_feature_store_offload_thread_execution_and_exception_resilience(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Verify that score_transaction offloads FeatureStore lookup and handles exceptions gracefully."""
-    import threading
-    from unittest.mock import MagicMock
-    import app.presentation.routers.predict as predict_module
-
     executed_threads: list[int] = []
     orig_get_online_features = predict_module._feature_store.get_online_features
 
