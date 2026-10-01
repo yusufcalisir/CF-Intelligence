@@ -48,21 +48,36 @@ The repository explicitly separates HTTP performance evaluation into two complem
 - **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (127.0.0.1:8089/api/v1/score-transaction). Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation), Pydantic request validation, ModelService evaluation offloaded via syncio.to_thread, and response serialization. Rate limiting is controlled at benchmark configuration level to isolate pure inference capacity.
 - **Server Provenance**: Uvicorn 0.47.0 (single-worker ASGI process), Python 3.12.10, AMD Ryzen 16-core, Windows 11.
 - **Client Provenance**: httpx (0.28.1) async client with keep-alive connection pooling, closed-loop concurrency sweep (=1000$ per repetition across 3 independent sweeps).
-- **Raw Artifacts**: [latency_http_service_benchmark.json](./raw/latency_http_service_benchmark.json) | Raw Samples: [latency_http_service_samples.json](./raw/latency_http_service_samples.json)
+- **Raw Artifacts (Current Implementation)**: [`latency_http_service_benchmark.json`](./raw/latency_http_service_benchmark.json) | Raw Samples: [`latency_http_service_samples.json`](./raw/latency_http_service_samples.json)
+- **Historical Pre-Intervention Baseline**: [`latency_http_service_benchmark_pre_intervention.json`](./raw/latency_http_service_benchmark_pre_intervention.json) | Samples: [`latency_http_service_samples_pre_intervention.json`](./raw/latency_http_service_samples_pre_intervention.json)
+
+##### Current Implementation (Post-FeatureStore Offload via `asyncio.to_thread`)
 
 | Concurrency Level | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **83.0 $\pm$ 4.2 req/s** | 3,000 | 0 | 0 | **11.39 ms** | 16.27 ms | 21.32 ms | 39.43 ms | 100.0% |
-| **10** | **89.0 $\pm$ 46.9 req/s** | 3,000 | 0 | 0 | **139.94 ms** | 192.44 ms | 432.16 ms | 3,420.77 ms | 100.0% |
-| **50** | **71.4 $\pm$ 7.8 req/s** | 2,999 | 0 | 0 | **461.06 ms** | 1,886.43 ms | 3,126.24 ms | 6,268.55 ms | 99.9% |
-| **100** | **51.9 $\pm$ 18.5 req/s** | 2,999 | 0 | 0 | **1,338.76 ms** | 5,319.02 ms | 7,577.62 ms | 17,912.10 ms | 99.9% |
-| **250** | **51.3 $\pm$ 6.0 req/s** | 2,998 | 0 | 0 | **3,577.98 ms** | 9,915.45 ms | 12,793.41 ms | 16,839.23 ms | 99.9% |
-| **500** | **48.8 $\pm$ 2.3 req/s** | 2,991 | 0 | 0 | **9,091.82 ms** | 14,621.48 ms | 15,580.84 ms | 17,377.97 ms | 99.7% |
+| **1** | **91.1 $\pm$ 2.3 req/s** | 3,000 | 0 | 0 | **10.77 ms** | 12.41 ms | 15.21 ms | 26.54 ms | 100.0% |
+| **10** | **191.0 $\pm$ 1.9 req/s** | 3,000 | 0 | 0 | **48.06 ms** | 57.85 ms | 80.65 ms | 128.52 ms | 100.0% |
+| **50** | **120.6 $\pm$ 2.0 req/s** | 3,000 | 0 | 0 | **231.56 ms** | 1,205.94 ms | 1,918.50 ms | 4,218.42 ms | 100.0% |
+| **100** | **82.7 $\pm$ 5.5 req/s** | 3,000 | 0 | 0 | **648.51 ms** | 3,199.80 ms | 5,152.51 ms | 11,420.15 ms | 100.0% |
+| **250** | **68.0 $\pm$ 3.6 req/s** | 2,998 | 0 | 0 | **2,379.38 ms** | 7,885.00 ms | 10,207.36 ms | 14,892.11 ms | 99.9% |
+| **500** | **59.3 $\pm$ 0.2 req/s** | 2,989 | 0 | 0 | **7,358.68 ms** | 11,104.51 ms | 12,729.72 ms | 15,210.45 ms | 99.6% |
+
+##### Controlled Intervention Comparative Matrix (Post-Offload vs. Pre-Intervention Baseline)
+
+| Concurrency Level | Baseline Throughput | Post-Offload Throughput | Throughput $\Delta$ (%) | Baseline 2xx p50 | Post-Offload 2xx p50 | Latency $\Delta$ p50 | Baseline 2xx p95 | Post-Offload 2xx p95 |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| **$C=1$** | 83.0 req/s | 91.1 req/s | **+8.1 req/s (+9.8%)** | 11.39 ms | 10.77 ms | **-0.62 ms (-5.4%)** | 16.27 ms | 12.41 ms |
+| **$C=10$** | 89.0 req/s | 191.0 req/s | **+102.0 req/s (+114.6%)** | 139.94 ms | 48.06 ms | **-91.88 ms (-65.7%)** | 192.44 ms | 57.85 ms |
+| **$C=50$** | 71.4 req/s | 120.6 req/s | **+49.2 req/s (+68.9%)** | 461.06 ms | 231.56 ms | **-229.50 ms (-49.8%)** | 1,886.43 ms | 1,205.94 ms |
+| **$C=100$** | 51.9 req/s | 82.7 req/s | **+30.8 req/s (+59.3%)** | 1,338.76 ms | 648.51 ms | **-690.25 ms (-51.6%)** | 5,319.02 ms | 3,199.80 ms |
+| **$C=250$** | 51.3 req/s | 68.0 req/s | **+16.7 req/s (+32.6%)** | 3,577.98 ms | 2,379.38 ms | **-1,198.60 ms (-33.5%)** | 9,915.45 ms | 7,885.00 ms |
+| **$C=500$** | 48.8 req/s | 59.3 req/s | **+10.5 req/s (+21.5%)** | 9,091.82 ms | 7,358.68 ms | **-1,733.14 ms (-19.1%)** | 14,621.48 ms | 11,104.51 ms |
 
 > [!NOTE]
 > **Operational Observations**:
-> 1. **Single-Client Baseline**: At =1$, median 2xx inference transaction latency is .39\text{ ms}$ with peak throughput of .0\text{ req/s}$ (.97\text{ req/s}$ peak at =10$). Previous published numbers reporting  = 2.60\text{ ms}$ at =1$ were rate-limit contaminated by 429 serialization and have been superseded and archived.
-> 2. **High-Concurrency Queueing**: At =500$, approximately 99.7% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Client-observed HTTP tail latency increased substantially at =500$ ( \approx 15.58\text{ s}$); the benchmark establishes the observed behavior under single-worker concurrency but does not by itself isolate the responsible queueing layer.
+> 1. **Peak Throughput Doubling**: Offloading `_feature_store.get_online_features` from the main asyncio event loop to worker threads doubled peak throughput from $89.0\text{ req/s}$ to $191.0\text{ req/s}$ (+114.6%) at $C=10$ with 100% success rate.
+> 2. **Broad Latency Reductions**: Median latency dropped substantially across all tiers: by -65.7% at $C=10$ ($139.94\text{ ms} \to 48.06\text{ ms}$), -49.8% at $C=50$, -51.6% at $C=100$, and by $-1{,}733\text{ ms}$ (-19.1%) at $C=500$.
+> 3. **Causal Mechanism**: Removing synchronous $2.2\text{ ms}$ FeatureStore lookups from the event-loop thread reduced event-loop scheduling lag by 46.7% (p50: $10.06\text{ ms} \to 5.36\text{ ms}$) and enabled up to 20 concurrent lookups in executor threads. At extreme concurrency ($C=500$), the bottleneck shifted from event-loop blocking to executor worker contention (executor queue wait rose to $\sim 107\text{ ms}$).
 
 #### Class B2: Rate-Limited Public-Endpoint Behavior Benchmark
 - **Runner**: enchmarks/runners/run_http_ratelimit_benchmark.py

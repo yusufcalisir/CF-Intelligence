@@ -891,7 +891,8 @@ async def score_transaction(
                     "merchant_id": payload.merchant_id,
                 }
             ]
-            online_feats = _feature_store.get_online_features(
+            online_feats = await asyncio.to_thread(
+                _feature_store.get_online_features,
                 entity_rows,
                 [
                     "customer_history_score",

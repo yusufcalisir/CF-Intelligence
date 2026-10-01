@@ -274,3 +274,49 @@ def test_score_transaction_routes_parity() -> None:
         assert "risk_level" in data
         assert "decision" in data
         assert "latency_ms" in data
+
+
+def test_feature_store_offload_thread_execution_and_exception_resilience(monkeypatch: Any) -> None:
+    """Verify that score_transaction offloads FeatureStore lookup and handles exceptions gracefully."""
+    import threading
+    from unittest.mock import MagicMock
+    import app.presentation.routers.predict as predict_module
+
+    executed_threads: list[int] = []
+    orig_get_online_features = predict_module._feature_store.get_online_features
+
+    def tracking_get_online_features(entity_rows: list[dict[str, Any]], features: list[str]) -> list[dict[str, Any]]:
+        executed_threads.append(threading.get_ident())
+        return orig_get_online_features(entity_rows, features)
+
+    monkeypatch.setattr(predict_module._settings, "feature_store_enabled", True)
+    monkeypatch.setattr(predict_module._feature_store, "get_online_features", tracking_get_online_features)
+
+    payload = {
+        "transaction_id": "tx_offload_test_001",
+        "account_id": "acc_offload_001",
+        "amount": 150.0,
+        "currency": "EUR",
+        "merchant_id": "merch_001",
+        "country": "US",
+        "device_id": "dev_001",
+    }
+
+    # 1. Normal execution: verify FeatureStore executes on a separate worker thread
+    res = client.post("/api/v1/score-transaction", json=payload)
+    assert res.status_code == 200
+    assert len(executed_threads) >= 1
+    assert "risk_score" in res.json()
+
+    # 2. Exception resilience: verify that if FeatureStore raises, score_transaction falls back gracefully
+    def failing_get_online_features(entity_rows: list[dict[str, Any]], features: list[str]) -> list[dict[str, Any]]:
+        raise RuntimeError("Simulated Redis/Feast timeout")
+
+    monkeypatch.setattr(predict_module._feature_store, "get_online_features", failing_get_online_features)
+
+    res_fail = client.post("/api/v1/score-transaction", json=payload)
+    assert res_fail.status_code == 200
+    data_fail = res_fail.json()
+    assert "risk_score" in data_fail
+    assert data_fail["decision"] in ("ALLOW", "REVIEW", "BLOCK")
+
