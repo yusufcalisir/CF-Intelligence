@@ -36,7 +36,8 @@ The benchmark was executed on the real **Elliptic Bitcoin Transaction Dataset** 
 
 ### 3.1 Strict Temporal Split (Zero-Leakage Invariant)
 To prevent temporal data leakage and future-lookahead bias, the transaction stream is partitioned strictly chronologically:
-- **Training Graph ($\mathcal{D}_{\mathrm{train}}$)**: Timesteps $1 \le t \le 34$ ($29{,}894$ labeled nodes: $3{,}462$ illicit, $26{,}432$ licit; $11.58\%$ illicit prevalence).
+- **Training Graph ($\mathcal{D}_{\mathrm{train}}$)**: Timesteps $1 \le t \le 30$ ($26{,}819$ labeled nodes: $3{,}036$ illicit, $23{,}783$ licit; $11.58\%$ illicit prevalence).
+- **Validation Graph ($\\mathcal{D}_{\\mathrm{val}}$)**: Timesteps  \\le t \\le 34$ ({,}075$ labeled nodes: $ illicit, {,}649$ licit; .85\\%$ illicit prevalence) used strictly for checkpoint and threshold calibration.
 - **Test Graph ($\mathcal{D}_{\mathrm{test}}$)**: Timesteps $35 \le t \le 49$ ($16{,}670$ labeled nodes: $1{,}083$ illicit, $15{,}587$ licit; $6.50\%$ illicit prevalence).
 - **Temporal Edge Invariant**: All $234{,}355$ edges satisfy $t_v - t_u = 0$, guaranteeing zero edge traversals between past and future time intervals.
 
@@ -44,7 +45,8 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
 
 | Model Architecture / Aggregator | Evaluation Paradigm | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR | F1-Score | Latency / 1k Nodes |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Inductive GraphSAGE (2-Layer Mean)** | `GRAPH_INTELLIGENCE_CHAMPION` | 0.4372 | 0.8388 | **13.20%** | 18.28% | 23.08% | **0.3804** | $6.16\text{ ms}$ |
+| **Inductive GraphSAGE (2-Layer Mean)** | CANONICAL_REAL_3SEEDS | **0.3761 ± 0.0482** | 0.8325 ± 0.0078 | 4.62% ± 3.75% | 14.34% | 20.81% | **0.3555 ± 0.0567** | $6.16\text{ ms}$ |
+| **Legacy Single-Run Baseline (Archived)** | HISTORICAL_SINGLE_RUN | 0.4372 | 0.8388 | 13.20% | 18.28% | 23.08% | 0.3804 | $6.16\text{ ms}$ |
 | **Inductive GraphSAGE (1-Layer Mean)** | `GRAPH_INTELLIGENCE_1HOP` | 0.4604 | 0.8430 | **14.96%** | **29.09%** | 33.52% | 0.2739 | $2.93\text{ ms}$ |
 | **GraphSAGE (GCN Symmetric)** | `GRAPH_ABLATION` | **0.4655** | 0.8337 | 7.85% | 28.44% | **34.53%** | 0.3587 | $5.72\text{ ms}$ |
 | **Tabular MLP Baseline (0-Hop / No Graph)** | `TABULAR_BASELINE` | 0.4602 | **0.8613** | 8.22% | 20.41% | 25.39% | 0.3580 | **1.44 ms** |
@@ -58,8 +60,8 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
    - 1-Layer GraphSAGE intercepts **14.96%** ($162$ illicit transactions), achieving **+6.74 percentage points (+82.0% relative gain)**.
    Graph message aggregation successfully pulls in immediate counterparty signals, allowing the model to flag covert laundering operations with high confidence.
 
-2. **Topological Noise & Multi-Hop Bitcoin Mixing**:
-   Over the broad unconstrained probability spectrum, 2-layer GraphSAGE exhibits a slight PR-AUC compression ($-0.0229$ vs Tabular MLP). This reflects cryptocurrency transaction mixing (CoinJoin, multi-input clustering) where 2-hop neighborhoods incorporate heterogeneous and unrelated transactions. 1-hop GraphSAGE ($0.4604$) and symmetric GCN aggregation ($0.4655$) effectively mitigate this dispersion.
+2. **Exploratory Topological Ablations (Noncanonical Diagnostic)**:
+   In exploratory single-seed ablations on this temporal split, 2-layer GraphSAGE exhibited lower PR-AUC than 1-layer GraphSAGE and Tabular MLP across the unconstrained probability spectrum. The repository does not establish an empirical causal mechanism (such as specific transaction-level mixing or dilution) for this difference, and these exploratory ablations are not used for canonical model selection.
 
 3. **Inference Latency Profile**:
    GraphSAGE achieves an inference latency of $6.16\text{ ms}$ per $1{,}000$ transactions on standard x86 CPU hardware, executing well within the $<15.0\text{ ms}$ real-time transaction authorization SLA contract.
@@ -71,7 +73,7 @@ To prevent temporal data leakage and future-lookahead bias, the transaction stre
 ### 4.1 Neighborhood Hop Depth ($K \in \{0, 1, 2\}$)
 - **0-Hop (Tabular MLP)**: Relies exclusively on local node features (transaction amounts, degrees, output count). PR-AUC: $0.4602$, Recall @ 0.1% FPR: $8.22\%$.
 - **1-Hop GraphSAGE**: Aggregates direct counterparties. Captures immediate suspicious fund transfers. PR-AUC: $0.4604$, Recall @ 0.1% FPR: **$14.96\%$** ($+82.0\%$ relative uplift).
-- **2-Hop GraphSAGE**: Aggregates multi-hop fund flows. Maximizes F1 score ($0.3804$ vs $0.3580$) and high-confidence recall ($13.20\%$).
+- **2-Hop GraphSAGE**: Aggregates multi-hop fund flows. Active canonical PR-AUC: .3761 \\pm 0.0482$ (3 seeds: 42, 123, 456; mean ± sample SD). (Historical single-run diagnostic: PR-AUC .4372$, F1 .3804$, noncanonical).
 
 ### 4.2 Aggregation Function (Mean vs GCN Symmetric)
 - **Mean Aggregator**: Computes unweighted average across incident neighbors. Demonstrates superior low-FPR recall ($13.20\%$ vs $7.85\%$).

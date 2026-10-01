@@ -274,8 +274,8 @@ Evaluated across the full $N = 203{,}769$ transaction nodes and $234{,}355$ dire
 
 1. **High-Confidence Operational Interception (+60.7% Relative Gain @ 0.1% Strict FPR)**:
    In production anti-money laundering (AML) operations, compliance teams can investigate only a tiny fraction of flagged transactions (strict budget of $\le 0.1$% False Positive Rate). At this strict operating point, the Tabular MLP baseline captures only 8.22% ($89$ illicit transactions), whereas 2-layer GraphSAGE intercepts **13.20%** ($143$ transactions), achieving a **+4.99 percentage point (+60.7% relative) uplift**. 1-layer GraphSAGE expands this further to **14.96%** ($162$ transactions, **+82.0% relative gain**), proving that immediate graph neighborhood context flags covert laundering syndicates that appear benign in isolation.
-2. **Topological Noise & Multi-Hop Bitcoin Mixing**:
-   Over the unconstrained probability spectrum, 2-layer GraphSAGE exhibits slight PR-AUC compression ($-0.0229$ vs Tabular MLP). This reflects cryptocurrency transaction mixing (CoinJoin, peel chains), where 2-hop neighborhoods incorporate unrelated transactions. 1-hop GraphSAGE ($0.4604$) and symmetric GCN aggregation ($0.4655$) attenuate hub noise and restore PR-AUC parity.
+2. **Exploratory Topological Ablations (Noncanonical Diagnostic)**:
+   In exploratory single-seed ablations on this temporal split, 2-layer GraphSAGE exhibited lower PR-AUC than 1-layer GraphSAGE and Tabular MLP across the unconstrained probability spectrum. The repository does not establish an empirical causal mechanism (such as specific transaction-level mixing or dilution) for this difference, and these exploratory ablations are not used for canonical model selection.
 3. **Sub-10ms Inference Profile**:
    GraphSAGE executes in $6.16\text{ ms}$ per $1{,}000$ transactions, satisfying real-time cryptocurrency compliance SLAs.
 

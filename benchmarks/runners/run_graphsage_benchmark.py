@@ -53,6 +53,12 @@ def main() -> None:
     parser.add_argument("--all-rows", action="store_true", default=True, help="Load entire 203,769 nodes")
     parser.add_argument("--nrows", type=int, default=None, help="Target number of rows (subsampling if not all-rows)")
     parser.add_argument("--output-dir", type=str, default=None, help="Output directory")
+    parser.add_argument(
+        "--canonical",
+        action="store_true",
+        default=False,
+        help="Explicitly authorize serialization to repository canonical artifacts (benchmarks/results/raw/)",
+    )
 
     args = parser.parse_args()
 
@@ -68,6 +74,7 @@ def main() -> None:
         all_rows=args.all_rows,
         nrows=args.nrows,
         output_dir=args.output_dir,
+        is_canonical=args.canonical,
     )
 
     sage_m = results["graphsage_metrics"]

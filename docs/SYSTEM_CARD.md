@@ -194,10 +194,10 @@ Evaluated on standard enterprise infrastructure under multi-concurrency stress t
 
 ## 8. Verification & Continuous Validation
 
-The integrity of the system is certified across all layers by **4,157 total automated tests** (100% pass rate):
+The system test infrastructure comprises **4,157 total automated tests collected across test suites**:
 - **Backend Pytest Suite**: **3,361 automated tests** (unit, integration, chaos, property-based, and security invariants).
 - **Scientific Verification Suite**: **409 verification tests** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
 - **Frontend Vitest Suite**: **356 component and integration tests**.
 - **Smart Contracts Suite**: **31 Hardhat tests** for consortium Shapley value settlement.
 
-*(Note: 3,361 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,157 automated tests. Additional optional E2E/Playwright tests run in separate browser workflows).*
+*(Note: 3,361 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,157 automated tests collected across suites. Additional optional E2E/Playwright tests run in separate browser workflows).*

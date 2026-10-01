@@ -1,10 +1,10 @@
 {
   "schema_version": "1.0.0",
-  "experiment_id": "exp-elliptic-graphsage-1790838032",
+  "experiment_id": "exp-elliptic-graphsage-1790842448",
   "config": {
-    "experiment_id": "exp-elliptic-graphsage-1790838032",
+    "experiment_id": "exp-elliptic-graphsage-1790842448",
     "experiment_name": "Elliptic Bitcoin GraphSAGE Inductive Benchmark",
-    "description": "Canonical multi-seed benchmark evaluating GraphSAGE on physical Elliptic Bitcoin graph with strict temporal validation.",
+    "description": "Canonical multi-seed benchmark evaluating GraphSAGE on physical Elliptic Bitcoin graph with strict temporal validation. Executed from remediation working tree on base commit aa70eb0a.",
     "tags": [
       "graphsage",
       "elliptic",
@@ -50,7 +50,7 @@
     "cpu_physical_cores": 8,
     "cpu_logical_cores": 16,
     "total_ram_gb": 7.34,
-    "available_ram_gb": 0.59,
+    "available_ram_gb": 1.0,
     "python_version": "3.12.10",
     "torch_version": "2.12.0+cpu",
     "cuda_available": false,
@@ -73,9 +73,9 @@
   "git_commit": "aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e",
   "git_branch": "main",
   "status": "COMPLETED",
-  "start_time_utc": "2026-10-01T06:53:57.679080+00:00",
-  "end_time_utc": "2026-10-01T07:00:28.449284+00:00",
-  "total_duration_seconds": 390.77,
+  "start_time_utc": "2026-10-01T08:09:49.245855+00:00",
+  "end_time_utc": "2026-10-01T08:14:05.791673+00:00",
+  "total_duration_seconds": 256.55,
   "final_metrics": {
     "pr_auc": 0.3761,
     "roc_auc": 0.8325,
@@ -86,7 +86,7 @@
     "threshold": 0.65,
     "pr_auc_std": 0.0482,
     "roc_auc_std": 0.0078,
-    "inference_latency_per_1k_ms": 5.945
+    "inference_latency_per_1k_ms": 4.954
   },
   "history": [
     {
@@ -99,8 +99,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -113,8 +113,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -127,8 +127,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -141,8 +141,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -155,8 +155,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -169,8 +169,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -183,8 +183,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -197,8 +197,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -211,8 +211,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -225,8 +225,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -239,8 +239,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -253,8 +253,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -267,8 +267,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -281,8 +281,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     },
     {
@@ -295,8 +295,8 @@
       "f1_score": null,
       "precision": null,
       "recall": null,
-      "duration_seconds": 26.051,
-      "timestamp_utc": "2026-10-01T07:00:32.970903+00:00",
+      "duration_seconds": 17.103,
+      "timestamp_utc": "2026-10-01T08:14:08.273513+00:00",
       "extra": {}
     }
   ],
@@ -531,6 +531,7 @@
     "roc_curves": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\roc_curves.png",
     "neighborhood_ablation": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\neighborhood_ablation.png",
     "temporal_generalization": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\temporal_generalization.png",
-    "consolidated_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\docs\\figures\\benchmark_graphsage_elliptic.png"
+    "consolidated_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\plots\\benchmark_graphsage_elliptic.png",
+    "docs_figure": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\docs\\figures\\benchmark_graphsage_elliptic.png"
   }
 }

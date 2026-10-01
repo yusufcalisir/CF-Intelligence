@@ -1,6 +1,6 @@
 {
   "dataset_name": "Elliptic Bitcoin Transaction Graph",
-  "evaluated_at_utc": "2026-10-01T07:00:28.449284+00:00",
+  "evaluated_at_utc": "2026-10-01T08:14:05.791673+00:00",
   "temporal_split": "Timesteps 1-30 Train, 31-34 Val, 35-49 Test",
   "models": [
     {
@@ -13,7 +13,7 @@
       "recall_at_10_fpr": 0.262235,
       "f1_score": 0.340491,
       "brier_score": 0.164865,
-      "latency_ms": 5.945,
+      "latency_ms": 4.954,
       "delta_pr_auc_vs_tabular": -0.151339,
       "description": "2-layer neighborhood aggregation capturing 2-hop transaction money flows"
     },
@@ -27,7 +27,7 @@
       "recall_at_10_fpr": 0.291782,
       "f1_score": 0.399202,
       "brier_score": 0.239361,
-      "latency_ms": 5.821,
+      "latency_ms": 2.522,
       "delta_pr_auc_vs_tabular": -0.122256,
       "description": "1-layer immediate neighborhood aggregation (direct counterparties only)"
     },
@@ -41,7 +41,7 @@
       "recall_at_10_fpr": 0.443213,
       "f1_score": 0.516186,
       "brier_score": 0.172035,
-      "latency_ms": 1.248,
+      "latency_ms": 0.831,
       "delta_pr_auc_vs_tabular": 0.0,
       "description": "Standard neural network evaluated strictly on node features without topology"
     },
@@ -55,7 +55,7 @@
       "recall_at_10_fpr": 0.34349,
       "f1_score": 0.384457,
       "brier_score": 0.15235,
-      "latency_ms": 5.528,
+      "latency_ms": 4.203,
       "delta_pr_auc_vs_tabular": -0.08564,
       "description": "Symmetric normalized adjacency aggregator (Kipf & Welling variant)"
     }
@@ -97,8 +97,8 @@
             "tp": 863
           }
         },
-        "inference_latency_ms": 254.29,
-        "inference_latency_per_1k_ms": 1.248,
+        "inference_latency_ms": 169.31,
+        "inference_latency_per_1k_ms": 0.831,
         "best_epoch": 9,
         "val_pr_auc": 0.768833
       },
@@ -131,8 +131,8 @@
             "tp": 941
           }
         },
-        "inference_latency_ms": 1186.1,
-        "inference_latency_per_1k_ms": 5.821,
+        "inference_latency_ms": 513.85,
+        "inference_latency_per_1k_ms": 2.522,
         "best_epoch": 15,
         "val_pr_auc": 0.735125
       },
@@ -165,8 +165,8 @@
             "tp": 827
           }
         },
-        "inference_latency_ms": 1211.33,
-        "inference_latency_per_1k_ms": 5.945,
+        "inference_latency_ms": 1009.54,
+        "inference_latency_per_1k_ms": 4.954,
         "best_epoch": 15,
         "val_pr_auc": 0.713901
       }
@@ -201,8 +201,8 @@
             "tp": 827
           }
         },
-        "inference_latency_ms": 1211.33,
-        "inference_latency_per_1k_ms": 5.945,
+        "inference_latency_ms": 1009.54,
+        "inference_latency_per_1k_ms": 4.954,
         "best_epoch": 15,
         "val_pr_auc": 0.713901
       },
@@ -235,8 +235,8 @@
             "tp": 776
           }
         },
-        "inference_latency_ms": 1126.51,
-        "inference_latency_per_1k_ms": 5.528,
+        "inference_latency_ms": 856.34,
+        "inference_latency_per_1k_ms": 4.203,
         "best_epoch": 15,
         "val_pr_auc": 0.751268
       }

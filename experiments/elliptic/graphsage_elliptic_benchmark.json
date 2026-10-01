@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-10-01T07:00:28.449284+00:00",
+  "timestamp_utc": "2026-10-01T08:14:05.791673+00:00",
   "benchmark": "GraphSAGE Elliptic Bitcoin Inductive Node Classification",
   "model": "GraphSAGE (2-layer Mean Aggregator)",
   "dataset": "Elliptic Bitcoin Transaction Graph (Real)",
@@ -74,14 +74,16 @@
     "roc_auc": 0.8245,
     "precision": 0.2068,
     "recall": 0.458,
-    "f1_score": 0.3078
+    "f1_score": 0.3078,
+    "recall_at_01_fpr": 0.0175
   },
   "metrics_max": {
     "pr_auc": 0.4265,
     "roc_auc": 0.8401,
     "precision": 0.3848,
     "recall": 0.615,
-    "f1_score": 0.4182
+    "f1_score": 0.4182,
+    "recall_at_01_fpr": 0.0886
   },
   "per_seed_results": [
     {
@@ -210,8 +212,8 @@
         "tp": 827
       }
     },
-    "inference_latency_ms": 1211.33,
-    "inference_latency_per_1k_ms": 5.945,
+    "inference_latency_ms": 1009.54,
+    "inference_latency_per_1k_ms": 4.954,
     "best_epoch": 15,
     "val_pr_auc": 0.713901
   },
@@ -244,8 +246,8 @@
         "tp": 941
       }
     },
-    "inference_latency_ms": 1186.1,
-    "inference_latency_per_1k_ms": 5.821,
+    "inference_latency_ms": 513.85,
+    "inference_latency_per_1k_ms": 2.522,
     "best_epoch": 15,
     "val_pr_auc": 0.735125
   },
@@ -278,8 +280,8 @@
         "tp": 863
       }
     },
-    "inference_latency_ms": 254.29,
-    "inference_latency_per_1k_ms": 1.248,
+    "inference_latency_ms": 169.31,
+    "inference_latency_per_1k_ms": 0.831,
     "best_epoch": 9,
     "val_pr_auc": 0.768833
   },
@@ -320,8 +322,8 @@
             "tp": 863
           }
         },
-        "inference_latency_ms": 254.29,
-        "inference_latency_per_1k_ms": 1.248,
+        "inference_latency_ms": 169.31,
+        "inference_latency_per_1k_ms": 0.831,
         "best_epoch": 9,
         "val_pr_auc": 0.768833
       },
@@ -354,8 +356,8 @@
             "tp": 941
           }
         },
-        "inference_latency_ms": 1186.1,
-        "inference_latency_per_1k_ms": 5.821,
+        "inference_latency_ms": 513.85,
+        "inference_latency_per_1k_ms": 2.522,
         "best_epoch": 15,
         "val_pr_auc": 0.735125
       },
@@ -388,8 +390,8 @@
             "tp": 827
           }
         },
-        "inference_latency_ms": 1211.33,
-        "inference_latency_per_1k_ms": 5.945,
+        "inference_latency_ms": 1009.54,
+        "inference_latency_per_1k_ms": 4.954,
         "best_epoch": 15,
         "val_pr_auc": 0.713901
       }
@@ -424,8 +426,8 @@
             "tp": 827
           }
         },
-        "inference_latency_ms": 1211.33,
-        "inference_latency_per_1k_ms": 5.945,
+        "inference_latency_ms": 1009.54,
+        "inference_latency_per_1k_ms": 4.954,
         "best_epoch": 15,
         "val_pr_auc": 0.713901
       },
@@ -458,8 +460,8 @@
             "tp": 776
           }
         },
-        "inference_latency_ms": 1126.51,
-        "inference_latency_per_1k_ms": 5.528,
+        "inference_latency_ms": 856.34,
+        "inference_latency_per_1k_ms": 4.203,
         "best_epoch": 15,
         "val_pr_auc": 0.751268
       }
@@ -481,5 +483,17 @@
     "precision": 0.2711,
     "recall": 0.6371,
     "note": "Initial single-seed run without pre-test validation split; superseded by canonical 3-seed temporal validation benchmark."
+  },
+  "execution_provenance": {
+    "execution_base_commit": "aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e",
+    "working_tree_modified": true,
+    "working_tree_changes": [
+      "experiments/elliptic/train_graphsage.py (DEF-01 artifact isolation + DEF-02 aggregate metrics fix)",
+      "backend/tests/unit/test_graphsage_benchmark.py (regression tests added)",
+      "docs/enterprise_benchmark_report.md (DEF-03 causal claim replaced)",
+      "docs/algorithms/graphsage.md (DEF-03 causal claim replaced)"
+    ],
+    "closure_remediation_commit_pending": true,
+    "provenance_note": "Benchmark was executed from the remediation working tree after DEF-01/DEF-02 code changes were applied on top of base commit aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e before those changes were committed to git. This distinguishes execution-time code state from later repository closure commits."
   }
 }

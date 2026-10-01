@@ -81,6 +81,15 @@ from experiments.harness.schema import (
 
 logger = logging.getLogger("experiments.elliptic.train_graphsage")
 
+CANONICAL_AGGREGATE_METRICS: tuple[str, ...] = (
+    "pr_auc",
+    "roc_auc",
+    "precision",
+    "recall",
+    "f1_score",
+    "recall_at_01_fpr",
+)
+
 
 # ===========================================================================
 # 1. Visualization Styling
@@ -407,6 +416,7 @@ class EllipticGraphSAGEBenchmark:
         nrows: int | None = None,
         split_timestep: int = 34,
         val_start_timestep: int = 31,
+        is_canonical: bool = False,
     ):
         self.seed = seed
         self.seeds = list(seeds) if seeds is not None else [seed]
@@ -417,6 +427,7 @@ class EllipticGraphSAGEBenchmark:
         self.nrows = nrows
         self.split_timestep = split_timestep
         self.val_start_timestep = val_start_timestep
+        self.is_canonical = is_canonical
 
         np.random.seed(seed)
         torch.manual_seed(seed)
@@ -617,6 +628,7 @@ class EllipticGraphSAGEBenchmark:
         hidden_dim: int = 128,
         embedding_dim: int = 64,
         output_dir: Path | str | None = None,
+        is_canonical: bool = False,
     ) -> dict[str, Any]:
         """Execute full GraphSAGE vs Tabular MLP benchmark with multi-seed evaluation and controlled ablations."""
         start_time_utc = datetime.now(UTC).isoformat()
@@ -734,6 +746,7 @@ class EllipticGraphSAGEBenchmark:
                 "precision": round(float(np.min(precs)), 4),
                 "recall": round(float(np.min(recs)), 4),
                 "f1_score": round(float(np.min(f1s)), 4),
+                "recall_at_01_fpr": round(float(np.min(r01s)), 4),
             },
             "max": {
                 "pr_auc": round(float(np.max(pr_aucs)), 4),
@@ -741,6 +754,7 @@ class EllipticGraphSAGEBenchmark:
                 "precision": round(float(np.max(precs)), 4),
                 "recall": round(float(np.max(recs)), 4),
                 "f1_score": round(float(np.max(f1s)), 4),
+                "recall_at_01_fpr": round(float(np.max(r01s)), 4),
             },
         }
 
@@ -833,13 +847,34 @@ class EllipticGraphSAGEBenchmark:
         end_time_utc = datetime.now(UTC).isoformat()
 
         # Build output paths
-        target_dir = Path(output_dir) if output_dir else REPO_ROOT / "experiments" / "elliptic"
+        # Strict canonical write authorization:
+        # Requires explicit canonical execution context (is_canonical flag),
+        # physical real dataset mode, full graph topology (all_rows=True),
+        # default output_dir (None), and multi-seed statistical evaluation (len(self.seeds) >= 3).
+        # Any ordinary real diagnostic run, single-seed run, non-default output directory,
+        # or synthetic run is strictly prohibited from writing or mutating canonical repository artifacts.
+        effective_canonical = bool(getattr(self, "is_canonical", False) or is_canonical)
+        is_canonical_real_run = (
+            effective_canonical is True
+            and self.dataset_mode == "real"
+            and output_dir is None
+            and self.all_rows is True
+            and len(self.seeds) >= 3
+        )
+        if output_dir:
+            target_dir = Path(output_dir)
+        elif self.dataset_mode == "real":
+            target_dir = REPO_ROOT / "experiments" / "elliptic"
+        else:
+            target_dir = REPO_ROOT / "experiments" / "elliptic" / "synthetic"
+
         plots_dir = target_dir / "plots"
         plots_dir.mkdir(parents=True, exist_ok=True)
         raw_results_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
-        raw_results_dir.mkdir(parents=True, exist_ok=True)
         docs_figures_dir = REPO_ROOT / "docs" / "figures"
-        docs_figures_dir.mkdir(parents=True, exist_ok=True)
+        if is_canonical_real_run:
+            raw_results_dir.mkdir(parents=True, exist_ok=True)
+            docs_figures_dir.mkdir(parents=True, exist_ok=True)
 
         # -----------------------------------------------------------------------
         # Generate Publication Plots
@@ -852,7 +887,8 @@ class EllipticGraphSAGEBenchmark:
             uplift,
             temporal_breakdown,
             plots_dir,
-            docs_figures_dir,
+            docs_figures_dir if is_canonical_real_run else None,
+            is_canonical_real_run=is_canonical_real_run,
         )
 
         # -----------------------------------------------------------------------
@@ -1151,19 +1187,23 @@ class EllipticGraphSAGEBenchmark:
             },
         }
 
-        # Write to both target_dir and benchmarks/results/raw
+        # Write output artifacts
         target_raw_path = target_dir / "graphsage_elliptic_benchmark.json"
         with open(target_raw_path, "w", encoding="utf-8") as f:
             json.dump(raw_payload, f, indent=2)
 
         root_raw_path = raw_results_dir / "graphsage_elliptic_benchmark.json"
-        with open(root_raw_path, "w", encoding="utf-8") as f:
-            json.dump(raw_payload, f, indent=2)
+        if is_canonical_real_run:
+            with open(root_raw_path, "w", encoding="utf-8") as f:
+                json.dump(raw_payload, f, indent=2)
+            canonical_path_str = str(root_raw_path)
+            logger.info("Successfully serialized canonical benchmark artifacts to: %s and %s", target_dir, root_raw_path)
+        else:
+            canonical_path_str = str(target_raw_path)
+            logger.info("Successfully serialized isolated benchmark artifacts to: %s", target_dir)
 
         audit_dossier_path = target_dir / "audit_dossier.md"
         self._write_audit_dossier(audit_dossier_path, comparative_baselines, exp_result)
-
-        logger.info("Successfully serialized all benchmark artifacts to: %s and %s", target_dir, root_raw_path)
 
         return {
             "status": "COMPLETED",
@@ -1176,7 +1216,7 @@ class EllipticGraphSAGEBenchmark:
                 "results_json": str(results_json_path),
                 "comparative_baselines": str(baselines_json_path),
                 "audit_dossier": str(audit_dossier_path),
-                "raw_benchmark": str(root_raw_path),
+                "raw_benchmark": canonical_path_str,
                 **plot_paths,
             },
         }
@@ -1190,7 +1230,8 @@ class EllipticGraphSAGEBenchmark:
         uplift: dict[str, Any],
         temporal_breakdown: list[dict[str, Any]],
         plots_dir: Path,
-        docs_figures_dir: Path,
+        docs_figures_dir: Path | None = None,
+        is_canonical_real_run: bool = False,
     ) -> dict[str, str]:
         """Generate publication-ready figures for precision-recall, ROC, and controlled ablations."""
         setup_publication_style()
@@ -1345,11 +1386,17 @@ class EllipticGraphSAGEBenchmark:
             axes[1, 1].legend(loc="upper right")
 
         fig.tight_layout()
-        consolidated_path = docs_figures_dir / "benchmark_graphsage_elliptic.png"
+        consolidated_path = plots_dir / "benchmark_graphsage_elliptic.png"
         fig.savefig(consolidated_path)
-        plt.close(fig)
         paths["consolidated_figure"] = str(consolidated_path)
 
+        if is_canonical_real_run and docs_figures_dir is not None:
+            docs_figures_dir.mkdir(parents=True, exist_ok=True)
+            doc_pub_path = docs_figures_dir / "benchmark_graphsage_elliptic.png"
+            fig.savefig(doc_pub_path)
+            paths["docs_figure"] = str(doc_pub_path)
+
+        plt.close(fig)
         return paths
 
     def _write_audit_dossier(
@@ -1370,7 +1417,7 @@ class EllipticGraphSAGEBenchmark:
             "> **Dataset**: Elliptic Bitcoin Transaction Graph (Weber et al., 2019)  ",
             f"> **Execution Timestamp**: `{exp_result.end_time_utc}`  ",
             f"> **Git Commit**: `{exp_result.git_commit}`  ",
-            "> **Temporal Invariant**: Strict past-to-future split (Timesteps 1-34 Train vs 35-49 Test)  ",
+            "> **Temporal Invariant**: Strict chronological split (Timesteps 1-30 Train, 31-34 Val, 35-49 Test)  ",
             f"> **Hardware**: {hw.cpu_model} ({hw.cpu_logical_cores} vCPUs), {hw.total_ram_gb:.1f} GB RAM, {platform.system()} {platform.release()}  ",
             "",
             "---",
@@ -1393,9 +1440,10 @@ class EllipticGraphSAGEBenchmark:
             "",
             "---",
             "",
-            "## 2. Controlled Neighborhood Hop Ablation Analysis",
+            "## 2. Exploratory Neighborhood Hop Ablation (Single-Seed Diagnostic)",
             "",
-            "To isolate the exact causal impact of graph topology from raw node features:",
+            "In exploratory single-seed ablations, 2-layer GraphSAGE was evaluated alongside 1-layer and tabular configurations under identical temporal partitions.",
+            "This comparison does not establish an empirical causal mechanism for performance variations across topologies and is not used for canonical model selection:",
             "",
             "```",
             f"0-Hop (Tabular MLP Baseline)       PR-AUC: {uplift['hop_ablation']['0_hop_tabular_mlp']['pr_auc']:.4f}  |  ROC-AUC: {uplift['hop_ablation']['0_hop_tabular_mlp']['roc_auc']:.4f}  |  Recall@0.1%FPR: {uplift['hop_ablation']['0_hop_tabular_mlp']['recall_at_01_fpr']:.4f}",
@@ -1474,6 +1522,7 @@ def run_graphsage_benchmark(
     all_rows: bool = True,
     nrows: int | None = None,
     output_dir: Path | str | None = None,
+    is_canonical: bool = False,
 ) -> dict[str, Any]:
     """Top-level entry point to execute the Elliptic GraphSAGE benchmark.
 
@@ -1501,6 +1550,7 @@ def run_graphsage_benchmark(
         dataset_mode=dataset_mode,
         all_rows=all_rows,
         nrows=nrows,
+        is_canonical=is_canonical,
     )
     return bench.run_benchmark(
         epochs=epochs,
@@ -1508,9 +1558,15 @@ def run_graphsage_benchmark(
         hidden_dim=hidden_dim,
         embedding_dim=embedding_dim,
         output_dir=output_dir,
+        is_canonical=is_canonical,
     )
 
 
-# Canonical alias for authoritative benchmark execution
-run_canonical_graphsage_benchmark = run_graphsage_benchmark
+def run_canonical_graphsage_benchmark(**kwargs: Any) -> dict[str, Any]:
+    """Authoritative canonical benchmark runner authorized to write repository benchmark artifacts."""
+    kwargs.setdefault("is_canonical", True)
+    kwargs.setdefault("dataset_mode", "real")
+    kwargs.setdefault("all_rows", True)
+    kwargs.setdefault("seeds", [42, 123, 456])
+    return run_graphsage_benchmark(**kwargs)
 

@@ -1,9 +1,9 @@
-# Experiment Execution Dossier: `exp-elliptic-graphsage-1790452183`
+# Experiment Execution Dossier: `exp-elliptic-graphsage-1790842448`
 
 > **Experiment Name:** Elliptic Bitcoin GraphSAGE Inductive Benchmark  
 > **Model / Strategy:** `GraphSAGE` (InductiveNeighborhoodAggregation)  
 > **Status:** `COMPLETED` | **Duration:** 141.51s  
-> **Git Provenance:** Commit `229c2623bb` (Branch: `main`)
+> **Git Provenance:** Commit `54b5c0b0` (Branch: `main`)
 
 ---
 
@@ -16,7 +16,7 @@
 | **F1-Score (Validation Calibrated)** | **0.3555** | 0.0567 | [0.3078, 0.4182] | `CONFIRMED` |
 | **Precision (PPV)** | **0.2757** | 0.0956 | [0.2068, 0.3848] | `CONFIRMED` |
 | **Recall (Sensitivity)** | **0.5583** | 0.0871 | [0.4580, 0.6150] | `CONFIRMED` |
-| **Recall @ 0.1% Strict FPR** | **4.62%** | 3.75% | [0.00%, 8.86%] | `CONFIRMED` |
+| **Recall @ 0.1% Strict FPR** | **4.62%** | 3.75% | [1.75%, 8.86%] | `CONFIRMED` |
 | **Recall @ 0.5% FPR** | **14.34%** | 4.60% | [10.25%, 20.31%] | `CONFIRMED` |
 | **Recall @ 1.0% FPR** | **20.81%** | 1.83% | [18.74%, 22.53%] | `CONFIRMED` |
 

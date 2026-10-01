@@ -1,9 +1,9 @@
 # Elliptic Bitcoin GraphSAGE Inductive Benchmark Audit Dossier
 
 > **Dataset**: Elliptic Bitcoin Transaction Graph (Weber et al., 2019)  
-> **Execution Timestamp**: `2026-10-01T07:00:28.449284+00:00`  
-> **Git Commit**: `aa70eb0a27f85b9fe2c773a03ae309fb731fbb7e`  
-> **Temporal Invariant**: Strict past-to-future split (Timesteps 1-34 Train vs 35-49 Test)  
+> **Execution Timestamp**: `2026-10-01T08:14:05.791673+00:00`  
+> **Git Commit**: `2a11c237894de1f20812c6ad4903d4333966f044`  
+> **Temporal Invariant**: Strict chronological split (Timesteps 1-30 Train, 31-34 Val, 35-49 Test)  
 > **Hardware**: AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD (16 vCPUs), 7.3 GB RAM, Windows 11  
 
 ---
@@ -12,16 +12,17 @@
 
 | Evaluation Paradigm | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | F1-Score | Brier Score | Latency (ms/1k) | $\Delta$ PR-AUC vs Tabular |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **Inductive GraphSAGE (2-Layer Mean Aggregator)** | `0.4265` | `0.8401` | `0.0886` | `0.2031` | `0.3405` | `0.1649` | `5.95` ms | **-0.1513** |
-| **Inductive GraphSAGE (1-Layer Mean Aggregator)** | `0.4556` | `0.8368` | `0.1293` | `0.2225` | `0.3992` | `0.2394` | `5.82` ms | **-0.1223** |
-| **Tabular MLP Baseline (No Graph / 0-Hop)** | `0.5778` | `0.8722` | `0.2521` | `0.3897` | `0.5162` | `0.1720` | `1.25` ms | **Baseline (0.0)** |
-| **GraphSAGE (GCN Symmetric Aggregator)** | `0.4922` | `0.8504` | `0.1043` | `0.2862` | `0.3845` | `0.1524` | `5.53` ms | **-0.0856** |
+| **Inductive GraphSAGE (2-Layer Mean Aggregator)** | `0.4265` | `0.8401` | `0.0886` | `0.2031` | `0.3405` | `0.1649` | `4.95` ms | **-0.1513** |
+| **Inductive GraphSAGE (1-Layer Mean Aggregator)** | `0.4556` | `0.8368` | `0.1293` | `0.2225` | `0.3992` | `0.2394` | `2.52` ms | **-0.1223** |
+| **Tabular MLP Baseline (No Graph / 0-Hop)** | `0.5778` | `0.8722` | `0.2521` | `0.3897` | `0.5162` | `0.1720` | `0.83` ms | **Baseline (0.0)** |
+| **GraphSAGE (GCN Symmetric Aggregator)** | `0.4922` | `0.8504` | `0.1043` | `0.2862` | `0.3845` | `0.1524` | `4.20` ms | **-0.0856** |
 
 ---
 
-## 2. Controlled Neighborhood Hop Ablation Analysis
+## 2. Exploratory Neighborhood Hop Ablation (Single-Seed Diagnostic)
 
-To isolate the exact causal impact of graph topology from raw node features:
+In exploratory single-seed ablations, 2-layer GraphSAGE was evaluated alongside 1-layer and tabular configurations under identical temporal partitions.
+This comparison does not establish an empirical causal mechanism for performance variations across topologies and is not used for canonical model selection:
 
 ```
 0-Hop (Tabular MLP Baseline)       PR-AUC: 0.5778  |  ROC-AUC: 0.8722  |  Recall@0.1%FPR: 0.2521
@@ -63,5 +64,5 @@ To isolate the exact causal impact of graph topology from raw node features:
 - **Result Payload**: [`results.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\results.json)
 - **Comparative Baselines**: [`comparative_baselines.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\comparative_baselines.json)
 - **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\graphsage_elliptic_benchmark.json)
-- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\docs\figures\benchmark_graphsage_elliptic.png)
+- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](file:///C:\Users\Yusuf\Desktop\projects\Privacy-preserving cross-bank fraud detection using Federated Learning\experiments\elliptic\plots\benchmark_graphsage_elliptic.png)
 
