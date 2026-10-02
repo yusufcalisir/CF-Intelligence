@@ -1,0 +1,746 @@
+{
+  "metadata": {
+    "artifact_type": "DERIVED RECONCILIATION ARTIFACT",
+    "description": "Scientific record reconciliation for SecurityHeaders pure-ASGI intervention",
+    "benchmark_execution": "NO NEW BENCHMARK EXECUTION \u2014 REASONING EXCLUSIVELY FROM VERIFIED HISTORICAL EVIDENCE",
+    "timestamp_iso": "2026-10-02T12:25:00Z"
+  },
+  "source_artifacts": {
+    "benchmarks/results/raw/security_headers_pre_semantic_oracle.json": "bee822eafe057fe7deaea9b6cf8da64868d49b37fd7bff06587d1b130713f1a0",
+    "benchmarks/results/raw/security_headers_pre_structural_baseline.json": "943c87b6b5ca11fef9cbb283e71d87eaf706c4f5a510e1605b88971e53969d97",
+    "benchmarks/results/raw/latency_http_service_benchmark_post_ddos.json": "165c5f682c218e493aff56b7d591c6bb95048a5666f3eca508f05834bb0346ed",
+    "benchmarks/results/raw/security_headers_post_semantic_differential.json": "e9be1083267abac58831dc6c46b8b10f40c61cb7228b4da0643f4ee644d3dc66",
+    "benchmarks/results/raw/security_headers_structural_ab_benchmark.json": "0f85d6093704dfc114d9971de8a67ed121509b233e2f362702c1ed9cb5b6c148",
+    "benchmarks/results/raw/latency_http_service_benchmark_post_security_headers.json": "963121c69786e3a478a0c3ef9476c51a2b848d57cad053e5ab78aed833ca0b34"
+  },
+  "structural_reconciliation": {
+    "workload": "aiohttp C=500 N=1000",
+    "pair_mapping": [
+      {
+        "pair": 1,
+        "order": "PRE->POST",
+        "pre_rps": 724.6420395138923,
+        "post_rps": 1003.9364347638962,
+        "rps_delta_pct": 38.542394730143094,
+        "rps_post_favorable": true,
+        "pre_p50": 531.2623999961943,
+        "post_p50": 306.77379999906407,
+        "p50_post_favorable": true,
+        "pre_p99": 650.3081370045402,
+        "post_p99": 800.6689130061568,
+        "p99_post_favorable": false,
+        "pre_task_peak": 1182,
+        "post_task_peak": 5,
+        "task_post_favorable": true,
+        "pre_lag_p99": 44.10061100046611,
+        "post_lag_p99": 33.8497080033993,
+        "lag_post_favorable": true
+      },
+      {
+        "pair": 2,
+        "order": "POST->PRE",
+        "pre_rps": 869.9573790498484,
+        "post_rps": 1012.1707459162474,
+        "rps_delta_pct": 16.3471648486644,
+        "rps_post_favorable": true,
+        "pre_p50": 384.99120000051335,
+        "post_p50": 346.81225000167615,
+        "p50_post_favorable": true,
+        "pre_p99": 612.573629000035,
+        "post_p99": 720.1104400031909,
+        "p99_post_favorable": false,
+        "pre_task_peak": 1076,
+        "post_task_peak": 5,
+        "task_post_favorable": true,
+        "pre_lag_p99": 48.06401800618921,
+        "post_lag_p99": 11.525883998838252,
+        "lag_post_favorable": true
+      },
+      {
+        "pair": 3,
+        "order": "PRE->POST",
+        "pre_rps": 756.2984153880616,
+        "post_rps": 1220.7673523770407,
+        "rps_delta_pct": 61.41344838738782,
+        "rps_post_favorable": true,
+        "pre_p50": 538.3683000000019,
+        "post_p50": 281.43514999828767,
+        "p50_post_favorable": true,
+        "pre_p99": 875.9225389990024,
+        "post_p99": 654.1323360007664,
+        "p99_post_favorable": true,
+        "pre_task_peak": 975,
+        "post_task_peak": 5,
+        "task_post_favorable": true,
+        "pre_lag_p99": 64.69493300159125,
+        "post_lag_p99": 18.366440000390924,
+        "lag_post_favorable": true
+      },
+      {
+        "pair": 4,
+        "order": "POST->PRE",
+        "pre_rps": 908.2436003808734,
+        "post_rps": 1162.8094919156115,
+        "rps_delta_pct": 28.02837162056363,
+        "rps_post_favorable": true,
+        "pre_p50": 403.3702999986417,
+        "post_p50": 346.4954000010039,
+        "p50_post_favorable": true,
+        "pre_p99": 614.5266600006289,
+        "post_p99": 745.4280080020544,
+        "p99_post_favorable": false,
+        "pre_task_peak": 1016,
+        "post_task_peak": 5,
+        "task_post_favorable": true,
+        "pre_lag_p99": 42.34003000106893,
+        "post_lag_p99": 15.78280200323203,
+        "lag_post_favorable": true
+      },
+      {
+        "pair": 5,
+        "order": "PRE->POST",
+        "pre_rps": 886.2881648989659,
+        "post_rps": 781.4103722697396,
+        "rps_delta_pct": -11.833373927675323,
+        "rps_post_favorable": false,
+        "pre_p50": 402.4024999998801,
+        "post_p50": 481.4340499979153,
+        "p50_post_favorable": false,
+        "pre_p99": 605.2484290006396,
+        "post_p99": 1033.7778250003612,
+        "p99_post_favorable": false,
+        "pre_task_peak": 998,
+        "post_task_peak": 5,
+        "task_post_favorable": true,
+        "pre_lag_p99": 46.39539000519944,
+        "post_lag_p99": 24.119071995955775,
+        "lag_post_favorable": true
+      }
+    ],
+    "recomputed_metrics": {
+      "rps": {
+        "pre_mean": 829.0859198463284,
+        "pre_sd": 82.78746334478204,
+        "post_mean": 1036.218879448507,
+        "post_sd": 170.75652719363518,
+        "delta_pct": 24.983292399968747,
+        "pairwise_post_favorable_count": 4,
+        "pairwise_pre_favorable_count": 1,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          724.6420395138923,
+          869.9573790498484,
+          756.2984153880616,
+          908.2436003808734,
+          886.2881648989659
+        ],
+        "post_raw_values": [
+          1003.9364347638962,
+          1012.1707459162474,
+          1220.7673523770407,
+          1162.8094919156115,
+          781.4103722697396
+        ]
+      },
+      "p50_ms": {
+        "pre_mean": 452.07893999904627,
+        "pre_sd": 75.92252489591772,
+        "post_mean": 352.5901299995894,
+        "post_sd": 77.19043435760618,
+        "delta_pct": -22.006955245397354,
+        "pairwise_post_favorable_count": 4,
+        "pairwise_pre_favorable_count": 1,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          531.2623999961943,
+          384.99120000051335,
+          538.3683000000019,
+          403.3702999986417,
+          402.4024999998801
+        ],
+        "post_raw_values": [
+          306.77379999906407,
+          346.81225000167615,
+          281.43514999828767,
+          346.4954000010039,
+          481.4340499979153
+        ]
+      },
+      "p95_ms": {
+        "pre_mean": 648.1130610001856,
+        "pre_sd": 120.59523937103212,
+        "post_mean": 780.8860299986554,
+        "post_sd": 146.8376550399625,
+        "delta_pct": 20.48608136265161,
+        "pairwise_post_favorable_count": 1,
+        "pairwise_pre_favorable_count": 4,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          557.0163549971767,
+          610.592895002992,
+          860.0644900001498,
+          612.3931299960532,
+          600.4984350045561
+        ],
+        "post_raw_values": [
+          783.7834949983517,
+          717.0808050006599,
+          639.9956700006442,
+          736.9500949978828,
+          1026.6200849957386
+        ]
+      },
+      "p99_ms": {
+        "pre_mean": 671.7158788009692,
+        "pre_sd": 115.48266733532593,
+        "post_mean": 790.8235044025059,
+        "post_sd": 145.66167826246897,
+        "delta_pct": 17.731846061782402,
+        "pairwise_post_favorable_count": 1,
+        "pairwise_pre_favorable_count": 4,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          650.3081370045402,
+          612.573629000035,
+          875.9225389990024,
+          614.5266600006289,
+          605.2484290006396
+        ],
+        "post_raw_values": [
+          800.6689130061568,
+          720.1104400031909,
+          654.1323360007664,
+          745.4280080020544,
+          1033.7778250003612
+        ]
+      },
+      "task_peak": {
+        "pre_mean": 1049.4,
+        "pre_sd": 83.0409537517483,
+        "post_mean": 5.0,
+        "post_sd": 0.0,
+        "delta_pct": -99.52353725938632,
+        "pairwise_post_favorable_count": 5,
+        "pairwise_pre_favorable_count": 0,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          1182,
+          1076,
+          975,
+          1016,
+          998
+        ],
+        "post_raw_values": [
+          5,
+          5,
+          5,
+          5,
+          5
+        ]
+      },
+      "task_mean": {
+        "pre_mean": 15.295093295402163,
+        "pre_sd": 0.23539593761120411,
+        "post_mean": 3.9023474175700263,
+        "post_sd": 0.041077645661436506,
+        "delta_pct": -74.4862790817817,
+        "pairwise_post_favorable_count": 5,
+        "pairwise_pre_favorable_count": 0,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          15.246350364963504,
+          15.622047244094489,
+          15.21031746031746,
+          15.406311637080869,
+          14.990439770554493
+        ],
+        "post_raw_values": [
+          3.8829516539440205,
+          3.938730853391685,
+          3.903225806451613,
+          3.942857142857143,
+          3.8439716312056738
+        ]
+      },
+      "lag_p99_ms": {
+        "pre_mean": 49.11899640290299,
+        "pre_sd": 8.976070823000557,
+        "post_mean": 20.728781200363258,
+        "post_sd": 8.63697682807311,
+        "delta_pct": -57.798850305626026,
+        "pairwise_post_favorable_count": 5,
+        "pairwise_pre_favorable_count": 0,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          44.10061100046611,
+          48.06401800618921,
+          64.69493300159125,
+          42.34003000106893,
+          46.39539000519944
+        ],
+        "post_raw_values": [
+          33.8497080033993,
+          11.525883998838252,
+          18.366440000390924,
+          15.78280200323203,
+          24.119071995955775
+        ]
+      },
+      "server_cpu_pct": {
+        "pre_mean": 60.60241859589686,
+        "pre_sd": 8.461060124352933,
+        "post_mean": 50.313392982456136,
+        "post_sd": 9.589091514341787,
+        "delta_pct": -16.977912518721404,
+        "pairwise_post_favorable_count": 4,
+        "pairwise_pre_favorable_count": 1,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          46.6,
+          60.58181818181818,
+          66.24347826086957,
+          68.20952380952382,
+          61.37727272727273
+        ],
+        "post_raw_values": [
+          65.85263157894737,
+          46.735,
+          51.7,
+          40.28333333333333,
+          46.996
+        ]
+      },
+      "client_cpu_pct": {
+        "pre_mean": 27.28,
+        "pre_sd": 7.578637740385801,
+        "post_mean": 33.989999999999995,
+        "post_sd": 2.500099998000079,
+        "delta_pct": 24.596774193548363,
+        "pairwise_post_favorable_count": 1,
+        "pairwise_pre_favorable_count": 4,
+        "pairwise_ties": 0,
+        "pre_raw_values": [
+          30.1,
+          23.0,
+          39.25,
+          20.45,
+          23.6
+        ],
+        "post_raw_values": [
+          32.8,
+          31.75,
+          32.1,
+          37.3,
+          36.0
+        ]
+      }
+    },
+    "reporting_error_analysis": {
+      "finding": "Summary in security_headers_structural_ab_benchmark.json correctly reported 4/5 pairs favorable for RPS (Pair 5 was PRE 886.29 vs POST 781.41). However, the intervention report Section 33 included an erroneous manually transcribed table with numbers (Pair 1: 948.5/1297.8, Pair 4: 805.8/818.1) that conflicted with both the raw artifact and the summary count.",
+      "correction": "The raw artifact values are authoritative: POST RPS is favorable in Pairs 1, 2, 3, 4 (4/5 favorable) and regressed in Pair 5 (1/5 regressed). Ties: 0."
+    }
+  },
+  "canonical_reconciliation": {
+    "schema_analysis": {
+      "pre_artifact_path": "benchmarks/results/raw/latency_http_service_benchmark_post_ddos.json",
+      "post_artifact_path": "benchmarks/results/raw/latency_http_service_benchmark_post_security_headers.json",
+      "historical_set_a_source": "Fields `p50_latency_ms`, `p95_latency_ms`, `p99_latency_ms` representing the mean of repetition percentiles.",
+      "intervention_set_b_source": "Fields `pooled_p50_ms`, `pooled_p95_ms`, `pooled_p99_ms` representing the pooled distribution percentiles across 3,000 requests.",
+      "resolution": "Both Sets A and B are valid representations within the same artifact schema. Set A is the mean of the 3 repetition percentiles; Set B is the pooled percentile. Like-for-like comparisons have been constructed for both semantics."
+    },
+    "like_for_like_pooled_comparison": {
+      "c1": {
+        "concurrency": 1,
+        "pre_rps": 118.2,
+        "post_rps": 128.9,
+        "delta_rps_pct": 9.052453468697125,
+        "pre_pooled_p50_ms": 8.22,
+        "post_pooled_p50_ms": 7.4,
+        "delta_p50_pct": -9.975669099756693,
+        "pre_pooled_p95_ms": 10.56,
+        "post_pooled_p95_ms": 10.51,
+        "delta_p95_pct": -0.47348484848485517,
+        "pre_pooled_p99_ms": 12.33,
+        "post_pooled_p99_ms": 13.02,
+        "delta_p99_pct": 5.596107055961067,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      },
+      "c10": {
+        "concurrency": 10,
+        "pre_rps": 322.2,
+        "post_rps": 481.0,
+        "delta_rps_pct": 49.28615766604594,
+        "pre_pooled_p50_ms": 27.94,
+        "post_pooled_p50_ms": 20.67,
+        "delta_p50_pct": -26.0200429491768,
+        "pre_pooled_p95_ms": 50.06,
+        "post_pooled_p95_ms": 26.76,
+        "delta_p95_pct": -46.54414702357171,
+        "pre_pooled_p99_ms": 69.24,
+        "post_pooled_p99_ms": 31.3,
+        "delta_p99_pct": -54.7949162333911,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      },
+      "c50": {
+        "concurrency": 50,
+        "pre_rps": 314.9,
+        "post_rps": 478.3,
+        "delta_rps_pct": 51.88948872657988,
+        "pre_pooled_p50_ms": 131.22,
+        "post_pooled_p50_ms": 97.45,
+        "delta_p50_pct": -25.735406188081082,
+        "pre_pooled_p95_ms": 240.01,
+        "post_pooled_p95_ms": 148.93,
+        "delta_p95_pct": -37.94841881588267,
+        "pre_pooled_p99_ms": 566.35,
+        "post_pooled_p99_ms": 183.03,
+        "delta_p99_pct": -67.68252847179306,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      },
+      "c100": {
+        "concurrency": 100,
+        "pre_rps": 351.8,
+        "post_rps": 487.5,
+        "delta_rps_pct": 38.5730528709494,
+        "pre_pooled_p50_ms": 248.75,
+        "post_pooled_p50_ms": 194.86,
+        "delta_p50_pct": -21.664321608040197,
+        "pre_pooled_p95_ms": 596.93,
+        "post_pooled_p95_ms": 280.25,
+        "delta_p95_pct": -53.05144656827433,
+        "pre_pooled_p99_ms": 630.36,
+        "post_pooled_p99_ms": 404.49,
+        "delta_p99_pct": -35.83190557776509,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      },
+      "c250": {
+        "concurrency": 250,
+        "pre_rps": 266.4,
+        "post_rps": 447.5,
+        "delta_rps_pct": 67.9804804804805,
+        "pre_pooled_p50_ms": 890.14,
+        "post_pooled_p50_ms": 479.44,
+        "delta_p50_pct": -46.138809625452176,
+        "pre_pooled_p95_ms": 1193.33,
+        "post_pooled_p95_ms": 818.71,
+        "delta_p95_pct": -31.39282511962323,
+        "pre_pooled_p99_ms": 1232.81,
+        "post_pooled_p99_ms": 841.05,
+        "delta_p99_pct": -31.777808421411248,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      },
+      "c500": {
+        "concurrency": 500,
+        "pre_rps": 300.5,
+        "post_rps": 430.4,
+        "delta_rps_pct": 43.22795341098169,
+        "pre_pooled_p50_ms": 1384.16,
+        "post_pooled_p50_ms": 1034.45,
+        "delta_p50_pct": -25.26514275806265,
+        "pre_pooled_p95_ms": 2190.49,
+        "post_pooled_p95_ms": 1500.71,
+        "delta_p95_pct": -31.489757999351735,
+        "pre_pooled_p99_ms": 2499.55,
+        "post_pooled_p99_ms": 1898.41,
+        "delta_p99_pct": -24.0499289872177,
+        "pre_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "pooled_p50_ms",
+          "pooled_p95_ms",
+          "pooled_p99_ms"
+        ]
+      }
+    },
+    "like_for_like_mean_of_repetition_comparison": {
+      "c1": {
+        "concurrency": 1,
+        "pre_rps": 118.2,
+        "post_rps": 128.9,
+        "delta_rps_pct": 9.052453468697125,
+        "pre_mean_rep_p50_ms": 8.24,
+        "post_mean_rep_p50_ms": 7.53,
+        "delta_p50_pct": -8.61650485436893,
+        "pre_mean_rep_p95_ms": 10.49,
+        "post_mean_rep_p95_ms": 9.71,
+        "delta_p95_pct": -7.43565300285986,
+        "pre_mean_rep_p99_ms": 12.26,
+        "post_mean_rep_p99_ms": 11.59,
+        "delta_p99_pct": -5.464926590538336,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      },
+      "c10": {
+        "concurrency": 10,
+        "pre_rps": 322.2,
+        "post_rps": 481.0,
+        "delta_rps_pct": 49.28615766604594,
+        "pre_mean_rep_p50_ms": 29.07,
+        "post_mean_rep_p50_ms": 20.52,
+        "delta_p50_pct": -29.411764705882355,
+        "pre_mean_rep_p95_ms": 46.47,
+        "post_mean_rep_p95_ms": 25.74,
+        "delta_p95_pct": -44.60942543576501,
+        "pre_mean_rep_p99_ms": 67.03,
+        "post_mean_rep_p99_ms": 30.75,
+        "delta_p99_pct": -54.12501864836641,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      },
+      "c50": {
+        "concurrency": 50,
+        "pre_rps": 314.9,
+        "post_rps": 478.3,
+        "delta_rps_pct": 51.88948872657988,
+        "pre_mean_rep_p50_ms": 139.14,
+        "post_mean_rep_p50_ms": 102.65,
+        "delta_p50_pct": -26.22538450481528,
+        "pre_mean_rep_p95_ms": 216.32,
+        "post_mean_rep_p95_ms": 140.74,
+        "delta_p95_pct": -34.938979289940825,
+        "pre_mean_rep_p99_ms": 564.35,
+        "post_mean_rep_p99_ms": 154.92,
+        "delta_p99_pct": -72.54895011960663,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      },
+      "c100": {
+        "concurrency": 100,
+        "pre_rps": 351.8,
+        "post_rps": 487.5,
+        "delta_rps_pct": 38.5730528709494,
+        "pre_mean_rep_p50_ms": 244.94,
+        "post_mean_rep_p50_ms": 190.33,
+        "delta_p50_pct": -22.29525598105658,
+        "pre_mean_rep_p95_ms": 591.75,
+        "post_mean_rep_p95_ms": 306.35,
+        "delta_p95_pct": -48.22982678495986,
+        "pre_mean_rep_p99_ms": 607.58,
+        "post_mean_rep_p99_ms": 319.64,
+        "delta_p99_pct": -47.391290035880054,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      },
+      "c250": {
+        "concurrency": 250,
+        "pre_rps": 266.4,
+        "post_rps": 447.5,
+        "delta_rps_pct": 67.9804804804805,
+        "pre_mean_rep_p50_ms": 882.76,
+        "post_mean_rep_p50_ms": 471.59,
+        "delta_p50_pct": -46.57777878472065,
+        "pre_mean_rep_p95_ms": 1189.17,
+        "post_mean_rep_p95_ms": 777.47,
+        "delta_p95_pct": -34.62078592631836,
+        "pre_mean_rep_p99_ms": 1227.94,
+        "post_mean_rep_p99_ms": 792.77,
+        "delta_p99_pct": -35.43902796553578,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      },
+      "c500": {
+        "concurrency": 500,
+        "pre_rps": 300.5,
+        "post_rps": 430.4,
+        "delta_rps_pct": 43.22795341098169,
+        "pre_mean_rep_p50_ms": 1371.88,
+        "post_mean_rep_p50_ms": 1045.43,
+        "delta_p50_pct": -23.79581304487273,
+        "pre_mean_rep_p95_ms": 2075.75,
+        "post_mean_rep_p95_ms": 1526.79,
+        "delta_p95_pct": -26.446344694688666,
+        "pre_mean_rep_p99_ms": 2175.74,
+        "post_mean_rep_p99_ms": 1589.99,
+        "delta_p99_pct": -26.9218748563707,
+        "pre_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ],
+        "post_source_fields": [
+          "throughput_rps",
+          "p50_latency_ms",
+          "p95_latency_ms",
+          "p99_latency_ms"
+        ]
+      }
+    },
+    "c500_p99_provenance": {
+      "historical_2175_74_ms": "Mean of repetition percentiles: rep1=1922.40 ms, rep2=2072.58 ms, rep3=2532.24 ms -> mean = 2175.74 ms.",
+      "intervention_2499_55_ms": "Pooled percentile across all 3,000 requests concatenated in C=500 tier.",
+      "status": "Both values are legitimate and reflect distinct aggregation methods in latency_http_service_benchmark_post_ddos.json."
+    },
+    "negative_results_preserved": [
+      {
+        "tier": "C1",
+        "metric": "pooled_p99_ms",
+        "pre": 12.33,
+        "post": 13.02,
+        "delta_pct": 5.6,
+        "nature": "Pooled tail latency slight regression (+5.60%) under single-client load."
+      },
+      {
+        "tier": "Structural C500",
+        "metric": "p95_ms and p99_ms",
+        "pre_p95": 648.11,
+        "post_p95": 780.89,
+        "pre_p99": 671.72,
+        "post_p99": 790.82,
+        "nature": "Structural tail latencies regressed in 4/5 pairs (+20.5% p95, +17.7% p99)."
+      },
+      {
+        "tier": "Structural C500",
+        "metric": "rps_pair_5",
+        "pre": 886.29,
+        "post": 781.41,
+        "delta_pct": -11.83,
+        "nature": "POST RPS regressed in Pair 5 of the structural A/B benchmark."
+      }
+    ]
+  },
+  "claim_and_causality_reconciliation": {
+    "claim_depth_removal": {
+      "statement": "SecurityHeaders BaseHTTP -> pure-ASGI intervention caused active custom BaseHTTP depth 1 -> 0.",
+      "classification": "SUPPORTED"
+    },
+    "claim_live_task_reduction": {
+      "statement": "The intervention changed live-task population under the controlled workload.",
+      "classification": "SUPPORTED AT THE MEASURED LEVEL"
+    },
+    "claim_event_loop_lag_reduction": {
+      "statement": "The intervention changed measured event-loop lag.",
+      "classification": "SUPPORTED AT THE MEASURED LEVEL"
+    },
+    "claim_intervention_level_performance": {
+      "statement": "The SecurityHeaders pure-ASGI intervention produced a material measured performance effect under the tested workloads.",
+      "classification": "SUPPORTED AT THE MEASURED LEVEL"
+    },
+    "claim_task_reduction_mediation": {
+      "statement": "Task reduction uniquely mediated the performance change.",
+      "classification": "PLAUSIBLE / NOT UNIQUELY ISOLATED"
+    },
+    "claim_header_processing_bottleneck": {
+      "statement": "SecurityHeaders header-processing logic itself was a material bottleneck.",
+      "classification": "NOT ESTABLISHED"
+    },
+    "claim_dominant_bottleneck": {
+      "statement": "SecurityHeaders was the dominant application bottleneck.",
+      "classification": "NOT ESTABLISHED"
+    },
+    "claim_server_cpu_mechanism": {
+      "statement": "Server CPU was lower in the POST measurements under this workload; causal link to scheduling overhead is plausible but not uniquely isolated.",
+      "classification": "SUPPORTED AT THE MEASURED LEVEL (OBSERVATION) / NOT UNIQUELY ISOLATED (MECHANISM)"
+    }
+  }
+}
