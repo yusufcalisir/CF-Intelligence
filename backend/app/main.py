@@ -733,12 +733,29 @@ app.add_middleware(ContentTypeMiddleware)
 
 # ── W3C Distributed Trace Context Middleware ─────────────────────────────────
 # Injects W3C compliant traceparent header (00-{trace_id}-{span_id}-01) into all responses
-# for cross-service distributed trace propagation per OpenTelemetry standards.
-class W3CTraceContextMiddleware(BaseHTTPMiddleware):
-    """Extract or generate W3C traceparent header and propagate to HTTP response headers."""
+# for cross-service distributed trace propagation per OpenTelemetry standards (Pure ASGI).
+class W3CTraceContextMiddleware:
+    """Extract or generate W3C traceparent header and propagate to HTTP response headers (Pure ASGI)."""
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        incoming_tp = request.headers.get("traceparent")
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Extract incoming traceparent (exact Starlette request.headers.get semantics: first match)
+        incoming_tp: str | None = None
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"traceparent":
+                try:
+                    incoming_tp = value.decode("latin-1")
+                except Exception:
+                    incoming_tp = value.decode("utf-8", errors="replace")
+                break
+
+        # Exact existing validation check
         if incoming_tp and incoming_tp.startswith("00-") and len(incoming_tp.split("-")) == 4:
             traceparent = incoming_tp
         else:
@@ -746,9 +763,19 @@ class W3CTraceContextMiddleware(BaseHTTPMiddleware):
             span_id = uuid.uuid4().hex[:16]
             traceparent = f"00-{trace_id}-{span_id}-01"
 
-        response = await call_next(request)
-        response.headers["traceparent"] = traceparent
-        return response
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                raw_headers: list[tuple[bytes, bytes]] = list(message.get("headers", []))
+                # Exact overwrite semantics: filter out any existing traceparent response header
+                new_headers: list[tuple[bytes, bytes]] = [
+                    (k, v) for k, v in raw_headers if k.lower() != b"traceparent"
+                ]
+                new_headers.append((b"traceparent", traceparent.encode("latin-1")))
+                message = {**message, "headers": new_headers}
+
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
 
 
 app.add_middleware(W3CTraceContextMiddleware)

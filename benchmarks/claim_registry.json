@@ -335,7 +335,7 @@
       "dataset_scale": "C=10 Concurrent Clients (3000 Requests across 3 reps)",
       "stated_value": 50.0,
       "stated_unit": "successful 2xx req/s",
-      "empirical_measured_value": 233.7,
+      "empirical_measured_value": 327.9,
       "centralized_baseline_value": 89.0,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -343,12 +343,18 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 233.7 ± 3.9 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success, client loop lag p99=7.99ms, client CPU=0.12 cores). Following the pure-ASGI conversions of ContentTypeMiddleware and APIVersionLifecycleMiddleware, mean successful throughput increased at all six evaluated concurrency tiers. Latency effects were predominantly favorable, with C50 p99 as a notable regression: C=1: 104.8 ± 3.1 req/s; C=10: 233.7 ± 3.9 req/s; C=50: 204.3 ± 6.9 req/s (p99 latency regressed from 570.14ms to 645.77ms); C=100: 197.4 ± 4.7 req/s; C=250 performance recovered to 176.6 ± 2.8 req/s (from 112.1 ± 25.0 req/s); C=500 reached 174.4 ± 4.8 req/s with median latency dropping by -836.8ms from 3,536.11ms to 2,699.36ms and p99 latency falling by -1,808.86ms to 3,758.08ms. Historical HTTPX measurements (191.0 req/s at C=10, collapsing to 41.6 req/s at C=500 due to client event-loop starvation) are preserved in benchmarks/results/raw/latency_http_service_benchmark_httpx.json as VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS, SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION.",
+      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 327.9 ± 2.3 successful 2xx req/s at C=10 across 3 independent repetitions (3,000 requests, 100% 2xx success, client loop lag p99=3.03ms, client CPU=0.12 cores). Following the pure-ASGI conversions of ContentTypeMiddleware, APIVersionLifecycleMiddleware, and W3CTraceContextMiddleware (BaseHTTP depth 4 -> 3), mean successful throughput increased at all six evaluated concurrency tiers: C=1: 119.6 ± 2.8 req/s (pooled p50=8.18ms); C=10: 327.9 ± 2.3 req/s (pooled p50=30.36ms); C=50: 275.8 ± 11.4 req/s (pooled p50=147.27ms, pooled p95=434.97ms, pooled p99=629.42ms; note rep 3 p99 was 665.80ms vs PRE 579.41ms, yielding 2/3 pairwise p99 improvement); C=100: 270.2 ± 4.4 req/s (pooled p50=294.42ms); C=250: 250.9 ± 4.7 req/s (pooled p50=1019.60ms); C=500 reached 231.8 ± 3.6 req/s with median latency dropping by -704.1ms to 1976.43ms and p99 latency falling by -658.9ms to 3227.18ms. Historical baselines: Pre-intervention (89.0 req/s peak) in latency_http_service_benchmark_pre_intervention.json; Post-APIVersion (233.7 req/s peak) archived in latency_http_service_benchmark_post_apiversion.json; HTTPX measurements (191.0 req/s at C=10 collapsing to 41.6 req/s at C=500 due to client event-loop starvation) in latency_http_service_benchmark_httpx.json.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
         "baseline_peak_rps": 89.0,
         "notes": "Pre-intervention synchronous FeatureStore execution on event loop yielded 89.0 req/s peak at C=10."
+      },
+      "post_apiversion_baseline": {
+        "status": "POST_APIVERSION_PRE_W3C_BASELINE",
+        "source": "benchmarks/results/raw/latency_http_service_benchmark_post_apiversion.json",
+        "baseline_peak_rps": 233.7,
+        "notes": "Post-APIVersion pure-ASGI state (BaseHTTP depth 4) yielded 233.7 req/s peak at C=10 and 174.4 req/s at C=500."
       },
       "historical_httpx_artifact": {
         "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
@@ -372,7 +378,7 @@
       "dataset_scale": "C=1 Client (3000 Requests across 3 reps)",
       "stated_value": 10.0,
       "stated_unit": "ms",
-      "empirical_measured_value": 9.22,
+      "empirical_measured_value": 8.25,
       "centralized_baseline_value": 11.39,
       "evaluation_type": "CLASS_B1_LOCAL_HTTP_INFERENCE_CAPACITY_BENCHMARK",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -380,12 +386,18 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP using aiohttp load generator: mean=9.85ms, per-repetition p50 mean=9.22ms (pooled p50=9.20ms), p95=11.94ms, p99=14.24ms (100% 2xx success across 3,000 requests, client loop lag p99=8.95ms, client CPU=0.08 cores). Historical HTTPX measurement (mean=10.97ms, p50=10.77ms) is preserved in latency_http_service_benchmark_httpx.json.",
+      "notes": "Client-observed wall-clock latency for successful HTTP 2xx inference transactions at C=1 on live Uvicorn ASGI server over loopback TCP using aiohttp load generator: mean=8.34ms, per-repetition p50 mean=8.25ms (pooled p50=8.18ms), p95=9.37ms, p99=10.26ms (100% 2xx success across 3,000 requests, client loop lag p99=4.11ms, client CPU=0.06 cores). Historical baselines: Pre-intervention (p50=11.39ms, p99=21.32ms); Post-APIVersion (p50=9.22ms, p99=14.24ms); HTTPX (p50=10.77ms, p99=15.21ms).",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
         "baseline_p50_ms": 11.39,
         "baseline_p99_ms": 21.32
+      },
+      "post_apiversion_baseline": {
+        "status": "POST_APIVERSION_PRE_W3C_BASELINE",
+        "source": "benchmarks/results/raw/latency_http_service_benchmark_post_apiversion.json",
+        "baseline_p50_ms": 9.22,
+        "baseline_p99_ms": 14.24
       },
       "historical_httpx_artifact": {
         "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",

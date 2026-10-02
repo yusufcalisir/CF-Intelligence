@@ -1500,17 +1500,17 @@ Measures client-observed wall-clock HTTP latency against a live running Uvicorn 
 
 | Concurrency ($C$) | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **104.8 $\pm$ 3.1 req/s** | 3,000 | 0 | 0 | **9.22 ms** | 11.94 ms | 14.24 ms | 26.63 ms | 100.0% |
-| **10** | **233.7 $\pm$ 3.9 req/s** | 3,000 | 0 | 0 | **40.46 ms** | 58.81 ms | 67.62 ms | 79.74 ms | 100.0% |
-| **50** | **204.3 $\pm$ 6.9 req/s** | 3,000 | 0 | 0 | **191.74 ms** | 499.25 ms | 645.77 ms | 702.36 ms | 100.0% |
-| **100** | **197.4 $\pm$ 4.7 req/s** | 3,000 | 0 | 0 | **427.34 ms** | 771.22 ms | 826.44 ms | 922.23 ms | 100.0% |
-| **250** | **176.6 $\pm$ 2.8 req/s** | 3,000 | 0 | 0 | **1,359.46 ms** | 1,553.51 ms | 1,588.07 ms | 1,649.46 ms | 100.0% |
-| **500** | **174.4 $\pm$ 4.8 req/s** | 3,000 | 0 | 0 | **2,699.36 ms** | 3,609.92 ms | 3,758.08 ms | 3,922.58 ms | 100.0% |
+| **1** | **119.6 $\pm$ 2.8 req/s** | 3,000 | 0 | 0 | **8.25 ms** | 9.37 ms | 10.26 ms | 17.30 ms | 100.0% |
+| **10** | **327.9 $\pm$ 2.3 req/s** | 3,000 | 0 | 0 | **30.35 ms** | 33.43 ms | 35.06 ms | 40.02 ms | 100.0% |
+| **50** | **275.8 $\pm$ 11.4 req/s** | 3,000 | 0 | 0 | **147.32 ms** | 436.36 ms | 547.12 ms | 678.83 ms | 100.0% |
+| **100** | **270.2 $\pm$ 4.4 req/s** | 3,000 | 0 | 0 | **288.81 ms** | 619.01 ms | 625.44 ms | 714.51 ms | 100.0% |
+| **250** | **250.9 $\pm$ 4.7 req/s** | 3,000 | 0 | 0 | **1,018.83 ms** | 1,158.96 ms | 1,337.64 ms | 1,386.92 ms | 100.0% |
+| **500** | **231.8 $\pm$ 3.6 req/s** | 3,000 | 0 | 0 | **1,976.22 ms** | 2,664.16 ms | 3,171.46 ms | 3,318.13 ms | 100.0% |
 
 *Artifacts: [`benchmarks/results/raw/latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json), [`benchmarks/results/raw/latency_http_service_samples.json`](benchmarks/results/raw/latency_http_service_samples.json)*
 
-- **Single-Client Baseline**: At $C=1$, median 2xx inference transaction latency is $9.22\text{ ms}$ with peak throughput of $233.7\text{ req/s}$ reached at $C=10$ ($204.3\text{ req/s}$ sustained at $C=50$).
-- **High-Concurrency Queueing**: At $C=500$, 100% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Mean successful throughput increased at all six evaluated concurrency tiers. Latency effects were predominantly favorable, with C50 p99 as a notable regression ($570.14\text{ ms} \to 645.77\text{ ms}$). Following the progressive pure-ASGI conversions of ContentTypeMiddleware and APIVersionLifecycleMiddleware, median latency at $C=500$ decreased from $4,340.29\text{ ms}$ down to $2,699.36\text{ ms}$ (-1,640.93 ms, -37.8%) and throughput increased from $118.2\text{ req/s}$ to $174.4\text{ req/s}$ (+47.5%). The C250 performance regression observed in the previous canonical run recovered in the post-intervention evaluation, reaching $176.6 \pm 2.8\text{ req/s}$ with $p_{99}$ latency dropping from $3,136.95\text{ ms}$ to $1,588.07\text{ ms}$.
+- **Single-Client Baseline**: At $C=1$, median 2xx inference transaction latency is $8.25\text{ ms}$ (pooled $8.18\text{ ms}$) with peak throughput of $327.9\text{ req/s}$ reached at $C=10$ ($275.8\text{ req/s}$ sustained at $C=50$).
+- **High-Concurrency Queueing**: At $C=500$, 100% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Mean successful throughput increased at all six evaluated concurrency tiers. Following the progressive pure-ASGI conversions of ContentTypeMiddleware, APIVersionLifecycleMiddleware, and W3CTraceContextMiddleware (BaseHTTP depth $4 \to 3$), median latency at $C=500$ decreased from $2,699.36\text{ ms}$ down to $1,976.22\text{ ms}$ (-723.14 ms, -26.8%) and throughput increased from $174.4\text{ req/s}$ to $231.8\text{ req/s}$ (+32.9%). Throughput and median latency improved across 18/18 independent repetition pairs. Historical baselines and negative results remain preserved: at $C=50$, repetition 3 $p_{99}$ latency was $665.80\text{ ms}$ vs PRE rep 3 of $579.41\text{ ms}$ ($2/3$ pairwise $p_{99}$ improvement), and trivial A/B Pair 1 loop lag $p_{99}$ was $631.94\text{ ms}$ vs $502.11\text{ ms}$.
 
 #### Class B2: Rate-Limited Public-Endpoint Behavior Benchmark (`benchmarks/runners/run_http_ratelimit_benchmark.py`)
 
