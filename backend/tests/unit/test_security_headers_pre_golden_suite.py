@@ -31,8 +31,8 @@ class RawASGIHarness:
     async def request(
         self,
         scope: dict | None = None,
-        receive_messages: list[dict] | None = None,
-    ) -> tuple[int | None, list[tuple[bytes, bytes]], list[bytes], list[dict]]:
+        receive_messages: list[Message] | None = None,
+    ) -> tuple[int | None, list[tuple[bytes, bytes]], list[bytes], list[Message]]:
         if scope is None:
             scope = {
                 "type": "http",
@@ -47,8 +47,8 @@ class RawASGIHarness:
                 "server": ("127.0.0.1", 80),
             }
 
-        sent_messages: list[dict] = []
-        recv_queue: asyncio.Queue[dict] = asyncio.Queue()
+        sent_messages: list[Message] = []
+        recv_queue: asyncio.Queue[Message] = asyncio.Queue()
         if receive_messages:
             for m in receive_messages:
                 recv_queue.put_nowait(m)
