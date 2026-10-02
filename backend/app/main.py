@@ -1001,8 +1001,8 @@ app.add_middleware(DDoSProtectionMiddleware)
 # Enforces tenant boundary isolation at the HTTP middleware layer:
 # Prevents a bank user from accessing another bank's data simply by tampering
 # with bank_id parameters in the URL, query string, or request context.
-class TenantAccessControlMiddleware(BaseHTTPMiddleware):
-    """Enforces multi-tenant broken access control (BOLA/IDOR) prevention across all routes."""
+class TenantAccessControlMiddleware:
+    """Enforces multi-tenant broken access control (BOLA/IDOR) prevention across all routes (Pure ASGI)."""
 
     _EXEMPT_PREFIXES = (
         "/docs",
@@ -1016,9 +1016,19 @@ class TenantAccessControlMiddleware(BaseHTTPMiddleware):
         "/api/v1/onboarding",
     )
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive=receive)
+
         if any(request.url.path.startswith(p) for p in self._EXEMPT_PREFIXES):
-            return await call_next(request)
+            await self.app(scope, receive, send)
+            return
 
         # 1. Extract caller tenant identity and roles from OIDC JWT, X-Tenant-ID, X-Bank-ID, or X-API-Key
         caller_tenant: str | None = None
@@ -1072,7 +1082,7 @@ class TenantAccessControlMiddleware(BaseHTTPMiddleware):
                         target_bank,
                         request.url.path,
                     )
-                    return JSONResponse(
+                    response = JSONResponse(
                         status_code=403,
                         content={
                             "type": "https://cfi-platform.org/errors/TenantAccessDenied",
@@ -1083,8 +1093,10 @@ class TenantAccessControlMiddleware(BaseHTTPMiddleware):
                         },
                         media_type="application/problem+json",
                     )
+                    await response(scope, receive, send)
+                    return
 
-        return await call_next(request)
+        await self.app(scope, receive, send)
 
 
 app.add_middleware(TenantAccessControlMiddleware)

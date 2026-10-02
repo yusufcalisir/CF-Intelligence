@@ -13,7 +13,7 @@ This matrix maps platform privacy, authentication, zero-trust cryptographic prot
 | **`SOC2-CC6.1.2`** | SOC 2 Type II | Short-lived JWTs (15 min) with single-use refresh token rotation | `EnterpriseAuthService` (`auth_service.py`), `auth.py` | `test_auth_security.py`<br/>`test_auth_routes.py` | `PASS` |
 | **`SOC2-CC6.1.3`** | SOC 2 Type II | Brute-force account & IP lockout (5 failed attempts -> 15 min lock) | `EnterpriseAuthService` (`auth_service.py`), `auth.py` | `test_auth_security.py`<br/>`test_auth_routes.py` | `PASS` |
 | **`SOC2-CC6.1.4`** | SOC 2 Type II | Strict CORS whitelist (zero wildcard `*`) & HTTP security headers | `SecurityHeadersMiddleware`, `config.py` | `test_security_headers.py` | `PASS` |
-| **`SOC2-CC6.2`** | SOC 2 Type II | Multi-Tenant BOLA Isolation & OIDC Scoped Tenant Access | `TenantAccessControlMiddleware` (`main.py`) | `test_tenant_isolation.py` | `PASS` |
+| **`SOC2-CC6.2`** | SOC 2 Type II | Multi-Tenant BOLA Isolation & OIDC Scoped Tenant Access | `TenantAccessControlMiddleware` (`main.py`) | `test_tenant_isolation.py`<br/>`test_tenant_access_control_middleware.py` | `PASS` |
 | **`SOC2-CC6.3`** | SOC 2 Type II | Attribute-Based Access Control (ABAC) with granular tenant rules | `ABACPolicyEngine` (`abac_engine.py`) | `test_enterprise_security_suite.py` | `PASS` |
 | **`SOC2-CC6.6`** | SOC 2 Type II | TLS 1.3 in transit & AES-256-GCM envelope encryption at rest | `TenantKMSEngine`, `VaultClient` | `test_tenant_kms_metering.py` | `PASS` |
 | **`SOC2-CC6.7.1`** | SOC 2 Type II | Production error sanitization (RFC 7807, zero stack trace leakage) | `ProductionErrorHandler` (`error_handler.py`) | `test_error_sanitization.py` | `PASS` |
