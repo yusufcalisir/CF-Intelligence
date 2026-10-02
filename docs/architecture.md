@@ -109,7 +109,7 @@ Contains concrete implementations of adapters, persistence engines, cryptographi
 ### 2.4 Presentation Layer ([`backend/app/presentation/`](../backend/app/presentation))
 Interactions with clients, compliance officers, investigators, and consortium banking nodes.
 
-* [`main.py`](../backend/app/main.py): Houses global `TenantAccessControlMiddleware` (pure ASGI BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware` (pure ASGI sliding-window rate limiter), `SecurityHeadersMiddleware`, `ProductionErrorHandler`, and the dark-themed `@scalar/api-reference` gateway at `GET /scalar`.
+* [`main.py`](../backend/app/main.py): Houses global `TenantAccessControlMiddleware` (pure ASGI BOLA/IDOR query parameter tampering interception), `DDoSProtectionMiddleware` (pure ASGI sliding-window rate limiter), `SecurityHeadersMiddleware` (pure ASGI defensive HTTP response headers, active custom BaseHTTP depth = 0), `ProductionErrorHandler`, and the dark-themed `@scalar/api-reference` gateway at `GET /scalar`.
 * **44 Modular REST Routers** in [`routers/`](../backend/app/presentation/routers): Verifies request formats via Pydantic schemas, enforcing `@limiter.limit(...)`, `enforce_tenant_isolation(...)`, and specialized RegTech engines (`regulatory_dossier.py`, `financial_messages.py`, `bridge_messaging.py`, `payment_recall.py`, `screening.py`, `regulatory.py`, `onboarding.py`, `cases.py`, `alerts.py`, `banks.py`, `gateway.py`, `predict.py`, `diagnostics.py`, `open_aml_adapter.py`, `ubo_graph.py`, `european_scenarios.py`, `asset_recovery.py`, `core_banking_gateway.py`, etc.).
 * **WebSockets**: [`websockets/streaming_ws.py`](../backend/app/presentation/websockets/streaming_ws.py) & [`training_ws.py`](../backend/app/presentation/websockets/training_ws.py): Persistent WebSocket channels broadcasting real-time high-risk fraud alerts (`/ws/telemetry`), telemetry ticks, and live federated training weight updates.
 * **Unified Web UI Frontend Architecture** ([`frontend/`](../frontend)): React 19, TypeScript, Vite, TanStack Query, Tailwind CSS, Lucide icons, and Framer Motion delivering 12 integrated enterprise views:
@@ -612,7 +612,7 @@ Enterprise federated SSO and consortium bearer tokens are validated through [`OI
 - **Dynamic Key Management**: Automatically resolves symmetric signing secret from application configuration (`settings.oidc_jwt_signing_secret`), ensuring synchronization with the security gateway and auth routers.
 
 ### 15.3 Application Perimeter Defense, WAF Guard & Defensive Security Headers
-Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGuard`](../backend/app/infrastructure/security/perimeter_waf.py) and [`SecurityHeadersMiddleware`](../backend/app/infrastructure/security/security_headers.py):
+Ingress traffic to the FastAPI application layer is guarded by [`PerimeterWAFGuard`](../backend/app/infrastructure/security/perimeter_waf.py) and [`SecurityHeadersMiddleware`](../backend/app/infrastructure/security/security_headers.py) (pure ASGI):
 - **Deep OWASP Top 10 Header & Body Inspection**: Every request URL path, body payload, and all HTTP request headers (including `User-Agent`, `Referer`, and custom `X-*` headers) are systematically inspected for:
   - **SQL Injection (SQLi)**: Regex patterns (`UNION SELECT`, `DROP TABLE`, `OR 1=1`, inline comment sequences).
   - **Cross-Site Scripting (XSS)**: `<script>` tags, `javascript:` pseudoprotocols, and DOM event handlers (`onload=`).

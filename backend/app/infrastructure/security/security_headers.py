@@ -16,15 +16,8 @@ FastAPI / Starlette variant — wraps every response via BaseHTTPMiddleware.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-from starlette.middleware.base import BaseHTTPMiddleware
-
-if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable
-
-    from starlette.requests import Request
-    from starlette.responses import Response
+from starlette.datastructures import MutableHeaders
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 # ---------------------------------------------------------------------------
 # Content-Security-Policy directive values
@@ -84,20 +77,22 @@ _SECURITY_HEADERS: dict[str, str] = {
 }
 
 
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    """Starlette/FastAPI middleware that appends security headers to every response.
+class SecurityHeadersMiddleware:
+    """Starlette/FastAPI pure ASGI middleware that appends security headers to every response.
 
     Existing headers set by individual routes are preserved; docs routes (/docs,
     /redoc, /scalar) receive tailored CSP headers allowing Swagger and Scalar CDN assets.
     """
 
-    async def dispatch(
-        self,
-        request: Request,
-        call_next: Callable[[Request], Awaitable[Response]],
-    ) -> Response:
-        response: Response = await call_next(request)
-        path = request.url.path
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
         is_docs_route = path in ("/openapi.json", "/favicon.ico", "/favicon.svg") or any(
             path.startswith(p) for p in ("/docs", "/redoc", "/scalar", "/logo")
         )
@@ -106,9 +101,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         if is_docs_route:
             headers_to_apply["Content-Security-Policy"] = _DOCS_CSP_DIRECTIVES
 
-        for header, value in headers_to_apply.items():
-            if header not in response.headers or (is_docs_route and header == "Content-Security-Policy"):
-                response.headers[header] = value
-        return response
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                for header, value in headers_to_apply.items():
+                    if header not in headers or (is_docs_route and header == "Content-Security-Policy"):
+                        headers[header] = value
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
 
 

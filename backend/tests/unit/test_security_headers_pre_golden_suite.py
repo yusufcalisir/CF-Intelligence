@@ -283,7 +283,7 @@ async def test_pre_golden_streaming_progressive():
 
 @pytest.mark.asyncio
 async def test_pre_golden_contextvar_isolation():
-    """Vector V72: Upstream->downstream visible, downstream->upstream isolated under BaseHTTP."""
+    """Vector V72: Upstream->downstream visible, downstream->upstream reflected under pure ASGI."""
     downstream_saw = None
 
     async def cvar_app(scope: Scope, receive: Receive, send: Send):
@@ -299,7 +299,9 @@ async def test_pre_golden_contextvar_isolation():
     await harness.request()
     cvar_after = test_cvar.get()
     assert downstream_saw == "set_upstream"
-    assert cvar_after == "set_upstream"  # Isolated because BaseHTTP runs in separate asyncio task
+    # BaseHTTP downstream-to-upstream ContextVar isolation is removed by pure-ASGI execution.
+    # No production dependency on that isolation was identified.
+    assert cvar_after == "mutated_downstream"
 
 
 @pytest.mark.asyncio
