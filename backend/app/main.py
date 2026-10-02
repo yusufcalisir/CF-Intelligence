@@ -27,12 +27,11 @@ os.environ["TQDM_DISABLE"] = "1"
 print(">>> Python main.py loaded successfully! <<<", flush=True)
 
 from contextlib import asynccontextmanager
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, Response
-from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.config import get_settings
@@ -909,9 +908,9 @@ app.add_middleware(MTLSVerificationMiddleware)
 
 # ── Application-Layer DDoS & Volumetric Flood Protection Middleware ──────────
 # Implements sliding-window token bucket rate limiting for burst attack detection
-# and volumetric request flood prevention at the L7 application layer.
-class DDoSProtectionMiddleware(BaseHTTPMiddleware):
-    """Enforce sliding-window L7 volumetric flood protection per client IP with bounded memory pruning and hard ceiling eviction."""
+# and volumetric request flood prevention at the L7 application layer (Pure ASGI).
+class DDoSProtectionMiddleware:
+    """Enforce sliding-window L7 volumetric flood protection per client IP with bounded memory pruning and hard ceiling eviction (Pure ASGI)."""
 
     _WINDOW_SECONDS = 10.0
     _MAX_REQUESTS_PER_WINDOW = 100
@@ -920,21 +919,16 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
     _requests: dict[str, list[float]] = {}
     _lock = Lock()
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        # Extract real client IP considering trusted reverse proxy headers (Vercel, Cloudflare, AWS ALB)
-        forwarded = request.headers.get("x-forwarded-for")
-        client_ip = (
-            request.headers.get("cf-connecting-ip")
-            or request.headers.get("x-real-ip")
-            or (forwarded.split(",")[0].strip() if forwarded else None)
-            or (request.client.host if request.client else "unknown")
-        )
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
 
-        # Bypass throttling in test environments only for standard testclient/loopback
-        # to prevent cross-test 429 accumulation while allowing real burst testing on explicit IPs.
-        import os
-        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
-            return await call_next(request)
+    def _evaluate_rate_limit(
+        self, client_ip: str, request_path: str
+    ) -> tuple[bool, JSONResponse | None, int]:
+        """Evaluate sliding-window rate limit for client IP under class lock.
+
+        Returns (is_throttled, throttled_response_or_none, remaining_requests).
+        """
         now = time.time()
         cutoff = now - self._WINDOW_SECONDS
 
@@ -967,14 +961,14 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
                     len(history),
                     self._WINDOW_SECONDS,
                 )
-                return JSONResponse(
+                throttled_resp = JSONResponse(
                     status_code=429,
                     content={
                         "type": "https://cfi-platform.org/errors/DDoSThrottled",
                         "title": "Volumetric Flood Throttling Triggered",
                         "status": 429,
                         "detail": f"Request burst limit exceeded ({self._MAX_REQUESTS_PER_WINDOW} reqs/{int(self._WINDOW_SECONDS)}s). Temporarily throttled.",
-                        "instance": request.url.path,
+                        "instance": request_path,
                     },
                     headers={
                         "Retry-After": str(int(self._WINDOW_SECONDS)),
@@ -985,12 +979,79 @@ class DDoSProtectionMiddleware(BaseHTTPMiddleware):
                     },
                     media_type="application/problem+json",
                 )
+                return True, throttled_resp, 0
+
             history.append(now)
             self._requests[client_ip] = history
+            remaining = max(0, self._MAX_REQUESTS_PER_WINDOW - len(history))
+            return False, None, remaining
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request = Request(scope, receive=receive)
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = (
+            request.headers.get("cf-connecting-ip")
+            or request.headers.get("x-real-ip")
+            or (forwarded.split(",")[0].strip() if forwarded else None)
+            or (request.client.host if request.client else "unknown")
+        )
+
+        # Bypass throttling in test environments only for standard testclient/loopback
+        # to prevent cross-test 429 accumulation while allowing real burst testing on explicit IPs.
+        import os
+        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
+            await self.app(scope, receive, send)
+            return
+
+        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(client_ip, request.url.path)
+        if is_throttled and throttled_resp is not None:
+            await throttled_resp(scope, receive, send)
+            return
+
+        limit_str = str(self._MAX_REQUESTS_PER_WINDOW)
+        remaining_str = str(remaining)
+
+        async def send_wrapper(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                raw_headers = list(message.get("headers", []))
+                # Overwrite existing rate-limit headers case-insensitively
+                filtered_headers = [
+                    (k, v)
+                    for k, v in raw_headers
+                    if k.lower() not in (b"x-ratelimit-limit", b"x-ratelimit-remaining")
+                ]
+                filtered_headers.append((b"x-ratelimit-limit", limit_str.encode("latin-1")))
+                filtered_headers.append((b"x-ratelimit-remaining", remaining_str.encode("latin-1")))
+                message = {**message, "headers": filtered_headers}
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+    async def dispatch(self, request: Request, call_next: Any) -> Response:
+        """Backward-compatibility dispatch interface for existing unit test suites."""
+        forwarded = request.headers.get("x-forwarded-for")
+        client_ip = (
+            request.headers.get("cf-connecting-ip")
+            or request.headers.get("x-real-ip")
+            or (forwarded.split(",")[0].strip() if forwarded else None)
+            or (request.client.host if request.client else "unknown")
+        )
+
+        import os
+        if os.environ.get("TESTING") == "1" and client_ip in ("testclient", "127.0.0.1", "unknown", "localhost"):
+            return await call_next(request)
+
+        is_throttled, throttled_resp, remaining = self._evaluate_rate_limit(client_ip, request.url.path)
+        if is_throttled and throttled_resp is not None:
+            return throttled_resp
 
         response = await call_next(request)
         response.headers["X-RateLimit-Limit"] = str(self._MAX_REQUESTS_PER_WINDOW)
-        response.headers["X-RateLimit-Remaining"] = str(max(0, self._MAX_REQUESTS_PER_WINDOW - len(history)))
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
         return response
 
 
