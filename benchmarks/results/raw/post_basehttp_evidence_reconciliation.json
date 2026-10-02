@@ -42,7 +42,17 @@
       "p95_ms": 569.81,
       "p99_ms": 584.76
     },
-    "delta": {
+    "delta_vs_pooled_canonical": {
+      "rps_delta": -191.83,
+      "rps_delta_pct": -36.83,
+      "p50_delta_ms": 89.43,
+      "p50_delta_pct": 50.10,
+      "p95_delta_ms": 303.43,
+      "p95_delta_pct": 113.91,
+      "p99_delta_ms": 295.34,
+      "p99_delta_pct": 102.04
+    },
+    "delta_vs_single_run_canonical": {
       "rps_delta": -191.83,
       "rps_delta_pct": -36.83,
       "p50_delta_ms": 87.48,
@@ -254,7 +264,7 @@
     "rationale": "High-concurrency latency has been reproducibly demonstrated and localized to concurrency-sensitive request-lifecycle/scheduling intervals rather than algorithmic model compute. The dominant measured region is pre-route server time, with additional coroutine-resume and pre-ASGI client/transport delay. Exact causal subdivision of those broad intervals is not fully isolated, but this residual uncertainty does not prevent closure of the original research question."
   },
   "intervention_readiness": {
-    "status": "F. CURRENT PERFORMANCE EXPLAINED WITHOUT NEED FOR FURTHER OPTIMIZATION",
+    "status": "F. CURRENT PERFORMANCE SUFFICIENTLY CHARACTERIZED FOR RESEARCH-BACKLOG CLOSURE WITHOUT NEED FOR FURTHER OPTIMIZATION",
     "authorization": "ZERO PRODUCTION OPTIMIZATIONS ARE AUTHORIZED"
   }
 }
