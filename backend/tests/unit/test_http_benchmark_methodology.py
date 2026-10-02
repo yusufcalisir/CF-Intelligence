@@ -225,8 +225,12 @@ def test_claim_registry_resolves_http_service_claims_to_b1_artifact() -> None:
     tp_claim = claims["CLM-HTTP-SERVICE-THROUGHPUT"]
     lat_claim = claims["CLM-HTTP-SERVICE-LATENCY-P50"]
 
-    assert tp_claim["raw_artifact"] == "benchmarks/results/raw/latency_http_service_benchmark.json"
-    assert lat_claim["raw_artifact"] == "benchmarks/results/raw/latency_http_service_benchmark.json"
+    valid_b1_artifacts = {
+        "benchmarks/results/raw/latency_http_service_benchmark.json",
+        "benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json",
+    }
+    assert tp_claim["raw_artifact"] in valid_b1_artifacts
+    assert lat_claim["raw_artifact"] in valid_b1_artifacts
 
 
 # ── Invariant 14: B1 and B2 are explicitly distinguished ─────────────────────

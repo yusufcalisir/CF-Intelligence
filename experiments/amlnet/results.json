@@ -1,5 +1,7 @@
 {
   "schema_version": "1.0.0",
+  "benchmark_id": "amlnet_synthetic",
+  "status": "EXPERIMENTAL",
   "experiment_id": "amlnet_fl_1790521210",
   "config": {
     "experiment_id": "amlnet_fl_1790521210",
@@ -51,20 +53,29 @@
   },
   "dataset": {
     "dataset_name": "Australian AUSTRAC AMLNet Synthetic AML Extreme Imbalance Benchmark",
-    "source_uri": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\amlnet",
-    "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dataset_type": "PROJECT_SYNTHETIC",
+    "source_uri": "backend/storage/datasets/amlnet/transactions.parquet",
+    "generator_path": "scripts/generate_amlnet_dataset.py",
+    "generator_seed": 42,
+    "generator_parameters": {
+      "n_transactions": 25000,
+      "laundering_ratio": 0.0014
+    },
+    "generated_artifact_sha256": "40a22904a3f754acf58faa8fea25003bc8184f417456774d0ca17354e96593df",
+    "sha256_hash": "40a22904a3f754acf58faa8fea25003bc8184f417456774d0ca17354e96593df",
     "total_samples": 25000,
     "num_features": 18,
     "fraud_samples": 35,
-    "fraud_rate": 0.0015,
+    "fraud_rate": 0.0014,
     "split_ratios": {
       "train": 0.8,
       "test": 0.2
-    }
+    },
+    "synthetic_separability_note": "Target rule separability: structuring amounts in [8500, 9950] AUD directly exposed by near_thresh feature. Trivial 1.0 PR-AUC is a synthetic generator property."
   },
   "git_commit": "7f52489c8567f2caf7078c564315054f0a656c06",
   "git_branch": "main",
-  "status": "COMPLETED",
+  "execution_status": "COMPLETED",
   "start_time_utc": "2026-09-27T14:59:33.696247+00:00",
   "end_time_utc": "2026-09-27T15:00:10.425718+00:00",
   "total_duration_seconds": 36.7,

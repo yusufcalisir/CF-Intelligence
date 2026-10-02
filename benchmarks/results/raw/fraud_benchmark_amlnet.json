@@ -1,6 +1,11 @@
 {
+  "benchmark_id": "fraud_benchmark_amlnet",
+  "status": "HISTORICAL",
+  "is_canonical": false,
+  "superseded_by": "experiments/amlnet/results.json",
+  "supersession_reason": "Quarantined legacy smoke run; canonical benchmark points to experiments/amlnet/results.json.",
   "dataset": "Australian AUSTRAC AMLNet Synthetic AML Extreme Imbalance Benchmark",
-  "timestamp_utc": "2026-09-29T19:18:09.865000+00:00",
+  "timestamp_utc": "2026-10-02T18:52:02.757403+00:00",
   "total_transactions": 500,
   "train_transactions": 400,
   "test_transactions": 100,

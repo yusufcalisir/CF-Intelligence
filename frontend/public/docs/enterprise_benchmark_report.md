@@ -128,8 +128,8 @@ Evaluated across $150{,}000$ training transactions and an untouched global conso
 | **Centralized Deep MLP (Neural)** | `THEORETICAL_UPPER_BOUND` | **0.8520** | **0.9780** | **64.10%** | **0.0145** | `0.260 ms` | ❌ **Illegal Data Pooling** (GDPR/KVKK Violation) |
 | **Federated Champion (FedAvg/FedProx)** | `PRODUCTION_CHAMPION` | **0.8420** | **0.9750** | **62.40%** | **0.0158** | `0.260 ms` | ✅ **100% Compliant** (Zero Raw PII, DP $\epsilon=1.0$) |
 | **Isolated Local Silos (3-Bank Mean)** | `ISOLATED_SILO` | **0.6940** | **0.8820** | **43.20%** | **0.0380** | `0.040 ms` | ⚠️ **Legally Passive** (Blind to Cross-Bank Mules) |
-| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | **0.8120** | **0.9540** | **57.80%** | **0.0190** | `0.080 ms` | ❌ **Requires Pooled Features** |
-| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | **0.6540** | **0.8520** | **38.50%** | **0.0450** | `0.010 ms` | ❌ **Linear Boundary Blindness** |
+| **Classical Random Forest (Pooled)** | `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
+| **Classical Logistic Regression (Pooled)**| `CLASSICAL_BASELINE` | `NOT_EVALUATED` | `—` | `—` | `—` | `—` | ⚠️ **Not Evaluated on Partition** |
 
 ### 3.3 Key Empirical Findings
 
@@ -1972,18 +1972,18 @@ The CF-Intelligence Master Benchmark Matrix strictly enforces:
 
 | Dataset | Domain & Scale | Model / Paradigm | Clients & Rounds | PR-AUC | ROC-AUC | F1-Score | Precision | Recall | Recall @ 0.1% FPR | Status |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
-| **PaySim Mobile Money Fraud**<br>*6.36M transactions (Blekinge Institute)* | Centralized Pooled Oracle | Centralized Neural Classifier | 1 silo (Pooled) | 0.4654 | — | — | — | — | 0.4000 | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg) | 3 clients / 10 rnds | **0.1184** | **0.8700** | 0.0000 | 0.0000 | 0.0000 | **0.3333** | `FEDERATED [OK]` |
+| **PaySim Mobile Money Fraud**<br>*6.36M transactions (Blekinge Institute)* | Centralized Pooled Oracle | Centralized Neural Classifier (30 ep) | 1 silo (Pooled) | 0.9545 | 0.9994 | — | — | — | 0.9877 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | PaySimNeuralClassifier (FedAvg) | 3 clients / 10 rnds | **0.9545** | **0.9994** | — | — | — | **0.9816** | `FEDERATED [OK]` |
 | | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **IEEE-CIS Fraud Detection**<br>*590k transactions (Vesta Corp)* | Centralized Pooled Oracle | Centralized Neural Classifier | 1 silo (Pooled) | 0.7811 | — | — | — | — | 0.3692 | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.7554** | — | — | — | — | **0.4308** | `FEDERATED [OK]` |
-| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx mu=0.01) | 3 clients / 5 rnds | 0.0691 | 0.6632 | 0.0000 | 0.0000 | 0.0000 | 0.0000 | `FEDPROX [OK]` |
+| **IEEE-CIS Fraud Detection**<br>*590,540 transactions (Vesta Corp)* | Centralized Pooled Oracle | Centralized Neural Classifier (10 ep) | 1 silo (Pooled) | 0.4422 | 0.8536 | — | — | — | 0.2004 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | IEEECISNeuralClassifier (FedAvg) | 3 clients / 5 rnds | **0.3895** | **0.8325** | — | — | — | **0.1976** | `FEDERATED [OK]` |
+| | Federated FedProx (Robust) | IEEECISNeuralClassifier (FedProx mu=0.01) | 3 clients / 5 rnds | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
-| **European Credit Card Fraud**<br>*284,807 transactions (ULB Machine Learning Group)* | Centralized Pooled Oracle | Centralized Logistic/MLP Baseline | 1 silo (Pooled) | 0.7920 | 0.9850 | — | — | — | — | `CENTRALIZED` |
-| | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg) | 3 clients / 5 rnds | **0.7750** | **0.9837** | 0.7882 | 0.7619 | 0.8163 | **0.8469** | `FEDERATED [OK]` |
+| **European Credit Card Fraud**<br>*284,807 transactions (ULB Machine Learning Group)* | Centralized Pooled Oracle | Centralized Equalized MLP (10 ep) | 1 silo (Pooled) | 0.8219 | 0.9803 | — | — | — | 0.8653 | `CENTRALIZED [OK]` |
+| | **Federated FedAvg (Collaborative)** | CreditCardImbalanceMLP (FedAvg) | 3 clients / 5 rnds | **0.8248** | **0.9841** | — | — | — | **0.8653** | `FEDERATED [OK]` |
 | | Federated FedProx (Robust) | FedProx ($\mu=0.01$) | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Isolated Silos (No Sharing) | Local Independent Models | — | — | — | — | — | — | — | `N/A (NOT RUN)` |
 | | Classical Baselines | Random Forest / LogReg | Non-Neural | — | — | — | — | — | — | `N/A (NOT RUN)` |
@@ -2018,10 +2018,11 @@ The CF-Intelligence Master Benchmark Matrix strictly enforces:
 ### 29.4 Comparative Empirical Insights & Mathematical Takeaways
 
 1. **Parity with Centralized Upper Bounds**:
-   Across non-graph financial transactions, Federated FedAvg achieves near-identical performance to the theoretical centralized pooled baseline:
-   - **CreditCard**: Federated $\text{PR-AUC} = 0.7750$ vs Centralized $0.7920$ (97.85% empirical parity).
+   Across non-graph financial transactions, Federated FedAvg achieves near-identical performance to the theoretical centralized pooled baseline under controlled budget equalization:
+   - **PaySim**: Federated $\text{PR-AUC} = 0.9545$ vs Centralized $0.9545$ (100.0% empirical parity within seed variance).
+   - **CreditCard**: Federated $\text{PR-AUC} = 0.8248$ vs Centralized $0.8219$ (similar observed mean performance under equalized 10-pass budget, observed mean difference $+0.0029$; Bank C rescued from $0.5428$ to $0.8248$).
    - **SynthAML**: Federated $\text{PR-AUC} = 0.9985$ vs Centralized $0.9995$ (99.90% empirical parity).
-   - **IEEE-CIS**: Federated $\text{PR-AUC} = 0.7554$ vs Centralized $0.7811$ (96.72% empirical parity).
+   - **IEEE-CIS (Controlled Federation Gap)**: Physical Kaggle IEEE-CIS ($N=590{,}540$ txns, 421 numeric features) executed across 3 seeds on strict 80/20 chronological holdout under Dirichlet $\alpha=0.5$ simulated client skew. Centralized PR-AUC is $0.4422 \pm 0.0034$ (ROC-AUC $0.8536$) and FedAvg PR-AUC is $0.3895 \pm 0.0124$ (ROC-AUC $0.8325$, Recall@0.1%FPR $19.76\% \pm 1.41\%$, paired difference $\Delta = -0.0527 \pm 0.0090$). FedAvg retained ~88.1% of global Average Precision and ~98.6% of centralized recall at the 0.1% FPR diagnostic operating point (~114 approx FP, ~803 approx TP). Performance reflects chronological out-of-time evaluation; temporal distribution shift is a plausible contributor, but the experiment did not isolate its causal effect. Transaction data are real competition data; bank federation is simulated. Earlier synthetic smoke metrics ($0.7811 / 0.7554$) are archived as non-comparable.
 2. **Defeating the Information-Theoretic Silo Horizon**:
    In multi-bank financial laundering topology, isolated bank silos lack visibility into upstream layering hops:
    - On **SynthAML**, the worst isolated bank silo achieves only $\text{PR-AUC} = 0.2214$, whereas Collaborative Federated Learning lifts detection to $\text{PR-AUC} = 0.9985$ ($\Delta = +0.7771$).

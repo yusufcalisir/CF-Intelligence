@@ -819,7 +819,7 @@ def run_ieee_benchmark(
     fedprox_mu: float = 0.01,
     test_ratio: float = 0.20,
     seed: int = 42,
-    require_real: bool = False,
+    require_real: bool = True,
     output_dir: Path | str | None = None,
 ) -> dict[str, Any]:
     """Execute end-to-end IEEE-CIS federated benchmark and serialize all outputs."""
@@ -964,8 +964,12 @@ def run_ieee_benchmark(
         output_path=dossier_path,
     )
 
-    # 7. Serialize raw benchmark JSON for out_dir / fraud_benchmark_ieee_cis.json
-    raw_benchmark_path = out_dir / "fraud_benchmark_ieee_cis.json"
+    # 7. Serialize raw benchmark JSON
+    is_synthetic = (not require_real) or (partitioner.raw_data and partitioner.raw_data.get("source") in ("mock", "mock_synthetic", "synthetic"))
+    if is_synthetic:
+        raw_benchmark_path = out_dir / "fraud_benchmark_ieee_cis_synthetic_smoke.json"
+    else:
+        raw_benchmark_path = out_dir / "fraud_benchmark_ieee_cis.json"
 
     comp_pooled = comparative_results.get("individual_pooled_models", {}).get("pooled_gradient_boosting", {})
     m_fedavg = optimizer_results["fedavg"]["final_metrics"]
@@ -978,6 +982,9 @@ def run_ieee_benchmark(
     raw_benchmark_data = {
         "timestamp_utc": datetime.now(UTC).isoformat(),
         "dataset": "ieee_cis",
+        "dataset_type": "PROJECT_SYNTHETIC" if is_synthetic else "REAL_DATA",
+        "status": "SMOKE_TEST" if is_synthetic else "CANONICAL",
+        "is_canonical": not is_synthetic,
         "environment": {
             "os": f"{platform.system()}-{platform.release()}-{platform.version()}",
             "cpu": platform.processor() or "AMD64",
@@ -1012,9 +1019,13 @@ def run_ieee_benchmark(
             "pr_auc_parity_ratio": (fedprox_pr_auc / pooled_pr_auc) if pooled_pr_auc > 0 else 0.0,
         },
     }
+    if is_synthetic:
+        raw_benchmark_data["mandatory_caveat"] = (
+            "Generated via synthetic mock generator. Does NOT represent canonical real IEEE-CIS evaluation."
+        )
     with open(raw_benchmark_path, "w", encoding="utf-8") as f:
         json.dump(raw_benchmark_data, f, indent=2)
-    logger.info("[Raw Benchmark JSON] Written to %s", raw_benchmark_path)
+    logger.info("[Raw Benchmark JSON] Written to %s (status=%s)", raw_benchmark_path, raw_benchmark_data["status"])
 
     return {
         "partitioner": partitioner,
@@ -1044,9 +1055,17 @@ if __name__ == "__main__":
     parser.add_argument("--num-clients", type=int, default=3, help="Number of bank clients")
     parser.add_argument("--fedprox-mu", type=float, default=0.01, help="FedProx proximal parameter mu")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--require-real", action="store_true", help="Require real physical dataset files")
+    parser.add_argument(
+        "--dataset-mode",
+        type=str,
+        default="real",
+        choices=["real", "synthetic"],
+        help="'real': requires physical IEEE-CIS files (default). 'synthetic': controlled smoke test.",
+    )
+    parser.add_argument("--require-real", action="store_true", default=None, help="Legacy flag for requiring real dataset files")
 
     args = parser.parse_args()
+    require_real = True if args.require_real is True else (args.dataset_mode == "real")
     run_ieee_benchmark(
         nrows=args.nrows,
         rounds=args.rounds,
@@ -1057,5 +1076,5 @@ if __name__ == "__main__":
         num_clients=args.num_clients,
         fedprox_mu=args.fedprox_mu,
         seed=args.seed,
-        require_real=args.require_real,
+        require_real=require_real,
     )

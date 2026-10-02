@@ -118,6 +118,8 @@ class TestRealDatasetLoading:
         assert len(data["y"]) == len(data["X"])
         assert set(np.unique(data["y"])).issubset({0, 1})
         assert not np.isnan(data["X"]).any(), "Feature matrix contains NaN values"
+        assert "TransactionDT" not in data["feature_names"], "TransactionDT must not leak into feature_names"
+        assert data["transaction_dt"] is not None, "TransactionDT must be retained separately as split axis"
 
     def test_load_creditcard_real_dataset_integrity(self, tmp_path: Path) -> None:
         p = _get_or_create_real_path("creditcard", tmp_path)

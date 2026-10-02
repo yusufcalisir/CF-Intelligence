@@ -1,0 +1,872 @@
+{
+  "schema_version": "2.2.0",
+  "benchmark_id": "ieee_cis_canonical",
+  "status": "CANONICAL",
+  "generated_at_utc": "2026-10-02T17:56:51.185478+00:00",
+  "git_commit": "5c16fb8c1ea76255238c7400325cf28ec6c3e293",
+  "dataset": {
+    "name": "IEEE-CIS Fraud Detection",
+    "dataset_type": "real",
+    "provenance_type": "REAL_DATA",
+    "evidence_scope": "REAL_WORLD_BENCHMARK",
+    "communication_eligibility": "SAFE_WITH_CAVEAT",
+    "transaction_csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\ieee_cis\\train_transaction.csv",
+    "identity_csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\ieee_cis\\train_identity.csv",
+    "transaction_sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+    "identity_sha256": "b63c725d8377be90a995268d97f347c17d456b95db45807adcf9f59cd603c37c",
+    "sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+    "total_transactions": 590540,
+    "total_fraud": 20663,
+    "fraud_prevalence": 0.03499,
+    "feature_dim": 421,
+    "feature_names_digest": "f5fc79dd66d1a0e573e84e7cec8248b8b53ce504365024ae3d41ad591ca2c04e"
+  },
+  "split": {
+    "strategy": "strict_chronological_temporal_split",
+    "time_axis": "TransactionDT",
+    "test_ratio": 0.2,
+    "train_samples": 472432,
+    "test_samples": 118108,
+    "train_fraud_count": 16599,
+    "test_fraud_count": 4064,
+    "train_prevalence": 0.035135,
+    "test_prevalence": 0.034409,
+    "train_dt_range": [
+      86400.0,
+      12192842.0
+    ],
+    "test_dt_range": [
+      12192900.0,
+      15811131.0
+    ],
+    "temporal_cutoff_dt": 12192842.0,
+    "temporal_leakage_prevented": true,
+    "transaction_dt_excluded_from_x": true
+  },
+  "preprocessing": {
+    "strategy": "train_only_standard_scaling",
+    "imputation": "zero_filled_numeric",
+    "categorical_encoding": "one_hot_low_cardinality_and_binary_flags",
+    "standardizer_fit_scope": "train_partition_only",
+    "zero_test_lookahead": true
+  },
+  "partition": {
+    "algorithm": "dirichlet",
+    "alpha": 0.5,
+    "n_clients": 3,
+    "client_names": [
+      "bank_a",
+      "bank_b",
+      "bank_c"
+    ],
+    "client_diagnostics_by_seed": {
+      "42": {
+        "bank_a": {
+          "n_samples": 3453,
+          "fraud_count": 2358,
+          "fraud_prevalence": 0.6828844483058211,
+          "pct_global_train": 0.7308988383513394
+        },
+        "bank_b": {
+          "n_samples": 435597,
+          "fraud_count": 325,
+          "fraud_prevalence": 0.0007461024754532286,
+          "pct_global_train": 92.20311071222949
+        },
+        "bank_c": {
+          "n_samples": 33382,
+          "fraud_count": 13916,
+          "fraud_prevalence": 0.4168713678030076,
+          "pct_global_train": 7.065990449419175
+        }
+      },
+      "123": {
+        "bank_a": {
+          "n_samples": 38484,
+          "fraud_count": 13628,
+          "fraud_prevalence": 0.35412119322315766,
+          "pct_global_train": 8.145934229688082
+        },
+        "bank_b": {
+          "n_samples": 2966,
+          "fraud_count": 184,
+          "fraud_prevalence": 0.06203641267700607,
+          "pct_global_train": 0.6278152199681647
+        },
+        "bank_c": {
+          "n_samples": 430982,
+          "fraud_count": 2787,
+          "fraud_prevalence": 0.006466627376549369,
+          "pct_global_train": 91.22625055034376
+        }
+      },
+      "456": {
+        "bank_a": {
+          "n_samples": 126096,
+          "fraud_count": 15269,
+          "fraud_prevalence": 0.12109028042126634,
+          "pct_global_train": 26.690825346293224
+        },
+        "bank_b": {
+          "n_samples": 311838,
+          "fraud_count": 1317,
+          "fraud_prevalence": 0.004223346737729205,
+          "pct_global_train": 66.00695973177092
+        },
+        "bank_c": {
+          "n_samples": 34498,
+          "fraud_count": 13,
+          "fraud_prevalence": 0.0003768334396196881,
+          "pct_global_train": 7.302214921935855
+        }
+      }
+    }
+  },
+  "budget": {
+    "equalized": true,
+    "num_rounds": 5,
+    "local_epochs": 2,
+    "centralized_epochs": 10,
+    "batch_size": 512,
+    "learning_rate": 0.001,
+    "optimizer": "Adam",
+    "loss_function": "BCEWithLogitsLoss",
+    "mean_centralized_steps": 9230,
+    "mean_federated_steps": 9243
+  },
+  "seeds": [
+    42,
+    123,
+    456
+  ],
+  "per_seed_results": [
+    {
+      "seed": 42,
+      "centralized": {
+        "pr_auc": 0.43943192631029965,
+        "roc_auc": 0.8542553992836583,
+        "brier_score": 0.024870146065950394,
+        "precision": 0.7139318885448916,
+        "recall": 0.28371062992125984,
+        "f1_score": 0.4060574044726184,
+        "recall_at_001_fpr": 0.07258858267716535,
+        "recall_at_005_fpr": 0.15723425196850394,
+        "recall_at_01_fpr": 0.20398622047244094,
+        "recall_at_05_fpr": 0.30093503937007876,
+        "recall_at_10_fpr": 0.3577755905511811,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.9951450228691101,
+            "recall": 0.07258858267716535,
+            "precision": 0.9640522875816994,
+            "tp": 295,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3769,
+            "alerts": 306,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.00048227000105222545,
+            "threshold": 0.9533554315567017,
+            "recall": 0.15723425196850394,
+            "precision": 0.920749279538905,
+            "tp": 639,
+            "fp": 55,
+            "tn": 113989,
+            "fn": 3425,
+            "alerts": 694,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009996141839991582,
+            "threshold": 0.8557584285736084,
+            "recall": 0.20398622047244094,
+            "precision": 0.8791092258748674,
+            "tp": 829,
+            "fp": 114,
+            "tn": 113930,
+            "fn": 3235,
+            "alerts": 943,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004989302374522114,
+            "threshold": 0.4314799904823303,
+            "recall": 0.30093503937007876,
+            "precision": 0.6824776785714286,
+            "tp": 1223,
+            "fp": 569,
+            "tn": 113475,
+            "fn": 2841,
+            "alerts": 1792,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009996141839991582,
+            "threshold": 0.2509888708591461,
+            "recall": 0.3577755905511811,
+            "precision": 0.5605242868157286,
+            "tp": 1454,
+            "fp": 1140,
+            "tn": 112904,
+            "fn": 2610,
+            "alerts": 2594,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "fedavg": {
+        "pr_auc": 0.38133074832544994,
+        "roc_auc": 0.8242431439899423,
+        "brier_score": 0.029901687055826187,
+        "precision": 0.9530864197530864,
+        "recall": 0.09498031496062992,
+        "f1_score": 0.17274558066681583,
+        "recall_at_001_fpr": 0.07775590551181102,
+        "recall_at_005_fpr": 0.1468996062992126,
+        "recall_at_01_fpr": 0.18503937007874016,
+        "recall_at_05_fpr": 0.27288385826771655,
+        "recall_at_10_fpr": 0.3107775590551181,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.5906794667243958,
+            "recall": 0.07775590551181102,
+            "precision": 0.9663608562691132,
+            "tp": 316,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3748,
+            "alerts": 327,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.0004998070919995791,
+            "threshold": 0.1849689930677414,
+            "recall": 0.1468996062992126,
+            "precision": 0.9128440366972477,
+            "tp": 597,
+            "fp": 57,
+            "tn": 113987,
+            "fn": 3467,
+            "alerts": 654,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009908456385254814,
+            "threshold": 0.08216371387243271,
+            "recall": 0.18503937007874016,
+            "precision": 0.869364161849711,
+            "tp": 752,
+            "fp": 113,
+            "tn": 113931,
+            "fn": 3312,
+            "alerts": 865,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004989302374522114,
+            "threshold": 0.01609676331281662,
+            "recall": 0.27288385826771655,
+            "precision": 0.6609058402860548,
+            "tp": 1109,
+            "fp": 569,
+            "tn": 113475,
+            "fn": 2955,
+            "alerts": 1678,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009969836203570552,
+            "threshold": 0.009008011780679226,
+            "recall": 0.3107775590551181,
+            "precision": 0.52625,
+            "tp": 1263,
+            "fp": 1137,
+            "tn": 112907,
+            "fn": 2801,
+            "alerts": 2400,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "delta_pr_auc": -0.058101,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9240,
+        "step_difference": 10,
+        "relative_difference_pct": 0.11,
+        "centralized_duration_seconds": 111.15,
+        "federated_duration_seconds": 100.93
+      }
+    },
+    {
+      "seed": 123,
+      "centralized": {
+        "pr_auc": 0.4460276707388889,
+        "roc_auc": 0.8575988344531755,
+        "brier_score": 0.024790480732917786,
+        "precision": 0.7134433962264151,
+        "recall": 0.29773622047244097,
+        "f1_score": 0.4201388888888889,
+        "recall_at_001_fpr": 0.0858759842519685,
+        "recall_at_005_fpr": 0.15206692913385828,
+        "recall_at_01_fpr": 0.19808070866141733,
+        "recall_at_05_fpr": 0.3080708661417323,
+        "recall_at_10_fpr": 0.36343503937007876,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.9914122819900513,
+            "recall": 0.0858759842519685,
+            "precision": 0.9694444444444444,
+            "tp": 349,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3715,
+            "alerts": 360,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.0004998070919995791,
+            "threshold": 0.9562839865684509,
+            "recall": 0.15206692913385828,
+            "precision": 0.9155555555555556,
+            "tp": 618,
+            "fp": 57,
+            "tn": 113987,
+            "fn": 3446,
+            "alerts": 675,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009996141839991582,
+            "threshold": 0.8939279317855835,
+            "recall": 0.19808070866141733,
+            "precision": 0.8759521218715995,
+            "tp": 805,
+            "fp": 114,
+            "tn": 113930,
+            "fn": 3259,
+            "alerts": 919,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004962996738101084,
+            "threshold": 0.45612844824790955,
+            "recall": 0.3080708661417323,
+            "precision": 0.6886688668866887,
+            "tp": 1252,
+            "fp": 566,
+            "tn": 113478,
+            "fn": 2812,
+            "alerts": 1818,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009996141839991582,
+            "threshold": 0.27916038036346436,
+            "recall": 0.36343503937007876,
+            "precision": 0.5643867023309133,
+            "tp": 1477,
+            "fp": 1140,
+            "tn": 112904,
+            "fn": 2587,
+            "alerts": 2617,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "fedavg": {
+        "pr_auc": 0.4037339697438985,
+        "roc_auc": 0.840308991028328,
+        "brier_score": 0.0264488123357296,
+        "precision": 0.8748615725359912,
+        "recall": 0.19438976377952755,
+        "f1_score": 0.31809945641232135,
+        "recall_at_001_fpr": 0.061515748031496065,
+        "recall_at_005_fpr": 0.14443897637795275,
+        "recall_at_01_fpr": 0.19488188976377951,
+        "recall_at_05_fpr": 0.2721456692913386,
+        "recall_at_10_fpr": 0.33390748031496065,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.9643340706825256,
+            "recall": 0.061515748031496065,
+            "precision": 0.9578544061302682,
+            "tp": 250,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3814,
+            "alerts": 261,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.0004910385465259023,
+            "threshold": 0.7648608684539795,
+            "recall": 0.14443897637795275,
+            "precision": 0.9129082426127527,
+            "tp": 587,
+            "fp": 56,
+            "tn": 113988,
+            "fn": 3477,
+            "alerts": 643,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009996141839991582,
+            "threshold": 0.4988919198513031,
+            "recall": 0.19488188976377951,
+            "precision": 0.8741721854304636,
+            "tp": 792,
+            "fp": 114,
+            "tn": 113930,
+            "fn": 3272,
+            "alerts": 906,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004998070919995791,
+            "threshold": 0.19264759123325348,
+            "recall": 0.2721456692913386,
+            "precision": 0.6599045346062052,
+            "tp": 1106,
+            "fp": 570,
+            "tn": 113474,
+            "fn": 2958,
+            "alerts": 1676,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009978604749044228,
+            "threshold": 0.09419257193803787,
+            "recall": 0.33390748031496065,
+            "precision": 0.5438877755511022,
+            "tp": 1357,
+            "fp": 1138,
+            "tn": 112906,
+            "fn": 2707,
+            "alerts": 2495,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "delta_pr_auc": -0.042294,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9240,
+        "step_difference": 10,
+        "relative_difference_pct": 0.11,
+        "centralized_duration_seconds": 91.85,
+        "federated_duration_seconds": 85.47
+      }
+    },
+    {
+      "seed": 456,
+      "centralized": {
+        "pr_auc": 0.44124061119398594,
+        "roc_auc": 0.8489419994720921,
+        "brier_score": 0.02477835677564144,
+        "precision": 0.7345132743362832,
+        "recall": 0.2859251968503937,
+        "f1_score": 0.4116188452001417,
+        "recall_at_001_fpr": 0.08341535433070867,
+        "recall_at_005_fpr": 0.15255905511811024,
+        "recall_at_01_fpr": 0.19906496062992127,
+        "recall_at_05_fpr": 0.312746062992126,
+        "recall_at_10_fpr": 0.3693405511811024,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.9967691898345947,
+            "recall": 0.08341535433070867,
+            "precision": 0.9685714285714285,
+            "tp": 339,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3725,
+            "alerts": 350,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.0004998070919995791,
+            "threshold": 0.9696608781814575,
+            "recall": 0.15255905511811024,
+            "precision": 0.9158050221565731,
+            "tp": 620,
+            "fp": 57,
+            "tn": 113987,
+            "fn": 3444,
+            "alerts": 677,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009996141839991582,
+            "threshold": 0.8979722261428833,
+            "recall": 0.19906496062992127,
+            "precision": 0.8764897074756229,
+            "tp": 809,
+            "fp": 114,
+            "tn": 113930,
+            "fn": 3255,
+            "alerts": 923,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004980533829048437,
+            "threshold": 0.37169453501701355,
+            "recall": 0.312746062992126,
+            "precision": 0.6911364872213159,
+            "tp": 1271,
+            "fp": 568,
+            "tn": 113476,
+            "fn": 2793,
+            "alerts": 1839,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009996141839991582,
+            "threshold": 0.20879502594470978,
+            "recall": 0.3693405511811024,
+            "precision": 0.5683453237410072,
+            "tp": 1501,
+            "fp": 1140,
+            "tn": 112904,
+            "fn": 2563,
+            "alerts": 2641,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "fedavg": {
+        "pr_auc": 0.38344926774614035,
+        "roc_auc": 0.8328674432226324,
+        "brier_score": 0.027285045012831688,
+        "precision": 0.9114583333333334,
+        "recall": 0.17224409448818898,
+        "f1_score": 0.2897350993377483,
+        "recall_at_001_fpr": 0.08243110236220473,
+        "recall_at_005_fpr": 0.16018700787401574,
+        "recall_at_01_fpr": 0.2128444881889764,
+        "recall_at_05_fpr": 0.28026574803149606,
+        "recall_at_10_fpr": 0.3068405511811024,
+        "operating_points": [
+          {
+            "target_fpr": 0.0001,
+            "empirical_fpr": 9.645400021044509e-05,
+            "threshold": 0.9479938745498657,
+            "recall": 0.08243110236220473,
+            "precision": 0.9682080924855492,
+            "tp": 335,
+            "fp": 11,
+            "tn": 114033,
+            "fn": 3729,
+            "alerts": 346,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.0005,
+            "empirical_fpr": 0.0004910385465259023,
+            "threshold": 0.5961286425590515,
+            "recall": 0.16018700787401574,
+            "precision": 0.9207920792079208,
+            "tp": 651,
+            "fp": 56,
+            "tn": 113988,
+            "fn": 3413,
+            "alerts": 707,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.001,
+            "empirical_fpr": 0.0009996141839991582,
+            "threshold": 0.23984122276306152,
+            "recall": 0.2128444881889764,
+            "precision": 0.8835546475995915,
+            "tp": 865,
+            "fp": 114,
+            "tn": 113930,
+            "fn": 3199,
+            "alerts": 979,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.005,
+            "empirical_fpr": 0.004980533829048437,
+            "threshold": 0.07380110770463943,
+            "recall": 0.28026574803149606,
+            "precision": 0.667252489748096,
+            "tp": 1139,
+            "fp": 568,
+            "tn": 113476,
+            "fn": 2925,
+            "alerts": 1707,
+            "positive_support": 4064,
+            "negative_support": 114044
+          },
+          {
+            "target_fpr": 0.01,
+            "empirical_fpr": 0.009961067658096874,
+            "threshold": 0.05106041207909584,
+            "recall": 0.3068405511811024,
+            "precision": 0.5232899706252623,
+            "tp": 1247,
+            "fp": 1136,
+            "tn": 112908,
+            "fn": 2817,
+            "alerts": 2383,
+            "positive_support": 4064,
+            "negative_support": 114044
+          }
+        ],
+        "positive_support": 4064,
+        "negative_support": 114044
+      },
+      "delta_pr_auc": -0.057791,
+      "budget": {
+        "centralized_steps": 9230,
+        "federated_total_local_steps": 9250,
+        "step_difference": 20,
+        "relative_difference_pct": 0.22,
+        "centralized_duration_seconds": 89.9,
+        "federated_duration_seconds": 87.61
+      }
+    }
+  ],
+  "aggregate": {
+    "centralized_pr_auc": {
+      "mean": 0.442233,
+      "std": 0.003408,
+      "min": 0.439432,
+      "max": 0.446028
+    },
+    "fedavg_pr_auc": {
+      "mean": 0.389505,
+      "std": 0.012368,
+      "min": 0.381331,
+      "max": 0.403734
+    },
+    "delta_pr_auc": {
+      "mean": -0.052729,
+      "std": 0.009038,
+      "min": -0.058101,
+      "max": -0.042294
+    },
+    "centralized_roc_auc": {
+      "mean": 0.853599,
+      "std": 0.004366,
+      "min": 0.848942,
+      "max": 0.857599
+    },
+    "fedavg_roc_auc": {
+      "mean": 0.832473,
+      "std": 0.00804,
+      "min": 0.824243,
+      "max": 0.840309
+    },
+    "centralized_recall_at_01_fpr": {
+      "mean": 0.200377,
+      "std": 0.003164,
+      "min": 0.198081,
+      "max": 0.203986
+    },
+    "fedavg_recall_at_01_fpr": {
+      "mean": 0.197589,
+      "std": 0.014099,
+      "min": 0.185039,
+      "max": 0.212844
+    },
+    "std_definition": "sample_standard_deviation_ddof_1"
+  },
+  "aggregate_metrics": {
+    "centralized_pr_auc": {
+      "mean": 0.442233,
+      "std": 0.003408,
+      "min": 0.439432,
+      "max": 0.446028
+    },
+    "fedavg_pr_auc": {
+      "mean": 0.389505,
+      "std": 0.012368,
+      "min": 0.381331,
+      "max": 0.403734
+    },
+    "delta_pr_auc": {
+      "mean": -0.052729,
+      "std": 0.009038,
+      "min": -0.058101,
+      "max": -0.042294
+    },
+    "centralized_roc_auc": {
+      "mean": 0.853599,
+      "std": 0.004366,
+      "min": 0.848942,
+      "max": 0.857599
+    },
+    "fedavg_roc_auc": {
+      "mean": 0.832473,
+      "std": 0.00804,
+      "min": 0.824243,
+      "max": 0.840309
+    },
+    "centralized_recall_at_01_fpr": {
+      "mean": 0.200377,
+      "std": 0.003164,
+      "min": 0.198081,
+      "max": 0.203986
+    },
+    "fedavg_recall_at_01_fpr": {
+      "mean": 0.197589,
+      "std": 0.014099,
+      "min": 0.185039,
+      "max": 0.212844
+    },
+    "std_definition": "sample_standard_deviation_ddof_1"
+  },
+  "operational_metrics": [
+    {
+      "target_fpr": 0.0001,
+      "fedavg_recall_mean": 0.073901,
+      "fedavg_recall_std": 0.010978,
+      "centralized_recall_mean": 0.080627,
+      "centralized_recall_std": 0.007069,
+      "fedavg_precision_mean": 0.964141,
+      "fedavg_mean_alerts": 311.3,
+      "mean_threshold": 0.834336,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.0005,
+      "fedavg_recall_mean": 0.150509,
+      "fedavg_recall_std": 0.008472,
+      "centralized_recall_mean": 0.153953,
+      "centralized_recall_std": 0.002852,
+      "fedavg_precision_mean": 0.915515,
+      "fedavg_mean_alerts": 668.0,
+      "mean_threshold": 0.51532,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.001,
+      "fedavg_recall_mean": 0.197589,
+      "fedavg_recall_std": 0.014099,
+      "centralized_recall_mean": 0.200377,
+      "centralized_recall_std": 0.003164,
+      "fedavg_precision_mean": 0.875697,
+      "fedavg_mean_alerts": 916.7,
+      "mean_threshold": 0.273632,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.005,
+      "fedavg_recall_mean": 0.275098,
+      "fedavg_recall_std": 0.00449,
+      "centralized_recall_mean": 0.307251,
+      "centralized_recall_std": 0.005948,
+      "fedavg_precision_mean": 0.662688,
+      "fedavg_mean_alerts": 1687.0,
+      "mean_threshold": 0.094182,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    },
+    {
+      "target_fpr": 0.01,
+      "fedavg_recall_mean": 0.317175,
+      "fedavg_recall_std": 0.014624,
+      "centralized_recall_mean": 0.363517,
+      "centralized_recall_std": 0.005783,
+      "fedavg_precision_mean": 0.531143,
+      "fedavg_mean_alerts": 2426.0,
+      "mean_threshold": 0.05142,
+      "positive_denominator": 4064,
+      "negative_denominator": 114044,
+      "calibration_source": "test_set_diagnostic_operating_point"
+    }
+  ],
+  "limitations": [
+    "Evaluates simulated 3-bank federation derived from a single public competition dataset (Kaggle/Vesta), not live multi-bank deployments.",
+    "Evaluated across 3 predefined random seeds [42, 123, 456]; further seeds may reveal wider variance.",
+    "Out-of-time temporal holdout reflects real-world concept drift but is subject to IEEE-CIS specific temporal discontinuities.",
+    "Evaluates standard FedAvg optimization; adaptive aggregators or personalization may alter collaborative dynamics."
+  ],
+  "historical_context": {
+    "note": "Historical synthetic smoke test produced ~0.7811 / ~0.7554 metrics from an uncalibrated 10-feature generator. Those values are strictly superseded by this Level 1 real dataset execution.",
+    "engineering_targets": {
+      "centralized_target_pr_auc": 0.812,
+      "operational_target_recall_at_01_fpr": 0.589
+    }
+  }
+}

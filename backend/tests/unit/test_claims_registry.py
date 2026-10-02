@@ -60,6 +60,7 @@ def test_claims_field_schema_and_types(claim_registry: dict[str, Any]) -> None:
         "MEASURED_TARGET_NOT_MET",
         "SUPERSEDED",
         "NOT_EVALUATED",
+        "HISTORICAL_SYNTHETIC_SMOKE_TEST",
     }
 
     for claim in claims:
@@ -72,9 +73,13 @@ def test_claims_field_schema_and_types(claim_registry: dict[str, Any]) -> None:
         assert "category" in claim
         assert "title" in claim
         assert "stated_value" in claim
-        assert isinstance(claim["stated_value"], (int, float))
-        assert "empirical_measured_value" in claim
-        assert isinstance(claim["empirical_measured_value"], (int, float))
+        if claim.get("verification_status") != "NOT_EVALUATED_ON_DISK":
+            assert isinstance(claim["stated_value"], (int, float))
+            assert "empirical_measured_value" in claim
+            assert isinstance(claim["empirical_measured_value"], (int, float))
+        else:
+            assert claim["stated_value"] is None
+            assert claim["empirical_measured_value"] is None
         assert "verification_status" in claim
         assert "claim_classification" in claim
         assert claim["claim_classification"] in valid_classifications, (
@@ -86,6 +91,8 @@ def test_claims_field_schema_and_types(claim_registry: dict[str, Any]) -> None:
 def test_mathematical_bounds_of_claims(claim_registry: dict[str, Any]) -> None:
     """Verifies mathematical validity of AUC metrics, percentages, and latencies."""
     for claim in claim_registry["claims"]:
+        if claim.get("verification_status") == "NOT_EVALUATED_ON_DISK":
+            continue
         unit = claim.get("stated_unit", "")
         stated = claim["stated_value"]
         empirical = claim["empirical_measured_value"]
@@ -123,11 +130,17 @@ def test_raw_artifacts_exist_and_reconcile_with_registry(claim_registry: dict[st
     assert pytest.approx(claims_by_id["CLM-PAYSIM-FED-PRAUC"]["empirical_measured_value"], abs=1e-4) == paysim_fed_pr_auc
 
     # 2. IEEE-CIS Raw Reconciliation
-    ieee_file = RAW_RESULTS_DIR / "fraud_benchmark_ieee_cis.json"
+    raw_rel_ieee = claims_by_id["CLM-IEEE-FED-PRAUC"]["raw_artifact"]
+    ieee_file = REPO_ROOT / raw_rel_ieee
     assert ieee_file.exists(), f"Missing IEEE-CIS raw artifact: {ieee_file}"
     with open(ieee_file, encoding="utf-8") as f:
         ieee_raw = json.load(f)
-    ieee_fed_pr_auc = ieee_raw["federated_fedavg"]["pr_auc"]
+    if "aggregate" in ieee_raw and "fedavg_pr_auc" in ieee_raw["aggregate"]:
+        ieee_fed_pr_auc = ieee_raw["aggregate"]["fedavg_pr_auc"]["mean"]
+    elif "aggregate_metrics" in ieee_raw and "fedavg_pr_auc" in ieee_raw["aggregate_metrics"]:
+        ieee_fed_pr_auc = ieee_raw["aggregate_metrics"]["fedavg_pr_auc"]["mean"]
+    else:
+        ieee_fed_pr_auc = ieee_raw["federated_fedavg"]["pr_auc"]
     assert pytest.approx(claims_by_id["CLM-IEEE-FED-PRAUC"]["empirical_measured_value"], abs=1e-4) == ieee_fed_pr_auc
 
     # 3. Elliptic GraphSAGE Raw Reconciliation
@@ -170,11 +183,15 @@ def test_raw_artifacts_exist_and_reconcile_with_registry(claim_registry: dict[st
     assert pytest.approx(claims_by_id["CLM-GATEWAY-PEAK-THROUGHPUT"]["empirical_measured_value"], abs=1e-1) == c100_data["throughput_rps"]
 
     # 7. Local HTTP Service Benchmark Reconciliation
-    http_file = RAW_RESULTS_DIR / "latency_http_service_benchmark.json"
+    raw_http_rel = claims_by_id["CLM-HTTP-SERVICE-THROUGHPUT"]["raw_artifact"]
+    http_file = REPO_ROOT / raw_http_rel
     assert http_file.exists(), f"Missing HTTP service benchmark raw artifact: {http_file}"
     with open(http_file, encoding="utf-8") as f:
         http_raw = json.load(f)
-    c10_http = next(item for item in http_raw["concurrency_scaling"] if item["concurrency"] == 10)
-    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-THROUGHPUT"]["empirical_measured_value"], abs=1e-1) == c10_http["throughput_rps"]
+    # Peak throughput at C=50 (543.0 req/s)
+    c50_http = next(item for item in http_raw["concurrency_scaling"] if item["concurrency"] == 50)
+    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-THROUGHPUT"]["empirical_measured_value"], abs=1e-1) == c50_http["throughput_rps"]
+    # Single-client median latency at C=1 (7.12 ms pooled_p50)
     c1_http = next(item for item in http_raw["concurrency_scaling"] if item["concurrency"] == 1)
-    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-LATENCY-P50"]["empirical_measured_value"], abs=1e-1) == c1_http["p50_latency_ms"]
+    p50_val = c1_http.get("pooled_p50_ms", c1_http.get("p50_latency_ms"))
+    assert pytest.approx(claims_by_id["CLM-HTTP-SERVICE-LATENCY-P50"]["empirical_measured_value"], abs=1e-1) == p50_val

@@ -10,16 +10,16 @@
     "verifiable_raw_provenance": true
   },
   "summary_metrics": {
-    "total_claims": 21,
-    "empirical_verified_claims": 17,
-    "design_target_claims": 4,
-    "total_raw_benchmark_files": 8
+    "total_claims": 26,
+    "empirical_verified_claims": 25,
+    "design_target_claims": 1,
+    "total_raw_benchmark_files": 13
   },
   "claims": [
     {
       "claim_id": "CLM-PAYSIM-FED-PRAUC",
       "category": "fraud_detection_benchmarks",
-      "title": "PaySim Federated Learning PR-AUC (Canonical Real-Data Benchmark)",
+      "title": "PaySim Federated Learning PR-AUC (Canonical Externally-Simulated Benchmark)",
       "dataset": "paysim",
       "dataset_scale": "636,262 rows (systematic every-10th-row sample from 6.36M PaySim transactions)",
       "stated_value": 0.842,
@@ -73,7 +73,11 @@
         "source": "benchmarks/results/raw/fraud_benchmark_paysim.json",
         "dataset_type": "synthetic_10_feature_fallback",
         "status": "ARCHIVED -- produced when preprocessed/ partitions were absent; SimpleMLP+BatchNorm1d on 10 synthetic features, 5 clients, 3 rounds"
-      }
+      },
+      "claim_type": "MEASURED",
+      "provenance_type": "EXTERNALLY_SIMULATED",
+      "evidence_scope": "EXTERNAL_SIMULATION_BENCHMARK",
+      "dataset_description": "Externally simulated mobile-money benchmark (Lopez-Rojas et al.), not real observed bank records."
     },
     {
       "claim_id": "CLM-PAYSIM-RECALL-FPR",
@@ -95,41 +99,102 @@
         "fedavg_recall_at_01pct_fpr": 0.2,
         "centralized_recall_at_01pct_fpr": 0.4,
         "status": "ARCHIVED -- synthetic fallback data"
-      }
+      },
+      "claim_type": "HISTORICAL_MEASURED"
     },
     {
       "claim_id": "CLM-IEEE-FED-PRAUC",
       "category": "fraud_detection_benchmarks",
       "title": "IEEE-CIS Card Fraud Federated Learning PR-AUC",
       "dataset": "ieee_cis",
-      "dataset_scale": "590k Real Vesta Transactions",
+      "benchmark_id": "ieee_cis_canonical",
+      "dataset_scale": "590,540 Real Kaggle/Vesta transactions (80/20 chronological holdout, 4,064 test fraud)",
       "stated_value": 0.812,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.7554,
-      "centralized_baseline_value": 0.7811,
+      "empirical_measured_value": 0.3895,
+      "centralized_baseline_value": 0.4422,
       "evaluation_type": "FEDERATED_VS_CENTRALIZED",
+      "metric_definition": "sklearn.metrics.average_precision_score (reported as PR-AUC in project tables)",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
-      "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
-      "raw_artifact": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
-      "runner_script": "benchmarks/runners/run_fraud_benchmark.py",
-      "notes": "Federated FedAvg achieves 0.7554 PR-AUC vs Centralized 0.7811, demonstrating 96.72% empirical parity on real e-commerce transactions."
+      "claim_classification": "VERIFIED_MEASURED",
+      "evidence_scope": "REAL_WORLD_BENCHMARK",
+      "communication_eligibility": "SAFE_WITH_CAVEAT",
+      "mandatory_caveat": "Transaction data are real competition data from Kaggle/Vesta (590k txns); 3 clients are simulated partitions under Dirichlet alpha=0.5. Evaluates standard FedAvg on a public dataset; does not represent a live multi-bank institutional deployment.",
+      "raw_artifact": "experiments/ieee_cis/canonical_results.json",
+      "runner_script": "experiments/ieee_cis/run_ieee_cis_canonical_benchmark.py",
+      "dataset_sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+      "seeds": [
+        42,
+        123,
+        456
+      ],
+      "per_seed_results": [
+        {
+          "seed": 42,
+          "centralized_pr_auc": 0.4394,
+          "fedavg_pr_auc": 0.3813
+        },
+        {
+          "seed": 123,
+          "centralized_pr_auc": 0.446,
+          "fedavg_pr_auc": 0.4037
+        },
+        {
+          "seed": 456,
+          "centralized_pr_auc": 0.4412,
+          "fedavg_pr_auc": 0.3834
+        }
+      ],
+      "notes": "Empirically measured from 590,540 real IEEE-CIS transactions (434 merged columns, 421 numeric model inputs) under strict chronological out-of-time 80/20 holdout across 3 simulated bank clients (Dirichlet alpha=0.5 non-IID label skew) across seeds [42, 123, 456]. Centralized baseline AP: 0.4422 +/- 0.0034; FedAvg AP: 0.3895 +/- 0.0124; Paired Delta: -0.0527 +/- 0.0090 (approx. 11.9% relative reduction vs centralized mean). Client heterogeneity is one plausible contributor to the observed gap. The predefined engineering target of 0.8120 was not reached under the evaluated chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Historical synthetic smoke metrics (0.7811 / 0.7554) came from an earlier synthetic fallback experiment and are non-comparable.",
+      "legacy_artifact": {
+        "centralized_pr_auc": 0.7811,
+        "fedavg_pr_auc": 0.7554,
+        "source": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
+        "dataset_type": "synthetic_10_feature_fallback",
+        "status": "ARCHIVED -- synthetic fallback data produced when processed dataset was absent"
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-IEEE-RECALL-FPR",
       "category": "fraud_detection_benchmarks",
       "title": "IEEE-CIS Fraud Detection Recall @ 0.1% FPR",
       "dataset": "ieee_cis",
-      "dataset_scale": "590k Real Vesta Transactions",
+      "benchmark_id": "ieee_cis_canonical",
+      "dataset_scale": "590,540 Real Kaggle/Vesta transactions (80/20 chronological holdout, 4,064 test fraud, 114,044 test legit)",
       "stated_value": 0.589,
       "stated_unit": "Recall @ 0.1% FPR",
-      "empirical_measured_value": 0.4308,
-      "centralized_baseline_value": 0.3692,
+      "empirical_measured_value": 0.1976,
+      "centralized_baseline_value": 0.2004,
       "evaluation_type": "HIGH_PRECISION_OPERATIONAL_THRESHOLD",
+      "metric_definition": "Recall at target FPR = 0.001 (0.1% FPR) evaluated as a test-set diagnostic operating point",
+      "target_fpr": 0.001,
+      "threshold_type": "test_set_diagnostic_operating_point",
+      "positive_support": 4064,
+      "negative_support": 114044,
+      "approx_fp": 114,
+      "approx_tp": 803,
+      "approx_total_alerts": 917,
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
-      "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
-      "raw_artifact": "benchmarks/results/raw/fraud_benchmark_ieee_cis.json",
-      "runner_script": "benchmarks/runners/run_fraud_benchmark.py",
-      "notes": "At 0.1% maximum FPR, Federated FedAvg achieves 43.08% recall, outperforming Centralized baseline 36.92% due to federated regularization."
+      "claim_classification": "VERIFIED_MEASURED",
+      "evidence_scope": "REAL_WORLD_BENCHMARK",
+      "communication_eligibility": "SAFE_WITH_CAVEAT",
+      "mandatory_caveat": "Operating point is a diagnostic threshold computed on held-out test data (~114 false positives, ~803 true positives, ~917 total alerts); not a validated production deployment threshold. Transaction data are real; bank federation is simulated.",
+      "raw_artifact": "experiments/ieee_cis/canonical_results.json",
+      "runner_script": "experiments/ieee_cis/run_ieee_cis_canonical_benchmark.py",
+      "dataset_sha256": "3a5c83ab6b3cc13dcabe5ffa9f522307fd5f7f7b6e6f6a60c32284ca6283d642",
+      "seeds": [
+        42,
+        123,
+        456
+      ],
+      "notes": "Empirically measured test-set diagnostic operating point at 0.1% FPR (4,064 positive support, 114,044 negative support). Centralized baseline recall: 20.04% +/- 0.32%; FedAvg recall: 19.76% +/- 1.41%. False-positive budget is approximately 114 false positives, capturing ~803 true positives (~917 total investigation alerts). The predefined engineering target of 58.90% was not reached under the evaluated chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Historical synthetic smoke metrics are archived as non-comparable.",
+      "legacy_artifact": {
+        "centralized_recall_01": 0.3692,
+        "fedavg_recall_01": 0.4308,
+        "status": "ARCHIVED -- synthetic fallback data"
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-ELLIPTIC-PRAUC",
@@ -146,7 +211,8 @@
       "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
       "raw_artifact": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
       "runner_script": "benchmarks/runners/run_graph_benchmark.py --dataset-mode real --epochs 15",
-      "notes": "Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph. PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 ± 0.0482 PR-AUC and 0.8325 ± 0.0078 ROC-AUC across seeds (42, 123, 456) under strict past-to-future temporal split (train 1-30, val 31-34, test 35-49) with validation-only checkpoint selection and validation-calibrated operating threshold."
+      "notes": "Canonical 3-seed temporal out-of-time inductive benchmark on physical 203k-node Elliptic Bitcoin transaction graph. PyTorch GraphSAGE 2-layer mean aggregator achieves 0.3761 \u00b1 0.0482 PR-AUC and 0.8325 \u00b1 0.0078 ROC-AUC across seeds (42, 123, 456) under strict past-to-future temporal split (train 1-30, val 31-34, test 35-49) with validation-only checkpoint selection and validation-calibrated operating threshold. Architectural negative result preserved: Tabular MLP baseline (0.5778) outperforms GraphSAGE on out-of-time test set.",
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-CREDITCARD-PRAUC",
@@ -161,9 +227,14 @@
       "evaluation_type": "FEDERATED_VS_CENTRALIZED_EQUALIZED_BUDGET",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
       "claim_classification": "EMPIRICAL_PARITY_VERIFIED",
-      "raw_artifact": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
+      "raw_artifact": "experiments/credit_card/multi_seed_controlled_results.json",
       "runner_script": "experiments/credit_card/run_creditcard_benchmark.py",
-      "notes": "Under controlled optimization budget parity (10 dataset passes / ~35.6k optimizer steps across 3 seeds 42, 123, 456), Federated FedAvg achieves 0.8248 ± 0.0417 PR-AUC (Seed 42: 0.7788) vs Centralized 0.8219 ± 0.0364 (Seed 42: 0.7800), demonstrating empirical parity (99.83%–100.35%). Legacy unequal-budget (2 epochs) centralized baseline achieved 0.7449 ± 0.0385 (Seed 42: 0.7059)."
+      "notes": "Under controlled optimization budget parity (10 dataset passes / ~35.6k optimizer steps across 3 seeds 42, 123, 456), Centralized and FedAvg showed similar observed mean performance across the three evaluated seeds (0.8219 \u00b1 0.0364 vs 0.8248 \u00b1 0.0417 PR-AUC; observed mean difference +0.0029; Seed 42: 0.7800 vs 0.7788). Legacy unequal-budget (2 epochs) centralized baseline achieved 0.7449 \u00b1 0.0385 (Seed 42: 0.7059). Unpopulated 0.0/0.5 template in benchmarks/results/raw/fraud_benchmark_credit_card.json is marked SUPERSEDED_PLACEHOLDER.",
+      "legacy_artifact": {
+        "source": "benchmarks/results/raw/fraud_benchmark_credit_card.json",
+        "status": "SUPERSEDED_PLACEHOLDER -- unpopulated 0.0/0.5 template superseded by canonical controlled multi-seed benchmark"
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-DP-SIGMA30",
@@ -180,13 +251,14 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine, accountant='prv') with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via PRVAccountant [Gopi et al. 2021]: epsilon=0.3497) yields PR-AUC 0.3465 ± 0.1580 and ROC-AUC 0.8720 ± 0.0551 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1), reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
+      "notes": "Genuine DP-SGD (PyTorch Opacus PrivacyEngine, accountant='prv') with per-sample clipping C=1.0 and Gaussian mechanism over 20,000 synthetic transactions (15 features, 2.1% fraud prevalence, 84 test fraud cases). High-noise setting (sigma=3.0, delta=1e-5 via PRVAccountant [Gopi et al. 2021]: epsilon=0.3497) yields PR-AUC 0.3465 \u00b1 0.1580 and ROC-AUC 0.8720 \u00b1 0.0551 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1), reflecting realistic utility loss (-61.35% relative to non-private ceiling 0.8965) under strict differential privacy.",
       "legacy_artifact": {
         "pr_auc": 0.1963,
         "source": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json (legacy commit f0705141 / 7e32f409)",
         "dataset_type": "synthetic_10_feature_centroid_prototype",
         "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype with hardcoded fixtures"
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-DP-SIGMA00",
@@ -203,11 +275,12 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
       "runner_script": "benchmarks/runners/run_dp_tradeoff.py",
-      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 ± 0.0078 and ROC-AUC 0.9872 ± 0.0050 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1).",
+      "notes": "Unperturbed baseline (sigma=0.0, epsilon=infinity) trained under identical FraudDetectionModel architecture and schedule achieves PR-AUC 0.8965 \u00b1 0.0078 and ROC-AUC 0.9872 \u00b1 0.0050 across seeds [42, 123, 456] (sample std across 3 training seeds, ddof=1).",
       "legacy_artifact": {
         "pr_auc": 0.6272,
         "status": "ARCHIVED -- legacy 10-feature algebraic centroid prototype"
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-BYZ-TRIMMED",
@@ -224,7 +297,17 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
       "runner_script": "benchmarks/runners/run_byzantine_benchmark.py",
-      "notes": "Under sign-inversion attack (malicious updates -3.0x honest), Trimmed Mean achieves 0.7344 PR-AUC (99.66% parity with honest FedAvg 0.7369)."
+      "notes": "Under sign-inversion attack (malicious updates -3.0x honest), Trimmed Mean achieves 0.7344 PR-AUC (99.66% parity with honest FedAvg 0.7369).",
+      "claim_type": "MEASURED",
+      "attack_type": "sign_inversion",
+      "malicious_fraction": 0.2,
+      "client_count": 10,
+      "malicious_client_count": 2,
+      "clean_baseline_pr_auc": 0.7369,
+      "retained_performance_pct": 99.66,
+      "evidence_scope": "CONTROLLED_ADVERSARIAL_TESTBED",
+      "mandatory_scope": "Sign-inversion attack, 10 clients, 2 malicious (20%), controlled testbed only",
+      "atomic_claim_rendered": "99.7% of clean PR-AUC (0.7344 vs 0.7369) under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine)"
     },
     {
       "claim_id": "CLM-BYZ-KRUM",
@@ -241,7 +324,17 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
       "runner_script": "benchmarks/runners/run_byzantine_benchmark.py",
-      "notes": "Krum aggregator achieves 0.7257 PR-AUC (98.48% parity with honest FedAvg)."
+      "notes": "Krum aggregator achieves 0.7257 PR-AUC (98.48% parity with honest FedAvg).",
+      "claim_type": "MEASURED",
+      "attack_type": "sign_inversion",
+      "malicious_fraction": 0.2,
+      "client_count": 10,
+      "malicious_client_count": 2,
+      "clean_baseline_pr_auc": 0.7369,
+      "retained_performance_pct": 98.48,
+      "evidence_scope": "CONTROLLED_ADVERSARIAL_TESTBED",
+      "mandatory_scope": "Sign-inversion attack, 10 clients, 2 malicious (20%), controlled testbed only",
+      "atomic_claim_rendered": "98.5% of clean PR-AUC (0.7257 vs 0.7369) under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine)"
     },
     {
       "claim_id": "CLM-BYZ-BULYAN",
@@ -258,7 +351,17 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
       "runner_script": "benchmarks/runners/run_byzantine_benchmark.py",
-      "notes": "Bulyan aggregator achieves 0.7070 PR-AUC (95.94% parity with honest FedAvg)."
+      "notes": "Bulyan aggregator achieves 0.7070 PR-AUC (95.94% parity with honest FedAvg).",
+      "claim_type": "MEASURED",
+      "attack_type": "sign_inversion",
+      "malicious_fraction": 0.2,
+      "client_count": 10,
+      "malicious_client_count": 2,
+      "clean_baseline_pr_auc": 0.7369,
+      "retained_performance_pct": 95.94,
+      "evidence_scope": "CONTROLLED_ADVERSARIAL_TESTBED",
+      "mandatory_scope": "Sign-inversion attack, 10 clients, 2 malicious (20%), controlled testbed only",
+      "atomic_claim_rendered": "95.9% of clean PR-AUC (0.7070 vs 0.7369) under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine)"
     },
     {
       "claim_id": "CLM-LATENCY-FASTPATH",
@@ -281,7 +384,8 @@
         "legacy_c1_p99_ms": 3.53,
         "source": "benchmarks/results/raw/latency_concurrency_benchmark.json (pre-repair)",
         "status": "SUPERSEDED -- Pre-repair small-sample (N=10) measurements superseded by authorized multi-repetition (N>=1000) methodology"
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-LATENCY-SHAP",
@@ -300,9 +404,10 @@
       "runner_script": "benchmarks/runners/run_latency_benchmark.py",
       "notes": "Full explainability path with linear attribution breakdown takes total duration 2.516ms (well under internal target <50ms).",
       "legacy_artifact": {
-        "legacy_stated_ms": 2.340,
+        "legacy_stated_ms": 2.34,
         "status": "SUPERSEDED -- Pre-repair measurement superseded by authorized multi-repetition methodology"
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-GATEWAY-PEAK-THROUGHPUT",
@@ -325,7 +430,8 @@
         "legacy_c50_rps": 1791.0,
         "source": "benchmarks/results/raw/latency_concurrency_benchmark.json (pre-repair)",
         "status": "SUPERSEDED -- Pre-repair small-sample (N=10) measurements superseded by authorized multi-repetition (N>=1000) methodology"
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-HTTP-SERVICE-THROUGHPUT",
@@ -343,7 +449,7 @@
       "target_type": "PROJECT-DEFINED BENCHMARK TARGET",
       "raw_artifact": "benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json",
       "runner_script": "benchmarks/runners/run_http_benchmark.py",
-      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 543.0 ± 23.6 successful 2xx req/s at C=50 across 3 independent repetitions (3,000 requests, 100% 2xx success, pooled p50=89.02ms, pooled p99=156.81ms). Following the complete pure-ASGI conversion of all middleware (active custom BaseHTTPMiddleware depth = 0), successful throughput across tiers: C=1: 134.9 ± 2.4 req/s (pooled p50=7.12ms, p99=10.85ms); C=10: 452.8 ± 14.0 req/s (pooled p50=20.48ms, p99=39.96ms); C=50: 543.0 ± 23.6 req/s (pooled p50=89.02ms, p99=156.81ms); C=100: 520.8 ± 37.6 req/s (pooled p50=178.50ms, p99=289.42ms); C=250: 431.9 ± 29.6 req/s (pooled p50=474.97ms, p99=950.14ms); C=500: 401.7 ± 26.7 req/s (pooled p50=1060.89ms, pooled p99=1760.77ms). Historical baselines: Pre-intervention (89.0 req/s peak) in latency_http_service_benchmark_pre_intervention.json; Post-APIVersion (233.7 req/s peak) in latency_http_service_benchmark_post_apiversion.json; Post-W3C (327.9 req/s peak) in latency_http_service_benchmark_post_w3c.json; Post-MTLS (369.0 req/s peak) in latency_http_service_benchmark.json; HTTPX measurements (191.0 req/s at C=10 collapsing to 41.6 req/s at C=500 due to client event-loop starvation) in latency_http_service_benchmark_httpx.json.",
+      "notes": "Class B1 v2 Single-Worker Localhost HTTP Benchmark over local loopback TCP socket (127.0.0.1:8089/api/v1/score-transaction) served by Uvicorn (single-worker) using a separate-process aiohttp load generator under benchmark mode (rate limiting disabled to isolate pure inference capacity). Target applies strictly to successful HTTP 2xx inference transactions. Peak throughput reached 543.0 \u00b1 23.6 successful 2xx req/s at C=50 across 3 independent repetitions (3,000 requests, 100% 2xx success, pooled p50=89.02ms, pooled p99=156.81ms). Following the complete pure-ASGI conversion of all middleware (active custom BaseHTTPMiddleware depth = 0), successful throughput across tiers: C=1: 134.9 \u00b1 2.4 req/s (pooled p50=7.12ms, p99=10.85ms); C=10: 452.8 \u00b1 14.0 req/s (pooled p50=20.48ms, p99=39.96ms); C=50: 543.0 \u00b1 23.6 req/s (pooled p50=89.02ms, p99=156.81ms); C=100: 520.8 \u00b1 37.6 req/s (pooled p50=178.50ms, p99=289.42ms); C=250: 431.9 \u00b1 29.6 req/s (pooled p50=474.97ms, p99=950.14ms); C=500: 401.7 \u00b1 26.7 req/s (pooled p50=1060.89ms, pooled p99=1760.77ms). Historical baselines: Pre-intervention (89.0 req/s peak) in latency_http_service_benchmark_pre_intervention.json; Post-APIVersion (233.7 req/s peak) in latency_http_service_benchmark_post_apiversion.json; Post-W3C (327.9 req/s peak) in latency_http_service_benchmark_post_w3c.json; Post-MTLS (369.0 req/s peak) in latency_http_service_benchmark.json; HTTPX measurements (191.0 req/s at C=10 collapsing to 41.6 req/s at C=500 due to client event-loop starvation) in latency_http_service_benchmark_httpx.json.",
       "pre_intervention_baseline": {
         "status": "PRE_INTERVENTION_BASELINE",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_pre_intervention.json",
@@ -369,18 +475,19 @@
         "notes": "Post-MTLS pure-ASGI state (BaseHTTP depth 2) yielded 369.0 req/s peak at C=10 and 277.6 req/s at C=500."
       },
       "historical_httpx_artifact": {
-        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS \u2014 SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
         "historical_c10_throughput_rps": 191.0,
         "historical_c500_throughput_rps": 55.8,
         "reason": "HTTPX client-side event loop starvation under high concurrency suppressed client throughput to ~41-56 req/s while aiohttp achieved 118-141 req/s on the identical unchanged server."
       },
       "legacy_artifact": {
-        "status": "SUPERSEDED — RATE-LIMIT CONTAMINATED",
+        "status": "SUPERSEDED \u2014 RATE-LIMIT CONTAMINATED",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_superseded_v1.json",
         "legacy_throughput_rps": 72.9,
         "reason": "SlowAPI rate limiter (60 req/min) active during benchmark, mixing 2xx and 429 responses and counting wall-clock benchmark time without isolating 2xx population."
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-HTTP-SERVICE-LATENCY-P50",
@@ -424,17 +531,18 @@
         "baseline_p99_ms": 10.13
       },
       "historical_httpx_artifact": {
-        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS — SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
+        "status": "VALID MEASUREMENT OF HTTPX LOCALHOST HARNESS \u2014 SUPERSEDED FOR SERVER-CAPACITY INTERPRETATION",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_httpx.json",
         "historical_p50_ms": 10.77,
         "historical_p99_ms": 15.21
       },
       "legacy_artifact": {
-        "status": "SUPERSEDED — RATE-LIMIT CONTAMINATED",
+        "status": "SUPERSEDED \u2014 RATE-LIMIT CONTAMINATED",
         "source": "benchmarks/results/raw/latency_http_service_benchmark_superseded_v1.json",
         "legacy_p50_ms": 2.6,
         "reason": "Single-client median of 2.60ms was dominated by SlowAPI 429 Too Many Requests responses rather than full inference pipeline execution."
-      }
+      },
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-ABAC-THROUGHPUT",
@@ -451,7 +559,8 @@
       "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_abac_benchmark.py",
-      "notes": "In-memory dynamic ABAC evaluation achieves 132,942 req/s mean throughput with p99 latency < 0.015ms."
+      "notes": "In-memory dynamic ABAC evaluation achieves 132,942 req/s mean throughput with p99 latency < 0.015ms.",
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-SECAGG-CURVE25519",
@@ -468,7 +577,8 @@
       "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "backend/app/infrastructure/security/p2p_secagg_driver.py",
-      "notes": "Curve25519 ECDH pairwise zero-sum masking yields ~513,000 parameters/sec in pure Python."
+      "notes": "Curve25519 ECDH pairwise zero-sum masking yields ~513,000 parameters/sec in pure Python.",
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-SECAGG-NUMPY",
@@ -485,7 +595,8 @@
       "claim_classification": "EMPIRICAL_SUPERIOR_VERIFIED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "backend/app/application/services/fl_engine.py",
-      "notes": "NumPy vectorized array masking path achieves ~5.63M parameters/sec with linear scaling R^2 = 0.9703."
+      "notes": "NumPy vectorized array masking path achieves ~5.63M parameters/sec with linear scaling R^2 = 0.9703.",
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-DR-FAILOVER-RTO",
@@ -502,14 +613,15 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "chaos_dr_drill.py",
-      "notes": "Logical state failover timeout drill achieves 15.01s with zero lost records (RPO=0)."
+      "notes": "Logical state failover timeout drill achieves 15.01s with zero lost records (RPO=0).",
+      "claim_type": "MEASURED"
     },
     {
       "claim_id": "CLM-TEST-SUITE-PASS-RATE",
       "category": "platform_reliability_and_governance",
       "title": "Repository-Wide Test Suite Pass Rate",
       "dataset": "full_codebase",
-      "dataset_scale": "4,348 Collected Tests Across 4 Suites",
+      "dataset_scale": "4,360 Collected Tests Across 4 Suites",
       "stated_value": 100.0,
       "stated_unit": "% Pass Rate",
       "empirical_measured_value": 100.0,
@@ -519,7 +631,125 @@
       "claim_classification": "VERIFIED_MEASURED",
       "raw_artifact": "README.md Section 15.1",
       "runner_script": "scripts/run_all_tests.py",
-      "notes": "Automated test inventory comprises 4,348 uniquely collected tests across 4 disjoint suites: 3,552 backend pytests, 409 scientific verification tests across 21 modules, 356 frontend vitest tests, and 31 smart contract tests. Core Python suites (3,961 collected tests: 3,552 backend + 409 verification) maintain 100% pass rate in CI."
+      "notes": "Automated test inventory comprises 4,360 uniquely collected tests across 4 disjoint suites: 3,564 backend pytests, 409 scientific verification tests across 21 modules, 356 frontend vitest tests, and 31 smart contract tests. Core Python suites (3,973 collected tests: 3,564 backend + 409 verification) maintain 100% pass rate in CI.",
+      "claim_type": "MEASURED"
+    },
+    {
+      "claim_id": "CLM-AMLSIM-GRAPHSAGE-PRAUC",
+      "category": "fraud_detection_benchmarks",
+      "title": "IBM AMLSim Multi-Hop GraphSAGE PR-AUC",
+      "dataset": "amlsim",
+      "dataset_scale": "1.32M Transactions, 10k Accounts (IBM Research AI Agent Simulation)",
+      "claim_type": "MEASURED",
+      "stated_value": 0.6527,
+      "stated_unit": "PR-AUC",
+      "empirical_measured_value": 0.6527,
+      "centralized_baseline_value": 0.6093,
+      "evaluation_type": "GRAPH_INDUCTIVE_NEIGHBORHOOD",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "VERIFIED_MEASURED",
+      "raw_artifact": "experiments/amlsim/results.json",
+      "runner_script": "python experiments/amlsim/evaluate_patterns.py",
+      "dataset_sha256": "b3dc9b72f985e7247198f81df8d4db7c559d93dfd7d00fb4ec18a6b0b368647c",
+      "evidence_scope": "EXTERNAL_SIMULATION_BENCHMARK",
+      "communication_eligibility": "SAFE_WITH_CAVEAT",
+      "mandatory_caveat": "Agent-based multi-hop graph simulation. Evaluates Inductive GraphSAGE against tabular baselines on cycle and fan-in laundering structures.",
+      "notes": "Canonical 1.32M transaction run (70% train / 30% test). GraphSAGE 2-layer achieves PR-AUC 0.6527 (cycle recall 67.36%, fan-in recall 70.50%), outperforming tabular MLP (0.6093)."
+    },
+    {
+      "claim_id": "CLM-SYNTHAML-ALERTMLP-PRAUC",
+      "category": "fraud_detection_benchmarks",
+      "title": "Danish Spar Nord Bank SynthAML AlertMLP PR-AUC",
+      "dataset": "synthaml",
+      "dataset_scale": "5,000 alerts (synthetic generation modeled on Spar Nord Bank SAR profiles)",
+      "claim_type": "MEASURED",
+      "stated_value": 0.9924,
+      "stated_unit": "PR-AUC",
+      "empirical_measured_value": 0.9924,
+      "centralized_baseline_value": 0.9341,
+      "evaluation_type": "FEDERATED_VS_CENTRALIZED",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "VERIFIED_MEASURED",
+      "raw_artifact": "benchmarks/results/raw/fraud_benchmark_synthaml.json",
+      "runner_script": "python benchmarks/runners/run_fraud_benchmark.py --dataset synthaml",
+      "dataset_sha256": "378bca2f5c7a4eb2933fae5cb5e58e845cf1b214ed654e187d76e30328da59fa",
+      "evidence_scope": "PROJECT_SYNTHETIC_EXPERIMENT",
+      "communication_eligibility": "INTERNAL_ONLY",
+      "mandatory_caveat": "Project-generated synthetic benchmark (scripts/generate_synthaml_dataset.py). High classification performance reflects synthetic copula separability (Run B canonical: 0.9924 FedAvg PR-AUC; historical Run A: 0.9985), not real bank SAR logs.",
+      "notes": "Evaluates 3-bank federated alert classification under extreme partition imbalance. Bank Beta silo collapses to 0.2214 PR-AUC; FedAvg achieves 0.9924 collaborative rescue."
+    },
+    {
+      "claim_id": "CLM-AMLNET-FEDAVG-PRAUC",
+      "category": "fraud_detection_benchmarks",
+      "title": "AUSTRAC AMLNet Structuring Detection PR-AUC",
+      "dataset": "amlnet",
+      "dataset_scale": "25,000 transactions (internal synthetic generation modeled on AUSTRAC wire transfers)",
+      "claim_type": "MEASURED",
+      "stated_value": 1.0,
+      "stated_unit": "PR-AUC",
+      "empirical_measured_value": 1.0,
+      "centralized_baseline_value": null,
+      "evaluation_type": "FEDERATED_LEARNING",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "VERIFIED_MEASURED",
+      "raw_artifact": "experiments/amlnet/results.json",
+      "runner_script": "python benchmarks/runners/run_fraud_benchmark.py --dataset amlnet",
+      "dataset_sha256": "40a22904a3f754acf58faa8fea25003bc8184f417456774d0ca17354e96593df",
+      "evidence_scope": "PROJECT_SYNTHETIC_EXPERIMENT",
+      "communication_eligibility": "INTERNAL_ONLY",
+      "mandatory_caveat": "Project-generated synthetic benchmark exhibiting trivial structuring rule separability (amounts in [8500, 9950] AUD directly exposed by near_thresh feature). Not suitable for external real-world performance claims.",
+      "notes": "AUSTRAC wire structuring benchmark across 3 banks. 1.0 PR-AUC reflects synthetic structuring rule separability where near_thresh feature trivially isolates laundering transactions."
+    },
+    {
+      "claim_id": "CLM-CROSSBANK-DETECTION-RATE",
+      "category": "fraud_detection_benchmarks",
+      "title": "CFI-CrossBank-01 7-Scenario Consortium Multi-Bank Detection Rate",
+      "dataset": "cross_bank",
+      "dataset_scale": "1,807 transactions across 3 simulated banks, 7 topological attack scenarios",
+      "claim_type": "MEASURED",
+      "stated_value": 1.0,
+      "stated_unit": "Detection Rate",
+      "empirical_measured_value": 1.0,
+      "centralized_baseline_value": 1.0,
+      "evaluation_type": "CONSORTIUM_CROSS_BANK_COLLABORATION",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "VERIFIED_MEASURED",
+      "raw_artifact": "benchmarks/results/raw/fraud_benchmark_crossbank.json",
+      "runner_script": "python experiments/cross_bank/evaluate_cross_bank_intelligence.py",
+      "dataset_sha256": null,
+      "evidence_scope": "CONTROLLED_EXPERIMENT",
+      "communication_eligibility": "SAFE_WITH_CAVEAT",
+      "mandatory_caveat": "Must not be cited as live financial recoveries; Scenario 7 evaluates exactly N=2 synthetic test incidents (100% detection = 2/2 incidents; ,701.40 simulated averted volume).",
+      "scenario_7_support": "100.0% (2/2 synthetic incidents)",
+      "notes": "7-scenario cross-bank consortium simulation (1,807 transactions). Overall federated detection rate is 100.0% vs 80.95% isolated. Scenario 7 evaluates N=2 synthetic test incidents."
+    },
+    {
+      "claim_id": "CLM-FL-NONIID-ALPHA05",
+      "category": "federated_optimization",
+      "title": "Non-IID Dirichlet alpha=0.5 Optimization Comparison",
+      "dataset": "non_iid_synthetic",
+      "dataset_scale": "5 clients, 10 rounds, Dirichlet alpha=0.5 non-IID partition",
+      "claim_type": "MEASURED",
+      "stated_value": 0.2331,
+      "stated_unit": "PR-AUC",
+      "empirical_measured_value": 0.2331,
+      "centralized_baseline_value": null,
+      "evaluation_type": "FEDERATED_OPTIMIZATION_COMPARISON",
+      "verification_status": "VERIFIED_EMPIRICAL_RUN",
+      "claim_classification": "VERIFIED_MEASURED",
+      "raw_artifact": "benchmarks/results/raw/fl_comparison_alpha_0.5.json",
+      "runner_script": "python benchmarks/runners/run_fl_comparison.py --alpha 0.5",
+      "dataset_sha256": null,
+      "dirichlet_alpha": 0.5,
+      "algorithms_evaluated": {
+        "fedavg": 0.2331,
+        "fedprox": 0.2285,
+        "scaffold": 0.2196
+      },
+      "evidence_scope": "CONTROLLED_NON_IID_TESTBED",
+      "communication_eligibility": "INTERNAL_ONLY",
+      "mandatory_caveat": "Controlled algorithmic benchmark evaluating optimization under partition skew (Dirichlet alpha=0.5). Compares FedAvg (0.2331), FedProx (0.2285), and SCAFFOLD (0.2196). Not a live financial deployment measurement.",
+      "notes": "Non-IID Dirichlet alpha=0.5 comparison across 5 clients. FedAvg achieves 0.2331 PR-AUC, FedProx 0.2285, SCAFFOLD 0.2196."
     }
   ]
 }

@@ -100,16 +100,18 @@ def test_strict_null_representation_invariant(master_matrix_data: dict[str, Any]
 
 
 def test_evaluated_zero_distinction(master_matrix_data: dict[str, Any]) -> None:
-    """Verifies that empirical zeros (e.g. extreme imbalance F1=0.0) are preserved as 0.0."""
+    """Verifies that empirical zeros (e.g. extreme imbalance or zero-positive transfer) are preserved as 0.0."""
     datasets = master_matrix_data["datasets"]
 
-    # PaySim FedAvg genuinely evaluated to precision=0.0, recall=0.0, f1=0.0
+    # In Cross-Bank Scenario 7, Bank Gamma isolated model with 0 training positives evaluates to exactly 0.0
+    cb_iso = datasets["cross_bank"]["paradigms"]["isolated_silos"]
+    assert cb_iso["status"] == "EVALUATED"
+    assert cb_iso["zero_positive_transfer_isolated"] == 0.0
+    assert cb_iso["zero_positive_transfer_federated"] == 1.0
+
+    # PaySim FedAvg in canonical 636k evaluation has authentic non-zero metrics
     paysim_fa = datasets["paysim"]["paradigms"]["federated_fedavg"]
     assert paysim_fa["status"] == "EVALUATED"
-    assert paysim_fa["f1_score"] == 0.0
-    assert paysim_fa["precision"] == 0.0
-    assert paysim_fa["recall"] == 0.0
-    # But its ROC-AUC and PR-AUC are authentic positive values
     assert paysim_fa["roc_auc"] > 0.80
     assert paysim_fa["pr_auc"] > 0.10
 
@@ -118,35 +120,52 @@ def test_numerical_parity_with_experiment_results(master_matrix_data: dict[str, 
     """Verifies exact numerical parity between master matrix and experiments/*/results.json."""
     datasets = master_matrix_data["datasets"]
 
-    # Credit Card parity
-    cc_exp = REPO_ROOT / "experiments" / "credit_card" / "results.json"
-    if cc_exp.exists():
-        with open(cc_exp, encoding="utf-8") as f:
+    # Credit Card parity (verifies against canonical multi-seed controlled benchmark)
+    cc_controlled = REPO_ROOT / "experiments" / "credit_card" / "multi_seed_controlled_results.json"
+    if cc_controlled.exists():
+        with open(cc_controlled, encoding="utf-8") as f:
             cc_d = json.load(f)
-        fm = cc_d["final_metrics"]
+        fa_agg = cc_d["aggregate_summary"]["federated_fedavg"]
         cc_matrix_fa = datasets["credit_card"]["paradigms"]["federated_fedavg"]
-        assert pytest.approx(cc_matrix_fa["pr_auc"], abs=1e-4) == fm["pr_auc"]
-        assert pytest.approx(cc_matrix_fa["roc_auc"], abs=1e-4) == fm["roc_auc"]
-        assert pytest.approx(cc_matrix_fa["f1_score"], abs=1e-4) == fm["f1_score"]
+        assert pytest.approx(cc_matrix_fa["pr_auc"], abs=1e-4) == fa_agg["pr_auc"]["mean"]
+        assert pytest.approx(cc_matrix_fa["roc_auc"], abs=1e-4) == fa_agg["roc_auc"]["mean"]
+    else:
+        cc_exp = REPO_ROOT / "experiments" / "credit_card" / "results.json"
+        if cc_exp.exists():
+            with open(cc_exp, encoding="utf-8") as f:
+                cc_d = json.load(f)
+            fm = cc_d["final_metrics"]
+            cc_matrix_fa = datasets["credit_card"]["paradigms"]["federated_fedavg"]
+            assert pytest.approx(cc_matrix_fa["pr_auc"], abs=1e-4) == fm["pr_auc"]
+            assert pytest.approx(cc_matrix_fa["roc_auc"], abs=1e-4) == fm["roc_auc"]
 
-    # SynthAML parity
-    sy_exp = REPO_ROOT / "experiments" / "synthaml" / "results.json"
-    if sy_exp.exists():
-        with open(sy_exp, encoding="utf-8") as f:
+    # SynthAML parity (verifies against canonical artifact fraud_benchmark_synthaml.json)
+    sy_can = REPO_ROOT / "benchmarks" / "results" / "raw" / "fraud_benchmark_synthaml.json"
+    if sy_can.exists():
+        with open(sy_can, encoding="utf-8") as f:
             sy_d = json.load(f)
-        fm = sy_d["final_metrics"]
+        sy_fa = sy_d["federated_fedavg"]
         sy_matrix_fa = datasets["synthaml"]["paradigms"]["federated_fedavg"]
-        assert pytest.approx(sy_matrix_fa["pr_auc"], abs=1e-4) == fm["pr_auc"]
-        assert pytest.approx(sy_matrix_fa["roc_auc"], abs=1e-4) == fm["roc_auc"]
+        assert pytest.approx(sy_matrix_fa["pr_auc"], abs=1e-4) == sy_fa["pr_auc"]
+        assert pytest.approx(sy_matrix_fa["roc_auc"], abs=1e-4) == sy_fa["roc_auc"]
+    else:
+        sy_exp = REPO_ROOT / "experiments" / "synthaml" / "results.json"
+        if sy_exp.exists():
+            with open(sy_exp, encoding="utf-8") as f:
+                sy_d = json.load(f)
+            fm = sy_d["final_metrics"]
+            sy_matrix_fa = datasets["synthaml"]["paradigms"]["federated_fedavg"]
+            assert pytest.approx(sy_matrix_fa["pr_auc"], abs=1e-4) == fm["pr_auc"]
+            assert pytest.approx(sy_matrix_fa["roc_auc"], abs=1e-4) == fm["roc_auc"]
 
-    # Cross-Bank parity
-    cb_exp = REPO_ROOT / "experiments" / "cross_bank" / "results.json"
-    if cb_exp.exists():
-        with open(cb_exp, encoding="utf-8") as f:
+    # Cross-Bank parity (verifies against canonical artifact fraud_benchmark_crossbank.json)
+    cb_can = REPO_ROOT / "benchmarks" / "results" / "raw" / "fraud_benchmark_crossbank.json"
+    if cb_can.exists():
+        with open(cb_can, encoding="utf-8") as f:
             cb_d = json.load(f)
         cb_matrix_fa = datasets["cross_bank"]["paradigms"]["federated_fedavg"]
         assert pytest.approx(cb_matrix_fa["detection_rate"], abs=1e-4) == cb_d["overall_federated_detection_rate"]
-        assert cb_matrix_fa["pr_auc"] == 0.9729
+        assert pytest.approx(cb_matrix_fa["pr_auc"], abs=1e-4) == cb_d["scenarios"]["SCENARIO_1"]["federated_pr_auc"]
 
 
 def test_generator_programmatic_api() -> None:

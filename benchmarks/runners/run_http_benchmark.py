@@ -154,7 +154,7 @@ async def client_event_loop_heartbeat(lags_list: list[float], stop_event: asynci
         try:
             await asyncio.wait_for(stop_event.wait(), timeout=interval_s)
             break
-        except asyncio.TimeoutError:
+        except TimeoutError:
             t1 = time.perf_counter()
             lag_ms = max(0.0, (t1 - t0 - interval_s) * 1000.0)
             lags_list.append(lag_ms)
@@ -174,7 +174,7 @@ async def run_single_concurrency_tier(
     url = f"http://{host}:{port}{endpoint}"
     c = concurrency
     rpw = max(2, target_requests // c)
-    actual_attempted = rpw * c
+    _actual_attempted = rpw * c
 
     # Ensure deterministic state reset immediately prior to tier execution
     reset_ok = reset_server_benchmark_state(port=port, host=host)
@@ -188,12 +188,12 @@ async def run_single_concurrency_tier(
     # Client process tracking
     client_proc = psutil.Process()
     client_pid = client_proc.pid
-    client_threads_start = client_proc.num_threads()
+    _client_threads_start = client_proc.num_threads()
     cpu_before = client_proc.cpu_times()
 
     # Server process tracking
     server_proc_obj = psutil.Process(server_pid) if server_pid and psutil.pid_exists(server_pid) else None
-    server_threads_start = server_proc_obj.num_threads() if server_proc_obj else None
+    _server_threads_start = server_proc_obj.num_threads() if server_proc_obj else None
     server_cpu_before = server_proc_obj.cpu_times() if server_proc_obj else None
 
     # Start event-loop heartbeat monitor
@@ -242,7 +242,7 @@ async def run_single_concurrency_tier(
                                 "repetition": repetition,
                                 "concurrency": c,
                             })
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         elapsed = (time.perf_counter() - t_req) * 1000.0
                         w_samples.append({
                             "latency_ms": round(elapsed, 3),

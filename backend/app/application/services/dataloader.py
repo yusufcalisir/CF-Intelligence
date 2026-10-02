@@ -1393,9 +1393,10 @@ def _process_ieee_cis_dataframe(df: pd.DataFrame, source: str) -> dict[str, Any]
         if id_tf in df.columns:
             df[f"{id_tf}_flag"] = df[id_tf].map({"T": 1.0, "F": 0.0}).fillna(-1.0).astype(np.float32)
 
-    # 7. Exclude raw non-numeric & identifier columns
+    # 7. Exclude raw non-numeric, identifier, and chronological split axis columns
     drop_cols = {
         "TransactionID",
+        "TransactionDT",  # Crucial: Raw timestamp is split/order axis, never an ordinary input feature
         "isFraud",
         "is_fraud",
         "label",

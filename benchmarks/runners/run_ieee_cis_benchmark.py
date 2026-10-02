@@ -361,52 +361,55 @@ def main() -> None:
     pooled_models = comp_results.get("individual_pooled_models", {})
     gbdt_model = pooled_models.get("pooled_gradient_boosting", {})
 
-    pooled_prauc = cent_gap_analysis.get("pooled_pr_auc", gbdt_model.get("pr_auc", 0.781))
-    pooled_rocauc = cent_gap_analysis.get("pooled_roc_auc", gbdt_model.get("roc_auc", 0.970))
-    pooled_rec_01 = gbdt_model.get("recall_at_01_fpr", cent_gap_analysis.get("pooled_recall_at_01_fpr", 0.369))
-    pooled_rec_10 = gbdt_model.get("recall_at_1_fpr", 0.769)
+    pooled_prauc = cent_gap_analysis.get("pooled_pr_auc", gbdt_model.get("pr_auc"))
+    pooled_rocauc = cent_gap_analysis.get("pooled_roc_auc", gbdt_model.get("roc_auc"))
+    pooled_rec_01 = gbdt_model.get("recall_at_01_fpr", cent_gap_analysis.get("pooled_recall_at_01_fpr"))
+    pooled_rec_10 = gbdt_model.get("recall_at_1_fpr")
 
-    silo_prauc = silo_analysis.get("mean_pr_auc", 0.215)
-    silo_rocauc = silo_analysis.get("mean_roc_auc", 0.699)
-    silo_rec_01 = silo_analysis.get("mean_recall_at_01_fpr", 0.102)
+    silo_prauc = silo_analysis.get("mean_pr_auc")
+    silo_rocauc = silo_analysis.get("mean_roc_auc")
+    silo_rec_01 = silo_analysis.get("mean_recall_at_01_fpr")
     silo_models = comp_results.get("individual_silo_models", {})
     if silo_models:
-        silo_rec_10 = float(np.mean([m.get("recall_at_1_fpr", 0.0) for m in silo_models.values()]))
+        valid_rec = [m.get("recall_at_1_fpr") for m in silo_models.values() if m.get("recall_at_1_fpr") is not None]
+        silo_rec_10 = float(np.mean(valid_rec)) if valid_rec else None
     else:
-        silo_rec_10 = 0.20
+        silo_rec_10 = None
 
-    roc_dict = {
-        "Pooled Upper Bound": (
+    roc_dict = {}
+    if pooled_rocauc is not None:
+        roc_dict["Pooled Upper Bound"] = (
             [0.0, 0.05, 0.1, 0.2, 0.5, 1.0],
             [0.0, 0.82, 0.90, 0.95, 0.98, 1.0],
             pooled_rocauc,
-        ),
-        "FedAvg": (fedavg_curves.fpr, fedavg_curves.tpr, fedavg_res["final_metrics"]["roc_auc"]),
-        "FedProx (mu=0.01)": (fedprox_curves.fpr, fedprox_curves.tpr, fedprox_res["final_metrics"]["roc_auc"]),
-        "Isolated Silos (Mean)": (
+        )
+    roc_dict["FedAvg"] = (fedavg_curves.fpr, fedavg_curves.tpr, fedavg_res["final_metrics"]["roc_auc"])
+    roc_dict["FedProx (mu=0.01)"] = (fedprox_curves.fpr, fedprox_curves.tpr, fedprox_res["final_metrics"]["roc_auc"])
+    if silo_rocauc is not None:
+        roc_dict["Isolated Silos (Mean)"] = (
             [0.0, 0.1, 0.3, 0.6, 1.0],
             [0.0, 0.45, 0.65, 0.85, 1.0],
             silo_rocauc,
-        ),
-    }
+        )
     roc_path = plots_dir / "roc_curves.png"
     plot_multi_paradigm_roc(roc_dict, roc_path)
 
     prev = float(np.mean(benchmark_outputs["partitioner"].y_all))
-    pr_dict = {
-        "Pooled Upper Bound": (
+    pr_dict = {}
+    if pooled_prauc is not None:
+        pr_dict["Pooled Upper Bound"] = (
             [0.0, 0.4, 0.7, 0.9, 1.0],
             [1.0, 0.90, 0.75, 0.50, prev],
             pooled_prauc,
-        ),
-        "FedAvg": (fedavg_curves.recall, fedavg_curves.precision, fedavg_res["final_metrics"]["pr_auc"]),
-        "FedProx (mu=0.01)": (fedprox_curves.recall, fedprox_curves.precision, fedprox_res["final_metrics"]["pr_auc"]),
-        "Isolated Silos (Mean)": (
+        )
+    pr_dict["FedAvg"] = (fedavg_curves.recall, fedavg_curves.precision, fedavg_res["final_metrics"]["pr_auc"])
+    pr_dict["FedProx (mu=0.01)"] = (fedprox_curves.recall, fedprox_curves.precision, fedprox_res["final_metrics"]["pr_auc"])
+    if silo_prauc is not None:
+        pr_dict["Isolated Silos (Mean)"] = (
             [0.0, 0.3, 0.5, 0.8, 1.0],
             [0.6, 0.45, 0.30, 0.15, prev],
             silo_prauc,
-        ),
-    }
+        )
     pr_path = plots_dir / "pr_curves.png"
     plot_multi_paradigm_pr(pr_dict, prev, pr_path)
 
@@ -420,17 +423,22 @@ def main() -> None:
     doc_fig_dir.mkdir(parents=True, exist_ok=True)
     barchart_path = doc_fig_dir / "benchmark_ieee_cis_comparison.png"
     prauc_dict = {
-        "Centralized Upper Bound": pooled_prauc,
         "Federated Champion (FedAvg)": fedavg_res["final_metrics"]["pr_auc"],
         "Federated FedProx (mu=0.01)": fedprox_res["final_metrics"]["pr_auc"],
-        "Isolated Banking Silos": silo_prauc,
     }
+    if pooled_prauc is not None:
+        prauc_dict["Centralized Upper Bound"] = pooled_prauc
+    if silo_prauc is not None:
+        prauc_dict["Isolated Banking Silos"] = silo_prauc
+
     rocauc_dict = {
-        "Centralized Upper Bound": pooled_rocauc,
         "Federated Champion (FedAvg)": fedavg_res["final_metrics"]["roc_auc"],
         "Federated FedProx (mu=0.01)": fedprox_res["final_metrics"]["roc_auc"],
-        "Isolated Banking Silos": silo_rocauc,
     }
+    if pooled_rocauc is not None:
+        rocauc_dict["Centralized Upper Bound"] = pooled_rocauc
+    if silo_rocauc is not None:
+        rocauc_dict["Isolated Banking Silos"] = silo_rocauc
     plot_consolidated_comparison_barchart(prauc_dict, rocauc_dict, barchart_path)
 
     total_time = time.perf_counter() - t_start
@@ -446,10 +454,15 @@ def main() -> None:
     print("-" * 80)
     print(f"  {'Paradigm / Optimizer':<30} | {'PR-AUC':<8} | {'ROC-AUC':<8} | {'Rec@0.1%FPR':<11} | {'Rec@1.0%FPR':<11}")
     print("-" * 80)
-    print(f"  {'Centralized Upper Bound':<30} | {pooled_prauc:<8.4f} | {pooled_rocauc:<8.4f} | {pooled_rec_01*100:<10.2f}% | {pooled_rec_10*100:<10.2f}%")
-    print(f"  {'Federated FedAvg (Champion)':<30} | {m_fedavg.get('pr_auc', 0.0):<8.4f} | {m_fedavg.get('roc_auc', 0.0):<8.4f} | {m_fedavg.get('recall_at_01_fpr', 0.0)*100:<10.2f}% | {m_fedavg.get('recall_at_1_fpr', 0.0)*100:<10.2f}%")
-    print(f"  {'Federated FedProx (mu=0.01)':<30} | {m_fedprox.get('pr_auc', 0.0):<8.4f} | {m_fedprox.get('roc_auc', 0.0):<8.4f} | {m_fedprox.get('recall_at_01_fpr', 0.0)*100:<10.2f}% | {m_fedprox.get('recall_at_1_fpr', 0.0)*100:<10.2f}%")
-    print(f"  {'Isolated Banking Silos (Mean)':<30} | {silo_prauc:<8.4f} | {silo_rocauc:<8.4f} | {silo_rec_01*100:<10.2f}% | {silo_rec_10*100:<10.2f}%")
+    def _fmt(val: float | None, is_pct: bool = False) -> str:
+        if val is None:
+            return "N/A"
+        return f"{val * 100:.2f}%" if is_pct else f"{val:.4f}"
+
+    print(f"  {'Centralized Upper Bound':<30} | {_fmt(pooled_prauc):<8} | {_fmt(pooled_rocauc):<8} | {_fmt(pooled_rec_01, True):<11} | {_fmt(pooled_rec_10, True):<11}")
+    print(f"  {'Federated FedAvg (Champion)':<30} | {_fmt(m_fedavg.get('pr_auc')):<8} | {_fmt(m_fedavg.get('roc_auc')):<8} | {_fmt(m_fedavg.get('recall_at_01_fpr'), True):<11} | {_fmt(m_fedavg.get('recall_at_1_fpr'), True):<11}")
+    print(f"  {'Federated FedProx (mu=0.01)':<30} | {_fmt(m_fedprox.get('pr_auc')):<8} | {_fmt(m_fedprox.get('roc_auc')):<8} | {_fmt(m_fedprox.get('recall_at_01_fpr'), True):<11} | {_fmt(m_fedprox.get('recall_at_1_fpr'), True):<11}")
+    print(f"  {'Isolated Banking Silos (Mean)':<30} | {_fmt(silo_prauc):<8} | {_fmt(silo_rocauc):<8} | {_fmt(silo_rec_01, True):<11} | {_fmt(silo_rec_10, True):<11}")
     print("=" * 80)
     print(f"  [+] Machine-Readable Dossier: {benchmark_outputs['paths']['audit_dossier']}")
     print(f"  [+] Pydantic v2 JSON Schema:  {benchmark_outputs['paths']['results_json']}")

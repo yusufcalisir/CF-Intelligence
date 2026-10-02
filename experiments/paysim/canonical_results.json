@@ -4,7 +4,7 @@
   "generated_at_utc": "2026-09-30T19:32:42.881667+00:00",
   "dataset": {
     "name": "PaySim Mobile Money Fraud",
-    "dataset_type": "real",
+    "dataset_type": "externally_simulated",
     "source": "real_csv_systematic_10th",
     "csv_path": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\paysim\\PS_20174392719_1491204439457_log.csv",
     "sha256": "16910f90577b0d981bf8ff289714510bb89bc71bff7d3f220f024e287e4eea6b",
@@ -33,7 +33,10 @@
       "newbalanceDest",
       "errorBalanceOrig",
       "errorBalanceDest"
-    ]
+    ],
+    "provenance_type": "EXTERNALLY_SIMULATED",
+    "evidence_scope": "EXTERNAL_SIMULATION_BENCHMARK",
+    "provenance_description": "PaySim is an externally simulated agent-based mobile-money benchmark (Lopez-Rojas et al.), not real observed bank records."
   },
   "split": {
     "strategy": "stratified_random_80_20",

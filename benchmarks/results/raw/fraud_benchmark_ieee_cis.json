@@ -1,6 +1,11 @@
 {
   "timestamp_utc": "2026-09-26T01:31:47.520830+00:00",
   "dataset": "ieee_cis",
+  "status": "HISTORICAL",
+  "is_canonical": false,
+  "dataset_type": "PROJECT_SYNTHETIC",
+  "canonical_status_for_real_data": "NOT_EVALUATED",
+  "mandatory_caveat": "Historical synthetic smoke test generated from 10 synthetic features across 10,000 samples (5 clients x 2,000 samples) with artificial fraud prevalence (3.5%). Does NOT represent the real 590k IEEE-CIS/Vesta dataset. Real IEEE-CIS evaluation remains strictly NOT_EVALUATED on disk.",
   "environment": {
     "os": "Windows-11-10.0.26200-SP0",
     "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",

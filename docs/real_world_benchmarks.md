@@ -110,10 +110,12 @@ Under real-world distributions and calibrated noise injection ($\varepsilon = 1.
 | :--- | :--- | :---: | :---: | :---: | :---: |
 | **PaySim (M-Pesa)** | **Federated GNN + FedAvg** | **0.8420** | **0.9120** | **62.4%** | **94.0%** |
 | PaySim (M-Pesa) | Isolated Single-Bank Model | 0.6940 | 0.8350 | 43.2% | 72.0% |
-| **IEEE-CIS (Vesta)** | **Federated GNN + FedProx** | **0.8120** | **0.8980** | **58.9%** | **91.0%** |
-| IEEE-CIS (Vesta) | Isolated Single-Bank Model | 0.6510 | 0.8140 | 37.5% | 66.0% |
+| **IEEE-CIS (Vesta)\*** | **Federated GNN + FedProx (Target Spec)** | *0.8120 (Target)* | *0.8980 (Target)* | *58.9% (Target)* | *91.0% (Target)* |
+| IEEE-CIS (Vesta)\* | Isolated Single-Bank Model (Target Spec) | *0.6510 (Target)* | *0.8140 (Target)* | *37.5% (Target)* | *66.0% (Target)* |
 | **Elliptic Bitcoin** | **FedGNN (GraphSAGE + SecAgg)** | **0.8746** | **0.9758** | **80.6%** | **94.0%** |
 | Elliptic Bitcoin | Isolated Local GNN | 0.2543 | 0.7330 | 52.4% | 61.0% |
+
+*\* Note: Physical Kaggle IEEE-CIS (590,540 transactions, 421 numeric features) has been executed under Level 1 canonical protocol (`experiments/ieee_cis/canonical_results.json`). Across seeds [42, 123, 456] on strict 80/20 chronological holdout under Dirichlet $\alpha=0.5$ non-IID client skew, measured FedAvg PR-AUC is $0.3895 \pm 0.0124$ (ROC-AUC $0.8325 \pm 0.0080$, Recall@0.1%FPR $19.76\% \pm 1.41\%$) vs Centralized baseline PR-AUC $0.4422 \pm 0.0034$ (ROC-AUC $0.8536 \pm 0.0044$, Recall@0.1%FPR $20.04\% \pm 0.32\%$). Paired difference is $\Delta = -0.0527 \pm 0.0090$ (~11.9% relative reduction; client heterogeneity is one plausible contributor to the observed gap). Recall@0.1%FPR represents a test-set diagnostic operating point (~114 approx FP, ~803 approx TP). The 0.8120 target represents an unachieved asymptotic engineering design target under chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Transaction data are real Kaggle competition logs; bank federation is simulated.*
 
 ---
 

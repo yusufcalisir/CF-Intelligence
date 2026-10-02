@@ -1,5 +1,9 @@
 {
   "benchmark_id": "fraud_benchmark_amlsim",
+  "status": "HISTORICAL",
+  "is_canonical": false,
+  "superseded_by": "experiments/amlsim/results.json",
+  "supersession_reason": "Quarantined 500-sample smoke run with 1 positive test sample; canonical benchmark points to 1.32M-sample results.json.",
   "dataset_name": "AMLSim (IBM Agent-Based Multi-Hop Transaction Graph)",
   "timestamp_utc": "2026-09-27T07:53:18.479686+00:00",
   "hardware": {

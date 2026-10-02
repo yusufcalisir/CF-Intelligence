@@ -89,6 +89,12 @@ class ScenarioMetrics(BaseModel):
     federated_recall_at_01_fpr: float = Field(0.0, ge=0.0, le=1.0)
     rounds_to_detection: int = Field(1, ge=1)
     participating_institutions: int = Field(3, ge=1)
+    target_test_incidents: int | None = Field(None, description="Number of evaluation incidents")
+    isolated_detected_count: int | None = Field(None, description="Number detected by isolated model")
+    federated_detected_count: int | None = Field(None, description="Number detected by federated model")
+    support_presentation: str | None = Field(None, description="Human-readable support fraction")
+    simulated_averted_volume_usd: float | None = Field(None, description="Simulated averted loss volume")
+    volume_caveat: str | None = Field(None, description="Caveat regarding simulated volume")
 
 
 class ConsortiumBenchmarkResult(BaseModel):

@@ -219,7 +219,7 @@ def run_fraud_benchmark(
     fl_r_05 = compute_recall_at_fpr(test_y, preds_fl, 0.005)
     fl_r_10 = compute_recall_at_fpr(test_y, preds_fl, 0.010)
 
-    results = {
+    results: dict[str, Any] = {
         "timestamp_utc": datetime.datetime.now(datetime.UTC).isoformat(),
         "dataset": dataset_name,
         "dataset_type": _dataset_type,
@@ -253,7 +253,18 @@ def run_fraud_benchmark(
     if save_artifact:
         results_dir = base_dir / "benchmarks" / "results" / "raw"
         results_dir.mkdir(parents=True, exist_ok=True)
-        out_file = Path(output_path) if output_path else results_dir / f"fraud_benchmark_{dataset_name}.json"
+        if output_path:
+            out_file = Path(output_path)
+        else:
+            if effective_mode == "synthetic":
+                out_file = results_dir / f"fraud_benchmark_{dataset_name}_synthetic_smoke.json"
+            else:
+                out_file = results_dir / f"fraud_benchmark_{dataset_name}.json"
+
+        results["status"] = "SMOKE_TEST" if effective_mode == "synthetic" else "CANONICAL"
+        results["is_canonical"] = (effective_mode == "real")
+        results["provenance_classification"] = "PROJECT_SYNTHETIC" if effective_mode == "synthetic" else "REAL_DATA"
+
         with open(out_file, "w", encoding="utf-8") as f:
             json.dump(results, f, indent=2)
         print(f"Saved machine-readable results to: {out_file}")

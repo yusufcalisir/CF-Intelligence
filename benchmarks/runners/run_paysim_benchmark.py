@@ -417,16 +417,16 @@ def run_paysim_benchmark(
 
     # Add Pooled GBDT and Silos if available
     pooled_gbdt = comparative_report.get("individual_pooled_models", {}).get("pooled_gradient_boosting", {})
-    if pooled_gbdt:
+    if pooled_gbdt and pooled_gbdt.get("roc_auc") is not None and pooled_gbdt.get("pr_auc") is not None:
         roc_curves["Pooled GBDT (Upper Bound)"] = (
             [0.0, 0.05, 0.1, 0.3, 1.0],
             [0.0, 0.85, 0.94, 0.98, 1.0],
-            pooled_gbdt.get("roc_auc", 0.98),
+            pooled_gbdt["roc_auc"],
         )
         pr_curves["Pooled GBDT (Upper Bound)"] = (
             [0.0, 0.6, 0.8, 0.9, 1.0],
             [1.0, 0.92, 0.86, 0.78, prevalence],
-            pooled_gbdt.get("pr_auc", 0.86),
+            pooled_gbdt["pr_auc"],
         )
 
     roc_fig_path = plot_path / "roc_curves.png"
@@ -449,18 +449,19 @@ def run_paysim_benchmark(
     # 4.4 Consolidated Multi-Paradigm Performance Bar Chart
     auc_comp_fig_path = REPO_ROOT / "docs" / "figures" / "benchmark_auc_comparison.png"
     silo_summary = comparative_report.get("silo_deficit_analysis", {})
-    silo_pr = silo_summary.get("mean_silo_pr_auc", 0.69)
-    silo_roc = silo_summary.get("mean_silo_roc_auc", 0.88)
+    silo_pr = silo_summary.get("mean_silo_pr_auc")
+    silo_roc = silo_summary.get("mean_silo_roc_auc")
     pooled_mlp = comparative_report.get("individual_pooled_models", {}).get("pooled_neural_mlp", {})
 
     bar_data = [
-        ("Pooled GBDT", pooled_gbdt.get("pr_auc", 0.865), pooled_gbdt.get("roc_auc", 0.984), "#17becf"),
-        ("Pooled Deep MLP", pooled_mlp.get("pr_auc", 0.852), pooled_mlp.get("roc_auc", 0.978), "#9467bd"),
         (f"Fed {best_opt_name.upper()}", champion_fl["final_metrics"]["pr_auc"], champion_fl["final_metrics"]["roc_auc"], "#1f77b4"),
-        ("Isolated Silos (Mean)", silo_pr, silo_roc, "#d62728"),
-        ("Classical RF", 0.812, 0.954, "#2ca02c"),
-        ("Classical LR", 0.654, 0.852, "#7f7f7f"),
     ]
+    if pooled_gbdt and pooled_gbdt.get("pr_auc") is not None and pooled_gbdt.get("roc_auc") is not None:
+        bar_data.insert(0, ("Pooled GBDT", pooled_gbdt["pr_auc"], pooled_gbdt["roc_auc"], "#17becf"))
+    if pooled_mlp and pooled_mlp.get("pr_auc") is not None and pooled_mlp.get("roc_auc") is not None:
+        bar_data.insert(1, ("Pooled Deep MLP", pooled_mlp["pr_auc"], pooled_mlp["roc_auc"], "#9467bd"))
+    if silo_pr is not None and silo_roc is not None:
+        bar_data.append(("Isolated Silos (Mean)", silo_pr, silo_roc, "#d62728"))
     plot_paradigm_auc_comparison(bar_data, auc_comp_fig_path)
 
     # 5. Build ExperimentResult Schema

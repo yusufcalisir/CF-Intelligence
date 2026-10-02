@@ -74,7 +74,7 @@ class IEEECISPartitioner:
             raise ValueError(f"test_ratio must be between 0 and 1, got {test_ratio}")
 
         self.alpha = float(alpha)
-        self.num_clients = int(num_clients)
+        self.num_clients = num_clients
         if client_names is not None:
             if len(client_names) != self.num_clients:
                 raise ValueError(
@@ -88,11 +88,11 @@ class IEEECISPartitioner:
             else:
                 self.client_names = [f"bank_{i}" for i in range(self.num_clients)]
 
-        self.seed = int(seed)
-        self.rng = np.random.default_rng(self.seed)
-        self.min_samples_per_client = int(min_samples_per_client)
+        self.seed = seed
+        self.rng: Any = np.random.default_rng(self.seed)
+        self.min_samples_per_client = min_samples_per_client
         self.test_ratio = float(test_ratio)
-        self.partition_strategy = str(partition_strategy)
+        self.partition_strategy = partition_strategy
 
         # State storage
         self.raw_data: dict[str, Any] | None = None
@@ -115,11 +115,15 @@ class IEEECISPartitioner:
         self.client_indices: dict[str, np.ndarray] = {}
         self.diagnostics: dict[str, Any] = {}
 
+        # Feature scaling state (train-fitted standardizer)
+        self.scaler_mean_: np.ndarray | None = None
+        self.scaler_scale_: np.ndarray | None = None
+
     def load_data(
         self,
         path: Path | str | None = None,
         nrows: int | None = None,
-        require_real: bool = False,
+        require_real: bool = True,
         all_rows: bool = False,
         n_mock_txns: int = 10_000,
         join_identity: bool = True,
@@ -190,11 +194,21 @@ class IEEECISPartitioner:
         self.X_all = X_arr
         self.y_all = y_arr
 
-        if transaction_dt is not None:
-            self.dt_all = np.asarray(transaction_dt, dtype=np.float64)
-        elif "TransactionDT" in self.feature_names:
+        # Crucial P0 Fix: Enforce strict separation of TransactionDT split axis from predictive feature matrix X
+        if "TransactionDT" in self.feature_names:
             dt_idx = self.feature_names.index("TransactionDT")
-            self.dt_all = self.X_all[:, dt_idx].astype(np.float64)
+            if transaction_dt is None:
+                self.dt_all = self.X_all[:, dt_idx].astype(np.float64)
+            else:
+                self.dt_all = np.asarray(transaction_dt, dtype=np.float64)
+            # Remove raw TransactionDT from X_all and feature_names
+            keep_mask = np.ones(self.X_all.shape[1], dtype=bool)
+            keep_mask[dt_idx] = False
+            self.X_all = self.X_all[:, keep_mask]
+            self.feature_names = [f for i, f in enumerate(self.feature_names) if i != dt_idx]
+            logger.info("[IEEECISPartitioner] Purged raw TransactionDT from predictive feature matrix X (retained as dt_all)")
+        elif transaction_dt is not None:
+            self.dt_all = np.asarray(transaction_dt, dtype=np.float64)
         else:
             # Fallback to linear synthetic second timestamps starting from day 1
             self.dt_all = np.linspace(86400, 86400 * 180, num=len(X_arr), dtype=np.float64)
@@ -253,6 +267,10 @@ class IEEECISPartitioner:
                 f"exceeds minimum test TransactionDT ({test_min_dt})."
             )
 
+        assert "TransactionDT" not in self.feature_names, (
+            "Temporal leakage violation: raw TransactionDT must not be present in feature_names or X!"
+        )
+
         logger.info(
             "[IEEECISPartitioner] Temporal split complete: Train=%d txns (dt <= %.1f), Test=%d txns (dt >= %.1f)",
             len(self.X_train),
@@ -260,6 +278,55 @@ class IEEECISPartitioner:
             len(self.X_test),
             test_min_dt,
         )
+
+    def fit_standardizer(self) -> IEEECISPartitioner:
+        """Fit a feature standardizer strictly on training partition (X_train) and transform X_train and X_test.
+
+        Zero test lookahead leakage: mean and std are derived strictly from X_train.
+        Zero-variance features are scaled with scale 1.0 (no division by zero).
+        """
+        if self.X_train is None or self.X_test is None:
+            raise RuntimeError("Temporal split must be performed before fitting standardizer.")
+
+        mean = np.mean(self.X_train, axis=0, dtype=np.float64)
+        std = np.std(self.X_train, axis=0, dtype=np.float64)
+        std[std < 1e-8] = 1.0  # Avoid division by zero for constant features
+
+        self.scaler_mean_ = mean.astype(np.float32)
+        self.scaler_scale_ = std.astype(np.float32)
+
+        self.X_train = ((self.X_train - self.scaler_mean_) / self.scaler_scale_).astype(np.float32)
+        self.X_test = ((self.X_test - self.scaler_mean_) / self.scaler_scale_).astype(np.float32)
+
+        # Update client partitions if already created
+        if self.client_partitions:
+            for name, idx in self.client_indices.items():
+                self.client_partitions[name] = (self.X_train[idx], self.y_train[idx])
+        logger.info("[IEEECISPartitioner] Standardizer fitted on X_train (features=%d). Transformed X_train and X_test.", len(self.scaler_mean_))
+        return self
+
+    def get_train_data(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return (X_train, y_train)."""
+        if self.X_train is None or self.y_train is None:
+            raise RuntimeError("Data not loaded or split.")
+        return self.X_train, self.y_train
+
+    def get_test_data(self) -> tuple[np.ndarray, np.ndarray]:
+        """Return (X_test, y_test)."""
+        if self.X_test is None or self.y_test is None:
+            raise RuntimeError("Data not loaded or split.")
+        return self.X_test, self.y_test
+
+    def get_scaler_metadata(self) -> dict[str, Any] | None:
+        """Return scaler metadata for serialization and provenance auditing."""
+        if self.scaler_mean_ is None or self.scaler_scale_ is None:
+            return None
+        return {
+            "num_features": len(self.scaler_mean_),
+            "mean": self.scaler_mean_.tolist(),
+            "scale": self.scaler_scale_.tolist(),
+            "fit_boundary": "TRAIN_ONLY",
+        }
 
     def partition_dirichlet(self, alpha: float | None = None) -> dict[str, tuple[np.ndarray, np.ndarray]]:
         """Partition training set across K simulated banks using Dirichlet distribution.

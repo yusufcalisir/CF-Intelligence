@@ -1,6 +1,6 @@
 {
   "benchmark_id": "CFI-TOPOLOGY-SENSITIVITY-01",
-  "timestamp_utc": "2026-09-28T15:51:12.544225+00:00",
+  "timestamp_utc": "2026-10-02T18:58:01.376043+00:00",
   "config": {
     "n_nodes": 400,
     "fraud_prevalence": 0.03,
@@ -53,7 +53,7 @@
       "f1_score": 0.0952,
       "recall_at_0_1_fpr": 0.0,
       "delta_pr_auc_vs_0hop": -0.0035,
-      "aggregation_latency_ms": 11.16
+      "aggregation_latency_ms": 5.36
     }
   ],
   "topology_type_results": [

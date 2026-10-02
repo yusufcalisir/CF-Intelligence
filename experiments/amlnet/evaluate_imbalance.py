@@ -1043,8 +1043,16 @@ def run_amlnet_benchmark(
     raw_results_dir = REPO_ROOT / "benchmarks" / "results" / "raw"
     raw_results_dir.mkdir(parents=True, exist_ok=True)
     raw_json_path = raw_results_dir / "fraud_benchmark_amlnet.json"
+    raw_amlnet_data = {
+        "benchmark_id": "fraud_benchmark_amlnet",
+        "status": "HISTORICAL",
+        "is_canonical": False,
+        "superseded_by": "experiments/amlnet/results.json",
+        "supersession_reason": "Quarantined legacy smoke run; canonical benchmark points to experiments/amlnet/results.json.",
+        **comp_baselines,
+    }
     with open(raw_json_path, "w", encoding="utf-8") as f:
-        json.dump(comp_baselines, f, indent=2)
+        json.dump(raw_amlnet_data, f, indent=2)
 
     # Save audit_dossier.md
     dossier_path = out_path / "audit_dossier.md"

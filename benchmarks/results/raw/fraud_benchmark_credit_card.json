@@ -1,7 +1,12 @@
 {
   "timestamp_utc": "2026-09-30T18:11:01.600261+00:00",
   "dataset": "credit_card",
+  "status": "SUPERSEDED_PLACEHOLDER",
+  "is_canonical": false,
+  "dataset_type": "REAL_DATA",
   "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
+  "superseded_by": "experiments/credit_card/multi_seed_controlled_results.json",
+  "supersession_reason": "Unpopulated template placeholder artifact containing sentinel default values (PR-AUC 0.0, ROC-AUC 0.5). Does NOT represent a model training or evaluation failure. Superseded by canonical 3-seed controlled budget-equalized benchmark (Centralized PR-AUC 0.8219, FedAvg PR-AUC 0.8248).",
   "environment": {
     "os": "Windows-11-10.0.26300",
     "cpu": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",

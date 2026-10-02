@@ -215,23 +215,25 @@ def plot_all_experiment_figures(result_dict: dict[str, Any], output_dir: Path | 
     final_metrics = result_dict.get("final_metrics", {})
     cm = result_dict.get("confusion_matrix")
     calib = result_dict.get("calibration")
-    fraud_rate = result_dict.get("dataset", {}).get("fraud_rate", 0.05)
+    fraud_rate = result_dict.get("dataset", {}).get("fraud_rate")
+    roc_auc = final_metrics.get("roc_auc")
+    pr_auc = final_metrics.get("pr_auc")
 
-    if curves and "fpr" in curves and "tpr" in curves and curves["fpr"]:
+    if curves and "fpr" in curves and "tpr" in curves and curves["fpr"] and roc_auc is not None:
         roc_p = plot_roc_curve(
             fpr=curves["fpr"],
             tpr=curves["tpr"],
-            roc_auc=final_metrics.get("roc_auc", 0.90),
+            roc_auc=roc_auc,
             output_path=out_dir / "roc_curve.png",
             model_name=model_name,
         )
         generated["roc_curve"] = str(roc_p.as_posix())
 
-    if curves and "recall" in curves and "precision" in curves and curves["recall"]:
+    if curves and "recall" in curves and "precision" in curves and curves["recall"] and pr_auc is not None:
         pr_p = plot_pr_curve(
             recall=curves["recall"],
             precision=curves["precision"],
-            pr_auc=final_metrics.get("pr_auc", 0.75),
+            pr_auc=pr_auc,
             output_path=out_dir / "pr_curve.png",
             baseline_prevalence=fraud_rate,
             model_name=model_name,

@@ -51,12 +51,20 @@
   },
   "dataset": {
     "dataset_name": "Danish Spar Nord Bank SynthAML Synthetic AML Benchmark",
-    "source_uri": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\backend\\storage\\datasets\\synthaml",
-    "sha256_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "dataset_type": "PROJECT_SYNTHETIC",
+    "source_uri": "backend/storage/datasets/synthaml/alerts.parquet",
+    "generator_path": "scripts/generate_synthaml_dataset.py",
+    "generator_seed": 42,
+    "generator_parameters": {
+      "n_alerts": 5000,
+      "positive_ratio": 0.085
+    },
+    "generated_artifact_sha256": "378bca2f5c7a4eb2933fae5cb5e58e845cf1b214ed654e187d76e30328da59fa",
+    "sha256_hash": "378bca2f5c7a4eb2933fae5cb5e58e845cf1b214ed654e187d76e30328da59fa",
     "total_samples": 5000,
     "num_features": 14,
     "fraud_samples": 425,
-    "fraud_rate": 0.045,
+    "fraud_rate": 0.085,
     "split_ratios": {
       "train": 0.8,
       "test": 0.2

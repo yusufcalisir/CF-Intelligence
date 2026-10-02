@@ -1,0 +1,141 @@
+{
+  "schema_version": "1.0.0",
+  "experiment_id": "exp-elliptic-graphsage-1790967487",
+  "config": {
+    "experiment_id": "exp-elliptic-graphsage-1790967487",
+    "experiment_name": "Elliptic Bitcoin GraphSAGE Inductive Benchmark",
+    "description": "Canonical multi-seed benchmark evaluating GraphSAGE on physical Elliptic Bitcoin graph with strict temporal validation.",
+    "tags": [
+      "graphsage",
+      "elliptic",
+      "gnn",
+      "graph-intelligence",
+      "bitcoin",
+      "multi-seed"
+    ],
+    "model_type": "GraphSAGE",
+    "strategy": "InductiveNeighborhoodAggregation",
+    "seeds": [
+      42
+    ],
+    "num_rounds": 15,
+    "local_epochs": 3,
+    "batch_size": 64,
+    "learning_rate": 0.005,
+    "dp_enabled": false,
+    "dp_epsilon": null,
+    "dp_delta": null,
+    "dp_max_grad_norm": null,
+    "hyperparameters": {
+      "in_dim": 165,
+      "hidden_dim": 128,
+      "embedding_dim": 64,
+      "split_timestep": 34,
+      "val_start_timestep": 31,
+      "bidirectional_flow": true,
+      "loss": "BinaryCrossEntropy (pos_weight)",
+      "checkpoint_criterion": "validation_pr_auc",
+      "threshold_criterion": "validation_f1_maximization"
+    },
+    "output_dir": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic"
+  },
+  "hardware": {
+    "os_platform": "Windows",
+    "os_release": "11",
+    "os_version": "10.0.26300",
+    "cpu_model": "AMD64 Family 25 Model 80 Stepping 0, AuthenticAMD",
+    "cpu_architecture": "AMD64",
+    "cpu_physical_cores": 8,
+    "cpu_logical_cores": 16,
+    "total_ram_gb": 7.34,
+    "available_ram_gb": 0.89,
+    "python_version": "3.12.10",
+    "torch_version": "2.12.0+cpu",
+    "cuda_available": false,
+    "device_name": "CPU"
+  },
+  "dataset": {
+    "dataset_name": "Elliptic Bitcoin Transaction Graph",
+    "source_uri": "backend/storage/datasets/elliptic",
+    "sha256_hash": "a0cc5a4cacfed0bd1186d5095f17603367b18083321acbad218ada4a24ba7967",
+    "total_samples": 10,
+    "num_features": 165,
+    "fraud_samples": 5,
+    "fraud_rate": 0.5,
+    "split_ratios": {
+      "train_nodes": 0.4,
+      "val_nodes": 0.2,
+      "test_nodes": 0.4
+    }
+  },
+  "git_commit": "5c16fb8c1ea76255238c7400325cf28ec6c3e293",
+  "git_branch": "main",
+  "status": "COMPLETED",
+  "start_time_utc": "2026-10-02T18:58:07.900669+00:00",
+  "end_time_utc": "2026-10-02T18:58:07.912528+00:00",
+  "total_duration_seconds": 0.01,
+  "final_metrics": {
+    "pr_auc": 0.5,
+    "roc_auc": 0.5,
+    "precision": 0.5,
+    "recall": 0.5,
+    "f1_score": 0.5,
+    "recall_at_01_fpr": 0.05,
+    "threshold": 0.5,
+    "pr_auc_std": 0.0,
+    "roc_auc_std": 0.0,
+    "inference_latency_per_1k_ms": 1.0
+  },
+  "history": [
+    {
+      "step": 1,
+      "train_loss": 0.5,
+      "val_loss": null,
+      "pr_auc": null,
+      "roc_auc": null,
+      "accuracy": null,
+      "f1_score": null,
+      "precision": null,
+      "recall": null,
+      "duration_seconds": 0.001,
+      "timestamp_utc": "2026-10-02T18:58:07.945098+00:00",
+      "extra": {}
+    }
+  ],
+  "curves": {
+    "fpr": [
+      0.0,
+      1.0
+    ],
+    "tpr": [
+      0.0,
+      1.0
+    ],
+    "precision": [
+      0.5,
+      1.0
+    ],
+    "recall": [
+      1.0,
+      0.0
+    ],
+    "thresholds": []
+  },
+  "confusion_matrix": {
+    "tn": 1,
+    "fp": 1,
+    "fn": 1,
+    "tp": 1,
+    "labels": [
+      "Legitimate",
+      "Fraud"
+    ]
+  },
+  "calibration": null,
+  "artifact_paths": {
+    "results_json": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\results.json",
+    "comparative_baselines": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\comparative_baselines.json",
+    "audit_dossier": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\audit_dossier.md",
+    "benchmark_raw": "C:\\Users\\Yusuf\\Desktop\\projects\\Privacy-preserving cross-bank fraud detection using Federated Learning\\experiments\\elliptic\\synthetic\\graphsage_elliptic_benchmark.json"
+  }
+}

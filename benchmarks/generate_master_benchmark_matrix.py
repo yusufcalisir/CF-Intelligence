@@ -21,6 +21,14 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from benchmarks.canonical_registry import (  # noqa: E402
+    CANONICAL_REGISTRY,
+    resolve_canonical_artifact,
+)
+
 EXPERIMENTS_DIR = REPO_ROOT / "experiments"
 RAW_RESULTS_DIR = REPO_ROOT / "benchmarks" / "results" / "raw"
 OUTPUT_MATRIX_PATH = RAW_RESULTS_DIR / "master_benchmark_matrix.json"
@@ -70,41 +78,49 @@ class MasterBenchmarkMatrixGenerator:
         datasets_matrix: dict[str, Any] = {}
 
         # 1. PaySim
-        paysim_exp = self._safe_load_json(self.experiments_dir / "paysim" / "results.json") or {}
-        paysim_raw = self._safe_load_json(self.raw_results_dir / "fraud_benchmark_paysim.json") or {}
-        p_fm = paysim_exp.get("final_metrics", {})
+        paysim_can = resolve_canonical_artifact("paysim_canonical") or {}
+        p_agg = paysim_can.get("aggregate", {})
+        p_seeds = paysim_can.get("per_seed_results", [])
+        p_cent0 = p_seeds[0].get("centralized", {}) if p_seeds else {}
+        p_fl0 = p_seeds[0].get("fedavg", {}) if p_seeds else {}
+        p_budget = paysim_can.get("budget", {})
         datasets_matrix["paysim"] = {
             "dataset_id": "paysim",
             "dataset_name": "PaySim Mobile Money Fraud",
             "domain": "Mobile Money (P2P / Cash-Out)",
-            "real_vs_synthetic": "SYNTHETIC_AGENT_SIMULATOR",
-            "provenance_scale": "6.36M transactions (Blekinge Institute)",
-            "evaluated_samples": paysim_exp.get("dataset", {}).get("total_samples", 30000),
-            "fraud_prevalence_pct": 0.129,
-            "feature_dim": 13,
+            "real_vs_synthetic": CANONICAL_REGISTRY["paysim_canonical"].provenance_type.value,
+            "provenance_scale": "6.36M transactions (Blekinge Institute, 10% systematic sample)",
+            "evaluated_samples": paysim_can.get("dataset", {}).get("n_rows_sampled", 636262),
+            "fraud_prevalence_pct": (
+                round(paysim_can.get("dataset", {}).get("fraud_rate") * 100, 3)
+                if paysim_can.get("dataset", {}).get("fraud_rate") is not None
+                else None
+            ),
+            "feature_dim": len(paysim_can.get("dataset", {}).get("feature_cols", [])) or 13,
+            "mandatory_caveat": CANONICAL_REGISTRY["paysim_canonical"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
-                    "architecture": "Centralized Neural Classifier",
-                    "pr_auc": paysim_raw.get("models", {}).get("centralized_pooled", {}).get("pr_auc", 0.4654),
-                    "roc_auc": paysim_raw.get("models", {}).get("centralized_pooled", {}).get("roc_auc"),
+                    "architecture": "Centralized Neural Classifier (Budget-Equalized 30 Epochs)",
+                    "pr_auc": p_agg.get("centralized_pr_auc", {}).get("mean"),
+                    "roc_auc": p_cent0.get("roc_auc"),
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
-                    "recall_at_01_fpr": paysim_raw.get("models", {}).get("centralized_pooled", {}).get("recall_at_01_fpr", 0.4000),
+                    "recall_at_01_fpr": p_cent0.get("recall_at_01pct_fpr"),
                     "recall_at_001_fpr": None,
                     "status": "EVALUATED",
                 },
                 "federated_fedavg": {
-                    "architecture": "PaySimNeuralClassifier (FedAvg)",
-                    "clients": 3,
-                    "rounds": 10,
-                    "pr_auc": p_fm.get("pr_auc", 0.11838),
-                    "roc_auc": p_fm.get("roc_auc", 0.86996),
-                    "f1_score": p_fm.get("f1_score", 0.0),
-                    "precision": p_fm.get("precision", 0.0),
-                    "recall": p_fm.get("recall", 0.0),
-                    "recall_at_01_fpr": p_fm.get("recall_at_01_fpr", 0.33333),
-                    "recall_at_001_fpr": p_fm.get("recall_at_001_fpr", 0.0),
+                    "architecture": "PaySimNeuralClassifier (FedAvg 10 Rnds x 3 Local Ep)",
+                    "clients": paysim_can.get("partition", {}).get("n_clients", 3),
+                    "rounds": p_budget.get("num_rounds", 10),
+                    "pr_auc": p_agg.get("fedavg_pr_auc", {}).get("mean"),
+                    "roc_auc": p_fl0.get("roc_auc"),
+                    "f1_score": None,
+                    "precision": None,
+                    "recall": None,
+                    "recall_at_01_fpr": p_fl0.get("recall_at_01pct_fpr"),
+                    "recall_at_001_fpr": None,
                     "status": "EVALUATED",
                 },
                 "federated_fedprox": {
@@ -137,114 +153,56 @@ class MasterBenchmarkMatrixGenerator:
         }
 
         # 2. IEEE-CIS
-        ieee_exp = self._safe_load_json(self.experiments_dir / "ieee_cis" / "results.json") or {}
-        ieee_raw = self._safe_load_json(self.raw_results_dir / "fraud_benchmark_ieee_cis.json") or {}
-        i_fm = ieee_exp.get("final_metrics", {})
+        ieee_can = resolve_canonical_artifact("ieee_cis_real") or {}
+        ieee_agg = ieee_can.get("aggregate_metrics") or ieee_can.get("aggregate", {})
+        ieee_budget = ieee_can.get("budget", {})
+        ieee_cent_pr = ieee_agg.get("centralized_pr_auc", {}).get("mean")
+        ieee_fa_pr = ieee_agg.get("fedavg_pr_auc", {}).get("mean")
+        ieee_cent_roc = ieee_agg.get("centralized_roc_auc", {}).get("mean")
+        ieee_fa_roc = ieee_agg.get("fedavg_roc_auc", {}).get("mean")
+        ieee_cent_rec01 = ieee_agg.get("centralized_recall_at_01_fpr", {}).get("mean")
+        ieee_fa_rec01 = ieee_agg.get("fedavg_recall_at_01_fpr", {}).get("mean")
+        ieee_status = "EVALUATED" if ieee_can else "NOT_EVALUATED"
+
         datasets_matrix["ieee_cis"] = {
             "dataset_id": "ieee_cis",
             "dataset_name": "IEEE-CIS Fraud Detection",
             "domain": "E-Commerce Card-Not-Present (CNP)",
-            "real_vs_synthetic": "REAL_PRODUCTION_CNP_LOGS",
-            "provenance_scale": "590k transactions (Vesta Corp)",
-            "evaluated_samples": ieee_exp.get("dataset", {}).get("total_samples", 15000),
+            "real_vs_synthetic": CANONICAL_REGISTRY["ieee_cis_real"].provenance_type.value,
+            "provenance_scale": "590,540 transactions (Kaggle / Vesta Corp) — Canonical Level 1" if ieee_can else "590k transactions (Kaggle / Vesta Corp) — Not Evaluated",
+            "evaluated_samples": ieee_can.get("dataset", {}).get("total_transactions", 590540) if ieee_can else None,
             "fraud_prevalence_pct": 3.50,
-            "feature_dim": 422,
+            "feature_dim": ieee_can.get("dataset", {}).get("feature_dim", 421) if ieee_can else 421,
+            "mandatory_caveat": CANONICAL_REGISTRY["ieee_cis_real"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
-                    "architecture": "Centralized Neural Classifier",
-                    "pr_auc": ieee_raw.get("models", {}).get("centralized_pooled", {}).get("pr_auc", 0.7811),
-                    "roc_auc": ieee_raw.get("models", {}).get("centralized_pooled", {}).get("roc_auc"),
+                    "architecture": "Centralized Neural Classifier (10 Epochs Pooled)",
+                    "pr_auc": ieee_cent_pr,
+                    "roc_auc": ieee_cent_roc,
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
-                    "recall_at_01_fpr": ieee_raw.get("models", {}).get("centralized_pooled", {}).get("recall_at_01_fpr", 0.3692),
+                    "recall_at_01_fpr": ieee_cent_rec01,
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": ieee_status,
                 },
                 "federated_fedavg": {
-                    "architecture": "IEEECISNeuralClassifier (FedAvg)",
-                    "clients": 3,
-                    "rounds": 5,
-                    "pr_auc": ieee_raw.get("models", {}).get("federated_fedavg", {}).get("pr_auc", 0.7554),
-                    "roc_auc": None,
+                    "architecture": "IEEECISNeuralClassifier (FedAvg 5 Rnds x 2 Local Ep)",
+                    "clients": ieee_can.get("partition", {}).get("n_clients", 3) if ieee_can else None,
+                    "rounds": ieee_budget.get("num_rounds", 5) if ieee_can else None,
+                    "pr_auc": ieee_fa_pr,
+                    "roc_auc": ieee_fa_roc,
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
-                    "recall_at_01_fpr": ieee_raw.get("models", {}).get("federated_fedavg", {}).get("recall_at_01_fpr", 0.4308),
+                    "recall_at_01_fpr": ieee_fa_rec01,
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": ieee_status,
                 },
                 "federated_fedprox": {
                     "architecture": "IEEECISNeuralClassifier (FedProx mu=0.01)",
-                    "clients": 3,
-                    "rounds": 5,
-                    "pr_auc": i_fm.get("pr_auc", 0.06914),
-                    "roc_auc": i_fm.get("roc_auc", 0.66322),
-                    "f1_score": i_fm.get("f1_score", 0.0),
-                    "precision": i_fm.get("precision", 0.0),
-                    "recall": i_fm.get("recall", 0.0),
-                    "recall_at_01_fpr": i_fm.get("recall_at_01_fpr", 0.0),
-                    "recall_at_001_fpr": i_fm.get("recall_at_001_fpr", 0.0),
-                    "status": "EVALUATED",
-                },
-                "isolated_silos": {
-                    "architecture": "Isolated Bank Nodes (No FL)",
-                    "worst_silo_pr_auc": None,
-                    "mean_silo_pr_auc": None,
-                    "best_silo_pr_auc": None,
-                    "status": "NOT_RUN",
-                },
-                "classical_baselines": {
-                    "random_forest_pr_auc": None,
-                    "logistic_regression_pr_auc": None,
-                    "xgboost_pr_auc": None,
-                    "status": "NOT_RUN",
-                },
-            },
-        }
-
-        # 3. Credit Card
-        cc_exp = self._safe_load_json(self.experiments_dir / "credit_card" / "results.json") or {}
-        cc_raw = self._safe_load_json(self.raw_results_dir / "fraud_benchmark_credit_card.json") or {}
-        cc_fm = cc_exp.get("final_metrics", {})
-        datasets_matrix["credit_card"] = {
-            "dataset_id": "credit_card",
-            "dataset_name": "European Credit Card Fraud",
-            "domain": "Retail Credit Card Transactions",
-            "real_vs_synthetic": "REAL_ANONYMIZED_PCA",
-            "provenance_scale": "284,807 transactions (ULB Machine Learning Group)",
-            "evaluated_samples": cc_exp.get("dataset", {}).get("total_samples", 284806),
-            "fraud_prevalence_pct": 0.173,
-            "feature_dim": 30,
-            "paradigms": {
-                "centralized_pooled": {
-                    "architecture": "Centralized Logistic/MLP Baseline",
-                    "pr_auc": cc_raw.get("models", {}).get("centralized_pooled", {}).get("pr_auc", 0.7920),
-                    "roc_auc": cc_raw.get("models", {}).get("centralized_pooled", {}).get("roc_auc", 0.9850),
-                    "f1_score": None,
-                    "precision": None,
-                    "recall": None,
-                    "recall_at_01_fpr": None,
-                    "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
-                },
-                "federated_fedavg": {
-                    "architecture": "CreditCardImbalanceMLP (FedAvg)",
-                    "clients": 3,
-                    "rounds": 5,
-                    "pr_auc": cc_fm.get("pr_auc", 0.77499),
-                    "roc_auc": cc_fm.get("roc_auc", 0.98374),
-                    "f1_score": cc_fm.get("f1_score", 0.78818),
-                    "precision": cc_fm.get("precision", 0.76190),
-                    "recall": cc_fm.get("recall", 0.81633),
-                    "recall_at_01_fpr": cc_fm.get("recall_at_01_fpr", 0.84694),
-                    "recall_at_001_fpr": cc_fm.get("recall_at_001_fpr", 0.42857),
-                    "status": "EVALUATED",
-                },
-                "federated_fedprox": {
-                    "architecture": "CreditCardImbalanceMLP (FedProx)",
-                    "clients": 3,
-                    "rounds": 5,
+                    "clients": None,
+                    "rounds": None,
                     "pr_auc": None,
                     "roc_auc": None,
                     "f1_score": None,
@@ -270,30 +228,107 @@ class MasterBenchmarkMatrixGenerator:
             },
         }
 
+        # 3. Credit Card
+        cc_can = resolve_canonical_artifact("credit_card_canonical") or {}
+        cc_stats = cc_can.get("aggregate_summary", {})
+        cc_cent = cc_stats.get("centralized_equalized_10ep", {})
+        cc_fa = cc_stats.get("federated_fedavg", {})
+        cc_fp = cc_stats.get("federated_fedprox", {})
+        cc_silo_a = cc_stats.get("bank_a_silo", {})
+        cc_silo_b = cc_stats.get("bank_b_silo", {})
+        datasets_matrix["credit_card"] = {
+            "dataset_id": "credit_card",
+            "dataset_name": "European Credit Card Fraud",
+            "domain": "Retail Credit Card Transactions",
+            "real_vs_synthetic": CANONICAL_REGISTRY["credit_card_canonical"].provenance_type.value,
+            "provenance_scale": "284,807 transactions (ULB Machine Learning Group)",
+            "evaluated_samples": cc_can.get("benchmark_metadata", {}).get("total_transactions", 284807),
+            "fraud_prevalence_pct": 0.173,
+            "feature_dim": 30,
+            "mandatory_caveat": CANONICAL_REGISTRY["credit_card_canonical"].mandatory_caveat,
+            "paradigms": {
+                "centralized_pooled": {
+                    "architecture": "Centralized Equalized MLP (10 Epochs, 35.6k Steps)",
+                    "pr_auc": cc_cent.get("pr_auc", {}).get("mean"),
+                    "roc_auc": cc_cent.get("roc_auc", {}).get("mean"),
+                    "f1_score": None,
+                    "precision": None,
+                    "recall": None,
+                    "recall_at_01_fpr": cc_cent.get("recall_at_01_fpr", {}).get("mean"),
+                    "recall_at_001_fpr": None,
+                    "status": "EVALUATED",
+                },
+                "federated_fedavg": {
+                    "architecture": "CreditCardImbalanceMLP (FedAvg 5 Rnds x 2 Local Ep)",
+                    "clients": 3,
+                    "rounds": 5,
+                    "pr_auc": cc_fa.get("pr_auc", {}).get("mean"),
+                    "roc_auc": cc_fa.get("roc_auc", {}).get("mean"),
+                    "f1_score": None,
+                    "precision": None,
+                    "recall": None,
+                    "recall_at_01_fpr": cc_fa.get("recall_at_01_fpr", {}).get("mean"),
+                    "recall_at_001_fpr": None,
+                    "status": "EVALUATED",
+                },
+                "federated_fedprox": {
+                    "architecture": "CreditCardImbalanceMLP (FedProx mu=0.01)",
+                    "clients": 3,
+                    "rounds": 5,
+                    "pr_auc": cc_fp.get("pr_auc", {}).get("mean"),
+                    "roc_auc": cc_fp.get("roc_auc", {}).get("mean"),
+                    "f1_score": None,
+                    "precision": None,
+                    "recall": None,
+                    "recall_at_01_fpr": cc_fp.get("recall_at_01_fpr", {}).get("mean"),
+                    "recall_at_001_fpr": None,
+                    "status": "EVALUATED",
+                },
+                "isolated_silos": {
+                    "architecture": "Isolated Bank Nodes (No FL)",
+                    "worst_silo_pr_auc": cc_silo_b.get("pr_auc", {}).get("mean"),
+                    "mean_silo_pr_auc": (
+                        round((cc_silo_a.get("pr_auc", {}).get("mean") + cc_silo_b.get("pr_auc", {}).get("mean")) / 2.0, 4)
+                        if (cc_silo_a.get("pr_auc", {}).get("mean") is not None and cc_silo_b.get("pr_auc", {}).get("mean") is not None)
+                        else None
+                    ),
+                    "best_silo_pr_auc": cc_silo_a.get("pr_auc", {}).get("mean"),
+                    "status": "EVALUATED",
+                },
+                "classical_baselines": {
+                    "random_forest_pr_auc": None,
+                    "logistic_regression_pr_auc": None,
+                    "xgboost_pr_auc": None,
+                    "status": "NOT_RUN",
+                },
+            },
+        }
+
         # 4. Elliptic
-        ell_exp = self._safe_load_json(self.experiments_dir / "elliptic" / "results.json") or {}
-        ell_raw = self._safe_load_json(self.raw_results_dir / "graphsage_elliptic_benchmark.json") or {}
-        ell_metrics = ell_raw.get("metrics") or ell_exp.get("aggregate_metrics", {}).get("mean") or {}
+        ell_can = resolve_canonical_artifact("elliptic_canonical") or {}
+        ell_metrics = ell_can.get("metrics") or {}
+        ell_meta = ell_can.get("dataset_metadata") or {}
         datasets_matrix["elliptic"] = {
             "dataset_id": "elliptic",
             "dataset_name": "Elliptic Bitcoin AML Graph",
             "domain": "Cryptocurrency Blockchain DAG",
-            "real_vs_synthetic": "REAL_BLOCKCHAIN_DAG",
+            "real_vs_synthetic": CANONICAL_REGISTRY["elliptic_canonical"].provenance_type.value,
             "provenance_scale": "203k nodes, 234k edges (MIT-IBM Watson / Elliptic)",
-            "evaluated_samples": ell_exp.get("dataset", {}).get("total_samples", 203769),
+            "evaluated_samples": ell_meta.get("total_nodes", 203769),
             "fraud_prevalence_pct": 9.76,
-            "feature_dim": 165,
+            "feature_dim": ell_meta.get("total_features", 165),
+            "mandatory_caveat": CANONICAL_REGISTRY["elliptic_canonical"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
                     "architecture": "GraphSAGE Centralized Inductive (Multi-Seed Temporal Mean)",
-                    "pr_auc": ell_metrics.get("pr_auc", 0.3761),
-                    "roc_auc": ell_metrics.get("roc_auc", 0.8325),
-                    "f1_score": ell_metrics.get("f1_score", 0.3555),
-                    "precision": ell_metrics.get("precision", 0.2757),
-                    "recall": ell_metrics.get("recall", 0.5583),
-                    "recall_at_01_fpr": ell_metrics.get("recall_at_01_fpr", 0.0886),
+                    "pr_auc": ell_metrics.get("pr_auc"),
+                    "roc_auc": ell_metrics.get("roc_auc"),
+                    "f1_score": ell_metrics.get("f1_score"),
+                    "precision": ell_metrics.get("precision"),
+                    "recall": ell_metrics.get("recall"),
+                    "recall_at_01_fpr": ell_metrics.get("recall_at_01_fpr"),
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "EVALUATED" if ell_metrics.get("pr_auc") is not None else "NOT_RUN",
                 },
                 "federated_fedavg": {
                     "architecture": "GraphSAGE FedAvg (Cross-Bank Subgraph Partitioning)",
@@ -339,42 +374,47 @@ class MasterBenchmarkMatrixGenerator:
         }
 
         # 5. IBM AMLSim
-        amlsim_exp = self._safe_load_json(self.experiments_dir / "amlsim" / "results.json") or {}
-        amlsim_raw = self._safe_load_json(self.raw_results_dir / "fraud_benchmark_amlsim.json") or {}
-        as_fm = amlsim_exp.get("final_metrics", {})
+        amlsim_can = resolve_canonical_artifact("amlsim_canonical") or {}
+        as_fm = amlsim_can.get("final_metrics") or {}
+        as_ds = amlsim_can.get("dataset") or {}
+        amlsim_base = self._safe_load_json(self.experiments_dir / "amlsim" / "comparative_baselines.json") or {}
+        as_models = amlsim_base.get("models") or {}
+        as_rf = as_models.get("random_forest", {}).get("pr_auc")
+        as_lr = as_models.get("logistic_regression", {}).get("pr_auc")
         datasets_matrix["amlsim"] = {
             "dataset_id": "amlsim",
             "dataset_name": "IBM AMLSim Multi-Hop Banking",
             "domain": "Commercial Banking Multi-Agent Graph",
-            "real_vs_synthetic": "SYNTHETIC_AGENT_GRAPH",
+            "real_vs_synthetic": CANONICAL_REGISTRY["amlsim_canonical"].provenance_type.value,
             "provenance_scale": "1.32M transactions, 10k accounts (IBM Research AI)",
-            "evaluated_samples": amlsim_exp.get("dataset", {}).get("total_samples", 1323234),
-            "fraud_prevalence_pct": 0.130,
-            "feature_dim": 6,
+            "evaluated_samples": as_ds.get("total_samples", 1323234),
+            "fraud_prevalence_pct": round(as_ds.get("fraud_rate") * 100, 3) if as_ds.get("fraud_rate") is not None else None,
+            "feature_dim": as_ds.get("num_features", 6),
+            "mandatory_caveat": CANONICAL_REGISTRY["amlsim_canonical"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
-                    "architecture": "GraphSAGE Centralized Oracle",
-                    "pr_auc": amlsim_raw.get("centralized_baseline_pr_auc", 0.6720),
-                    "roc_auc": None,
-                    "f1_score": None,
-                    "precision": None,
-                    "recall": None,
-                    "recall_at_01_fpr": None,
+                    "architecture": "GraphSAGE Centralized Oracle (2-Layer)",
+                    "pr_auc": as_fm.get("pr_auc"),
+                    "roc_auc": as_fm.get("roc_auc"),
+                    "f1_score": as_fm.get("f1_score"),
+                    "precision": as_fm.get("precision"),
+                    "recall": as_fm.get("recall"),
+                    "recall_at_01_fpr": as_fm.get("recall_at_01_fpr"),
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "EVALUATED" if as_fm.get("pr_auc") is not None else "NOT_RUN",
                 },
                 "federated_fedavg": {
-                    "architecture": "GraphSAGE Inductive Neighborhood",
+                    "architecture": "GraphSAGE Inductive Neighborhood (15 Rounds)",
                     "clients": None,
-                    "rounds": 15,
-                    "pr_auc": as_fm.get("pr_auc", 0.6527),
-                    "roc_auc": as_fm.get("roc_auc", 0.9509),
-                    "f1_score": as_fm.get("f1_score", 0.1689),
-                    "precision": None,
-                    "recall": None,
-                    "recall_at_01_fpr": as_fm.get("recall_at_01_fpr", 0.6412),
+                    "rounds": amlsim_can.get("config", {}).get("num_rounds", 15),
+                    "pr_auc": as_fm.get("pr_auc"),
+                    "roc_auc": as_fm.get("roc_auc"),
+                    "f1_score": as_fm.get("f1_score"),
+                    "precision": as_fm.get("precision"),
+                    "recall": as_fm.get("recall"),
+                    "recall_at_01_fpr": as_fm.get("recall_at_01_fpr"),
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "EVALUATED" if as_fm.get("pr_auc") is not None else "NOT_RUN",
                 },
                 "federated_fedprox": {
                     "architecture": "GraphSAGE FedProx",
@@ -397,6 +437,82 @@ class MasterBenchmarkMatrixGenerator:
                     "status": "NOT_RUN",
                 },
                 "classical_baselines": {
+                    "random_forest_pr_auc": as_rf,
+                    "logistic_regression_pr_auc": as_lr,
+                    "xgboost_pr_auc": None,
+                    "status": "EVALUATED" if (as_rf is not None or as_lr is not None) else "NOT_RUN",
+                },
+            },
+        }
+
+        # 6. SynthAML
+        synth_can = resolve_canonical_artifact("synthaml_synthetic") or {}
+        sy_cent = synth_can.get("centralized_baseline") or {}
+        sy_fa = synth_can.get("federated_fedavg") or {}
+        sy_fp = synth_can.get("federated_fedprox") or {}
+        sy_silos = synth_can.get("isolated_silos") or {}
+        sy_b_alpha = sy_silos.get("bank_alpha", {}).get("pr_auc")
+        sy_b_beta = sy_silos.get("bank_beta", {}).get("pr_auc")
+        sy_b_gamma = sy_silos.get("bank_gamma", {}).get("pr_auc")
+        silo_vals = [v for v in [sy_b_alpha, sy_b_beta, sy_b_gamma] if v is not None]
+        mean_silo = round(sum(silo_vals) / len(silo_vals), 4) if silo_vals else None
+
+        datasets_matrix["synthaml"] = {
+            "dataset_id": "synthaml",
+            "dataset_name": "Danish Spar Nord Bank SynthAML",
+            "domain": "Commercial Danish Banking AML Alerts",
+            "real_vs_synthetic": CANONICAL_REGISTRY["synthaml_synthetic"].provenance_type.value,
+            "provenance_scale": "20k alerts / 16M txns (Aarhus Univ / Spar Nord)",
+            "evaluated_samples": 5000,
+            "fraud_prevalence_pct": 8.50,
+            "feature_dim": 14,
+            "mandatory_caveat": CANONICAL_REGISTRY["synthaml_synthetic"].mandatory_caveat,
+            "paradigms": {
+                "centralized_pooled": {
+                    "architecture": "Centralized AlertMLP",
+                    "pr_auc": sy_cent.get("pr_auc"),
+                    "roc_auc": sy_cent.get("roc_auc"),
+                    "f1_score": sy_cent.get("f1_score"),
+                    "precision": sy_cent.get("precision"),
+                    "recall": sy_cent.get("recall"),
+                    "recall_at_01_fpr": sy_cent.get("recall_at_01_fpr"),
+                    "recall_at_001_fpr": sy_cent.get("recall_at_001_fpr"),
+                    "status": "EVALUATED" if sy_cent.get("pr_auc") is not None else "NOT_RUN",
+                },
+                "federated_fedavg": {
+                    "architecture": "AlertMLPClassifier (FedAvg)",
+                    "clients": 3,
+                    "rounds": 6,
+                    "pr_auc": sy_fa.get("pr_auc"),
+                    "roc_auc": sy_fa.get("roc_auc"),
+                    "f1_score": sy_fa.get("f1_score"),
+                    "precision": sy_fa.get("precision"),
+                    "recall": sy_fa.get("recall"),
+                    "recall_at_01_fpr": sy_fa.get("recall_at_01_fpr"),
+                    "recall_at_001_fpr": sy_fa.get("recall_at_001_fpr"),
+                    "status": "EVALUATED" if sy_fa.get("pr_auc") is not None else "NOT_RUN",
+                },
+                "federated_fedprox": {
+                    "architecture": "AlertMLPClassifier (FedProx)",
+                    "clients": 3,
+                    "rounds": 6,
+                    "pr_auc": sy_fp.get("pr_auc"),
+                    "roc_auc": sy_fp.get("roc_auc"),
+                    "f1_score": sy_fp.get("f1_score"),
+                    "precision": sy_fp.get("precision"),
+                    "recall": sy_fp.get("recall"),
+                    "recall_at_01_fpr": sy_fp.get("recall_at_01_fpr"),
+                    "recall_at_001_fpr": sy_fp.get("recall_at_001_fpr"),
+                    "status": "EVALUATED" if sy_fp.get("pr_auc") is not None else "NOT_RUN",
+                },
+                "isolated_silos": {
+                    "architecture": "Isolated Bank Silos (Bank Alpha / Beta / Gamma)",
+                    "worst_silo_pr_auc": min(silo_vals) if silo_vals else None,
+                    "mean_silo_pr_auc": mean_silo,
+                    "best_silo_pr_auc": max(silo_vals) if silo_vals else None,
+                    "status": "EVALUATED" if silo_vals else "NOT_RUN",
+                },
+                "classical_baselines": {
                     "random_forest_pr_auc": None,
                     "logistic_regression_pr_auc": None,
                     "xgboost_pr_auc": None,
@@ -405,49 +521,23 @@ class MasterBenchmarkMatrixGenerator:
             },
         }
 
-        # 6. SynthAML
-        synth_exp = self._safe_load_json(self.experiments_dir / "synthaml" / "results.json") or {}
-        synth_raw = self._safe_load_json(self.raw_results_dir / "fraud_benchmark_synthaml.json") or {}
-        sy_fm = synth_exp.get("final_metrics", {})
-        sy_silos = synth_raw.get("collaboration_uplift", {})
-        datasets_matrix["synthaml"] = {
-            "dataset_id": "synthaml",
-            "dataset_name": "Danish Spar Nord Bank SynthAML",
-            "domain": "Commercial Danish Banking AML Alerts",
-            "real_vs_synthetic": "REAL_TOPOLOGY_COPULA_SYNTHETIC",
-            "provenance_scale": "20k alerts / 16M txns (Aarhus Univ / Spar Nord)",
-            "evaluated_samples": synth_exp.get("dataset", {}).get("total_samples", 5000),
-            "fraud_prevalence_pct": 8.50,
-            "feature_dim": 14,
+        # 7. AMLNet
+        amlnet_can = resolve_canonical_artifact("amlnet_synthetic") or {}
+        an_fm = amlnet_can.get("final_metrics") or {}
+        an_ds = amlnet_can.get("dataset") or {}
+        datasets_matrix["amlnet"] = {
+            "dataset_id": "amlnet",
+            "dataset_name": "Australian AUSTRAC AMLNet",
+            "domain": "International AUSTRAC Wire Transfers",
+            "real_vs_synthetic": CANONICAL_REGISTRY["amlnet_synthetic"].provenance_type.value,
+            "provenance_scale": "1.09M wire transactions (Griffith Univ / Zenodo)",
+            "evaluated_samples": an_ds.get("total_samples", 25000),
+            "fraud_prevalence_pct": round(an_ds.get("fraud_rate") * 100, 3) if an_ds.get("fraud_rate") is not None else None,
+            "feature_dim": an_ds.get("num_features", 18),
+            "mandatory_caveat": CANONICAL_REGISTRY["amlnet_synthetic"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
-                    "architecture": "Centralized AlertMLP",
-                    "pr_auc": synth_raw.get("models", {}).get("centralized_pooled", {}).get("pr_auc", 0.9995),
-                    "roc_auc": synth_raw.get("models", {}).get("centralized_pooled", {}).get("roc_auc", 0.9998),
-                    "f1_score": None,
-                    "precision": None,
-                    "recall": None,
-                    "recall_at_01_fpr": None,
-                    "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
-                },
-                "federated_fedavg": {
-                    "architecture": "AlertMLPClassifier (FedAvg)",
-                    "clients": 3,
-                    "rounds": 6,
-                    "pr_auc": sy_fm.get("pr_auc", 0.99845),
-                    "roc_auc": sy_fm.get("roc_auc", 0.99949),
-                    "f1_score": sy_fm.get("f1_score", 0.98361),
-                    "precision": sy_fm.get("precision", 0.98765),
-                    "recall": sy_fm.get("recall", 0.97959),
-                    "recall_at_01_fpr": sy_fm.get("recall_at_01_fpr", 0.98776),
-                    "recall_at_001_fpr": sy_fm.get("recall_at_001_fpr", 0.89796),
-                    "status": "EVALUATED",
-                },
-                "federated_fedprox": {
-                    "architecture": "AlertMLPClassifier (FedProx)",
-                    "clients": 3,
-                    "rounds": 6,
+                    "architecture": "Centralized AMLNetClassifier",
                     "pr_auc": None,
                     "roc_auc": None,
                     "f1_score": None,
@@ -457,58 +547,18 @@ class MasterBenchmarkMatrixGenerator:
                     "recall_at_001_fpr": None,
                     "status": "NOT_RUN",
                 },
-                "isolated_silos": {
-                    "architecture": "Isolated Bank Silos (Bank Alpha / Beta / Gamma)",
-                    "worst_silo_pr_auc": sy_silos.get("worst_silo_pr_auc", 0.2214),
-                    "mean_silo_pr_auc": sy_silos.get("mean_silo_pr_auc", 0.7245),
-                    "best_silo_pr_auc": sy_silos.get("best_silo_pr_auc", 0.9924),
-                    "status": "EVALUATED",
-                },
-                "classical_baselines": {
-                    "random_forest_pr_auc": synth_raw.get("models", {}).get("random_forest", {}).get("pr_auc"),
-                    "logistic_regression_pr_auc": synth_raw.get("models", {}).get("logistic_regression", {}).get("pr_auc"),
-                    "xgboost_pr_auc": None,
-                    "status": "NOT_RUN",
-                },
-            },
-        }
-
-        # 7. AMLNet
-        amlnet_exp = self._safe_load_json(self.experiments_dir / "amlnet" / "results.json") or {}
-        an_fm = amlnet_exp.get("final_metrics", {})
-        datasets_matrix["amlnet"] = {
-            "dataset_id": "amlnet",
-            "dataset_name": "Australian AUSTRAC AMLNet",
-            "domain": "International AUSTRAC Wire Transfers",
-            "real_vs_synthetic": "KNOWLEDGE_GUIDED_MULTI_AGENT_SYNTHETIC",
-            "provenance_scale": "1.09M wire transactions (Griffith Univ / Zenodo)",
-            "evaluated_samples": amlnet_exp.get("dataset", {}).get("total_samples", 25000),
-            "fraud_prevalence_pct": 0.140,
-            "feature_dim": 18,
-            "paradigms": {
-                "centralized_pooled": {
-                    "architecture": "Centralized AMLNetClassifier",
-                    "pr_auc": 1.0,
-                    "roc_auc": 1.0,
-                    "f1_score": 1.0,
-                    "precision": 1.0,
-                    "recall": 1.0,
-                    "recall_at_01_fpr": 1.0,
-                    "recall_at_001_fpr": 1.0,
-                    "status": "EVALUATED",
-                },
                 "federated_fedavg": {
                     "architecture": "AMLNetClassifier (FedAvg)",
                     "clients": 3,
                     "rounds": 6,
-                    "pr_auc": an_fm.get("pr_auc", 1.0),
-                    "roc_auc": an_fm.get("roc_auc", 1.0),
-                    "f1_score": an_fm.get("f1_score", 1.0),
-                    "precision": an_fm.get("precision", 1.0),
-                    "recall": an_fm.get("recall", 1.0),
-                    "recall_at_01_fpr": an_fm.get("recall_at_01_fpr", 1.0),
-                    "recall_at_001_fpr": an_fm.get("recall_at_001_fpr", 1.0),
-                    "status": "EVALUATED",
+                    "pr_auc": an_fm.get("pr_auc"),
+                    "roc_auc": an_fm.get("roc_auc"),
+                    "f1_score": an_fm.get("f1_score"),
+                    "precision": an_fm.get("precision"),
+                    "recall": an_fm.get("recall"),
+                    "recall_at_01_fpr": an_fm.get("recall_at_01_fpr"),
+                    "recall_at_001_fpr": an_fm.get("recall_at_001_fpr"),
+                    "status": "EVALUATED" if an_fm.get("pr_auc") is not None else "NOT_RUN",
                 },
                 "federated_fedprox": {
                     "architecture": "AMLNetClassifier (FedProx)",
@@ -540,44 +590,46 @@ class MasterBenchmarkMatrixGenerator:
         }
 
         # 8. CFI-CrossBank Consortium
-        cb_exp = self._safe_load_json(self.experiments_dir / "cross_bank" / "results.json") or {}
-        scenarios = cb_exp.get("scenarios", {})
-        sc7 = scenarios.get("SCENARIO_7", {})
+        cb_can = resolve_canonical_artifact("cross_bank_consortium") or {}
+        scenarios = cb_can.get("scenarios") or {}
+        sc1 = scenarios.get("SCENARIO_1") or {}
+        sc7 = scenarios.get("SCENARIO_7") or {}
         datasets_matrix["cross_bank"] = {
             "dataset_id": "cross_bank",
             "dataset_name": "CFI-CrossBank Multi-Bank Consortium",
             "domain": "Cross-Institutional Multi-Jurisdiction Banking",
-            "real_vs_synthetic": "SYNTHETIC_CONSORTIUM_TOPOLOGY",
-            "provenance_scale": "100k txns, 1k accounts, 7 Attack Scenarios (CFI-CrossBank-01)",
-            "evaluated_samples": cb_exp.get("total_transactions", 100000),
+            "real_vs_synthetic": CANONICAL_REGISTRY["cross_bank_consortium"].provenance_type.value,
+            "provenance_scale": f"{cb_can.get('total_transactions', 1807)} multi-bank transactions, 7 Scenarios (CFI-CrossBank-01)",
+            "evaluated_samples": cb_can.get("total_transactions", 1807),
             "fraud_prevalence_pct": 2.10,
             "feature_dim": 14,
+            "mandatory_caveat": CANONICAL_REGISTRY["cross_bank_consortium"].mandatory_caveat,
             "paradigms": {
                 "centralized_pooled": {
                     "architecture": "Pooled Consortium Oracle Upper Bound",
-                    "pr_auc": 0.9850,
-                    "roc_auc": 0.9990,
-                    "detection_rate": cb_exp.get("overall_pooled_detection_rate", 1.0),
+                    "pr_auc": sc1.get("pooled_pr_auc"),
+                    "roc_auc": sc1.get("pooled_roc_auc"),
+                    "detection_rate": cb_can.get("overall_pooled_detection_rate"),
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
-                    "recall_at_01_fpr": 0.9900,
+                    "recall_at_01_fpr": sc1.get("pooled_recall_at_01_fpr"),
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "EVALUATED" if cb_can.get("overall_pooled_detection_rate") is not None else "NOT_RUN",
                 },
                 "federated_fedavg": {
                     "architecture": "Collaborative Federated Intelligence (FedAvg)",
                     "clients": 3,
                     "rounds": 2,
-                    "pr_auc": 0.9729,
-                    "roc_auc": 0.9985,
-                    "detection_rate": cb_exp.get("overall_federated_detection_rate", 1.0),
+                    "pr_auc": sc1.get("federated_pr_auc"),
+                    "roc_auc": sc1.get("federated_roc_auc"),
+                    "detection_rate": cb_can.get("overall_federated_detection_rate"),
                     "f1_score": None,
                     "precision": None,
                     "recall": None,
-                    "recall_at_01_fpr": 0.9881,
+                    "recall_at_01_fpr": sc1.get("federated_recall_at_01_fpr"),
                     "recall_at_001_fpr": None,
-                    "status": "EVALUATED",
+                    "status": "EVALUATED" if sc1.get("federated_pr_auc") is not None else "NOT_RUN",
                 },
                 "federated_fedprox": {
                     "architecture": "Collaborative Federated Intelligence (FedProx)",
@@ -595,12 +647,13 @@ class MasterBenchmarkMatrixGenerator:
                 "isolated_silos": {
                     "architecture": "Isolated Bank Nodes (No Cross-Bank Sharing)",
                     "worst_silo_pr_auc": None,
-                    "mean_silo_pr_auc": 0.8832,
+                    "mean_silo_pr_auc": sc1.get("isolated_pr_auc"),
                     "best_silo_pr_auc": None,
-                    "overall_detection_rate": cb_exp.get("overall_isolated_detection_rate", 0.8061),
-                    "zero_positive_transfer_isolated": sc7.get("isolated_detection_rate", 0.0),
-                    "zero_positive_transfer_federated": sc7.get("federated_detection_rate", 1.0),
-                    "status": "EVALUATED",
+                    "overall_detection_rate": cb_can.get("overall_isolated_detection_rate"),
+                    "zero_positive_transfer_isolated": sc7.get("isolated_detection_rate"),
+                    "zero_positive_transfer_federated": sc7.get("federated_detection_rate"),
+                    "scenario_7_support": sc7.get("support_presentation"),
+                    "status": "EVALUATED" if cb_can.get("overall_isolated_detection_rate") is not None else "NOT_RUN",
                 },
                 "classical_baselines": {
                     "random_forest_pr_auc": None,
@@ -667,8 +720,8 @@ class MasterBenchmarkMatrixGenerator:
             ds_data = datasets[ds_id]
             paradigms = ds_data.get("paradigms", {})
 
-            # Invariant: FedAvg must be EVALUATED for tabular/transactional datasets,
-            # while Elliptic remains a centralized graph benchmark (NOT_EVALUATED for cross-bank subgraph partitioning).
+            # Invariant: FedAvg must be EVALUATED for evaluated transactional datasets,
+            # while Elliptic remains NOT_EVALUATED on disk.
             fedavg = paradigms.get("federated_fedavg", {})
             if ds_id == "elliptic":
                 if fedavg.get("status") != "NOT_EVALUATED":

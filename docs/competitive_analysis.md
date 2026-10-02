@@ -211,12 +211,14 @@ Under empirical real-world distributions with calibrated differential privacy no
 | **PaySim (Kenya M-Pesa)** | **CF-Intelligence (FedGNN + FedProx)** | **0.8420** | **0.9120** | **62.4%** | **94.0%** | **4.1 ms** |
 | PaySim (Kenya M-Pesa) | Isolated Single-Bank Model | 0.6940 | 0.8350 | 43.2% | 72.0% | 3.8 ms |
 | PaySim (Kenya M-Pesa) | Centralized Pooled (Non-Private Upper Bound) | 0.8650 | 0.9250 | 65.1% | 96.0% | 38.5 ms |
-| **IEEE-CIS (Vesta E-Comm)**| **CF-Intelligence (FedGNN + FedProx)** | **0.8120** | **0.8980** | **58.9%** | **91.0%** | **4.5 ms** |
-| IEEE-CIS (Vesta E-Comm)| Isolated Single-Bank Model | 0.6510 | 0.8140 | 37.5% | 66.0% | 4.2 ms |
-| IEEE-CIS (Vesta E-Comm)| Centralized Pooled (Non-Private Upper Bound) | 0.8340 | 0.9090 | 61.2% | 93.0% | 42.1 ms |
+| **IEEE-CIS (Vesta E-Comm)\***| **CF-Intelligence (Target Spec)** | *0.8120 (Target)* | *0.8980 (Target)* | *58.9% (Target)* | *91.0% (Target)* | *4.5 ms* |
+| IEEE-CIS (Vesta E-Comm)\*| Isolated Single-Bank Model (Target Spec) | *0.6510 (Target)* | *0.8140 (Target)* | *37.5% (Target)* | *66.0% (Target)* | *4.2 ms* |
+| IEEE-CIS (Vesta E-Comm)\*| Centralized Pooled (Target Spec) | *0.8340 (Target)* | *0.9090 (Target)* | *61.2% (Target)* | *93.0% (Target)* | *42.1 ms* |
 | **Elliptic Bitcoin Graph** | **CF-Intelligence (FedGNN + SecAgg)** | **0.8746** | **0.9758** | **80.6%** | **94.0%** | **7.4 ms** |
 | Elliptic Bitcoin Graph | Isolated Local GNN Subgraph | 0.2543 | 0.7330 | 52.4% | 61.0% | 6.8 ms |
 | Elliptic Bitcoin Graph | Centralized Global Graph (Non-Private) | 0.8912 | 0.9810 | 83.2% | 95.0% | 46.0 ms |
+
+*\* Note: Real Kaggle IEEE-CIS (590k transactions) execution is pending download of physical Kaggle CSV files; listed values reflect architectural target specifications and are marked `NOT_EVALUATED` in canonical evidence.*
 
 ### Key Empirical Observations:
 1. **The Collaborative Federated Advantage:** CF-Intelligence achieves **97.3% - 98.1% of the detection performance of a non-private centralized data pool**, while transmitting zero raw customer transactions.

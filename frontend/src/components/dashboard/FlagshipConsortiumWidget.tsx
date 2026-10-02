@@ -174,10 +174,10 @@ export default function FlagshipConsortiumWidget() {
           </div>
           <div className="text-2xl font-black font-mono text-amber-400 flex items-baseline gap-1.5">
             0% → 100%
-            <span className="text-xs font-normal text-slate-400">Instant</span>
+            <span className="text-xs font-normal text-slate-400">(2/2 txns)</span>
           </div>
           <div className="text-[11px] text-slate-400 font-mono">
-            Bank Gamma zero-positive prior transfer
+            Bank Gamma zero-positive prior transfer (simulated N=2)
           </div>
         </div>
       </div>

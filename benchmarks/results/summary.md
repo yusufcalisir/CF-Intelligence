@@ -126,7 +126,7 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 |:---|:---:|:---:|:---|
 | **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
 | **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
-| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | **Resilient** (99.7% of Clean PR-AUC) |
+| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | **Resilient** (99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine) |
 | **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | **Resilient** (98.5% of Clean PR-AUC) |
 | **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | **Resilient** (95.9% of Clean PR-AUC) |
 
@@ -155,19 +155,28 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 ---
 
 ## 5. Fraud Detection: Centralized vs Federated Baselines
-- **Runner**: `benchmarks/runners/run_fraud_benchmark.py`, `experiments/credit_card/run_creditcard_benchmark.py`
-- **Raw Artifacts**: [`fraud_benchmark_paysim.json`](./raw/fraud_benchmark_paysim.json), [`fraud_benchmark_ieee_cis.json`](./raw/fraud_benchmark_ieee_cis.json), [`fraud_benchmark_credit_card.json`](./raw/fraud_benchmark_credit_card.json)
+- **Canonical Runners**: `experiments/paysim/run_paysim_canonical_benchmark.py`, `experiments/credit_card/run_creditcard_benchmark.py`
+- **Canonical Artifacts**: [`experiments/paysim/canonical_results.json`](../../experiments/paysim/canonical_results.json), [`experiments/credit_card/multi_seed_controlled_results.json`](../../experiments/credit_card/multi_seed_controlled_results.json)
+- **Historical / Smoke Artifacts**: [`fraud_benchmark_paysim.json`](./raw/fraud_benchmark_paysim.json) (`SUPERSEDED`), [`fraud_benchmark_ieee_cis.json`](./raw/fraud_benchmark_ieee_cis.json) (`HISTORICAL`), [`fraud_benchmark_credit_card.json`](./raw/fraud_benchmark_credit_card.json) (`SUPERSEDED_PLACEHOLDER`)
 
-| Dataset | Evaluation Setting | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Recall @ 0.5% FPR | Recall @ 1.0% FPR |
-|:---|:---|:---:|:---:|:---:|:---:|:---:|
-| **PaySim** | Centralized Baseline | **0.4654** | 0.9891 | 0.4000 | 0.6000 | 0.6000 |
-| **PaySim** | Federated FedAvg (5 clients) | **0.1463** | 0.9712 | 0.2000 | 0.2000 | 0.2000 |
-| **IEEE-CIS** | Centralized Baseline | **0.7811** | 0.9892 | 0.3692 | 0.6154 | 0.6923 |
-| **IEEE-CIS** | Federated FedAvg (5 clients) | **0.7554** | 0.9859 | 0.4308 | 0.6308 | 0.6769 |
-| **Credit Card** | Centralized Equalized (10 ep, 35.6k steps) | **0.8219** (Seed 42: 0.7800) | 0.9802 | 0.8653 | 0.8889 | 0.8990 |
-| **Credit Card** | Federated FedAvg (5 rounds × 2 ep) | **0.8248** (Seed 42: 0.7788) | 0.9845 | 0.8653 | 0.8855 | 0.8990 |
-| **Credit Card** | Centralized Legacy (2 ep, 7.1k steps) | **0.7449** (Seed 42: 0.7059) | 0.9861 | 0.8519 | 0.8754 | 0.8822 |
-| **Credit Card** | Bank C Silo (Near-Zero Fraud: 2 cases) | **0.5428** (Seed 42: 0.6113) | 0.9630 | 0.6061 | 0.7879 | 0.7980 |
+| Dataset | Evaluation Setting | Provenance | PR-AUC | ROC-AUC | Recall @ 0.1% FPR | Status |
+|:---|:---|:---:|:---:|:---:|:---:|:---|
+| **PaySim** | Centralized Baseline (30 ep, 59.7k steps) | `EXTERNALLY_SIMULATED` | **0.9545 $\pm$ 0.0073** | 0.9994 | 0.9877 | `CANONICAL` |
+| **PaySim** | Federated FedAvg (3 clients, 10 rounds) | `EXTERNALLY_SIMULATED` | **0.9545 $\pm$ 0.0119** | 0.9993 | 0.9816 | `CANONICAL` |
+| **PaySim (Historical)** | Centralized / FedAvg (10-feat synthetic fallback) | `PROJECT_SYNTHETIC` | 0.4654 / 0.1463 | 0.9891 / 0.9712 | 0.4000 / 0.2000 | `SUPERSEDED` |
+| **Credit Card** | Centralized Equalized (10 ep, 35.6k steps) | `REAL_DATA` | **0.8219 $\pm$ 0.0364** | 0.9803 | 0.8653 | `CANONICAL` |
+| **Credit Card** | Federated FedAvg (3 clients, 5 rnds × 2 ep) | `REAL_DATA` | **0.8248 $\pm$ 0.0417** | 0.9841 | 0.8653 | `CANONICAL` |
+| **Credit Card** | Centralized Legacy (2 ep, 7.1k steps) | `REAL_DATA` | 0.7449 $\pm$ 0.0385 | 0.9860 | 0.8519 | `HISTORICAL` |
+| **Credit Card** | Bank C Silo (Near-Zero Fraud: 2 cases) | `REAL_DATA` | 0.5428 $\pm$ 0.1185 | 0.9630 | 0.6061 | `CANONICAL` |
+| **IEEE-CIS (Real 590k)** | Centralized Pooled (10 ep, 9,230 steps) | `REAL_DATA` | **0.4422 $\pm$ 0.0034** | 0.8536 | 0.2004 | `CANONICAL` |
+| **IEEE-CIS (Real 590k)** | Federated FedAvg (3 clients, 5 rnds × 2 ep, 9,240 steps) | `REAL_DATA` | **0.3895 $\pm$ 0.0124** | 0.8325 | 0.1976 | `CANONICAL` |
+| **IEEE-CIS (Historical)** | Centralized / FedAvg (10-feat synthetic smoke) | `PROJECT_SYNTHETIC` | 0.7811 / 0.7554 | 0.9709 / 0.9672 | 0.3692 / 0.4308 | `SUPERSEDED` |
+
+> [!NOTE]
+> **Scientific Provenance Notes**:
+> 1. **PaySim Canonical Parity**: Evaluated across 3 independent seeds (`[42, 123, 456]`) on a 10% systematic sample ($N=636{,}262$ transactions, 817 fraud) of the physical PaySim CSV (`PS_20174392719_1491204439457_log.csv`, SHA-256: `16910f90...`). Centralized equalized budget achieves PR-AUC $0.9545 \pm 0.0073$; Federated FedAvg achieves $0.9545 \pm 0.0119$ ($\Delta = 0.0000 \pm 0.0191$). Historical synthetic fallback values (`0.4654` / `0.1463`) are archived as `SUPERSEDED`.
+> 2. **IEEE-CIS Canonical Execution**: Evaluated across 3 predefined random seeds (`[42, 123, 456]`) on the full physical Kaggle IEEE-CIS dataset ($N=590{,}540$ transactions, 434 merged columns, 421 numeric input features, $20{,}663$ fraud cases). Strict 80/20 chronological holdout on `TransactionDT` (train: $472{,}432$ txns, test: $118{,}108$ txns; zero future lookahead, $4{,}064$ test fraud cases, $114{,}044$ test non-fraud cases). Standardizer fit strictly on train partition. Primary metric is Average Precision (`sklearn.metrics.average_precision_score`, reported as PR-AUC). Under Dirichlet $\alpha=0.5$ non-IID client partitioning across 3 simulated bank clients with closely matched optimizer work (9,230 centralized vs. 9,240 federated local optimizer steps; ~0.11% difference), Centralized PR-AUC is $0.4422 \pm 0.0034$ and FedAvg PR-AUC is $0.3895 \pm 0.0124$ (paired difference $\Delta = -0.0527 \pm 0.0090$, corresponding to ~11.9% relative reduction vs centralized mean; client heterogeneity is one plausible contributor to the observed gap). Recall @ 0.1% FPR diagnostic operating point achieves $20.04\% \pm 0.32\%$ Centralized vs $19.76\% \pm 1.41\%$ FedAvg (approx. 114 false positives, approx. 803 true positives, ~917 total investigation alerts). The predefined engineering target of `0.8120` was not reached under the evaluated chronological holdout; temporal distribution shift is a plausible contributor, but this experiment did not isolate its causal effect. Historical synthetic smoke metrics (`0.7811` / `0.7554`) came from an earlier synthetic fallback experiment and are archived as non-comparable. Transaction data are real competition data; bank federation is simulated.
+> 3. **Credit Card Budget Equalization**: When given equalized compute budgets (10 dataset passes, 35.6k optimizer steps), Centralized and FedAvg showed similar observed mean performance across the three evaluated seeds ($0.8219 \pm 0.0364$ vs $0.8248 \pm 0.0417$; observed mean difference $+0.0029$). Bank C experiences a collapse in silo isolation ($0.5428$) but is rescued to $0.8248$ via collaborative federated learning.
 
 ---
 
@@ -178,9 +187,12 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 
 | FL Strategy | Convergence PR-AUC (Round 1) | Final PR-AUC (Round 10) | Final ROC-AUC | Communication Volume (MB) |
 |:---|:---:|:---:|:---:|:---:|
-| **FedAvg** (McMahan et al., 2017) | 0.2602 | 0.0757 | 0.4347 | 0.147 MB |
-| **FedProx** ($\mu=0.01$; Li et al., 2020) | 0.0599 | 0.0548 | 0.2080 | 0.147 MB |
-| **SCAFFOLD** (Karimireddy et al., 2020) | 0.0595 | 0.0570 | 0.2448 | 0.147 MB |
+| **FedAvg** (McMahan et al., 2017) | **0.0179** | **0.2331** | **0.9202** | 0.147 MB |
+| **FedProx** ($\mu=0.01$; Li et al., 2020) | **0.0179** | **0.2285** | **0.9185** | 0.147 MB |
+| **SCAFFOLD** (Karimireddy et al., 2020) | **0.0179** | **0.2196** | **0.9175** | 0.294 MB |
+
+> [!NOTE]
+> **Non-IID Provenance Synchronization**: Values above reflect authoritative Level 1 disk measurements from `fl_comparison_alpha_0.5.json`. Earlier draft summary values (`0.0757` / `0.0548` / `0.0570`) were from an uncommitted draft run and have been reconciled. Under severe Dirichlet skew ($\alpha=0.5$), FedAvg ($0.2331$) and FedProx ($0.2285$) maintain competitive classification performance while SCAFFOLD consumes 2× communication ($0.294\text{ MB}$) due to client state drift control vectors.
 
 ---
 
