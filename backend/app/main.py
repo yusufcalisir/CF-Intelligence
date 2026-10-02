@@ -827,49 +827,81 @@ app.add_middleware(APIVersionLifecycleMiddleware)
 
 # ── In-App mTLS Peer Verification Middleware ─────────────────────────────────
 # Enforces mutual TLS peer certificate verification at the application layer,
-# checking client certificate SHA-256 fingerprints and CRL revocation status.
-class MTLSVerificationMiddleware(BaseHTTPMiddleware):
-    """Enforce in-app mTLS peer certificate validation on sensitive routes."""
+# checking client certificate SHA-256 fingerprints and CRL revocation status (Pure ASGI).
+class MTLSVerificationMiddleware:
+    """Enforce in-app mTLS peer certificate validation on sensitive routes (Pure ASGI)."""
 
     _ENFORCED_PREFIXES = ("/api/v1/predict", "/api/v1/training", "/api/v1/banks")
 
-    async def dispatch(self, request: Request, call_next) -> Response:  # type: ignore[override]
-        if settings.mtls_enabled and any(
-            request.url.path.startswith(p) for p in self._ENFORCED_PREFIXES
-        ):
-            cert_verify = request.headers.get("x-ssl-client-verify", "").upper()
-            cert_hash = request.headers.get("x-client-cert-sha256", "")
+    def __init__(self, app: ASGIApp) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        path = scope.get("path", "")
+        if settings.mtls_enabled and any(path.startswith(p) for p in self._ENFORCED_PREFIXES):
+            # Extract headers (exact Starlette request.headers.get semantics: first match)
+            cert_verify_raw: str = ""
+            cert_hash: str = ""
+            found_verify = False
+            found_hash = False
+
+            for name, value in scope.get("headers", []):
+                if not found_verify and name.lower() == b"x-ssl-client-verify":
+                    try:
+                        cert_verify_raw = value.decode("latin-1")
+                    except Exception:
+                        cert_verify_raw = value.decode("utf-8", errors="replace")
+                    found_verify = True
+                elif not found_hash and name.lower() == b"x-client-cert-sha256":
+                    try:
+                        cert_hash = value.decode("latin-1")
+                    except Exception:
+                        cert_hash = value.decode("utf-8", errors="replace")
+                    found_hash = True
+
+                if found_verify and found_hash:
+                    break
+
+            cert_verify = cert_verify_raw.upper()
 
             if cert_verify and cert_verify != "SUCCESS":
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=403,
                     content={
                         "type": "https://cfi-platform.org/errors/mTLSVerificationFailed",
                         "title": "mTLS Handshake Verification Failed",
                         "status": 403,
                         "detail": f"Client certificate verification status: '{cert_verify}'",
-                        "instance": request.url.path,
+                        "instance": path,
                     },
                     media_type="application/problem+json",
                 )
+                await response(scope, receive, send)
+                return
 
             from app.infrastructure.security.mtls_manager import MTLSManager
 
             mtls_mgr = MTLSManager()
             if cert_hash and cert_hash in mtls_mgr.crl_revoked_serials:
-                return JSONResponse(
+                response = JSONResponse(
                     status_code=403,
                     content={
                         "type": "https://cfi-platform.org/errors/mTLSCertificateRevoked",
                         "title": "mTLS Certificate Revoked",
                         "status": 403,
                         "detail": f"Client certificate SHA-256 fingerprint '{cert_hash}' is revoked in CRL.",
-                        "instance": request.url.path,
+                        "instance": path,
                     },
                     media_type="application/problem+json",
                 )
+                await response(scope, receive, send)
+                return
 
-        return await call_next(request)
+        await self.app(scope, receive, send)
 
 
 app.add_middleware(MTLSVerificationMiddleware)

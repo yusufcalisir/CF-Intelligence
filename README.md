@@ -1392,13 +1392,13 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-LATENCY-FASTPATH`** | In-Process Fast-Path Scoring Latency | `< 15.0 ms` (Target) | `2.569 ms` (p99: 8.87 ms @ C=1, 105.02 ms @ C=100) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
 | **`CLM-LATENCY-SHAP`** | In-Process Explainability Latency (with SHAP) | `< 50.0 ms` (Target) | `2.516 ms` (linear attribution) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --with-shap` | `VERIFIED_MEASURED` |
 | **`CLM-GATEWAY-PEAK-THROUGHPUT`** | In-Process Microbenchmark Peak Throughput | `> 1,200 req/s` (Target) | `1,109.9 req/s` @ C=100 (`1,246.3` @ C=50) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
-| **`CLM-HTTP-SERVICE-THROUGHPUT`** | Local HTTP Service Peak Throughput (Class B1) | `50.0 req/s` (Target) | `191.0 req/s` @ C=10 (Post-Offload; Baseline: 89.0 req/s) | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED_TARGET_MET` |
-| **`CLM-HTTP-SERVICE-LATENCY-P50`** | Local HTTP Service Median Latency (Class B1) | `10.0 ms` (Target) | `10.77 ms` @ C=1 (Post-Offload; Baseline: 11.39 ms) | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED` |
+| **`CLM-HTTP-SERVICE-THROUGHPUT`** | Local HTTP Service Peak Throughput (Class B1) | `50.0 req/s` (Target) | `369.0 req/s` @ C=10 (Post-MTLS Pure-ASGI; Baseline: 89.0 req/s) | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED_TARGET_MET` |
+| **`CLM-HTTP-SERVICE-LATENCY-P50`** | Local HTTP Service Median Latency (Class B1) | `10.0 ms` (Target) | `8.43 ms` @ C=1 (Post-MTLS Pure-ASGI; Baseline: 11.39 ms) | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `python benchmarks/runners/run_http_benchmark.py` | `MEASURED` |
 | **`CLM-ABAC-THROUGHPUT`** | ABAC Authorization Engine Throughput | `> 5,000 req/s` | `132,942 req/s` (mean) | [`scripts/run_abac_benchmark.py`](scripts/run_abac_benchmark.py) | `python scripts/run_abac_benchmark.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-CURVE25519`** | SecAgg Curve25519 Masking Throughput | `> 250k param/s` | `~513,000 param/s` | [`p2p_secagg_driver.py`](backend/app/infrastructure/security/p2p_secagg_driver.py) | `pytest backend/tests/unit/test_shamir_p2p_secagg.py -v` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-SECAGG-NUMPY`** | SecAgg NumPy Vectorized Masking | `> 1.0M param/s` | `~5,630,000 param/s` | [`fl_engine.py`](backend/app/application/services/fl_engine.py) | `python benchmarks/runners/secagg_benchmark_scalability.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
 | **`CLM-DR-FAILOVER-RTO`** | Disaster Recovery Failover (RTO) | `< 30.0 s` | `15.01 s` (RPO = 0 records) | [`chaos_dr_drill.py`](backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py) | `python backend/app/infrastructure/disaster_recovery/chaos_dr_drill.py` | `EMPIRICAL_SUPERIOR_VERIFIED` |
-| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,819 / 3,819 Core, 4,206 Total Collected) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-TEST-SUITE-PASS-RATE`** | Full Test Suite Pass Rate | `100.0%` | `100.0%` (3,849 / 3,849 Core, 4,249 Total Collected) | [`scripts/run_all_tests.py`](scripts/run_all_tests.py) | `python scripts/run_all_tests.py` | `EMPIRICAL_PARITY_VERIFIED` |
 
 ---
 
@@ -1407,7 +1407,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | Benchmark Dimension | Target Specification | Measured Benchmark Value | Verification Reference | Verification Status |
 | :--- | :---: | :---: | :--- | :---: |
 | **In-Process Scoring Latency (Fast-Path Raw)** | < 15 ms (Internal Target) | **2.57 ms compute** (p99: 8.87 ms @ C=1, 105.02 ms @ C=100) | `benchmarks/runners/run_latency_benchmark.py` | `Self-Verified (host-calibrated PyTorch microbenchmark, 1,246.3 req/s peak throughput)` |
-| **Local HTTP Service Latency (Class B1 Inference Capacity)** | < 100 ms (p99 @ C=1) | **9.22 ms (p50) / 14.24 ms (p99) @ C=1** | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `Empirical ASGI HTTP Service Benchmark (233.7 req/s peak throughput @ C=10; Baseline: 89.0 req/s)` |
+| **Local HTTP Service Latency (Class B1 Inference Capacity)** | < 100 ms (p99 @ C=1) | **8.43 ms (p50) / 10.13 ms (p99) @ C=1** | [`latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json) | `Empirical ASGI HTTP Service Benchmark (369.0 req/s peak throughput @ C=10; Baseline: 89.0 req/s)` |
 | **Concurrent Ensemble Latency (p50 / p99)** | **258.9 ms (p50) / 308.2 ms (p99)** | < 350 ms (Ensemble SLA) | `test_load_concurrency_verification.py` | `Empirical Load Benchmark (15 workers, 9-signal feature store)` |
 | **HTTP Endpoint Latency under Load (p50 / p99)** | **166 ms (p50) / 395 ms (p99) @ 97.6 req/s** | < 100 ms (p99 SLA) | [`scripts/realtime_benchmark.py`](scripts/realtime_benchmark.py) | `Empirical ASGI Load Test (1,500 real requests, 20-concurrency, 3 endpoints; GIL-bound single-process)` |
 | **Event-Driven Stream SLA (p50 / p99)** | **26.1 ms (p50) / 62.75 ms (p99) @ 62.4 tx/s** | < 100 ms (Stream SLA) | [`scripts/transaction_stream.py`](scripts/transaction_stream.py) | `Empirical ASGI Stream Pipeline (1,883 real transactions, 30s, asyncio.Queue producer→consumer, 0 errors, 100% utilization)` |
@@ -1421,7 +1421,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$** (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | 100% | **4,192 / 4,192 passing** (3,396 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
+| **Full Test Suite Pass Rate** | 100% | **4,249 / 4,249 passing** (3,453 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
 
 ---
 
@@ -1500,17 +1500,17 @@ Measures client-observed wall-clock HTTP latency against a live running Uvicorn 
 
 | Concurrency ($C$) | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **119.6 $\pm$ 2.8 req/s** | 3,000 | 0 | 0 | **8.25 ms** | 9.37 ms | 10.26 ms | 17.30 ms | 100.0% |
-| **10** | **327.9 $\pm$ 2.3 req/s** | 3,000 | 0 | 0 | **30.35 ms** | 33.43 ms | 35.06 ms | 40.02 ms | 100.0% |
-| **50** | **275.8 $\pm$ 11.4 req/s** | 3,000 | 0 | 0 | **147.32 ms** | 436.36 ms | 547.12 ms | 678.83 ms | 100.0% |
-| **100** | **270.2 $\pm$ 4.4 req/s** | 3,000 | 0 | 0 | **288.81 ms** | 619.01 ms | 625.44 ms | 714.51 ms | 100.0% |
-| **250** | **250.9 $\pm$ 4.7 req/s** | 3,000 | 0 | 0 | **1,018.83 ms** | 1,158.96 ms | 1,337.64 ms | 1,386.92 ms | 100.0% |
-| **500** | **231.8 $\pm$ 3.6 req/s** | 3,000 | 0 | 0 | **1,976.22 ms** | 2,664.16 ms | 3,171.46 ms | 3,318.13 ms | 100.0% |
+| **1** | **118.0 $\pm$ 3.8 req/s** | 3,000 | 0 | 0 | **8.43 ms** | 9.58 ms | 10.13 ms | 16.23 ms | 100.0% |
+| **10** | **369.0 $\pm$ 7.6 req/s** | 3,000 | 0 | 0 | **26.81 ms** | 30.70 ms | 33.40 ms | 36.50 ms | 100.0% |
+| **50** | **297.8 $\pm$ 19.5 req/s** | 3,000 | 0 | 0 | **137.81 ms** | 409.27 ms | 482.60 ms | 629.45 ms | 100.0% |
+| **100** | **304.1 $\pm$ 25.4 req/s** | 3,000 | 0 | 0 | **267.26 ms** | 597.54 ms | 614.60 ms | 737.92 ms | 100.0% |
+| **250** | **285.6 $\pm$ 9.4 req/s** | 3,000 | 0 | 0 | **848.06 ms** | 1,113.84 ms | 1,143.40 ms | 1,219.53 ms | 100.0% |
+| **500** | **277.6 $\pm$ 19.6 req/s** | 3,000 | 0 | 0 | **1,600.71 ms** | 2,479.79 ms | 2,590.10 ms | 2,706.87 ms | 100.0% |
 
 *Artifacts: [`benchmarks/results/raw/latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json), [`benchmarks/results/raw/latency_http_service_samples.json`](benchmarks/results/raw/latency_http_service_samples.json)*
 
-- **Single-Client Baseline**: At $C=1$, median 2xx inference transaction latency is $8.25\text{ ms}$ (pooled $8.18\text{ ms}$) with peak throughput of $327.9\text{ req/s}$ reached at $C=10$ ($275.8\text{ req/s}$ sustained at $C=50$).
-- **High-Concurrency Queueing**: At $C=500$, 100% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Mean successful throughput increased at all six evaluated concurrency tiers. Following the progressive pure-ASGI conversions of ContentTypeMiddleware, APIVersionLifecycleMiddleware, and W3CTraceContextMiddleware (BaseHTTP depth $4 \to 3$), median latency at $C=500$ decreased from $2,699.36\text{ ms}$ down to $1,976.22\text{ ms}$ (-723.14 ms, -26.8%) and throughput increased from $174.4\text{ req/s}$ to $231.8\text{ req/s}$ (+32.9%). Throughput and median latency improved across 18/18 independent repetition pairs. Historical baselines and negative results remain preserved: at $C=50$, repetition 3 $p_{99}$ latency was $665.80\text{ ms}$ vs PRE rep 3 of $579.41\text{ ms}$ ($2/3$ pairwise $p_{99}$ improvement), and trivial A/B Pair 1 loop lag $p_{99}$ was $631.94\text{ ms}$ vs $502.11\text{ ms}$.
+- **Single-Client Baseline**: At $C=1$, median 2xx inference transaction latency is $8.43\text{ ms}$ (pooled $8.42\text{ ms}$) with peak throughput of $369.0\text{ req/s}$ reached at $C=10$ ($297.8\text{ req/s}$ sustained at $C=50$).
+- **High-Concurrency Queueing**: At $C=500$, 100% of requests succeed with HTTP 2xx, demonstrating sustained inference completion. Mean successful throughput increased across all high-concurrency tiers. Following the progressive pure-ASGI conversions of ContentTypeMiddleware, APIVersionLifecycleMiddleware, W3CTraceContextMiddleware, and MTLSVerificationMiddleware (BaseHTTP depth $4 \to 3 \to 2$), median latency at $C=500$ decreased from $1,976.22\text{ ms}$ down to $1,600.71\text{ ms}$ (-375.51 ms, -19.0%) and throughput increased from $231.8\text{ req/s}$ to $277.6\text{ req/s}$ (+19.8%). Throughput and median latency improved across 3/3 repetitions at C=10, 50, 100, 250, 500. Historical baselines and negative observations remain preserved: at C=1, throughput showed minor variance (118.0 vs 119.6 req/s), and in trivial A/B testing at C=500, p95 and p99 tail latencies showed slight elevation while peak tasks (-49.1%) and event loop lag p99 (-26.8%) dropped substantially.
 
 #### Class B2: Rate-Limited Public-Endpoint Behavior Benchmark (`benchmarks/runners/run_http_ratelimit_benchmark.py`)
 
