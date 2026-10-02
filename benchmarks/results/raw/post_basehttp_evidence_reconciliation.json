@@ -235,7 +235,7 @@
     },
     {
       "claim": "Single Uvicorn worker is unique causal throughput bottleneck",
-      "existing_evidence": "1 process core saturated",
+      "existing_evidence": "Process CPU plateaus at ~1.1-1.2 cores",
       "limitation": "Workload involves 3 thread offloads; multi-worker counterfactual not run",
       "classification": "PLAUSIBLE"
     },
@@ -248,8 +248,8 @@
     {
       "claim": "Multiple interacting constraints are more consistent with evidence",
       "existing_evidence": "Event-loop duty cycle, thread offloading, and burst queueing interact",
-      "limitation": "None; supported by cross-tier resource profiles",
-      "classification": "SUPPORTED"
+      "limitation": "Hypothesized joint causal bottleneck not counterfactually isolated",
+      "classification": "CONSISTENT WITH EVIDENCE / PLAUSIBLE MULTI-CONSTRAINT EXPLANATION"
     },
     {
       "claim": "C500 latency is sufficiently localized for research closure",
