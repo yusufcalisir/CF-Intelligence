@@ -45,39 +45,41 @@ The repository explicitly separates HTTP performance evaluation into two complem
 
 #### Class B1: Local HTTP Successful-Inference Capacity Benchmark
 - **Runner**: enchmarks/runners/run_http_benchmark.py
-- **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (127.0.0.1:8089/api/v1/score-transaction). Includes TCP framing, Uvicorn event loop dispatch, FastAPI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation), Pydantic request validation, ModelService evaluation offloaded via syncio.to_thread, and response serialization. Rate limiting is controlled at benchmark configuration level to isolate pure inference capacity.
+- **Scope**: Measures client-observed wall-clock HTTP latency against a live running Uvicorn ASGI server over local loopback TCP sockets (127.0.0.1:8089/api/v1/score-transaction). Includes TCP framing, Uvicorn event loop dispatch, FastAPI pure-ASGI middleware stack (SecurityHeaders, DDoS, CORS, TenantIsolation, MTLS, W3C, APIVersion, ContentType; active custom BaseHTTPMiddleware depth = 0), Pydantic request validation, ModelService evaluation, and response serialization. Rate limiting is controlled at benchmark configuration level to isolate pure inference capacity.
 - **Server Provenance**: Uvicorn 0.47.0 (single-worker ASGI process), Python 3.12.10, AMD Ryzen 16-core, Windows 11.
-- **Client Provenance**: httpx (0.28.1) async client with keep-alive connection pooling, closed-loop concurrency sweep (=1000$ per repetition across 3 independent sweeps).
-- **Raw Artifacts (Current Implementation)**: [`latency_http_service_benchmark.json`](./raw/latency_http_service_benchmark.json) | Raw Samples: [`latency_http_service_samples.json`](./raw/latency_http_service_samples.json)
-- **Historical Pre-Intervention Baseline**: [`latency_http_service_benchmark_pre_intervention.json`](./raw/latency_http_service_benchmark_pre_intervention.json) | Samples: [`latency_http_service_samples_pre_intervention.json`](./raw/latency_http_service_samples_pre_intervention.json)
+- **Client Provenance**: iohttp (3.14.3) async client in separate OS process with keep-alive connection pooling, closed-loop concurrency sweep ( \ge 1{,}000$ per repetition across 3 independent sweeps, 3,000 requests per tier).
+- **Authoritative Canonical Artifact (Post-BaseHTTP=0 Final State)**: [latency_http_service_benchmark_post_basehttp0_diagnosis.json](./raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json) | Samples: [latency_http_service_samples.json](./raw/latency_http_service_samples.json)
+- **Historical Pre-Intervention Baseline**: [latency_http_service_benchmark_pre_intervention.json](./raw/latency_http_service_benchmark_pre_intervention.json)
 
-##### Current Implementation (Post-FeatureStore Offload via `asyncio.to_thread`)
+##### Canonical Implementation (Active Custom BaseHTTPMiddleware Depth = 0)
 
-| Concurrency Level | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
+| Concurrency Level ($) | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | Pooled p50 Latency (ms) | Pooled p95 Latency (ms) | Pooled p99 Latency (ms) | Max Latency (ms) | Success Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **91.1 $\pm$ 2.3 req/s** | 3,000 | 0 | 0 | **10.77 ms** | 12.41 ms | 15.21 ms | 26.54 ms | 100.0% |
-| **10** | **191.0 $\pm$ 1.9 req/s** | 3,000 | 0 | 0 | **48.06 ms** | 57.85 ms | 80.65 ms | 128.52 ms | 100.0% |
-| **50** | **120.6 $\pm$ 2.0 req/s** | 3,000 | 0 | 0 | **231.56 ms** | 1,205.94 ms | 1,918.50 ms | 4,218.42 ms | 100.0% |
-| **100** | **82.7 $\pm$ 5.5 req/s** | 3,000 | 0 | 0 | **648.51 ms** | 3,199.80 ms | 5,152.51 ms | 11,420.15 ms | 100.0% |
-| **250** | **68.0 $\pm$ 3.6 req/s** | 2,998 | 0 | 0 | **2,379.38 ms** | 7,885.00 ms | 10,207.36 ms | 14,892.11 ms | 99.9% |
-| **500** | **59.3 $\pm$ 0.2 req/s** | 2,989 | 0 | 0 | **7,358.68 ms** | 11,104.51 ms | 12,729.72 ms | 15,210.45 ms | 99.6% |
-
-##### Controlled Intervention Comparative Matrix (Post-Offload vs. Pre-Intervention Baseline)
-
-| Concurrency Level | Baseline Throughput | Post-Offload Throughput | Throughput $\Delta$ (%) | Baseline 2xx p50 | Post-Offload 2xx p50 | Latency $\Delta$ p50 | Baseline 2xx p95 | Post-Offload 2xx p95 |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **$C=1$** | 83.0 req/s | 91.1 req/s | **+8.1 req/s (+9.8%)** | 11.39 ms | 10.77 ms | **-0.62 ms (-5.4%)** | 16.27 ms | 12.41 ms |
-| **$C=10$** | 89.0 req/s | 191.0 req/s | **+102.0 req/s (+114.6%)** | 139.94 ms | 48.06 ms | **-91.88 ms (-65.7%)** | 192.44 ms | 57.85 ms |
-| **$C=50$** | 71.4 req/s | 120.6 req/s | **+49.2 req/s (+68.9%)** | 461.06 ms | 231.56 ms | **-229.50 ms (-49.8%)** | 1,886.43 ms | 1,205.94 ms |
-| **$C=100$** | 51.9 req/s | 82.7 req/s | **+30.8 req/s (+59.3%)** | 1,338.76 ms | 648.51 ms | **-690.25 ms (-51.6%)** | 5,319.02 ms | 3,199.80 ms |
-| **$C=250$** | 51.3 req/s | 68.0 req/s | **+16.7 req/s (+32.6%)** | 3,577.98 ms | 2,379.38 ms | **-1,198.60 ms (-33.5%)** | 9,915.45 ms | 7,885.00 ms |
-| **$C=500$** | 48.8 req/s | 59.3 req/s | **+10.5 req/s (+21.5%)** | 9,091.82 ms | 7,358.68 ms | **-1,733.14 ms (-19.1%)** | 14,621.48 ms | 11,104.51 ms |
+| **1** | **134.9 $\pm$ 2.4 req/s** | 3,000 | 0 | 0 | **7.12 ms** | 9.00 ms | 10.85 ms | 14.88 ms | 100.0% |
+| **10** | **452.8 $\pm$ 14.0 req/s** | 3,000 | 0 | 0 | **20.48 ms** | 31.84 ms | 39.96 ms | 53.64 ms | 100.0% |
+| **50** | **543.0 $\pm$ 23.6 req/s** | 3,000 | 0 | 0 | **89.02 ms** | 104.70 ms | 156.81 ms | 189.07 ms | 100.0% |
+| **100** | **520.8 $\pm$ 37.6 req/s** | 3,000 | 0 | 0 | **178.50 ms** | 266.38 ms | 289.42 ms | 337.89 ms | 100.0% |
+| **250** | **431.9 $\pm$ 29.6 req/s** | 3,000 | 0 | 0 | **474.97 ms** | 918.33 ms | 950.14 ms | 1,024.12 ms | 100.0% |
+| **500** | **401.7 $\pm$ 26.7 req/s** | 3,000 | 0 | 0 | **1,060.89 ms** | 1,469.24 ms | 1,760.77 ms | 2,187.52 ms | 100.0% |
 
 > [!NOTE]
-> **Operational Observations**:
-> 1. **Peak Throughput Doubling**: Offloading `_feature_store.get_online_features` from the main asyncio event loop to worker threads doubled peak throughput from $89.0\text{ req/s}$ to $191.0\text{ req/s}$ (+114.6%) at $C=10$ with 100% success rate.
-> 2. **Broad Latency Reductions**: Median latency dropped substantially across all tiers: by -65.7% at $C=10$ ($139.94\text{ ms} \to 48.06\text{ ms}$), -49.8% at $C=50$, -51.6% at $C=100$, and by $-1{,}733\text{ ms}$ (-19.1%) at $C=500$.
-> 3. **Causal Mechanism**: Removing synchronous $2.2\text{ ms}$ FeatureStore lookups from the event-loop thread reduced event-loop scheduling lag by 46.7% (p50: $10.06\text{ ms} \to 5.36\text{ ms}$) and enabled up to 20 concurrent lookups in executor threads. At extreme concurrency ($C=500$), the bottleneck shifted from event-loop blocking to executor worker contention (executor queue wait rose to $\sim 107\text{ ms}$).
+> **Canonical Post-BaseHTTP=0 Findings & Scope**:
+> 1. **Peak Empirical Throughput**: Reached **543.0 $\pm$ 23.6 req/s** at =50$ with 100% 2xx success rate across 3,000 requests. Single-client median latency is **7.12 ms** (pooled p50) / **7.13 ms** (per-rep mean).
+> 2. **High-Concurrency Queueing Characterization**: At =500$, throughput sustains **401.7 $\pm$ 26.7 req/s** with 18,000/18,000 successful responses across the full diagnostic sweep. Latency grows at high concurrency (pooled p50 = 1,060.89 ms, pooled p99 = 1,760.77 ms). Correlated stage tracing in post_basehttp_bottleneck_diagnosis.json localizes the largest component of median latency to the pre_route_ms socket/dispatch region, confirming that model compute is not the dominant high-concurrency bottleneck. A unique throughput-limiting root cause was not causally isolated. Localhost single-worker results do not constitute production-capacity claims.
+
+##### Historical Methodology Experiment: HTTPX Benchmark Harness (Superseded for Server Capacity)
+
+- **Artifact**: [latency_http_service_benchmark_httpx.json](./raw/latency_http_service_benchmark_httpx.json)
+- **Methodological Context**: Prior evaluations used an in-process httpx client. Controlled load-generator isolation demonstrated substantial client-side event-loop starvation under high concurrency (heartbeat lag $> 1{,}000\text{ ms}$), capping observed client throughput at $\sim 55.8\text{ req/s}$ at =500$. Migrating to a separate-process iohttp closed-loop client resolved client starvation, yielding the canonical measurements above. The historical HTTPX numbers below are preserved strictly as a methodological artifact:
+
+| Concurrency Level | HTTPX Throughput | Status 2xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | Success Rate | Methodological Status |
+|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---|
+| **1** | **91.1 $\pm$ 2.3 req/s** | 3,000 | 0 | **10.77 ms** | 12.41 ms | 15.21 ms | 100.0% | Valid single-client baseline |
+| **10** | **191.0 $\pm$ 1.9 req/s** | 3,000 | 0 | **48.06 ms** | 57.85 ms | 80.65 ms | 100.0% | Historical offload baseline |
+| **50** | **120.6 $\pm$ 2.0 req/s** | 3,000 | 0 | **231.56 ms** | 1,205.94 ms | 1,918.50 ms | 100.0% | Client loop lag emerging |
+| **100** | **82.7 $\pm$ 5.5 req/s** | 3,000 | 0 | **648.51 ms** | 3,199.80 ms | 5,152.51 ms | 100.0% | Client loop lag growing |
+| **250** | **68.0 $\pm$ 3.6 req/s** | 2,998 | 0 | **2,379.38 ms** | 7,885.00 ms | 10,207.36 ms | 99.9% | Client loop starvation |
+| **500** | **59.3 $\pm$ 0.2 req/s** | 2,989 | 0 | **7,358.68 ms** | 11,104.51 ms | 12,729.72 ms | 99.6% | Severe client starvation (Superseded) |
 
 #### Class B2: Rate-Limited Public-Endpoint Behavior Benchmark
 - **Runner**: enchmarks/runners/run_http_ratelimit_benchmark.py

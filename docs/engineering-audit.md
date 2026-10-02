@@ -2,7 +2,7 @@
 
 > **CF-Intelligence Technical Audit Report**  
 > **Repository:** [`https://github.com/yusufcalisir/CF-Intelligence`](https://github.com/yusufcalisir/CF-Intelligence)  
-> **Audited Baseline:** 4,110 Automated Tests across Backend (3,314 Pytest), Scientific Verification (409 Tests / 21 Modules), Frontend (356 Vitest), and Smart Contracts (31 Hardhat).
+> **Audited Baseline:** 4,348 Collected Tests across Backend (3,552 Pytest), Scientific Verification (409 Tests / 21 Modules), Frontend (356 Vitest), and Smart Contracts (31 Hardhat).
 
 ---
 

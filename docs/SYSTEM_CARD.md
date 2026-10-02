@@ -57,7 +57,7 @@ The platform couples sub-3ms pre-authorization transaction risk scoring (`DeepFr
 │                  ┌─────────────────────────────────┐                                   │
 │                  │ Enterprise Inference Gateway    │                                   │
 │                  │ - 1,246.3 req/s Peak Throughput │                                   │
-│                  │ - 2.29ms Fast-Path Latency      │                                   │
+│                  │ - 2.57ms Fast-Path Latency      │                                   │
 │                  └────────────────┬────────────────┘                                   │
 │                                   │                                                    │
 │                                   ▼                                                    │
@@ -177,13 +177,13 @@ The central aggregator incorporates robust Byzantine aggregation algorithms to n
 
 ### 7.1 Production Hardware Benchmarks
 Evaluated on standard host hardware distinguishing in-process compute microbenchmark from live ASGI HTTP service:
-- **In-Process Scoring Pipeline Microbenchmark** ([`latency_microbenchmark.json`](../benchmarks/results/raw/latency_microbenchmark.json)):
+- **In-Process Scoring Pipeline Microbenchmark** ([`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json)):
   - **Single-Request Fast-Path Compute**: **2.57 ms** (well below internal $< 15\text{ ms}$ target; p50: 2.70 ms, p99: 8.87 ms at $C=1$).
   - **Peak Throughput**: **1,246.3 requests/second** at $C = 50$ (C=100: 1,109.9 req/s; 0.0% error rate).
   - **Latency Distribution (C = 100 Stress Load)**: p50: **47.49 ms**, p95: **87.31 ms**, p99: **105.02 ms**.
-- **Local HTTP Service Benchmark (Class B1 Inference Capacity)** ([`latency_http_service_benchmark.json`](../benchmarks/results/raw/latency_http_service_benchmark.json)):
-  - **Single-Client Median Latency**: **11.39 ms** (p99: 21.32 ms at $C=1$).
-  - **Peak Service Throughput**: **89.0 requests/second** at $C = 10$ on single-worker Uvicorn over loopback TCP (100% 2xx success).
+- **Local HTTP Service Benchmark (Class B1 Inference Capacity)** ([`latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json)):
+  - **Single-Client Median Latency**: **7.12 ms** (pooled p50; pooled p99: 10.85 ms at $C=1$).
+  - **Peak Service Throughput**: **543.0 req/s** at $C = 50$ on single-worker Uvicorn over loopback TCP (452.8 req/s at $C=10$; 401.7 req/s at $C=500$; 100% 2xx success).
 - **Bandwidth Consumption**: Model gradient payloads are compressed by **74.8%** via Zstandard, Top-$k$ sparsification ($k=20\%$), and INT8 quantization.
 
 ### 7.2 Multi-Cloud Infrastructure as Code (IaC)
@@ -195,10 +195,10 @@ Evaluated on standard host hardware distinguishing in-process compute microbench
 
 ## 8. Verification & Continuous Validation
 
-The system test infrastructure comprises **4,198 total automated tests collected across test suites**:
-- **Backend Pytest Suite**: **3,402 automated tests** (unit, integration, chaos, property-based, and security invariants).
-- **Scientific Verification Suite**: **409 verification tests** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
-- **Frontend Vitest Suite**: **356 component and integration tests**.
-- **Smart Contracts Suite**: **31 Hardhat tests** for consortium Shapley value settlement.
+The system test infrastructure comprises **4,348 total automated tests collected across test suites**:
+- **Backend Pytest Suite**: **3,552 automated tests collected** (unit, integration, chaos, property-based, and security invariants).
+- **Scientific Verification Suite**: **409 verification tests collected** across 21 modules (differential privacy moments accounting, membership inference attack resistance, DLG gradient inversion resilience, test set isolation).
+- **Frontend Vitest Suite**: **356 component and integration tests collected**.
+- **Smart Contracts Suite**: **31 Hardhat tests collected** for consortium Shapley value settlement.
 
-*(Note: 3,402 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,198 automated tests collected across suites. Additional optional E2E/Playwright tests run in separate browser workflows).*
+*(Note: 3,552 Backend + 409 Scientific + 356 Frontend + 31 Contracts = 4,348 automated tests collected across suites; 3,961 Python core tests. Additional optional E2E/Playwright tests run in separate browser workflows).*

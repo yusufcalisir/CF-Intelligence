@@ -161,9 +161,9 @@ Evaluated on host hardware distinguishing in-process compute microbenchmark from
   - **p50 Latency (C = 100 Load)**: **47.49 ms**
   - **p95 Latency (C = 100 Load)**: **87.31 ms**
   - **p99 Latency (C = 100 Load)**: **105.02 ms**
-- **Local HTTP Service Benchmark (Class B1 Inference Capacity)** ([`benchmarks/results/raw/latency_http_service_benchmark.json`](benchmarks/results/raw/latency_http_service_benchmark.json)):
-  - **Single-Client Median Latency**: **11.39 ms** (p99: 21.32 ms at $C=1$)
-  - **Peak Service Throughput**: **89.0 req/s** at $C = 10$ on single-worker Uvicorn over loopback TCP (100% 2xx success)
+- **Local HTTP Service Benchmark (Class B1 Inference Capacity)** ([`benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json)):
+  - **Single-Client Median Latency**: **7.12 ms** (pooled p50; pooled p99: 10.85 ms at $C=1$)
+  - **Peak Service Throughput**: **543.0 req/s** at $C = 50$ on single-worker Uvicorn over loopback TCP (452.8 req/s at $C=10$; 401.7 req/s at $C=500$; 100% 2xx success)
 
 ---
 

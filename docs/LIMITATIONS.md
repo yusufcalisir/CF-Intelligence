@@ -69,6 +69,10 @@ In [`benchmarks/results/raw/dp_privacy_utility_tradeoff.json`](file:///benchmark
 | $\sigma = 2.0$ | $\epsilon = 1.2410$ | **0.3150** | $-0.3122$ (-49.8%) | High privacy; severe detection degradation |
 | $\sigma = 3.0$ | $\epsilon = 0.6272$ | **0.1963** | **$-0.4309$ (-68.7%)** | **Severe Utility Collapse**: -68.7% loss |
 
+> [!NOTE]
+> **Archival Note on Legacy Prototype Data & Canonical Frontier**:  
+> The table above records the historical prototype run (10-feature algebraic centroid prototype without per-sample clipping). The canonical multi-seed Opacus DP-SGD neural benchmark ($N=20{,}000$, per-sample gradient clipping $C=1.0$, PRV accountant) achieves $\mathrm{PR\text{-}AUC} = 0.8965 \pm 0.0078$ at $\sigma=0.0$ and degrades to $0.3465 \pm 0.1580$ at $\sigma=3.0$ ($\epsilon=0.3497$, $-61.35\%$ relative loss) — confirming the identical fundamental negative result (utility collapse under strong privacy noise) under production-grade PyTorch Opacus execution. Full canonical results: [`dp_privacy_utility_tradeoff.json`](../benchmarks/results/raw/dp_privacy_utility_tradeoff.json).
+
 #### Mathematical & Operational Reality
 - **Why It Happens:** Differential privacy injects spherical Gaussian noise $\mathcal{N}(0, \sigma^2 C^2 \mathbf{I})$ into clipped gradient updates. In extreme class imbalance, the gradient signal corresponding to rare fraudulent samples is minuscule relative to majority legitimate traffic. At $\sigma \ge 3.0$, the perturbation variance swamps the minority gradient coordinates, destroying decision boundary refinement.
 - **Operational Reality:** Banks cannot operate at extreme differential privacy ($\epsilon < 1.0$) in real-time fraud scoring without surrendering more than two-thirds of their fraud detection capability. The platform defines $\epsilon \le 1.0, \delta = 10^{-5}$ as a research target / intended configuration, while empirical evaluations benchmark points from $\epsilon = 1.858$ down to strong utility-collapse regimes. Real-world production deployment remains subject to future institutional risk appetite.
