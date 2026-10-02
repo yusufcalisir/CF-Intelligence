@@ -1,0 +1,3404 @@
+{
+  "metadata": {
+    "phase": "PRE-INTERVENTION FORENSIC DIAGNOSIS",
+    "middleware": "SecurityHeadersMiddleware",
+    "architecture": "BaseHTTPMiddleware",
+    "timestamp": 1790929365.0136101,
+    "total_vectors": 75
+  },
+  "vectors": [
+    {
+      "vector_id": "V01_200_JSON",
+      "category": "basic_responses",
+      "description": "GET /api/v1/test -> 200",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "15"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"status\":\"ok\"}",
+      "extra": {
+        "method": "GET",
+        "path": "/api/v1/test"
+      }
+    },
+    {
+      "vector_id": "V02_200_TEXT",
+      "category": "basic_responses",
+      "description": "GET /test -> 200",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "11"
+        ],
+        [
+          "content-type",
+          "text/plain; charset=utf-8"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "hello world",
+      "extra": {
+        "method": "GET",
+        "path": "/test"
+      }
+    },
+    {
+      "vector_id": "V03_200_EMPTY",
+      "category": "basic_responses",
+      "description": "GET /empty -> 200",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "GET",
+        "path": "/empty"
+      }
+    },
+    {
+      "vector_id": "V04_201_CREATED",
+      "category": "basic_responses",
+      "description": "POST /create -> 201",
+      "status_code": 201,
+      "headers": [
+        [
+          "content-length",
+          "16"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"created\":true}",
+      "extra": {
+        "method": "POST",
+        "path": "/create"
+      }
+    },
+    {
+      "vector_id": "V05_204_NO_CONTENT",
+      "category": "basic_responses",
+      "description": "DELETE /delete -> 204",
+      "status_code": 204,
+      "headers": [
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "DELETE",
+        "path": "/delete"
+      }
+    },
+    {
+      "vector_id": "V06_301_MOVED",
+      "category": "basic_responses",
+      "description": "GET /old -> 301",
+      "status_code": 301,
+      "headers": [
+        [
+          "location",
+          "/new"
+        ],
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "GET",
+        "path": "/old"
+      }
+    },
+    {
+      "vector_id": "V07_302_FOUND",
+      "category": "basic_responses",
+      "description": "GET /temp -> 302",
+      "status_code": 302,
+      "headers": [
+        [
+          "location",
+          "/new"
+        ],
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "GET",
+        "path": "/temp"
+      }
+    },
+    {
+      "vector_id": "V08_307_TEMP_REDIRECT",
+      "category": "basic_responses",
+      "description": "POST /redirect307 -> 307",
+      "status_code": 307,
+      "headers": [
+        [
+          "location",
+          "/new"
+        ],
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "POST",
+        "path": "/redirect307"
+      }
+    },
+    {
+      "vector_id": "V09_308_PERM_REDIRECT",
+      "category": "basic_responses",
+      "description": "POST /redirect308 -> 308",
+      "status_code": 308,
+      "headers": [
+        [
+          "location",
+          "/new"
+        ],
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "POST",
+        "path": "/redirect308"
+      }
+    },
+    {
+      "vector_id": "V10_HEAD",
+      "category": "basic_responses",
+      "description": "HEAD /api/v1/test -> 200",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "0"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "",
+      "extra": {
+        "method": "HEAD",
+        "path": "/api/v1/test"
+      }
+    },
+    {
+      "vector_id": "V11_400_BAD_REQUEST",
+      "category": "error_responses",
+      "description": "Isolated downstream 400 status",
+      "status_code": 400,
+      "headers": [
+        [
+          "content-length",
+          "23"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"bad request\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V12_401_UNAUTHORIZED",
+      "category": "error_responses",
+      "description": "Isolated downstream 401 status",
+      "status_code": 401,
+      "headers": [
+        [
+          "content-length",
+          "24"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"unauthorized\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V13_403_FORBIDDEN",
+      "category": "error_responses",
+      "description": "Isolated downstream 403 status",
+      "status_code": 403,
+      "headers": [
+        [
+          "content-length",
+          "21"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"forbidden\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V14_404_NOT_FOUND",
+      "category": "error_responses",
+      "description": "Isolated downstream 404 status",
+      "status_code": 404,
+      "headers": [
+        [
+          "content-length",
+          "21"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"not found\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V15_405_METHOD_NOT_ALLOWED",
+      "category": "error_responses",
+      "description": "Isolated downstream 405 status",
+      "status_code": 405,
+      "headers": [
+        [
+          "content-length",
+          "30"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"method not allowed\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V16_415_UNSUPPORTED_MEDIA",
+      "category": "error_responses",
+      "description": "Isolated downstream 415 status",
+      "status_code": 415,
+      "headers": [
+        [
+          "content-length",
+          "29"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"unsupported media\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V17_422_UNPROCESSABLE_ENTITY",
+      "category": "error_responses",
+      "description": "Isolated downstream 422 status",
+      "status_code": 422,
+      "headers": [
+        [
+          "content-length",
+          "29"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"validation failed\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V18_500_EXPLICIT_RESPONSE",
+      "category": "error_responses",
+      "description": "Isolated downstream 500 status",
+      "status_code": 500,
+      "headers": [
+        [
+          "content-length",
+          "26"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": "{\"error\":\"internal error\"}",
+      "extra": {}
+    },
+    {
+      "vector_id": "V19_UNHANDLED_EXCEPTION_ISOLATED",
+      "category": "exception_semantics",
+      "description": "Isolated SecurityHeadersMiddleware with unhandled downstream exception",
+      "status_code": null,
+      "headers": [],
+      "body_snippet": null,
+      "extra": {
+        "messages": [
+          "exception"
+        ],
+        "exception_caught": true
+      }
+    },
+    {
+      "vector_id": "V20_UNHANDLED_EXCEPTION_PRODUCTION",
+      "category": "exception_semantics",
+      "description": "Production stack unhandled exception (escapes to ServerErrorMiddleware at Layer 0; SecurityHeaders absent)",
+      "status_code": 500,
+      "headers": [
+        [
+          "x-incident-id",
+          "inc_852f23ae8994"
+        ],
+        [
+          "content-length",
+          "271"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ]
+      ],
+      "body_snippet": "{\"type\":\"https://cfi-platform.org/errors/ValueError\",\"title\":\"Internal Server Error (Development Mod",
+      "extra": {
+        "security_headers_present": false
+      }
+    },
+    {
+      "vector_id": "V21_TENANT_ACCESS_EARLY_403",
+      "category": "middleware_interaction",
+      "description": "TenantAccessControlMiddleware early 403 short-circuit (outermost layer)",
+      "status_code": 403,
+      "headers": [
+        [
+          "content-length",
+          "251"
+        ],
+        [
+          "content-type",
+          "application/problem+json"
+        ]
+      ],
+      "body_snippet": "{\"type\":\"https://cfi-platform.org/errors/TenantAccessDenied\",\"title\":\"Cross-Tenant Broken Access Con",
+      "extra": {}
+    },
+    {
+      "vector_id": "V22_DDOS_EARLY_429",
+      "category": "middleware_interaction",
+      "description": "DDoSProtectionMiddleware early 429 short-circuit (outer layer)",
+      "status_code": 429,
+      "headers": [
+        [
+          "retry-after",
+          "10"
+        ],
+        [
+          "x-ddos-throttled",
+          "true"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "0"
+        ],
+        [
+          "x-ratelimit-reset",
+          "1790929374"
+        ],
+        [
+          "content-length",
+          "224"
+        ],
+        [
+          "content-type",
+          "application/problem+json"
+        ]
+      ],
+      "body_snippet": "{\"type\":\"https://cfi-platform.org/errors/DDoSThrottled\",\"title\":\"Volumetric Flood Throttling Trigger",
+      "extra": {}
+    },
+    {
+      "vector_id": "V23_MTLS_EARLY_403",
+      "category": "middleware_interaction",
+      "description": "MTLSVerificationMiddleware early 403 rejection (outer layer)",
+      "status_code": 403,
+      "headers": [
+        [
+          "content-length",
+          "212"
+        ],
+        [
+          "content-type",
+          "application/problem+json"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "98"
+        ]
+      ],
+      "body_snippet": "{\"type\":\"https://cfi-platform.org/errors/mTLSVerificationFailed\",\"title\":\"mTLS Handshake Verificatio",
+      "extra": {}
+    },
+    {
+      "vector_id": "V24_CONTENT_TYPE_EARLY_415",
+      "category": "middleware_interaction",
+      "description": "ContentTypeMiddleware early 415 rejection (outer layer)",
+      "status_code": 415,
+      "headers": [
+        [
+          "content-length",
+          "243"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "traceparent",
+          "00-52acce5fefe64489ace76c1e0c10ca50-3e38dd00171b4086-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "97"
+        ]
+      ],
+      "body_snippet": "{\"type\":\"https://cfi-platform.org/errors/UnsupportedMediaType\",\"title\":\"Unsupported Media Type\",\"sta",
+      "extra": {}
+    },
+    {
+      "vector_id": "V25_CORS_PREFLIGHT_OPTIONS",
+      "category": "middleware_interaction",
+      "description": "CORS preflight OPTIONS response (CORSMiddleware inside SecurityHeadersMiddleware)",
+      "status_code": 200,
+      "headers": [
+        [
+          "vary",
+          "Origin"
+        ],
+        [
+          "access-control-allow-methods",
+          "GET, POST, PUT, DELETE, PATCH, OPTIONS"
+        ],
+        [
+          "access-control-max-age",
+          "600"
+        ],
+        [
+          "access-control-allow-credentials",
+          "true"
+        ],
+        [
+          "access-control-allow-origin",
+          "http://localhost:3000"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-type",
+          "text/plain; charset=utf-8"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-30cb5e7ce2974416be38bf0eb1967180-1ec19e91334e4202-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "96"
+        ]
+      ],
+      "body_snippet": "OK",
+      "extra": {}
+    },
+    {
+      "vector_id": "V26_CORS_SIMPLE_GET",
+      "category": "middleware_interaction",
+      "description": "CORS simple GET response with Origin",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "131"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "access-control-allow-credentials",
+          "true"
+        ],
+        [
+          "access-control-expose-headers",
+          "Retry-After, X-RateLimit-Exceeded"
+        ],
+        [
+          "access-control-allow-origin",
+          "http://localhost:3000"
+        ],
+        [
+          "vary",
+          "Origin"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-20ab321c5b3b4e5d8c14467e45ab29c3-de50e8ec84714788-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "95"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V27_ROUTER_404",
+      "category": "middleware_interaction",
+      "description": "Router 404 Not Found",
+      "status_code": 404,
+      "headers": [
+        [
+          "content-length",
+          "22"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-21c563136dbf4224b7b928a11e3eba43-2c188bf0c216488b-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "94"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V28_ROUTER_405",
+      "category": "middleware_interaction",
+      "description": "Router 405 Method Not Allowed",
+      "status_code": 405,
+      "headers": [
+        [
+          "allow",
+          "GET"
+        ],
+        [
+          "content-length",
+          "31"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-f9ecc6e9cb3f4973b481e368621b3071-8f37bfa3b970454f-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "93"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V29_VALIDATION_422",
+      "category": "middleware_interaction",
+      "description": "Pydantic validation 422 Unprocessable Entity",
+      "status_code": 422,
+      "headers": [
+        [
+          "content-length",
+          "314"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-bc50104e77f946d1abc270c6aa158de3-317f42024ee44982-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "92"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V30_OUTER_HEADERS_COEXISTENCE",
+      "category": "middleware_interaction",
+      "description": "Coexistence of SecurityHeaders with traceparent, x-api-version, and rate-limit headers",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "131"
+        ],
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "traceparent",
+          "00-354be3bb8f7049a1a4405b6f627d36bf-ce2a9cbf75764980-01"
+        ],
+        [
+          "x-api-version",
+          "v1"
+        ],
+        [
+          "x-ratelimit-limit",
+          "100"
+        ],
+        [
+          "x-ratelimit-remaining",
+          "91"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V31_DOCS_PATH_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /docs",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/docs",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V32_REDOC_PATH_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /redoc",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/redoc",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V33_SCALAR_PATH_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /scalar",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/scalar",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V34_OPENAPI_PATH_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /openapi.json",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/openapi.json",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V35_FAVICON_ICO_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /favicon.ico",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/favicon.ico",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V36_FAVICON_SVG_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /favicon.svg",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/favicon.svg",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V37_LOGO_PREFIX_CSP",
+      "category": "docs_csp_policy",
+      "description": "Tailored docs CSP for path /logo/logo.png",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "path": "/logo/logo.png",
+        "is_docs_csp": true
+      }
+    },
+    {
+      "vector_id": "V38_Content_Security_Policy_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for Content-Security-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V39_Content_Security_Policy_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for Content-Security-Policy on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-security-policy",
+          "custom-override-content-security-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-content-security-policy",
+        "final_value": "custom-override-content-security-policy"
+      }
+    },
+    {
+      "vector_id": "V40_Content_Security_Policy_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header content-security-policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-security-policy",
+          "custom-override-content-security-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V41_Content_Security_Policy_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for Content-Security-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "Content-Security-Policy",
+          "first-val"
+        ],
+        [
+          "Content-Security-Policy",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ]
+      }
+    },
+    {
+      "vector_id": "V42_Strict_Transport_Security_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for Strict-Transport-Security",
+      "status_code": 200,
+      "headers": [
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V43_Strict_Transport_Security_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for Strict-Transport-Security on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "strict-transport-security",
+          "custom-override-strict-transport-security"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-strict-transport-security",
+        "final_value": "custom-override-strict-transport-security"
+      }
+    },
+    {
+      "vector_id": "V44_Strict_Transport_Security_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header strict-transport-security",
+      "status_code": 200,
+      "headers": [
+        [
+          "strict-transport-security",
+          "custom-override-strict-transport-security"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V45_Strict_Transport_Security_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for Strict-Transport-Security",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "Strict-Transport-Security",
+          "first-val"
+        ],
+        [
+          "Strict-Transport-Security",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "max-age=31536000; includeSubDomains; preload"
+        ]
+      }
+    },
+    {
+      "vector_id": "V46_X_Content_Type_Options_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for X-Content-Type-Options",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V47_X_Content_Type_Options_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for X-Content-Type-Options on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-content-type-options",
+          "custom-override-x-content-type-options"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-x-content-type-options",
+        "final_value": "custom-override-x-content-type-options"
+      }
+    },
+    {
+      "vector_id": "V48_X_Content_Type_Options_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header x-content-type-options",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-content-type-options",
+          "custom-override-x-content-type-options"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V49_X_Content_Type_Options_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for X-Content-Type-Options",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "X-Content-Type-Options",
+          "first-val"
+        ],
+        [
+          "X-Content-Type-Options",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "nosniff"
+        ]
+      }
+    },
+    {
+      "vector_id": "V50_X_Frame_Options_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for X-Frame-Options",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V51_X_Frame_Options_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for X-Frame-Options on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-frame-options",
+          "custom-override-x-frame-options"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-x-frame-options",
+        "final_value": "custom-override-x-frame-options"
+      }
+    },
+    {
+      "vector_id": "V52_X_Frame_Options_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header x-frame-options",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-frame-options",
+          "custom-override-x-frame-options"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V53_X_Frame_Options_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for X-Frame-Options",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "X-Frame-Options",
+          "first-val"
+        ],
+        [
+          "X-Frame-Options",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "DENY"
+        ]
+      }
+    },
+    {
+      "vector_id": "V54_Referrer_Policy_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for Referrer-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V55_Referrer_Policy_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for Referrer-Policy on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "referrer-policy",
+          "custom-override-referrer-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-referrer-policy",
+        "final_value": "custom-override-referrer-policy"
+      }
+    },
+    {
+      "vector_id": "V56_Referrer_Policy_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header referrer-policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "referrer-policy",
+          "custom-override-referrer-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V57_Referrer_Policy_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for Referrer-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "Referrer-Policy",
+          "first-val"
+        ],
+        [
+          "Referrer-Policy",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "no-referrer"
+        ]
+      }
+    },
+    {
+      "vector_id": "V58_Permissions_Policy_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for Permissions-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V59_Permissions_Policy_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for Permissions-Policy on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "permissions-policy",
+          "custom-override-permissions-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-permissions-policy",
+        "final_value": "custom-override-permissions-policy"
+      }
+    },
+    {
+      "vector_id": "V60_Permissions_Policy_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header permissions-policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "permissions-policy",
+          "custom-override-permissions-policy"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V61_Permissions_Policy_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for Permissions-Policy",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "Permissions-Policy",
+          "first-val"
+        ],
+        [
+          "Permissions-Policy",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ]
+      }
+    },
+    {
+      "vector_id": "V62_X_XSS_Protection_SAME",
+      "category": "collision_matrix",
+      "description": "Downstream sets same value for X-XSS-Protection",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V63_X_XSS_Protection_DIFF_OVERRIDE",
+      "category": "collision_matrix",
+      "description": "Downstream sets custom different value for X-XSS-Protection on normal path",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-xss-protection",
+          "custom-override-x-xss-protection"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_value": "custom-override-x-xss-protection",
+        "final_value": "custom-override-x-xss-protection"
+      }
+    },
+    {
+      "vector_id": "V64_X_XSS_Protection_LOWERCASE",
+      "category": "collision_matrix",
+      "description": "Downstream sets lowercase header x-xss-protection",
+      "status_code": 200,
+      "headers": [
+        [
+          "x-xss-protection",
+          "custom-override-x-xss-protection"
+        ],
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {}
+    },
+    {
+      "vector_id": "V65_X_XSS_Protection_DUPLICATES",
+      "category": "collision_matrix",
+      "description": "Downstream sends duplicate raw tuples for X-XSS-Protection",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain"
+        ],
+        [
+          "X-XSS-Protection",
+          "first-val"
+        ],
+        [
+          "X-XSS-Protection",
+          "second-val"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "observed_matching": [
+          "first-val",
+          "second-val",
+          "1; mode=block"
+        ]
+      }
+    },
+    {
+      "vector_id": "V66_DOCS_CSP_OVERWRITE_DOWNSTREAM",
+      "category": "collision_matrix",
+      "description": "Docs route forcibly overwrites downstream CSP with _DOCS_CSP_DIRECTIVES",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-security-policy",
+          "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://cdn.jsdelivr.net https://unpkg.com https://*; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com https://unpkg.com https://*; img-src 'self' data: blob: https://fastapi.tiangolo.com https://cdn.jsdelivr.net https://scalar.com https://*; font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net https://* data: blob:; connect-src 'self' https://cdn.jsdelivr.net https://* wss://*; worker-src 'self' blob: https://*; child-src 'self' blob: https://*; frame-ancestors 'none'; form-action 'self'; base-uri 'self'"
+        ],
+        [
+          "content-length",
+          "4"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "downstream_overwritten": true
+      }
+    },
+    {
+      "vector_id": "V67_UNRELATED_HEADER_PRESERVATION",
+      "category": "header_preservation",
+      "description": "Preservation of multiple Set-Cookie, WWW-Authenticate, Location, Content-Type, Content-Length, and custom duplicate headers",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-length",
+          "15"
+        ],
+        [
+          "set-cookie",
+          "session=abc; Path=/; HttpOnly"
+        ],
+        [
+          "set-cookie",
+          "csrf=xyz; Path=/; Secure"
+        ],
+        [
+          "www-authenticate",
+          "Bearer realm=\"test\""
+        ],
+        [
+          "location",
+          "/redirect-target"
+        ],
+        [
+          "x-custom-test",
+          "val1"
+        ],
+        [
+          "x-custom-test",
+          "val2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "cookies": [
+          "session=abc; Path=/; HttpOnly",
+          "csrf=xyz; Path=/; Secure"
+        ],
+        "x_custom": [
+          "val1",
+          "val2"
+        ]
+      }
+    },
+    {
+      "vector_id": "V68_STREAMING_RESPONSE",
+      "category": "streaming_semantics",
+      "description": "Multi-chunk StreamingResponse under SecurityHeadersMiddleware",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain; charset=utf-8"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "chunk_count": 6,
+        "body_message_count": 6
+      }
+    },
+    {
+      "vector_id": "V69_STREAM_EXCEPTION_AFTER_START",
+      "category": "streaming_semantics",
+      "description": "Streaming response that raises an exception after http.response.start",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "text/plain; charset=utf-8"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "chunks_before_exception": 2,
+        "messages": [
+          "http.response.start",
+          "http.response.body",
+          "http.response.body",
+          "exception"
+        ]
+      }
+    },
+    {
+      "vector_id": "V70_BACKGROUND_TASK",
+      "category": "lifecycle",
+      "description": "Starlette BackgroundTask execution under SecurityHeadersMiddleware",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-length",
+          "2"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "background_executed": true
+      }
+    },
+    {
+      "vector_id": "V71_WEBSOCKET_SCOPE",
+      "category": "non_http_scopes",
+      "description": "Websocket scope handling under BaseHTTPMiddleware",
+      "status_code": null,
+      "headers": [],
+      "body_snippet": null,
+      "extra": {
+        "ws_called": true
+      }
+    },
+    {
+      "vector_id": "V72_LIFESPAN_SCOPE",
+      "category": "non_http_scopes",
+      "description": "Lifespan scope handling under BaseHTTPMiddleware",
+      "status_code": null,
+      "headers": [],
+      "body_snippet": null,
+      "extra": {
+        "lifespan_called": true,
+        "sent": [
+          {
+            "type": "lifespan.startup.complete"
+          }
+        ]
+      }
+    },
+    {
+      "vector_id": "V73_CONTEXTVAR_PROPAGATION",
+      "category": "structural_forensics",
+      "description": "ContextVar propagation upstream->downstream and downstream->upstream under BaseHTTP",
+      "status_code": 200,
+      "headers": [],
+      "body_snippet": null,
+      "extra": {
+        "upstream_to_downstream_visible": true,
+        "downstream_to_upstream_isolated": true
+      }
+    },
+    {
+      "vector_id": "V74_CONCURRENT_RESPONSE_ISOLATION",
+      "category": "concurrency",
+      "description": "Verify zero cross-request contamination under concurrent requests",
+      "status_code": 200,
+      "headers": [],
+      "body_snippet": null,
+      "extra": {
+        "cross_contamination": false,
+        "requests_tested": 20
+      }
+    },
+    {
+      "vector_id": "V75_RAW_HEADER_ORDERING",
+      "category": "raw_ordering",
+      "description": "Exact raw outgoing header ordering for standard JSON response",
+      "status_code": 200,
+      "headers": [
+        [
+          "content-type",
+          "application/json"
+        ],
+        [
+          "content-length",
+          "15"
+        ],
+        [
+          "content-security-policy",
+          "default-src 'none'; script-src 'none'; style-src 'none'; img-src 'none'; font-src 'none'; connect-src 'self'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'; object-src 'none'"
+        ],
+        [
+          "strict-transport-security",
+          "max-age=31536000; includeSubDomains; preload"
+        ],
+        [
+          "x-content-type-options",
+          "nosniff"
+        ],
+        [
+          "x-frame-options",
+          "DENY"
+        ],
+        [
+          "referrer-policy",
+          "no-referrer"
+        ],
+        [
+          "permissions-policy",
+          "geolocation=(), microphone=(), camera=(), payment=()"
+        ],
+        [
+          "x-xss-protection",
+          "1; mode=block"
+        ]
+      ],
+      "body_snippet": null,
+      "extra": {
+        "ordered_names": [
+          "content-type",
+          "content-length",
+          "content-security-policy",
+          "strict-transport-security",
+          "x-content-type-options",
+          "x-frame-options",
+          "referrer-policy",
+          "permissions-policy",
+          "x-xss-protection"
+        ]
+      }
+    }
+  ]
+}
