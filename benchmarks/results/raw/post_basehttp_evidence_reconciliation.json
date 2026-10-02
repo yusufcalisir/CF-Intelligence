@@ -1,0 +1,260 @@
+{
+  "metadata": {
+    "artifact_type": "DERIVED RECONCILIATION ARTIFACT",
+    "description": "Scientific record and causal claim reconciliation for Post-BaseHTTP high-concurrency diagnosis",
+    "benchmark_execution": "NO NEW BENCHMARK EXECUTION — REASONING EXCLUSIVELY FROM VERIFIED HISTORICAL EVIDENCE",
+    "timestamp_iso": "2026-10-02T13:25:00Z"
+  },
+  "source_artifacts": {
+    "benchmarks/results/raw/latency_http_service_benchmark_post_security_headers.json": "963121c69786e3a478a0c3ef9476c51a2b848d57cad053e5ab78aed833ca0b34",
+    "benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json": "146f24bf3ba266a60a5f03b33911fadb13026d4098aea6cd17653fe8cfe2c75c",
+    "benchmarks/results/raw/post_basehttp_bottleneck_diagnosis.json": "4b41541a0060dcf7dafc01807b269eba4d0c0a1beaedfbececb310d133e23ac5"
+  },
+  "empirical_canonical_baseline": {
+    "status": "CROSS-SESSION REPRODUCIBILITY EVIDENCE",
+    "fresh_canonical_c500": {
+      "rps": 401.7,
+      "rps_std": 26.7,
+      "pooled_p50_ms": 1060.89,
+      "pooled_p95_ms": 1469.24,
+      "pooled_p99_ms": 1760.77
+    },
+    "six_tier_pooled_p50_ms": {
+      "C1": 7.12,
+      "C10": 20.48,
+      "C50": 89.02,
+      "C100": 178.50,
+      "C250": 474.97,
+      "C500": 1060.89
+    }
+  },
+  "instrumentation_perturbation": {
+    "tier": "C100",
+    "canonical_uninstrumented": {
+      "rps": 520.8,
+      "p50_ms": 180.45,
+      "p95_ms": 247.85,
+      "p99_ms": 257.71
+    },
+    "diagnostic_instrumented": {
+      "rps": 328.97,
+      "p50_ms": 267.93,
+      "p95_ms": 569.81,
+      "p99_ms": 584.76
+    },
+    "delta": {
+      "rps_delta": -191.83,
+      "rps_delta_pct": -36.83,
+      "p50_delta_ms": 87.48,
+      "p50_delta_pct": 48.48,
+      "p95_delta_ms": 321.96,
+      "p95_delta_pct": 129.90,
+      "p99_delta_ms": 327.05,
+      "p99_delta_pct": 126.91
+    },
+    "classification": "INSTRUMENTATION MATERIALLY PERTURBED ABSOLUTE PERFORMANCE."
+  },
+  "c500_instrumentation_overhead": {
+    "status": "NOT DIRECTLY MEASURED",
+    "note": "Only C100 pairwise overhead was recorded in post_basehttp_bottleneck_diagnosis.json. C500 overhead was not directly measured."
+  },
+  "threadpool_capacity_audit": {
+    "erroneous_formula": "20 workers / 0.0171 s = 1169.6 jobs/s / 3 = 390 req/s",
+    "dimensional_error": "Double division of worker service demand. 17.10 ms was already total demand per request across all 3 jobs.",
+    "empirical_refutation": "Empirical C50 reached 543.0 RPS, disproving the claimed theoretical ceiling of 390 req/s.",
+    "classification": "W/D CAPACITY ESTIMATE NOT SUFFICIENT FOR CAUSAL THROUGHPUT LIMIT."
+  },
+  "interval_reclassifications": {
+    "pre_route_ms": {
+      "name": "PRE-ROUTE SERVER INTERVAL",
+      "measured_c500_p50_ms": 713.27,
+      "measured_c500_p99_ms": 1114.12,
+      "components_included": [
+        "Inbound traversal of 8 pure-ASGI middlewares",
+        "Starlette URL routing and endpoint resolution",
+        "FastAPI request body reading and Pydantic validation",
+        "FastAPI dependency injection resolution",
+        "Asyncio event-loop runnable queueing and coroutine dispatch"
+      ],
+      "isolation_status": "Internal decomposition between execution and event-loop queueing not isolated."
+    },
+    "pre_asgi_client_transport": {
+      "name": "PRE-ASGI CLIENT/TRANSPORT INTERVAL",
+      "measured_c500_p50_ms": 142.84,
+      "measured_c500_p99_ms": 259.29,
+      "physical_boundary": "Between client task initiation (C1_post_start) and server ASGI entry (S0_asgi_entry)",
+      "isolation_status": "Unattributed. Internal mechanisms (TCP handshake, kernel socket buffer, Uvicorn accept scheduling) not separately distinguished."
+    }
+  },
+  "event_loop_heartbeat_audit": {
+    "observed_p50_p95_p99_ms": 0.0,
+    "max_lag_ms": 0.5,
+    "support": "NO LARGE SYNCHRONOUS EVENT-LOOP BLOCKING STALLS OBSERVED",
+    "limitation": "Zero lag is compatible with frequent coroutine yielding and does not independently prove event loop saturation."
+  },
+  "cpu_attribution_audit": {
+    "process_cpu_range_pct": "110.5% - 119.7%",
+    "logical_core_equivalents": "1.1 - 1.2",
+    "per_thread_cpu_recorded": false,
+    "classification": "Process CPU usage plateaus at approximately 1.1-1.2 logical-core equivalents across all process threads. Per-thread CPU was not directly measured."
+  },
+  "gil_claim_audit": {
+    "classification": "GIL CONTENTION — PLAUSIBLE, NOT ESTABLISHED"
+  },
+  "risk_p99_statistical_reconciliation": {
+    "global_stage_p99_ms": 303.44,
+    "regional_p99_band_mean_ms": 14.21,
+    "distinction": "Global stage p99 is the unconditional 99th percentile across all 1,000 risk worker calls. Regional p99-band mean is the mean risk worker service of the 15 slowest overall requests."
+  },
+  "tail_latency_reconciliation": {
+    "p50_to_p99_delta_ms": 568.12,
+    "delta_breakdown": {
+      "pre_route_ms_growth": 400.85,
+      "pre_route_pct_of_delta": 70.6,
+      "pre_asgi_unattributed_growth": 116.45,
+      "pre_asgi_pct_of_delta": 20.5,
+      "resume_delay_growth": 40.45,
+      "resume_delay_pct_of_delta": 7.1,
+      "pytorch_forward_growth": 0.22,
+      "pytorch_forward_pct_of_delta": 0.04
+    },
+    "classification": "TAIL EXPANSION IS DOMINATED BY SCHEDULING/REQUEST-LIFECYCLE INTERVALS RATHER THAN MODEL COMPUTE, BUT THE INTERNAL CAUSAL DECOMPOSITION OF THE LARGEST INTERVALS IS NOT FULLY ISOLATED."
+  },
+  "causal_claims_matrix": [
+    {
+      "claim": "High-concurrency latency is reproducible",
+      "existing_evidence": "Fresh canonical baseline reproduced historical baseline across all 6 tiers",
+      "limitation": "Cross-session operating system variance",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "pre_route_ms is largest measured C500 latency region",
+      "existing_evidence": "713.27 ms at median (70.4%), 1114.12 ms at p99 (70.5%)",
+      "limitation": "None; directly measured between S0 and S8",
+      "classification": "SUPPORTED AS MEASURED REGION"
+    },
+    {
+      "claim": "pre_route_ms is entirely asyncio runnable-queue waiting",
+      "existing_evidence": "Large delay under 500 concurrent coroutines",
+      "limitation": "Traverses 8 middlewares, validation, routing; sub-intervals not isolated",
+      "classification": "NOT ESTABLISHED"
+    },
+    {
+      "claim": "Async resume delays increase materially with concurrency",
+      "existing_evidence": "Measured resume delay grows monotonically from 0.18 ms (C1) to 45 ms (C500) per job",
+      "limitation": "None; directly measured between worker end and coroutine resume",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "PyTorch is dominant latency source",
+      "existing_evidence": "Offloaded to threadpool, uses OpenMP CPU threads",
+      "limitation": "Service time is only 2.77 ms at median; tail expands by only 0.22 ms",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "FeatureStore is dominant latency source",
+      "existing_evidence": "Lookup 1 offloaded, Lookup 2 nested in risk engine",
+      "limitation": "Total FS compute is <12 ms; queue wait is <3 ms at median",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "Risk engine is dominant latency source",
+      "existing_evidence": "Contains nested FeatureStore lookup",
+      "limitation": "Total risk compute is only 8.76 ms (3.0 ms pure heuristic compute)",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "Executor burst saturation occurs",
+      "existing_evidence": "Active workers reach max (20); queue depth reaches 96 at C500",
+      "limitation": "Queue drains between bursts; median queue wait is only 2.84 ms",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "Executor is sole throughput bottleneck",
+      "existing_evidence": "Active workers at max during bursts",
+      "limitation": "Median queue wait is <3 ms; theoretical pool capacity exceeds 1000 req/s",
+      "classification": "NOT SUPPORTED"
+    },
+    {
+      "claim": "Server process CPU plateaus around 1.1-1.2 core equivalents",
+      "existing_evidence": "psutil recorded 110.5%-119.7% across C10 to C500",
+      "limitation": "None; directly measured at process level",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "Event-loop thread itself is proven at exactly 100% CPU",
+      "existing_evidence": "Process CPU is ~110-120%",
+      "limitation": "Per-thread CPU profiling was not directly measured",
+      "classification": "NOT ESTABLISHED"
+    },
+    {
+      "claim": "GIL contention causes resume delays",
+      "existing_evidence": "Python worker threads re-acquire GIL",
+      "limitation": "No GIL profiler was executed; direct causal link unmeasured",
+      "classification": "PLAUSIBLE"
+    },
+    {
+      "claim": "aiohttp client starvation occurs",
+      "existing_evidence": "Localhost client load generator",
+      "limitation": "Client loop lag p99 <11 ms; client CPU <29%; /health reached 2021 RPS",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "Response serialization materially limits throughput",
+      "existing_evidence": "Pydantic response model",
+      "limitation": "Model construction takes 0.04 ms; ASGI body send takes 0.24 ms",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "GC materially limits throughput",
+      "existing_evidence": "Python garbage collection active",
+      "limitation": "RSS stable at ~490 MB; zero GC stop-the-world pauses",
+      "classification": "REJECTED"
+    },
+    {
+      "claim": "Pre-ASGI interval is specifically TCP/socket backlog",
+      "existing_evidence": "142.84 ms measured between client dispatch and ASGI entry",
+      "limitation": "Internal socket/kernel/Uvicorn accept queue mechanisms not isolated",
+      "classification": "NOT ESTABLISHED"
+    },
+    {
+      "claim": "Tail expansion is dominated by non-model request-lifecycle intervals",
+      "existing_evidence": "pre_route_ms (+401 ms) and pre-ASGI (+116 ms) account for 91% of delta",
+      "limitation": "None; PyTorch forward expands by only 0.22 ms",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "Single Uvicorn worker is unique causal throughput bottleneck",
+      "existing_evidence": "1 process core saturated",
+      "limitation": "Workload involves 3 thread offloads; multi-worker counterfactual not run",
+      "classification": "PLAUSIBLE"
+    },
+    {
+      "claim": "One dominant throughput bottleneck has been established",
+      "existing_evidence": "Multiple components show high utilization",
+      "limitation": "Interacting constraints (event loop, thread offloads, CPU) coexist",
+      "classification": "NOT SUPPORTED"
+    },
+    {
+      "claim": "Multiple interacting constraints are more consistent with evidence",
+      "existing_evidence": "Event-loop duty cycle, thread offloading, and burst queueing interact",
+      "limitation": "None; supported by cross-tier resource profiles",
+      "classification": "SUPPORTED"
+    },
+    {
+      "claim": "C500 latency is sufficiently localized for research closure",
+      "existing_evidence": "84% server-internal, 14% pre-ASGI client/transport, 17 ms compute",
+      "limitation": "Sub-intervals of pre_route not isolated, but sufficient for portfolio E scope",
+      "classification": "SUPPORTED"
+    }
+  ],
+  "research_backlog_closure": {
+    "item": "E — High-Concurrency Latency",
+    "decision": "E — CLOSED",
+    "rationale": "High-concurrency latency has been reproducibly demonstrated and localized to concurrency-sensitive request-lifecycle/scheduling intervals rather than algorithmic model compute. The dominant measured region is pre-route server time, with additional coroutine-resume and pre-ASGI client/transport delay. Exact causal subdivision of those broad intervals is not fully isolated, but this residual uncertainty does not prevent closure of the original research question."
+  },
+  "intervention_readiness": {
+    "status": "F. CURRENT PERFORMANCE EXPLAINED WITHOUT NEED FOR FURTHER OPTIMIZATION",
+    "authorization": "ZERO PRODUCTION OPTIMIZATIONS ARE AUTHORIZED"
+  }
+}
