@@ -20,21 +20,14 @@ Tests PRE and POST behavior for:
 
 from __future__ import annotations
 
-import asyncio
 from contextvars import ContextVar
-import os
-import sys
-from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.testclient import TestClient
-from starlette.datastructures import Headers, QueryParams
 
-from app.domain.entities_phase2 import Alert
-from app.domain.enums import AlertSeverity, AlertStatus
 from app.infrastructure.security.oidc_authenticator import OIDCAuthenticator
 from app.main import app, seed_mock_data
 

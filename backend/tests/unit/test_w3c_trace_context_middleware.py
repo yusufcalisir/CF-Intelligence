@@ -17,9 +17,8 @@ to pure ASGI:
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncGenerator
-from typing import Any
 import uuid
+from collections.abc import AsyncGenerator
 
 import pytest
 from starlette.requests import Request

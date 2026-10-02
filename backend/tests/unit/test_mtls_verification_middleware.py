@@ -41,14 +41,12 @@ from typing import Any
 from unittest.mock import patch
 
 import pytest
-from starlette.requests import Request
 from starlette.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 from starlette.testclient import TestClient
-from starlette.types import Message, Receive, Scope, Send
+from starlette.types import Message, Scope
 
 from app.infrastructure.security.mtls_manager import MTLSManager
 from app.main import MTLSVerificationMiddleware, app, settings
-
 
 test_var: ContextVar[str] = ContextVar("test_var", default="initial")
 
@@ -339,20 +337,22 @@ async def test_mtls_revoked_hash_rejects():
 
     mw = MTLSVerificationMiddleware(downstream)
     revoked_sha = "revoked_sha256_hash_12345"
-    with patch.object(settings, "mtls_enabled", True):
-        with patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {revoked_sha})):
-            scope = make_http_scope(
-                "/api/v1/predict",
-                headers=[
-                    (b"x-ssl-client-verify", b"SUCCESS"),
-                    (b"x-client-cert-sha256", revoked_sha.encode("latin-1")),
-                ],
-            )
-            status, headers, body = await run_asgi(mw, scope)
-            assert status == 403
-            assert headers[b"content-type"] == b"application/problem+json"
-            assert b"mTLSCertificateRevoked" in body
-            assert revoked_sha.encode("latin-1") in body
+    with (
+        patch.object(settings, "mtls_enabled", True),
+        patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {revoked_sha})),
+    ):
+        scope = make_http_scope(
+            "/api/v1/predict",
+            headers=[
+                (b"x-ssl-client-verify", b"SUCCESS"),
+                (b"x-client-cert-sha256", revoked_sha.encode("latin-1")),
+            ],
+        )
+        status, headers, body = await run_asgi(mw, scope)
+        assert status == 403
+        assert headers[b"content-type"] == b"application/problem+json"
+        assert b"mTLSCertificateRevoked" in body
+        assert revoked_sha.encode("latin-1") in body
 
 
 @pytest.mark.asyncio
@@ -384,18 +384,20 @@ async def test_mtls_hash_case_sensitivity():
         await resp(scope, receive, send)
 
     mw = MTLSVerificationMiddleware(downstream)
-    with patch.object(settings, "mtls_enabled", True):
-        with patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {"sha_lower"})):
-            # Upper case 'SHA_LOWER' is not in {'sha_lower'} -> passes
-            scope = make_http_scope(
-                "/api/v1/predict",
-                headers=[
-                    (b"x-ssl-client-verify", b"SUCCESS"),
-                    (b"x-client-cert-sha256", b"SHA_LOWER"),
-                ],
-            )
-            status, _, _ = await run_asgi(mw, scope)
-            assert status == 200
+    with (
+        patch.object(settings, "mtls_enabled", True),
+        patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {"sha_lower"})),
+    ):
+        # Upper case 'SHA_LOWER' is not in {'sha_lower'} -> passes
+        scope = make_http_scope(
+            "/api/v1/predict",
+            headers=[
+                (b"x-ssl-client-verify", b"SUCCESS"),
+                (b"x-client-cert-sha256", b"SHA_LOWER"),
+            ],
+        )
+        status, _, _ = await run_asgi(mw, scope)
+        assert status == 200
 
 
 # ------------------------------------------------------------------------------
@@ -444,31 +446,33 @@ async def test_mtls_duplicate_cert_hash_headers_first_wins():
     mw = MTLSVerificationMiddleware(downstream)
     revoked = "revoked_123"
     clean = "clean_123"
-    with patch.object(settings, "mtls_enabled", True):
-        with patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {revoked})):
-            # [clean, revoked] -> first is clean -> passes
-            scope1 = make_http_scope(
-                "/api/v1/predict",
-                headers=[
-                    (b"x-ssl-client-verify", b"SUCCESS"),
-                    (b"x-client-cert-sha256", clean.encode("latin-1")),
-                    (b"x-client-cert-sha256", revoked.encode("latin-1")),
-                ],
-            )
-            s1, _, _ = await run_asgi(mw, scope1)
-            assert s1 == 200
+    with (
+        patch.object(settings, "mtls_enabled", True),
+        patch.object(MTLSManager, "__init__", lambda self: setattr(self, "crl_revoked_serials", {revoked})),
+    ):
+        # [clean, revoked] -> first is clean -> passes
+        scope1 = make_http_scope(
+            "/api/v1/predict",
+            headers=[
+                (b"x-ssl-client-verify", b"SUCCESS"),
+                (b"x-client-cert-sha256", clean.encode("latin-1")),
+                (b"x-client-cert-sha256", revoked.encode("latin-1")),
+            ],
+        )
+        s1, _, _ = await run_asgi(mw, scope1)
+        assert s1 == 200
 
-            # [revoked, clean] -> first is revoked -> 403
-            scope2 = make_http_scope(
-                "/api/v1/predict",
-                headers=[
-                    (b"x-ssl-client-verify", b"SUCCESS"),
-                    (b"x-client-cert-sha256", revoked.encode("latin-1")),
-                    (b"x-client-cert-sha256", clean.encode("latin-1")),
-                ],
-            )
-            s2, _, _ = await run_asgi(mw, scope2)
-            assert s2 == 403
+        # [revoked, clean] -> first is revoked -> 403
+        scope2 = make_http_scope(
+            "/api/v1/predict",
+            headers=[
+                (b"x-ssl-client-verify", b"SUCCESS"),
+                (b"x-client-cert-sha256", revoked.encode("latin-1")),
+                (b"x-client-cert-sha256", clean.encode("latin-1")),
+            ],
+        )
+        s2, _, _ = await run_asgi(mw, scope2)
+        assert s2 == 403
 
 
 # ------------------------------------------------------------------------------
@@ -483,14 +487,16 @@ async def test_mtls_manager_constructor_failure():
         await resp(scope, receive, send)
 
     mw = MTLSVerificationMiddleware(downstream)
-    with patch.object(settings, "mtls_enabled", True):
-        with patch("app.infrastructure.security.mtls_manager.MTLSManager", side_effect=RuntimeError("PKI init failed")):
-            scope = make_http_scope(
-                "/api/v1/predict",
-                headers=[(b"x-ssl-client-verify", b"SUCCESS")],
-            )
-            with pytest.raises(RuntimeError, match="PKI init failed"):
-                await run_asgi(mw, scope)
+    with (
+        patch.object(settings, "mtls_enabled", True),
+        patch("app.infrastructure.security.mtls_manager.MTLSManager", side_effect=RuntimeError("PKI init failed")),
+    ):
+        scope = make_http_scope(
+            "/api/v1/predict",
+            headers=[(b"x-ssl-client-verify", b"SUCCESS")],
+        )
+        with pytest.raises(RuntimeError, match="PKI init failed"):
+            await run_asgi(mw, scope)
 
 
 # ------------------------------------------------------------------------------
@@ -571,7 +577,7 @@ async def test_mtls_downstream_streaming():
     async def downstream(scope, receive, send):
         async def numbers():
             for i in range(3):
-                yield f"chunk_{i},".encode("utf-8")
+                yield f"chunk_{i},".encode()
         resp = StreamingResponse(numbers(), media_type="text/plain")
         await resp(scope, receive, send)
 
@@ -602,7 +608,7 @@ async def test_mtls_head_request():
 @pytest.mark.asyncio
 async def test_mtls_non_http_scope_passthrough():
     """Non-HTTP scopes (websocket, lifespan) pass through to downstream app."""
-    reached = False
+    reached: bool = False
 
     async def downstream(scope, receive, send):
         nonlocal reached
@@ -611,7 +617,7 @@ async def test_mtls_non_http_scope_passthrough():
     mw = MTLSVerificationMiddleware(downstream)
     scope = {"type": "websocket", "path": "/ws/alerts"}
     await mw(scope, dummy_receive, dummy_send)
-    assert reached is True
+    assert reached
 
 
 @pytest.mark.asyncio
