@@ -182,7 +182,7 @@ class FederatedLearningEngine:
             arr = np.asarray(w.flat_weights, dtype=np.float32)
             if np.isfinite(arr).all():
                 clean_weights.append(w)
-                clean_samples.append(max(0, int(s)))
+                clean_samples.append(max(0, s))
             else:
                 logger.warning(
                     "Quarantining client update %d due to non-finite parameter weights (NaN/Inf detected)",

@@ -102,7 +102,7 @@ class TestFedAvgMathematicalOracle:
 
     def test_fedavg_oracle_multi_tensor(self, fl_engine: FederatedLearningEngine):
         """Test with multi-layer tensor weights compared against independent mathematical oracle."""
-        shapes = [(4, 2), (2,)]
+        shapes: list[tuple[int, ...]] = [(4, 2), (2,)]
         rng = np.random.default_rng(1234)
 
         clients = []
