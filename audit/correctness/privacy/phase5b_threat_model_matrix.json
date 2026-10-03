@@ -1,0 +1,77 @@
+{
+  "phase": "5B",
+  "threat_model_matrix": [
+    {
+      "mechanism": "Differential Privacy (DP-SGD & Gaussian Mechanism)",
+      "protected_asset": "Individual transaction records and customer membership in bank training sets",
+      "adversary": "Curious federation coordinator, semi-honest participating banks, and external model query observers (membership inference / reconstruction attacks)",
+      "guarantee": "Bounded worst-case information leakage: P[M(D) in S] <= exp(epsilon) * P[M(D') in S] + delta for datasets D, D' differing by one training sample",
+      "non_guarantee": "Does not hide global population properties, aggregate fraud patterns, model architecture, or number of training rounds",
+      "trust_assumption": "Local client execution environment honestly executes gradient clipping and calibrated Gaussian noise injection before sending updates",
+      "plaintext_boundary": "Inside bank client local training process (pre-clipping and pre-noise gradients are visible only to client)",
+      "key_owner": "N/A (cryptographic keys not used; relies on entropy from secure random number generators)",
+      "failure_semantics": "Fails closed: invalid parameters raise ValueError; cumulative budget exhaustion raises PrivacyBudgetExceededError",
+      "evidence": "backend/app/application/services/privacy_service.py and backend/tests/unit/test_phase5b_privacy_correctness.py"
+    },
+    {
+      "mechanism": "Secure Aggregation (Pairwise Zero-Sum Additive Masking)",
+      "protected_asset": "Individual bank model parameter updates (delta_w)",
+      "adversary": "Curious aggregation server and passive network observers",
+      "guarantee": "The central server observes only the sum of client updates; individual client weights w_i are obscured by random zero-sum masks",
+      "non_guarantee": "Does not protect against collusion between the server and N-1 clients; does not protect against Byzantine poisoning or model reconstruction from the aggregate model itself",
+      "trust_assumption": "Clients follow the zero-sum masking agreement and masks cancel upon aggregation across honest participating clients",
+      "plaintext_boundary": "Client memory before masking; aggregate global model in server memory after summation",
+      "key_owner": "Clients negotiate or derive pairwise mask seeds",
+      "failure_semantics": "Gracefully bypasses masking when fewer than 2 participants are available; rejects malformed shapes",
+      "evidence": "backend/app/application/services/fl_engine.py:apply_secure_aggregation_masks"
+    },
+    {
+      "mechanism": "Fully Homomorphic Encryption (TenSEAL CKKS)",
+      "protected_asset": "Raw float model parameter vectors during server-side transport and aggregation",
+      "adversary": "Untrusted cloud aggregation coordinator and snooping network entities",
+      "guarantee": "Server computes weighted averages directly over polynomial ring ciphertexts without possessing the secret decryption key",
+      "non_guarantee": "Does not prevent client-side data poisoning; does not hide vector dimension or number of clients; subject to CKKS numerical precision bounds",
+      "trust_assumption": "Secret key remains isolated in client/consortium vault and is never transmitted to the aggregation server",
+      "plaintext_boundary": "Plaintext exists solely at client encryption and client/coordinator final decryption; server memory contains only CKKS ciphertexts",
+      "key_owner": "Consortium Key Ring (FHEKeyRing)",
+      "failure_semantics": "Fails closed: mismatched key IDs raise ValueError; corrupt ciphertexts fail decryption",
+      "evidence": "backend/app/infrastructure/security/fhe_driver.py"
+    },
+    {
+      "mechanism": "Trusted Execution Environment (Intel SGX / AWS Nitro)",
+      "protected_asset": "Model parameters during plaintext aggregation in server memory",
+      "adversary": "Host operating system, hypervisor, cloud provider administrators, and privileged host processes",
+      "guarantee": "Memory encryption and cryptographic remote attestation (MRENCLAVE/MRSIGNER) guarantee execution of untampered code in isolated enclave",
+      "non_guarantee": "Does not protect against side-channel memory access timing attacks without cache mitigation; does not hide input/output communication volume",
+      "trust_assumption": "Intel / AWS hardware root of trust and uncompromised silicon microcode",
+      "plaintext_boundary": "Plaintext exists only within EPC (Enclave Page Cache) isolated memory pages; memory bus traffic is hardware-encrypted",
+      "key_owner": "Enclave hardware key derivation and attestation key pair",
+      "failure_semantics": "Truthfully labels software sandbox emulation vs physical SGX hardware; rejects tampered AEAD sealed data",
+      "evidence": "backend/app/infrastructure/security/tee_driver.py"
+    },
+    {
+      "mechanism": "Pseudonymization & Type-Salted HMAC",
+      "protected_asset": "Personally Identifiable Information (PII) including customer account numbers, emails, phone numbers, and IBANs",
+      "adversary": "Cross-bank data leak observers, malicious auditors, and internal database operators",
+      "guarantee": "Deterministic 128-bit truncated HMAC tokens allow cross-bank entity resolution while preventing raw PII transmission or reversible identification",
+      "non_guarantee": "Does not provide information-theoretic anonymity against rainbow table attacks if HMAC secret key is compromised or input entropy is extremely low",
+      "trust_assumption": "Tenant-isolated KMS vaults securely store and protect HMAC secret keys per bank node",
+      "plaintext_boundary": "Raw PII is tokenized at the bank connector ingestion edge; only salted HMAC tokens enter shared intelligence networks",
+      "key_owner": "Tenant-isolated bank KMS vault",
+      "failure_semantics": "Fails closed on missing KMS key or malformed input",
+      "evidence": "backend/app/domain/value_objects_phase2.py"
+    },
+    {
+      "mechanism": "Mutual TLS (mTLS 1.3)",
+      "protected_asset": "Inter-bank and client-coordinator communication payloads and node identity",
+      "adversary": "Man-In-The-Middle (MITM) network interceptors, rogue client nodes, and DNS spoofing attackers",
+      "guarantee": "Bidirectional cryptographic identity authentication (X.509) and transport encryption enforcing CERT_REQUIRED and SAN validation",
+      "non_guarantee": "Does not protect endpoints against compromise once payload is decrypted in application memory",
+      "trust_assumption": "Root Certificate Authority (CFI-Root-CA / HashiCorp Vault PKI) private key integrity",
+      "plaintext_boundary": "Network wire is encrypted; plaintext exists in application memory after TLS socket decryption",
+      "key_owner": "Bank node leaf private key and Root CA",
+      "failure_semantics": "Connection abort on untrusted CA, expired certificate, SAN mismatch, or revoked serial in CRL",
+      "evidence": "backend/app/infrastructure/security/mtls_manager.py"
+    }
+  ]
+}

@@ -449,6 +449,19 @@ class SimulationService:
             dp_mode = getattr(config, "dp_mode", "post_hoc")
             use_opacus_dp = enable_dp and dp_mode == "opacus"
 
+            if enable_dp:
+                if getattr(config, "dp_epsilon", 0.0) <= 0.0:
+                    raise ValueError(
+                        f"dp_epsilon must be strictly positive, got {getattr(config, 'dp_epsilon', 0.0)}"
+                    )
+                dp_delta = getattr(config, "dp_delta", 1e-5)
+                if dp_delta <= 0.0 or dp_delta >= 1.0:
+                    raise ValueError(f"dp_delta must be in (0, 1), got {dp_delta}")
+                if getattr(config, "dp_max_grad_norm", 0.0) <= 0.0:
+                    raise ValueError(
+                        f"dp_max_grad_norm must be strictly positive, got {getattr(config, 'dp_max_grad_norm', 0.0)}"
+                    )
+
             global_model = self.model_service.create_model(
                 input_dim=feature_dim, dp_compatible=use_opacus_dp
             )
@@ -766,22 +779,46 @@ class SimulationService:
                                 input_dim=feature_dim, dp_compatible=use_opacus_dp
                             )
                             loc_model = self.model_service.set_parameters(loc_model, global_weights)
-                            loc_model, loss_hist, _c_local = self.model_service.train_local(
-                                loc_model,
-                                bank_data[bank.id]["X_train"],
-                                bank_data[bank.id]["y_train"],
-                                epochs=config.local_epochs,
-                                learning_rate=config.learning_rate,
-                                batch_size=config.batch_size,
-                                fedprox_mu=effective_fedprox_mu,
-                                moon_mu=getattr(config, "moon_mu", 0.0),
-                                moon_temperature=getattr(config, "moon_temperature", 0.5),
-                                global_weights=global_weights,
-                                prev_local_weights=prev_w,
-                                sens_attr=bank_data[bank.id]["sens_train"],
-                                enable_bias_mitigation=config.enable_bias_mitigation,
-                                fairness_lambda=config.fairness_lambda,
-                            )
+                            if use_opacus_dp:
+                                loc_model, loss_hist, actual_eps = (
+                                    self.model_service.train_local_with_opacus(
+                                        loc_model,
+                                        bank_data[bank.id]["X_train"],
+                                        bank_data[bank.id]["y_train"],
+                                        target_epsilon=config.dp_epsilon,
+                                        target_delta=config.dp_delta,
+                                        max_grad_norm=config.dp_max_grad_norm,
+                                        epochs=config.local_epochs,
+                                        learning_rate=config.learning_rate,
+                                        batch_size=config.batch_size,
+                                        fedprox_mu=effective_fedprox_mu,
+                                        moon_mu=getattr(config, "moon_mu", 0.0),
+                                        moon_temperature=getattr(config, "moon_temperature", 0.5),
+                                        global_weights=global_weights,
+                                        prev_local_weights=prev_w,
+                                        sens_attr=bank_data[bank.id]["sens_train"],
+                                        enable_bias_mitigation=config.enable_bias_mitigation,
+                                        fairness_lambda=config.fairness_lambda,
+                                    )
+                                )
+                            else:
+                                loc_model, loss_hist, _c_local = self.model_service.train_local(
+                                    loc_model,
+                                    bank_data[bank.id]["X_train"],
+                                    bank_data[bank.id]["y_train"],
+                                    epochs=config.local_epochs,
+                                    learning_rate=config.learning_rate,
+                                    batch_size=config.batch_size,
+                                    fedprox_mu=effective_fedprox_mu,
+                                    moon_mu=getattr(config, "moon_mu", 0.0),
+                                    moon_temperature=getattr(config, "moon_temperature", 0.5),
+                                    global_weights=global_weights,
+                                    prev_local_weights=prev_w,
+                                    sens_attr=bank_data[bank.id]["sens_train"],
+                                    enable_bias_mitigation=config.enable_bias_mitigation,
+                                    fairness_lambda=config.fairness_lambda,
+                                )
+                                actual_eps = None
                             local_w = self.model_service.get_parameters(loc_model)
                             local_loss = loss_hist[-1] if loss_hist else 0.1
                             local_samples = len(bank_data[bank.id]["X_train"])
@@ -790,7 +827,7 @@ class SimulationService:
                                 "weights": local_w,
                                 "loss": local_loss,
                                 "num_samples": local_samples,
-                                "actual_epsilon": None,
+                                "actual_epsilon": actual_eps,
                             }
                             del loc_model
                         else:

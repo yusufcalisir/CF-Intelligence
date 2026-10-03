@@ -141,6 +141,8 @@ class FHEDriver:
         start_time = time.perf_counter()
         flat_arr = np.array(weights.flat_weights, dtype=np.float64)
         param_count = len(flat_arr)
+        if param_count == 0:
+            raise ValueError("Cannot encrypt empty weights.")
 
         if TENSEAL_AVAILABLE and ts is not None and key_ring.context is not None:
             # Encrypt flat vector into CKKS polynomial ciphertext

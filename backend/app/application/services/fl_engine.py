@@ -608,6 +608,9 @@ class FederatedLearningEngine:
         - Masks are generated centrally (defeats the purpose in production)
         - No dropout recovery (real protocols handle this with Shamir secret sharing)
         """
+        if not client_weights or len(client_weights) < 2:
+            return list(client_weights)
+
         if rng is None:
             rng = np.random.default_rng()
 

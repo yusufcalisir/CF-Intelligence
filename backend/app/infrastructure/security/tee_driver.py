@@ -124,6 +124,9 @@ class TEEDriver:
 
         Plaintext data never leaves the enclave boundary during summation.
         """
+        if not client_weights:
+            raise ValueError("Cannot execute TEE secure aggregation on empty client_weights.")
+
         start_time = time.perf_counter()
 
         n_clients = len(client_weights)
