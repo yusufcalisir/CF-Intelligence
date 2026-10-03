@@ -1,0 +1,213 @@
+{
+  "schema_version": "1.0.0",
+  "registry_name": "CFI-CrossBank-02 Canonical Claim Registry",
+  "benchmark_id": "CFI-CrossBank-02",
+  "protocol_version": "2.1.0",
+  "raw_artifact_sha256": "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a",
+  "raw_artifact_relpath": "benchmarks/results/raw/crossbank_v2_canonical.json",
+  "frozen_commit_sha": "2f64a02b65caa0b35588ec8c016290d1f2ac6e61",
+  "manifest_sha256": "e8dcc5aad8cfaecfe4837be73b2c78769ca1376be235f4a1e2ca838e7753177e",
+  "total_claims": 20,
+  "claims": [
+    {
+      "claim_id": "CB-Q1-ARCH",
+      "exact_claim_text": "Simulated federated training aggregated parameters across three clients without centrally pooling raw client training datasets",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Training execution path (multi-client simulation)",
+      "evidence": "_execute_federated_fedavg exchanges state_dicts only",
+      "mandatory_caveat": "No privacy mechanism; data generated centrally then partitioned; does not establish cryptographic privacy, secure aggregation, differential privacy, or legal compliance",
+      "forbidden_stronger_interpretation": "secure / private / compliant / real-world deployment",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-Q2-ROC",
+      "exact_claim_text": "Across five canonical seeds, pooled ROC-AUC was higher for federated than isolated local training in 5/5 seeds, mean paired difference +0.1897 +/- 0.0204 (pooled concatenated bank-local test views)",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Concatenated bank-local test views (8,019 rows in seed 42)",
+      "evidence": "Per-seed paired dROC: +0.1851, +0.1561, +0.2029, +0.2052, +0.1993",
+      "mandatory_caveat": "Pooled isolated score mixes three separately trained models; per-bank decomposition shows Bank A lower (5/5), Bank B lower (4/5), and Bank C higher (5/5); gain concentrated in zero-positive Bank C",
+      "forbidden_stronger_interpretation": "federation improves every bank; statistical significance; causal mechanism",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-Q2-AP",
+      "exact_claim_text": "Average Precision difference between federated and isolated was +0.0123 +/- 0.0138, positive in 4 of 5 seeds",
+      "classification": "SUPPORTED_WITH_CAVEAT",
+      "metric_population": "Concatenated bank-local test views",
+      "evidence": "Per-seed dAP: +0.0166, +0.0010, -0.0048, +0.0285, +0.0201",
+      "mandatory_caveat": "Seed-dependent (negative in seed 456); per-bank AP mostly lower for Banks A and B",
+      "forbidden_stronger_interpretation": "consistent AP gain across all seeds; uniform institutional benefit",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-Q2-LOWFPR",
+      "exact_claim_text": "Recall difference at the validation-selected 0.1%-FPR threshold was +0.0032 +/- 0.0128 (2 positive, 2 negative, 1 zero paired difference)",
+      "classification": "SUPPORTED_WITH_CAVEAT",
+      "metric_population": "Concatenated bank-local test views",
+      "evidence": "Per-seed dRecall: +0.0238, +0.0062, -0.0071, 0.0000, -0.0069",
+      "mandatory_caveat": "Achieved test FPR is not exactly 0.1% (realized FPR 0.0011-0.0016); mixed directional outcome",
+      "forbidden_stronger_interpretation": "systematic low-FPR detection superiority",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-Q2-PERBANK",
+      "exact_claim_text": "Federated per-bank ROC was lower than isolated for Bank A in 5/5 seeds (-0.0293 +/- 0.0104) and Bank B in 4/5 seeds (-0.0171 +/- 0.0226), while higher for Bank C in 5/5 seeds (+0.3514 +/- 0.2009)",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Bank-local test partitions (Bank A, Bank B, Bank C)",
+      "evidence": "Per-bank test partition metrics stored in per_bank_metrics across all 5 seeds",
+      "mandatory_caveat": "Bank C isolated model was trained on negatives only; pooled gain is concentrated in Bank C rescue; causal mechanism not evaluated",
+      "forbidden_stronger_interpretation": "uniform cross-institutional benefit; causal mechanism attribution",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-Q3-AP",
+      "exact_claim_text": "Under the frozen executable matched-view comparison, federated training had higher AP than centralized training in all five seeds (mean paired difference +0.0325 +/- 0.0181)",
+      "classification": "SUPPORTED_WITH_CAVEAT",
+      "metric_population": "Concatenated bank-local test views",
+      "evidence": "Per-seed dAP: +0.0487, +0.0470, +0.0294, +0.0037, +0.0335; federated mean 0.1779 vs centralized mean 0.1454",
+      "mandatory_caveat": "The centralized expanded-view construction is bound by the frozen executable source but was not independently encoded in the manifest; historical pre-execution prose used an inconsistent unique-transaction exposure count; optimizer states differ",
+      "forbidden_stronger_interpretation": "universal winner claim; equivalence claim; optimization identity; causal mechanism",
+      "promotion_status": "PROMOTED_CANONICAL_WITH_PROVENANCE_CAVEAT"
+    },
+    {
+      "claim_id": "CB-Q3-ROC",
+      "exact_claim_text": "Under the frozen executable matched-view comparison, centralized training had higher ROC-AUC than federated training in all five seeds (federated-minus-centralized mean paired difference -0.0079 +/- 0.0056)",
+      "classification": "SUPPORTED_WITH_CAVEAT",
+      "metric_population": "Concatenated bank-local test views",
+      "evidence": "Per-seed dROC: -0.0060, -0.0094, -0.0079, -0.0158, -0.0002; centralized mean 0.9091 vs federated mean 0.9013",
+      "mandatory_caveat": "The centralized expanded-view construction is bound by the frozen executable source but was not independently encoded in the manifest; historical pre-execution prose used an inconsistent unique-transaction exposure count; optimizer states differ",
+      "forbidden_stronger_interpretation": "universal winner claim; equivalence claim; optimization identity",
+      "promotion_status": "PROMOTED_CANONICAL_WITH_PROVENANCE_CAVEAT"
+    },
+    {
+      "claim_id": "CB-Q3-EQUIVALENCE",
+      "exact_claim_text": "Federated training achieves statistical or empirical equivalence to centralized training (matches centralized)",
+      "classification": "NOT_EVALUATED",
+      "metric_population": "Not applicable",
+      "evidence": "No equivalence test was preregistered; metrics diverge in opposite directions (AP favors federated, ROC favors centralized)",
+      "mandatory_caveat": "Metrics diverge; no margin was prespecified; matches centralized is retired",
+      "forbidden_stronger_interpretation": "any equivalence or parity claim",
+      "promotion_status": "RETIRED_NOT_EVALUATED"
+    },
+    {
+      "claim_id": "CB-COLD-RANK",
+      "exact_claim_text": "In the synthetic zero-positive Bank C setting, federated parameter sharing improved Bank C ranking metrics relative to isolated local training across all five seeds (mean dROC +0.3514 +/- 0.2009, mean dAP +0.1086 +/- 0.0596)",
+      "classification": "SUPPORTED_WITH_CAVEAT",
+      "metric_population": "Bank C test partition (2,035 rows, 50 positive in seed 42)",
+      "evidence": "Per-seed Bank C dROC: +0.2046, +0.1029, +0.3527, +0.5643, +0.5327; dAP: +0.1763, +0.0299, +0.0866, +0.0904, +0.1599",
+      "mandatory_caveat": "Isolated Bank C comparator had 0 training positives and scored below chance (ROC 0.3296, 0.3337) in two seeds; did not translate into operational detection (CB-COLD-LOWFPR)",
+      "forbidden_stronger_interpretation": "cold-start was solved; operational fraud detection in cold-start",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-COLD-LOWFPR",
+      "exact_claim_text": "At the validation-selected 0.1% FPR operating regime, Bank C test recall remained 0% in all five seeds for the realistic local-feature federated condition",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Bank C test partition",
+      "evidence": "TP = 0 across all 5 seeds (FN: 50, 44, 44, 36, 43; FP: 2, 0, 1, 2, 0)",
+      "mandatory_caveat": "Ranking gains do not yield operational low-FPR detection",
+      "forbidden_stronger_interpretation": "operational cold-start detection",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-S7-REALISTIC",
+      "exact_claim_text": "Under the realistic federated local-feature condition, 5 of 133 pooled Scenario 7 test incidents were detected across five seeds (3.76% pooled recall; 3.92% mean per-seed recall)",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Deduplicated unique test transactions (133 pooled incidents across 5 seeds), source-bank scoring",
+      "evidence": "Detected / test incidents per seed: 1/26, 2/27, 0/27, 2/24, 0/29 (sum 5/133)",
+      "mandatory_caveat": "Scenario metrics use source-bank-only scoring pipeline while operating threshold is chosen from concatenated-view validation scores",
+      "forbidden_stronger_interpretation": "reliable detection; impossibility without graph features",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-S7-RELIABLE",
+      "exact_claim_text": "Reliable Scenario 7 detection using the evaluated local-feature regime",
+      "classification": "NOT_SUPPORTED",
+      "metric_population": "Deduplicated unique test transactions",
+      "evidence": "Pooled detection rate 3.76% (5/133) and centralized 0/133 confirm local features fail to provide reliable detection",
+      "mandatory_caveat": "First-class negative result",
+      "forbidden_stronger_interpretation": "any claim of reliable detection",
+      "promotion_status": "PROMOTED_AS_NEGATIVE_RESULT"
+    },
+    {
+      "claim_id": "CB-S7-ORACLE",
+      "exact_claim_text": "The diagnostic oracle condition detected 133 of 133 Scenario 7 test incidents (100% recall)",
+      "classification": "ORACLE_ONLY",
+      "metric_population": "Deduplicated unique test transactions",
+      "evidence": "Detected per seed: 26/26, 27/27, 27/27, 24/24, 29/29",
+      "mandatory_caveat": "Oracle feature (scenario_id is not None) is label-equivalent; provides zero evidence of graph or consortium intelligence",
+      "forbidden_stronger_interpretation": "deployable detection; graph intelligence; consortium intelligence",
+      "promotion_status": "PROMOTED_AS_DIAGNOSTIC_ABLATION"
+    },
+    {
+      "claim_id": "CB-ORACLE",
+      "exact_claim_text": "The generator-truth oracle condition, whose added input is a single binary feature equal to the label, achieved mean AP 0.8140 +/- 0.1133 and mean recall 0.7840 +/- 0.1112 at the validation-selected threshold",
+      "classification": "ORACLE_ONLY",
+      "metric_population": "Concatenated bank-local test views",
+      "evidence": "Per-seed oracle AP: 0.7313, 0.9976, 0.7604, 0.8489, 0.7320",
+      "mandatory_caveat": "Input equals the label; sub-1.0 metrics reflect optimization/scaling dynamics; not an informational ceiling and not graph evidence",
+      "forbidden_stronger_interpretation": "graph topology attribution; consortium intelligence; deployable performance",
+      "promotion_status": "PROMOTED_AS_DIAGNOSTIC_ABLATION"
+    },
+    {
+      "claim_id": "CB-PRIVACY",
+      "exact_claim_text": "The federated cross-bank detection system preserves privacy",
+      "classification": "NOT_EVALUATED",
+      "metric_population": "Not applicable",
+      "evidence": "No differential privacy, secure aggregation, encryption, or inference-attack evaluation was performed",
+      "mandatory_caveat": "FedAvg exchanges model weights, not raw data, but weight exchange without cryptographic mechanisms does not prove privacy",
+      "forbidden_stronger_interpretation": "any privacy, confidentiality, or compliance guarantee",
+      "promotion_status": "PROMOTED_AS_NOT_EVALUATED"
+    },
+    {
+      "claim_id": "CB-REALWORLD",
+      "exact_claim_text": "Results generalize to real-world banking environments",
+      "classification": "NOT_EVALUATED",
+      "metric_population": "Not applicable",
+      "evidence": "Evaluated strictly on project-synthetic simulated transactions and simulated client processes",
+      "mandatory_caveat": "All monetary amounts and transaction topologies are synthetic; real-world generalizability is completely unmeasured",
+      "forbidden_stronger_interpretation": "real-world effectiveness or deployability",
+      "promotion_status": "PROMOTED_AS_NOT_EVALUATED"
+    },
+    {
+      "claim_id": "CB-SYNTHETIC-USD",
+      "exact_claim_text": "Detected synthetic Scenario 7 test incidents represented 104,904.05 SYNTHETIC_USD in pooled volume (mean 20,980.81 SYNTHETIC_USD per seed) out of 3,356,392.71 SYNTHETIC_USD total exposure",
+      "classification": "SUPPORTED_BY_CANONICAL_SYNTHETIC_EXPERIMENT",
+      "metric_population": "Deduplicated unique test transactions",
+      "evidence": "Sum of amount column for detected positive Scenario 7 transactions across seeds",
+      "mandatory_caveat": "Synthetically generated numbers in SYNTHETIC_USD; does not represent real currency or prevented fraud",
+      "forbidden_stronger_interpretation": "real financial recovery; prevented loss; chargebacks; ROI",
+      "promotion_status": "PROMOTED_CANONICAL"
+    },
+    {
+      "claim_id": "CB-PREVENTED-FRAUD",
+      "exact_claim_text": "Synthetic monetary volume represents prevented fraud or direct chargeback savings",
+      "classification": "NOT_EVALUATED",
+      "metric_population": "Not applicable",
+      "evidence": "The experiment does not measure prevention, avoided losses, operational intervention, or recovery",
+      "mandatory_caveat": "Absence of a measurement; not a negative result, but completely unmeasured",
+      "forbidden_stronger_interpretation": "any prevention or recovery claim",
+      "promotion_status": "PROMOTED_AS_NOT_EVALUATED"
+    },
+    {
+      "claim_id": "CB-PVALUE",
+      "exact_claim_text": "Q2 ROC improvement is statistically significant (p < 0.001)",
+      "classification": "UNSUPPORTED_POST_HOC_INFERENCE",
+      "metric_population": "Not applicable",
+      "evidence": "No hypothesis test or p-value was preregistered or computed by a stored procedure; Phase 3.1 t-test was retracted",
+      "mandatory_caveat": "Descriptive statistics only (mean +/- sample SD, paired differences)",
+      "forbidden_stronger_interpretation": "any statistical significance claim",
+      "promotion_status": "RETIRED"
+    },
+    {
+      "claim_id": "CB-Q3-MECH",
+      "exact_claim_text": "Decentralized per-bank client batching regularizes against majority bank domination",
+      "classification": "SPECULATIVE_NOT_EVALUATED",
+      "metric_population": "Not applicable",
+      "evidence": "No factorial ablation separates batching from optimizer resets, scalers, or FedAvg weighting",
+      "mandatory_caveat": "Unverified post-hoc hypothesis",
+      "forbidden_stronger_interpretation": "any causal mechanism claim",
+      "promotion_status": "RETIRED"
+    }
+  ]
+}

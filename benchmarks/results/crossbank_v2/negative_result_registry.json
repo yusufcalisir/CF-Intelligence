@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "registry_name": "CFI-CrossBank-02 Negative Result Registry",
+  "benchmark_id": "CFI-CrossBank-02",
+  "total_negative_results": 10,
+  "negative_results": [
+    {
+      "id": "NR-S7-LOCAL-DETECTION-FAILURE",
+      "title": "Scenario 7 realistic federated local-feature detection failure",
+      "finding": "Federated realistic local-feature condition detected only 5 of 133 pooled Scenario 7 test incidents (3.76% pooled recall; 3.92% mean per-seed recall). Centralized local features detected 0/133 (0.0%).",
+      "significance": "Establishes an empirical negative result: realistic bank-local features fail to detect unseen cross-bank structuring/layering typologies.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: per-seed scenario_metrics.scenario_7"
+    },
+    {
+      "id": "NR-BANKC-COLD-START-LOWFPR-ZERO",
+      "title": "Bank C zero-positive cold-start low-FPR detection failure",
+      "finding": "Bank C federated test recall at the validation-selected 0.1%-FPR operating regime was exactly 0% across all five evaluated seeds (TP = 0, FN = 50, 44, 44, 36, 43).",
+      "significance": "Demonstrates that federated parameter sharing does not yield operational detection at stringent enterprise operating thresholds for zero-positive institutions.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: per_bank_metrics.bank_c"
+    },
+    {
+      "id": "NR-Q2-AP-INCONSISTENCY",
+      "title": "Federated AP improvement is non-uniform and seed-inconsistent",
+      "finding": "While ROC-AUC gained consistently (+0.1897), the paired AP difference was small (+0.0123 +/- 0.0138) and negative in seed 456 (-0.0048).",
+      "significance": "Federated learning does not guarantee precision-recall improvements across all data splits.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: overall_metrics.average_precision"
+    },
+    {
+      "id": "NR-Q2-LOWFPR-MIXED-DIRECTION",
+      "title": "Federated low-FPR recall shows mixed directional deltas",
+      "finding": "Paired difference in recall at validation-selected 0.1% FPR was +0.0032 +/- 0.0128, exhibiting 2 positive, 2 negative, and 1 zero delta across the five seeds.",
+      "significance": "Federated collaboration does not reliably shift the extreme-tail low-FPR operating point outward.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: overall_metrics.recall_at_validation_fpr"
+    },
+    {
+      "id": "NR-INSTITUTIONAL-REGRESSION-BANKS-A-B",
+      "title": "Per-bank performance degradation for data-rich institutions (Banks A and B)",
+      "finding": "Federated ROC was lower than isolated local training for Bank A in 5/5 seeds (-0.0293 +/- 0.0104) and for Bank B in 4/5 seeds (-0.0171 +/- 0.0226).",
+      "significance": "Refutes the assumption that federated learning uniformly benefits every participant; pooled gain is driven entirely by rescuing Bank C (+0.3514 dROC).",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: per_bank_metrics.bank_a and bank_b"
+    },
+    {
+      "id": "NR-Q3-CENTRAL-ROC-SUPERIORITY",
+      "title": "Centralized training superior in ROC-AUC across all seeds",
+      "finding": "Centralized pooled training achieved higher ROC-AUC than federated training in 5/5 seeds (federated-minus-centralized paired dROC: -0.0079 +/- 0.0056; central 0.9091 vs fed 0.9013).",
+      "significance": "Disproves universal federated superiority; FedAvg incurs an empirical ranking penalty relative to centralized pooling.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: conditions.COND_CENTRALIZED_POOLED_UPPER_BOUND"
+    },
+    {
+      "id": "NR-COLD-START-LOCAL-BASELINE-NON-DISCRIMINATIVE",
+      "title": "Isolated cold-start baseline is completely non-discriminative",
+      "finding": "ColdStartLocalBaseline produces constant Laplace prior 1/(n+2), resulting in ROC-AUC 0.5000, realized test FPR 1.0, and an all-positive operating point in every seed.",
+      "significance": "Confirms that local isolated training with zero positive observations yields zero ranking discrimination.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: conditions.COND_COLD_START_ZERO_POSITIVE"
+    },
+    {
+      "id": "NR-LOGISTIC-BASELINE-ZERO-LOWFPR-RECALL",
+      "title": "Linear logistic baseline fails low-FPR operational detection",
+      "finding": "Balanced Logistic Regression achieved 0 recall, 0 precision, and 0 F1 at the validation-selected 0.1% FPR threshold in all five seeds.",
+      "significance": "Demonstrates that linear decision boundaries fail completely in the ultra-low-FPR detection regime.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: conditions.COND_SIMPLE_BASELINE_LOGISTIC"
+    },
+    {
+      "id": "NR-FEDERATED-ZERO-RECALL-SEED-456",
+      "title": "Federated realistic condition total low-FPR detection failure in seed 456",
+      "finding": "In seed 456, federated realistic training achieved exactly 0.0000 recall (TP = 0 on pooled test views) at the validation-selected threshold.",
+      "significance": "Shows that stochastic partitioning and optimization can lead to complete operational detection failure even with federated collaboration.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: per_seed_results[456]"
+    },
+    {
+      "id": "NR-ORACLE-NOT-CLEAN-CEILING",
+      "title": "Oracle condition is bounded by optimization rather than information",
+      "finding": "Despite receiving a label-equivalent feature, oracle AP dropped as low as 0.7313 (seed 42) and ROC as low as 0.8232 (seed 42).",
+      "significance": "Reveals that neural network optimization, batching, feature scaling, and FedAvg parameter averaging fail to achieve 1.0 performance even with perfect ground-truth inputs.",
+      "evidence": "benchmarks/results/raw/crossbank_v2_canonical.json: conditions.COND_FEDERATED_CONSORTIUM_ORACLE"
+    }
+  ]
+}

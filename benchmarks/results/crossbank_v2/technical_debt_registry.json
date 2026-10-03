@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "registry_name": "CFI-CrossBank-02 Technical Debt Registry",
+  "benchmark_id": "CFI-CrossBank-02",
+  "total_debt_entries": 3,
+  "debt_entries": [
+    {
+      "debt_id": "DEBT-CB-THRESHOLD-TIE",
+      "classification": "CONFIRMED_THRESHOLD_TIE_DEFECT",
+      "component": "benchmarks/crossbank_v2/metrics.py::select_threshold_on_validation",
+      "description": "select_threshold_on_validation computes a cumulative false-positive curve ignoring score ties. When score distribution has identical values (e.g. ColdStartLocalBaseline constant 1/(n+2)), it selects the tied score as the threshold and reports an artificial validation FPR (~0.001), whereas classifying with score >= threshold marks all tied rows as positive, producing realized FPR 1.0.",
+      "impact": "Artifact reported achieved_validation_fpr for cold start baseline is misleading; actual validation FPR is 1.0. Does not invalidate realistic conditions with continuous float32 scores, but represents an algorithmic tie-handling defect.",
+      "action_required": "Do not modify frozen code in this phase. Must be resolved in future protocol version (e.g. Protocol v2.2) by grouping ties before cumulative sum.",
+      "status": "REGISTERED_FOR_FUTURE_PROTOCOL"
+    },
+    {
+      "debt_id": "DEBT-CB-SCHEMA-NAMING",
+      "classification": "SCHEMA_NAMING_DEFECT",
+      "component": "benchmarks/crossbank_v2/schema.py::InformationBudget and TrainingBudget",
+      "description": "The artifact fields information_budget.unique_training_rows and training_budget.unique_information_rows contain expanded local-view row counts (e.g. 33,029 for seed 42), not deduplicated unique transaction counts (23,438). The naming suggests unique transaction counting, which led to audit prose confusion.",
+      "impact": "Semantic confusion between deduplicated transactions and expanded local-view rows across earlier audit phases.",
+      "action_required": "Do not mutate canonical raw artifact. Must be renamed in future protocol version schema to expanded_local_view_rows and unique_transaction_count.",
+      "status": "REGISTERED_FOR_FUTURE_PROTOCOL"
+    },
+    {
+      "debt_id": "DEBT-CB-UNHASHED-COMPONENTS",
+      "classification": "MANIFEST_BINDING_INCOMPLETENESS",
+      "component": "benchmarks/crossbank_v2/manifest.json",
+      "description": "The canonical manifest binds protocol_config_hash, experiment_matrix_hash, generator_source_hash, and feature_schema_hash (LOCAL_ONLY only). It does not hash runner.py, model.py, metrics.py, or the consortium feature schema.",
+      "impact": "Executable training and evaluation behavior is bound only via git commit SHA (2f64a02b), not independently verifiable from the manifest alone.",
+      "action_required": "Future manifest specifications should hash all executable runner, model, and metrics modules.",
+      "status": "REGISTERED_FOR_FUTURE_PROTOCOL"
+    }
+  ]
+}
