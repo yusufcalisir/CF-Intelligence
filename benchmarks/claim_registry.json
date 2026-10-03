@@ -838,10 +838,10 @@
       "claim_type": "MEASURED",
       "stated_value": 0.7189,
       "stated_unit": "PR-AUC",
-      "empirical_measured_value": 0.718892,
-      "sample_sd": 0.017105,
-      "mean_retention_ratio": 1.002279,
-      "retention_sd": 0.051239,
+      "empirical_measured_value": 0.718874,
+      "sample_sd": 0.017070,
+      "mean_retention_ratio": 1.002334,
+      "retention_sd": 0.051216,
       "centralized_baseline_value": null,
       "evaluation_type": "BYZANTINE_ADVERSARIAL_ROBUSTNESS",
       "verification_status": "VERIFIED_EMPIRICAL_RUN",
@@ -851,9 +851,9 @@
       "dataset_sha256": "76274b691b16a6c49d3f159c883398e03ccd6d1ee12d9d8ee38f4b4b98551a89",
       "seeds": [42, 123, 456],
       "per_seed_results": [
-        {"seed": 42, "pr_auc": 0.723326, "roc_auc": 0.983115, "retention_of_clean": 0.997194},
-        {"seed": 123, "pr_auc": 0.733333, "roc_auc": 0.984201, "retention_of_clean": 1.055942},
-        {"seed": 456, "pr_auc": 0.700018, "roc_auc": 0.977855, "retention_of_clean": 0.953942}
+        {"seed": 42, "pr_auc": 0.723322, "roc_auc": 0.983059, "retention_of_clean": 0.997189},
+        {"seed": 123, "pr_auc": 0.733280, "roc_auc": 0.984222, "retention_of_clean": 1.055866},
+        {"seed": 456, "pr_auc": 0.700021, "roc_auc": 0.977889, "retention_of_clean": 0.953946}
       ],
       "attack_parameters": {
         "attack_type": "alie_omniscient",
@@ -865,7 +865,7 @@
       "evidence_scope": "CONTROLLED_EXPERIMENT",
       "communication_eligibility": "SAFE_WITH_CAVEAT",
       "mandatory_caveat": "Evaluated on omniscient ALIE model-delta stress test (z=1.0). Trimmed Mean was stable, while Coordinate Median (0.2045) and Bulyan (0.2220) exhibited severe degradation on Seed 123.",
-      "notes": "Trimmed Mean achieved mean PR-AUC 0.7189 ± 0.0171 (100.23% ± 5.12% retention) under fixed z=1.0 ALIE stress test."
+      "notes": "Trimmed Mean achieved mean PR-AUC 0.7189 ± 0.0171 (100.23% ± 5.12% retention; exact canonical condition mean 0.718874 ± 0.017070) under fixed z=1.0 ALIE stress test."
     },
     {
       "claim_id": "CLM-BYZ-CANONICAL-SEED-INSTABILITY",

@@ -698,13 +698,19 @@ class TestByzantineCanonicalPromotionEvidence:
         assert abs(float(np.mean(gn_tm_seed_vals)) - 0.725945) < 1e-5
         assert abs(float(np.std(gn_tm_seed_vals, ddof=1)) - 0.000435) < 1e-5
 
-        # ALIE + Trimmed Mean: 0.718892 +/- 0.017105 (agg 0.7189, mean retention 1.0023)
+        # ALIE + Trimmed Mean: exact condition mean 0.718874 +/- 0.017070 (agg 0.7189, mean retention 1.0023)
+        al_tm_seed_vals = [per_seed[("alie_omniscient_z1", "trimmed_mean", s)]["test_pr_auc"] for s in [42, 123, 456]]
+        assert abs(float(np.mean(al_tm_seed_vals)) - 0.718874) < 1e-5
+        assert abs(float(np.std(al_tm_seed_vals, ddof=1)) - 0.017070) < 1e-5
         al_tm_agg = agg[("alie_omniscient_z1", "trimmed_mean")]
         assert abs(al_tm_agg["pr_auc_mean"] - 0.7189) < 1e-4
         assert abs(al_tm_agg["pr_auc_std"] - 0.0171) < 1e-4
         assert abs(al_tm_agg["retention_ratio_mean"] - 1.0023) < 1e-4
 
-        # ALIE + Multi-Krum: 0.713139 +/- 0.019129 (agg 0.7131, mean retention 0.9943)
+        # ALIE + Multi-Krum: exact condition mean 0.713115 +/- 0.019150 (agg 0.7131, mean retention 0.9943)
+        al_mk_seed_vals = [per_seed[("alie_omniscient_z1", "multi_krum", s)]["test_pr_auc"] for s in [42, 123, 456]]
+        assert abs(float(np.mean(al_mk_seed_vals)) - 0.713115) < 1e-5
+        assert abs(float(np.std(al_mk_seed_vals, ddof=1)) - 0.019150) < 1e-5
         al_mk_agg = agg[("alie_omniscient_z1", "multi_krum")]
         assert abs(al_mk_agg["pr_auc_mean"] - 0.7131) < 1e-4
         assert abs(al_mk_agg["pr_auc_std"] - 0.0191) < 1e-4
@@ -764,3 +770,42 @@ class TestByzantineCanonicalPromotionEvidence:
         byz_old = CANONICAL_REGISTRY["byzantine_sign_inversion"]
         assert byz_old.status == ArtifactStatus.HISTORICAL
         assert byz_old.communication_eligibility == CommunicationEligibility.HISTORICAL_ONLY
+
+    def test_exact_numerical_parity_vs_display_rounding_parity(self):
+        """Verifies formal distinction between EXACT_NUMERICAL_PARITY and DISPLAY_ROUNDING_PARITY."""
+        import json
+
+        import numpy as np
+
+        artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_federated_canonical.json"
+        data = json.loads(artifact_path.read_text(encoding="utf-8"))
+        per_seed = { (r["attack_name"], r["aggregator_name"], r["seed"]): r for r in data["per_seed_results"] }
+
+        # ALIE + Trimmed Mean
+        al_tm_vals = [per_seed[("alie_omniscient_z1", "trimmed_mean", s)]["test_pr_auc"] for s in [42, 123, 456]]
+        al_tm_mean = float(np.mean(al_tm_vals))
+        al_tm_std = float(np.std(al_tm_vals, ddof=1))
+
+        # Stale draft expectation vs exact canonical artifact
+        stale_tm_expected_mean = 0.718892
+        exact_numerical_parity_tm = abs(al_tm_mean - stale_tm_expected_mean) < 1e-6
+        display_rounding_parity_tm = round(al_tm_mean, 4) == round(stale_tm_expected_mean, 4) == 0.7189
+
+        assert not exact_numerical_parity_tm, "0.718874 and 0.718892 must NOT have exact numerical parity"
+        assert display_rounding_parity_tm, "Both must round to 0.7189 at 4 decimal places"
+        assert abs(al_tm_mean - 0.718874) < 1e-5
+        assert abs(al_tm_std - 0.017070) < 1e-5
+
+        # ALIE + Multi-Krum
+        al_mk_vals = [per_seed[("alie_omniscient_z1", "multi_krum", s)]["test_pr_auc"] for s in [42, 123, 456]]
+        al_mk_mean = float(np.mean(al_mk_vals))
+        al_mk_std = float(np.std(al_mk_vals, ddof=1))
+
+        stale_mk_expected_mean = 0.713139
+        exact_numerical_parity_mk = abs(al_mk_mean - stale_mk_expected_mean) < 1e-6
+        display_rounding_parity_mk = round(al_mk_mean, 4) == round(stale_mk_expected_mean, 4) == 0.7131
+
+        assert not exact_numerical_parity_mk, "0.713115 and 0.713139 must NOT have exact numerical parity"
+        assert display_rounding_parity_mk, "Both must round to 0.7131 at 4 decimal places"
+        assert abs(al_mk_mean - 0.713115) < 1e-5
+        assert abs(al_mk_std - 0.019150) < 1e-5
