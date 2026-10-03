@@ -14,14 +14,11 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.application.schemas.dashboard import (
-    CentralizationGapAnalysisSchema,
     ComparativeBenchmarkResponseSchema,
-    ComparativeModelItemSchema,
     DashboardStatsResponse,
     MerchantRiskItem,
     RiskWeightsResponse,
     RiskWeightsUpdateRequest,
-    SiloDeficitAnalysisSchema,
 )
 from app.application.services.risk_engine import RiskScoringEngine
 from app.domain.enums import EntityType

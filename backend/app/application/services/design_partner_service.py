@@ -15,10 +15,13 @@ from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
+import torch
 
 if TYPE_CHECKING:
     import pandas as pd
 
+from app.application.services.model_service import ModelService
+from app.config import get_settings
 from app.domain.distribution_fidelity_service import (
     audit_distribution_fidelity,
 )
@@ -254,10 +257,6 @@ class DesignPartnerPilotService:
         partitions = partition_dataset_non_iid(X, y, num_banks=3, alpha=0.5)
 
         # Real PyTorch neural network inference for FL model vs Local model
-        import torch
-        from app.application.services.model_service import ModelService
-        from app.config import get_settings
-
         input_dim = int(X.shape[1])
         model_service = ModelService(settings=get_settings())
 

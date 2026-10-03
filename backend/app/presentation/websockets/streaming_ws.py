@@ -276,7 +276,9 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
         live_provider_name = "NONE"
         if getattr(settings, "kafka_enabled", False) or getattr(settings, "use_kafka", False):
             try:
-                from app.infrastructure.connectors.kafka_streaming_connector import KafkaStreamingConnector
+                import importlib
+
+                importlib.import_module("app.infrastructure.connectors.kafka_streaming_connector")
                 has_live_connector = True
                 live_provider_name = "KAFKA_STREAMING"
             except Exception:
