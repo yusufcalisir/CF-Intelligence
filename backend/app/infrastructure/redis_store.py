@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 from typing import Any
 
 import redis
@@ -31,6 +32,7 @@ class RedisStore:
 
     # Class-level shared in-memory stores for fallback mode, keyed by prefix
     _shared_fallback_stores: dict[str, dict] = {}
+    _lock: threading.RLock = threading.RLock()
 
     def __init__(self, prefix: str):
         self.prefix: str = prefix
@@ -40,9 +42,10 @@ class RedisStore:
 
     @property
     def _fallback_store(self) -> dict:
-        if self.prefix not in RedisStore._shared_fallback_stores:
-            RedisStore._shared_fallback_stores[self.prefix] = {}
-        return RedisStore._shared_fallback_stores[self.prefix]
+        with RedisStore._lock:
+            if self.prefix not in RedisStore._shared_fallback_stores:
+                RedisStore._shared_fallback_stores[self.prefix] = {}
+            return RedisStore._shared_fallback_stores[self.prefix]
 
     @property
     def client(self) -> Any:
@@ -80,8 +83,6 @@ class RedisStore:
                         pwds_to_try = [
                             parsed.password,
                             self.settings.redis_password,
-                            "cfi_redis_secure_pass_2026",
-                            "cfi_redis_secure_pass_2026_change_in_production",
                             None,
                         ]
                         seen_candidates = set()
@@ -149,7 +150,8 @@ class RedisStore:
                     return json.loads(val)
             except Exception as e:
                 logger.error(f"Redis get failed for {key}: {e}")
-        return self._fallback_store.get(key)
+        with RedisStore._lock:
+            return self._fallback_store.get(key)
 
     def set(self, key: str, value: Any, ex: int | None = None) -> None:
         c = self.client
@@ -159,7 +161,8 @@ class RedisStore:
                 return
             except Exception as e:
                 logger.error(f"Redis set failed for {key}: {e}")
-        self._fallback_store[key] = value
+        with RedisStore._lock:
+            self._fallback_store[key] = value
 
     def delete(self, key: str) -> None:
         c = self.client
@@ -169,7 +172,8 @@ class RedisStore:
                 return
             except Exception as e:
                 logger.error(f"Redis delete failed for {key}: {e}")
-        self._fallback_store.pop(key, None)
+        with RedisStore._lock:
+            self._fallback_store.pop(key, None)
 
     def list_values(self) -> list[dict]:
         c = self.client
@@ -186,7 +190,8 @@ class RedisStore:
                 return [json.loads(v) for v in vals if v]
             except Exception as e:
                 logger.error(f"Redis list_values failed: {e}")
-        return list(self._fallback_store.values())
+        with RedisStore._lock:
+            return list(self._fallback_store.values())
 
     def list_keys(self) -> list[str]:
         c = self.client
@@ -197,7 +202,8 @@ class RedisStore:
                 return [k[prefix_len:] for k in keys if not k.endswith(":list_data")]
             except Exception as e:
                 logger.error(f"Redis list_keys failed: {e}")
-        return [k for k in self._fallback_store if not k.endswith(":list_data")]
+        with RedisStore._lock:
+            return [k for k in self._fallback_store if not k.endswith(":list_data")]
 
     def push_list(self, key: str, value: dict) -> None:
         c = self.client
@@ -207,7 +213,8 @@ class RedisStore:
                 return
             except Exception as e:
                 logger.error(f"Redis push_list failed: {e}")
-        self._fallback_store.setdefault(f"{key}:list_data", []).append(value)
+        with RedisStore._lock:
+            self._fallback_store.setdefault(f"{key}:list_data", []).append(value)
 
     def get_list(self, key: str) -> list[dict]:
         c = self.client
@@ -217,7 +224,8 @@ class RedisStore:
                 return [json.loads(v) for v in vals if v]
             except Exception as e:
                 logger.error(f"Redis get_list failed: {e}")
-        return self._fallback_store.get(f"{key}:list_data", [])
+        with RedisStore._lock:
+            return list(self._fallback_store.get(f"{key}:list_data", []))
 
     def clear(self) -> None:
         c = self.client
@@ -228,4 +236,5 @@ class RedisStore:
                     c.delete(*keys)
             except Exception as e:
                 logger.error(f"Redis clear failed: {e}")
-        self._fallback_store.clear()
+        with RedisStore._lock:
+            self._fallback_store.clear()

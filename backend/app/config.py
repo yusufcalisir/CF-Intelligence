@@ -216,8 +216,46 @@ class Settings(BaseSettings):
             "bank_c": "http://localhost:8013",
         }
 
+    def validate_production_invariants(self) -> None:
+        """Enforces security-by-default and fail-closed validation when operating in production mode.
+
+        Fails fast if insecure development defaults, fallback secrets, or open debug flags are retained.
+        """
+        if self.app_env.lower() != "production":
+            return
+
+        violations: list[str] = []
+
+        if self.app_debug:
+            violations.append("app_debug must be False in production.")
+
+        if self.payload_signing_secret in (
+            "cfi_local_secret_key_2026_change_me_in_production",
+            "change_me_in_production",
+            "",
+        ):
+            violations.append(
+                "payload_signing_secret must be set to a high-entropy secret in production (cannot be default placeholder)."
+            )
+
+        if self.database_type == "postgres" and (
+            self.postgres_password in ("change_me_in_production", "")
+            or "change_me" in self.postgres_password
+        ):
+            violations.append(
+                "postgres_password must be customized in production (cannot contain 'change_me')."
+            )
+
+        if "*" in self.cors_allowed_origins.split(","):
+            violations.append("cors_allowed_origins cannot contain wildcard '*' in production.")
+
+        if violations:
+            msg = "Production Security Configuration Violations:\n - " + "\n - ".join(violations)
+            raise ValueError(msg)
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     """Return cached settings instance. Parsed once at startup."""
     return Settings()
+

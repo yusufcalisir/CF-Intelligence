@@ -70,8 +70,6 @@ class RedisBankClientListener:
                     pwds = [
                         parsed.password,
                         getattr(settings, "redis_password", None),
-                        "cfi_redis_secure_pass_2026",
-                        "cfi_redis_secure_pass_2026_change_in_production",
                     ]
                     for h in hosts:
                         if not h or recovered:

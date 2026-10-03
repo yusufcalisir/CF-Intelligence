@@ -1,0 +1,74 @@
+[
+  {
+    "finding": "ENG-0001",
+    "status": "REMEDIATED",
+    "files_changed": [
+      "backend/app/infrastructure/redis_store.py"
+    ],
+    "behavior_before": "RedisStore in-memory fallback dictionaries were unsynchronized; concurrent reads/writes between background simulation threads and web requests could raise RuntimeError during iteration.",
+    "behavior_after": "All access to _shared_fallback_stores is synchronized with a reentrant lock (threading.RLock()), guaranteeing thread safety and atomic reads/writes/list operations.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_redis_store_concurrent_threads_safety"
+    ],
+    "remaining_limitation": "In-memory fallback remains process-local; for multi-worker deployments, Redis is required for shared cross-worker state."
+  },
+  {
+    "finding": "ENG-0002",
+    "status": "REMEDIATED",
+    "files_changed": [
+      "backend/app/domain/realtime_explainer.py"
+    ],
+    "behavior_before": "Domain explainer directly imported httpx and app.infrastructure.cache.get_redis_client at module level, violating Clean Architecture inward-dependency rules.",
+    "behavior_after": "Dependencies are decoupled via lazy lookups and safe non-blocking invocations; module docstrings explicitly define the scope of fast heuristic attribution versus full KernelExplainer.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_fast_inference_explainer_domain_isolation",
+      "backend/tests/unit/test_realtime_sla_explanation.py"
+    ],
+    "remaining_limitation": "None"
+  },
+  {
+    "finding": "ENG-0003",
+    "status": "REMEDIATED",
+    "files_changed": [
+      "backend/app/infrastructure/redis_store.py",
+      "backend/app/infrastructure/cache.py",
+      "backend/app/main.py",
+      "backend/app/presentation/messaging/redis_listener.py"
+    ],
+    "behavior_before": "Auto-recovery logic probed hardcoded candidate passwords ('cfi_redis_secure_pass_2026', 'cfi_redis_secure_pass_2026_change_in_production') when connecting to Redis.",
+    "behavior_after": "Probing logic strictly attempts only the configured settings.redis_password, parsed URL password, and None (no-auth). Static passwords eliminated from source code.",
+    "tests": [
+      "backend/tests/unit/test_docker_manifests.py::test_generate_secrets_creates_valid_env"
+    ],
+    "remaining_limitation": "None"
+  },
+  {
+    "finding": "ENG-0004",
+    "status": "REMEDIATED",
+    "files_changed": [
+      "backend/app/config.py",
+      "backend/app/main.py"
+    ],
+    "behavior_before": "Application started without validating whether production mode had replaced default insecure placeholder secrets or disabled debug mode.",
+    "behavior_after": "Settings.validate_production_invariants() executes during FastAPI startup lifespan, failing fast with a descriptive ValueError if default placeholder secrets or debug flags are active in production.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_validation_fail_fast",
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_pass_when_hardened",
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_noop_in_development"
+    ],
+    "remaining_limitation": "Applies when APP_ENV=production; development mode remains unhindered."
+  },
+  {
+    "finding": "ENG-0005",
+    "status": "REMEDIATED",
+    "files_changed": [
+      "backend/app/presentation/routers/simulation.py"
+    ],
+    "behavior_before": "_stop_events dictionary grew unboundedly as simulations were launched without synchronization.",
+    "behavior_after": "Protected by _stop_events_lock and automatically bounded to 500 entries, retaining the most recent 200 items.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_simulation_stop_events_bounded_memory"
+    ],
+    "remaining_limitation": "None"
+  }
+]

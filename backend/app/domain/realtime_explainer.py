@@ -1,4 +1,9 @@
-"""Sub-Millisecond Fast Real-Time Decision Explainer & Async SHAP Engine — Section 42.2."""
+"""Sub-Millisecond Fast Real-Time Decision Explainer & Async Feature Attribution Engine.
+
+Provides sub-millisecond fast-path heuristic feature attributions for online scoring SLAs (<5ms).
+For comprehensive game-theoretic Shapley value attribution on complex models, see ExplainabilityService
+(which uses KernelExplainer).
+"""
 
 from __future__ import annotations
 
@@ -9,11 +14,17 @@ from collections import OrderedDict
 from dataclasses import asdict, dataclass
 from typing import Any
 
-import httpx
-
-from app.infrastructure.cache import get_redis_client
-
 logger = logging.getLogger(__name__)
+
+
+def get_redis_client() -> Any:
+    """Lazily obtain the redis client from infrastructure without rigid static coupling."""
+    try:
+        from app.infrastructure.cache import get_redis_client as _get_client
+
+        return _get_client()
+    except Exception:
+        return None
 
 
 # Bounded in-memory LRU fallback cache (max 1000 entries) when Redis is unreachable
@@ -151,6 +162,8 @@ class FastInferenceExplainer:
         # Trigger webhook if URL provided
         if webhook_url and isinstance(webhook_url, str) and webhook_url.strip().lower().startswith(("http://", "https://")):
             try:
+                import httpx
+
                 headers = {
                     "Content-Type": "application/json",
                     "User-Agent": "CF-Intelligence-Webhook/1.0",

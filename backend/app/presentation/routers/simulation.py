@@ -52,6 +52,7 @@ singular_api_router = APIRouter(prefix="/v1/simulation", tags=["simulation"])
 _simulation_results = RedisStore("sim_results")
 _simulation_events = RedisStore("sim_events")
 _stop_events: dict[str, threading.Event] = {}
+_stop_events_lock = threading.Lock()
 
 
 def _seed_canonical_simulation() -> None:
@@ -414,7 +415,11 @@ async def create_simulation(
     Poll GET /simulations/{id} or GET /simulation/{id}/status for progress.
     """
     simulation_id = str(uuid.uuid4())
-    _stop_events[simulation_id] = threading.Event()
+    with _stop_events_lock:
+        if len(_stop_events) > 500:
+            for k in list(_stop_events.keys())[:-200]:
+                _stop_events.pop(k, None)
+        _stop_events[simulation_id] = threading.Event()
 
     # Build config dict
     config_dict = {
@@ -590,7 +595,8 @@ async def stop_simulation(
         )
 
     # Signal stop event to background thread
-    stop_event = _stop_events.get(simulation_id)
+    with _stop_events_lock:
+        stop_event = _stop_events.get(simulation_id)
     if stop_event:
         stop_event.set()
 
@@ -888,7 +894,8 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
         # passed by the service may differ from our simulation_id.  We always look up
         # by our own simulation_id (the key stored in _simulation_results).
         def progress_cb(_sim_id: str, event_type: str, data: dict[str, Any]) -> None:
-            stop_evt = _stop_events.get(simulation_id)
+            with _stop_events_lock:
+                stop_evt = _stop_events.get(simulation_id)
             if stop_evt and stop_evt.is_set():
                 logger.info("Simulation %s received stop signal. Aborting progress callback.", simulation_id)
                 return

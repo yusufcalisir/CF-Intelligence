@@ -1,0 +1,154 @@
+{
+  "architecture_model": "Clean Architecture / Hexagonal Ports & Adapters",
+  "evaluated_at": "2026-10-04T02:15:00Z",
+  "layers": [
+    {
+      "layer": "Domain",
+      "purpose": "Enterprise business entities, cryptographic primitives, pure validation rules, and mathematical invariants.",
+      "directories": [
+        "backend/app/domain"
+      ],
+      "major_modules": [
+        "app.domain.entities",
+        "app.domain.enums",
+        "app.domain.data_validator",
+        "app.domain.realtime_explainer",
+        "app.domain.secagg_crypto",
+        "app.domain.differential_privacy",
+        "app.domain.byzantine"
+      ],
+      "allowed_inward_dependencies": [],
+      "observed_dependencies": [
+        "Standard Python library, typing, math, pydantic (schemas only)"
+      ],
+      "violations_detected": 0,
+      "violations_remediated": [
+        "ENG-0002 decoupled static httpx and concrete Redis client imports from app.domain.realtime_explainer"
+      ]
+    },
+    {
+      "layer": "Application",
+      "purpose": "Use case orchestration, federated learning simulation management, alert handling, case investigation workflows.",
+      "directories": [
+        "backend/app/application"
+      ],
+      "major_modules": [
+        "app.application.services.multi_bank_simulator",
+        "app.application.services.coordinator_service",
+        "app.application.services.alert_service",
+        "app.application.services.case_service",
+        "app.application.services.entity_service",
+        "app.application.services.explainability_service",
+        "app.application.services.model_registry",
+        "app.application.schemas"
+      ],
+      "allowed_inward_dependencies": [
+        "Domain"
+      ],
+      "observed_dependencies": [
+        "Domain entities, domain services, infrastructure interfaces"
+      ],
+      "violations_detected": 0
+    },
+    {
+      "layer": "Infrastructure",
+      "purpose": "Concrete database drivers, cache adapters, Kafka producers/consumers, TEE hardware drivers, MinIO storage, zero-trust PKI.",
+      "directories": [
+        "backend/app/infrastructure"
+      ],
+      "major_modules": [
+        "app.infrastructure.database",
+        "app.infrastructure.redis_store",
+        "app.infrastructure.cache",
+        "app.infrastructure.streaming.kafka_producer",
+        "app.infrastructure.security.tee_driver",
+        "app.infrastructure.security.pki_service",
+        "app.infrastructure.connectors"
+      ],
+      "allowed_inward_dependencies": [
+        "Domain",
+        "Application (Ports)"
+      ],
+      "observed_dependencies": [
+        "SQLAlchemy, redis, aioredis, confluent-kafka, cryptography, torch, numpy"
+      ],
+      "violations_detected": 0
+    },
+    {
+      "layer": "Presentation / API",
+      "purpose": "FastAPI HTTP REST routers, WebSocket streaming handlers, request parsing, authentication middlewares.",
+      "directories": [
+        "backend/app/presentation"
+      ],
+      "major_modules": [
+        "app.presentation.routers.simulation",
+        "app.presentation.routers.alerts",
+        "app.presentation.routers.cases",
+        "app.presentation.routers.health",
+        "app.presentation.routers.coordinator",
+        "app.presentation.routers.security",
+        "app.presentation.websockets.manager",
+        "app.presentation.websockets.streaming_ws"
+      ],
+      "allowed_inward_dependencies": [
+        "Application",
+        "Domain",
+        "Infrastructure (via Dependency Injection)"
+      ],
+      "observed_dependencies": [
+        "FastAPI, Starlette, application services, infrastructure stores"
+      ],
+      "violations_detected": 0
+    },
+    {
+      "layer": "Frontend Presentation",
+      "purpose": "React 19 Single Page Application, TanStack Query data caching, Tailwind CSS design system, Lucide icons, Recharts visualization.",
+      "directories": [
+        "frontend/src"
+      ],
+      "major_modules": [
+        "frontend/src/pages",
+        "frontend/src/components",
+        "frontend/src/api",
+        "frontend/src/hooks",
+        "frontend/src/types"
+      ],
+      "allowed_inward_dependencies": [
+        "Backend HTTP API & WebSocket endpoints"
+      ],
+      "observed_dependencies": [
+        "React, TanStack Query, Lucide-React, Recharts, Vite"
+      ],
+      "violations_detected": 0
+    }
+  ],
+  "runtime_state_owners": {
+    "simulation_results": {
+      "owner": "app.infrastructure.redis_store.RedisStore('sim_results')",
+      "concurrency_mechanism": "threading.RLock() synchronized dictionary in-memory; atomic SET/GET in Redis",
+      "persistence_mode": "Durable when Redis configured; ephemeral in-memory fallback when offline"
+    },
+    "simulation_events": {
+      "owner": "app.infrastructure.redis_store.RedisStore('sim_events')",
+      "concurrency_mechanism": "threading.RLock() synchronized push/get list operations",
+      "persistence_mode": "Durable lists in Redis; in-memory lists in fallback"
+    },
+    "simulation_stop_events": {
+      "owner": "app.presentation.routers.simulation._stop_events",
+      "concurrency_mechanism": "threading.Lock() protected dictionary of threading.Event instances with bounded LRU eviction",
+      "persistence_mode": "Process-local lifecycle management"
+    },
+    "case_and_alert_entities": {
+      "owner": "app.infrastructure.database (AsyncSession SQL + in-memory store fallback)",
+      "concurrency_mechanism": "Database transactions / RLock synchronized memory store",
+      "persistence_mode": "PostgreSQL 16 relational durability / SQLite central DB"
+    }
+  },
+  "infrastructure_adapters": {
+    "cache_and_broker": "Redis 7.2 (with auto-detect and in-process event bus fallback)",
+    "relational_storage": "PostgreSQL 16 / SQLite central database",
+    "event_streaming": "Apache Kafka 3.7 CloudEvents 1.0 (with in-memory queue fallback)",
+    "security_enclave": "Intel SGX / AWS Nitro Enclaves (with software emulation sandbox fallback)",
+    "key_management": "HashiCorp Vault / SoftHSM PKCS#11 (with local cryptographic derivation fallback)"
+  }
+}

@@ -427,6 +427,7 @@ def seed_mock_data() -> None:
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application startup and shutdown hooks."""
     logger.info("Environment: %s", settings.app_env)
+    settings.validate_production_invariants()
 
     # Configure PyTorch runtime threads for 2 cores
     try:
@@ -460,8 +461,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 pwds = [
                     parsed.password,
                     getattr(settings, "redis_password", None),
-                    "cfi_redis_secure_pass_2026",
-                    "cfi_redis_secure_pass_2026_change_in_production",
                     None,
                 ]
                 for h in hosts:

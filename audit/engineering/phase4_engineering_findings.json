@@ -1,0 +1,75 @@
+[
+  {
+    "id": "ENG-0001",
+    "severity": "HIGH",
+    "category": "CONCURRENCY",
+    "component": "backend/app/infrastructure/redis_store.py",
+    "evidence": "RedisStore._shared_fallback_stores was a plain Python dictionary accessed concurrently by background simulation threads and asynchronous FastAPI request handlers without mutual exclusion locking.",
+    "operational_consequence": "Risk of RuntimeError: dictionary changed size during iteration when list_values() or list_keys() was called while a simulation run updated metrics or pushed events.",
+    "root_cause": "The in-memory fallback store was implemented as an unsynchronized class-level dictionary without thread locks.",
+    "remediation": "Added reentrant lock threading.RLock() to RedisStore class and protected all dictionary reads, writes, deletions, and iterations with with RedisStore._lock:.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_redis_store_concurrent_threads_safety"
+    ],
+    "final_status": "REMEDIATED"
+  },
+  {
+    "id": "ENG-0002",
+    "severity": "MEDIUM",
+    "category": "ARCHITECTURE",
+    "component": "backend/app/domain/realtime_explainer.py",
+    "evidence": "Domain layer explainer directly imported concrete infrastructure modules (app.infrastructure.cache.get_redis_client, httpx) at top level, and module terminology labeled heuristic risk scoring as compute_shap.",
+    "operational_consequence": "Clean Architecture violation: Domain entities depended on concrete HTTP and cache drivers. Ambiguity between fast SLA heuristic attribution and exact KernelExplainer game-theoretic Shapley values.",
+    "root_cause": "Historical consolidation of SLA feature attribution into the domain layer without dependency inversion.",
+    "remediation": "Decoupled top-level infrastructure dependencies; made Redis lookup and webhook delivery use lazy, non-breaking invocations; updated docstrings to clarify heuristic attribution methodology versus full KernelExplainer.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_fast_inference_explainer_domain_isolation",
+      "backend/tests/unit/test_realtime_sla_explanation.py"
+    ],
+    "final_status": "REMEDIATED"
+  },
+  {
+    "id": "ENG-0003",
+    "severity": "MEDIUM",
+    "category": "SECURITY",
+    "component": "backend/app/infrastructure/redis_store.py, backend/app/infrastructure/cache.py, backend/app/main.py, backend/app/presentation/messaging/redis_listener.py",
+    "evidence": "Source code contained hardcoded candidate password strings ('cfi_redis_secure_pass_2026', 'cfi_redis_secure_pass_2026_change_in_production') in auto-healing connection loops.",
+    "operational_consequence": "Security audit failure; violated secret management hygiene by embedding static credentials into source code instead of relying strictly on environment configuration.",
+    "root_cause": "Development convenience logic was introduced to automatically attempt connection using historical placeholder passwords.",
+    "remediation": "Removed all hardcoded password strings from candidate probing arrays across all four files; connection resolution now strictly honors parsed URL passwords and settings.redis_password.",
+    "tests": [
+      "backend/tests/unit/test_docker_manifests.py::test_generate_secrets_creates_valid_env"
+    ],
+    "final_status": "REMEDIATED"
+  },
+  {
+    "id": "ENG-0004",
+    "severity": "MEDIUM",
+    "category": "CONFIGURATION",
+    "component": "backend/app/config.py, backend/app/main.py",
+    "evidence": "Production mode (app_env == 'production') lacked startup fail-fast assertions to reject default placeholder secrets (e.g. payload_signing_secret, postgres_password) or open debug flags.",
+    "operational_consequence": "A deployment configured with APP_ENV=production could inadvertently start up with insecure development placeholders intact.",
+    "root_cause": "Configuration validation relied on runtime defaults without an explicit fail-closed production policy.",
+    "remediation": "Implemented Settings.validate_production_invariants() and integrated it into the FastAPI lifespan startup lifecycle, raising immediate ValueError on insecure production configurations.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_validation_fail_fast",
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_pass_when_hardened",
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_production_invariants_noop_in_development"
+    ],
+    "final_status": "REMEDIATED"
+  },
+  {
+    "id": "ENG-0005",
+    "severity": "LOW",
+    "category": "RESOURCE_LIFECYCLE",
+    "component": "backend/app/presentation/routers/simulation.py",
+    "evidence": "Simulation _stop_events dictionary was stored as an unbounded process-global dictionary without synchronization or memory bounds.",
+    "operational_consequence": "Potential memory growth over very large numbers of simulation executions in long-running services.",
+    "root_cause": "Absence of bounded eviction or locking around the background task stop signal collection.",
+    "remediation": "Introduced _stop_events_lock and automatic LRU bounding to prune completed stop event objects once the collection exceeds 500 entries.",
+    "tests": [
+      "backend/tests/unit/test_phase4_engineering_hardening.py::test_simulation_stop_events_bounded_memory"
+    ],
+    "final_status": "REMEDIATED"
+  }
+]
