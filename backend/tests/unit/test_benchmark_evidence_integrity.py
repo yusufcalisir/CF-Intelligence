@@ -186,10 +186,12 @@ class TestAggregateMathematicalReconciliation:
         with pytest.raises(ValueError, match="non-canonical status"):
             resolve_canonical_artifact("byzantine_sign_inversion")
 
-        # New canonical benchmark must be registered as NOT_EVALUATED
+        # Canonical benchmark promoted to CANONICAL status and resolves to disk artifact
         new_entry = CANONICAL_REGISTRY["byzantine_federated_canonical"]
-        assert new_entry.status == ArtifactStatus.NOT_EVALUATED
-        assert resolve_canonical_artifact("byzantine_federated_canonical") is None
+        assert new_entry.status == ArtifactStatus.CANONICAL
+        byz_canonical_data = resolve_canonical_artifact("byzantine_federated_canonical")
+        assert byz_canonical_data is not None
+        assert byz_canonical_data["status"] == "CANONICAL"
 
         # Verify historical artifact on disk remains numerically intact
         raw_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_benchmark_sign_inversion.json"

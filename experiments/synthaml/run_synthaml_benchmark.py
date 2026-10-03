@@ -1068,10 +1068,15 @@ def run_synthaml_benchmark(
         "isolated_silos": silo_metrics,
         "collaboration_uplift": comp_baselines["collaboration_uplift"],
     }
-    raw_benchmark_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "fraud_benchmark_synthaml.json"
-    raw_benchmark_path.parent.mkdir(parents=True, exist_ok=True)
-    with open(raw_benchmark_path, "w", encoding="utf-8") as f:
-        json.dump(raw_benchmark_json, f, indent=2)
+    if output_dir is None:
+        raw_benchmark_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "fraud_benchmark_synthaml.json"
+        raw_benchmark_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(raw_benchmark_path, "w", encoding="utf-8") as f:
+            json.dump(raw_benchmark_json, f, indent=2)
+    else:
+        raw_benchmark_path = out_path / "fraud_benchmark_synthaml.json"
+        with open(raw_benchmark_path, "w", encoding="utf-8") as f:
+            json.dump(raw_benchmark_json, f, indent=2)
 
     # Author scientific audit dossier
     dossier_content = f"""# Scientific Audit Dossier: Danish Spar Nord Bank SynthAML Benchmark
