@@ -364,9 +364,163 @@ class BenchmarkEvidenceVerifier:
             self.log_fail(f"Cross-Bank overall federated detection rate mismatch: expected 1.0, got {overall_dr}")
         else:
             self.log_pass(
-                f"Cross-Bank: Controlled consortium simulation verified (Overall DR: {overall_dr*100:.1f}%, "
+                f"Cross-Bank v1: Controlled consortium simulation verified (Overall DR: {overall_dr*100:.1f}%, "
                 f"Scenario 7 Support: {support_pres}, Simulated volume caveat present)"
             )
+
+        # CrossBank v2 Canonical Verification
+        cb2_entry = CANONICAL_REGISTRY.get("crossbank_v2_canonical")
+        if not cb2_entry:
+            self.log_fail("crossbank_v2_canonical missing from canonical registry.")
+            return
+        cb2_data = resolve_canonical_artifact("crossbank_v2_canonical")
+        if not cb2_data:
+            self.log_fail("crossbank_v2_canonical failed to resolve.")
+            return
+
+        cb2_path = self.repo_root / cb2_entry.canonical_artifact_relpath
+        cb2_bytes = cb2_path.read_bytes()
+        if len(cb2_bytes) != 322468:
+            self.log_fail(f"Canonical CrossBank v2 artifact size mismatch: expected 322468, got {len(cb2_bytes)}")
+            return
+
+        import hashlib
+        cb2_sha = hashlib.sha256(cb2_bytes).hexdigest()
+        if cb2_sha != "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a":
+            self.log_fail(f"Canonical CrossBank v2 artifact SHA-256 mismatch: {cb2_sha}")
+            return
+
+        # 1. Exact Canonical Seed Binding ([42, 123, 456, 789, 2025], strictly rejecting 101112)
+        seeds = cb2_data.get("canonical_seeds", [])
+        expected_seeds = [42, 123, 456, 789, 2025]
+        if seeds != expected_seeds:
+            self.log_fail(f"Canonical CrossBank v2 seeds mismatch: expected {expected_seeds}, got {seeds}")
+            return
+
+        # 2. Condition Identifiers
+        expected_conditions = {
+            "COND_LOCAL_ISOLATED",
+            "COND_FEDERATED_FEDAVG_LOCAL_FEATS",
+            "COND_CENTRALIZED_POOLED",
+            "COND_COLD_START_ZERO_POSITIVE",
+            "COND_FEDERATED_CONSORTIUM_SIGNAL",
+            "COND_SIMPLE_BASELINE_LOGISTIC",
+        }
+        actual_conditions = set(cb2_data.get("condition_ids", []))
+        if not expected_conditions.issubset(actual_conditions):
+            self.log_fail(f"Canonical CrossBank v2 condition IDs missing: {expected_conditions - actual_conditions}")
+            return
+
+        # 3. Independent Programmatic Reconstruction from Level 1 Per-Seed Measurements
+        per_seed = cb2_data.get("per_seed_results", {})
+        agg = cb2_data.get("aggregate_results", {})
+        import math
+
+        def _mean_std(vals: list[float]) -> tuple[float, float]:
+            n = len(vals)
+            m = sum(vals) / n
+            s = math.sqrt(sum((x - m) ** 2 for x in vals) / (n - 1)) if n > 1 else 0.0
+            return m, s
+
+        # Independently compute and validate per-condition sample mean and sample std (ddof=1)
+        computed_metrics: dict[str, dict[str, tuple[float, float]]] = {}
+        for cond in expected_conditions:
+            ap_vals = [per_seed[str(s)]["conditions"][cond]["overall_metrics"]["average_precision"] for s in seeds]
+            roc_vals = [per_seed[str(s)]["conditions"][cond]["overall_metrics"]["roc_auc"] for s in seeds]
+            m_ap, s_ap = _mean_std(ap_vals)
+            m_roc, s_roc = _mean_std(roc_vals)
+            computed_metrics[cond] = {"average_precision": (m_ap, s_ap), "roc_auc": (m_roc, s_roc)}
+
+            # Cross-check against reported Level 1 aggregate results using validate_per_seed_aggregate
+            rep_m_ap = agg.get(cond, {}).get("average_precision", {}).get("mean")
+            rep_s_ap = agg.get(cond, {}).get("average_precision", {}).get("std")
+            rep_m_roc = agg.get(cond, {}).get("roc_auc", {}).get("mean")
+            rep_s_roc = agg.get(cond, {}).get("roc_auc", {}).get("std")
+            try:
+                validate_per_seed_aggregate(ap_vals, rep_m_ap, rep_s_ap, label=f"CrossBank v2 {cond} AP", ddof=1)
+                validate_per_seed_aggregate(roc_vals, rep_m_roc, rep_s_roc, label=f"CrossBank v2 {cond} ROC", ddof=1)
+            except ValueError as e:
+                self.log_fail(f"CrossBank v2 mechanical aggregate reconciliation failed: {e}")
+                return
+
+        # 4. Independent Reconstruction of Q2 & Q3 Paired Estimands
+        q2_ap = [per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["average_precision"] -
+                 per_seed[str(s)]["conditions"]["COND_LOCAL_ISOLATED"]["overall_metrics"]["average_precision"] for s in seeds]
+        q2_roc = [per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["roc_auc"] -
+                  per_seed[str(s)]["conditions"]["COND_LOCAL_ISOLATED"]["overall_metrics"]["roc_auc"] for s in seeds]
+        m_q2_ap, s_q2_ap = _mean_std(q2_ap)
+        m_q2_roc, s_q2_roc = _mean_std(q2_roc)
+
+        q3_ap = [per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["average_precision"] -
+                 per_seed[str(s)]["conditions"]["COND_CENTRALIZED_POOLED"]["overall_metrics"]["average_precision"] for s in seeds]
+        q3_roc = [per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["roc_auc"] -
+                  per_seed[str(s)]["conditions"]["COND_CENTRALIZED_POOLED"]["overall_metrics"]["roc_auc"] for s in seeds]
+        m_q3_ap, s_q3_ap = _mean_std(q3_ap)
+        m_q3_roc, s_q3_roc = _mean_std(q3_roc)
+
+        # 5. Registry Binding Verification against benchmarks/results/canonical_evidence_registry.json
+        registry_path = self.repo_root / "benchmarks" / "results" / "canonical_evidence_registry.json"
+        if registry_path.exists():
+            with open(registry_path, encoding="utf-8") as f:
+                reg_data = json.load(f)
+            cb_claim = next((b for b in reg_data.get("benchmarks", []) if b.get("claim_id") == "CLM-CROSSBANK-V2-CANONICAL"), None)
+            if not cb_claim:
+                self.log_fail("CLM-CROSSBANK-V2-CANONICAL missing from canonical_evidence_registry.json")
+                return
+            reg_val = cb_claim.get("value", {})
+            reg_seeds = cb_claim.get("seeds", [])
+            if reg_seeds != seeds:
+                self.log_fail(f"Registry seeds mismatch: expected {seeds}, got {reg_seeds}")
+                return
+            if abs(reg_val.get("fedavg_local_ap_mean", 0) - computed_metrics["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["average_precision"][0]) > 0.001:
+                self.log_fail("Registry fedavg_local_ap_mean does not match computed Level 1 raw mean")
+                return
+            if abs(reg_val.get("consortium_oracle_ap_mean", 0) - computed_metrics["COND_FEDERATED_CONSORTIUM_SIGNAL"]["average_precision"][0]) > 0.001:
+                self.log_fail("Registry consortium_oracle_ap_mean does not match computed Level 1 raw mean (stale value rejected)")
+                return
+            if abs(reg_val.get("q2_paired_delta_ap_mean", 0) - m_q2_ap) > 0.001:
+                self.log_fail("Registry q2_paired_delta_ap_mean does not match computed Q2 paired delta")
+                return
+            if abs(reg_val.get("q3_paired_delta_roc_mean", 0) - m_q3_roc) > 0.001:
+                self.log_fail("Registry q3_paired_delta_roc_mean does not match computed Q3 paired delta")
+                return
+
+        # 6. Bank C Zero-Positive Training Invariant and Cold-Start Operational Failure
+        for s in seeds:
+            s_data = per_seed.get(str(s), {})
+            split = s_data.get("split_summary", {})
+            if split.get("bank_c_train_pos") != 0:
+                self.log_fail(f"Bank C training fraud positives must be 0 in seed {s}, got {split.get('bank_c_train_pos')}")
+                return
+            bc_metrics = s_data.get("conditions", {}).get("COND_FEDERATED_FEDAVG_LOCAL_FEATS", {}).get("per_bank_metrics", {}).get("bank_c", {})
+            cm = bc_metrics.get("confusion_matrix", {})
+            if cm.get("tp") != 0:
+                self.log_fail(f"Bank C low-FPR operational TP must be 0 in seed {s}, got {cm.get('tp')}")
+                return
+
+        # 7. Scenario 7 Negative Result (5/133 realistic detections)
+        s7_detected = 0
+        s7_total = 0
+        for s in seeds:
+            s7 = per_seed.get(str(s), {}).get("conditions", {}).get("COND_FEDERATED_FEDAVG_LOCAL_FEATS", {}).get("scenario_metrics", {}).get("SCENARIO_7", {})
+            s7_detected += s7.get("detected_incident_count", 0)
+            s7_total += s7.get("test_incident_count", 0)
+
+        if s7_total != 133 or s7_detected != 5:
+            self.log_fail(f"Canonical Scenario 7 realistic detection mismatch: expected 5/133, got {s7_detected}/{s7_total}")
+            return
+
+        fed_ap, fed_ap_std = computed_metrics["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["average_precision"]
+        cen_ap, cen_ap_std = computed_metrics["COND_CENTRALIZED_POOLED"]["average_precision"]
+        iso_ap, iso_ap_std = computed_metrics["COND_LOCAL_ISOLATED"]["average_precision"]
+        oracle_ap, oracle_ap_std = computed_metrics["COND_FEDERATED_CONSORTIUM_SIGNAL"]["average_precision"]
+
+        self.log_pass(
+            f"CrossBank v2: Canonical 5-seed neural benchmark mechanically reconstructed from Level 1 per-seed raw evidence "
+            f"(Seeds: {seeds}, FedAvg AP: {fed_ap:.4f}+/-{fed_ap_std:.4f}, Central AP: {cen_ap:.4f}+/-{cen_ap_std:.4f}, "
+            f"Isolated AP: {iso_ap:.4f}+/-{iso_ap_std:.4f}, Oracle AP: {oracle_ap:.4f}+/-{oracle_ap_std:.4f}, "
+            f"Q2 dAP: {m_q2_ap:+.4f}, Q3 dROC: {m_q3_roc:+.4f}, S7: {s7_detected}/{s7_total}, Registry Bound, SHA-256 confirmed)"
+        )
 
     def verify_byzantine(self) -> None:
         """Verify Byzantine benchmark evidence status and historical quarantine."""

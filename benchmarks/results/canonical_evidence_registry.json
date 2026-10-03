@@ -1,0 +1,488 @@
+{
+  "schema_version": "2.0.0",
+  "registry_name": "CF-Intelligence Authoritative Canonical Evidence & Benchmark Claim Registry",
+  "generated_at_utc": "2026-10-03T21:50:00Z",
+  "repository_head_commit": "4cc1ffba0d253a4c336b2d5e267b5b6666c742c1",
+  "frozen_protocol_commit": "2f64a02b65caa0b35588ec8c016290d1f2ac6e61",
+  "total_benchmarks": 12,
+  "benchmarks": [
+    {
+      "claim_id": "CLM-IEEE-FED-PRAUC",
+      "benchmark_family": "IEEE-CIS Card Fraud",
+      "dataset": "Kaggle IEEE-CIS / Vesta Corp Fraud Detection (590k)",
+      "dataset_class": "REAL_EXTERNAL_DATA",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-IEEE-CIS-CANONICAL-REAL",
+      "metric": "Average Precision (sklearn.metrics.average_precision_score)",
+      "population": "590,540 transactions, 421 numeric input features; 80/20 chronological holdout (train: 472,432, test: 118,108; 4,064 test fraud)",
+      "value": {
+        "centralized_mean": 0.442233,
+        "centralized_std": 0.003408,
+        "fedavg_mean": 0.389505,
+        "fedavg_std": 0.012368,
+        "paired_delta_mean": -0.052729,
+        "paired_delta_std": 0.009038,
+        "recall_at_01pct_val_fpr_centralized": 0.2004,
+        "recall_at_01pct_val_fpr_fedavg": 0.1976
+      },
+      "seeds": [42, 123, 456],
+      "artifact": "experiments/ieee_cis/canonical_results.json",
+      "artifact_sha256": "4b68925ca14c718a93902344719b49bcfbc3bb6656715fbc7ba081f215707b6c",
+      "source_commit": "032d78a7",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Evaluated on real Kaggle competition logs; multi-bank federation is simulated across 3 clients under Dirichlet alpha=0.5 non-IID label skew.",
+        "Chronological holdout performance (FedAvg 0.3895 vs Centralized 0.4422) reflects temporal distribution shift and client partition heterogeneity.",
+        "Engineering target 0.8120 was not reached under chronological holdout."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/fraud_benchmark_ieee_cis.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "live multi-bank deployment",
+        "measured target of 0.8120",
+        "causal proof of temporal drift effect"
+      ]
+    },
+    {
+      "claim_id": "CLM-CREDITCARD-PRAUC",
+      "benchmark_family": "European Credit Card Fraud",
+      "dataset": "ULB Machine Learning Group European Cardholders",
+      "dataset_class": "REAL_EXTERNAL_DATA",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-CREDITCARD-CONTROLLED-BUDGET",
+      "metric": "Average Precision / PR-AUC",
+      "population": "284,807 transactions, 492 fraud cases, 3 simulated bank clients under Dirichlet alpha=0.5",
+      "value": {
+        "centralized_equalized_mean": 0.8219,
+        "centralized_equalized_std": 0.0364,
+        "fedavg_mean": 0.8248,
+        "fedavg_std": 0.0417,
+        "paired_delta_mean": 0.0029,
+        "bank_c_isolated_mean": 0.2468,
+        "bank_c_federated_mean": 0.8599
+      },
+      "seeds": [42, 123, 456],
+      "artifact": "experiments/credit_card/multi_seed_controlled_results.json",
+      "artifact_sha256": "df06e336e9ff0f6a29bc01a61c47098e60aa8bbef6df846a81bbbe0b7f8c5be9",
+      "source_commit": "bc454e48",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Real transaction records; federation is simulated locally.",
+        "Under controlled budget parity (10 dataset passes / ~35.6k optimizer steps), Centralized and FedAvg exhibit overlapping confidence intervals; descriptive similarity does not imply formal statistical equivalence.",
+        "Primary value is collaborative rescue of data-starved Bank C (from 0.2468 to 0.8599)."
+      ],
+      "supersedes": [
+        "experiments/credit_card/legacy_unequal_budget/results_legacy_unequal_budget.json",
+        "benchmarks/results/raw/fraud_benchmark_credit_card.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "formal statistical equivalence",
+        "federated superiority over centralized"
+      ]
+    },
+    {
+      "claim_id": "CLM-ELLIPTIC-PRAUC",
+      "benchmark_family": "Elliptic Bitcoin AML Graph",
+      "dataset": "Elliptic Bitcoin Blockchain DAG (MIT-IBM Watson)",
+      "dataset_class": "REAL_EXTERNAL_DATA",
+      "federation_class": "CENTRALIZED_ONLY",
+      "experiment_id": "EXP-ELLIPTIC-TEMPORAL-GRAPHSAGE",
+      "metric": "Average Precision (Illicit class)",
+      "population": "203,769 transaction nodes, 234,355 directed edges, 165 features; strict temporal split (train 1-30, val 31-34, test 35-49)",
+      "value": {
+        "graphsage_mean": 0.3761,
+        "graphsage_std": 0.0482,
+        "roc_auc_mean": 0.8325,
+        "roc_auc_std": 0.0078,
+        "recall_at_01pct_val_fpr": 0.0462,
+        "tabular_mlp_0hop_ap": 0.5778
+      },
+      "seeds": [42, 123, 456],
+      "artifact": "benchmarks/results/raw/graphsage_elliptic_benchmark.json",
+      "artifact_sha256": "4b6c33c393bcbb4416ea052cb7ec5ef2e46b9a2fc49a0a558509c3c544c33055",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Strict temporal out-of-time evaluation shows architectural negative result: Tabular MLP (0.5778) outperforms Inductive GraphSAGE (0.3761).",
+        "Federated partition on Bitcoin graph is NOT_EVALUATED.",
+        "Legacy 1,500-node synthetic chain result (0.9001) is permanently retired."
+      ],
+      "supersedes": [
+        "experiments/elliptic/synthetic/graphsage_elliptic_benchmark.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "federated evaluation evaluated",
+        "GraphSAGE superiority on out-of-time Bitcoin graphs",
+        "citing 0.9001 as real performance"
+      ]
+    },
+    {
+      "claim_id": "CLM-PAYSIM-FED-PRAUC",
+      "benchmark_family": "PaySim Mobile Money",
+      "dataset": "PaySim Financial Simulator (Blekinge Institute)",
+      "dataset_class": "EXTERNALLY_SIMULATED_DATA",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-PAYSIM-CANONICAL-SAMPLED",
+      "metric": "Average Precision / PR-AUC",
+      "population": "636,262 rows (systematic 10% sample of 6.36M txns, 817 fraud, 163 test fraud); 3 clients, Dirichlet alpha=0.5",
+      "value": {
+        "centralized_mean": 0.9545,
+        "centralized_std": 0.0073,
+        "fedavg_mean": 0.9545,
+        "fedavg_std": 0.0119,
+        "paired_delta_mean": 0.0000,
+        "paired_delta_std": 0.0191,
+        "recall_at_01pct_val_fpr": 0.9816
+      },
+      "seeds": [42, 123, 456],
+      "artifact": "experiments/paysim/canonical_results.json",
+      "artifact_sha256": "47a3ddad2b781120e7df6a17b884d6428aa7a8bf6065e903a4eb5b50df3654e5",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Agent-based synthetic financial simulation (Lopez-Rojas et al.), not live banking records.",
+        "Parity within seed variance (delta=0.0000) observed across 3 seeds; formal statistical equivalence was not preregistered.",
+        "Historical fallback numbers (0.4654 / 0.1463) are superseded."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/fraud_benchmark_paysim.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "real banking transactions",
+        "formal statistical equivalence"
+      ]
+    },
+    {
+      "claim_id": "CLM-AMLSIM-GRAPHSAGE-PRAUC",
+      "benchmark_family": "IBM AMLSim Multi-Hop Graph",
+      "dataset": "IBM AMLSim Agent Graph Simulator",
+      "dataset_class": "EXTERNALLY_SIMULATED_DATA",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-AMLSIM-GRAPHSAGE-CANONICAL",
+      "metric": "PR-AUC and Structural Topology Recall",
+      "population": "1,323,234 transactions across 10,000 accounts; chronological split (t <= 140 train, t > 140 test)",
+      "value": {
+        "graphsage_pr_auc": 0.6527,
+        "graphsage_roc_auc": 0.9509,
+        "cycle_recall": 0.6736,
+        "fan_in_recall": 0.7050,
+        "tabular_mlp_pr_auc": 0.6093,
+        "graph_uplift": 0.0434
+      },
+      "seeds": [42],
+      "artifact": "experiments/amlsim/results.json",
+      "artifact_sha256": "eb6098ecce5e913a07604adca570a2a5d2ae30c99f3efea5eb04bcfcb4474776",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "STRONGLY_SUPPORTED",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Agent-based simulation of multi-hop laundering topologies.",
+        "Demonstrates graph relational aggregation advantage on cycle (+2.08 pp) and fan-in (+5.75 pp) structures."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/fraud_benchmark_amlsim.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "live inter-bank transaction ledger"
+      ]
+    },
+    {
+      "claim_id": "CLM-SYNTHAML-ALERTMLP-PRAUC",
+      "benchmark_family": "Danish SynthAML",
+      "dataset": "Spar Nord Bank Operational Alert Model",
+      "dataset_class": "PROJECT_SYNTHETIC",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-SYNTHAML-ALERTMLP-RUNB",
+      "metric": "PR-AUC / Alert Triage Accuracy",
+      "population": "20,000 synthetic SAR alerts across 3 bank profiles",
+      "value": {
+        "centralized_pr_auc": 0.9341,
+        "fedavg_pr_auc": 0.9924,
+        "isolated_mean_pr_auc": 0.7245,
+        "isolated_worst_pr_auc": 0.2214
+      },
+      "seeds": [42],
+      "artifact": "benchmarks/results/raw/fraud_benchmark_synthaml.json",
+      "artifact_sha256": "3cb40d5a3ef2e41c42f068c2eeec05fb04b904d1c448bbd6d376f9c99ecdb650",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "STRONGLY_SUPPORTED",
+      "lifecycle": "INTERNAL_ONLY",
+      "external_use_class": "NOT_FOR_EXTERNAL_USE",
+      "mandatory_caveats": [
+        "Project-generated synthetic benchmark with copula separability.",
+        "Near-perfect performance (0.9924 FedAvg) reflects mathematical generator structure, not real banking noise.",
+        "Restricted to internal algorithm validation."
+      ],
+      "supersedes": [
+        "experiments/synthaml/comparative_baselines.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "production bank SAR triage accuracy",
+        "external marketing claim"
+      ]
+    },
+    {
+      "claim_id": "CLM-AMLNET-FEDAVG-PRAUC",
+      "benchmark_family": "AUSTRAC AMLNet",
+      "dataset": "AUSTRAC Wire Transfer Structuring Simulation",
+      "dataset_class": "PROJECT_SYNTHETIC",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-AMLNET-STRUCTURING",
+      "metric": "PR-AUC",
+      "population": "1.09M wire transactions",
+      "value": {
+        "fedavg_pr_auc": 1.0000,
+        "roc_auc": 1.0000
+      },
+      "seeds": [42],
+      "artifact": "experiments/amlnet/results.json",
+      "artifact_sha256": "81f1437198bbd78dbe0ee59c4fae41cb5146c69f6e6f54c3fc2834b67e3df17f",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "STRONGLY_SUPPORTED",
+      "lifecycle": "INTERNAL_ONLY",
+      "external_use_class": "NOT_FOR_EXTERNAL_USE",
+      "mandatory_caveats": [
+        "Synthetic structuring rules (e.g. amounts in [8500, 9950] AUD) are trivially separable by threshold features.",
+        "PR-AUC of 1.0000 is an artifact of synthetic rule generation; strictly internal only."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/fraud_benchmark_amlnet.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "real-world AUSTRAC compliance performance",
+        "unassisted fraud detection perfection"
+      ]
+    },
+    {
+      "claim_id": "CLM-BYZ-FED-CANONICAL",
+      "benchmark_family": "Byzantine Robustness",
+      "dataset": "European Credit Card Fraud (Adversarial Simulation)",
+      "dataset_class": "REAL_EXTERNAL_DATA",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-BYZ-CANONICAL-72COND",
+      "metric": "PR-AUC Retention Ratio relative to clean FedAvg",
+      "population": "n=12 client nodes, f=2 malicious Byzantine adversaries, Dirichlet alpha=0.5, 72 conditions across seeds [42, 123, 456]",
+      "value": {
+        "clean_fedavg_mean": 0.7174,
+        "clean_fedavg_std": 0.0152,
+        "trimmed_mean_ap": 0.7141,
+        "trimmed_mean_std": 0.0129,
+        "trimmed_mean_retention_pct": 99.54,
+        "multi_krum_ap": 0.7061,
+        "multi_krum_std": 0.0341,
+        "multi_krum_retention_pct": 98.48,
+        "single_krum_ap": 0.6543,
+        "single_krum_std": 0.0892
+      },
+      "seeds": [42, 123, 456],
+      "artifact": "benchmarks/results/raw/byzantine_federated_canonical.json",
+      "artifact_sha256": "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d",
+      "source_commit": "be6111a7",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Evaluates real Credit Card data under simulated federation and simulated gradient poisoning attacks.",
+        "Robustness is attack- and seed-dependent; Trimmed Mean achieved 99.54% mean retention under evaluated scaled sign inversion, but Single Krum exhibited high variance across seeds.",
+        "Historical universal 99.7% claim was from an algebraic single-seed Gaussian proxy and is quarantined."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
+        "benchmarks/results/raw/byzantine_breakdown_analysis.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "guaranteed immunity against all Byzantine attacks",
+        "single universal 99.7% robustness percentage"
+      ]
+    },
+    {
+      "claim_id": "CLM-CROSSBANK-V2-CANONICAL",
+      "benchmark_family": "CFI-CrossBank-02 Consortium Fraud",
+      "dataset": "CFI-CrossBank-02 Protocol 2.1.0 Synthetic Generator",
+      "dataset_class": "PROJECT_SYNTHETIC",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-CROSSBANK-V2-CANONICAL-NEURAL",
+      "metric": "Average Precision (AP) and ROC-AUC across 4 Conditions & 7 Scenarios",
+      "population": "5 canonical seeds [42, 123, 456, 789, 2025], 3 simulated bank institutions (Bank A 50%, Bank B 30%, Bank C 20% with zero historical training fraud), 8,019 test views per seed (seed 42)",
+      "value": {
+        "centralized_pooled_ap_mean": 0.1454,
+        "centralized_pooled_ap_std": 0.0186,
+        "centralized_pooled_roc_mean": 0.9091,
+        "centralized_pooled_roc_std": 0.0112,
+        "fedavg_local_ap_mean": 0.1779,
+        "fedavg_local_ap_std": 0.0260,
+        "fedavg_local_roc_mean": 0.9013,
+        "fedavg_local_roc_std": 0.0066,
+        "isolated_local_ap_mean": 0.1656,
+        "isolated_local_ap_std": 0.0278,
+        "isolated_local_roc_mean": 0.7116,
+        "isolated_local_roc_std": 0.0219,
+        "consortium_oracle_ap_mean": 0.8140,
+        "consortium_oracle_ap_std": 0.1133,
+        "consortium_oracle_roc_mean": 0.9227,
+        "consortium_oracle_roc_std": 0.0758,
+        "consortium_oracle_recall_mean": 0.7840,
+        "consortium_oracle_recall_std": 0.1112,
+        "q2_paired_delta_ap_mean": 0.0123,
+        "q2_paired_delta_ap_std": 0.0138,
+        "q2_paired_delta_roc_mean": 0.1897,
+        "q2_paired_delta_roc_std": 0.0204,
+        "q3_paired_delta_ap_mean": 0.0325,
+        "q3_paired_delta_ap_std": 0.0181,
+        "q3_paired_delta_roc_mean": -0.0079,
+        "q3_paired_delta_roc_std": 0.0056,
+        "scenario_7_local_recall_pct": 3.76,
+        "bank_c_lowfpr_recall_pct": 0.00
+      },
+      "seeds": [42, 123, 456, 789, 2025],
+      "artifact": "benchmarks/results/raw/crossbank_v2_canonical.json",
+      "artifact_sha256": "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a",
+      "source_commit": "4cc1ffba",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Project-synthetic data with simulated federation. Real-world generalizability NOT_EVALUATED.",
+        "Q2 pooled gain (+0.1897 dROC) is driven by rescuing zero-positive Bank C (+0.3514 dROC); data-rich Banks A and B experience slight regressions.",
+        "Q3 trade-off: AP favors FedAvg (+0.0325), ROC favors Centralized (-0.0079); matches centralized claim is retired.",
+        "Scenario 7 negative result: Realistic local features detected only 5 of 133 test incidents (3.76% pooled recall).",
+        "Bank C cold-start low-FPR recall is 0.0% in all 5 seeds.",
+        "Predecessor CFI-CrossBank-01 (100% detection on 2 incidents, $639,701.40) is superseded."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/fraud_benchmark_crossbank.json",
+        "benchmarks/results/raw/consortium_flagship_benchmark.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "real-world banking generalizability",
+        "matches centralized equivalence claim",
+        "cold-start solved claim",
+        "Scenario 7 100% detection claim"
+      ]
+    },
+    {
+      "claim_id": "CLM-DP-PRIVACY-UTILITY",
+      "benchmark_family": "Differential Privacy",
+      "dataset": "Synthetic Banking Transactions (DP-SGD Opacus)",
+      "dataset_class": "CONTROLLED_TESTBED",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-DP-OPACUS-SWEEP",
+      "metric": "PR-AUC vs Theoretical Epsilon (PRV Accountant)",
+      "population": "N=20,000 synthetic banking records, noise multipliers sigma in [0.0, 3.0]",
+      "value": {
+        "sigma_3_0": {"epsilon": 0.3497, "pr_auc": 0.3465},
+        "sigma_2_0": {"epsilon": 0.5725, "pr_auc": 0.4710},
+        "sigma_1_0": {"epsilon": 1.7744, "pr_auc": 0.7088},
+        "sigma_0_5": {"epsilon": 12.1989, "pr_auc": 0.8457},
+        "sigma_0_0_nonprivate": {"epsilon": null, "pr_auc": 0.8965}
+      },
+      "seeds": [42],
+      "artifact": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
+      "artifact_sha256": "43015a519fa620f4c3298a0c2420f5c1d683792cbcc2c4e61817cf137baea584",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Demonstrates empirical privacy-utility floor on synthetic banking data: PR-AUC collapses from 0.8965 to 0.3465 at stringent epsilon=0.3497.",
+        "DP provides information-theoretic privacy boundary, not absolute security against external side-channels."
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "privacy preserves full accuracy",
+        "guaranteed unassisted defense"
+      ]
+    },
+    {
+      "claim_id": "CLM-FL-NONIID-ALPHA05",
+      "benchmark_family": "Non-IID Federation",
+      "dataset": "Synthetic Dirichlet Partitioning Testbed",
+      "dataset_class": "CONTROLLED_TESTBED",
+      "federation_class": "SIMULATED_FEDERATION",
+      "experiment_id": "EXP-FL-OPTIMIZERS-ALPHA05",
+      "metric": "Final Round PR-AUC and Communication Volume",
+      "population": "5 clients, severe Dirichlet alpha=0.5 class skew, 10 communication rounds",
+      "value": {
+        "fedavg_pr_auc": 0.2331,
+        "fedprox_pr_auc": 0.2285,
+        "scaffold_pr_auc": 0.2196,
+        "fedavg_roc_auc": 0.9202,
+        "fedavg_comm_mb": 0.147,
+        "scaffold_comm_mb": 0.294
+      },
+      "seeds": [42],
+      "artifact": "benchmarks/results/raw/fl_comparison_alpha_0.5.json",
+      "artifact_sha256": "ba0e75525546059d0a514d3fdf2033bc6f3df80f4949ec302c40c14c51978d38",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Evaluates optimizer performance under controlled laboratory Dirichlet label skew.",
+        "SCAFFOLD incurs 2x communication overhead for gradient correction states."
+      ],
+      "supersedes": [],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "live inter-bank non-IID conditions"
+      ]
+    },
+    {
+      "claim_id": "CLM-LATENCY-GATEWAY-MICROBENCHMARK",
+      "benchmark_family": "Latency and Gateway Throughput",
+      "dataset": "In-Process PyTorch Model & Local FastAPI Service",
+      "dataset_class": "CONTROLLED_TESTBED",
+      "federation_class": "NOT_APPLICABLE",
+      "experiment_id": "EXP-LATENCY-CALIBRATED-GATEWAY",
+      "metric": "Latency percentiles (p50, p99 ms) and peak request throughput (req/s)",
+      "population": "1,000 requests per concurrency tier, AMD Ryzen / Windows 11 host",
+      "value": {
+        "inprocess_p50_ms": 2.70,
+        "inprocess_p99_ms": 3.21,
+        "pytorch_forward_ms": 0.19,
+        "pytorch_forward_pct": 8.1,
+        "http_c1_p50_ms": 7.12,
+        "http_c50_peak_rps": 543.0,
+        "http_c50_p50_ms": 82.5
+      },
+      "seeds": [42],
+      "artifact": "benchmarks/results/raw/latency_microbenchmark.json",
+      "artifact_sha256": "43015a519fa620f4c3298a0c2420f5c1d683792cbcc2c4e61817cf137baea584",
+      "source_commit": "5c16fb8c",
+      "evidence_strength": "PROVEN",
+      "lifecycle": "CANONICAL",
+      "external_use_class": "CANONICAL_CAVEAT_BOUND",
+      "mandatory_caveats": [
+        "Measured in local host environment; production latency depends on network topology, TLS termination, and database locking.",
+        "Legacy pre-calibration numbers (2.29 / 17.77 / 71.99 ms) are superseded."
+      ],
+      "supersedes": [
+        "benchmarks/results/raw/latency_concurrency_benchmark.json"
+      ],
+      "superseded_by": [],
+      "forbidden_interpretations": [
+        "global distributed network latency guarantee"
+      ]
+    }
+  ]
+}

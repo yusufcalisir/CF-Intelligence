@@ -225,3 +225,27 @@ All benchmark runs automatically feed into [`benchmarks/runners/generate_charts.
 - `docs/figures/benchmark_privacy_utility.png`
 - `docs/figures/benchmark_byzantine_resilience.png`
 - `docs/figures/benchmark_latency_concurrency.png`
+
+---
+
+## 8. CFI-CrossBank-02 Consortium Benchmark (Canonical Protocol 2.1.0)
+- **Protocol & Execution Identity**: `CFI-CrossBank-02` Version 2.1.0 (Frozen at commit `2f64a02b65caa0b35588ec8c016290d1f2ac6e61`, promoted at `4cc1ffba0d253a4c336b2d5e267b5b6666c742c1`)
+- **Canonical Raw Artifact**: [`crossbank_v2_canonical.json`](./raw/crossbank_v2_canonical.json) (SHA-256: `b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a`, 322,468 bytes)
+- **Evaluation Scope**: 5 canonical seeds (`[42, 123, 456, 789, 2025]`), 3 synthetic banking institutions (Bank A 50%, Bank B 30%, Bank C 20% with zero historical training fraud), 7 complex fraud scenarios.
+
+| Evaluation Condition | Paradigm & Feature Regime | Provenance | Average Precision (AP) | ROC-AUC | Recall @ 0.1% Val FPR | Status |
+|:---|:---|:---:|:---:|:---:|:---:|:---|
+| **Centralized Baseline** | Centralized Pooled (Matched Local Feats) | `PROJECT_SYNTHETIC` | 0.1454 $\pm$ 0.0186 | **0.9091 $\pm$ 0.0112** | 0.0041 $\pm$ 0.0038 | `CANONICAL` |
+| **Federated FedAvg** | Collaborative Local Features (Realistic) | `PROJECT_SYNTHETIC` | **0.1779 $\pm$ 0.0260** | 0.9013 $\pm$ 0.0066 | 0.0130 $\pm$ 0.0096 | `CANONICAL` |
+| **Isolated Local Silos** | Independent Bank Models (Alpha / Beta / Gamma) | `PROJECT_SYNTHETIC` | 0.1656 $\pm$ 0.0278 | 0.7116 $\pm$ 0.0219 | 0.0098 $\pm$ 0.0064 | `CANONICAL` |
+| **Consortium Signal (Oracle)** | Federated Cross-Bank Signal (Diagnostic Ceiling) | `PROJECT_SYNTHETIC` | **0.8140 $\pm$ 0.1133** | **0.9227 $\pm$ 0.0758** | 0.7840 $\pm$ 0.1112 | `ORACLE_UPPER_BOUND_ABLATION` |
+
+> [!NOTE]
+> **CrossBank v2 Scientific Findings & Preserved Negative Results**:
+> 1. **Q2 Collaborative Uplift & Institution Disparity**: Federated parameter sharing achieves a pooled AP gain over isolated local training ($0.1779$ vs $0.1656$, paired $\Delta\text{AP} = +0.0123 \pm 0.0138$; paired $\Delta\text{ROC} = +0.1897 \pm 0.0204$). However, per-bank decomposition reveals this pooled gain is driven by rescuing Bank C (which had zero local training fraud; $\Delta\text{ROC} = +0.3514 \pm 0.2009$, $\Delta\text{AP} = +0.1086 \pm 0.0596$). Data-rich institutions experience slight regressions (Bank A: $-0.0293 \pm 0.0104$, Bank B: $-0.0171 \pm 0.0226$), refuting the assumption that federated learning uniformly benefits every participant.
+> 2. **Q3 Centralized vs Federated Trade-off**: Metrics diverge across paradigms: AP favors FedAvg ($+0.0325 \pm 0.0181$), while ROC-AUC favors Centralized ($-0.0079 \pm 0.0056$). Both conditions carry a provenance caveat (the centralized baseline was trained on bank-local features). Claims of "matching centralized performance" are permanently retired as no equivalence test was preregistered.
+> 3. **Scenario 7 Multi-Hop Layering Negative Result**: Under realistic bank-local features, federated training detected only 5 of 133 pooled Scenario 7 test incidents ($3.76\%$ recall; $3.92\%$ mean per-seed recall), confirming that realistic bank-local features fail to intercept unseen multi-hop layering.
+> 4. **Bank C Cold-Start Low-FPR Detection Failure**: At enterprise-grade $0.1\%$ false positive rate operating thresholds, Bank C test recall was exactly $0.0\%$ in all 5 seeds ($TP=0$), demonstrating that ranking transfer does not translate to operational detection in the ultra-low-FPR regime.
+> 5. **Predecessor Supersession**: CFI-CrossBank-01 (the historical 7-scenario prototype with 2 test incidents) is formally superseded by CFI-CrossBank-02.
+> 6. **Diagnostic Oracle Boundary**: The consortium signal condition achieved high metrics ($0.8140$ AP / $0.9227$ ROC) through access to a label-equivalent scenario indicator, serving strictly as a diagnostic upper bound ablation (`ORACLE_UPPER_BOUND_ABLATION`), not deployable technology.
+

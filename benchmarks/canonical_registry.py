@@ -159,6 +159,22 @@ CANONICAL_REGISTRY: dict[str, CanonicalBenchmarkEntry] = {
         mandatory_caveat="Safe to describe externally ONLY as an internal synthetic architectural proof-of-concept; must not be cited as live financial recoveries. Scenario 7 evaluates exactly N=2 synthetic test incidents (100% detection = 2/2 synthetic incidents; $639,701.40 simulated averted volume).",
         is_external_communication_safe=True,
     ),
+    "crossbank_v2_canonical": CanonicalBenchmarkEntry(
+        benchmark_id="crossbank_v2_canonical",
+        dataset_name="CFI-CrossBank-02 Consortium Fraud Benchmark (Protocol 2.1.0)",
+        provenance_type=DatasetProvenanceType.PROJECT_SYNTHETIC,
+        status=ArtifactStatus.CANONICAL,
+        evidence_scope=EvidenceScope.CONTROLLED_EXPERIMENT,
+        communication_eligibility=CommunicationEligibility.SAFE_WITH_CAVEAT,
+        canonical_artifact_relpath="benchmarks/results/raw/crossbank_v2_canonical.json",
+        historical_artifacts_relpaths=[
+            "benchmarks/results/raw/fraud_benchmark_crossbank.json",
+            "benchmarks/results/raw/consortium_flagship_benchmark.json",
+        ],
+        description="Canonical multi-seed neural benchmark under protocol 2.1.0 across 5 canonical seeds [42, 123, 456, 789, 2025], 6 conditions, and 7 scenarios across 3 banks.",
+        mandatory_caveat="Project-synthetic data with simulated federation. Real-world generalizability NOT_EVALUATED. Scenario 7 exhibits cold-start low-FPR failure (near-zero detection at FPR=0.001: 3.76% pooled recall; 5/133 detected). Q3 comparison carries provenance caveat (central baseline trained on local features). Oracle condition represents diagnostic upper bound ablation.",
+        is_external_communication_safe=True,
+    ),
     "dp_privacy_utility": CanonicalBenchmarkEntry(
         benchmark_id="dp_privacy_utility",
         dataset_name="DP-SGD Opacus Privacy-Utility Tradeoff",

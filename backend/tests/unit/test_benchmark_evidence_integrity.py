@@ -769,3 +769,116 @@ class TestIEEECISScientificSemanticsInvariants:
         d2 = resolve_canonical_artifact("ieee_cis_canonical")
         assert d1 is not None and d2 is not None
         assert d1["benchmark_id"] == d2["benchmark_id"] == "ieee_cis_canonical"
+
+
+class TestCrossBankV2CanonicalEvidenceBinding:
+    """Rigorous scientific-invariant test suite enforcing CrossBank v2 Level 1 raw binding."""
+
+    def test_crossbank_v2_artifact_identity_and_seeds(self):
+        """CrossBank v2 artifact identity, byte count, and exact canonical seeds."""
+        import hashlib
+        artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "crossbank_v2_canonical.json"
+        assert artifact_path.exists()
+        raw_bytes = artifact_path.read_bytes()
+        assert len(raw_bytes) == 322468
+        assert hashlib.sha256(raw_bytes).hexdigest() == "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a"
+
+        data = json.loads(raw_bytes.decode("utf-8"))
+        assert data["canonical_seeds"] == [42, 123, 456, 789, 2025]
+        assert 101112 not in data["canonical_seeds"]
+        assert data["protocol_version"] == "2.1.0"
+        assert data["execution_commit_sha"] == "2f64a02b65caa0b35588ec8c016290d1f2ac6e61"
+
+    def test_crossbank_v2_condition_and_metric_reconciliation(self):
+        """CrossBank v2 condition metrics mechanically match exact Level 1 raw values and registry."""
+        import math
+        artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "crossbank_v2_canonical.json"
+        with open(artifact_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        seeds = data["canonical_seeds"]
+        per_seed = data["per_seed_results"]
+        agg = data["aggregate_results"]
+
+        def _mean_std(vals: list[float]) -> tuple[float, float]:
+            n = len(vals)
+            m = sum(vals) / n
+            s = math.sqrt(sum((x - m) ** 2 for x in vals) / (n - 1)) if n > 1 else 0.0
+            return m, s
+
+        # Independently reconstruct all 6 conditions from per-seed results
+        for cond in data["condition_ids"]:
+            ap_vals = [per_seed[str(s)]["conditions"][cond]["overall_metrics"]["average_precision"] for s in seeds]
+            roc_vals = [per_seed[str(s)]["conditions"][cond]["overall_metrics"]["roc_auc"] for s in seeds]
+            m_ap, s_ap = _mean_std(ap_vals)
+            m_roc, s_roc = _mean_std(roc_vals)
+
+            validate_per_seed_aggregate(ap_vals, agg[cond]["average_precision"]["mean"], agg[cond]["average_precision"]["std"], label=f"{cond} AP", ddof=1)
+            validate_per_seed_aggregate(roc_vals, agg[cond]["roc_auc"]["mean"], agg[cond]["roc_auc"]["std"], label=f"{cond} ROC", ddof=1)
+
+            assert pytest.approx(m_ap, abs=1e-4) == agg[cond]["average_precision"]["mean"]
+            assert pytest.approx(s_ap, abs=1e-4) == agg[cond]["average_precision"]["std"]
+            assert pytest.approx(m_roc, abs=1e-4) == agg[cond]["roc_auc"]["mean"]
+            assert pytest.approx(s_roc, abs=1e-4) == agg[cond]["roc_auc"]["std"]
+
+        # Mechanical check of key canonical estimands
+        fed_m_ap, _ = _mean_std([per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["average_precision"] for s in seeds])
+        cen_m_ap, _ = _mean_std([per_seed[str(s)]["conditions"]["COND_CENTRALIZED_POOLED"]["overall_metrics"]["average_precision"] for s in seeds])
+        iso_m_ap, _ = _mean_std([per_seed[str(s)]["conditions"]["COND_LOCAL_ISOLATED"]["overall_metrics"]["average_precision"] for s in seeds])
+        oracle_m_ap, _ = _mean_std([per_seed[str(s)]["conditions"]["COND_FEDERATED_CONSORTIUM_SIGNAL"]["overall_metrics"]["average_precision"] for s in seeds])
+
+        assert pytest.approx(fed_m_ap, abs=1e-4) == 0.1779
+        assert pytest.approx(cen_m_ap, abs=1e-4) == 0.1454
+        assert pytest.approx(iso_m_ap, abs=1e-4) == 0.1656
+        assert pytest.approx(oracle_m_ap, abs=1e-4) == 0.8140  # Rejects stale 0.4437
+
+        # Paired Q2 & Q3 deltas
+        q2_ap = [per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["overall_metrics"]["average_precision"] -
+                 per_seed[str(s)]["conditions"]["COND_LOCAL_ISOLATED"]["overall_metrics"]["average_precision"] for s in seeds]
+        m_q2_ap, _ = _mean_std(q2_ap)
+        assert pytest.approx(m_q2_ap, abs=1e-4) == 0.0123
+
+        # Registry synchronization check
+        reg_path = REPO_ROOT / "benchmarks" / "results" / "canonical_evidence_registry.json"
+        if reg_path.exists():
+            with open(reg_path, encoding="utf-8") as f:
+                reg_data = json.load(f)
+            cb_claim = next((b for b in reg_data.get("benchmarks", []) if b.get("claim_id") == "CLM-CROSSBANK-V2-CANONICAL"), None)
+            assert cb_claim is not None
+            assert cb_claim["seeds"] == seeds
+            assert pytest.approx(cb_claim["value"]["fedavg_local_ap_mean"], abs=1e-4) == fed_m_ap
+            assert pytest.approx(cb_claim["value"]["consortium_oracle_ap_mean"], abs=1e-4) == oracle_m_ap
+
+
+    def test_crossbank_v2_scenario_7_and_bank_c_invariants(self):
+        """CrossBank v2 Scenario 7 negative result and Bank C zero-positive training invariant."""
+        artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "crossbank_v2_canonical.json"
+        with open(artifact_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        per_seed = data["per_seed_results"]
+        expected_seeds = [42, 123, 456, 789, 2025]
+
+        # Invariant 1: Bank C training fraud is strictly 0 across all 5 seeds
+        for s in expected_seeds:
+            split = per_seed[str(s)]["split_summary"]
+            assert split["bank_c_train_pos"] == 0
+            assert split["bank_c_scenario7_train_pos"] == 0
+
+        # Invariant 2: Bank C low-FPR operational detection is 0 across all 5 seeds
+        for s in expected_seeds:
+            bc = per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["per_bank_metrics"]["bank_c"]
+            assert bc["confusion_matrix"]["tp"] == 0
+            assert bc["recall_at_validation_fpr"] == 0.0
+
+        # Invariant 3: Scenario 7 realistic detection is exactly 5/133 (3.76% recall)
+        total_s7 = 0
+        detected_s7 = 0
+        for s in expected_seeds:
+            s7 = per_seed[str(s)]["conditions"]["COND_FEDERATED_FEDAVG_LOCAL_FEATS"]["scenario_metrics"]["SCENARIO_7"]
+            total_s7 += s7["test_incident_count"]
+            detected_s7 += s7["detected_incident_count"]
+
+        assert total_s7 == 133
+        assert detected_s7 == 5
+        assert pytest.approx(detected_s7 / total_s7 * 100, abs=0.01) == 3.76
