@@ -11,10 +11,10 @@ import {
 } from '../../api/queries';
 
 interface ModelRegistryPanelProps {
-  simulationId: string;
+  simulationId?: string;
 }
 
-export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelProps) {
+export default function ModelRegistryPanel({ simulationId = '' }: ModelRegistryPanelProps) {
   const { data: versions, isLoading: loadingVersions, refetch: refetchVersions } = useModelVersions(simulationId);
   const { data: canaryHistory, isLoading: loadingCanary } = useCanaryHistory(simulationId);
   const rollbackMutation = useRollbackModel();

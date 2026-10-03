@@ -5,11 +5,11 @@ import type { BankResult } from '../../api/types';
 import { formatPercent } from '../../utils/formatters';
 
 interface ComplianceReportPanelProps {
-  simulationId: string;
+  simulationId?: string;
   banks: BankResult[];
 }
 
-export default function ComplianceReportPanel({ simulationId, banks }: ComplianceReportPanelProps) {
+export default function ComplianceReportPanel({ simulationId = '', banks }: ComplianceReportPanelProps) {
   const [showJson, setShowJson] = useState(false);
   const { data: report, isLoading, error } = useAIActComplianceReport(simulationId, Boolean(simulationId));
 
