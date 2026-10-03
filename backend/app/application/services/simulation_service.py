@@ -970,6 +970,11 @@ class SimulationService:
                         agg_time = (time.perf_counter() - agg_start) * 1000
                     else:
                         agg_time = 0.0
+                        logger.warning(
+                            "Round %d: No valid client updates collected for simulation %s; retaining previous global model state",
+                            round_num,
+                            simulation.id,
+                        )
 
                     # Load aggregated weights into global structure
                     global_model = self.model_service.set_parameters(global_model, global_weights)

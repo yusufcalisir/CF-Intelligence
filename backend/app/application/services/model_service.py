@@ -8,6 +8,7 @@ is the federated learning architecture, not model complexity.
 from __future__ import annotations
 
 import logging
+import math
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
@@ -618,12 +619,33 @@ class ModelService:
         model: FraudDetectionModel,
         weights: ModelWeights,
     ) -> FraudDetectionModel:
-        """Load parameters from a ModelWeights object into the model."""
+        """Load parameters from a ModelWeights object into the model.
+
+        Raises:
+            ValueError: If layer count, shapes, or parameter counts do not match the model.
+        """
+        model_params = list(model.parameters())
+        if len(model_params) != len(weights.layer_shapes):
+            raise ValueError(
+                f"Layer count mismatch: model has {len(model_params)} layers, "
+                f"weights have {len(weights.layer_shapes)}"
+            )
+
+        expected_total = sum(math.prod(s) for s in weights.layer_shapes)
+        if len(weights.flat_weights) != expected_total:
+            raise ValueError(
+                f"Flat weights length mismatch: expected {expected_total}, "
+                f"got {len(weights.flat_weights)}"
+            )
+
         offset = 0
-        for param, shape in zip(model.parameters(), weights.layer_shapes, strict=False):
-            numel = 1
-            for s in shape:
-                numel *= s
+        for i, (param, shape) in enumerate(zip(model_params, weights.layer_shapes, strict=True)):
+            if tuple(param.shape) != tuple(shape):
+                raise ValueError(
+                    f"Layer {i} shape mismatch: model expects {tuple(param.shape)}, "
+                    f"weights specify {tuple(shape)}"
+                )
+            numel = math.prod(shape)
             param_data = weights.flat_weights[offset : offset + numel]
             param.data = torch.FloatTensor(param_data).reshape(shape).to(self.device)
             offset += numel

@@ -1,0 +1,102 @@
+{
+  "phase": "Phase 5A",
+  "component": "Federated Learning Core Execution Map",
+  "entry_points": [
+    {
+      "type": "REST_API",
+      "router": "backend/app/presentation/api/v1/endpoints/simulation.py",
+      "endpoint": "POST /api/v1/simulations/start",
+      "handler": "start_simulation"
+    },
+    {
+      "type": "SERVICE_DIRECT",
+      "service": "backend/app/application/services/simulation_service.py",
+      "method": "SimulationService.run_simulation"
+    }
+  ],
+  "orchestration": {
+    "engine": "backend/app/application/services/simulation_service.py",
+    "lifecycle_runner": "SimulationService.run_simulation",
+    "round_loop": "SimulationService._run_round",
+    "hardware_modes": ["software", "fhe", "tee"]
+  },
+  "dataset_path": {
+    "module": "backend/app/application/services/dataloader.py",
+    "synthetic_generator": "DataLoaderService.load_or_generate_data",
+    "contract": "ZeroLeakagePartitionContract",
+    "feature_dim": 10,
+    "label_classes": [0, 1]
+  },
+  "partition_path": {
+    "module": "backend/app/application/services/fl_dirichlet_partitioner.py",
+    "class": "DirichletPartitioner",
+    "method": "DirichletPartitioner.partition_dataset",
+    "guarantees": {
+      "completeness": "union(client_partitions) == dataset",
+      "disjointness": "intersection(client_i, client_j) == empty",
+      "min_partition_size": "Guaranteed via rejection sampling & donor rebalancing"
+    }
+  },
+  "model_initialization": {
+    "module": "backend/app/application/services/model_service.py",
+    "class": "ModelService",
+    "factory": "ModelService.create_model",
+    "model_architecture": "FraudDetectionModel (nn.Sequential: Linear-ReLU-Norm-Dropout-Linear-ReLU-Norm-Dropout-Linear-Sigmoid)",
+    "parameter_extractor": "ModelService.get_parameters",
+    "parameter_loader": "ModelService.set_parameters (strictly validated: layer count, shapes, flat length)"
+  },
+  "client_selection": {
+    "orchestrator": "backend/app/application/services/simulation_service.py",
+    "selection_logic": "Random bank sampling per round with participation_ratio, minimum client threshold validation, active tenant binding"
+  },
+  "local_training": {
+    "module": "backend/app/application/services/model_service.py",
+    "standard_loop": "ModelService.train_local",
+    "dp_loop": "ModelService.train_local_with_opacus",
+    "optimizer_lifecycle": "Recreated per client per round (Adam, lr=configurable, zero gradient carryover)",
+    "loss_contract": "nn.BCELoss() on Sigmoid probability outputs in [0, 1]"
+  },
+  "aggregation": {
+    "module": "backend/app/application/services/fl_engine.py",
+    "class": "FederatedLearningEngine",
+    "entry_point": "FederatedLearningEngine.aggregate_parameters",
+    "supported_methods": [
+      "FED_AVG",
+      "FED_AVG_WEIGHTED",
+      "FED_PROX",
+      "FED_ADAM",
+      "FED_ADAGRAD",
+      "FED_YOGI",
+      "SCAFFOLD",
+      "KRUM",
+      "COORDINATE_WISE_MEDIAN",
+      "TRIMMED_MEAN",
+      "BULYAN"
+    ],
+    "sanitization": {
+      "nan_inf_filter": "Quarantined via np.isfinite check",
+      "negative_sample_clamp": "Clamped to max(0, int(s))",
+      "zero_sample_fallback": "Uniform proportion 1.0/n fallback without ZeroDivisionError"
+    }
+  },
+  "evaluation": {
+    "module": "backend/app/application/services/model_service.py",
+    "evaluator": "ModelService.evaluate",
+    "metrics": ["accuracy", "precision", "recall", "f1_score", "auc_roc", "loss", "confusion_matrix", "fairness_counts"],
+    "single_class_handling": "Fallback to 0.5 AUC-ROC without exception"
+  },
+  "state_publication": {
+    "websocket": "backend/app/presentation/api/v1/endpoints/simulation.py",
+    "event_bus": "Simulation.add_event / WebSocketManager.broadcast_to_simulation",
+    "metrics_repository": "backend/app/infrastructure/database/repositories/simulation_repo.py"
+  },
+  "failure_paths": {
+    "client_drop_or_failure": "Client omitted from client_weights; round proceeds with remaining valid clients",
+    "all_clients_fail": "Round skips aggregation, logs explicit warning, retains previous global model state",
+    "nan_inf_poisoning": "Poisoned clients quarantined; clean clients aggregated or global fallback applied",
+    "simulation_cancellation": "Simulation state cleared, resources pruned via clear_simulation_state"
+  },
+  "shared_state": {
+    "server_optimizers": "Isolated per simulation_id in _server_m_by_sim, _server_v_by_sim, _server_c_by_sim; pruned on termination; ephemeral for unkeyed calls"
+  }
+}

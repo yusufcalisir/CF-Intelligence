@@ -182,7 +182,7 @@ class FederatedLearningEngine:
             arr = np.asarray(w.flat_weights, dtype=np.float32)
             if np.isfinite(arr).all():
                 clean_weights.append(w)
-                clean_samples.append(s)
+                clean_samples.append(max(0, int(s)))
             else:
                 logger.warning(
                     "Quarantining client update %d due to non-finite parameter weights (NaN/Inf detected)",
@@ -210,6 +210,12 @@ class FederatedLearningEngine:
 
         start_time = time.perf_counter()
 
+        def _get_proportions(samples: list[int], count: int) -> list[float]:
+            tot = sum(samples)
+            if tot <= 0 or count <= 0:
+                return [1.0 / max(1, count)] * count
+            return [s / tot for s in samples]
+
         if method == AggregationMethod.FED_AVG:
             # Unweighted average
             weights_array = np.array([w.flat_weights for w in client_weights])
@@ -221,13 +227,7 @@ class FederatedLearningEngine:
 
         elif method in (AggregationMethod.FED_AVG_WEIGHTED, AggregationMethod.FED_PROX):
             # Weighted average by dataset size (FedAvg: McMahan et al. 2017; FedProx: Li et al. 2020)
-            total_samples = sum(client_samples)
-            n = len(client_weights)
-            if total_samples <= 0:
-                proportions = [1.0 / n] * n
-            else:
-                proportions = [s / total_samples for s in client_samples]
-
+            proportions = _get_proportions(client_samples, len(client_weights))
             avg_weights = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
                 avg_weights += np.array(w.flat_weights) * proportion
@@ -235,8 +235,7 @@ class FederatedLearningEngine:
 
         elif method in (AggregationMethod.FED_ADAM, AggregationMethod.FED_ADAGRAD):
             # Calculate standard weighted FedAvg first to get the averaged updates
-            total_samples = sum(client_samples)
-            proportions = [s / total_samples for s in client_samples]
+            proportions = _get_proportions(client_samples, len(client_weights))
             w_avg = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
                 w_avg += np.array(w.flat_weights) * proportion
@@ -248,7 +247,8 @@ class FederatedLearningEngine:
                 w_t = np.array(global_weights.flat_weights)
                 delta_t = w_avg - w_t  # pseudo-gradient
 
-                sim_id = simulation_id or "default_sim"
+                is_ephemeral = simulation_id is None
+                sim_id = simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
                 with self._state_lock:
                     if sim_id not in self._server_m_by_sim:
                         self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
@@ -277,15 +277,22 @@ class FederatedLearningEngine:
                     w_next = w_t + eta * m_hat / (np.sqrt(v_hat) + tau)
 
                     with self._state_lock:
-                        self._server_m_by_sim[sim_id] = m_t_next
-                        self._server_v_by_sim[sim_id] = v_t_next
-                        self._server_round_by_sim[sim_id] = t + 1
+                        if not is_ephemeral:
+                            self._server_m_by_sim[sim_id] = m_t_next
+                            self._server_v_by_sim[sim_id] = v_t_next
+                            self._server_round_by_sim[sim_id] = t + 1
+                        else:
+                            self._server_m_by_sim.pop(sim_id, None)
+                            self._server_v_by_sim.pop(sim_id, None)
                 else:  # FED_ADAGRAD
                     v_t_next = v_t + (delta_t**2)
                     w_next = w_t + eta * delta_t / (np.sqrt(v_t_next) + tau)
 
                     with self._state_lock:
-                        self._server_v_by_sim[sim_id] = v_t_next
+                        if not is_ephemeral:
+                            self._server_v_by_sim[sim_id] = v_t_next
+                        else:
+                            self._server_v_by_sim.pop(sim_id, None)
 
                 avg_weights = w_next.tolist()
 
@@ -394,8 +401,7 @@ class FederatedLearningEngine:
             # v_t ← v_t - (1-β₂)·sign(v_t - Δ²)·Δ²
             # m_t ← β₁·m_t + (1-β₁)·Δ
             # w_next ← w_t + η·m_t / (√v_t + τ)
-            total_samples = sum(client_samples)
-            proportions = [s / total_samples for s in client_samples]
+            proportions = _get_proportions(client_samples, len(client_weights))
             w_avg = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
                 w_avg += np.array(w.flat_weights) * proportion
@@ -406,7 +412,8 @@ class FederatedLearningEngine:
                 w_t = np.array(global_weights.flat_weights)
                 delta_t = w_avg - w_t  # pseudo-gradient
 
-                sim_id = simulation_id or "default_sim"
+                is_ephemeral = simulation_id is None
+                sim_id = simulation_id or f"_ephemeral_{id(client_weights)}_{time.perf_counter_ns()}"
                 with self._state_lock:
                     if sim_id not in self._server_m_by_sim:
                         self._server_m_by_sim[sim_id] = np.zeros_like(w_avg)
@@ -429,8 +436,12 @@ class FederatedLearningEngine:
                 w_next = w_t + eta * m_t_next / (np.sqrt(v_t_next) + tau)
 
                 with self._state_lock:
-                    self._server_m_by_sim[sim_id] = m_t_next
-                    self._server_v_by_sim[sim_id] = v_t_next
+                    if not is_ephemeral:
+                        self._server_m_by_sim[sim_id] = m_t_next
+                        self._server_v_by_sim[sim_id] = v_t_next
+                    else:
+                        self._server_m_by_sim.pop(sim_id, None)
+                        self._server_v_by_sim.pop(sim_id, None)
 
                 avg_weights = w_next.tolist()
 
@@ -446,20 +457,19 @@ class FederatedLearningEngine:
             # don't receive per-client c_i deltas through the connector layer,
             # this server step degrades to a weighted FedAvg which is still
             # correct — the client-side variate correction ensures drift is fixed.
-            total_samples = sum(client_samples)
-            proportions = [s / total_samples for s in client_samples]
+            proportions = _get_proportions(client_samples, len(client_weights))
             w_avg = np.zeros(len(client_weights[0].flat_weights))
             for w, proportion in zip(client_weights, proportions, strict=False):
                 w_avg += np.array(w.flat_weights) * proportion
             avg_weights = w_avg.tolist()
 
             # Global server control variate tracking
-            sim_id = simulation_id or "default_sim"
-            with self._state_lock:
-                if not hasattr(self, "_server_c_by_sim"):
-                    self._server_c_by_sim = {}
-                if sim_id not in self._server_c_by_sim:
-                    self._server_c_by_sim[sim_id] = np.zeros(len(w_avg))
+            if simulation_id is not None:
+                with self._state_lock:
+                    if not hasattr(self, "_server_c_by_sim"):
+                        self._server_c_by_sim = {}
+                    if simulation_id not in self._server_c_by_sim:
+                        self._server_c_by_sim[simulation_id] = np.zeros(len(w_avg))
             logger.info(
                 "SCAFFOLD aggregation (server FedAvg & variate tracking step) for sim=%s",
                 simulation_id,
