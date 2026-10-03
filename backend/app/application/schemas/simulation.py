@@ -162,6 +162,8 @@ class SimulationSummaryResponse(BaseModel):
     created_at: datetime
     completed_at: datetime | None = None
     duration_seconds: float | None = None
+    is_canonical_reference: bool = False
+    provenance: str = "LIVE_RUNTIME_RUN"
 
 
 class SimulationDetailResponse(BaseModel):
@@ -180,6 +182,11 @@ class SimulationDetailResponse(BaseModel):
     error_message: str | None = None
     banks: list[BankResponse] = []
     rounds: list[RoundResponse] = []
+    is_canonical_reference: bool = False
+    provenance: str = "LIVE_RUNTIME_RUN"
+    execution_mode: str = "OPERATIONAL"
+    tee_is_hardware_backed: bool = False
+    tee_driver_mode: str = "NONE"
 
     # Hardware/Cryptographic Isolation telemetry
     tee_mrenclave: str | None = None

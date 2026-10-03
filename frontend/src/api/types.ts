@@ -283,6 +283,9 @@ export interface SimulationSummary {
   created_at: string;
   completed_at: string | null;
   duration_seconds: number | null;
+  is_canonical_reference?: boolean;
+  provenance?: string;
+  execution_mode?: string;
 }
 
 export interface SimulationDetail {
@@ -299,6 +302,11 @@ export interface SimulationDetail {
   error_message: string | null;
   banks: BankResult[];
   rounds: TrainingRound[];
+  is_canonical_reference?: boolean;
+  provenance?: string;
+  execution_mode?: string;
+  tee_is_hardware_backed?: boolean;
+  tee_driver_mode?: string;
 
   // Hardware/Cryptographic Isolation telemetry
   tee_mrenclave?: string | null;

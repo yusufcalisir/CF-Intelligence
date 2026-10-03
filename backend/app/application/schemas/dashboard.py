@@ -147,4 +147,7 @@ class ComparativeBenchmarkResponseSchema(BaseModel):
     comparison_matrix: list[ComparativeModelItemSchema]
     centralization_gap_analysis: CentralizationGapAnalysisSchema
     silo_deficit_analysis: SiloDeficitAnalysisSchema
+    provenance: str = "CANONICAL_BENCHMARK_REFERENCE"
+    is_live_runtime: bool = False
+    surface_type: str = "BENCHMARK_REFERENCE"
 

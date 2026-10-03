@@ -11,6 +11,11 @@ from app.domain.value_objects import ModelWeights
 logger = logging.getLogger(__name__)
 
 
+def is_sgx_hardware_available() -> bool:
+    """Check if host provides physical Intel SGX or AWS Nitro Enclave device nodes."""
+    return os.path.exists("/dev/sgx_enclave") or os.path.exists("/dev/isgx") or os.path.exists("/dev/nitro_enclaves")
+
+
 @dataclass
 class EnclaveContext:
     """Represents the context of an initialized Trusted Execution Environment (TEE) Enclave."""
@@ -32,6 +37,8 @@ class AttestationReport:
     signature: str
     verified: bool
     timestamp: str
+    is_hardware_backed: bool = False
+    driver_mode: str = "SOFTWARE_EMULATION_SANDBOX"
 
 
 class TEEDriver:
@@ -95,6 +102,7 @@ class TEEDriver:
             duration,
         )
 
+        hw_avail = is_sgx_hardware_available()
         return AttestationReport(
             enclave_id=enclave_ctx.enclave_id,
             mrenclave=enclave_ctx.mrenclave,
@@ -102,6 +110,8 @@ class TEEDriver:
             signature=signature,
             verified=True,
             timestamp=time.strftime("%Y-%m-%d %H:%M:%SZ", time.gmtime()),
+            is_hardware_backed=hw_avail,
+            driver_mode="INTEL_SGX_HARDWARE" if hw_avail else "SOFTWARE_EMULATION_SANDBOX",
         )
 
     @staticmethod

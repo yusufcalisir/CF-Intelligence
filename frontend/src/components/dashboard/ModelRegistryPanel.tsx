@@ -382,6 +382,12 @@ export default function ModelRegistryPanel({ simulationId }: ModelRegistryPanelP
               ))}
             </div>
           )}
+
+          {(!versions || versions.length === 0) && (
+            <div className="text-center py-8 border border-dashed border-[var(--color-border-subtle)] rounded-xl text-xs text-[var(--color-text-muted)]">
+              No registered model versions found in repository. Complete training rounds to promote and version models.
+            </div>
+          )}
         </div>
       )}
 

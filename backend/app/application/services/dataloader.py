@@ -296,6 +296,8 @@ def _generate_mock_elliptic(
         "tx_to_idx": tx_to_idx,
         "idx_to_tx": idx_to_tx,
         "source": "mock",
+        "provenance": "EXPLICIT_SYNTHETIC_DEMO",
+        "is_synthetic": True,
         "fraud_ratio": fraud_ratio,
         "to_pyg_data": to_pyg_data,
         "to_networkx": to_networkx,
@@ -323,6 +325,7 @@ def load_elliptic(
     n_mock_nodes: int = 2_000,
     rng: np.random.Generator | None = None,
     require_real: bool = False,
+    allow_synthetic: bool | None = None,
     all_rows: bool = False,
     include_unknown: bool = False,
     temporal_split: bool = False,
@@ -546,6 +549,8 @@ def load_elliptic(
             "tx_to_idx": tx_to_idx,
             "idx_to_tx": idx_to_tx,
             "source": "real",
+            "provenance": "REAL_OFFICIAL_DATASET",
+            "is_synthetic": False,
             "fraud_ratio": fraud_ratio,
             "to_pyg_data": to_pyg_data,
             "to_networkx": to_networkx,
@@ -572,11 +577,12 @@ def load_elliptic(
         )
         return result
 
-    if require_real:
+    allow_synth = allow_synthetic if allow_synthetic is not None else (force_mock or not require_real)
+    if require_real or not allow_synth:
         raise FileNotFoundError(
             f"Real Elliptic Bitcoin dataset files not found in '{root}'. "
             f"Expected 'elliptic_cache.parquet' or ('elliptic_txs_features.csv' and 'elliptic_txs_classes.csv'). "
-            f"Synthetic fallback is disabled under strict real-data mode."
+            f"Synthetic fallback is disabled under strict real-data mode. Set allow_synthetic=True or force_mock=True for synthetic demo."
         )
 
     return _generate_mock_elliptic(

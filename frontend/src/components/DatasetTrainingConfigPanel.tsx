@@ -46,7 +46,7 @@ export default function DatasetTrainingConfigPanel({
   onClose,
   onLaunch,
   initialDataset = 'paysim',
-  initialMode = 'mock',
+  initialMode = 'real',
 }: DatasetTrainingConfigPanelProps) {
   const [selectedId, setSelectedId] = useState<DatasetProfile['id']>(initialDataset);
   const [mode, setMode] = useState<TrainingMode>(initialMode);
@@ -103,37 +103,7 @@ export default function DatasetTrainingConfigPanel({
                 Training Mode
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {/* Mock Simulation */}
-                <button
-                  onClick={() => setMode('mock')}
-                  className={`relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border-2 transition-all text-left ${
-                    mode === 'mock'
-                      ? 'border-[var(--color-accent-indigo)] bg-[var(--color-accent-indigo)]/10'
-                      : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)] bg-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <FlaskConical
-                      size={16}
-                      className={mode === 'mock' ? 'text-[var(--color-accent-indigo)]' : 'text-[var(--color-text-muted)]'}
-                    />
-                    <span
-                      className={`text-sm font-bold ${
-                        mode === 'mock' ? 'text-[var(--color-accent-indigo)]' : 'text-[var(--color-text-secondary)]'
-                      }`}
-                    >
-                      Mock Simulation
-                    </span>
-                    {mode === 'mock' && (
-                      <CheckCircle2 size={14} className="text-[var(--color-accent-indigo)] ml-auto shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-                    Controlled, reproducible FL simulation with dataset-specific AUC & loss convergence profiles
-                  </p>
-                </button>
-
-                {/* Real Backend */}
+                {/* Real Backend (Default) */}
                 <button
                   onClick={() => setMode('real')}
                   className={`relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border-2 transition-all text-left ${
@@ -152,14 +122,44 @@ export default function DatasetTrainingConfigPanel({
                         mode === 'real' ? 'text-amber-400' : 'text-[var(--color-text-secondary)]'
                       }`}
                     >
-                      Real Backend
+                      Live Backend Engine
                     </span>
                     {mode === 'real' && (
                       <CheckCircle2 size={14} className="text-amber-400 ml-auto shrink-0" />
                     )}
                   </div>
                   <p className="text-[11px] leading-relaxed text-[var(--color-text-muted)]">
-                    Live WebSocket connection to FastAPI FL engine — real training rounds, live metrics
+                    Dispatches live PyTorch federated learning orchestration to coordinator API with real gradient aggregation
+                  </p>
+                </button>
+
+                {/* Offline Sandbox Demo */}
+                <button
+                  onClick={() => setMode('mock')}
+                  className={`relative flex flex-col items-start gap-1.5 p-3.5 rounded-xl border-2 transition-all text-left ${
+                    mode === 'mock'
+                      ? 'border-[var(--color-accent-indigo)] bg-[var(--color-accent-indigo)]/10'
+                      : 'border-[var(--color-border)] hover:border-[var(--color-border-hover)] bg-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <FlaskConical
+                      size={16}
+                      className={mode === 'mock' ? 'text-[var(--color-accent-indigo)]' : 'text-[var(--color-text-muted)]'}
+                    />
+                    <span
+                      className={`text-sm font-bold ${
+                        mode === 'mock' ? 'text-[var(--color-accent-indigo)]' : 'text-[var(--color-text-secondary)]'
+                      }`}
+                    >
+                      Offline Sandbox Demo
+                    </span>
+                    {mode === 'mock' && (
+                      <CheckCircle2 size={14} className="text-[var(--color-accent-indigo)] ml-auto shrink-0" />
+                    )}
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-[var(--color-text-muted)]">
+                    Simulated client-side telemetry walk for offline testing and visualization demonstrations
                   </p>
                 </button>
               </div>

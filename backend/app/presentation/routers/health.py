@@ -90,8 +90,17 @@ async def check_enclave_component_health() -> DependencyHealthStatus:
     """Check SGX / TEE hardware enclave driver health."""
     start = time.perf_counter()
     try:
+        from app.infrastructure.security.tee_driver import is_sgx_hardware_available
+
+        hw_avail = is_sgx_hardware_available()
+        status_str = "HEALTHY" if hw_avail else "EMULATED"
+        msg = (
+            "Intel SGX hardware enclave driver active"
+            if hw_avail
+            else "Software emulation sandbox active (zero hardware SGX available)"
+        )
         latency = round((time.perf_counter() - start) * 1000.0 + 0.8, 2)
-        return DependencyHealthStatus(status="HEALTHY", latency_ms=latency)
+        return DependencyHealthStatus(status=status_str, latency_ms=latency, message=msg)
     except Exception as e:
         latency = round((time.perf_counter() - start) * 1000.0, 2)
         return DependencyHealthStatus(status="DEGRADED", latency_ms=latency, message=str(e))
@@ -152,12 +161,21 @@ def _build_liveness_response() -> LivenessResponse:
 
 def _build_health_response() -> HealthCheckResponse:
     uptime = round(time.time() - _PROCESS_START_TIME, 2)
+    from app.infrastructure.redis_store import RedisStore
+
+    probe_store = RedisStore("_health_probe")
+    using_redis = probe_store.client is not None
+    backend_mode = "redis" if using_redis else "in_memory"
+    durability_mode = "durable" if using_redis else "ephemeral"
+
     return HealthCheckResponse(
         status="healthy",
         service="fraud-intelligence-api",
         timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         version="2.4.0",
         uptime_seconds=uptime,
+        storage_backend=backend_mode,
+        durability=durability_mode,
     )
 
 
@@ -174,7 +192,7 @@ async def _perform_readiness_evaluation(response: Response) -> ReadinessResponse
         "database": db_stat.status == "HEALTHY",
         "redis": redis_stat.status == "HEALTHY",
         "vault": vault_stat.status == "HEALTHY",
-        "enclave": enclave_stat.status == "HEALTHY",
+        "enclave": enclave_stat.status in ("HEALTHY", "EMULATED"),
         "mlflow": mlflow_stat.status == "HEALTHY",
         "storage": storage_stat.status == "HEALTHY",
     }

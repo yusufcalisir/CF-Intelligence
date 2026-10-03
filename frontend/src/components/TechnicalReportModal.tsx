@@ -68,8 +68,13 @@ export const TechnicalReportModal: React.FC<TechnicalReportModalProps> = ({ isOp
 
   const handleDownloadJson = () => {
     const dossier = {
+      dossier_type: 'CANONICAL_BENCHMARK_REFERENCE_DOSSIER',
+      provenance: 'CANONICAL_OFFLINE_BENCHMARK_EVIDENCE',
+      is_live_runtime: false,
       benchmark_id: 'CFI-CrossBank-01',
-      report_title: 'Enterprise Payment Stream Benchmark & Latency SLA Report',
+      evidence_source: 'benchmarks/results/raw/cfi_crossbank_01_raw.json',
+      generated_at: new Date().toISOString(),
+      report_title: 'Enterprise Payment Stream Canonical Benchmark & Latency SLA Reference Dossier',
       standard: 'ISO 20022 pacs.008.001.08',
       conformance_verdict: 'PASSED_EXCEEDED',
       summary_kpis: {
@@ -107,7 +112,7 @@ export const TechnicalReportModal: React.FC<TechnicalReportModalProps> = ({ isOp
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'cfi_benchmark_dossier.json';
+    link.download = 'cfi_canonical_benchmark_dossier_CFI-CrossBank-01.json';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -117,7 +122,10 @@ export const TechnicalReportModal: React.FC<TechnicalReportModalProps> = ({ isOp
 
   const handleDownloadExecutiveSummary = () => {
     const summaryText = `COLLABORATIVE FRAUD INTELLIGENCE (CFI) CONSORTIUM
-EXECUTIVE TECHNICAL BENCHMARK & LATENCY SLA REPORT
+EXECUTIVE TECHNICAL BENCHMARK & LATENCY SLA REFERENCE DOSSIER
+PROVENANCE: CANONICAL BENCHMARK REFERENCE DOSSIER (OFFLINE EVIDENCE)
+DATA SOURCE: benchmarks/results/raw/cfi_crossbank_01_raw.json
+NOTE: This document reflects canonical benchmark evidence and not active runtime execution.
 Benchmark Identifier: CFI-CrossBank-01
 Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
 

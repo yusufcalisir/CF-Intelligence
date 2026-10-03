@@ -73,6 +73,7 @@ class TestModelRegistryMultiPrefixParity:
     )
     def test_global_inventory_prefix_parity(self, prefix: str):
         """Verify GET / responds with ModelInventoryResponse across all 4 route prefixes."""
+        _seed_sample_model("sim_test_parity", version=1)
         resp = client.get(prefix)
         assert resp.status_code == 200
         data = resp.json()

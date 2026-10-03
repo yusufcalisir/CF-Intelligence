@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import uuid
 from datetime import UTC, datetime, timezone
@@ -211,6 +212,11 @@ def _seed_canonical_simulation() -> None:
     sim_doc = {
         "id": sim_id,
         "status": SimulationStatus.COMPLETED.value,
+        "is_canonical_reference": True,
+        "provenance": "CANONICAL_BENCHMARK_REFERENCE",
+        "execution_mode": "REFERENCE_RUN",
+        "tee_is_hardware_backed": False,
+        "tee_driver_mode": "CANONICAL_BENCHMARK_ATTESTATION",
         "current_round": 10,
         "total_rounds": 10,
         "progress_pct": 100.0,
@@ -352,8 +358,9 @@ def _seed_canonical_simulation() -> None:
     logger.info("Canonical simulation 'sim_fed_01' initialized with 10 completed training rounds.")
 
 
-# Automatically seed on module load
-_seed_canonical_simulation()
+# Automatically seed only when explicitly configured or in test environments
+if os.environ.get("CF_SEED_CANONICAL_BENCHMARK", "0").lower() in ("1", "true"):
+    _seed_canonical_simulation()
 
 
 @router.post(
@@ -464,6 +471,9 @@ async def create_simulation(
         {
             "id": simulation_id,
             "status": SimulationStatus.PENDING.value,
+            "is_canonical_reference": False,
+            "provenance": "LIVE_ORCHESTRATED_RUN",
+            "execution_mode": "LIVE_RUNTIME",
             "config": config_dict,
             "current_round": 0,
             "total_rounds": config.num_rounds,
@@ -507,6 +517,9 @@ async def list_simulations() -> list[SimulationSummaryResponse]:
                 created_at=sim.get("created_at", "2026-01-01T00:00:00Z"),
                 completed_at=sim.get("completed_at"),
                 duration_seconds=sim.get("duration_seconds"),
+                is_canonical_reference=sim.get("is_canonical_reference", False),
+                provenance=sim.get("provenance", "LIVE_ORCHESTRATED_RUN"),
+                execution_mode=sim.get("execution_mode", "LIVE_RUNTIME"),
             )
         )
     return summaries
@@ -532,6 +545,9 @@ async def get_simulation_status(
 ) -> SimulationStatusResponse:
     """Get lightweight progress status and execution phase of a simulation."""
     sim = _simulation_results.get(simulation_id)
+    if not sim and simulation_id == "sim_fed_01":
+        _seed_canonical_simulation()
+        sim = _simulation_results.get(simulation_id)
     if not sim:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -615,6 +631,9 @@ async def get_simulation_rounds(
 ) -> list[TrainingRoundResponse]:
     """Retrieve all completed training rounds for a simulation."""
     sim = _simulation_results.get(simulation_id)
+    if not sim and simulation_id == "sim_fed_01":
+        _seed_canonical_simulation()
+        sim = _simulation_results.get(simulation_id)
     if not sim:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -653,6 +672,9 @@ async def get_comparison(simulation_id: str) -> ComparisonResponse:
     """Get local vs federated comparison for all banks."""
 
     sim = _simulation_results.get(simulation_id)
+    if not sim and simulation_id == "sim_fed_01":
+        _seed_canonical_simulation()
+        sim = _simulation_results.get(simulation_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
 
@@ -705,6 +727,9 @@ async def get_simulation(simulation_id: str) -> SimulationDetailResponse:
     """Get full simulation details including metrics."""
 
     sim = _simulation_results.get(simulation_id)
+    if not sim and simulation_id == "sim_fed_01":
+        _seed_canonical_simulation()
+        sim = _simulation_results.get(simulation_id)
     if not sim:
         raise HTTPException(status_code=404, detail="Simulation not found")
 
@@ -788,6 +813,11 @@ async def get_simulation(simulation_id: str) -> SimulationDetailResponse:
         error_message=sim.get("error_message"),
         banks=bank_responses,
         rounds=[],  # Rounds are in the training router
+        is_canonical_reference=sim.get("is_canonical_reference", False),
+        provenance=sim.get("provenance", "LIVE_ORCHESTRATED_RUN"),
+        execution_mode=sim.get("execution_mode", "LIVE_RUNTIME"),
+        tee_is_hardware_backed=sim.get("tee_is_hardware_backed", False),
+        tee_driver_mode=sim.get("tee_driver_mode", "SOFTWARE_EMULATION_SANDBOX"),
         tee_mrenclave=sim.get("tee_mrenclave"),
         tee_mrsigner=sim.get("tee_mrsigner"),
         tee_attestation_signature=sim.get("tee_attestation_signature"),

@@ -30,8 +30,8 @@ describe('DatasetTrainingConfigPanel', () => {
     expect(screen.getByText(/Elliptic Bitcoin AML Graph/i)).toBeInTheDocument();
     expect(screen.getByText(/European Credit Card Fraud/i)).toBeInTheDocument();
 
-    expect(screen.getByText(/Mock Simulation/i)).toBeInTheDocument();
-    expect(screen.getByText(/Real Backend/i)).toBeInTheDocument();
+    expect(screen.getByText(/Offline Sandbox Demo/i)).toBeInTheDocument();
+    expect(screen.getByText(/Live Backend Engine/i)).toBeInTheDocument();
   });
 
   it('calls onLaunch with selected dataset and mode when Launch Training is clicked', () => {
@@ -47,8 +47,8 @@ describe('DatasetTrainingConfigPanel', () => {
     // Select Elliptic
     fireEvent.click(screen.getByText(/Elliptic Bitcoin AML Graph/i));
 
-    // Toggle Real Backend mode
-    fireEvent.click(screen.getByText(/Real Backend/i));
+    // Toggle Live Backend Engine mode
+    fireEvent.click(screen.getByText(/Live Backend Engine/i));
 
     // Click Launch
     fireEvent.click(screen.getByText(/Launch Real Training/i));

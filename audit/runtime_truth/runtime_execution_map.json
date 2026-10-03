@@ -1,0 +1,879 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_0_RUNTIME_SURFACE_MAPPING",
+  "total_execution_maps": 8,
+  "execution_maps": [
+    {
+      "capability_id": "CAP-FL-SIMULATION-START",
+      "name": "Live Backend Federated Learning Simulation",
+      "user_surfaces": [
+        "frontend/src/pages/LiveOperationsView.tsx :: 'Start Simulation (Live)' Button",
+        "frontend/src/components/FLRoundRunner.tsx :: 'Start FL Training Simulation' Button"
+      ],
+      "nodes": [
+        {
+          "id": "node-ui-trigger",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView.handleStartRealTraining",
+          "line_range": "L841-L869",
+          "role": "UI Event Handler & Mutation Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-query-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "useCreateSimulation.mutationFn",
+          "line_range": "L295-L302",
+          "role": "HTTP Client / API Request",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-router-endpoint",
+          "file": "backend/app/presentation/routers/simulation.py",
+          "symbol": "create_simulation",
+          "line_range": "L400-L489",
+          "role": "FastAPI Route Handler (POST /api/v1/simulations)",
+          "layer": "Presentation / API Router",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-async-dispatch",
+          "file": "backend/app/presentation/routers/simulation.py",
+          "symbol": "_run_simulation_in_process",
+          "line_range": "L810-L925",
+          "role": "Background Daemon Thread Spawner",
+          "layer": "Application / Orchestration",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-simulation-service",
+          "file": "backend/app/application/services/simulation_service.py",
+          "symbol": "SimulationService.run_simulation",
+          "line_range": "L108-L1095",
+          "role": "Core Simulation Orchestrator",
+          "layer": "Application Service",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-fl-engine",
+          "file": "backend/app/application/services/fl_engine.py",
+          "symbol": "FederatedLearningEngine.run_round",
+          "line_range": "L310-L450",
+          "role": "Round Execution & Model Broadcast",
+          "layer": "Application / FL Engine",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-model-service",
+          "file": "backend/app/application/services/model_service.py",
+          "symbol": "ModelService.train_local",
+          "line_range": "L180-L245",
+          "role": "PyTorch Local Model Optimization",
+          "layer": "Domain / Model Computation",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-byzantine-defense",
+          "file": "backend/app/domain/byzantine_defense.py",
+          "symbol": "KrumAggregator.aggregate / BulyanAggregator.aggregate",
+          "line_range": "L65-L210",
+          "role": "Robust Gradient Aggregation",
+          "layer": "Domain / Cryptographic & Defense Math",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-evaluation",
+          "file": "backend/app/application/services/simulation_service.py",
+          "symbol": "SimulationService._evaluate_global_model",
+          "line_range": "L922-L969",
+          "role": "AUC, ROC, F1, Loss Metric Computation",
+          "layer": "Application Service",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-websocket-broadcast",
+          "file": "backend/app/presentation/websockets/manager.py",
+          "symbol": "TrainingWebSocketManager.broadcast",
+          "line_range": "L50-L95",
+          "role": "WebSocket Event Streamer",
+          "layer": "Presentation / WebSocket",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-store-results",
+          "file": "backend/app/infrastructure/redis_store.py",
+          "symbol": "RedisStore._simulation_results",
+          "line_range": "L110-L165",
+          "role": "In-Memory / Redis Persistence Store",
+          "layer": "Infrastructure / Store",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-ui-charts",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView (LossChart, AUCChart, MetricsComparisonBarChart)",
+          "line_range": "L1200-L1450",
+          "role": "Visual Metric Renderer",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-ui-trigger",
+          "to": "node-query-client",
+          "mechanism": "React Query mutateAsync call"
+        },
+        {
+          "from": "node-query-client",
+          "to": "node-router-endpoint",
+          "mechanism": "HTTP POST /api/v1/simulations with JSON body"
+        },
+        {
+          "from": "node-router-endpoint",
+          "to": "node-async-dispatch",
+          "mechanism": "threading.Thread(target=_run_simulation_in_process, daemon=True).start()"
+        },
+        {
+          "from": "node-async-dispatch",
+          "to": "node-simulation-service",
+          "mechanism": "Method invocation run_simulation(config)"
+        },
+        {
+          "from": "node-simulation-service",
+          "to": "node-fl-engine",
+          "mechanism": "Loop over num_rounds calling fl_engine.run_round"
+        },
+        {
+          "from": "node-fl-engine",
+          "to": "node-model-service",
+          "mechanism": "Client training invocation per participating bank"
+        },
+        {
+          "from": "node-fl-engine",
+          "to": "node-byzantine-defense",
+          "mechanism": "Gradient aggregation via Krum/TrimmedMean/Bulyan"
+        },
+        {
+          "from": "node-fl-engine",
+          "to": "node-evaluation",
+          "mechanism": "Global model validation against holdout split"
+        },
+        {
+          "from": "node-evaluation",
+          "to": "node-websocket-broadcast",
+          "mechanism": "training_ws_manager.broadcast round metrics event"
+        },
+        {
+          "from": "node-evaluation",
+          "to": "node-store-results",
+          "mechanism": "Dict storage in Redis/In-memory store under simulation_id"
+        },
+        {
+          "from": "node-websocket-broadcast",
+          "to": "node-ui-charts",
+          "mechanism": "WS message received on /ws/training updates React state"
+        },
+        {
+          "from": "node-store-results",
+          "to": "node-ui-charts",
+          "mechanism": "GET /api/v1/simulations/{id} polling updates React state"
+        }
+      ],
+      "user_visible_outputs": [
+        "Current Round (int)",
+        "Global Validation Loss (float)",
+        "Global Validation ROC-AUC (float)",
+        "Global Validation F1 Score (float)",
+        "Bank-specific local metrics (loss, samples)",
+        "Byzantine clients detected & isolated (list/badge)",
+        "Cumulative training latency (ms)"
+      ],
+      "audit_boundaries": [
+        "backend/app/presentation/routers/simulation.py:L810-L925 (Unbounded daemon thread execution)",
+        "backend/app/infrastructure/redis_store.py:L110-L165 (Ephemeral in-memory fallback if Redis unavailable)",
+        "backend/app/presentation/routers/simulation.py:L110-L140 (_seed_canonical_simulation pre-populates sim_fed_01)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-CLIENT-SIDE-SIMULATED-TRAINING",
+      "name": "Frontend Client-Side Simulated Training Walk",
+      "user_surfaces": [
+        "frontend/src/pages/LiveOperationsView.tsx :: 'Start Simulation' Button (when trainingMode === 'mock')"
+      ],
+      "nodes": [
+        {
+          "id": "node-mock-button",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView.handleStartClick",
+          "line_range": "L845-L865",
+          "role": "UI Button Click Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-client-loop",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView.startSimulatedTraining",
+          "line_range": "L611-L685",
+          "role": "Client-Side Timer Loop (setInterval/setTimeout)",
+          "layer": "Presentation / UI State Logic",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-gaussian-walk",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "Math.random() Gaussian Noise Walk (aucRoom, lossRoom)",
+          "line_range": "L625-L660",
+          "role": "Synthetic Metric Formula Generator",
+          "layer": "Presentation / UI Math",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-state-setter",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "setRounds, setCurrentRound, setLiveMetrics",
+          "line_range": "L665-L680",
+          "role": "React State Update",
+          "layer": "Presentation / UI State",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-rendered-cards",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView UI Cards & Charts",
+          "line_range": "L1200-L1350",
+          "role": "Visual Chart Rendering",
+          "layer": "Presentation / UI",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-mock-button",
+          "to": "node-client-loop",
+          "mechanism": "startSimulatedTraining() call on click"
+        },
+        {
+          "from": "node-client-loop",
+          "to": "node-gaussian-walk",
+          "mechanism": "Computes synthetic AUC & Loss per round step in browser memory"
+        },
+        {
+          "from": "node-gaussian-walk",
+          "to": "node-state-setter",
+          "mechanism": "setLiveMetrics({...}) on timer tick"
+        },
+        {
+          "from": "node-state-setter",
+          "to": "node-rendered-cards",
+          "mechanism": "Triggers React re-render of charts and metric badges"
+        }
+      ],
+      "user_visible_outputs": [
+        "Round progress (1..10)",
+        "Simulated AUC progression",
+        "Simulated Loss progression",
+        "Simulated F1 progression"
+      ],
+      "audit_boundaries": [
+        "frontend/src/pages/LiveOperationsView.tsx:L611-L685 (Completely bypasses backend API; zero network calls made)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-REALTIME-FRAUD-SCORING",
+      "name": "Synchronous Real-Time Transaction Scoring",
+      "user_surfaces": [
+        "frontend/src/components/TransactionEvaluator.tsx :: 'Score Transaction' Button",
+        "frontend/src/pages/LiveOperationsView.tsx :: Manual Transaction Tester"
+      ],
+      "nodes": [
+        {
+          "id": "node-score-ui",
+          "file": "frontend/src/components/TransactionEvaluator.tsx",
+          "symbol": "TransactionEvaluator.handleScore",
+          "line_range": "L85-L120",
+          "role": "UI Form Submission Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-score-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "useScoreTransaction.mutationFn",
+          "line_range": "L180-L195",
+          "role": "POST /api/v1/fraud/score call",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-score-router",
+          "file": "backend/app/presentation/routers/fraud.py",
+          "symbol": "score_transaction",
+          "line_range": "L145-L215",
+          "role": "FastAPI Route Handler",
+          "layer": "Presentation / Router",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-inference-engine",
+          "file": "backend/app/application/services/inference_engine.py",
+          "symbol": "InferenceEngine.predict_proba",
+          "line_range": "L75-L140",
+          "role": "PyTorch Model Forward Pass",
+          "layer": "Application / Inference",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-risk-scorer",
+          "file": "backend/app/domain/risk_scorer.py",
+          "symbol": "RiskScorer.compute_composite_score",
+          "line_range": "L45-L110",
+          "role": "Domain Risk Calibrator & Decision Logic",
+          "layer": "Domain / Risk Logic",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-score-audit",
+          "file": "backend/app/infrastructure/audit_log.py",
+          "symbol": "AuditLogger.record_decision",
+          "line_range": "L50-L90",
+          "role": "HMAC Hash-Chained Audit Trail Entry",
+          "layer": "Infrastructure / Audit",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-score-result-ui",
+          "file": "frontend/src/components/TransactionEvaluator.tsx",
+          "symbol": "TransactionEvaluator (ScoreGauge, DecisionBadge)",
+          "line_range": "L180-L240",
+          "role": "Score Display & Explanation Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-score-ui",
+          "to": "node-score-client",
+          "mechanism": "mutateAsync(payload)"
+        },
+        {
+          "from": "node-score-client",
+          "to": "node-score-router",
+          "mechanism": "HTTP POST /api/v1/fraud/score"
+        },
+        {
+          "from": "node-score-router",
+          "to": "node-inference-engine",
+          "mechanism": "predict_proba(features)"
+        },
+        {
+          "from": "node-inference-engine",
+          "to": "node-risk-scorer",
+          "mechanism": "compute_composite_score(prob, velocity, graph_prior)"
+        },
+        {
+          "from": "node-risk-scorer",
+          "to": "node-score-audit",
+          "mechanism": "record_decision(tx_id, score, decision)"
+        },
+        {
+          "from": "node-score-router",
+          "to": "node-score-result-ui",
+          "mechanism": "HTTP JSON Response 200 with score, probability, risk_band"
+        }
+      ],
+      "user_visible_outputs": [
+        "Fraud Score (0-100)",
+        "Probability (0.000-1.000)",
+        "Decision (APPROVE | REVIEW | DECLINE)",
+        "Risk Band (LOW | MEDIUM | HIGH | SEVERE)",
+        "Execution Latency (ms)"
+      ],
+      "audit_boundaries": [
+        "backend/app/application/services/inference_engine.py:L95-L115 (Fallback to heuristic scoring if PyTorch weights uninitialized)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-SHAP-EXPLAINABILITY",
+      "name": "Feature Attribution & SHAP Explanation Generation",
+      "user_surfaces": [
+        "frontend/src/components/TransactionEvaluator.tsx :: 'Explain Score' / 'View SHAP Attribution'",
+        "frontend/src/pages/CaseDetailPage.tsx :: SHAP Waterfall Chart"
+      ],
+      "nodes": [
+        {
+          "id": "node-shap-ui",
+          "file": "frontend/src/components/TransactionEvaluator.tsx",
+          "symbol": "TransactionEvaluator.handleExplain",
+          "line_range": "L130-L160",
+          "role": "UI Click Event",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-shap-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "useExplainPrediction.mutationFn",
+          "line_range": "L210-L225",
+          "role": "POST /api/v1/explain/prediction call",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-shap-router",
+          "file": "backend/app/presentation/routers/explain.py",
+          "symbol": "explain_prediction",
+          "line_range": "L85-L160",
+          "role": "FastAPI Route Handler",
+          "layer": "Presentation / Router",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-shap-service",
+          "file": "backend/app/application/services/explainability_service.py",
+          "symbol": "ExplainabilityService.compute_shap_values",
+          "line_range": "L110-L245",
+          "role": "KernelSHAP / TreeSHAP Evaluator",
+          "layer": "Application / Explainability",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-shap-waterfall-ui",
+          "file": "frontend/src/components/ShapWaterfallChart.tsx",
+          "symbol": "ShapWaterfallChart",
+          "line_range": "L45-L165",
+          "role": "Bar/Waterfall Chart Rendering of Attribution Vectors",
+          "layer": "Presentation / UI Component",
+          "runtime_classification": "RUNTIME_LIVE"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-shap-ui",
+          "to": "node-shap-client",
+          "mechanism": "mutateAsync({ transaction_id, features })"
+        },
+        {
+          "from": "node-shap-client",
+          "to": "node-shap-router",
+          "mechanism": "HTTP POST /api/v1/explain/prediction"
+        },
+        {
+          "from": "node-shap-router",
+          "to": "node-shap-service",
+          "mechanism": "compute_shap_values(model, sample)"
+        },
+        {
+          "from": "node-shap-service",
+          "to": "node-shap-waterfall-ui",
+          "mechanism": "Returns base_value, shap_values, feature_names"
+        }
+      ],
+      "user_visible_outputs": [
+        "SHAP Base Value (float)",
+        "Top Positive Drivers (features elevating risk)",
+        "Top Negative Drivers (features lowering risk)",
+        "Feature Attribution Bar / Waterfall Chart"
+      ],
+      "audit_boundaries": [
+        "backend/app/application/services/explainability_service.py:L140-L165 (Approximated sampling background baseline if training data unavailable)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-FINCEN-SAR-XML-EXPORT",
+      "name": "FinCEN Suspicious Activity Report (SAR) XML Export",
+      "user_surfaces": [
+        "frontend/src/pages/CaseDetailPage.tsx :: 'Export FinCEN SAR XML' Button"
+      ],
+      "nodes": [
+        {
+          "id": "node-sar-ui",
+          "file": "frontend/src/pages/CaseDetailPage.tsx",
+          "symbol": "CaseDetailPage.handleExportSarXml",
+          "line_range": "L420-L460",
+          "role": "UI Click Export Action",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-sar-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "fetchSarXml",
+          "line_range": "L450-L470",
+          "role": "GET /api/v1/regulatory/sar/export/{sar_id} Request",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-sar-router",
+          "file": "backend/app/presentation/routers/regulatory.py",
+          "symbol": "export_fincen_sar_xml",
+          "line_range": "L210-L295",
+          "role": "FastAPI Route Handler",
+          "layer": "Presentation / Router",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-sar-service",
+          "file": "backend/app/application/services/fincen_sar_service.py",
+          "symbol": "FinCENSARService.generate_xml_dossier",
+          "line_range": "L95-L260",
+          "role": "Schema-Conforming XML Builder (FinCEN SAR 2.0 XSD)",
+          "layer": "Application / Regulatory Service",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-sar-validator",
+          "file": "backend/app/domain/sar_generator.py",
+          "symbol": "SARGenerator.validate_xsd",
+          "line_range": "L40-L115",
+          "role": "XSD Schema Validator & Checksum Generator",
+          "layer": "Domain / Regulatory Rules",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-sar-download",
+          "file": "frontend/src/pages/CaseDetailPage.tsx",
+          "symbol": "Blob Download Trigger (window.URL.createObjectURL)",
+          "line_range": "L445-L458",
+          "role": "Browser File Download Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-sar-ui",
+          "to": "node-sar-client",
+          "mechanism": "Invokes download handler"
+        },
+        {
+          "from": "node-sar-client",
+          "to": "node-sar-router",
+          "mechanism": "GET /api/v1/regulatory/sar/export/{sar_id}"
+        },
+        {
+          "from": "node-sar-router",
+          "to": "node-sar-service",
+          "mechanism": "generate_xml_dossier(sar_id)"
+        },
+        {
+          "from": "node-sar-service",
+          "to": "node-sar-validator",
+          "mechanism": "validate_xsd(xml_content)"
+        },
+        {
+          "from": "node-sar-validator",
+          "to": "node-sar-router",
+          "mechanism": "Returns validated XML bytes with SHA-256 digest"
+        },
+        {
+          "from": "node-sar-router",
+          "to": "node-sar-download",
+          "mechanism": "HTTP 200 Response with Content-Type: application/xml"
+        }
+      ],
+      "user_visible_outputs": [
+        "FinCEN SAR XML 2.0 File Download",
+        "SAR ID & Filing Checksum",
+        "Narrative Block Summary"
+      ],
+      "audit_boundaries": [
+        "backend/app/application/services/fincen_sar_service.py:L180-L210 (Redaction and PII hashing rules applied prior to XML packaging)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-COMPARATIVE-BASELINES-FALLBACK",
+      "name": "Benchmark Comparative Baselines Widget Endpoint",
+      "user_surfaces": [
+        "frontend/src/components/ComparativeModelWidget.tsx :: Comparative Performance Bar Chart"
+      ],
+      "nodes": [
+        {
+          "id": "node-baseline-ui",
+          "file": "frontend/src/components/ComparativeModelWidget.tsx",
+          "symbol": "ComparativeModelWidget.useComparativeBaselines",
+          "line_range": "L25-L60",
+          "role": "Component Mount Data Fetcher",
+          "layer": "Presentation / UI",
+          "runtime_classification": "BENCHMARK_CROSSOVER"
+        },
+        {
+          "id": "node-baseline-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "useComparativeBaselines",
+          "line_range": "L510-L530",
+          "role": "GET /api/v1/dashboard/comparative-baselines call",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "BENCHMARK_CROSSOVER"
+        },
+        {
+          "id": "node-baseline-router",
+          "file": "backend/app/presentation/routers/dashboard.py",
+          "symbol": "get_comparative_baselines",
+          "line_range": "L270-L340",
+          "role": "FastAPI Route Handler",
+          "layer": "Presentation / Router",
+          "runtime_classification": "BENCHMARK_CROSSOVER"
+        },
+        {
+          "id": "node-baseline-file-read",
+          "file": "experiments/results/comparative_baselines.json",
+          "symbol": "Filesystem JSON Artifact Read",
+          "line_range": "Entire File",
+          "role": "Benchmark Experiment Result File",
+          "layer": "Benchmark Artifact / Filesystem",
+          "runtime_classification": "BENCHMARK_CROSSOVER"
+        },
+        {
+          "id": "node-baseline-hardcoded-dict",
+          "file": "backend/app/presentation/routers/dashboard.py",
+          "symbol": "_STATIC_FALLBACK_BASELINES",
+          "line_range": "L285-L325",
+          "role": "Hardcoded In-Memory Dictionary Fallback",
+          "layer": "Presentation / Router Fallback",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-baseline-widget",
+          "file": "frontend/src/components/ComparativeModelWidget.tsx",
+          "symbol": "ComparativeModelWidget UI View",
+          "line_range": "L75-L160",
+          "role": "Bar Chart (Local Model vs FedAvg vs CF-Intelligence)",
+          "layer": "Presentation / UI",
+          "runtime_classification": "BENCHMARK_CROSSOVER"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-baseline-ui",
+          "to": "node-baseline-client",
+          "mechanism": "React Query useQuery hook"
+        },
+        {
+          "from": "node-baseline-client",
+          "to": "node-baseline-router",
+          "mechanism": "HTTP GET /api/v1/dashboard/comparative-baselines"
+        },
+        {
+          "from": "node-baseline-router",
+          "to": "node-baseline-file-read",
+          "mechanism": "Attempts Path.read_text() from experiments/results/comparative_baselines.json"
+        },
+        {
+          "from": "node-baseline-router",
+          "to": "node-baseline-hardcoded-dict",
+          "mechanism": "Catches FileNotFoundError/Exception and returns static dictionary"
+        },
+        {
+          "from": "node-baseline-router",
+          "to": "node-baseline-widget",
+          "mechanism": "Returns JSON with AUC/F1 comparison across architecture variants"
+        }
+      ],
+      "user_visible_outputs": [
+        "Local Baseline AUC (0.831)",
+        "FedAvg Baseline AUC (0.874)",
+        "CF-Intelligence Global AUC (0.948)",
+        "False Positive Reduction Rate (-38.4%)"
+      ],
+      "audit_boundaries": [
+        "backend/app/presentation/routers/dashboard.py:L270-L340 (Direct crossover from experiment artifacts into live runtime dashboard)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-GLOBAL-TELEMETRY-STREAM",
+      "name": "Global Live Telemetry WebSocket Stream",
+      "user_surfaces": [
+        "frontend/src/pages/ObservabilityPage.tsx :: Real-Time Alert Ticker & Global Volume Metric",
+        "frontend/src/pages/LiveOperationsView.tsx :: Live Streaming Alert Feed"
+      ],
+      "nodes": [
+        {
+          "id": "node-telemetry-ws-client",
+          "file": "frontend/src/pages/LiveOperationsView.tsx",
+          "symbol": "LiveOperationsView WebSocket Hook",
+          "line_range": "L310-L365",
+          "role": "Browser WebSocket Connection to /ws/telemetry",
+          "layer": "Presentation / UI",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-telemetry-ws-router",
+          "file": "backend/app/presentation/websockets/streaming_ws.py",
+          "symbol": "telemetry_websocket_endpoint",
+          "line_range": "L310-L360",
+          "role": "FastAPI WebSocket Route Handler",
+          "layer": "Presentation / WebSocket Router",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-telemetry-random-generator",
+          "file": "backend/app/presentation/websockets/streaming_ws.py",
+          "symbol": "random.choice, random.uniform",
+          "line_range": "L325-L345",
+          "role": "Infinite Loop Synthetic Event Generator",
+          "layer": "Presentation / Synthetic Emitter",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        },
+        {
+          "id": "node-telemetry-ui-ticker",
+          "file": "frontend/src/pages/ObservabilityPage.tsx",
+          "symbol": "ObservabilityPage.TransactionTicker",
+          "line_range": "L180-L240",
+          "role": "Real-time scrolling ticker of streamed transactions",
+          "layer": "Presentation / UI",
+          "runtime_classification": "MOCK_SYNTHETIC_FALLBACK"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-telemetry-ws-client",
+          "to": "node-telemetry-ws-router",
+          "mechanism": "WS Handshake to /ws/telemetry"
+        },
+        {
+          "from": "node-telemetry-ws-router",
+          "to": "node-telemetry-random-generator",
+          "mechanism": "asyncio.sleep(1.0) loop generating synthetic transaction payload"
+        },
+        {
+          "from": "node-telemetry-random-generator",
+          "to": "node-telemetry-ws-client",
+          "mechanism": "websocket.send_json(synthetic_event)"
+        },
+        {
+          "from": "node-telemetry-ws-client",
+          "to": "node-telemetry-ui-ticker",
+          "mechanism": "Appends new event to visible ticker state"
+        }
+      ],
+      "user_visible_outputs": [
+        "Live transaction IDs",
+        "Transaction amounts ($1,500 - $450,000)",
+        "Originating bank labels",
+        "Fraud flag badge"
+      ],
+      "audit_boundaries": [
+        "backend/app/presentation/websockets/streaming_ws.py:L310-L360 (Loop generates pure random synthetic data with no connection to production queues)"
+      ],
+      "unresolved_edges": []
+    },
+    {
+      "capability_id": "CAP-AGENTIC-AML-COPILOT",
+      "name": "Autonomous Agentic AML Copilot Chat & Investigation",
+      "user_surfaces": [
+        "frontend/src/components/AgenticInvestigationCopilot.tsx :: Chat Panel & Autonomous Action Approvals",
+        "frontend/src/pages/InvestigationDashboard.tsx :: Copilot Sidebar"
+      ],
+      "nodes": [
+        {
+          "id": "node-copilot-ui",
+          "file": "frontend/src/components/AgenticInvestigationCopilot.tsx",
+          "symbol": "AgenticInvestigationCopilot.handleSendMessage",
+          "line_range": "L120-L165",
+          "role": "Chat Message Submit Trigger",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-copilot-client",
+          "file": "frontend/src/api/queries.ts",
+          "symbol": "useCopilotChat.mutationFn",
+          "line_range": "L610-L635",
+          "role": "POST /api/v1/copilot/chat Request",
+          "layer": "Frontend Infrastructure",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-copilot-router",
+          "file": "backend/app/presentation/routers/copilot.py",
+          "symbol": "copilot_chat_endpoint",
+          "line_range": "L75-L140",
+          "role": "FastAPI Route Handler",
+          "layer": "Presentation / Router",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-copilot-service",
+          "file": "backend/app/application/services/agentic_investigation_copilot.py",
+          "symbol": "AgenticInvestigationCopilot.process_query",
+          "line_range": "L90-L280",
+          "role": "Agentic Reasoner, Tool Dispatcher & ReAct Loop",
+          "layer": "Application / Agentic Copilot",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-copilot-tools",
+          "file": "backend/app/application/services/agentic_investigation_copilot.py",
+          "symbol": "InvestigateEntityTool, CheckSanctionsTool, QueryGraphTool",
+          "line_range": "L290-L450",
+          "role": "Deterministic AML Tools & Graph Invocations",
+          "layer": "Application / Domain Tools",
+          "runtime_classification": "RUNTIME_LIVE"
+        },
+        {
+          "id": "node-copilot-ui-response",
+          "file": "frontend/src/components/AgenticInvestigationCopilot.tsx",
+          "symbol": "MessageThread & ActionCards",
+          "line_range": "L210-L340",
+          "role": "Chat Bubble & Action Proposal Rendering",
+          "layer": "Presentation / UI",
+          "runtime_classification": "RUNTIME_LIVE"
+        }
+      ],
+      "edges": [
+        {
+          "from": "node-copilot-ui",
+          "to": "node-copilot-client",
+          "mechanism": "mutateAsync({ query, context_entity_id })"
+        },
+        {
+          "from": "node-copilot-client",
+          "to": "node-copilot-router",
+          "mechanism": "HTTP POST /api/v1/copilot/chat"
+        },
+        {
+          "from": "node-copilot-router",
+          "to": "node-copilot-service",
+          "mechanism": "process_query(query, context)"
+        },
+        {
+          "from": "node-copilot-service",
+          "to": "node-copilot-tools",
+          "mechanism": "Executes domain tools based on query intent"
+        },
+        {
+          "from": "node-copilot-tools",
+          "to": "node-copilot-service",
+          "mechanism": "Tool execution results aggregated into response"
+        },
+        {
+          "from": "node-copilot-service",
+          "to": "node-copilot-ui-response",
+          "mechanism": "Returns assistant message, reasoning trace, proposed actions"
+        }
+      ],
+      "user_visible_outputs": [
+        "Copilot conversational response",
+        "Reasoning step trace (ReAct thought/action)",
+        "Graph entity neighborhood summary",
+        "Proposed case actions (e.g., 'File SAR', 'Escalate to Tier 2')"
+      ],
+      "audit_boundaries": [
+        "backend/app/application/services/agentic_investigation_copilot.py:L115-L145 (Local rule-based fallback if LLM API key / provider unreachable)"
+      ],
+      "unresolved_edges": []
+    }
+  ]
+}

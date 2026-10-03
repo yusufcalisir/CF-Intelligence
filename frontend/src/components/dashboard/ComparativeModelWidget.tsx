@@ -45,23 +45,8 @@ export default function ComparativeModelWidget() {
 
   const {
     comparison_matrix = [],
-    centralization_gap_analysis = {
-      pooled_champion_model: 'pooled_gradient_boosting',
-      pooled_pr_auc: 0.865,
-      pooled_roc_auc: 0.984,
-      pooled_recall_at_01_fpr: 0.665,
-      centralization_gap_pr_auc: 0.023,
-      centralization_gap_roc_auc: 0.009,
-      federated_efficiency_pct: 97.34,
-    },
-    silo_deficit_analysis = {
-      mean_pr_auc: 0.694,
-      mean_roc_auc: 0.882,
-      mean_recall_at_01_fpr: 0.432,
-      silo_count: 3,
-      collaborative_uplift_pr_auc: 0.148,
-      collaborative_uplift_roc_auc: 0.093,
-    },
+    centralization_gap_analysis,
+    silo_deficit_analysis,
     dataset_name = 'PaySim & Financial Consortia',
   } = benchmarkData;
 
@@ -121,7 +106,7 @@ export default function ComparativeModelWidget() {
               Multi-Paradigm Benchmark Baselines & Comparative Analysis
             </h3>
             <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
-              {dataset_name}
+              Benchmark Reference · {dataset_name}
             </span>
           </div>
           <p className="text-xs text-slate-400 mt-0.5">

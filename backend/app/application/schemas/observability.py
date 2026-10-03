@@ -24,6 +24,8 @@ class HealthCheckResponse(BaseModel):
     timestamp: str = Field(..., description="UTC ISO8601 evaluation timestamp")
     version: str = Field(default="2.4.0", description="Semantic service release version")
     uptime_seconds: float = Field(default=0.0, description="Process uptime in seconds")
+    storage_backend: str = Field(default="in_memory", description="Underlying simulation storage backend: 'redis' or 'in_memory'")
+    durability: str = Field(default="ephemeral", description="Storage durability semantics: 'durable' or 'ephemeral'")
 
 
 class ReadinessResponse(BaseModel):

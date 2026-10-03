@@ -387,7 +387,7 @@ describe('LiveOperationsView Component', () => {
     expect(screen.queryByText(/Feature Importance/i)).not.toBeInTheDocument();
   });
 
-  it('ignores background WebSocket round_start events when in simulated mock training mode', () => {
+  it('processes WebSocket round_start events in real federated training mode', () => {
     let instance: any = null;
 
     class TestWebSocket {
@@ -415,7 +415,7 @@ describe('LiveOperationsView Component', () => {
       instance.onopen();
     });
 
-    // Send a background round_start event over the WebSocket
+    // Send a real round_start event over the WebSocket
     act(() => {
       instance.onmessage({
         data: JSON.stringify({
@@ -425,8 +425,8 @@ describe('LiveOperationsView Component', () => {
       });
     });
 
-    // In mock mode, background WS events should be ignored, so training should not be forced into federated mode
-    expect(screen.queryByText(/Round 1 \/ 10/i)).not.toBeInTheDocument();
+    // In real mode (default), live WS round events are processed and update training progress
+    expect(screen.getAllByText(/Round 1 \/ 10/i).length).toBeGreaterThanOrEqual(1);
 
     vi.unstubAllGlobals();
   });

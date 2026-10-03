@@ -35,11 +35,14 @@ function getWebSocketUrl(): string {
 export function useRealTimeFraudStream() {
   const {
     status,
+    streamSource,
+    streamProvenance,
     latencyMs,
     totalStreamedTransactions,
     recentTransactions,
     activeAlertToasts,
     setStatus,
+    setStreamSource,
     setLatencyMs,
     pushStreamEvent,
     dismissToast,
@@ -49,51 +52,11 @@ export function useRealTimeFraudStream() {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const mockIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const reconnectAttemptsRef = useRef<number>(0);
   const lastPingTimestampRef = useRef<number>(0);
 
   useEffect(() => {
     let isMounted = true;
-
-    function stopMockFallback() {
-      if (mockIntervalRef.current) {
-        clearInterval(mockIntervalRef.current);
-        mockIntervalRef.current = null;
-      }
-    }
-
-    function startMockFallbackStream() {
-      if (mockIntervalRef.current) return;
-      setStatus('mock_active');
-
-      const banks = ['bank_alpha', 'bank_beta', 'bank_gamma'];
-      const typologies = [
-        { typ: 'RAPID_CROSS_BANK_LAYERING', desc: 'High-Velocity Cross-Bank Transfer Burst', sev: 'critical' as const, score: 942 },
-        { typ: 'STRUCTURED_SMURFING', desc: 'Sub-Threshold Structured Smurfing Deposit', sev: 'high' as const, score: 815 },
-        { typ: 'GNN_TOPOLOGICAL_ANOMALY', desc: 'GraphSAGE 2-Hop Layering Syndicate', sev: 'critical' as const, score: 895 },
-        { typ: 'NEW_ACCOUNT_HIGH_VALUE_CRYPTO', desc: 'New Account High-Value Crypto Transfer', sev: 'high' as const, score: 780 },
-        { typ: 'LEGITIMATE_PAYMENT', desc: 'Standard Retail Interbank Transfer', sev: 'info' as const, score: 120 },
-      ];
-
-      mockIntervalRef.current = setInterval(() => {
-        if (!isMounted) return;
-        const item = typologies[Math.floor(Math.random() * typologies.length)] ?? typologies[0]!;
-        const bank = banks[Math.floor(Math.random() * banks.length)] ?? 'bank_alpha';
-        const txn: LiveStreamTransaction = {
-          transaction_id: `txn_${Math.floor(Date.now() % 1000000).toString().padStart(6, '0')}`,
-          bank_id: bank,
-          risk_score: item.score,
-          severity: item.sev,
-          typology: item.typ,
-          description: item.desc,
-          amount: Math.round((Math.random() * 250000 + 1500) * 100) / 100,
-          currency: 'EUR',
-          created_at: new Date().toISOString(),
-        };
-        pushStreamEvent(txn);
-      }, 5000);
-    }
 
     function scheduleReconnect() {
       if (!isMounted) return;
@@ -107,13 +70,10 @@ export function useRealTimeFraudStream() {
       const jitter = Math.random() * 500;
       const delay = Math.round(baseDelay + jitter);
 
-      if (reconnectAttemptsRef.current > 2) {
-        startMockFallbackStream();
-      } else {
-        setStatus('disconnected');
-      }
+      // On disconnect, truthfully remain disconnected. Never silently generate fake browser transactions.
+      setStatus('disconnected');
 
-      // CRITICAL: NEVER abandon reconnection! Always schedule retry even when mock_active
+      // Reconnect schedule
       reconnectTimeoutRef.current = setTimeout(() => {
         if (isMounted) {
           connect();
@@ -168,9 +128,6 @@ export function useRealTimeFraudStream() {
           reconnectAttemptsRef.current = 0;
           setStatus('connected');
 
-          // Immediately terminate offline simulated stream if it was running
-          stopMockFallback();
-
           // Real round-trip latency probe
           sendPing(ws);
 
@@ -202,9 +159,12 @@ export function useRealTimeFraudStream() {
 
             if (eventType === 'CONNECTED') {
               setStatus('connected');
-              stopMockFallback();
               sendPing(ws);
               return;
+            }
+
+            if (data.stream_type) {
+              setStreamSource(data.stream_type, data.provenance);
             }
 
             if (data.payload && (eventType === 'ALERT_TRIGGERED' || eventType === 'TRANSACTION_SCORED')) {
@@ -243,7 +203,6 @@ export function useRealTimeFraudStream() {
 
     return () => {
       isMounted = false;
-      stopMockFallback();
       if (pingIntervalRef.current) {
         clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = null;
@@ -276,10 +235,12 @@ export function useRealTimeFraudStream() {
         wsRef.current = null;
       }
     };
-  }, [pushStreamEvent, setLatencyMs, setStatus]);
+  }, [pushStreamEvent, setLatencyMs, setStatus, setStreamSource]);
 
   return {
     status,
+    streamSource,
+    streamProvenance,
     latencyMs,
     totalStreamedTransactions,
     recentTransactions,

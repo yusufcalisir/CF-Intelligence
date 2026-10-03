@@ -1,0 +1,228 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_1_REMEDIATION_BACKLOG",
+  "total_remediation_units": 8,
+  "remediation_units": [
+    {
+      "unit_id": "REM-UNIT-01",
+      "title": "Default Simulation Execution Path to Real Backend Engine",
+      "priority": "P0_CRITICAL",
+      "root_cause": "LiveOperationsView.tsx initializes trainingMode='mock' and executes client-side synthetic Gaussian noise steps instead of triggering the operational backend PyTorch federated training engine.",
+      "affected_findings": [
+        "RTF-0001"
+      ],
+      "target_files": [
+        "frontend/src/pages/LiveOperationsView.tsx"
+      ],
+      "target_symbols": [
+        "LiveOperationsView.trainingMode",
+        "LiveOperationsView.handleLaunchTraining",
+        "LiveOperationsView.startSimulatedTraining"
+      ],
+      "existing_real_implementation": [
+        "backend/app/presentation/routers/simulation.py :: create_simulation (POST /api/v1/simulations)",
+        "backend/app/application/services/simulation_service.py :: SimulationService.run_simulation",
+        "backend/app/application/services/model_service.py :: ModelService.train_local",
+        "backend/app/presentation/websockets/training_ws.py :: _handle_training_ws (/ws/training)"
+      ],
+      "required_change": "1. Change default trainingMode from 'mock' to 'real' in LiveOperationsView.tsx.\n2. Ensure 'Start Simulation' button triggers useCreateSimulation mutation directly.\n3. Connect charts to incoming WebSocket events from /ws/training.\n4. Retain client-side simulation strictly behind an explicitly labeled 'Offline Sandbox Demo' toggle for zero-backend testing.",
+      "required_tests": [
+        "frontend/src/pages/__tests__/LiveOperationsViewRealTraining.test.tsx",
+        "backend/tests/integration/test_simulation_ws_telemetry.py"
+      ],
+      "runtime_validation": "Trigger simulation in UI, verify HTTP POST /api/v1/simulations is fired, verify PyTorch logs appear in backend console, verify WebSocket streams live training losses.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-02",
+      "title": "Decouple Live Telemetry WebSocket from Pure Random Generation",
+      "priority": "P0_CRITICAL",
+      "root_cause": "/ws/telemetry runs an infinite loop generating transactions with random.choice and random.uniform while the UI claims 'Live WS'.",
+      "affected_findings": [
+        "RTF-0004"
+      ],
+      "target_files": [
+        "backend/app/presentation/websockets/streaming_ws.py",
+        "frontend/src/components/layout/Header.tsx"
+      ],
+      "target_symbols": [
+        "telemetry_websocket_endpoint",
+        "Header.tsx status badge"
+      ],
+      "existing_real_implementation": [
+        "backend/app/infrastructure/connectors/kafka_streaming_connector.py",
+        "backend/app/infrastructure/connectors/streaming_connector.py"
+      ],
+      "required_change": "1. In telemetry_websocket_endpoint, check if streaming connector (Kafka/Redis) is active. If active, stream real transactions.\n2. If no streaming connector is active, emit event with metadata stream_type: 'synthetic_simulation'.\n3. In Header.tsx, display 'Simulated Feed' instead of 'Live WS' when the stream is operating in synthetic mode.",
+      "required_tests": [
+        "backend/tests/unit/test_streaming_ws_telemetry.py",
+        "frontend/src/components/layout/__tests__/HeaderStreamBadge.test.tsx"
+      ],
+      "runtime_validation": "Connect to /ws/telemetry with and without Kafka, verify metadata stream_type is present and header badge reflects actual data source.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-03",
+      "title": "Replace Beta-Distribution Synthesis in Design Partner Service with Real Model Inference",
+      "priority": "P1_HIGH",
+      "root_cause": "evaluate_reference_benchmark synthesizes prediction probabilities using Beta distributions rather than running PyTorch model forward pass.",
+      "affected_findings": [
+        "RTF-0005"
+      ],
+      "target_files": [
+        "backend/app/application/services/design_partner_service.py"
+      ],
+      "target_symbols": [
+        "DesignPartnerPilotService.evaluate_reference_benchmark"
+      ],
+      "existing_real_implementation": [
+        "backend/app/application/services/inference_engine.py :: predict_proba",
+        "backend/app/application/services/model_service.py :: evaluate_model"
+      ],
+      "required_change": "Execute actual model inference on the sample feature matrix X using PyTorch weights to produce y_prob_fl and y_prob_local, calculating authentic ROC-AUC and PR-AUC.",
+      "required_tests": [
+        "backend/tests/unit/test_design_partner_real_inference.py"
+      ],
+      "runtime_validation": "Run POST /api/v1/design-partner/benchmark, verify that prediction probabilities vary with model checkpoint weights and input features.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-04",
+      "title": "Sanitize Dashboard Comparative Baselines Crossover & Model Registry Fallbacks",
+      "priority": "P1_HIGH",
+      "root_cause": "get_comparative_baselines reads offline benchmark files with static dictionary fallback; model_registry returns hardcoded champions if directory is unseeded.",
+      "affected_findings": [
+        "RTF-0003",
+        "RTF-0006"
+      ],
+      "target_files": [
+        "backend/app/presentation/routers/dashboard.py",
+        "backend/app/presentation/routers/model_registry.py"
+      ],
+      "target_symbols": [
+        "get_comparative_baselines",
+        "_get_all_model_summaries"
+      ],
+      "existing_real_implementation": [
+        "backend/app/domain/models/manifest.py",
+        "backend/app/infrastructure/redis_store.py"
+      ],
+      "required_change": "1. In get_comparative_baselines, aggregate comparisons from registered champion model evaluation logs; clearly label historical benchmark baselines as 'Benchmark Reference'.\n2. In model_registry, return empty array when no models exist rather than fabricating static models.",
+      "required_tests": [
+        "backend/tests/unit/test_dashboard_comparative_baselines.py",
+        "backend/tests/unit/test_model_registry_empty_state.py"
+      ],
+      "runtime_validation": "Verify GET /api/v1/models returns empty list on clean boot and populated list after training.",
+      "dependencies": [
+        "REM-UNIT-01"
+      ]
+    },
+    {
+      "unit_id": "REM-UNIT-05",
+      "title": "Gate Pre-Seeded Simulation 'sim_fed_01' Behind Explicit Reference Annotation",
+      "priority": "P1_HIGH",
+      "root_cause": "_seed_canonical_simulation runs on module load, creating a static completed simulation that appears as a live past run.",
+      "affected_findings": [
+        "RTF-0002"
+      ],
+      "target_files": [
+        "backend/app/presentation/routers/simulation.py"
+      ],
+      "target_symbols": [
+        "_seed_canonical_simulation"
+      ],
+      "existing_real_implementation": [
+        "SimulationService.run_simulation"
+      ],
+      "required_change": "Add metadata field is_canonical_reference: True to sim_fed_01 so UI renders it as 'Reference Benchmark Run (Read-Only)' rather than an active user execution.",
+      "required_tests": [
+        "backend/tests/unit/test_simulation_reference_seeding.py"
+      ],
+      "runtime_validation": "Query GET /api/v1/simulations/sim_fed_01 and verify is_canonical_reference is True and UI renders appropriate badge.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-06",
+      "title": "Make Storage Persistence Fallback and TEE Software Emulation Explicit in Health API and UI",
+      "priority": "P2_MEDIUM",
+      "root_cause": "Redis failure silently switches to ephemeral in-memory storage; TEE driver simulates SGX attestation in software with sleep delays.",
+      "affected_findings": [
+        "RTF-0007",
+        "RTF-0009"
+      ],
+      "target_files": [
+        "backend/app/presentation/routers/health.py",
+        "backend/app/infrastructure/security/tee_driver.py",
+        "frontend/src/pages/SecurityPage.tsx"
+      ],
+      "target_symbols": [
+        "get_health",
+        "TEEDriver.generate_attestation_report"
+      ],
+      "existing_real_implementation": [
+        "backend/app/infrastructure/redis_store.py",
+        "backend/app/infrastructure/security/tee_driver.py"
+      ],
+      "required_change": "1. In /api/v1/health, return storage_backend: 'redis' | 'in_memory_ephemeral'.\n2. In TEEDriver, return hardware_type: 'SOFTWARE_EMULATED' unless /dev/sgx_enclave exists. Render 'Software Emulation' on SecurityPage.",
+      "required_tests": [
+        "backend/tests/unit/test_health_storage_mode.py",
+        "backend/tests/unit/test_tee_driver_attestation_status.py"
+      ],
+      "runtime_validation": "Check GET /api/v1/health and verify storage_backend is reported correctly.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-07",
+      "title": "Connect Technical Dossier Download to Evidence Registry API",
+      "priority": "P2_MEDIUM",
+      "root_cause": "TechnicalReportModal generates JSON file from an in-memory literal object.",
+      "affected_findings": [
+        "RTF-0008"
+      ],
+      "target_files": [
+        "frontend/src/components/TechnicalReportModal.tsx",
+        "backend/app/presentation/routers/dashboard.py"
+      ],
+      "target_symbols": [
+        "TechnicalReportModal.handleDownloadJson"
+      ],
+      "existing_real_implementation": [
+        "benchmarks/results/canonical_evidence_registry.json"
+      ],
+      "required_change": "Wire download action to fetch authentic verified dossier from GET /api/v1/dashboard/evidence-dossier or static evidence registry.",
+      "required_tests": [
+        "frontend/src/components/__tests__/TechnicalReportModalDownload.test.tsx"
+      ],
+      "runtime_validation": "Click download in modal, verify file content matches verified evidence registry.",
+      "dependencies": []
+    },
+    {
+      "unit_id": "REM-UNIT-08",
+      "title": "Align Launch Modals and Stream Fallback with Explicit Status Indicators",
+      "priority": "P3_LOW",
+      "root_cause": "PlatformLaunchModal has hardcoded 950ms timer; useRealTimeFraudStream auto-switches to client random generator.",
+      "affected_findings": [
+        "RTF-0010",
+        "RTF-0011",
+        "RTF-0012"
+      ],
+      "target_files": [
+        "frontend/src/components/PlatformLaunchModal.tsx",
+        "frontend/src/hooks/useRealTimeFraudStream.ts"
+      ],
+      "target_symbols": [
+        "PlatformLaunchModal.useEffect",
+        "startMockFallbackStream"
+      ],
+      "existing_real_implementation": [
+        "backend/app/presentation/routers/health.py"
+      ],
+      "required_change": "1. Query /api/v1/health during launch modal before transitioning.\n2. In useRealTimeFraudStream, pause stream rather than generating random transactions unless user clicks 'Enable Offline Demo'.",
+      "required_tests": [
+        "frontend/src/components/__tests__/PlatformLaunchModal.test.tsx"
+      ],
+      "runtime_validation": "Verify launch modal verifies health and stream does not invent fake transactions on disconnect.",
+      "dependencies": []
+    }
+  ]
+}

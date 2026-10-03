@@ -42,7 +42,7 @@ def test_telemetry_websocket_route_aliases(client: TestClient):
             raw = ws.receive_text()
             data = json.loads(raw)
             assert data["event_type"] == "CONNECTED"
-            assert data["payload"]["status"] == "ONLINE"
+            assert data["payload"]["status"] in ("ONLINE", "STANDBY")
             assert "active_banks" in data["payload"]
 
 

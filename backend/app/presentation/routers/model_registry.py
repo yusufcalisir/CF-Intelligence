@@ -87,29 +87,6 @@ def _get_all_model_summaries() -> list[ModelSummary]:
                             last_updated=latest.get("created_at") if latest else None,
                         )
                     )
-
-    # Baseline consortium inventory if local directory is unseeded
-    if not summaries:
-        summaries = [
-            ModelSummary(
-                simulation_id="consortium_global_fl",
-                active_version=3,
-                champion_status="champion",
-                total_versions=3,
-                latest_metrics={"auc_roc": 0.942, "pr_auc": 0.835, "f1_score": 0.891, "latency_ms": 14.2},
-                sr11_7_compliant=True,
-                last_updated="2026-09-17T12:00:00Z",
-            ),
-            ModelSummary(
-                simulation_id="elliptic_graphsage_temporal",
-                active_version=2,
-                champion_status="champion",
-                total_versions=2,
-                latest_metrics={"auc_roc": 0.8746, "pr_auc": 0.624, "f1_score": 0.812, "latency_ms": 28.5},
-                sr11_7_compliant=True,
-                last_updated="2026-09-17T11:30:00Z",
-            ),
-        ]
     return summaries
 
 

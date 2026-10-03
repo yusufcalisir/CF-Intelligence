@@ -142,8 +142,8 @@ export const BenchmarkHubPage: React.FC = () => {
   const costLocal = benchmarkData?.performance_comparison?.isolated_local_model?.cost_report?.total_daily_cost_dollars;
   const costFL = benchmarkData?.performance_comparison?.federated_learning?.cost_report?.total_daily_cost_dollars;
   const dynamicRoiMultiple = (costLocal && costFL && costFL > 0)
-    ? (costLocal / costFL).toFixed(1)
-    : '8.4';
+    ? `${(costLocal / costFL).toFixed(1)}x ROI Multiple`
+    : (isLoading ? 'Calculating ROI Multiple...' : 'ROI Multiple: Pending Evaluation');
 
   const { data: readinessData } = usePilotReadinessChecklist(partnerName, 'EU/TR/US');
   const validatePiiMutation = useScanPii();
@@ -425,7 +425,7 @@ export const BenchmarkHubPage: React.FC = () => {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-xs font-mono px-3 py-1 rounded-xl bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 font-bold">
-                  {`${dynamicRoiMultiple}x ROI Multiple`}
+                  {dynamicRoiMultiple}
                 </span>
               </div>
             </div>

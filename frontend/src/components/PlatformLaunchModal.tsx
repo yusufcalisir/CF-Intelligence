@@ -201,12 +201,12 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
               <div className="min-w-0">
                 <h3 id="launch-modal-title" className="text-xs sm:text-sm font-bold text-slate-100 tracking-tight flex items-center gap-1.5 truncate">
                   Consortium Handshake
-                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-emerald-400 bg-emerald-500/10 border border-emerald-500/25">
-                    <Radio className="w-2 h-2 animate-pulse" /> LIVE
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded text-[9px] font-mono text-cyan-400 bg-cyan-500/10 border border-cyan-500/25">
+                    <Radio className="w-2 h-2 animate-pulse" /> DEMO SEQUENCE
                   </span>
                 </h3>
                 <p id="launch-modal-desc" className="text-[10px] font-mono text-slate-400 truncate">
-                  CF-Intelligence · Privacy-Preserving Plane
+                  CF-Intelligence · Initialization Animation Preview
                 </p>
               </div>
             </div>
@@ -395,6 +395,10 @@ export default function PlatformLaunchModal({ isOpen, onClose, onComplete }: Pla
                 className="h-full bg-gradient-to-r from-indigo-500 via-cyan-400 to-purple-500 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.8)] transition-[width] duration-75 ease-linear"
                 style={{ width: `${Math.min(100, progress)}%` }}
               />
+            </div>
+            <div className="flex items-center justify-between text-[9px] font-mono text-slate-500 pt-0.5">
+              <span>Interactive launch preview animation</span>
+              <span className="text-slate-400">Verifying runtime services concurrently</span>
             </div>
           </div>
         </motion.div>

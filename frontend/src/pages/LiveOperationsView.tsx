@@ -160,7 +160,7 @@ export default function LiveOperationsView() {
     ? DATASET_PROFILES[storedSession.selectedProfileKey as keyof typeof DATASET_PROFILES]
     : DATASET_PROFILES.paysim;
   const [selectedProfile, setSelectedProfile] = useState<DatasetProfile>(initialProfile);
-  const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');
+  const [trainingMode, setTrainingMode] = useState<TrainingMode>('real');
   const trainingModeRef = useRef(trainingMode);
   trainingModeRef.current = trainingMode;
   const [isConfigOpen, setIsConfigOpen] = useState(false);
@@ -170,7 +170,7 @@ export default function LiveOperationsView() {
   // ── Real Backend Query Hooks ───────────────────────────────────────────────
   const { data: scoringVolume, isLoading: isScoringVolumeLoading } = useScoringVolume();
   const { data: simulations } = useSimulations();
-  const activeSimId = id || simulations?.[0]?.id || 'sim_fed_01';
+  const activeSimId = id || simulations?.[0]?.id;
   const { data: currentSim } = useSimulation(activeSimId);
   const { data: trainingRounds } = useTrainingRounds(activeSimId);
   const { data: arSummary } = useAssetRecoverySummary();
@@ -943,8 +943,8 @@ export default function LiveOperationsView() {
 
     if ((isNewSimulationRun || (isAutoStart && trainingPhase === 'pending')) && !isTraining && !hasAutoStartedRef.current) {
       hasAutoStartedRef.current = true;
-      // Auto-start uses paysim defaults for backward compatibility
-      startSimulatedTraining(DATASET_PROFILES.paysim);
+      // Auto-start dispatches real federated training run
+      handleLaunchTraining(DATASET_PROFILES.paysim, 'real');
     }
 
     // Strip ?autostart=true from URL after first use so page refresh doesn't re-trigger
@@ -1060,7 +1060,7 @@ export default function LiveOperationsView() {
                   }}
                 >
                   {trainingMode === 'mock' ? <FlaskConical size={14} /> : <Zap size={14} />}
-                  {trainingMode === 'mock' ? 'Start Simulation' : 'Start Simulation (Live)'}
+                  {trainingMode === 'mock' ? 'Start Offline Demo' : 'Start Simulation'}
                 </motion.button>
               </div>
             ) : trainingPhase === 'completed' ? (
@@ -1562,8 +1562,8 @@ export default function LiveOperationsView() {
       )}
 
       {/* Deep Operational Panels — Fully Wired to Live Telemetry */}
-      <ModelRegistryPanel simulationId={activeSimId} />
-      <ComplianceReportPanel simulationId={activeSimId} banks={effectiveBanks} />
+      <ModelRegistryPanel simulationId={activeSimId || ''} />
+      <ComplianceReportPanel simulationId={activeSimId || ''} banks={effectiveBanks} />
       <IncentiveRegistryPanel banks={effectiveBanks} />
       <SecureHardwarePanel simulation={effectiveSim} />
 

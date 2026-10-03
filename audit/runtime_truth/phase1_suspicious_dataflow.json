@@ -1,0 +1,188 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_1_RUNTIME_TRUTH_DATAFLOW",
+  "nodes": [
+    {
+      "id": "src-math-random",
+      "label": "Math.random() Gaussian Walk",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "frontend/src/pages/LiveOperationsView.tsx"
+    },
+    {
+      "id": "src-py-random-ws",
+      "label": "random.choice / random.uniform",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/presentation/websockets/streaming_ws.py"
+    },
+    {
+      "id": "src-beta-dist",
+      "label": "rng.beta(3.2, 1.4) Distribution",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/application/services/design_partner_service.py"
+    },
+    {
+      "id": "src-seed-sim",
+      "label": "_seed_canonical_simulation()",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/presentation/routers/simulation.py"
+    },
+    {
+      "id": "src-static-baselines",
+      "label": "experiments/results/comparative_baselines.json + _STATIC_FALLBACK_BASELINES",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/presentation/routers/dashboard.py"
+    },
+    {
+      "id": "src-static-models",
+      "label": "_get_all_model_summaries static fallback",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/presentation/routers/model_registry.py"
+    },
+    {
+      "id": "src-inmemory-redis",
+      "label": "_shared_fallback_stores (in-memory dict)",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/infrastructure/redis_store.py"
+    },
+    {
+      "id": "src-hardcoded-dossier",
+      "label": "dossier literal object",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "frontend/src/components/TechnicalReportModal.tsx"
+    },
+    {
+      "id": "src-tee-sleeps",
+      "label": "TEEDriver time.sleep & static seeds",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "backend/app/infrastructure/security/tee_driver.py"
+    },
+    {
+      "id": "src-client-stream-gen",
+      "label": "startMockFallbackStream setInterval",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "frontend/src/hooks/useRealTimeFraudStream.ts"
+    },
+    {
+      "id": "src-modal-timer",
+      "label": "PlatformLaunchModal 950ms timer",
+      "type": "SUSPICIOUS_SOURCE",
+      "file": "frontend/src/components/PlatformLaunchModal.tsx"
+    },
+    {
+      "id": "sink-sim-charts",
+      "label": "LossChart & AUC Charts",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/pages/LiveOperationsView.tsx"
+    },
+    {
+      "id": "sink-header-badge",
+      "label": "Header 'Live WS' Badge & Ticker",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/components/layout/Header.tsx"
+    },
+    {
+      "id": "sink-benchmark-roi",
+      "label": "BenchmarkHubPage Financial ROI Cards",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/pages/BenchmarkHubPage.tsx"
+    },
+    {
+      "id": "sink-baseline-widget",
+      "label": "ComparativeModelWidget Bar Chart",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/components/ComparativeModelWidget.tsx"
+    },
+    {
+      "id": "sink-model-table",
+      "label": "Model Governance Registry Table",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/pages/ModelGovernancePage.tsx"
+    },
+    {
+      "id": "sink-sim-results-api",
+      "label": "GET /api/v1/simulations/sim_fed_01",
+      "type": "USER_FACING_SINK",
+      "file": "backend/app/presentation/routers/simulation.py"
+    },
+    {
+      "id": "sink-dossier-download",
+      "label": "Downloaded cfi_benchmark_dossier.json",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/components/TechnicalReportModal.tsx"
+    },
+    {
+      "id": "sink-security-sgx",
+      "label": "SecurityPage SGX Enclave Status",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/pages/SecurityPage.tsx"
+    },
+    {
+      "id": "sink-launch-modal",
+      "label": "PlatformLaunchModal Progress Bar",
+      "type": "USER_FACING_SINK",
+      "file": "frontend/src/components/PlatformLaunchModal.tsx"
+    }
+  ],
+  "edges": [
+    {
+      "from": "src-math-random",
+      "to": "sink-sim-charts",
+      "finding_id": "RTF-0001",
+      "mechanism": "Direct React state update in startSimulatedTraining timer"
+    },
+    {
+      "from": "src-py-random-ws",
+      "to": "sink-header-badge",
+      "finding_id": "RTF-0004",
+      "mechanism": "WS /ws/telemetry infinite sleep loop emitting synthetic txns"
+    },
+    {
+      "from": "src-beta-dist",
+      "to": "sink-benchmark-roi",
+      "finding_id": "RTF-0005",
+      "mechanism": "POST /api/v1/design-partner/benchmark calculates ROI from Beta distribution samples"
+    },
+    {
+      "from": "src-seed-sim",
+      "to": "sink-sim-results-api",
+      "finding_id": "RTF-0002",
+      "mechanism": "Module-level seeding writes precomputed sim_fed_01 to store"
+    },
+    {
+      "from": "src-static-baselines",
+      "to": "sink-baseline-widget",
+      "finding_id": "RTF-0003",
+      "mechanism": "GET /api/v1/dashboard/comparative-baselines reads benchmark JSON / static dict"
+    },
+    {
+      "from": "src-static-models",
+      "to": "sink-model-table",
+      "finding_id": "RTF-0006",
+      "mechanism": "GET /api/v1/models returns hardcoded models when storage empty"
+    },
+    {
+      "from": "src-hardcoded-dossier",
+      "to": "sink-dossier-download",
+      "finding_id": "RTF-0008",
+      "mechanism": "Client-side blob generation in handleDownloadJson"
+    },
+    {
+      "from": "src-tee-sleeps",
+      "to": "sink-security-sgx",
+      "finding_id": "RTF-0009",
+      "mechanism": "TEEDriver software emulation generates mock attestation report"
+    },
+    {
+      "from": "src-client-stream-gen",
+      "to": "sink-header-badge",
+      "finding_id": "RTF-0010",
+      "mechanism": "startMockFallbackStream pushes client-generated events on WS failure"
+    },
+    {
+      "from": "src-modal-timer",
+      "to": "sink-launch-modal",
+      "finding_id": "RTF-0011",
+      "mechanism": "setInterval advances stages based on elapsed clock time"
+    }
+  ]
+}

@@ -52,6 +52,8 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
     );
   }
 
+  const isHwBacked = simulation.tee_is_hardware_backed === true;
+
   // Generate latency chart data based on round count to compare FHE/TEE overhead with plaintext
   const totalRounds = simulation?.rounds?.length || 10;
   const chartData = Array.from({ length: totalRounds }).map((_, idx) => {
@@ -84,15 +86,31 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
           </div>
           <p className="text-xs text-slate-400">
             {hwMode === 'tee' 
-              ? 'Intel SGX / AWS Nitro Enclave secure memory yalıtımı ve kriptografik attestation doğrulaması.' 
+              ? (isHwBacked
+                  ? 'Intel SGX / AWS Nitro Enclave secure memory yalıtımı ve donanım attestation doğrulaması.'
+                  : 'Kriptografik yazılım emülasyonu (MRENCLAVE/MRSIGNER sandbox ölçümü, sıfır donanım SGX).')
               : 'CKKS şeması ile model ağırlıkları şifreli haldeyken plaintext sızıntısı olmadan homomorfik toplama.'}
           </p>
         </div>
         <div>
-          <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
-            <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-            {hwMode === 'tee' ? 'SGX Enclave Active' : 'FHE CKKS Active'}
-          </span>
+          {hwMode === 'tee' ? (
+            isHwBacked ? (
+              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                Intel SGX Hardware Active
+              </span>
+            ) : (
+              <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-amber-500/10 text-amber-300 border border-amber-500/30 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                Software Emulated TEE Sandbox
+              </span>
+            )
+          ) : (
+            <span className="text-xs px-3 py-1 rounded-full font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 inline-flex items-center gap-1.5 whitespace-nowrap shrink-0">
+              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+              FHE CKKS Active
+            </span>
+          )}
         </div>
       </div>
 
@@ -121,9 +139,17 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
                   {simulation.tee_attestation_signature || 'tee_signature_verified'}
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold bg-emerald-500/5 p-2 rounded border border-emerald-500/10 min-w-0">
+              <div className={`flex items-center gap-2 text-xs font-semibold p-2 rounded border min-w-0 ${
+                isHwBacked
+                  ? 'text-emerald-400 bg-emerald-500/5 border-emerald-500/10'
+                  : 'text-amber-300 bg-amber-500/5 border-amber-500/20'
+              }`}>
                 <ShieldCheckIcon />
-                <span className="truncate">Remote Attestation verified by Central CA</span>
+                <span className="truncate">
+                  {isHwBacked
+                    ? 'Remote Attestation verified by Central CA (Hardware SGX)'
+                    : 'Cryptographic Software Emulation (Zero Hardware SGX)'}
+                </span>
               </div>
             </div>
           ) : (

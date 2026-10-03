@@ -1,0 +1,539 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_1_RUNTIME_TRUTH_FINDINGS",
+  "total_findings": 12,
+  "findings": [
+    {
+      "finding_id": "RTF-0001",
+      "title": "Frontend Simulation Console Defaults to Client-Side Mock Random Walk Bypassing Real Backend Training",
+      "classification": "SYNTHETIC_USER_FACING_OUTPUT",
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "frontend/src/pages/LiveOperationsView.tsx",
+        "symbol": "LiveOperationsView.startSimulatedTraining",
+        "lines": "L163, L777-L838, L1052-L1064"
+      },
+      "sink": {
+        "file": "frontend/src/pages/LiveOperationsView.tsx",
+        "surface": "LossChart, MetricsComparisonBarChart, Champion AUC badge, Bank convergence statuses"
+      },
+      "execution_path": [
+        "User visits /simulation or /live-operations (trainingMode defaults to 'mock')",
+        "User clicks 'Start Simulation' button",
+        "handleLaunchTraining calls startSimulatedTraining(selectedProfile)",
+        "startSimulatedTraining executes setTimeout timer loop with Gaussian noise math",
+        "State updates (setChampionAuc, setRoundHistory) render realistic-looking convergence curves",
+        "Zero network requests or PyTorch model updates are dispatched to the backend"
+      ],
+      "trigger": "Clicking 'Start Simulation' button with default UI state or arriving with ?autostart=true",
+      "current_behavior": "Fabricates simulated round loss, AUC, and per-bank convergence curves completely in browser JavaScript memory using Math.random() and exponential decay formulas.",
+      "claimed_or_implied_behavior": "Executes multi-bank federated learning across participating bank nodes with differential privacy, gradient aggregation, and real model validation.",
+      "user_visibility": "Primary operator dashboard view. User observes animated training progress and convergence metrics labeled as live training.",
+      "evidence": [
+        "frontend/src/pages/LiveOperationsView.tsx:L163: const [trainingMode, setTrainingMode] = useState<TrainingMode>('mock');",
+        "frontend/src/pages/LiveOperationsView.tsx:L799-L800: const gaussianNoise = (std: number) => std * Math.sqrt(-2 * Math.log(Math.random())) * Math.cos(2 * Math.PI * Math.random());",
+        "frontend/src/pages/LiveOperationsView.tsx:L811-L817: Mathematical formulas generating artificial AUC and Loss steps toward profile targets.",
+        "frontend/src/pages/LiveOperationsView.tsx:L1063: Button text displays 'Start Simulation' (without indicating mock or synthetic mode)."
+      ],
+      "existing_real_alternative": [
+        "backend/app/presentation/routers/simulation.py :: create_simulation (POST /api/v1/simulations)",
+        "backend/app/application/services/simulation_service.py :: SimulationService.run_simulation",
+        "backend/app/application/services/model_service.py :: ModelService.train_local",
+        "frontend/src/api/queries.ts :: useCreateSimulation",
+        "backend/app/presentation/websockets/training_ws.py :: _handle_training_ws (/ws/training)"
+      ],
+      "recommended_remediation_type": "CONNECT_REAL_IMPLEMENTATION",
+      "recommended_existing_targets": [
+        "frontend/src/pages/LiveOperationsView.tsx :: change default trainingMode to 'real'",
+        "frontend/src/pages/LiveOperationsView.tsx :: wire 'Start Simulation' button directly to useCreateSimulation mutation",
+        "frontend/src/pages/LiveOperationsView.tsx :: isolate client-side simulation behind an explicitly labeled 'Offline Demo Mode' toggle"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "A complete, working PyTorch federated training engine already exists on the backend.",
+        "Defaulting to 'mock' masks the real engine and presents artificial metrics as primary telemetry."
+      ]
+    },
+    {
+      "finding_id": "RTF-0002",
+      "title": "Backend Startup Automatically Pre-Seeds Static Completed Simulation Run 'sim_fed_01'",
+      "classification": "PRECOMPUTED_RUNTIME_RESULT",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/presentation/routers/simulation.py",
+        "symbol": "_seed_canonical_simulation",
+        "lines": "L70-L355"
+      },
+      "sink": {
+        "file": "backend/app/presentation/routers/simulation.py",
+        "surface": "GET /api/v1/simulations/sim_fed_01, GET /api/v1/simulations, GET /api/v1/training/sim_fed_01/rounds"
+      },
+      "execution_path": [
+        "Backend server process starts up and imports simulation.py module",
+        "_seed_canonical_simulation() executes unconditionally at line 355",
+        "Populates _simulation_results['sim_fed_01'] with static 10 rounds, bank metrics, and Shapley payouts",
+        "Populates _simulation_events with 10 pre-computed round_complete payloads",
+        "Frontend LiveOperationsView fetches sim_fed_01 as activeSimId on initial load without running training"
+      ],
+      "trigger": "Module import on FastAPI startup.",
+      "current_behavior": "Populates the in-memory/Redis simulation store with a synthetic completed run ('sim_fed_01') having hardcoded AUC 0.948, F1 0.892, Shapley distributions, and Intel SGX MRENCLAVE hashes.",
+      "claimed_or_implied_behavior": "Represents an actual completed consortium federated learning simulation session.",
+      "user_visibility": "Visible to any user opening the application on cold-boot before starting a new run.",
+      "evidence": [
+        "backend/app/presentation/routers/simulation.py:L70-L140: canonical_banks dictionary containing hardcoded metrics.",
+        "backend/app/presentation/routers/simulation.py:L310: _simulation_results.set(sim_id, sim_doc)",
+        "backend/app/presentation/routers/simulation.py:L355: _seed_canonical_simulation() called at module level."
+      ],
+      "existing_real_alternative": [
+        "Return 404 or empty state if no simulation has been executed yet, or explicitly mark 'sim_fed_01' with is_canonical_benchmark_reference: true"
+      ],
+      "recommended_remediation_type": "MAKE_FALLBACK_EXPLICIT",
+      "recommended_existing_targets": [
+        "backend/app/presentation/routers/simulation.py:L355 :: gate seeding behind an explicit DEMO_SEED flag or annotate record metadata as CANONICAL_REFERENCE"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "Seeding was added to ensure initial UI dashboards don't render empty errors, but it presents static historical results as active runtime state."
+      ]
+    },
+    {
+      "finding_id": "RTF-0003",
+      "title": "Dashboard Comparative Baselines Route Reads Benchmark JSON Artifact with Hardcoded Dict Fallback",
+      "classification": "BENCHMARK_ARTIFACT_CROSSOVER",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/presentation/routers/dashboard.py",
+        "symbol": "get_comparative_baselines",
+        "lines": "L270-L345"
+      },
+      "sink": {
+        "file": "frontend/src/components/ComparativeModelWidget.tsx",
+        "surface": "Comparative Performance Bar Chart (Local Silo vs FedAvg vs CF-Intelligence)"
+      },
+      "execution_path": [
+        "User visits dashboard or LiveOperationsView mounting ComparativeModelWidget",
+        "Component fires GET /api/v1/dashboard/comparative-baselines",
+        "Route attempts to read experiments/results/comparative_baselines.json from disk",
+        "If missing or on exception, returns hardcoded _STATIC_FALLBACK_BASELINES dictionary",
+        "Frontend renders static benchmark numbers (0.975 ROC-AUC, 0.882 Local Silo) as live comparison"
+      ],
+      "trigger": "Mounting ComparativeModelWidget or loading the executive dashboard.",
+      "current_behavior": "Directly reads offline experiment result JSON from the filesystem, falling back to an in-memory dictionary with static baseline metrics.",
+      "claimed_or_implied_behavior": "Presents dynamic performance comparisons between the active federated model and baseline siloed models.",
+      "user_visibility": "Displayed prominently in ComparativeModelWidget on operator and executive dashboards.",
+      "evidence": [
+        "backend/app/presentation/routers/dashboard.py:L271-L272: Path references to experiments/results/comparative_baselines.json",
+        "backend/app/presentation/routers/dashboard.py:L285-L345: _STATIC_FALLBACK_BASELINES dictionary with literal ROC-AUC 0.9750, F1 0.7510"
+      ],
+      "existing_real_alternative": [
+        "backend/app/presentation/routers/model_registry.py :: aggregate live metrics from active registered champion and challenger models"
+      ],
+      "recommended_remediation_type": "COMPUTE_FROM_REAL_STATE",
+      "recommended_existing_targets": [
+        "backend/app/presentation/routers/dashboard.py:L270-L345 :: compute comparison dynamically from registered model evaluation logs or label clearly as benchmark reference"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "This is the single runtime endpoint in the backend that directly reads benchmark result JSON files."
+      ]
+    },
+    {
+      "finding_id": "RTF-0004",
+      "title": "Real-Time Telemetry WebSocket Emits Continuous Pure Random Synthetic Transactions",
+      "classification": "RANDOMIZED_FAKE_OUTPUT",
+      "severity": "CRITICAL",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/presentation/websockets/streaming_ws.py",
+        "symbol": "telemetry_websocket_endpoint",
+        "lines": "L310-L360"
+      },
+      "sink": {
+        "file": "frontend/src/components/layout/Header.tsx",
+        "surface": "Header 'Live WS' status badge, active latency counter, streamed transaction counter, ObservabilityPage live ticker"
+      },
+      "execution_path": [
+        "Frontend application mounts and connects WebSocket to /ws/telemetry",
+        "Backend accepts connection and enters while True loop with asyncio.sleep(1.0)",
+        "Generates transactions using random.choice(typologies) and random.uniform(1500.0, 450000.0)",
+        "Sends JSON payload to client over WebSocket",
+        "Header renders 'Live WS (XXms)' and increments transaction counter"
+      ],
+      "trigger": "Opening any page in the web application (Header maintains persistent WebSocket).",
+      "current_behavior": "Generates artificial transactions with random amounts, random bank IDs, and random fraud scores in an infinite sleep loop.",
+      "claimed_or_implied_behavior": "Represents live enterprise interbank payment traffic streaming from core banking systems.",
+      "user_visibility": "Top header bar of every page displays 'Live WS' indicator and transaction counter; ObservabilityPage displays live ticker.",
+      "evidence": [
+        "backend/app/presentation/websockets/streaming_ws.py:L321-L322: typ, desc, sev, score = random.choice(typologies); bank = random.choice(banks)",
+        "backend/app/presentation/websockets/streaming_ws.py:L335: 'amount': round(random.uniform(1500.0, 450000.0), 2)",
+        "frontend/src/components/layout/Header.tsx:L33-L36: Renders 'Live WS' badge when connected to this synthetic stream."
+      ],
+      "existing_real_alternative": [
+        "backend/app/infrastructure/connectors/kafka_streaming_connector.py :: KafkaStreamingConnector",
+        "backend/app/infrastructure/connectors/streaming_connector.py :: StreamingPaymentConnector"
+      ],
+      "recommended_remediation_type": "CONNECT_REAL_DATA_SOURCE",
+      "recommended_existing_targets": [
+        "backend/app/presentation/websockets/streaming_ws.py :: refactor endpoint to pull from Kafka/Redis stream when configured, and label as 'Simulated Telemetry' when running standalone demo"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "The UI header shows green 'Live WS' badge, creating a strong impression that real interbank transactions are flowing."
+      ]
+    },
+    {
+      "finding_id": "RTF-0005",
+      "title": "Design Partner Sandbox Synthesizes Model Predictions via Random Beta Distributions",
+      "classification": "SYNTHETIC_USER_FACING_OUTPUT",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "is_default_path": false,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/application/services/design_partner_service.py",
+        "symbol": "DesignPartnerPilotService.evaluate_reference_benchmark",
+        "lines": "L256-L273"
+      },
+      "sink": {
+        "file": "frontend/src/pages/BenchmarkHubPage.tsx",
+        "surface": "Projected Financial & Labor Savings, False Alarm Reduction %, ROC-AUC / PR-AUC cards"
+      },
+      "execution_path": [
+        "User visits /benchmarks (BenchmarkHubPage) and selects dataset/volume parameters",
+        "Frontend fires POST /api/v1/design-partner/benchmark",
+        "evaluate_reference_benchmark loads sample slice",
+        "Generates prediction probabilities using rng.beta(3.2, 1.4) and rng.beta(1.8, 2.2)",
+        "Calculates ROC-AUC and financial ROI metrics from Beta samples and returns JSON",
+        "Frontend renders annual savings ($USD) and dynamic ROI multiple"
+      ],
+      "trigger": "Interacting with BenchmarkHubPage parameter sliders.",
+      "current_behavior": "Instead of executing inference with trained PyTorch model weights on the sample data, prediction probabilities are sampled from calibrated Beta distributions.",
+      "claimed_or_implied_behavior": "Evaluates reference benchmark models (PaySim, IEEE-CIS) against bank sample data to compute empirical accuracy and financial uplift.",
+      "user_visibility": "BenchmarkHubPage financial ROI panel and performance comparison cards.",
+      "evidence": [
+        "backend/app/application/services/design_partner_service.py:L266-L267: y_prob_fl[fraud_idx] = rng.beta(a=3.2, b=1.4, size=len(fraud_idx))",
+        "backend/app/application/services/design_partner_service.py:L271-L272: y_prob_local[fraud_idx] = rng.beta(a=1.8, b=2.2, size=len(fraud_idx))"
+      ],
+      "existing_real_alternative": [
+        "backend/app/application/services/inference_engine.py :: run real forward pass using loaded PyTorch checkpoint"
+      ],
+      "recommended_remediation_type": "CONNECT_REAL_IMPLEMENTATION",
+      "recommended_existing_targets": [
+        "backend/app/application/services/design_partner_service.py:L256-L273 :: replace Beta random sampling with ModelService/InferenceEngine inference"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "The service generates realistic-looking distributions for sub-second sandbox speed, but it bypasses real neural network inference."
+      ]
+    },
+    {
+      "finding_id": "RTF-0006",
+      "title": "Model Registry Root Route Returns Hardcoded Baseline Models when Local Manifest is Empty",
+      "classification": "SILENT_FALLBACK",
+      "severity": "HIGH",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/presentation/routers/model_registry.py",
+        "symbol": "_get_all_model_summaries",
+        "lines": "L91-L113"
+      },
+      "sink": {
+        "file": "frontend/src/pages/ModelGovernancePage.tsx",
+        "surface": "Registered Models Table, Active Champions, Version History, SR 11-7 Compliance Badges"
+      },
+      "execution_path": [
+        "User visits /models or ModelGovernancePage",
+        "Frontend fires GET /api/v1/models",
+        "_get_all_model_summaries checks local storage directory",
+        "When empty, returns hardcoded consortium_global_fl (AUC 0.942) and elliptic_graphsage_temporal (AUC 0.8746)",
+        "Frontend displays models as live registered production champions"
+      ],
+      "trigger": "Visiting Model Governance console in a fresh environment.",
+      "current_behavior": "Fabricates two registered champion models with hardcoded version numbers, timestamps, and performance metrics when no models have been registered.",
+      "claimed_or_implied_behavior": "Lists authenticated, SR 11-7 compliant production models stored in the consortium registry.",
+      "user_visibility": "Model governance table displays hardcoded champions.",
+      "evidence": [
+        "backend/app/presentation/routers/model_registry.py:L93-L112: Static ModelSummary instances hardcoded in Python source."
+      ],
+      "existing_real_alternative": [
+        "Return empty list with guidance to train or import a model, or register default baseline models via explicit database migration"
+      ],
+      "recommended_remediation_type": "REMOVE_SILENT_FALLBACK",
+      "recommended_existing_targets": [
+        "backend/app/presentation/routers/model_registry.py:L91-L113 :: return empty list when no models exist instead of fabricating static models"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "Prevents empty state errors, but misleads auditor into believing production models are already registered."
+      ]
+    },
+    {
+      "finding_id": "RTF-0007",
+      "title": "In-Memory Ephemeral Storage Silently Replaces Redis with Zero Durability Warning",
+      "classification": "SILENT_FALLBACK",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/config.py",
+        "symbol": "Settings.redis_host",
+        "lines": "L56-L58"
+      },
+      "sink": {
+        "file": "backend/app/infrastructure/redis_store.py",
+        "surface": "All simulation run persistence, event logs, rate limiters, session stores"
+      },
+      "execution_path": [
+        "Backend starts with default configuration (redis_host = '')",
+        "RedisStore detects empty host and sets _global_redis_unavailable = True silently",
+        "Redirects all .set(), .get(), .push_list() operations to class-level Python dictionaries",
+        "UI operations succeed normally, but all state is destroyed on server restart"
+      ],
+      "trigger": "Running backend without explicit REDIS_HOST environment variable.",
+      "current_behavior": "Silently uses in-memory dictionary storage while APIs and documentation imply durable Redis/Celery persistence.",
+      "claimed_or_implied_behavior": "Durable distributed caching and message broker for multi-tenant bank isolation.",
+      "user_visibility": "No direct error message. Users believe runs are permanently recorded.",
+      "evidence": [
+        "backend/app/config.py:L56: # Leave redis_host empty to disable Redis and use in-memory storage silently.",
+        "backend/app/infrastructure/redis_store.py:L54-L57: self._redis_failed = True; RedisStore._global_redis_unavailable = True; return None"
+      ],
+      "existing_real_alternative": [
+        "backend/app/infrastructure/redis_store.py :: real Redis client when REDIS_HOST is configured"
+      ],
+      "recommended_remediation_type": "MAKE_FALLBACK_EXPLICIT",
+      "recommended_existing_targets": [
+        "backend/app/presentation/routers/health.py :: expose storage_mode: 'in_memory_ephemeral' vs 'redis_durable'",
+        "frontend/src/components/layout/Header.tsx :: display storage indicator if running in ephemeral mode"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "In-memory fallback is helpful for zero-dependency local testing, but it must be surfaced explicitly rather than operating silently."
+      ]
+    },
+    {
+      "finding_id": "RTF-0008",
+      "title": "Technical Report Modal Downloads In-Memory Hardcoded JSON Dossier",
+      "classification": "HARDCODED_USER_FACING_OUTPUT",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "is_default_path": false,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "frontend/src/components/TechnicalReportModal.tsx",
+        "symbol": "handleDownloadJson",
+        "lines": "L69-L100"
+      },
+      "sink": {
+        "file": "frontend/src/components/TechnicalReportModal.tsx",
+        "surface": "Downloaded cfi_benchmark_dossier.json file"
+      },
+      "execution_path": [
+        "User opens Technical Report Modal and clicks 'Download JSON Dossier'",
+        "Browser executes handleDownloadJson creating an in-memory blob with literal numbers (76700 txs, 38064.52 tx/s)",
+        "Triggers browser download of cfi_benchmark_dossier.json"
+      ],
+      "trigger": "User initiates download in TechnicalReportModal.",
+      "current_behavior": "Downloads a hardcoded JSON string constructed entirely in frontend memory.",
+      "claimed_or_implied_behavior": "Exports authentic benchmark verification results conforming to ISO 20022 and SLA tests.",
+      "user_visibility": "Downloaded JSON file opened by the user.",
+      "evidence": [
+        "frontend/src/components/TechnicalReportModal.tsx:L70-L100: dossier object with hardcoded values in component file."
+      ],
+      "existing_real_alternative": [
+        "GET /api/v1/benchmarks/dossier or static asset fetch from /docs/canonical_evidence_registry.json"
+      ],
+      "recommended_remediation_type": "CONNECT_OUTPUT_TO_CURRENT_RUN",
+      "recommended_existing_targets": [
+        "frontend/src/components/TechnicalReportModal.tsx:L69-L100 :: fetch authentic benchmark evidence from backend or label downloaded file clearly as reference template"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "The values match benchmark numbers from claim_registry.json, but they are hardcoded into frontend JSX instead of fetched from the evidence registry."
+      ]
+    },
+    {
+      "finding_id": "RTF-0009",
+      "title": "Software TEE Attestation Driver Uses Artificial Sleeps and Static Seeds",
+      "classification": "SYNTHETIC_USER_FACING_OUTPUT",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "is_default_path": false,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/infrastructure/security/tee_driver.py",
+        "symbol": "TEEDriver",
+        "lines": "L37-L100"
+      },
+      "sink": {
+        "file": "frontend/src/pages/SecurityPage.tsx",
+        "surface": "Intel SGX Enclave Attestation Report, MRENCLAVE / MRSIGNER verification badges"
+      },
+      "execution_path": [
+        "Simulation is launched with hardware_isolation_mode='intel_sgx'",
+        "SimulationService calls TEEDriver.create_enclave and TEEDriver.generate_attestation_report",
+        "Driver executes time.sleep(0.1) and time.sleep(0.05), computes SHA-256 of seed strings, and returns verified=True",
+        "SecurityPage renders 'Intel SGX Enclave: VERIFIED'"
+      ],
+      "trigger": "Enabling SGX enclave in simulation parameters.",
+      "current_behavior": "Emulates SGX enclave attestation in pure software using sleep delays and static SHA-256 hashes.",
+      "claimed_or_implied_behavior": "Cryptographic hardware-isolated enclave remote attestation via Intel SGX / AWS Nitro.",
+      "user_visibility": "Security dashboard displays SGX attestation verification badge.",
+      "evidence": [
+        "backend/app/infrastructure/security/tee_driver.py:L38: Docstring explicitly states SoftwareEmulatedTEEDriver for zero-hardware deployments.",
+        "backend/app/infrastructure/security/tee_driver.py:L53, L83: time.sleep(0.1) and time.sleep(0.05) artificial overhead delays."
+      ],
+      "existing_real_alternative": [
+        "Check for /dev/sgx_enclave or /dev/nitro_enclaves; if absent, display mode as SOFTWARE_EMULATION_SANDBOX"
+      ],
+      "recommended_remediation_type": "DERIVE_STATUS_FROM_VERIFICATION",
+      "recommended_existing_targets": [
+        "backend/app/infrastructure/security/tee_driver.py :: surface is_emulated: True in AttestationReport and render 'Software Emulated' badge in UI unless real SGX device node exists"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "The driver is well-structured as an emulator, but the UI renders it as 'Intel SGX Hardware Verified' without clearly indicating emulation."
+      ]
+    },
+    {
+      "finding_id": "RTF-0010",
+      "title": "Real-Time Fraud Stream Hook Falls Back to Client-Side Random Event Generator After Two Reconnect Failures",
+      "classification": "SILENT_FALLBACK",
+      "severity": "MEDIUM",
+      "confidence": "HIGH",
+      "is_default_path": false,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "frontend/src/hooks/useRealTimeFraudStream.ts",
+        "symbol": "startMockFallbackStream",
+        "lines": "L66-L115"
+      },
+      "sink": {
+        "file": "frontend/src/components/layout/Header.tsx",
+        "surface": "Live transaction stream subscribers"
+      },
+      "execution_path": [
+        "WebSocket connection to backend fails twice",
+        "useRealTimeFraudStream calls startMockFallbackStream()",
+        "Runs setInterval every 5000ms generating random transactions with Math.random()",
+        "Pushes events to stream subscribers"
+      ],
+      "trigger": "Running frontend without active backend WebSocket server.",
+      "current_behavior": "Generates artificial random transactions in the browser when WebSocket is unreachable.",
+      "claimed_or_implied_behavior": "Offline simulated fallback stream (header displays 'Simulated Stream (Offline)').",
+      "user_visibility": "Header badge changes to 'Simulated Stream (Offline)' with tooltip.",
+      "evidence": [
+        "frontend/src/hooks/useRealTimeFraudStream.ts:L79-L95: mockIntervalRef.current = setInterval(...) using Math.random()",
+        "frontend/src/components/layout/Header.tsx:L38-L41: Header correctly reflects status === 'mock_active'"
+      ],
+      "existing_real_alternative": [
+        "Keep stream paused in disconnected state until reconnection succeeds"
+      ],
+      "recommended_remediation_type": "MAKE_FALLBACK_EXPLICIT",
+      "recommended_existing_targets": [
+        "frontend/src/hooks/useRealTimeFraudStream.ts:L110-L115 :: make mock fallback opt-in via a user toggle rather than auto-activating"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "Header does indicate 'Simulated Stream', but auto-generating transactions can mask server connection drops."
+      ]
+    },
+    {
+      "finding_id": "RTF-0011",
+      "title": "Launch Modals Animate Staged Progress Using Client-Side Timers Without Backend Handshake",
+      "classification": "FAKE_PROGRESS",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "is_default_path": true,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "frontend/src/components/PlatformLaunchModal.tsx",
+        "symbol": "PlatformLaunchModal.useEffect",
+        "lines": "L124-L146"
+      },
+      "sink": {
+        "file": "frontend/src/components/PlatformLaunchModal.tsx",
+        "surface": "Modal progress bar, stage badges (mTLS, Kyber-768, SGX Enclave)"
+      },
+      "execution_path": [
+        "User clicks 'Launch Sandbox' on landing page",
+        "PlatformLaunchModal opens and runs 950ms setInterval timer",
+        "Increments progress from 0% to 100% based on elapsed clock time",
+        "On completion, navigates to target dashboard"
+      ],
+      "trigger": "Clicking launch button on landing page.",
+      "current_behavior": "Progress represents elapsed animation time (950ms), not backend initialization stages.",
+      "claimed_or_implied_behavior": "Authenticating PKI, negotiating Kyber-768 keys, initializing SGX memory.",
+      "user_visibility": "Full-screen modal during initial platform launch.",
+      "evidence": [
+        "frontend/src/components/PlatformLaunchModal.tsx:L124-L146: TOTAL_DURATION_MS = 950; setInterval based on elapsed / TOTAL_DURATION_MS"
+      ],
+      "existing_real_alternative": [
+        "GET /api/v1/health/ready to verify real backend readiness"
+      ],
+      "recommended_remediation_type": "DERIVE_STATUS_FROM_VERIFICATION",
+      "recommended_existing_targets": [
+        "frontend/src/components/PlatformLaunchModal.tsx :: query /api/v1/health or label modal clearly as an intro animation"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "Standard splash/launch transition animation, but stage tags ('FIPS 140-3 \u00b7 1.2ms') imply real-time measurements."
+      ]
+    },
+    {
+      "finding_id": "RTF-0012",
+      "title": "Dataloader Generates Synthetic Mock Graph Nodes when Real Elliptic Dataset File is Missing",
+      "classification": "LEGITIMATE_SYNTHETIC_INPUT",
+      "severity": "LOW",
+      "confidence": "HIGH",
+      "is_default_path": false,
+      "runtime_reachability": "PRODUCTION_USER_REACHABLE",
+      "source": {
+        "file": "backend/app/application/services/dataloader.py",
+        "symbol": "_generate_mock_elliptic",
+        "lines": "L181-L235"
+      },
+      "sink": {
+        "file": "backend/app/application/services/dataloader.py",
+        "surface": "load_dataset('elliptic') return dictionary"
+      },
+      "execution_path": [
+        "Code calls load_dataset('elliptic')",
+        "Checks if storage/benchmark_datasets/elliptic.csv exists",
+        "If missing, logs info and calls _generate_mock_elliptic(n_mock_nodes, rng)",
+        "Generates synthetic graph structure and features with correct dimensionality"
+      ],
+      "trigger": "Calling load_dataset with 'elliptic' when local dataset CSV is not downloaded.",
+      "current_behavior": "Generates a synthetic graph dataset matching Elliptic schema and feature dimensions (166 features).",
+      "claimed_or_implied_behavior": "Synthetic fallback dataset for sandbox development.",
+      "user_visibility": "Logged as `[Elliptic] Generating synthetic mock (%d nodes)` in backend logs.",
+      "evidence": [
+        "backend/app/application/services/dataloader.py:L189-L193: Logger explicitly states '[Elliptic] Generating synthetic mock'."
+      ],
+      "existing_real_alternative": [
+        "Real Elliptic CSV downloaded from Kaggle/Bitcoin dataset repository"
+      ],
+      "recommended_remediation_type": "LABEL_SYNTHETIC_MODE",
+      "recommended_existing_targets": [
+        "backend/app/application/services/dataloader.py :: return dataset metadata indicating is_synthetic: True"
+      ],
+      "requires_runtime_validation": true,
+      "notes": [
+        "Legitimate synthetic input: real algorithms execute on synthetic data, and the generator logs that it is generating synthetic mock data."
+      ]
+    }
+  ]
+}

@@ -7,7 +7,7 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const docsUrl = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '') + '/docs';
-  const { status, latencyMs, totalStreamedTransactions } = useRealTimeFraudStream();
+  const { status, streamSource, streamProvenance, latencyMs, totalStreamedTransactions } = useRealTimeFraudStream();
 
   return (
     <header className="h-14 border-b border-[var(--color-border)] bg-[var(--color-bg-secondary)]/80 backdrop-blur-md flex items-center px-4 md:px-6 sticky top-0 z-40">
@@ -30,12 +30,24 @@ export default function Header({ onMenuClick }: HeaderProps) {
         {/* Real-time WebSocket status badge */}
         <div className="hidden sm:flex items-center gap-2">
           {status === 'connected' ? (
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-              Live WS ({latencyMs}ms)
-            </span>
+            streamSource === 'LIVE_CONNECTOR' ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30" title={`Live Ingestion Provider: ${streamProvenance}`}>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                Live Connector WS ({latencyMs}ms)
+              </span>
+            ) : streamSource === 'SIMULATED' ? (
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="Simulated Sandbox Demo Feed (Synthetic transactions)">
+                <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
+                Simulated Feed ({latencyMs}ms)
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30" title="WebSocket connected, but no live telemetry provider is currently configured.">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+                Telemetry Standby ({latencyMs}ms)
+              </span>
+            )
           ) : status === 'mock_active' ? (
-            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="WebSocket disconnected. Serving deterministic simulated sandbox telemetry.">
+            <span className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30" title="WebSocket disconnected. Deterministic simulated sandbox telemetry.">
               <Radio className="w-2.5 h-2.5 text-indigo-400 animate-pulse" />
               Simulated Stream (Offline)
             </span>

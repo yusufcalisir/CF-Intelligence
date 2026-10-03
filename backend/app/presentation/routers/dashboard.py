@@ -11,7 +11,7 @@ import logging
 from collections import defaultdict
 from pathlib import Path
 
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from app.application.schemas.dashboard import (
     CentralizationGapAnalysisSchema,
@@ -278,127 +278,15 @@ async def get_comparative_baselines() -> ComparativeBenchmarkResponseSchema:
             try:
                 with open(p, encoding="utf-8") as f:
                     data = json.load(f)
+                data["provenance"] = "CANONICAL_BENCHMARK_REFERENCE"
+                data["is_live_runtime"] = False
+                data["surface_type"] = "BENCHMARK_REFERENCE"
                 return ComparativeBenchmarkResponseSchema(**data)
             except Exception as e:
                 logger.warning("Failed loading comparative baselines from %s: %s", p, e)
 
-    # Authoritative empirical baseline payload conforming to benchmarks/claim_registry.json
-    return ComparativeBenchmarkResponseSchema(
-        dataset_name="PaySim & Financial Consortia",
-        generated_at_utc="2026-09-26T12:00:00Z",
-        random_state=42,
-        bank_count=3,
-        total_training_samples=150000,
-        global_test_samples=45000,
-        fraud_prevalence_pct=0.129,
-        comparison_matrix=[
-            ComparativeModelItemSchema.model_validate(item)
-            for item in [
-                {
-                    "paradigm": "Centralized Upper Bound (Pooled GBDT)",
-                    "category": "THEORETICAL_UPPER_BOUND",
-                    "pr_auc": 0.8650,
-                    "roc_auc": 0.9840,
-                    "recall_at_01_fpr": 0.6650,
-                    "f1_score": 0.7820,
-                    "brier_score": 0.0120,
-                    "latency_ms": 0.045,
-                    "delta_pr_auc_vs_fed": 0.0230,
-                    "privacy_guarantee": "ILLEGAL_DATA_POOLING",
-                    "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
-                    "description": "All bank data combined into single repository (theoretical mathematical ceiling)",
-                },
-                {
-                    "paradigm": "Centralized Deep MLP (Pooled Neural)",
-                    "category": "THEORETICAL_UPPER_BOUND",
-                    "pr_auc": 0.8520,
-                    "roc_auc": 0.9780,
-                    "recall_at_01_fpr": 0.6410,
-                    "f1_score": 0.7650,
-                    "brier_score": 0.0145,
-                    "latency_ms": 0.260,
-                    "delta_pr_auc_vs_fed": 0.0100,
-                    "privacy_guarantee": "ILLEGAL_DATA_POOLING",
-                    "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
-                    "description": "PyTorch multi-layer perceptron on pooled raw transactions",
-                },
-                {
-                    "paradigm": "Federated Learning Champion (FedAvg / FedProx)",
-                    "category": "PRODUCTION_CHAMPION",
-                    "pr_auc": 0.8420,
-                    "roc_auc": 0.9750,
-                    "recall_at_01_fpr": 0.6240,
-                    "f1_score": 0.7510,
-                    "brier_score": 0.0158,
-                    "latency_ms": 0.260,
-                    "delta_pr_auc_vs_fed": 0.0000,
-                    "privacy_guarantee": "ZERO_RAW_PII_CURVE25519_OPACUS_DP",
-                    "legal_compliance": "FULLY_COMPLIANT_GDPR_KVKK",
-                    "description": "Consortium model trained via decentralized gradients with SecAgg and Differential Privacy",
-                },
-                {
-                    "paradigm": "Isolated Local Banking Silos (Mean of Banks)",
-                    "category": "ISOLATED_SILO",
-                    "pr_auc": 0.6940,
-                    "roc_auc": 0.8820,
-                    "recall_at_01_fpr": 0.4320,
-                    "f1_score": None,
-                    "brier_score": 0.0380,
-                    "latency_ms": 0.040,
-                    "delta_pr_auc_vs_fed": -0.1480,
-                    "status": "EVALUATED",
-                    "privacy_guarantee": "LOCAL_DATA_ONLY",
-                    "legal_compliance": "LEGALLY_PASSIVE_FRAUD_BLIND",
-                    "description": "Average performance of 3 banks training exclusively on local data (severe fraud blindness)",
-                },
-                {
-                    "paradigm": "Classical Random Forest (Pooled Baseline)",
-                    "category": "CLASSICAL_BASELINE",
-                    "pr_auc": None,
-                    "roc_auc": None,
-                    "recall_at_01_fpr": None,
-                    "f1_score": None,
-                    "brier_score": None,
-                    "latency_ms": None,
-                    "delta_pr_auc_vs_fed": None,
-                    "status": "NOT_RUN",
-                    "privacy_guarantee": "ILLEGAL_DATA_POOLING",
-                    "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
-                    "description": "Classical Random Forest baseline (not evaluated on this partition)",
-                },
-                {
-                    "paradigm": "Classical Logistic Regression (Pooled Baseline)",
-                    "category": "CLASSICAL_BASELINE",
-                    "pr_auc": None,
-                    "roc_auc": None,
-                    "recall_at_01_fpr": None,
-                    "f1_score": None,
-                    "brier_score": None,
-                    "latency_ms": None,
-                    "delta_pr_auc_vs_fed": None,
-                    "status": "NOT_RUN",
-                    "privacy_guarantee": "ILLEGAL_DATA_POOLING",
-                    "legal_compliance": "VIOLATES_GDPR_BANKING_SECRECY",
-                    "description": "Classical Logistic Regression baseline (not evaluated on this partition)",
-                },
-            ]
-        ],
-        centralization_gap_analysis=CentralizationGapAnalysisSchema(
-            pooled_champion_model="pooled_gradient_boosting",
-            pooled_pr_auc=0.8650,
-            pooled_roc_auc=0.9840,
-            pooled_recall_at_01_fpr=0.6650,
-            centralization_gap_pr_auc=0.0230,
-            centralization_gap_roc_auc=0.0090,
-            federated_efficiency_pct=97.34,
-        ),
-        silo_deficit_analysis=SiloDeficitAnalysisSchema(
-            mean_pr_auc=0.6940,
-            mean_roc_auc=0.8820,
-            mean_recall_at_01_fpr=0.4320,
-            silo_count=3,
-            collaborative_uplift_pr_auc=0.1480,
-            collaborative_uplift_roc_auc=0.0930,
-        ),
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Comparative benchmark reference evidence is not available on disk.",
     )
 

@@ -1,0 +1,1461 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_0_RUNTIME_SURFACE_MAPPING",
+  "repository": {
+    "name": "CF-Intelligence",
+    "branch": "main",
+    "head": "67b08b19eea16800c1e612b80aa7571b4f3c0246",
+    "origin_main": "67b08b19eea16800c1e612b80aa7571b4f3c0246",
+    "dirty_modified_files": 17,
+    "untracked_directories": 2,
+    "clean_architecture_compliance": "VERIFIED (374/382 documented files exact match, 8 documentation-only items identified)"
+  },
+  "statistics": {
+    "total_mapped_capabilities": 31,
+    "total_discovered_routes": 683,
+    "total_unique_endpoints": 673,
+    "total_router_modules": 45,
+    "total_service_modules": 75,
+    "total_domain_modules": 47,
+    "total_infrastructure_modules": 93,
+    "total_frontend_pages": 21,
+    "total_frontend_components": 87
+  },
+  "capabilities": [
+    {
+      "id": "CAP-FL-SIMULATION-START",
+      "name": "Start Federated Learning Simulation",
+      "description": "Orchestrates multi-bank federated training across participating bank nodes using specified aggregation strategy, differential privacy, and Byzantine defenses.",
+      "documented_in": [
+        "README.md#12-what-is-actually-implemented",
+        "README.md#5-federated-learning-engines--non-iid-optimization",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: 'Start Simulation' / 'Start Simulation (Live)' button",
+        "FLRoundRunner.tsx :: 'Start FL Training Simulation' button",
+        "SimulationControls.tsx :: 'Start Simulation' button",
+        "PlatformLaunchModal.tsx :: 'Launch Sandbox' button"
+      ],
+      "entry_points": [
+        "POST /api/v1/simulations",
+        "POST /api/v1/simulations/start",
+        "POST /v1/simulations",
+        "POST /api/v1/simulation",
+        "POST /v1/simulation"
+      ],
+      "services": [
+        "backend/app/application/services/simulation_service.py :: SimulationService.run_simulation",
+        "backend/app/application/services/fl_engine.py :: FederatedLearningEngine",
+        "backend/app/application/services/model_service.py :: ModelService",
+        "backend/app/application/services/privacy_service.py :: PrivacyService"
+      ],
+      "domain_components": [
+        "backend/app/domain/value_objects.py :: SimulationConfig",
+        "backend/app/domain/entities.py :: SimulationRun",
+        "backend/app/domain/byzantine_defense.py :: Krum, TrimmedMean, Bulyan",
+        "backend/app/domain/spectral_defense.py :: SpectralSVDFilter"
+      ],
+      "data_dependencies": [
+        "Synthetic data generated via DataGenerator.generate_bank_datasets",
+        "Real benchmark data loaded via Dataloader.load_dataset (PaySim, IEEE-CIS, Elliptic, CreditCard)"
+      ],
+      "model_dependencies": [
+        "PyTorch MLP model created via ModelService.create_model (NUM_FEATURES=10)"
+      ],
+      "result_producers": [
+        "backend/app/application/services/simulation_service.py:L922-L969",
+        "backend/app/application/services/fl_engine.py:L310-L450",
+        "backend/app/application/services/model_service.py:L180-L245"
+      ],
+      "final_consumers": [
+        "frontend/src/pages/LiveOperationsView.tsx (LossChart, MetricsComparisonBarChart)",
+        "frontend/src/components/FLRoundRunner.tsx (LineChart)",
+        "backend/app/infrastructure/redis_store.py (_simulation_results, _simulation_events)"
+      ],
+      "configuration": [
+        "fl_default_rounds",
+        "fl_default_learning_rate",
+        "bank_a_connector_type",
+        "aggregation_method",
+        "privacy_mechanism",
+        "hardware_isolation_mode"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/simulation.py:L400-L489",
+        "backend/app/presentation/routers/simulation.py:L810-L925",
+        "backend/app/application/services/simulation_service.py:L108-L1095",
+        "frontend/src/pages/LiveOperationsView.tsx:L841-L869",
+        "frontend/src/api/queries.ts:L295-L302"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-FL-SIMULATION-POLL",
+      "name": "Poll Simulation Progress & Telemetry",
+      "description": "Polls real-time training progress, completed rounds, and bank metrics, or streams events via WebSocket.",
+      "documented_in": [
+        "README.md#18-api-endpoint-blueprints--core-specification"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: Current round indicator, loss curves, bank status indicators",
+        "FLRoundRunner.tsx :: Round progress bar & round logs",
+        "ObservabilityPage.tsx :: Telemetry charts"
+      ],
+      "entry_points": [
+        "GET /api/v1/simulation/{simulation_id}/status",
+        "GET /api/v1/simulations/{simulation_id}",
+        "GET /api/v1/training/{simulation_id}/rounds",
+        "WS /ws/training",
+        "WS /ws/training/{simulation_id}"
+      ],
+      "services": [
+        "backend/app/presentation/routers/simulation.py :: get_simulation_status, get_simulation",
+        "backend/app/presentation/websockets/training_ws.py :: _handle_training_ws",
+        "backend/app/presentation/websockets/manager.py :: TrainingWebSocketManager"
+      ],
+      "domain_components": [
+        "backend/app/domain/entities.py :: TrainingRound",
+        "backend/app/domain/enums.py :: SimulationStatus"
+      ],
+      "data_dependencies": [
+        "_simulation_results RedisStore",
+        "_simulation_events RedisStore / in-memory ring-buffer"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/presentation/routers/simulation.py:L860-L921 (progress_cb)",
+        "backend/app/presentation/websockets/manager.py:L180-L240"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useSimulationStatus",
+        "frontend/src/pages/LiveOperationsView.tsx (ws.onmessage)"
+      ],
+      "configuration": [
+        "redis_url",
+        "app_env"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/simulation.py:L526-L548",
+        "backend/app/presentation/websockets/training_ws.py:L37-L253",
+        "frontend/src/pages/LiveOperationsView.tsx:L593-L670"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-FL-CANONICAL-BASELINE",
+      "name": "Retrieve Seeded Canonical Baseline Simulation",
+      "description": "Provides instant demonstration baseline metrics ('sim_fed_01') with precomputed 10-round metrics for ephemeral cold-boot environments.",
+      "documented_in": [
+        "README.md#12-what-is-actually-implemented"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: Default cold-load view when navigated without new run",
+        "Dashboard.tsx :: Overview metrics and champion AUC fallback"
+      ],
+      "entry_points": [
+        "GET /api/v1/simulations/sim_fed_01",
+        "GET /api/v1/training/sim_fed_01/rounds"
+      ],
+      "services": [
+        "backend/app/presentation/routers/simulation.py :: _seed_canonical_simulation"
+      ],
+      "domain_components": [
+        "backend/app/domain/entities.py :: SimulationRun, Bank, TrainingRound"
+      ],
+      "data_dependencies": [
+        "Static hardcoded dictionary in simulation.py (_seed_canonical_simulation)"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/presentation/routers/simulation.py:L56-L356"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useSimulation('sim_fed_01')",
+        "frontend/src/pages/LiveOperationsView.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/simulation.py:L56-L356"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-CLIENT-SIDE-SIMULATED-TRAINING",
+      "name": "Frontend Standalone Simulated Training Mode",
+      "description": "Simulates federated training convergence entirely within browser memory using Gaussian noise and setTimeout step functions (active when trainingMode === 'mock').",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: 'Start Simulation' button when trainingMode === 'mock'",
+        "LiveOperationsView.tsx :: Auto-start on navigation when no backend data exists"
+      ],
+      "entry_points": [
+        "Browser internal execution: LiveOperationsView.tsx :: startSimulatedTraining"
+      ],
+      "services": [],
+      "domain_components": [],
+      "data_dependencies": [
+        "DATASET_PROFILES in LiveOperationsView.tsx (paysim, ieee_cis, elliptic, creditcard convergence constants)"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "frontend/src/pages/LiveOperationsView.tsx:L777-L838"
+      ],
+      "final_consumers": [
+        "LiveOperationsView.tsx :: setRoundHistory, setChampionAuc, LossChart, MetricsComparisonBarChart"
+      ],
+      "configuration": [
+        "LiveOperationsView.tsx :: trainingMode ('mock' vs 'real')"
+      ],
+      "mapping_status": "EXPLICIT_DEMO_ONLY",
+      "confidence": "HIGH",
+      "evidence": [
+        "frontend/src/pages/LiveOperationsView.tsx:L777-L838",
+        "frontend/src/pages/LiveOperationsView.tsx:L924-L948"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-REALTIME-FRAUD-SCORING",
+      "name": "Real-Time Transaction Fraud Scoring Gateway",
+      "description": "Scores transaction payloads using active champion PyTorch neural network, executes 9-signal composite risk weighting, and records inference latency.",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification",
+        "README.md#18-api-endpoint-blueprints--core-specification"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: Manual Transaction Scorer / Predictor widget",
+        "Predictor.tsx :: Quick Score form",
+        "ApiDocsPage.tsx :: Interactive prediction tester"
+      ],
+      "entry_points": [
+        "POST /api/v1/predict",
+        "POST /v1/predict",
+        "POST /api/v1/realtime-inference/score"
+      ],
+      "services": [
+        "backend/app/application/services/model_service.py :: ModelService",
+        "backend/app/application/services/risk_engine.py :: RiskScoringEngine",
+        "backend/app/application/services/feature_store_service.py :: FeatureStoreService",
+        "backend/app/application/services/alert_service.py :: AlertIntelligenceService"
+      ],
+      "domain_components": [
+        "backend/app/domain/risk_engine.py :: RiskScoringEngine",
+        "backend/app/domain/entities.py :: Transaction, Alert",
+        "backend/app/domain/value_objects.py :: RiskWeightConfig"
+      ],
+      "data_dependencies": [
+        "Redis / FeatureStore rolling 1h velocity, 24h average amount, chargeback history",
+        "Global min-max reference bounds (REFERENCE_BOUNDS)"
+      ],
+      "model_dependencies": [
+        "Champion PyTorch model loaded from storage/model_registry/global_model.pt or active version manifest"
+      ],
+      "result_producers": [
+        "backend/app/presentation/routers/predict.py:L74-L78 (_eval_model)",
+        "backend/app/presentation/routers/predict.py:L211-L256 (preprocess_transaction)",
+        "backend/app/application/services/risk_engine.py:L140-L220 (score_transaction)"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: usePredictTransaction",
+        "frontend/src/components/Predictor.tsx",
+        "AlertIntelligenceService (if risk score >= 600.0)"
+      ],
+      "configuration": [
+        "feature_store_enabled",
+        "mtls_enabled",
+        "abac_enabled"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/predict.py:L259-L460",
+        "backend/app/application/services/risk_engine.py:L140-L240",
+        "frontend/src/services/api.ts:L29-L39"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-SHADOW-CHALLENGER-EVALUATION",
+      "name": "Champion/Challenger Shadow Deployment & Traffic Split",
+      "description": "Routes a configurable percentage of live inference traffic to a candidate challenger model without affecting primary production decisioning, logging divergence metrics.",
+      "documented_in": [
+        "README.md#2-master-system-architecture",
+        "README.md#11-three-tier-system-classification"
+      ],
+      "user_surfaces": [
+        "ModelRegistryPanel.tsx :: Shadow metrics comparison table",
+        "Dashboard.tsx :: Active model vs challenger divergence telemetry"
+      ],
+      "entry_points": [
+        "POST /api/v1/predict (internal traffic splitting)",
+        "GET /api/v1/model-registry/{simulation_id}/shadow-metrics",
+        "POST /api/v1/model-registry/{simulation_id}/traffic-share"
+      ],
+      "services": [
+        "backend/app/application/services/model_registry.py :: ModelEvaluationEngine",
+        "backend/app/presentation/routers/predict.py :: _load_challenger_model"
+      ],
+      "domain_components": [
+        "backend/app/domain/model_lifecycle.py :: ModelManifestEntry, ShadowEvaluationRecord"
+      ],
+      "data_dependencies": [
+        "Disk state dicts in storage/model_registry/{sim_id}_v{version}.pt"
+      ],
+      "model_dependencies": [
+        "Challenger PyTorch model checkpoint"
+      ],
+      "result_producers": [
+        "backend/app/presentation/routers/predict.py:L358-L426",
+        "backend/app/application/services/model_registry.py:L110-L160"
+      ],
+      "final_consumers": [
+        "frontend/src/components/dashboard/ModelRegistryPanel.tsx",
+        "ModelEvaluationEngine.get_shadow_metrics"
+      ],
+      "configuration": [
+        "traffic_share parameter"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/predict.py:L362-L426",
+        "backend/app/presentation/routers/model_registry.py:L180-L230"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-SHAP-EXPLAINABILITY",
+      "name": "SHAP & Counterfactual Feature Attribution",
+      "description": "Generates real-time feature importance attribution (KernelExplainer/TreeExplainer approximation) and actionable counterfactual recourse explanations.",
+      "documented_in": [
+        "README.md#12-what-is-actually-implemented",
+        "README.md#9-9-signal-composite-risk-engine--model-explainability"
+      ],
+      "user_surfaces": [
+        "CounterfactualWorkbench.tsx :: Recourse slider & feature delta cards",
+        "InvestigationDashboard.tsx :: SHAP waterfall feature attribution",
+        "CaseDetailPage.tsx :: Top contributing risk factors"
+      ],
+      "entry_points": [
+        "POST /api/v1/explainability/explain",
+        "GET /api/v1/explainability/counterfactuals",
+        "POST /api/v1/explainability/counterfactuals/generate",
+        "GET /api/v1/explainability/replay/{transaction_id}"
+      ],
+      "services": [
+        "backend/app/application/services/explainability_service.py :: ExplainabilityService",
+        "backend/app/application/services/counterfactual_service.py :: CounterfactualService",
+        "backend/app/domain/realtime_explainer.py :: RealtimeExplainer"
+      ],
+      "domain_components": [
+        "backend/app/domain/realtime_explainer.py :: FastFeatureAttribution"
+      ],
+      "data_dependencies": [
+        "Transaction feature vector and reference background distribution"
+      ],
+      "model_dependencies": [
+        "Serving model neural network forward function"
+      ],
+      "result_producers": [
+        "backend/app/application/services/explainability_service.py:L120-L210",
+        "backend/app/domain/realtime_explainer.py:L40-L110"
+      ],
+      "final_consumers": [
+        "frontend/src/components/CounterfactualWorkbench.tsx",
+        "frontend/src/components/charts/FeatureImportance.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/application/services/explainability_service.py:L120-L250",
+        "backend/app/domain/realtime_explainer.py:L40-L110",
+        "frontend/src/services/api.ts:L41-L78"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-ALERT-TRIAGE-MANAGEMENT",
+      "name": "Fraud Alert Feed & Investigation Triage",
+      "description": "Receives scored high-risk transactions, deduplicates alerts, surfaces them in investigator feed, and transitions status (NEW -> UNDER_REVIEW -> ESCALATED / DISMISSED).",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech"
+      ],
+      "user_surfaces": [
+        "AlertsPage.tsx :: Alert cards, severity badges, triage actions (Escalate to Case, Dismiss)",
+        "InvestigationDashboard.tsx :: Active triage feed and evidence timeline"
+      ],
+      "entry_points": [
+        "GET /api/v1/alerts/feed",
+        "GET /api/v1/alerts/{alert_id}",
+        "PATCH /api/v1/alerts/{alert_id}/status",
+        "POST /api/v1/alerts/triage/evaluate"
+      ],
+      "services": [
+        "backend/app/application/services/alert_service.py :: AlertIntelligenceService"
+      ],
+      "domain_components": [
+        "backend/app/domain/entities_phase2.py :: Alert",
+        "backend/app/domain/enums.py :: AlertSeverity, AlertStatus"
+      ],
+      "data_dependencies": [
+        "In-memory / RedisStore _alert_store",
+        "Seed mock alerts (alt_1001, alt_1002, alt_1003) from main.py seed_mock_data()"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/alert_service.py:L110-L180"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useAlerts, useUpdateAlertStatus",
+        "frontend/src/pages/AlertsPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/alerts.py:L110-L240",
+        "backend/app/application/services/alert_service.py:L110-L220",
+        "frontend/src/pages/AlertsPage.tsx:L120-L260"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-CASE-FOUR-EYES-WORKBENCH",
+      "name": "6-Stage Case Management & Four-Eyes Dual Supervisor Approval",
+      "description": "Investigates confirmed alerts, attaches evidence dossiers, enforces dual supervisor cryptographic signing, and transitions case to FILED status.",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "CasesPage.tsx :: Active cases table & SLA timers",
+        "CaseDetailPage.tsx :: Evidence timeline, supervisor signature pad, escalation controls"
+      ],
+      "entry_points": [
+        "GET /api/v1/cases",
+        "GET /api/v1/cases/{case_id}",
+        "POST /api/v1/cases",
+        "POST /api/v1/cases/{case_id}/sign",
+        "POST /api/v1/cases/{case_id}/escalate",
+        "POST /api/v1/cases/{case_id}/resolve"
+      ],
+      "services": [
+        "backend/app/application/services/case_service.py :: CaseManagementService",
+        "backend/app/application/services/case_workbench.py :: CaseWorkbench"
+      ],
+      "domain_components": [
+        "backend/app/domain/case_management.py :: FourEyesApprovalEngine",
+        "backend/app/domain/entities_phase2.py :: Case",
+        "backend/app/domain/enums.py :: CaseStatus, CasePriority"
+      ],
+      "data_dependencies": [
+        "_cases RedisStore in case_service.py",
+        "Initial seeded case CASE-98492"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/case_service.py:L140-L260",
+        "backend/app/domain/case_management.py:L60-L130"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useCase, useSignCase",
+        "frontend/src/pages/CaseDetailPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/cases.py:L140-L380",
+        "backend/app/application/services/case_service.py:L140-L280",
+        "frontend/src/pages/CaseDetailPage.tsx:L120-L250"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-FINCEN-SAR-XML-EXPORT",
+      "name": "FinCEN BSA SAR XML Compilation & SHA-256 Digest",
+      "description": "Compiles validated FinCEN Suspicious Activity Report XML conforming to official XSD specifications, hashes with SHA-256 for tamper evidence, and provides downloadable artifact.",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech"
+      ],
+      "user_surfaces": [
+        "CaseDetailPage.tsx :: 'Export FinCEN SAR XML' button",
+        "InvestigationDashboard.tsx :: 'Export SAR Dossier' button"
+      ],
+      "entry_points": [
+        "POST /api/v1/cases/export/fincen-xml",
+        "POST /api/v1/cases/{case_id}/sar/generate"
+      ],
+      "services": [
+        "backend/app/application/services/regulatory_reporter.py :: RegulatoryReporterService"
+      ],
+      "domain_components": [
+        "backend/app/domain/sar_generator.py :: SARXmlGenerator"
+      ],
+      "data_dependencies": [
+        "Case record and attached alert details from case_service and alert_service"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/regulatory_reporter.py:L120-L240",
+        "backend/app/domain/sar_generator.py:L80-L280"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useExportFinCENXml",
+        "frontend/src/pages/CaseDetailPage.tsx (download trigger)"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/cases.py:L630-L712",
+        "backend/app/application/services/regulatory_reporter.py:L120-L240",
+        "backend/app/domain/sar_generator.py:L80-L280"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-EU-GOAML-REGULATORY-FILING",
+      "name": "European FIU UNODC goAML 4.0 XML & EU AMLA Exporter",
+      "description": "Prototype generator for official UNODC goAML 4.0 XML filings (STR/SAR/TTR) and EU AMLA Single Rulebook interchange JSON with cryptographic envelope sealing.",
+      "documented_in": [
+        "README.md#12-what-is-actually-implemented",
+        "README.md#13-claims--evidence-verification-matrix"
+      ],
+      "user_surfaces": [
+        "ApiDocsPage.tsx :: Interactive regulatory filing sandbox",
+        "InvestigationDashboard.tsx :: European RegTech filing tab"
+      ],
+      "entry_points": [
+        "POST /api/v1/regulatory/reports",
+        "GET /api/v1/regulatory/reports/{report_id}",
+        "POST /api/v1/regulatory/reports/{report_id}/signoff",
+        "POST /api/v1/regulatory/reports/{report_id}/transmit"
+      ],
+      "services": [
+        "backend/app/application/services/fiu_regulatory_service.py :: FIURegulatoryService"
+      ],
+      "domain_components": [
+        "backend/app/domain/enums.py :: RegulatoryReportType, RegulatoryReportStatus"
+      ],
+      "data_dependencies": [
+        "In-memory report storage in FIURegulatoryService"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/fiu_regulatory_service.py:L210-L450"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useRegulatoryReports",
+        "European FIU / AMLA Hub transmission simulator"
+      ],
+      "configuration": [
+        "CFI_REGULATORY_ENVELOPE_SECRET"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/regulatory.py:L70-L260",
+        "backend/app/application/services/fiu_regulatory_service.py:L1-L868"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-GRAPH-INTELLIGENCE",
+      "name": "Entity Relationship Knowledge Graph Traversal",
+      "description": "Traverses 2-hop entity-relationship property graph networks, detects circular mule rings, smurfing structures, and renders interactive visualization.",
+      "documented_in": [
+        "README.md#8-graph-intelligence--fuzzy-entity-resolution",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "GraphPage.tsx :: Interactive ReactFlow 2D/3D knowledge graph visualizer",
+        "LiveOperationsView.tsx :: Real-time transaction graph sub-panel"
+      ],
+      "entry_points": [
+        "GET /api/v1/graph",
+        "GET /api/v1/graph/stats",
+        "GET /api/v1/graph/clusters/list",
+        "GET /api/v1/graph/mule-rings",
+        "GET /api/v1/graph/smurfing",
+        "GET /api/v1/graph/search"
+      ],
+      "services": [
+        "backend/app/application/services/graph_engine.py :: GraphEngine",
+        "backend/app/application/services/graph_analytics_service.py :: GraphAnalyticsService"
+      ],
+      "domain_components": [
+        "backend/app/domain/entities.py :: Entity, Relationship",
+        "backend/app/domain/enums.py :: EntityType, RelationshipType"
+      ],
+      "data_dependencies": [
+        "In-memory / Redis property graph in GraphEngine",
+        "Initial seeded entities & edges from main.py seed_mock_data()"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/graph_engine.py:L180-L320",
+        "backend/app/application/services/graph_analytics_service.py:L80-L190"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useGraph, useGraphStats",
+        "frontend/src/pages/GraphPage.tsx"
+      ],
+      "configuration": [
+        "graph_db_type",
+        "neo4j_uri"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/graph.py:L80-L240",
+        "backend/app/application/services/graph_engine.py:L180-L380",
+        "frontend/src/pages/GraphPage.tsx:L18-L120"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-GNN-RELATIONAL-EMBEDDINGS",
+      "name": "GraphSAGE 2-Hop Relational Node Embeddings",
+      "description": "Generates 64/128-dimensional inductive neighborhood node embeddings using PyTorch GraphSAGE architecture for topological fraud risk scoring.",
+      "documented_in": [
+        "README.md#8-graph-intelligence--fuzzy-entity-resolution",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "GraphPage.tsx :: Node embedding inspection modal",
+        "Predictor.tsx :: GNN topological risk signal (Signal 7 of 9)"
+      ],
+      "entry_points": [
+        "GET /api/v1/graph/gnn/embeddings/{entity_id}",
+        "POST /api/v1/graph/gnn/similarity",
+        "POST /api/v1/graph/gnn/train"
+      ],
+      "services": [
+        "backend/app/application/services/graph_embedding_service.py :: GraphEmbeddingService",
+        "backend/app/application/services/graph_embedding_model.py :: GraphSAGEModel"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "Adjacency matrix and node feature tensors from GraphEngine"
+      ],
+      "model_dependencies": [
+        "PyTorch GraphSAGE 2-layer GNN (GraphSAGEModel)"
+      ],
+      "result_producers": [
+        "backend/app/application/services/graph_embedding_model.py:L80-L160",
+        "backend/app/application/services/graph_embedding_service.py:L90-L210"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useEntityEmbedding, useGNNSimilarity",
+        "RiskScoringEngine (gnn_topological_risk signal)"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/graph.py:L260-L380",
+        "backend/app/application/services/graph_embedding_model.py:L80-L160"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-FUZZY-PSI-RESOLUTION",
+      "name": "MinHash LSH Private Set Intersection (Fuzzy PSI)",
+      "description": "Resolves cross-bank synthetic customer identifiers and shared accounts without decrypting or transmitting raw PII via MinHash locality-sensitive hashing and salted HMAC digests.",
+      "documented_in": [
+        "README.md#8-graph-intelligence--fuzzy-entity-resolution",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "PsiPage.tsx :: Interactive cross-bank entity matcher & tokenization tester"
+      ],
+      "entry_points": [
+        "POST /api/v1/entities/psi/match",
+        "POST /api/v1/entities/psi/match-direct",
+        "GET /api/v1/entities/psi/stats",
+        "POST /api/v1/entities/tokenize"
+      ],
+      "services": [
+        "backend/app/application/services/psi_service.py :: PSIService",
+        "backend/app/application/services/entity_resolution.py :: EntityResolutionService"
+      ],
+      "domain_components": [
+        "backend/app/domain/fuzzy_psi.py :: FuzzyPSI",
+        "backend/app/domain/minhash_lsh.py :: MinHashLSH"
+      ],
+      "data_dependencies": [
+        "Salted HMAC digests and MinHash signature vectors"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/domain/minhash_lsh.py:L60-L180",
+        "backend/app/application/services/psi_service.py:L80-L160"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: usePerformPSI, useHMACTokenize",
+        "frontend/src/pages/PsiPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/entities.py:L260-L390",
+        "backend/app/domain/minhash_lsh.py:L60-L180",
+        "frontend/src/pages/PsiPage.tsx:L80-L240"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-DIFFERENTIAL-PRIVACY-DEFENSE",
+      "name": "Differential Privacy Budget & MIA Defense Auditor",
+      "description": "Monitors cumulative R\u00e9nyi Differential Privacy moments budget consumption (epsilon, delta) and evaluates empirical vulnerability to Membership Inference Attacks.",
+      "documented_in": [
+        "README.md#6-core-privacy-enhancing-technologies-dp--secagg",
+        "docs/privacy-model.md"
+      ],
+      "user_surfaces": [
+        "PrivacyDefensePage.tsx :: Privacy budget gauge, RDP composition calculator, MIA auditor",
+        "PrivacyMonitor.tsx :: Dashboard widget"
+      ],
+      "entry_points": [
+        "GET /api/v1/privacy-defense/budgets",
+        "POST /api/v1/privacy-defense/rdp/compose",
+        "POST /api/v1/privacy-defense/simulate-mia",
+        "POST /api/v1/privacy-defense/circuit-breaker"
+      ],
+      "services": [
+        "backend/app/application/services/privacy_service.py :: PrivacyService",
+        "backend/app/application/services/privacy_audit_service.py :: PrivacyAuditService"
+      ],
+      "domain_components": [
+        "backend/app/domain/security_evaluator.py :: SecurityEvaluator",
+        "backend/app/domain/value_objects_rdp.py :: RDPAccountantRecord"
+      ],
+      "data_dependencies": [
+        "Noise scale sigma, sample rate q, steps T, gradient norms"
+      ],
+      "model_dependencies": [
+        "Opacus PRV accountant / Gaussian DP mechanism"
+      ],
+      "result_producers": [
+        "backend/app/application/services/privacy_audit_service.py:L70-L160",
+        "backend/app/domain/security_evaluator.py:L90-L210"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useBankBudgets, useSimulateMIA",
+        "frontend/src/pages/PrivacyDefensePage.tsx"
+      ],
+      "configuration": [
+        "dp_epsilon",
+        "dp_delta",
+        "dp_max_grad_norm",
+        "dp_mode"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/privacy_defense.py:L60-L240",
+        "backend/app/application/services/privacy_audit_service.py:L70-L160",
+        "frontend/src/pages/PrivacyDefensePage.tsx:L60-L220"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-BYZANTINE-POISONING-DEFENSE",
+      "name": "Byzantine Fault Tolerant Model Aggregation",
+      "description": "Applies Multi-Krum, Coordinate-wise Trimmed Mean, Bulyan, and Spectral SVD top eigenvalue anomaly filtering to isolate adversarial poisoned model updates.",
+      "documented_in": [
+        "README.md#7-byzantine-poisoning-defense--adversarial-robustness",
+        "docs/algorithms/README.md"
+      ],
+      "user_surfaces": [
+        "AdversarialDefensePanel.tsx :: Quarantine monitor & gradient outlier table",
+        "ScenariosPage.tsx :: Byzantine attack scenario controls"
+      ],
+      "entry_points": [
+        "POST /api/v1/scenarios/attack/inject",
+        "GET /api/v1/scenarios/active"
+      ],
+      "services": [
+        "backend/app/application/services/fl_engine.py :: FederatedLearningEngine.apply_byzantine_defense",
+        "backend/app/application/services/adversarial_service.py :: AdversarialService"
+      ],
+      "domain_components": [
+        "backend/app/domain/byzantine_defense.py :: krum, trimmed_mean, bulyan",
+        "backend/app/domain/spectral_defense.py :: spectral_svd_filter",
+        "backend/app/domain/attack_injector.py :: AttackInjector"
+      ],
+      "data_dependencies": [
+        "Flat weight vectors from client bank gradients"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/domain/byzantine_defense.py:L40-L180",
+        "backend/app/domain/spectral_defense.py:L50-L190"
+      ],
+      "final_consumers": [
+        "frontend/src/components/dashboard/AdversarialDefensePanel.tsx",
+        "FederatedLearningEngine.aggregate_parameters"
+      ],
+      "configuration": [
+        "byzantine_defense ('krum', 'trimmed_mean', 'bulyan', 'none')",
+        "poisoning_scale",
+        "poisoning_bank_id"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/domain/byzantine_defense.py:L40-L180",
+        "backend/app/domain/spectral_defense.py:L50-L190",
+        "backend/app/application/services/fl_engine.py:L180-L290"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-BENCHMARK-EVALUATION-SANDBOX",
+      "name": "Design Partner Reference Benchmark Evaluation",
+      "description": "Evaluates reference benchmark datasets (PaySim, IEEE-CIS, Elliptic, CreditCard) to compare federated vs siloed model performance and economic ROI.",
+      "documented_in": [
+        "README.md#15-empirical-performance--benchmark-suite"
+      ],
+      "user_surfaces": [
+        "BenchmarkHubPage.tsx :: Benchmark comparison hub & dataset selectors",
+        "BenchmarkLaunchModal.tsx :: Sandbox launcher modal"
+      ],
+      "entry_points": [
+        "GET /api/v1/design-partner/evaluate-benchmark",
+        "GET /api/v1/design-partner/distribution-fidelity",
+        "GET /api/v1/design-partner/readiness-checklist"
+      ],
+      "services": [
+        "backend/app/application/services/design_partner_service.py :: DesignPartnerPilotService"
+      ],
+      "domain_components": [
+        "backend/app/domain/distribution_fidelity_service.py :: audit_distribution_fidelity",
+        "backend/app/domain/risk_utility.py :: compute_financial_cost_utility"
+      ],
+      "data_dependencies": [
+        "Real/mock benchmark datasets loaded via dataloader.load_dataset"
+      ],
+      "model_dependencies": [
+        "Beta distribution synthetic probability generator (rng.beta) modeling calibrated output probabilities"
+      ],
+      "result_producers": [
+        "backend/app/application/services/design_partner_service.py:L227-L360"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useBenchmarkEvaluation",
+        "frontend/src/pages/BenchmarkHubPage.tsx"
+      ],
+      "configuration": [
+        "dataset",
+        "n_samples",
+        "daily_volume"
+      ],
+      "mapping_status": "PARTIALLY_MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/design_partner.py:L181-L280",
+        "backend/app/application/services/design_partner_service.py:L227-L360",
+        "frontend/src/pages/BenchmarkHubPage.tsx:L122-L160"
+      ],
+      "unresolved": [
+        "design_partner_service.py L260-L273 uses calibrated Beta distribution RNG to synthesize model prediction probabilities rather than executing offline trained model weights when full dataset is not on disk."
+      ]
+    },
+    {
+      "id": "CAP-COMPARATIVE-BASELINES-FALLBACK",
+      "name": "Dashboard Multi-Paradigm Comparative Baselines",
+      "description": "Surfaces comparative performance metrics across centralized pooled upper bound, federated champion, and isolated banking silos.",
+      "documented_in": [
+        "README.md#15-empirical-performance--benchmark-suite"
+      ],
+      "user_surfaces": [
+        "ComparativeModelWidget.tsx :: Benchmark comparison cards & metric toggle"
+      ],
+      "entry_points": [
+        "GET /api/v1/dashboard/comparative-baselines"
+      ],
+      "services": [
+        "backend/app/presentation/routers/dashboard.py :: get_comparative_baselines"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "experiments/results/comparative_baselines.json (if present) OR static dictionary fallback conforming to claim_registry.json"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/presentation/routers/dashboard.py:L270-L360"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useComparativeBaselines",
+        "frontend/src/components/dashboard/ComparativeModelWidget.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "BENCHMARK_ONLY",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/dashboard.py:L270-L360",
+        "frontend/src/components/dashboard/ComparativeModelWidget.tsx:L1-L60"
+      ],
+      "unresolved": [
+        "Reads experiments/results/comparative_baselines.json or returns precomputed JSON payload directly in API response."
+      ]
+    },
+    {
+      "id": "CAP-GLOBAL-TELEMETRY-STREAM",
+      "name": "Global Telemetry Synthetic Alert Stream",
+      "description": "Streams live simulated fraud transactions and alert triggers over WebSocket /ws/telemetry.",
+      "documented_in": [
+        "README.md#2-master-system-architecture"
+      ],
+      "user_surfaces": [
+        "ObservabilityPage.tsx :: Live telemetry event ticker",
+        "LiveOperationsView.tsx :: Live event terminal"
+      ],
+      "entry_points": [
+        "WS /ws/telemetry",
+        "WS /api/v1/ws/telemetry"
+      ],
+      "services": [
+        "backend/app/presentation/websockets/streaming_ws.py :: _handle_global_telemetry_ws"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "Random choice generator over typologies and bank identifiers"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/presentation/websockets/streaming_ws.py:L320-L342"
+      ],
+      "final_consumers": [
+        "frontend/src/pages/ObservabilityPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "EXPLICIT_DEMO_ONLY",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/websockets/streaming_ws.py:L320-L342"
+      ],
+      "unresolved": [
+        "/ws/telemetry generates continuous synthetic random transaction and alert payloads using Python random.choice and random.uniform."
+      ]
+    },
+    {
+      "id": "CAP-AGENTIC-AML-COPILOT",
+      "name": "Agentic AML Copilot Narrative Assembly",
+      "description": "Synthesizes formal FinCEN 5-paragraph SAR narrative briefings, analyzes case evidence graph, and generates investigator recommendations.",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech"
+      ],
+      "user_surfaces": [
+        "CaseDetailPage.tsx :: AML Copilot briefing drawer",
+        "InvestigationDashboard.tsx :: AI assistant panel"
+      ],
+      "entry_points": [
+        "POST /api/v1/copilot/query",
+        "GET /api/v1/copilot/status",
+        "POST /api/v1/cases/{case_id}/copilot/narrative"
+      ],
+      "services": [
+        "backend/app/application/services/aml_agentic_copilot.py :: AMLAgenticCopilot"
+      ],
+      "domain_components": [
+        "backend/app/domain/value_objects_copilot.py :: CopilotReasoningArtifact"
+      ],
+      "data_dependencies": [
+        "Case evidence items, alerts, graph relationships"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/aml_agentic_copilot.py:L80-L220"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useCopilotQuery",
+        "frontend/src/pages/CaseDetailPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/copilot.py:L60-L160",
+        "backend/app/application/services/aml_agentic_copilot.py:L80-L220"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-BANK-ONBOARDING-MTLS",
+      "name": "Bank Consortium Onboarding & mTLS Certificate Wizard",
+      "description": "Automates self-service bank node registration, public key verification, and X.509 mTLS certificate bundle provisioning.",
+      "documented_in": [
+        "README.md#10-multi-layer-defense-gateway-broken-access-control--rate-limiting",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "BankOnboardingPage.tsx :: 4-step wizard, CSR submission form, certificate download"
+      ],
+      "entry_points": [
+        "POST /api/v1/onboarding/request",
+        "POST /api/v1/onboarding/verify",
+        "GET /api/v1/onboarding/certificates/{node_id}"
+      ],
+      "services": [
+        "backend/app/application/services/bank_onboarding_service.py :: BankOnboardingService",
+        "backend/app/infrastructure/security/mtls_manager.py :: MTLSManager"
+      ],
+      "domain_components": [
+        "backend/app/domain/consortium_governance.py :: NodeRegistrationRecord"
+      ],
+      "data_dependencies": [
+        "X.509 CSR and client RSA/ECC public keys"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/bank_onboarding_service.py:L60-L170"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useOnboardingRequest",
+        "frontend/src/pages/BankOnboardingPage.tsx"
+      ],
+      "configuration": [
+        "mtls_enabled",
+        "mtls_cert_dir"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/onboarding.py:L50-L190",
+        "backend/app/application/services/bank_onboarding_service.py:L60-L170",
+        "frontend/src/pages/BankOnboardingPage.tsx:L80-L240"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-SECURITY-AUDIT-CHAIN",
+      "name": "Immutable SHA-256 Cryptographic Audit Ledger",
+      "description": "Maintains a tamper-evident append-only hash chain of all critical system events (model promotions, key rotations, supervisor approvals).",
+      "documented_in": [
+        "README.md#10-multi-layer-defense-gateway-broken-access-control--rate-limiting"
+      ],
+      "user_surfaces": [
+        "SecurityPage.tsx :: Cryptographic audit chain ledger & verify button"
+      ],
+      "entry_points": [
+        "GET /api/v1/security/audit-chain",
+        "POST /api/v1/security/audit-chain/verify"
+      ],
+      "services": [
+        "backend/app/infrastructure/security/immutable_audit_chain.py :: ImmutableAuditChain"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "storage/audit_chain.json or in-memory chain"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/infrastructure/security/immutable_audit_chain.py:L70-L150"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useAuditChain, useVerifyAuditChain",
+        "frontend/src/pages/SecurityPage.tsx"
+      ],
+      "configuration": [
+        "immutable_audit_chain_enabled"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/security.py:L140-L200",
+        "backend/app/infrastructure/security/immutable_audit_chain.py:L70-L150",
+        "frontend/src/pages/SecurityPage.tsx:L120-L220"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-DYNAMIC-POLICY-RULES",
+      "name": "Dynamic AML Policy Rule Engine",
+      "description": "Allows compliance officers to create, test, and tune custom business rules (e.g. velocity caps, high-risk merchant thresholds) without code redeployment.",
+      "documented_in": [
+        "README.md#9-9-signal-composite-risk-engine--model-explainability"
+      ],
+      "user_surfaces": [
+        "PoliciesPage.tsx :: Rule builder, threshold sliders, rule evaluation tester"
+      ],
+      "entry_points": [
+        "GET /api/v1/rules",
+        "POST /api/v1/rules",
+        "POST /api/v1/rules/test",
+        "POST /api/v1/rules/evaluate"
+      ],
+      "services": [
+        "backend/app/application/services/policy_engine.py :: PolicyEngine"
+      ],
+      "domain_components": [
+        "backend/app/domain/entities.py :: BusinessRule"
+      ],
+      "data_dependencies": [
+        "In-memory / Redis rule store"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/policy_engine.py:L80-L190"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useRules, useTestRule",
+        "frontend/src/pages/PoliciesPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/rules.py:L60-L180",
+        "backend/app/application/services/policy_engine.py:L80-L190",
+        "frontend/src/pages/PoliciesPage.tsx:L70-L210"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-DATASET-INGESTION-STUDIO",
+      "name": "Real Dataset Ingestion Studio & Contract Gating",
+      "description": "Drag-and-drop CSV/Parquet ingestion wizard with schema alignment to the 9-signal canonical contract, Great Expectations audit, and consortium enrollment.",
+      "documented_in": [
+        "README.md#4-multi-bank-synthetic-data--multi-standard-ingestion"
+      ],
+      "user_surfaces": [
+        "DatasetIngestionStudioModal.tsx :: 4-step wizard modal",
+        "LiveOperationsView.tsx :: 'Import Dataset' button"
+      ],
+      "entry_points": [
+        "POST /api/v1/datasets/preview",
+        "POST /api/v1/datasets/contract-audit",
+        "POST /api/v1/datasets/consortium-enroll"
+      ],
+      "services": [
+        "backend/app/application/services/data_validator.py :: DataValidatorService",
+        "backend/app/application/services/dataloader.py :: load_dataset"
+      ],
+      "domain_components": [
+        "backend/app/domain/data_validator.py :: SchemaValidator"
+      ],
+      "data_dependencies": [
+        "Uploaded file bytes / Multipart form data"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/data_validator.py:L60-L180"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useDatasetPreview, useDatasetContractAudit",
+        "frontend/src/components/ingestion/DatasetIngestionStudioModal.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/datasets.py:L50-L180",
+        "backend/app/application/services/data_validator.py:L60-L180",
+        "frontend/src/components/ingestion/DatasetIngestionStudioModal.tsx:L1-L220"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-PROMETHEUS-OBSERVABILITY",
+      "name": "Observability SLA Metrics & Latency Profiling",
+      "description": "Exposes real-time throughput (TPS), latency percentiles (p50/p95/p99), OpenTelemetry distributed trace headers, and Prometheus scrape metrics.",
+      "documented_in": [
+        "README.md#10-multi-layer-defense-gateway-broken-access-control--rate-limiting",
+        "docs/architecture.md"
+      ],
+      "user_surfaces": [
+        "ObservabilityPage.tsx :: SLA latency gauges, throughput charts, health checks"
+      ],
+      "entry_points": [
+        "GET /health",
+        "GET /ready",
+        "GET /metrics",
+        "GET /api/v1/monitoring/health",
+        "GET /api/v1/monitoring/sla",
+        "GET /api/v1/monitoring/overview"
+      ],
+      "services": [
+        "backend/app/infrastructure/telemetry/__init__.py :: setup_telemetry",
+        "backend/app/application/services/sla_monitor.py :: SLAMonitor"
+      ],
+      "domain_components": [
+        "backend/app/domain/sla_contract.py :: SLABounds"
+      ],
+      "data_dependencies": [
+        "Prometheus Collector Registry, in-memory latency circular buffers"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/infrastructure/telemetry/__init__.py:L40-L130"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useTelemetryOverview, useHealthCheck",
+        "frontend/src/pages/ObservabilityPage.tsx"
+      ],
+      "configuration": [
+        "otel_enabled",
+        "otel_service_name"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/monitoring.py:L50-L210",
+        "backend/app/presentation/routers/health.py:L30-L120",
+        "backend/app/infrastructure/telemetry/__init__.py:L40-L130"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-FEDERATED-UNLEARNING",
+      "name": "GDPR Art. 17 Federated Unlearning Engine",
+      "description": "Implements exact and approximate weight erasure to zeroize data from an exiting bank node without retraining the entire consortium model from scratch.",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification"
+      ],
+      "user_surfaces": [
+        "PrivacyDefensePage.tsx :: Unlearning trigger button & audit certificate"
+      ],
+      "entry_points": [
+        "POST /api/v1/privacy-defense/unlearn"
+      ],
+      "services": [
+        "backend/app/application/services/federated_unlearning_engine.py :: FederatedUnlearningEngine"
+      ],
+      "domain_components": [
+        "backend/app/domain/value_objects_unlearning.py :: UnlearningRequest"
+      ],
+      "data_dependencies": [
+        "Historical round checkpoints from storage/model_registry"
+      ],
+      "model_dependencies": [
+        "PyTorch model parameter subtraction and projected gradient descent"
+      ],
+      "result_producers": [
+        "backend/app/application/services/federated_unlearning_engine.py:L80-L190"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useUnlearnBank",
+        "frontend/src/pages/PrivacyDefensePage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/privacy_defense.py:L140-L190",
+        "backend/app/application/services/federated_unlearning_engine.py:L80-L190"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-SEPA-PAYMENT-RECALL",
+      "name": "SEPA Instant Payment Recall (camt.056 / camt.029)",
+      "description": "Simulates real-time European inter-bank payment recall requests and positive/negative resolution messages with ledger tracking.",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: Payment recall action in transaction feed"
+      ],
+      "entry_points": [
+        "POST /api/v1/payment-recall/request",
+        "GET /api/v1/payment-recall/tickets",
+        "POST /api/v1/payment-recall/{ticket_id}/resolve"
+      ],
+      "services": [
+        "backend/app/application/services/payment_recall_service.py :: PaymentRecallService"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "SEPA camt.056 XML message payload"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/payment_recall_service.py:L60-L180"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: usePaymentRecalls",
+        "LiveOperationsView.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/payment_recall.py:L50-L180",
+        "backend/app/application/services/payment_recall_service.py:L60-L180"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-SANCTIONS-PEP-SCREENING",
+      "name": "Multi-List Sanctions & PEP Fuzzy Screening Engine",
+      "description": "Screens counterparties and transaction beneficiaries against UN, OFAC, and EU consolidated sanctions lists using Jaro-Winkler and Levenshtein fuzzy string distance.",
+      "documented_in": [
+        "README.md#11-human-in-the-loop-workbench-european-finint--regulatory-regtech"
+      ],
+      "user_surfaces": [
+        "LiveOperationsView.tsx :: Sanctions screening badge on incoming payments"
+      ],
+      "entry_points": [
+        "POST /api/v1/screening/screen",
+        "GET /api/v1/screening/lists"
+      ],
+      "services": [
+        "backend/app/application/services/screening_service.py :: ScreeningService"
+      ],
+      "domain_components": [],
+      "data_dependencies": [
+        "Sanctions list records (UN/EU/OFAC consolidated lists)"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/application/services/screening_service.py:L70-L190"
+      ],
+      "final_consumers": [
+        "RiskScoringEngine (merchant / country reputation score)"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/screening.py:L40-L130",
+        "backend/app/application/services/screening_service.py:L70-L190"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-RESEARCH-FHE-HOMOMORPHIC-AVERAGING",
+      "name": "[Tier 2 Research] TenSEAL CKKS Homomorphic Encryption Driver",
+      "description": "Experimental TenSEAL CKKS driver for homomorphic ciphertext addition and averaging (with NumPy emulation fallback when TenSEAL is unavailable).",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification",
+        "README.md#19-tier-2-research-prototypes--experimental-explorations"
+      ],
+      "user_surfaces": [
+        "SimulationView.tsx :: TEE / FHE selector in advanced parameters"
+      ],
+      "entry_points": [
+        "backend/app/infrastructure/security/fhe_driver.py :: FHEDriver"
+      ],
+      "services": [
+        "backend/app/application/services/simulation_service.py (invoked when hardware_isolation_mode == 'fhe')"
+      ],
+      "domain_components": [],
+      "data_dependencies": [],
+      "model_dependencies": [
+        "TenSEAL CKKS context or NumPy software emulator"
+      ],
+      "result_producers": [
+        "backend/app/infrastructure/security/fhe_driver.py:L80-L180"
+      ],
+      "final_consumers": [
+        "simulation.fhe_noise_bound, simulation.fhe_key_id"
+      ],
+      "configuration": [
+        "hardware_isolation_mode = 'fhe'"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/infrastructure/security/fhe_driver.py:L1-L220",
+        "backend/app/application/services/simulation_service.py:L491-L516"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-RESEARCH-TEE-SGX-ATTESTATION",
+      "name": "[Tier 2 Research] Hardware TEE Intel SGX / Nitro Attestation Emulator",
+      "description": "Software emulator modeling Intel SGX / AWS Nitro remote attestation measurement structures (MRENCLAVE, MRSIGNER, attestation report signature).",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification",
+        "README.md#19-tier-2-research-prototypes--experimental-explorations"
+      ],
+      "user_surfaces": [
+        "SimulationView.tsx :: TEE selector in advanced parameters",
+        "SecurityPage.tsx :: Hardware enclave verification"
+      ],
+      "entry_points": [
+        "backend/app/infrastructure/security/tee_driver.py :: TEEDriver"
+      ],
+      "services": [
+        "backend/app/application/services/simulation_service.py (invoked when hardware_isolation_mode == 'tee')"
+      ],
+      "domain_components": [],
+      "data_dependencies": [],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/infrastructure/security/tee_driver.py:L60-L160"
+      ],
+      "final_consumers": [
+        "simulation.tee_mrenclave, simulation.tee_attestation_signature"
+      ],
+      "configuration": [
+        "hardware_isolation_mode = 'tee'"
+      ],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/infrastructure/security/tee_driver.py:L1-L190",
+        "backend/app/application/services/simulation_service.py:L463-L490"
+      ],
+      "unresolved": []
+    },
+    {
+      "id": "CAP-RESEARCH-SMART-CONTRACT-SETTLEMENT",
+      "name": "[Tier 2 Research] Blockchain Shapley Value Settlement Bridge",
+      "description": "Solidity ERC-20 smart contracts and Web3 RPC driver for calculating collaborative Shapley value contribution shares and executing wCBDC payouts.",
+      "documented_in": [
+        "README.md#11-three-tier-system-classification",
+        "README.md#20-tier-3-demonstrations--consortium-simulations"
+      ],
+      "user_surfaces": [
+        "ConsortiumPage.tsx :: Incentive distribution and settlement payout ledger"
+      ],
+      "entry_points": [
+        "GET /api/v1/settlement/payouts",
+        "POST /api/v1/settlement/distribute",
+        "POST /api/v1/settlement/verify-contract"
+      ],
+      "services": [
+        "backend/app/infrastructure/security/smart_contract_driver.py :: SmartContractDriver"
+      ],
+      "domain_components": [
+        "backend/app/domain/value_objects_bridge.py :: SettlementPayload"
+      ],
+      "data_dependencies": [
+        "Shapley score calculated from bank validation metric uplifts"
+      ],
+      "model_dependencies": [],
+      "result_producers": [
+        "backend/app/presentation/routers/settlement.py:L70-L180",
+        "backend/app/infrastructure/security/smart_contract_driver.py:L60-L160"
+      ],
+      "final_consumers": [
+        "frontend/src/api/queries.ts :: useSettlementPayouts",
+        "ConsortiumPage.tsx"
+      ],
+      "configuration": [],
+      "mapping_status": "MAPPED",
+      "confidence": "HIGH",
+      "evidence": [
+        "backend/app/presentation/routers/settlement.py:L50-L210",
+        "backend/app/infrastructure/security/smart_contract_driver.py:L1-L180",
+        "contracts/contracts/ShapleySettlement.sol"
+      ],
+      "unresolved": []
+    }
+  ]
+}

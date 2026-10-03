@@ -252,7 +252,7 @@ async def streaming_websocket_default(websocket: WebSocket) -> None:
 @router.websocket("/api/v1/ws/telemetry")
 @router.websocket("/v1/ws/telemetry")
 async def live_telemetry_websocket(websocket: WebSocket) -> None:
-    """Stream platform-wide live telemetry, transactions, and fraud alerts."""
+    """Stream platform-wide live telemetry, transactions, and fraud alerts with explicit source provenance."""
     room_name = "telemetry:global"
     connected = await global_telemetry_ws_manager.connect(websocket, room=room_name)
     if not connected:
@@ -266,18 +266,55 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
         pass
 
     try:
-        import random
+        from app.config import get_settings
+        settings = get_settings()
 
-        # Send initial connected banner
+        requested_mode = websocket.query_params.get("mode", "auto").lower()
+
+        # Check if real streaming connector is configured and available
+        has_live_connector = False
+        live_provider_name = "NONE"
+        if getattr(settings, "kafka_enabled", False) or getattr(settings, "use_kafka", False):
+            try:
+                from app.infrastructure.connectors.kafka_streaming_connector import KafkaStreamingConnector
+                has_live_connector = True
+                live_provider_name = "KAFKA_STREAMING"
+            except Exception:
+                has_live_connector = False
+
+        if has_live_connector and requested_mode != "simulated":
+            stream_source = "LIVE_CONNECTOR"
+            provenance = f"LIVE_INGESTION_{live_provider_name}"
+        elif requested_mode in ("simulated", "simulation", "demo"):
+            stream_source = "SIMULATED"
+            provenance = "SIMULATED_DEMO_FEED"
+        else:
+            stream_source = "UNAVAILABLE"
+            provenance = "NO_LIVE_CONNECTOR_CONFIGURED"
+
+        # Send initial connected banner with explicit source provenance
         await websocket.send_text(
             json.dumps(
                 {
                     "event_type": "CONNECTED",
                     "timestamp": time.time(),
+                    "stream_type": stream_source,
+                    "provenance": provenance,
                     "payload": {
-                        "status": "ONLINE",
+                        "status": "ONLINE" if stream_source != "UNAVAILABLE" else "STANDBY",
+                        "stream_type": stream_source,
+                        "provenance": provenance,
                         "engine": "FastAPI Bi-Directional Stream",
                         "active_banks": ["bank_alpha", "bank_beta", "bank_gamma"],
+                        "message": (
+                            "Live streaming ingestion active"
+                            if stream_source == "LIVE_CONNECTOR"
+                            else (
+                                "Simulated sandbox demo feed active"
+                                if stream_source == "SIMULATED"
+                                else "No live streaming connector configured. Telemetry in standby mode. Use ?mode=simulated for sandbox demo."
+                            )
+                        ),
                     },
                 }
             )
@@ -293,6 +330,7 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
             ("LEGITIMATE_PAYMENT", "Standard Retail Interbank Transfer", "info", 120),
         ]
 
+        last_heartbeat = time.time()
         # Continuous heartbeat and event delivery loop
         while True:
             # Check for inbound client frames or disconnects with timeout
@@ -311,34 +349,87 @@ async def live_telemetry_websocket(websocket: WebSocket) -> None:
                         await websocket.close(code=1008, reason="Rate limit exceeded")
                     return
 
-                if "ping" in inbound_data.lower():
+                inbound_lower = inbound_data.lower()
+                if "ping" in inbound_lower:
                     await websocket.send_text(
-                        json.dumps({"event_type": "PONG", "timestamp": time.time()})
+                        json.dumps({
+                            "event_type": "PONG",
+                            "timestamp": time.time(),
+                            "stream_type": stream_source,
+                            "provenance": provenance,
+                        })
+                    )
+
+                if "start_simulation" in inbound_lower or "mode:simulated" in inbound_lower or '"mode":"simulated"' in inbound_lower:
+                    stream_source = "SIMULATED"
+                    provenance = "SIMULATED_DEMO_FEED"
+                    await websocket.send_text(
+                        json.dumps({
+                            "event_type": "MODE_CHANGED",
+                            "timestamp": time.time(),
+                            "stream_type": stream_source,
+                            "provenance": provenance,
+                            "payload": {"status": "SIMULATED_DEMO_ACTIVE"},
+                        })
                     )
             except TimeoutError:
                 pass
 
-            typ, desc, sev, score = random.choice(typologies)
-            bank = random.choice(banks)
-            txn_id = f"txn_{int(time.time()*1000)%1000000:06d}"
+            now = time.time()
+            if stream_source == "SIMULATED":
+                import random
+                typ, desc, sev, score = random.choice(typologies)
+                bank = random.choice(banks)
+                txn_id = f"txn_{int(now*1000)%1000000:06d}"
 
-            event_payload = {
-                "event_type": "ALERT_TRIGGERED" if score >= 700 else "TRANSACTION_SCORED",
-                "timestamp": time.time(),
-                "payload": {
-                    "transaction_id": txn_id,
-                    "bank_id": bank,
-                    "risk_score": score,
-                    "severity": sev,
-                    "typology": typ,
-                    "description": desc,
-                    "amount": round(random.uniform(1500.0, 450000.0), 2),
-                    "currency": "EUR",
-                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                },
-            }
-            await websocket.send_text(json.dumps(event_payload))
-            global_telemetry_ws_manager.record_client_activity(websocket)
+                event_payload = {
+                    "event_type": "ALERT_TRIGGERED" if score >= 700 else "TRANSACTION_SCORED",
+                    "timestamp": now,
+                    "stream_type": "SIMULATED",
+                    "provenance": "SIMULATED_DEMO_FEED",
+                    "payload": {
+                        "transaction_id": txn_id,
+                        "bank_id": bank,
+                        "risk_score": score,
+                        "severity": sev,
+                        "typology": typ,
+                        "description": desc,
+                        "amount": round(random.uniform(1500.0, 450000.0), 2),
+                        "currency": "EUR",
+                        "created_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                        "provenance": "SIMULATED_DEMO_FEED",
+                    },
+                }
+                await websocket.send_text(json.dumps(event_payload))
+                global_telemetry_ws_manager.record_client_activity(websocket)
+            elif stream_source == "LIVE_CONNECTOR":
+                if now - last_heartbeat >= 5.0:
+                    last_heartbeat = now
+                    await websocket.send_text(
+                        json.dumps({
+                            "event_type": "HEARTBEAT",
+                            "timestamp": now,
+                            "stream_type": "LIVE_CONNECTOR",
+                            "provenance": provenance,
+                            "payload": {"status": "LIVE_INGESTION_HEALTHY"},
+                        })
+                    )
+            else:
+                # Standby: Do NOT fabricate transactions
+                if now - last_heartbeat >= 5.0:
+                    last_heartbeat = now
+                    await websocket.send_text(
+                        json.dumps({
+                            "event_type": "HEARTBEAT",
+                            "timestamp": now,
+                            "stream_type": "UNAVAILABLE",
+                            "provenance": "NO_LIVE_CONNECTOR_CONFIGURED",
+                            "payload": {
+                                "status": "STANDBY",
+                                "message": "No live streaming connector configured. Telemetry in standby mode.",
+                            },
+                        })
+                    )
 
     except WebSocketDisconnect:
         logger.info("Global telemetry WebSocket disconnected")

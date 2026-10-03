@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 export type WebSocketConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'mock_active';
+export type StreamSourceType = 'LIVE_CONNECTOR' | 'SIMULATED' | 'REPLAY' | 'UNAVAILABLE';
 
 export interface LiveStreamTransaction {
   transaction_id: string;
@@ -12,6 +13,7 @@ export interface LiveStreamTransaction {
   typology: string;
   description: string;
   created_at: string;
+  provenance?: string;
 }
 
 export interface LiveAlertToast {
@@ -25,15 +27,19 @@ export interface LiveAlertToast {
   amount: number;
   currency: string;
   created_at: string;
+  provenance?: string;
 }
 
 interface LiveAlertStoreState {
   status: WebSocketConnectionStatus;
+  streamSource: StreamSourceType;
+  streamProvenance: string;
   latencyMs: number;
   totalStreamedTransactions: number;
   recentTransactions: LiveStreamTransaction[];
   activeAlertToasts: LiveAlertToast[];
   setStatus: (status: WebSocketConnectionStatus) => void;
+  setStreamSource: (source: StreamSourceType, provenance?: string) => void;
   setLatencyMs: (latencyMs: number) => void;
   pushStreamEvent: (txn: LiveStreamTransaction) => void;
   dismissToast: (id: string) => void;
@@ -42,12 +48,15 @@ interface LiveAlertStoreState {
 
 export const useLiveAlertStore = create<LiveAlertStoreState>((set) => ({
   status: 'connecting',
-  latencyMs: 3.2,
-  totalStreamedTransactions: 1482,
+  streamSource: 'UNAVAILABLE',
+  streamProvenance: 'INITIALIZING',
+  latencyMs: 0.0,
+  totalStreamedTransactions: 0,
   recentTransactions: [],
   activeAlertToasts: [],
 
   setStatus: (status) => set({ status }),
+  setStreamSource: (source, provenance = '') => set({ streamSource: source, streamProvenance: provenance }),
   setLatencyMs: (latencyMs) => set({ latencyMs }),
 
   pushStreamEvent: (txn) =>
@@ -78,3 +87,4 @@ export const useLiveAlertStore = create<LiveAlertStoreState>((set) => ({
 
   clearAllToasts: () => set({ activeAlertToasts: [] }),
 }));
+
