@@ -887,20 +887,21 @@ $$
 
 ### 5.3 Asynchronous Federated Learning Engine & Dynamic Quorum Coordination (`async_fl_engine.py`, `coordinator_service.py`, `quorum_manager.py`)
 Provides non-blocking, asynchronous parameter updates (FedAsync; Xie et al., 2019) allowing fast participant banks to contribute weights continuously without waiting on high-latency straggler nodes:
-1. **Staleness Attenuation Factor** ($S(\tau)$): Down-weights parameter updates from slower nodes based on staleness delay $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ using polynomial decay with damping coefficient $\alpha$:
+1. **Staleness Attenuation Factor** $(S(\tau))$: Down-weights parameter updates from slower nodes based on staleness delay $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ using polynomial decay with damping coefficient $\alpha$:
 
 $$
 S(\tau) = (1 + \tau)^{-\alpha}, \quad \alpha \in [0.1, 1.0]
 $$
 
    Supported attenuation formulations also include exponential $S(\tau) = e^{-\alpha \tau}$, constant $S(\tau) = 1.0$, and hinge decay $S(\tau) = \min\left(1, \frac{1}{\alpha(\tau - 2) + 1}\right)$.
+
 2. **Effective Learning Rate & Global Consensus Update:** Global model parameters $W^{(t+1)}$ are updated as:
 
 $$
 W^{(t+1)} = (1 - \eta \cdot S(\tau)) W^{(t)} + \eta \cdot S(\tau) W_{\mathrm{client}}
 $$
 
-3. **Straggler Bounded Cutoff** ($\tau_{\max}$): Updates with staleness delay exceeding $\tau_{\max} = 50$ are automatically dropped to prevent parameter degradation from ancient checkpoints.
+3. **Straggler Bounded Cutoff** $(\tau_{\max})$: Updates with staleness delay exceeding $\tau_{\max} = 50$ are automatically dropped to prevent parameter degradation from ancient checkpoints.
 4. **Byzantine & Non-Finite Defense:** Client parameter updates undergo strict numerical validation (`np.isfinite`); updates containing `NaN` or `Inf` are rejected with `ValueError`, keeping the global consensus model unpoisoned.
 5. **Thread-Safe Mutex Lock:** All read and write operations on global weights and update histories are serialized via internal `threading.Lock()`, enforcing race-free multi-tenant concurrency.
 6. **Dynamic Quorum Timeout Manager (`quorum_manager.py`):** Continuously monitors participant check-in progress across bank nodes. A round transitions to `QUORUM_REACHED` as soon as $\ge 60\%$ of active nodes submit, or to `TIMEOUT_EXPIRED` after the 300-second target window.
@@ -920,13 +921,13 @@ $$
 
 ### 6.1 Opacus Differential Privacy Guard (`privacy_service.py`)
 Applies formal $(\epsilon, \delta)$-Differential Privacy to local model training rounds:
-- $L_2$ **Gradient Norm Clipping** ($C$):
+- $L_2$ **Gradient Norm Clipping** $(C)$:
 
 $$
 \bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}
 $$
 
-- **Gaussian Noise Addition** ($\sigma$):
+- **Gaussian Noise Addition** $(\sigma)$:
 
 $$
 \sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)
@@ -983,7 +984,7 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 - **500 tx/s Smurfing / Layering Burst Interception:** 
   - Simulates a coordinated money laundering syndicate executing high-velocity micro-transfers ($4,850 – $9,950) across multiple consortium institutions.
   - GraphSAGE relational graph embeddings and MinHash LSH Private Set Intersection intercept the syndicate, demonstrating immediate velocity threshold escalation.
-- **Byzantine Poisoned Gradient Attack** ($\Delta w \times -10.0$):
+- **Byzantine Poisoned Gradient Attack** $(\Delta w \times -10.0)$:
   - Simulates a compromised bank node (Bank Gamma) injecting inverted, malicious parameter weights to degrade the global model.
   - The **Krum / Bulyan Defense Shield** evaluates neighbor Euclidean distance sums ($\Delta = 48.2$, exceeding the distance threshold of $14.1$).
   - The malicious gradient is rejected, Bank Gamma is isolated with an immediate visual quarantine badge (`QUARANTINED BY KRUM`), and global model resilience is maintained.
@@ -1150,7 +1151,7 @@ To eliminate Broken Access Control (OWASP API1:2023), the platform implements cr
 
 ### 10.6 Real-Time Scoring Gateway, Tenant Quotas & SLA Monitoring
 
-- **REST Inference Endpoints (`POST /api/v1/predict`, `POST /api/v1/predict/fast` & `POST /api/v2/transactions/evaluate`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge$700). High-throughput payment rails (SEPA Instant, TARGET Instant Payment Settlement - TIPS) utilize the fast-path endpoint with sub-5ms raw neural latency (<14.2ms worst-case), while the enterprise OpenAPI v2 adapter (`/api/v2/transactions/evaluate`) enables drop-in integration with legacy AML pipelines without payload transformation. Full concurrent 9-signal feature store enrichment achieves ~258.9ms p50 / ~308.2ms p99 latency (well within the 350ms multi-model SLA budget).
+- **REST Inference Endpoints (`POST /api/v1/predict`, `POST /api/v1/predict/fast` & `POST /api/v2/transactions/evaluate`):** Screen normalized transactions and return actionable decisions (`ALLOW` <300, `REVIEW` 300-699, `BLOCK` $\ge 700$). High-throughput payment rails (SEPA Instant, TARGET Instant Payment Settlement - TIPS) utilize the fast-path endpoint with sub-5ms raw neural latency (<14.2ms worst-case), while the enterprise OpenAPI v2 adapter (`/api/v2/transactions/evaluate`) enables drop-in integration with legacy AML pipelines without payload transformation. Full concurrent 9-signal feature store enrichment achieves ~258.9ms p50 / ~308.2ms p99 latency (well within the 350ms multi-model SLA budget).
 - **Tenant Quota Enforcement (`TenantMeteringService` & `dependencies.py`):** The `enforce_tenant_quota` dependency actively intercepts requests to `/api/v1/predict` and `/api/v1/score-transaction`, tracking monthly quota consumption per tenant tier (e.g., 100,000 monthly calls) via atomic `acquire_quota()` and recording usage metrics (`record_inference`). When an institution breaches its quota ceiling, the gateway rejects the request with `HTTP 429 Too Many Requests` (`detail: "Tenant API quota limit exceeded"`). *Scope Note:* Metering is actively wired and enforced at the high-throughput inference gateway endpoints, rather than universally wrapping every internal admin or diagnostic probe.
 - **Latency & SLA Monitor (`sla_monitor.py`):** Continuously tracks p50, p95, and p99 inference latencies with Prometheus telemetry exports.
 
@@ -1284,7 +1285,7 @@ The persistence tier utilizes SQLAlchemy 2.0 Async ORM backed by a linear, dual-
   - *DDoS Memory Pruning:* Automatic IP timestamp sliding window cleanup preventing dictionary memory exhaustion (`_MAX_TRACKED_IPS = 1000`), backed by LRU hard ceiling eviction bound at `_HARD_CEILING_TRACKED_IPS = 5000` concurrent active IPs.
   - *Byzantine Non-Finite Isolation:* Immediate client quarantining on `NaN`/`Inf` model updates and champion fallback in `fl_engine.py` and `spectral_defense.py`.
   - *Universal Safe Evaluation:* Centralized `safe_roc_auc_score` and `safe_pr_auc_score` preventing single-class / empty-array evaluation crashes.
-  - *Multi-Tier Redis Caching:* In-memory LRU fast paths ($\sim 0.001\text{ms}$) with 0.1s socket connect timeouts and graceful degradation to local DB/PyTorch.
+  - *Multi-Tier Redis Caching:* In-memory LRU fast paths (~0.001 ms) with 0.1s socket connect timeouts and graceful degradation to local DB/PyTorch.
   - *Developer Webhook Perimeter:* Multi-layer SSRF protection (scheme validation + IP-range blocking for loopback/link-local/RFC 1918/multicast + fail-closed DNS resolution validation at registration and pre-dispatch), constant-time HMAC-SHA256 signature verification (`verify_signature`), and non-blocking bounded 3.0s delivery timeouts (`deliver_payload_async`).
   - *Graph Ego-Network Budget:* BFS traversal capped at 100 nodes max to prevent browser DOM and React Flow canvas thread freezing.
   - *Frontend Error Boundaries:* Complete UI tree isolation with dark-themed recovery cards eliminating White Screen of Death (WSOD) risks.
@@ -1912,7 +1913,7 @@ curl -X POST "http://localhost:8000/api/v1/score-transaction" \
   }'
 ```
 
-*Response (`HTTP 200 OK` — Latency: $14.2\text{ms}$):*
+*Response (`HTTP 200 OK` — Latency: 14.2 ms):*
 ```json
 {
   "transaction_id": "txn_88492049281",
@@ -2088,7 +2089,7 @@ A rigorous adversarial evaluation harness implementing 4 standard distributed ma
 4. **Spectral Backdoor Trigger Injection:** Embeds rare, subtle feature triggers into transactions to evaluate spectral SVD backdoor identification.
 
 ### 20.4 Simulated Network Latency & Client Dropout
-- **WAN Packet Jitter Simulation:** Injects synthetic network latency distributions ($\mathcal{N}(45\mathrm{ms}, 15\mathrm{ms}^2)$) between banks and the coordinator to evaluate asynchronous staleness weighting $\beta_k = (1 + \tau_k)^{-\gamma}$.
+- **WAN Packet Jitter Simulation:** Injects synthetic network latency distributions $(\mathcal{N}(45\mathrm{ms}, 15\mathrm{ms}^2))$ between banks and the coordinator to evaluate asynchronous staleness weighting $\beta_k = (1 + \tau_k)^{-\gamma}$.
 - **Unannounced Client Dropout:** Drops client connections mid-round ($p_{\mathrm{drop}} \in [0.1, 0.4]$) to verify Shamir secret sharing $(t, n)$ threshold reconstruction and ensure uninterrupted consortium aggregation.
 
 ### 20.5 Mocked External Integrations & FIU Regulatory Stubs

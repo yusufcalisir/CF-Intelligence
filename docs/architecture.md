@@ -287,7 +287,7 @@ Prevents training round deadlocks caused by bank node network outages, maintenan
 ### 6.1 Asynchronous Federated Aggregation (`async_fl_engine.py`, `coordinator_service.py`)
 The `AsyncFLEngine` implements the **FedAsync** parameter update protocol (Xie et al., 2019). Fast bank nodes submit model updates immediately — without blocking on straggler nodes — using a staleness attenuation factor to preserve convergence quality.
 
-**Staleness Attenuation Functions** ($S(\tau)$):
+**Staleness Attenuation Functions** $(S(\tau))$:
 
 $$
 S(\tau) = (1 + \tau)^{-\alpha}
@@ -295,7 +295,7 @@ $$
 
 where $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ (rounds elapsed since submission) and $\alpha$ is the attenuation exponent (default: $\alpha = 0.5$). Additional supported formulations include exponential decay $S(\tau) = e^{-\alpha \tau}$, constant $S(\tau) = 1.0$, and hinge decay $S(\tau) = \min\left(1, \frac{1}{\alpha(\tau - 2) + 1}\right)$.
 
-**Straggler Cutoff Bound** ($\tau_{\max}$):
+**Straggler Cutoff Bound** $(\tau_{\max})$:
 Updates with $\tau > \tau_{\max} = 50$ are automatically dropped ($S(\tau) = 0.0$) to prevent model divergence caused by severely outdated gradients.
 
 **Global Weight Update Rule:**
