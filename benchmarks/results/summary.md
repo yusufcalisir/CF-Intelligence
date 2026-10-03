@@ -117,19 +117,39 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 
 ---
 
-## 3. Byzantine Adversarial Attack Resilience (Historical Prototype)
-- **Status**: Under Canonical Re-Evaluation (`byzantine_federated_canonical`)
-- **Historical Runner**: `benchmarks/runners/run_byzantine_benchmark.py`
-- **Attack Modality**: Sign Inversion ($\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$, 2 malicious out of 10 clients on synthetic Gaussian testbed)
-- **Raw Historical Artifact**: [`byzantine_benchmark_sign_inversion.json`](./raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL`)
+## 3. Byzantine Adversarial Attack Resilience
 
-| Aggregation Strategy | Test PR-AUC | Test ROC-AUC | Adversarial Breakdown Status |
-|:---|:---:|:---:|:---|
-| **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
-| **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
-| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | Historical Proxy: 99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine) |
-| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | Historical Proxy: 98.5% of Clean PR-AUC |
-| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | Historical Proxy: 95.9% of Clean PR-AUC |
+- **Status**: `CANONICAL` (Canonical 72-Condition Multi-Round Benchmark)
+- **Runner**: `benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical`
+- **Scope & Protocol**: Real Credit Card Fraud tabular dataset partitioned across 12 simulated bank clients under Non-IID Dirichlet distribution ($\alpha = 0.50$, $\min(\text{samples}) = 50$, zero-positive clients permitted). Evaluated over 10 federated rounds, 1 local epoch per round, PyTorch MLP architecture, `MODEL_DELTA` aggregation space, $f=2$ Byzantine attackers ($16.7\%$), evaluated across $N=3$ seeds (`[42, 123, 456]`). Evaluates 6 aggregators across 4 attack states (18 clean conditions, 54 attacked conditions = 72 total conditions).
+- **Authoritative Canonical Artifact**: [`byzantine_federated_canonical.json`](./raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 47,417 bytes, SHA-256: `c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d`)
+- **Provenance Caveat**: `MACHINE_CONFIG_INCOMPLETE_BUT_INTENT_AND_EXECUTION_MATCH` (frozen protocol definition hash `d0640c8e...` vs execution-resolved config hash `f3c89626...`).
+
+### Canonical Multi-Round Benchmark Results
+
+Primary metric: Average Precision (`sklearn.metrics.average_precision_score`, reported as PR-AUC). Retention is calculated per-seed as $\mathrm{Retention}(c, s) = \mathrm{AP}(c, s) / \mathrm{AP}(\text{clean FedAvg}, s)$, reporting the mean of per-seed ratios with sample standard deviation ($\mathrm{ddof}=1$).
+
+| Aggregation Strategy | Clean PR-AUC ($f=0$) | Scaled Sign-Inversion ($\times -3.0$) | Gaussian Noise ($\sigma=1.0$) | Omniscient ALIE ($z=1.0$) | Mean Retention (Sign-Flip) | Observed Stability & Notes |
+|:---|:---:|:---:|:---:|:---:|:---:|:---|
+| **FedAvg (Unprotected)** | **0.7179 $\pm$ 0.0207** | 0.5279 $\pm$ 0.3140 | 0.7202 $\pm$ 0.0034 | 0.6365 $\pm$ 0.1474 | 73.19% $\pm$ 43.19% | Severe vulnerability; Seed 42 collapsed to **0.1653** under sign-flip |
+| **Coordinate Median** | 0.7145 $\pm$ 0.0150 | 0.7062 $\pm$ 0.0210 | 0.7200 $\pm$ 0.0105 | 0.5364 $\pm$ 0.2881 | 98.50% $\pm$ 4.70% | Stable under sign-flip; collapses under ALIE on Seed 123 (**0.2045**) |
+| **Trimmed Mean ($\beta=0.20$)** | 0.7177 $\pm$ 0.0183 | **0.7141 $\pm$ 0.0129** | **0.7259 $\pm$ 0.0004** | **0.7189 $\pm$ 0.0171** | **99.54% $\pm$ 4.05%** | Most consistent retention across evaluated configurations ($N=3$) |
+| **Single Krum** | 0.6729 $\pm$ 0.0270 | 0.4716 $\pm$ 0.4081 | 0.7148 $\pm$ 0.0264 | 0.6684 $\pm$ 0.0309 | 65.34% $\pm$ 56.49% | **Catastrophic collapse on Seed 456** (**0.0011**; root cause unidentifiable from raw artifact) |
+| **Multi-Krum ($m=10$)** | 0.7118 $\pm$ 0.0253 | **0.7061 $\pm$ 0.0341** | 0.7224 $\pm$ 0.0039 | 0.7131 $\pm$ 0.0191 | **98.48% $\pm$ 6.93%** | Resilient across evaluated attacks; minor degradation on Seed 456 (0.6667) |
+| **Bulyan** | 0.7161 $\pm$ 0.0205 | 0.6961 $\pm$ 0.0363 | 0.7168 $\pm$ 0.0094 | 0.4363 $\pm$ 0.2072 | 97.09% $\pm$ 5.92% | Tolerates sign-flip; collapses under ALIE on Seed 123 (**0.2220**) |
+
+> [!WARNING]
+> **Mandatory Disclosure of Seed-Level Instability**:
+> Multi-seed aggregation must not obscure catastrophic seed-level failures:
+> 1. **Sign-Flip + FedAvg**: Seed 42 collapsed to $\text{PR-AUC} = 0.165317$ (vs 0.711586 on Seed 123 and 0.706788 on Seed 456).
+> 2. **Sign-Flip + Single Krum**: Seed 456 experienced complete collapse to $\text{PR-AUC} = 0.001104$ (`ROOT_CAUSE_NOT_IDENTIFIABLE_FROM_CANONICAL_ARTIFACT`).
+> 3. **ALIE + Coordinate Median**: Seed 123 collapsed to $\text{PR-AUC} = 0.204505$.
+> 4. **ALIE + Bulyan**: Seed 123 collapsed to $\text{PR-AUC} = 0.222000$.
+
+### Historical Prototype Archive (Quarantined)
+
+- **Historical Raw Artifact**: [`byzantine_benchmark_sign_inversion.json`](./raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL_QUARANTINED`)
+- The historical single-seed synthetic Gaussian proxy ($0.7344 / 0.7369 \approx 99.66\% \approx 99.7\%$) evaluated a 10-client prototype and is quarantined from canonical claims. Note: Exploratory diagnostic figure `docs/figures/benchmark_byzantine_resilience.png` reflects a separate historical script and is decoupled from canonical FL evaluation.
 
 
 ---

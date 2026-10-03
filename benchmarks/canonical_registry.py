@@ -190,19 +190,19 @@ CANONICAL_REGISTRY: dict[str, CanonicalBenchmarkEntry] = {
     ),
     "byzantine_federated_canonical": CanonicalBenchmarkEntry(
         benchmark_id="byzantine_federated_canonical",
-        dataset_name="European Credit Card Fraud Detection (Byzantine Federated)",
+        dataset_name="European Credit Card Fraud Detection (Byzantine Federated Robustness)",
         provenance_type=DatasetProvenanceType.REAL_DATA,
-        status=ArtifactStatus.NOT_EVALUATED,
+        status=ArtifactStatus.CANONICAL,
         evidence_scope=EvidenceScope.CONTROLLED_EXPERIMENT,
-        communication_eligibility=CommunicationEligibility.INTERNAL_ONLY,
+        communication_eligibility=CommunicationEligibility.SAFE_WITH_CAVEAT,
         canonical_artifact_relpath="benchmarks/results/raw/byzantine_federated_canonical.json",
         historical_artifacts_relpaths=[
             "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
             "benchmarks/results/raw/byzantine_breakdown_analysis.json",
         ],
-        description="Controlled multi-seed multi-round federated adversarial benchmark (n=12, f=2) evaluating FedAvg, Median, Trimmed Mean, Multi-Krum, and Bulyan on real credit card fraud data.",
-        mandatory_caveat="Controlled simulated adversarial client model delta poisoning on real credit card fraud data under Dirichlet non-IID partition. Does NOT represent live production or malicious bank entities.",
-        is_external_communication_safe=False,
+        description="Canonical multi-seed multi-round federated adversarial benchmark (n=12, f=2, 3 seeds: 42, 123, 456, 72 conditions) evaluating FedAvg, Coordinate Median, Trimmed Mean, Krum, Multi-Krum, and Bulyan under Scaled Sign Inversion (scale=3.0), Isotropic Gaussian Noise (sigma=1.0), and Omniscient ALIE (z=1.0) on real Credit Card Fraud data under Dirichlet non-IID partitions (alpha=0.5).",
+        mandatory_caveat="Controlled laboratory federated learning simulation on real Credit Card Fraud transactions; client federation (12 nodes, Dirichlet alpha=0.5) and Byzantine adversaries (f=2) are simulated and do NOT represent live production banking rails. PROVENANCE CAVEAT: Machine-readable execution config hash (f3c89626...) diverged from definition hash (d0640c8e...) due to CLI metadata builder incompleteness; scientific intent and execution match 100% field-by-field.",
+        is_external_communication_safe=True,
     ),
 
     "fl_non_iid_alpha_0_5": CanonicalBenchmarkEntry(

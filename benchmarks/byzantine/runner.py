@@ -53,6 +53,28 @@ from benchmarks.byzantine.schema import (
 logger = logging.getLogger(__name__)
 
 
+def compute_clean_defense_metrics(
+    defense_clean_ap: float,
+    fedavg_clean_ap: float,
+) -> dict[str, float]:
+    """Computes explicit clean-defense comparison metrics from raw AP observations.
+
+    Distinguishes:
+    - clean_ap_difference: AP(clean defense) - AP(clean FedAvg) (absolute score delta)
+    - clean_retention_ratio: AP(clean defense) / AP(clean FedAvg) (dimensionless ratio)
+    - clean_relative_loss: 1.0 - clean_retention_ratio (legacy clean_penalty serialized in artifacts)
+    """
+    denom = max(1e-6, fedavg_clean_ap)
+    ret_ratio = float(defense_clean_ap / denom)
+    ap_diff = float(defense_clean_ap - fedavg_clean_ap)
+    rel_loss = float(1.0 - ret_ratio)
+    return {
+        "clean_ap_difference": round(ap_diff, 6),
+        "clean_retention_ratio": round(ret_ratio, 6),
+        "clean_relative_loss": round(rel_loss, 6),
+    }
+
+
 def evaluate_model_on_test_set(
     model: FraudMLP,
     test_dataset: TensorDataset,
@@ -355,8 +377,9 @@ class ByzantineFederatedRunner:
                     seed=seed,
                 )
                 clean_defense_baselines[d_agg_cfg.aggregator_type.value] = d_ap
-                penalty = round(1.0 - (d_ap / max(1e-6, clean_ap)), 6)
-                ret_clean = round(d_ap / max(1e-6, clean_ap), 6)
+                clean_m = compute_clean_defense_metrics(d_ap, clean_ap)
+                penalty = clean_m["clean_relative_loss"]  # Legacy field: relative loss = 1.0 - clean_retention_ratio
+                ret_clean = clean_m["clean_retention_ratio"]
                 per_seed_results.append(
                     ByzantineConditionResult(
                         seed=seed,

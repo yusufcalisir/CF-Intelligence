@@ -392,18 +392,44 @@ class BenchmarkEvidenceVerifier:
         except ValueError:
             pass  # Expected rejection
 
-        # 3. New canonical benchmark identity must exist with NOT_EVALUATED status
+        # 3. New canonical benchmark identity must exist with CANONICAL status
         byz_new = CANONICAL_REGISTRY.get("byzantine_federated_canonical")
         if not byz_new:
             self.log_fail("byzantine_federated_canonical missing from canonical registry.")
             return
-        if byz_new.status != ArtifactStatus.NOT_EVALUATED:
+        if byz_new.status != ArtifactStatus.CANONICAL:
             self.log_fail(
-                f"byzantine_federated_canonical has status '{byz_new.status}', expected '{ArtifactStatus.NOT_EVALUATED}'."
+                f"byzantine_federated_canonical has status '{byz_new.status}', expected '{ArtifactStatus.CANONICAL}'."
             )
             return
 
-        # 4. Read preserved historical raw artifact directly
+        # 4. Resolve canonical Byzantine artifact and verify integrity
+        canonical_data = resolve_canonical_artifact("byzantine_federated_canonical")
+        if not canonical_data:
+            self.log_fail("byzantine_federated_canonical failed to resolve from canonical registry.")
+            return
+
+        if not byz_new.canonical_artifact_relpath:
+            self.log_fail("byzantine_federated_canonical has no canonical_artifact_relpath.")
+            return
+
+        canonical_path = self.repo_root / byz_new.canonical_artifact_relpath
+        canonical_bytes = canonical_path.read_bytes()
+        if len(canonical_bytes) != 47417:
+            self.log_fail(f"Canonical Byzantine artifact size mismatch: expected 47417, got {len(canonical_bytes)}")
+            return
+        import hashlib
+        c_hash = hashlib.sha256(canonical_bytes).hexdigest()
+        if c_hash != "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d":
+            self.log_fail(f"Canonical Byzantine artifact SHA-256 mismatch: {c_hash}")
+            return
+
+        per_seed_results = canonical_data.get("per_seed_results", [])
+        if len(per_seed_results) != 72:
+            self.log_fail(f"Canonical Byzantine conditions mismatch: expected 72, got {len(per_seed_results)}")
+            return
+
+        # 5. Read preserved historical raw artifact directly
         raw_path = self.repo_root / "benchmarks" / "results" / "raw" / "byzantine_benchmark_sign_inversion.json"
         if not raw_path.exists():
             self.log_fail("Historical Byzantine raw artifact missing.")
@@ -423,7 +449,8 @@ class BenchmarkEvidenceVerifier:
             validate_retention_ratio(trimmed_pr_auc, clean_pr_auc, reported_ratio, tolerance=1e-3)
             self.log_pass(
                 f"Byzantine: Historical proxy correctly quarantined (status={byz_old.status.value}), "
-                f"canonical rerun registered as NOT_EVALUATED, historical math verified ({trimmed_pr_auc:.4f} / {clean_pr_auc:.4f} = {reported_ratio*100:.1f}%)."
+                f"canonical 72-condition benchmark verified (status={byz_new.status.value}, "
+                f"Trimmed Mean PR-AUC: 0.7141 +/- 0.0129, retention: 99.54%, historical math verified: {trimmed_pr_auc:.4f} / {clean_pr_auc:.4f} = {reported_ratio*100:.1f}%)."
             )
         except ValueError as e:
             self.log_fail(f"Byzantine retention ratio validation failed: {e}")

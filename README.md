@@ -134,14 +134,14 @@ To prevent ambiguity between production-grade components, algorithmic research e
 | **Real-Time Scoring Latency** | Target: < 15.0ms Fast Path (Internal SLA) | In-Process Microbenchmark: 2.57 ms fast-path compute (p99: 8.87 ms @ C=1, 105.02 ms @ C=100); Peak throughput: 1,246.3 req/s @ C=50 ([`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json)). Local HTTP Service (Class B1 Inference Capacity): pooled p50: 7.12 ms @ C=1 (pooled p99: 10.85 ms); Peak throughput: 543.0 req/s @ C=50 ([`latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json)) | **Verified** |
 | **Federated Non-IID Convergence** | Evaluated under Dirichlet $\alpha = 0.50$ | Observed convergence across evaluated multi-bank partitions; naive FedAvg shows degradation under severe non-IID label skew (requires FedProx/adaptive clipping) ([`run_fl_benchmark.py`](benchmarks/runners/run_fl_benchmark.py)) | **Evaluated** |
 | **Differential Privacy Guarantee** | Target: $\epsilon \le 1.0, \delta = 10^{-5}$ bound | Measured: $\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$ ([`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json)), Opacus PRV accounting (Gopi et al. 2021) | **Verified** |
-| **Byzantine Fault Tolerance** | Algorithm-specific bounds: Krum ($f < n/2$), Trimmed Mean ($\beta < 0.5$), Bulyan ($n \ge 4f + 3$) | Trimmed Mean retains ~99.7% of clean PR-AUC under evaluated sign-inversion attack ([`run_byzantine_benchmark.py`](benchmarks/runners/run_byzantine_benchmark.py)) | **Validated** |
+| **Byzantine Fault Tolerance** | Algorithm-specific bounds: Krum ($f < n/2$), Trimmed Mean ($\beta < 0.5$), Bulyan ($n \ge 4f + 3$) | Canonical 3-seed simulation on real Credit Card data ($n=12, f=2$, Dirichlet $\alpha=0.5$): Trimmed Mean achieved mean PR-AUC $0.7141 \pm 0.0129$ ($99.54\% \pm 4.05\%$ mean retention relative to clean FedAvg) under evaluated scaled sign inversion ($\times -3.0$); Multi-Krum achieved $0.7061 \pm 0.0341$ ($98.48\% \pm 6.93\%$ retention). High seed instability observed for Single Krum and non-robust aggregators ([`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json)). Historical single-seed proxy (~99.7%) quarantined. | **Evaluated** |
 | **Zero Raw PII Transmission** | No cleartext IBAN / SSN outside bank | AST static analyzer + `backend/tests/unit/test_data_contracts.py` | **Verified** |
 | **SSRF Perimeter Defense** | Private IP / AWS metadata blocking | `backend/tests/unit/test_perimeter_waf.py` (100% boundary probes blocked) | **Verified** |
 | **Statutory FIU E-Filing** | Direct API filing to FinCEN / EU FIU | UNODC goAML 4.0 XML export prototype (`fiu_regulatory_service.py`) | **Prototype Only** |
 | **Zero Vulnerabilities** | Mathematically impossible in software | Security test suite covering 18 distinct API & cryptographic vectors | **Clarified** |
 
 > **Machine-Readable Claim Provenance:**  
-> All 21 quantitative performance assertions, empirical baseline reconciliations, and cryptographic throughput measurements are tracked in the machine-readable [`benchmarks/claim_registry.json`](benchmarks/claim_registry.json) and verified by [`backend/tests/unit/test_claims_registry.py`](backend/tests/unit/test_claims_registry.py).
+> All 30 quantitative performance assertions, empirical baseline reconciliations, and cryptographic throughput measurements are tracked in the machine-readable [`benchmarks/claim_registry.json`](benchmarks/claim_registry.json) and verified by [`backend/tests/unit/test_claims_registry.py`](backend/tests/unit/test_claims_registry.py).
 
 ---
 
@@ -1386,9 +1386,13 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-CREDITCARD-PRAUC`** | Credit Card Fraud Controlled-Budget Federated Benchmark | `0.8250` | `0.8248` (FedAvg, 10-pass equalized) / `0.8219` (Centralized equalized) | [`multi_seed_controlled_results.json`](experiments/credit_card/multi_seed_controlled_results.json) | `python experiments/credit_card/run_creditcard_benchmark.py --all-rows --require-real --centralized-epochs 10` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-DP-SIGMA30`** | DP High-Noise Utility ($\sigma=3.0$) | `0.3465` | `0.3465` ($\epsilon=0.3497$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
 | **`CLM-DP-SIGMA00`** | DP Non-Private Ceiling ($\sigma=0.0$) | `0.8965` | `0.8965` ($\epsilon=\infty$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
-| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($\beta=0.20$, Historical Prototype) | `—` (Under Re-evaluation) | `0.7344` (Historical proxy: 99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
-| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector (Historical Prototype) | `—` (Under Re-evaluation) | `0.7257` (Historical proxy: 98.5% baseline; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
-| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator (Historical Prototype) | `—` (Under Re-evaluation) | `0.7070` (Historical proxy: 95.9% baseline; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
+| **`CLM-BYZ-CANONICAL-TRIMMED-MEAN`** | Byzantine Defense: Trimmed Mean under Scaled Sign-Inversion ($\times -3.0$, Canonical 3-Seed Benchmark) | `0.7141` | `0.7141 ± 0.0129` (Mean Retention: `99.54% ± 4.05%` relative to clean FedAvg, $N=3$) | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
+| **`CLM-BYZ-CANONICAL-MULTIKRUM`** | Byzantine Defense: Multi-Krum under Scaled Sign-Inversion ($\times -3.0$, Canonical 3-Seed Benchmark) | `0.7061` | `0.7061 ± 0.0341` (Mean Retention: `98.48% ± 6.93%` relative to clean FedAvg, $N=3$) | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
+| **`CLM-BYZ-CANONICAL-ALIE-TRIMMED-MEAN`** | Byzantine Defense: Trimmed Mean under Omniscient ALIE Attack ($z=1.0$, Canonical 3-Seed Benchmark) | `0.7189` | `0.7189 ± 0.0171` (Mean Retention: `100.23% ± 5.12%` relative to clean FedAvg, $N=3$) | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
+| **`CLM-BYZ-CANONICAL-SEED-INSTABILITY`** | Byzantine Seed Instability & Failure Disclosures (Single Krum Seed 456 Collapse, ALIE collapses) | `0.0011` | Single Krum Seed 456 collapses to `0.001104`; FedAvg Seed 42 collapses to `0.165317` under sign-flip; ALIE collapses Coord Median (`0.204505`) and Bulyan (`0.222000`) on Seed 123 | [`byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) | `python benchmarks/runners/run_byzantine_federated_benchmark.py --config canonical` | `VERIFIED_MEASURED` |
+| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($\beta=0.20$, Historical Prototype) | `—` (Historical) | `0.7344` (Historical proxy: 99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
+| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector (Historical Prototype) | `—` (Historical) | `0.7257` (Historical proxy: 98.5% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
+| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator (Historical Prototype) | `—` (Historical) | `0.7070` (Historical proxy: 95.9% baseline; quarantined) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `HISTORICAL_AUDITED` |
 | **`CLM-LATENCY-FASTPATH`** | In-Process Fast-Path Scoring Latency | `< 15.0 ms` (Target) | `2.569 ms` (p99: 8.87 ms @ C=1, 105.02 ms @ C=100) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
 | **`CLM-LATENCY-SHAP`** | In-Process Explainability Latency (with SHAP) | `< 50.0 ms` (Target) | `2.516 ms` (linear attribution) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --with-shap` | `VERIFIED_MEASURED` |
 | **`CLM-GATEWAY-PEAK-THROUGHPUT`** | In-Process Microbenchmark Peak Throughput | `> 1,200 req/s` (Target) | `1,109.9 req/s` @ C=100 (`1,246.3` @ C=50) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
@@ -1530,23 +1534,40 @@ Exercises the production SlowAPI rate limiter (`60/minute`) under stable client 
 
 ---
 
+### 15.6 Byzantine Adversarial Resilience & Model Poisoning Defense
+
 > [!NOTE]
-> **Status: Byzantine Robustness Benchmark Under Canonical Re-Evaluation**
-> Robust aggregation implementations (Coordinate-wise Median, Trimmed Mean, Krum, Multi-Krum, and Bulyan) are fully implemented and verified in `benchmarks/byzantine/` and `backend/app/domain/byzantine_defense.py`. Current empirical Byzantine performance claims are being re-evaluated under a multi-round federated protocol on real credit card fraud data (`byzantine_federated_canonical`). The metrics below represent the historical single-seed synthetic Gaussian proxy and are retained strictly for archival traceability.
+> **Canonical Benchmark Protocol & Provenance**:
+> Evaluated on real Credit Card Fraud tabular data partitioned into 12 simulated bank clients under Non-IID Dirichlet distribution ($\alpha = 0.50$, positive fraud cases unconstrained with zero-positive clients permitted, $\min(\text{samples}) = 50$). Federation parameters: 10 federated rounds, 1 local epoch per round, PyTorch MLP architecture, `MODEL_DELTA` aggregation space, evaluated across $N=3$ seeds (`[42, 123, 456]`). Evaluates 6 aggregation rules across 4 attack states (18 clean conditions, 54 attacked conditions = 72 total conditions).
+> **Scientific Scope**: Real transaction data; simulated bank federation; simulated Byzantine adversaries ($f=2$ of $n=12$, $\approx 16.7\%$ malicious share); controlled predeclared attack configurations. This is a laboratory federated training simulation, **not a production multi-bank validation**. No universal Byzantine robustness guarantee is asserted.
+> **Provenance Caveat**: Recorded under `MACHINE_CONFIG_INCOMPLETE_BUT_INTENT_AND_EXECUTION_MATCH` (frozen protocol definition hash `d0640c8e...` vs execution-resolved config hash `f3c89626...` due to omitted ALIE threat-model CLI serialization prior to canonical execution).
 
-### 15.6 Byzantine Adversarial Resilience & Model Poisoning Defense (Historical Prototype)
+#### Canonical Multi-Round Benchmark Results (`byzantine_federated_canonical.json`)
 
-Evaluating historical model defenses against Byzantine client poisoning (Sign Inversion attack: 2 malicious nodes out of 10 clients submitting $\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$):
+Primary metric: Average Precision (`sklearn.metrics.average_precision_score`, reported as PR-AUC). Retention is calculated per-seed as $\mathrm{Retention}(c, s) = \mathrm{AP}(c, s) / \mathrm{AP}(\text{clean FedAvg}, s)$, reporting the mean of per-seed ratios with sample standard deviation ($\mathrm{ddof}=1$).
 
-| Aggregation Strategy | Test PR-AUC | Test ROC-AUC | Resilience Assessment |
-|:---|:---:|:---:|:---|
-| **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
-| **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
-| **Coordinate-wise Trimmed Mean** ($\beta=0.20$) | **0.7344** | **0.9782** | Historical Proxy: 99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine) |
-| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | Historical Proxy: 98.5% of Clean PR-AUC |
-| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | Historical Proxy: 95.9% of Clean PR-AUC |
+| Aggregation Strategy | Clean PR-AUC ($f=0$) | Scaled Sign-Inversion ($\times -3.0$) | Gaussian Noise ($\sigma=1.0$) | Omniscient ALIE ($z=1.0$) | Mean Retention (Sign-Flip) | Observed Stability & Notes |
+|:---|:---:|:---:|:---:|:---:|:---:|:---|
+| **FedAvg (Unprotected)** | **0.7179 $\pm$ 0.0207** | 0.5279 $\pm$ 0.3140 | 0.7202 $\pm$ 0.0034 | 0.6365 $\pm$ 0.1474 | 73.19% $\pm$ 43.19% | Severe vulnerability; Seed 42 collapsed to **0.1653** under sign-flip |
+| **Coordinate Median** | 0.7145 $\pm$ 0.0150 | 0.7062 $\pm$ 0.0210 | 0.7200 $\pm$ 0.0105 | 0.5364 $\pm$ 0.2881 | 98.50% $\pm$ 4.70% | Stable under sign-flip; collapses under ALIE on Seed 123 (**0.2045**) |
+| **Trimmed Mean ($\beta=0.20$)** | 0.7177 $\pm$ 0.0183 | **0.7141 $\pm$ 0.0129** | **0.7259 $\pm$ 0.0004** | **0.7189 $\pm$ 0.0171** | **99.54% $\pm$ 4.05%** | Most consistent retention across evaluated configurations ($N=3$) |
+| **Single Krum** | 0.6729 $\pm$ 0.0270 | 0.4716 $\pm$ 0.4081 | 0.7148 $\pm$ 0.0264 | 0.6684 $\pm$ 0.0309 | 65.34% $\pm$ 56.49% | **Catastrophic collapse on Seed 456** (**0.0011**; root cause unidentifiable from raw artifact) |
+| **Multi-Krum ($m=10$)** | 0.7118 $\pm$ 0.0253 | **0.7061 $\pm$ 0.0341** | 0.7224 $\pm$ 0.0039 | 0.7131 $\pm$ 0.0191 | **98.48% $\pm$ 6.93%** | Resilient across evaluated attacks; minor degradation on Seed 456 (0.6667) |
+| **Bulyan** | 0.7161 $\pm$ 0.0205 | 0.6961 $\pm$ 0.0363 | 0.7168 $\pm$ 0.0094 | 0.4363 $\pm$ 0.2072 | 97.09% $\pm$ 5.92% | Tolerates sign-flip; collapses under ALIE on Seed 123 (**0.2220**) |
 
-*Historical Artifact: [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL`). Note: Exploratory diagnostic figure `docs/figures/benchmark_byzantine_resilience.png` reflects a separate historical multi-attack script (`experiments/byzantine/run_poisoning_suite.py`) and is decoupled from canonical FL evaluation.*
+*Authoritative Canonical Artifact: [`benchmarks/results/raw/byzantine_federated_canonical.json`](benchmarks/results/raw/byzantine_federated_canonical.json) (Status: `CANONICAL`, Size: 47,417 bytes, SHA-256: `c760df99...`).*
+
+> [!WARNING]
+> **Mandatory Disclosure of Seed-Level Instability**:
+> Aggregated multi-seed means must not conceal seed-level catastrophic breakdowns:
+> 1. **Sign-Flip + FedAvg**: Seed 42 collapsed to $\text{PR-AUC} = 0.165317$ (vs 0.711586 on Seed 123 and 0.706788 on Seed 456).
+> 2. **Sign-Flip + Single Krum**: Seed 456 experienced complete collapse to $\text{PR-AUC} = 0.001104$ (`ROOT_CAUSE_NOT_IDENTIFIABLE_FROM_CANONICAL_ARTIFACT` due to omitted per-round client selection serialization).
+> 3. **ALIE + Coordinate Median**: Seed 123 collapsed to $\text{PR-AUC} = 0.204505$.
+> 4. **ALIE + Bulyan**: Seed 123 collapsed to $\text{PR-AUC} = 0.222000$.
+
+#### Historical Prototype Archive (`byzantine_benchmark_sign_inversion.json`, Status: `HISTORICAL_QUARANTINED`)
+
+The historical single-seed synthetic Gaussian proxy ($0.7344 / 0.7369 \approx 99.66\% \approx 99.7\%$) evaluated a 10-client single-round prototype under simple sign inversion and is permanently quarantined from canonical claims. Historical artifact: [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL_QUARANTINED`). Note: Exploratory diagnostic figure `docs/figures/benchmark_byzantine_resilience.png` reflects a separate historical multi-attack script (`experiments/byzantine/run_poisoning_suite.py`) and is decoupled from canonical FL evaluation.
 
 ---
 

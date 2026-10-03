@@ -11,6 +11,7 @@ Usage:
   python benchmarks/runners/run_byzantine_federated_benchmark.py --canonical
 """
 
+# ruff: noqa: E402
 from __future__ import annotations
 
 import argparse

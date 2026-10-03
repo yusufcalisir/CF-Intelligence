@@ -131,19 +131,28 @@ In PaySim federated optimization across 10 communication rounds with Dirichlet s
 
 ### 2.5 Negative Result NR-005: Byzantine Defense Utility Penalty on Benign Non-IID Skew
 
-#### Empirical Observation
-In [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](file:///benchmarks/results/raw/byzantine_benchmark_sign_inversion.json), evaluating Byzantine-resilient aggregators on clean (uncompromised) data under natural statistical heterogeneity:
+#### Empirical Observation & Canonical Multi-Round Benchmark
+Evaluated across two complementary benchmark suites:
 
-| Aggregation Method | Clean Non-IID PR-AUC | Adversarial Attack Resilience | Clean Data Efficiency | Clean Penalty ($\Delta$) |
-| :--- | :---: | :---: | :---: | :---: |
-| **Naive FedAvg** | **0.7366** | 0.0000 (Collapses under Sign-Flip) | 100.0% | Baseline |
-| **Coordinate Trimmed Mean** | **0.7344** | 0.7344 (Tolerates 20% poisoned) | 99.7% | $-0.0022$ (-0.3%) |
-| **Multi-Vector Krum** | **0.7257** | 0.7257 (Tolerates Byzantine nodes) | 98.5% | $-0.0109$ (-1.5%) |
-| **Bulyan Aggregator** | **0.7070** | 0.7070 (Provable resilience) | 95.9% | **$-0.0296$ (-4.0%)** |
+1. **Canonical Multi-Round 72-Condition Benchmark** ([`benchmarks/results/raw/byzantine_federated_canonical.json`](file:///benchmarks/results/raw/byzantine_federated_canonical.json), Status: `CANONICAL`):
+   - Evaluated on real Credit Card Fraud tabular data partitioned into 12 simulated bank clients under Non-IID Dirichlet distribution ($\alpha = 0.50$, $\min(\text{samples}) = 50$, zero-positive clients permitted, 10 federated rounds, $N=3$ seeds).
+   - Under clean baseline conditions ($f=0$), honest FedAvg achieves PR-AUC $0.7179 \pm 0.0207$. Robust aggregators incur a small clean utility penalty or maintain parity: Trimmed Mean ($\beta=0.20$) achieves $0.7177 \pm 0.0183$ ($\Delta = -0.0002$), Coordinate Median achieves $0.7145 \pm 0.0150$ ($\Delta = -0.0034$), Bulyan achieves $0.7161 \pm 0.0205$ ($\Delta = -0.0018$), Multi-Krum achieves $0.7118 \pm 0.0253$ ($\Delta = -0.0061$), and Single Krum achieves $0.6729 \pm 0.0270$ ($\Delta = -0.0450$).
+   - Under evaluated scaled sign-inversion attack ($\times -3.0$, $f=2$ Byzantine nodes): FedAvg collapses to $0.5279 \pm 0.3140$ (with Seed 42 catastrophic collapse to $0.1653$), while Trimmed Mean retains $0.7141 \pm 0.0129$ ($99.54\% \pm 4.05\%$ mean retention relative to clean FedAvg) and Multi-Krum retains $0.7061 \pm 0.0341$ ($98.48\% \pm 6.93\%$).
+   - Disclosed seed collapses: Single Krum collapsed to $0.0011$ on Seed 456; ALIE-style perturbations collapsed Coordinate Median ($0.2045$) and Bulyan ($0.2220$) on Seed 123.
+
+2. **Historical Single-Seed Prototype (Quarantined)** ([`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](file:///benchmarks/results/raw/byzantine_benchmark_sign_inversion.json), Status: `HISTORICAL_QUARANTINED`):
+   - Evaluated an early 10-client prototype on synthetic Gaussian data ($0.7344 / 0.7369 \approx 99.66\% \approx 99.7\%$). Retained strictly for archival traceability:
+
+| Aggregation Method | Clean Non-IID PR-AUC | Adversarial Attack Resilience | Clean Data Efficiency | Clean Penalty ($\Delta$) | Status |
+| :--- | :---: | :---: | :---: | :---: | :---|
+| **Naive FedAvg** | **0.7366** | 0.0000 (Collapses under Sign-Flip) | 100.0% | Baseline | Historical Prototype |
+| **Coordinate Trimmed Mean** | **0.7344** | 0.7344 (Tolerates 20% poisoned) | 99.7% | $-0.0022$ (-0.3%) | Quarantined Archive |
+| **Multi-Vector Krum** | **0.7257** | 0.7257 (Tolerates Byzantine nodes) | 98.5% | $-0.0109$ (-1.5%) | Quarantined Archive |
+| **Bulyan Aggregator** | **0.7070** | 0.7070 (Provable resilience) | 95.9% | **$-0.0296$ (-4.0%)** | Quarantined Archive |
 
 #### Mathematical & Operational Reality
-- **Why It Happens:** Byzantine-robust aggregators (Krum, Bulyan) filter out candidate vectors located in the geometric periphery of the client update manifold. Under Non-IID Dirichlet skew, a bank with a unique legitimate transaction specialty (e.g. high-volume cross-border wires) produces legitimate gradients that reside in the geometric tail. Bulyan and Krum periodically discard these honest updates as suspected poisoning attempts.
-- **Operational Reality:** Robustness against malicious poisoning acts as an insurance policy: it guarantees survival under attack, but incurs a 1.5% - 4.0% utility tax on clean data.
+- **Why It Happens:** Byzantine-robust aggregators (Krum, Bulyan, Trimmed Mean) filter out candidate vectors located in the geometric periphery of the client update manifold. Under Non-IID Dirichlet skew, a bank with a unique legitimate transaction specialty (e.g. high-volume cross-border wires) produces legitimate gradients that reside in the geometric tail. Aggregators periodically discard these honest updates as suspected poisoning attempts.
+- **Operational Reality:** Robustness against malicious poisoning acts as an insurance policy: it guarantees survival under attack, but incurs a clean utility tax on benign data, and cannot guarantee universal immunity across all adversarial distribution shifts or seed realizations.
 
 ---
 

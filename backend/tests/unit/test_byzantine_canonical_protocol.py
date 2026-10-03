@@ -72,6 +72,7 @@ from benchmarks.byzantine.runner import (
 from benchmarks.byzantine.schema import ByzantineBenchmarkArtifact
 from benchmarks.canonical_registry import (
     CANONICAL_REGISTRY,
+    CommunicationEligibility,
     resolve_canonical_artifact,
 )
 from benchmarks.provenance_schema import ArtifactStatus
@@ -103,12 +104,15 @@ class TestByzantineHistoricalQuarantine:
         with pytest.raises(ValueError, match="non-canonical status"):
             resolve_canonical_artifact("byzantine_sign_inversion")
 
-    def test_new_canonical_entry_registered_as_not_evaluated(self):
+    def test_canonical_entry_promoted_to_canonical(self):
         assert "byzantine_federated_canonical" in CANONICAL_REGISTRY
         new_entry = CANONICAL_REGISTRY["byzantine_federated_canonical"]
-        assert new_entry.status == ArtifactStatus.NOT_EVALUATED
-        assert new_entry.is_external_communication_safe is False
-        assert resolve_canonical_artifact("byzantine_federated_canonical") is None
+        assert new_entry.status == ArtifactStatus.CANONICAL
+        assert new_entry.communication_eligibility == CommunicationEligibility.SAFE_WITH_CAVEAT
+        resolved = resolve_canonical_artifact("byzantine_federated_canonical")
+        assert resolved is not None
+        assert isinstance(resolved, dict)
+        assert resolved["benchmark_id"] == "byzantine_federated_canonical"
 
 
 class TestModelDeltaAndLossSemantics:
@@ -503,11 +507,16 @@ class TestPhase2BProtocolScientificIntegrity:
         assert h1 == h2
 
     def test_canonical_artifact_remains_absent(self):
-        """Strict Invariant: No canonical artifact file may exist in Phase 2B."""
+        """Strict Invariant: In Phase 2B artifact must remain absent; post Phase 3 execution, it must be immutable."""
         canonical_dest = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_federated_canonical.json"
-        assert not canonical_dest.exists(), (
-            f"FATAL: Canonical artifact {canonical_dest} exists before canonical execution! Must remain absent."
-        )
+        if canonical_dest.exists():
+            import hashlib
+            with open(canonical_dest, "rb") as f:
+                sha = hashlib.sha256(f.read()).hexdigest()
+            expected_sha = "c760df9912a1235f0131bd4060ab8fa274dddcb5b25c558ca4436c558723ff4d"
+            assert sha == expected_sha, (
+                f"FATAL: Canonical artifact exists but SHA altered! {sha} != {expected_sha}"
+            )
 
 
 class TestPhase2B1LiteratureAlignmentAndProtocolRepair:

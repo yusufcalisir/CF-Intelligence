@@ -37,7 +37,15 @@ class ByzantineRoundDiagnostic(BaseModel):
 
 
 class ByzantineConditionResult(BaseModel):
-    """Evaluation metrics for a specific (seed, attack, aggregator) condition."""
+    """Evaluation metrics for a specific (seed, attack, aggregator) condition.
+
+    Semantics:
+    - Primary evaluation metrics (test_pr_auc, test_roc_auc, f1_score) are bounded in [0.0, 1.0].
+    - retention_of_clean is a dimensionless ratio in [0.0, +inf) comparing condition AP against same-seed clean FedAvg AP.
+      Values > 1.0 are mathematically valid and indicate AP exceeding clean FedAvg for that seed replicate.
+    - clean_penalty is a legacy serialized field representing relative retention loss (1.0 - retention_of_clean).
+      It is NOT an absolute AP difference. If clean defense AP > clean FedAvg AP, this value is negative.
+    """
     model_config = ConfigDict(extra="ignore")
 
     seed: int
@@ -47,15 +55,39 @@ class ByzantineConditionResult(BaseModel):
     assumed_f: int = 2
     test_pr_auc: float
     test_roc_auc: float
-    retention_of_clean: float  # Primary retention: AP(condition) / AP(clean_fedavg)
-    defense_self_retention: float | None = None  # Diagnostic: AP(condition) / AP(clean_same_defense)
-    clean_penalty: float | None = None  # Insurance cost: 1.0 - (AP(clean_defense) / AP(clean_fedavg))
+    retention_of_clean: float  # Primary retention ratio: AP(condition) / AP(clean_fedavg, same_seed) in [0, +inf)
+    defense_self_retention: float | None = None  # Diagnostic: AP(condition) / AP(clean_same_defense, same_seed)
+    clean_penalty: float | None = None  # Legacy field: relative loss = 1.0 - (AP(clean_defense) / AP(clean_fedavg))
     f1_score: float | None = None
     rounds_completed: int = 10
 
+    @property
+    def clean_relative_loss(self) -> float | None:
+        """Explicit alias for relative retention loss: 1.0 - retention_of_clean."""
+        return self.clean_penalty
+
+    @property
+    def clean_retention_ratio(self) -> float | None:
+        """Retention ratio of clean defense relative to clean FedAvg."""
+        if self.clean_penalty is not None:
+            return 1.0 - self.clean_penalty
+        return self.retention_of_clean if self.attack_name == "none" else None
+
+    def compute_clean_ap_difference(self, clean_fedavg_ap: float) -> float | None:
+        """Computes absolute AP difference: AP(condition) - AP(clean_fedavg)."""
+        return self.test_pr_auc - clean_fedavg_ap
+
 
 class ByzantineAggregatedMetric(BaseModel):
-    """Multi-seed statistical summary across replicates."""
+    """Multi-seed statistical summary across replicates.
+
+    Semantics:
+    - pr_auc_mean / roc_auc_mean: sample means across evaluated seeds.
+    - pr_auc_std / roc_auc_std: sample standard deviations (ddof=1).
+    - retention_ratio_mean: sample mean of condition AP / clean FedAvg AP (can be > 1.0).
+    - defense_self_retention_mean: sample mean of condition AP / clean same-defense AP.
+    - clean_penalty_mean: sample mean of legacy relative loss (1.0 - clean_retention_ratio).
+    """
     model_config = ConfigDict(extra="ignore")
 
     condition_name: str
@@ -70,8 +102,13 @@ class ByzantineAggregatedMetric(BaseModel):
     retention_ratio_mean: float
     retention_ratio_std: float
     defense_self_retention_mean: float | None = None
-    clean_penalty_mean: float | None = None
+    clean_penalty_mean: float | None = None  # Legacy field: relative loss mean = 1.0 - clean_retention_ratio_mean
     n_seeds: int = 3
+
+    @property
+    def clean_relative_loss_mean(self) -> float | None:
+        """Explicit alias for clean_penalty_mean representing relative retention loss."""
+        return self.clean_penalty_mean
 
 
 class ByzantineBenchmarkArtifact(BaseModel):

@@ -17,6 +17,15 @@ from pydantic import BaseModel, ConfigDict, Field
 
 CANONICAL_SEEDS = [42, 123, 456]
 
+# Provenance Hash Identities:
+# 1. Preregistered Protocol Definition: computed from create_canonical_byzantine_config() (schema 2.1.0, frozen pre-run).
+FROZEN_PROTOCOL_CONFIG_SHA256 = "d0640c8e9dbd11df9405db97ace31ad31abd3bfaa2c1ccde25fccba05b25d4b6"
+FROZEN_PROTOCOL_MATRIX_SHA256 = "4b04d0d6ad70dcef780c64b76d21f0de25cfaab095c5987487d89d8a0d8a4ec0"
+
+# 2. Execution-Resolved Configuration: computed at runtime after ALIE attack model instantiation (schema 2.0.0, runtime resolved).
+CANONICAL_EXECUTION_RESOLVED_CONFIG_SHA256 = "f3c8962616571803098d0e8b48b1902a868465aedc400ba1803097b49161df9e"
+CANONICAL_EXECUTION_RESOLVED_MATRIX_SHA256 = "cd8528f77f956d12ca77059ab9448ff4b3fe21d39206eb97f8213704f9de22df"
+
 
 class ByzantineAttackType(StrEnum):
     """Supported distributed Byzantine attack modalities."""
