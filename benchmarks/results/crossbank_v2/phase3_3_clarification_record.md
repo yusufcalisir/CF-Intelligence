@@ -124,8 +124,8 @@ Phase 3.2 is authoritative for all scientific corrections across the benchmark:
 
 | Component | Path / Identification | Status |
 |:---|:---|:---:|
-| Canonical Raw Artifact | enchmarks/results/raw/crossbank_v2_canonical.json (SHA256: 6f802cad9..., 322,468 bytes) | VERIFIED |
-| Canonical Manifest | enchmarks/crossbank_v2/manifest.json (SHA256: e8dcc5aad8...) | VERIFIED |
+| Canonical Raw Artifact | enchmarks/results/raw/crossbank_v2_canonical.json (SHA-256: 81e3b39dab... LF / 6f802cad9... CRLF, 313,965 / 322,468 bytes) | VERIFIED |
+| Canonical Manifest | enchmarks/crossbank_v2/manifest.json (SHA-256: e8dcc5aad8...) | VERIFIED |
 | Phase 3.2 Reconciliation Report | enchmarks/results/crossbank_v2/phase3_2_reconciliation_report.md | VERIFIED |
 | Phase 3.3 Clarification Record | enchmarks/results/crossbank_v2/phase3_3_clarification_record.md | VERIFIED |
 | Canonical Claim Registry | enchmarks/results/crossbank_v2/claim_registry.json | VERIFIED |

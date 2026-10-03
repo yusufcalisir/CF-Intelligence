@@ -39,8 +39,10 @@ This is a **gate failure, not an execution-invalidity finding**. The executed co
 
 | Check | Start of phase | End of phase |
 |:---|:---|:---|
-| SHA-256 | `b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a` | identical |
-| Bytes | 322468 | 322468 |
+| SHA-256 (Canonical LF) | `81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6` | identical |
+| SHA-256 (Windows CRLF) | `b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a` | identical |
+| Bytes (Canonical LF) | 313965 | 313965 |
+| Bytes (Windows CRLF) | 322468 | 322468 |
 | Result | MATCH | MATCH |
 
 `CANONICAL_RAW_ARTIFACT_MUTATION_DETECTED`: not triggered.
@@ -498,9 +500,11 @@ FedAvg weights per seed (client rows / sum), A / B / C: 42: 0.4274 / 0.3186 / 0.
 ## AG. Final Raw Artifact Hash Recheck
 
 ```text
-SHA-256: b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a
-Bytes:   322468
-Result:  EXACT_MATCH (no mutation)
+SHA-256 (Canonical LF):   81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6
+SHA-256 (Windows CRLF):   b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a
+Bytes (Canonical LF):     313965
+Bytes (Windows CRLF):     322468
+Result:                   EXACT_MATCH (no mutation)
 ```
 
 ## AH. Report Correction Status

@@ -377,16 +377,21 @@ class BenchmarkEvidenceVerifier:
         if not cb2_data:
             self.log_fail("crossbank_v2_canonical failed to resolve.")
             return
+        if not cb2_entry.canonical_artifact_relpath:
+            self.log_fail("crossbank_v2_canonical has no canonical_artifact_relpath.")
+            return
 
         cb2_path = self.repo_root / cb2_entry.canonical_artifact_relpath
         cb2_bytes = cb2_path.read_bytes()
-        if len(cb2_bytes) != 322468:
-            self.log_fail(f"Canonical CrossBank v2 artifact size mismatch: expected 322468, got {len(cb2_bytes)}")
+        # Normalize CRLF to LF to ensure cross-platform hash and byte length determinism across Windows and Linux checkouts
+        cb2_normalized = cb2_bytes.replace(b"\r\n", b"\n")
+        if len(cb2_normalized) != 313965:
+            self.log_fail(f"Canonical CrossBank v2 artifact size mismatch: expected 313965 (normalized LF), got {len(cb2_normalized)}")
             return
 
         import hashlib
-        cb2_sha = hashlib.sha256(cb2_bytes).hexdigest()
-        if cb2_sha != "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a":
+        cb2_sha = hashlib.sha256(cb2_normalized).hexdigest()
+        if cb2_sha != "81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6":
             self.log_fail(f"Canonical CrossBank v2 artifact SHA-256 mismatch: {cb2_sha}")
             return
 

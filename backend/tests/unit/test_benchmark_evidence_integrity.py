@@ -780,10 +780,13 @@ class TestCrossBankV2CanonicalEvidenceBinding:
         artifact_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "crossbank_v2_canonical.json"
         assert artifact_path.exists()
         raw_bytes = artifact_path.read_bytes()
-        assert len(raw_bytes) == 322468
-        assert hashlib.sha256(raw_bytes).hexdigest() == "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a"
+        # Normalize CRLF to LF to ensure cross-platform hash and byte length determinism across Windows and Linux CI checkouts
+        normalized_bytes = raw_bytes.replace(b"\r\n", b"\n")
+        assert len(normalized_bytes) == 313965
+        assert len(raw_bytes) in (313965, 322468)
+        assert hashlib.sha256(normalized_bytes).hexdigest() == "81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6"
 
-        data = json.loads(raw_bytes.decode("utf-8"))
+        data = json.loads(normalized_bytes.decode("utf-8"))
         assert data["canonical_seeds"] == [42, 123, 456, 789, 2025]
         assert 101112 not in data["canonical_seeds"]
         assert data["protocol_version"] == "2.1.0"

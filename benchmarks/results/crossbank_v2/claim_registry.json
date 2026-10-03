@@ -3,7 +3,7 @@
   "registry_name": "CFI-CrossBank-02 Canonical Claim Registry",
   "benchmark_id": "CFI-CrossBank-02",
   "protocol_version": "2.1.0",
-  "raw_artifact_sha256": "b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a",
+  "raw_artifact_sha256": "81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6",
   "raw_artifact_relpath": "benchmarks/results/raw/crossbank_v2_canonical.json",
   "frozen_commit_sha": "2f64a02b65caa0b35588ec8c016290d1f2ac6e61",
   "manifest_sha256": "e8dcc5aad8cfaecfe4837be73b2c78769ca1376be235f4a1e2ca838e7753177e",

@@ -21,3 +21,6 @@ experiments/**/metrics.csv -filter -diff -merge
 # Exclude frontend public web assets and backend static assets from Git LFS so CI/CD (Vercel, Docker) receives real files
 frontend/public/** -filter -diff -merge
 backend/app/static/** -filter -diff -merge
+
+# Ensure canonical JSON benchmark raw artifacts retain exact POSIX LF line endings across all platforms
+benchmarks/results/raw/*.json text eol=lf

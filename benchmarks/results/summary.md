@@ -230,7 +230,7 @@ All benchmark runs automatically feed into [`benchmarks/runners/generate_charts.
 
 ## 8. CFI-CrossBank-02 Consortium Benchmark (Canonical Protocol 2.1.0)
 - **Protocol & Execution Identity**: `CFI-CrossBank-02` Version 2.1.0 (Frozen at commit `2f64a02b65caa0b35588ec8c016290d1f2ac6e61`, promoted at `4cc1ffba0d253a4c336b2d5e267b5b6666c742c1`)
-- **Canonical Raw Artifact**: [`crossbank_v2_canonical.json`](./raw/crossbank_v2_canonical.json) (SHA-256: `b6f802cad979c8cca083dd030cfc0bd12beb06846ea1b4ee317b8747ba0efe6a`, 322,468 bytes)
+- **Canonical Raw Artifact**: [`crossbank_v2_canonical.json`](./raw/crossbank_v2_canonical.json) (SHA-256: `81e3b39dabfeda0e92012f14d652ddce2e4edc2fb14ca16dd8b94391e2b1c4f6`, 313,965 bytes canonical LF / 322,468 bytes CRLF)
 - **Evaluation Scope**: 5 canonical seeds (`[42, 123, 456, 789, 2025]`), 3 synthetic banking institutions (Bank A 50%, Bank B 30%, Bank C 20% with zero historical training fraud), 7 complex fraud scenarios.
 
 | Evaluation Condition | Paradigm & Feature Regime | Provenance | Average Precision (AP) | ROC-AUC | Recall @ 0.1% Val FPR | Status |
