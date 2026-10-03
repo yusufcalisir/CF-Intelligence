@@ -128,7 +128,7 @@ class BenchmarkEvidenceVerifier:
         cc_path = self.repo_root / "backend" / "storage" / "datasets" / "creditcard" / "creditcard.csv"
         if cc_path.exists():
             status, computed = verify_physical_source_hash(cc_path, expected_hash)
-            if status != "HASH_VERIFIED":
+            if status != "HASH_VERIFIED" or not computed:
                 self.log_fail(f"Credit Card physical file hash verification failed: {status} ({computed})")
             elif self.verbose:
                 print(f"    Credit Card physical file verified: {cc_path} ({computed[:16]}...)")
@@ -261,7 +261,7 @@ class BenchmarkEvidenceVerifier:
         pq_path = self.repo_root / "backend" / "storage" / "datasets" / "amlsim" / "transactions.parquet"
         if pq_path.exists():
             status, computed = verify_physical_source_hash(pq_path, expected_hash)
-            if status != "HASH_VERIFIED":
+            if status != "HASH_VERIFIED" or not computed:
                 self.log_fail(f"AMLSim physical parquet verification failed: {status} ({computed})")
             elif self.verbose:
                 print(f"    AMLSim physical parquet verified: {pq_path} ({computed[:16]}...)")
@@ -292,7 +292,7 @@ class BenchmarkEvidenceVerifier:
         alerts_path = self.repo_root / "backend" / "storage" / "datasets" / "synthaml" / "alerts.parquet"
         if alerts_path.exists():
             status, computed = verify_physical_source_hash(alerts_path, expected_hash)
-            if status != "HASH_VERIFIED":
+            if status != "HASH_VERIFIED" or not computed:
                 self.log_fail(f"SynthAML physical alerts.parquet verification failed: {status} ({computed})")
             elif self.verbose:
                 print(f"    SynthAML physical alerts.parquet verified: {alerts_path} ({computed[:16]}...)")
@@ -325,7 +325,7 @@ class BenchmarkEvidenceVerifier:
         pq_path = self.repo_root / "backend" / "storage" / "datasets" / "amlnet" / "transactions.parquet"
         if pq_path.exists():
             status, computed = verify_physical_source_hash(pq_path, expected_hash)
-            if status != "HASH_VERIFIED":
+            if status != "HASH_VERIFIED" or not computed:
                 self.log_fail(f"AMLNet physical parquet verification failed: {status} ({computed})")
             elif self.verbose:
                 print(f"    AMLNet physical parquet verified: {pq_path} ({computed[:16]}...)")
@@ -369,14 +369,52 @@ class BenchmarkEvidenceVerifier:
             )
 
     def verify_byzantine(self) -> None:
-        """Verify Byzantine sign-inversion attack retention calculation."""
-        if CANONICAL_REGISTRY["byzantine_sign_inversion"].status != ArtifactStatus.CANONICAL:
-            self.log_fail("Byzantine canonical registry status is not CANONICAL.")
+        """Verify Byzantine benchmark evidence status and historical quarantine."""
+        # 1. Old proxy must be HISTORICAL and cannot be promoted to CANONICAL
+        byz_old = CANONICAL_REGISTRY.get("byzantine_sign_inversion")
+        if not byz_old:
+            self.log_fail("byzantine_sign_inversion missing from canonical registry.")
             return
-        data = resolve_canonical_artifact("byzantine_sign_inversion")
-        if not data:
-            self.log_fail("Byzantine canonical artifact failed to resolve.")
+        if byz_old.status != ArtifactStatus.HISTORICAL:
+            self.log_fail(
+                f"Historical Byzantine proxy artifact incorrectly has status '{byz_old.status}', "
+                f"expected '{ArtifactStatus.HISTORICAL}'."
+            )
             return
+        if byz_old.canonical_artifact_relpath is not None:
+            self.log_fail("Historical Byzantine proxy must have canonical_artifact_relpath=None.")
+
+        # 2. Cannot resolve historical artifact as canonical evidence
+        try:
+            res = resolve_canonical_artifact("byzantine_sign_inversion")
+            if res is not None:
+                self.log_fail("resolve_canonical_artifact('byzantine_sign_inversion') returned data instead of None/error!")
+        except ValueError:
+            pass  # Expected rejection
+
+        # 3. New canonical benchmark identity must exist with NOT_EVALUATED status
+        byz_new = CANONICAL_REGISTRY.get("byzantine_federated_canonical")
+        if not byz_new:
+            self.log_fail("byzantine_federated_canonical missing from canonical registry.")
+            return
+        if byz_new.status != ArtifactStatus.NOT_EVALUATED:
+            self.log_fail(
+                f"byzantine_federated_canonical has status '{byz_new.status}', expected '{ArtifactStatus.NOT_EVALUATED}'."
+            )
+            return
+
+        # 4. Read preserved historical raw artifact directly
+        raw_path = self.repo_root / "benchmarks" / "results" / "raw" / "byzantine_benchmark_sign_inversion.json"
+        if not raw_path.exists():
+            self.log_fail("Historical Byzantine raw artifact missing.")
+            return
+        with open(raw_path, encoding="utf-8") as f:
+            data = json.load(f)
+
+        if data.get("is_canonical") is True:
+            self.log_fail("Historical byzantine_benchmark_sign_inversion.json has is_canonical=True!")
+        if data.get("status") != ArtifactStatus.HISTORICAL.value:
+            self.log_fail(f"Historical byzantine artifact has status '{data.get('status')}', expected 'HISTORICAL'")
 
         clean_pr_auc = data.get("honest_fedavg_pr_auc") or 0.7369
         trimmed_pr_auc = data.get("trimmed_mean_pr_auc") or 0.7344
@@ -384,8 +422,8 @@ class BenchmarkEvidenceVerifier:
         try:
             validate_retention_ratio(trimmed_pr_auc, clean_pr_auc, reported_ratio, tolerance=1e-3)
             self.log_pass(
-                f"Byzantine: Sign-inversion defense verified (Trimmed Mean: {trimmed_pr_auc:.4f} "
-                f"retains {reported_ratio*100:.1f}% of Clean FedAvg: {clean_pr_auc:.4f})"
+                f"Byzantine: Historical proxy correctly quarantined (status={byz_old.status.value}), "
+                f"canonical rerun registered as NOT_EVALUATED, historical math verified ({trimmed_pr_auc:.4f} / {clean_pr_auc:.4f} = {reported_ratio*100:.1f}%)."
             )
         except ValueError as e:
             self.log_fail(f"Byzantine retention ratio validation failed: {e}")
@@ -424,6 +462,7 @@ class BenchmarkEvidenceVerifier:
             ("benchmarks/results/raw/fraud_benchmark_ieee_cis.json", ArtifactStatus.HISTORICAL),
             ("benchmarks/results/raw/fraud_benchmark_amlsim.json", ArtifactStatus.HISTORICAL),
             ("benchmarks/results/raw/fraud_benchmark_amlnet.json", ArtifactStatus.HISTORICAL),
+            ("benchmarks/results/raw/byzantine_benchmark_sign_inversion.json", ArtifactStatus.HISTORICAL),
         ]
         all_quarantined = True
         for rel_path, expected_status in checks:
@@ -440,7 +479,8 @@ class BenchmarkEvidenceVerifier:
                 all_quarantined = False
 
         if all_quarantined:
-            self.log_pass("Quarantined Artifacts: All 5 legacy/smoke artifacts safely quarantined with is_canonical=False.")
+            self.log_pass("Quarantined Artifacts: All 6 legacy/smoke artifacts safely quarantined with is_canonical=False.")
+
 
     def verify_master_matrix_parity(self) -> None:
         """Verify master benchmark matrix consumes canonical evidence without fake defaults across all 8 datasets."""
@@ -562,6 +602,8 @@ class BenchmarkEvidenceVerifier:
         byz_claim = claims_by_id.get("CLM-BYZ-TRIMMED", {})
         if byz_claim.get("attack_type") != "sign_inversion" or byz_claim.get("malicious_fraction") != 0.20:
             self.log_fail("CLM-BYZ-TRIMMED missing atomic attack scope metadata (sign_inversion, 0.20)")
+        if "centralized_baseline_value" in byz_claim and byz_claim["centralized_baseline_value"] is not None:
+            self.log_fail("CLM-BYZ-TRIMMED incorrectly asserts centralized_baseline_value (must be clean_fedavg or None)!")
         if "99.7% of clean PR-AUC" in readme_text and "sign-inversion" not in readme_text:
             self.log_fail("README renders Byzantine 99.7% claim without mandatory sign-inversion attack scope!")
 

@@ -117,18 +117,20 @@ ate_limit_behavior_samples.json](./raw/rate_limit_behavior_samples.json)
 
 ---
 
-## 3. Byzantine Adversarial Attack Resilience
-- **Runner**: `benchmarks/runners/run_byzantine_benchmark.py`
-- **Attack Modality**: Sign Inversion ($\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$, 2 malicious out of 10 clients)
-- **Raw Artifact**: [`byzantine_benchmark_sign_inversion.json`](./raw/byzantine_benchmark_sign_inversion.json)
+## 3. Byzantine Adversarial Attack Resilience (Historical Prototype)
+- **Status**: Under Canonical Re-Evaluation (`byzantine_federated_canonical`)
+- **Historical Runner**: `benchmarks/runners/run_byzantine_benchmark.py`
+- **Attack Modality**: Sign Inversion ($\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$, 2 malicious out of 10 clients on synthetic Gaussian testbed)
+- **Raw Historical Artifact**: [`byzantine_benchmark_sign_inversion.json`](./raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL`)
 
 | Aggregation Strategy | Test PR-AUC | Test ROC-AUC | Adversarial Breakdown Status |
 |:---|:---:|:---:|:---|
 | **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
 | **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
-| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | **Resilient** (99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine) |
-| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | **Resilient** (98.5% of Clean PR-AUC) |
-| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | **Resilient** (95.9% of Clean PR-AUC) |
+| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | Historical Proxy: 99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine) |
+| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | Historical Proxy: 98.5% of Clean PR-AUC |
+| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | Historical Proxy: 95.9% of Clean PR-AUC |
+
 
 ---
 

@@ -174,17 +174,37 @@ CANONICAL_REGISTRY: dict[str, CanonicalBenchmarkEntry] = {
     ),
     "byzantine_sign_inversion": CanonicalBenchmarkEntry(
         benchmark_id="byzantine_sign_inversion",
-        dataset_name="Byzantine Fault Tolerance Sign-Inversion Attack",
+        dataset_name="Byzantine Fault Tolerance Sign-Inversion Attack (Historical Prototype)",
         provenance_type=DatasetProvenanceType.CONTROLLED_TESTBED,
-        status=ArtifactStatus.CANONICAL,
+        status=ArtifactStatus.HISTORICAL,
         evidence_scope=EvidenceScope.CONTROLLED_EXPERIMENT,
-        communication_eligibility=CommunicationEligibility.SAFE_WITH_CAVEAT,
-        canonical_artifact_relpath="benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
-        historical_artifacts_relpaths=["benchmarks/results/raw/byzantine_breakdown_analysis.json"],
-        description="Adversarial evaluation of Trimmed Mean, Krum, and Bulyan under 20% sign-inversion poisoning (10 clients, 2 Byzantine).",
-        mandatory_caveat="Evaluates sign-inversion attack only under 10 clients with 2 Byzantine (20% malicious). The 99.7% retention metric cannot be cited without this explicit attack scope; does not prove universal Byzantine security across arbitrary poisoning vectors.",
-        is_external_communication_safe=True,
+        communication_eligibility=CommunicationEligibility.HISTORICAL_ONLY,
+        canonical_artifact_relpath=None,
+        historical_artifacts_relpaths=[
+            "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
+            "benchmarks/results/raw/byzantine_breakdown_analysis.json",
+        ],
+        description="Historical prototype evaluating sign-inversion attack on synthetic 10-feature Gaussian testbed (10 clients, 2 Byzantine). Superseded by byzantine_federated_canonical.",
+        mandatory_caveat="HISTORICAL EVIDENCE ONLY: Evaluates algebraic single-seed Gaussian proxy with centroid leakage. Does not constitute valid canonical FL Byzantine robustness evidence. Re-evaluation pending under byzantine_federated_canonical.",
+        is_external_communication_safe=False,
     ),
+    "byzantine_federated_canonical": CanonicalBenchmarkEntry(
+        benchmark_id="byzantine_federated_canonical",
+        dataset_name="European Credit Card Fraud Detection (Byzantine Federated)",
+        provenance_type=DatasetProvenanceType.REAL_DATA,
+        status=ArtifactStatus.NOT_EVALUATED,
+        evidence_scope=EvidenceScope.CONTROLLED_EXPERIMENT,
+        communication_eligibility=CommunicationEligibility.INTERNAL_ONLY,
+        canonical_artifact_relpath="benchmarks/results/raw/byzantine_federated_canonical.json",
+        historical_artifacts_relpaths=[
+            "benchmarks/results/raw/byzantine_benchmark_sign_inversion.json",
+            "benchmarks/results/raw/byzantine_breakdown_analysis.json",
+        ],
+        description="Controlled multi-seed multi-round federated adversarial benchmark (n=12, f=2) evaluating FedAvg, Median, Trimmed Mean, Multi-Krum, and Bulyan on real credit card fraud data.",
+        mandatory_caveat="Controlled simulated adversarial client model delta poisoning on real credit card fraud data under Dirichlet non-IID partition. Does NOT represent live production or malicious bank entities.",
+        is_external_communication_safe=False,
+    ),
+
     "fl_non_iid_alpha_0_5": CanonicalBenchmarkEntry(
         benchmark_id="fl_non_iid_alpha_0_5",
         dataset_name="Non-IID Label Skew Benchmark (Dirichlet alpha=0.5)",
@@ -232,9 +252,6 @@ def resolve_canonical_artifact(
         raise KeyError(f"Benchmark '{benchmark_id}' not found in canonical registry.")
 
     entry = CANONICAL_REGISTRY[benchmark_id]
-    if entry.status == ArtifactStatus.NOT_EVALUATED or not entry.canonical_artifact_relpath:
-        return None
-
     if entry.status in (
         ArtifactStatus.SUPERSEDED,
         ArtifactStatus.SUPERSEDED_PLACEHOLDER,
@@ -245,6 +262,10 @@ def resolve_canonical_artifact(
         raise ValueError(
             f"Cannot resolve canonical artifact: Benchmark '{benchmark_id}' has non-canonical status '{entry.status}'."
         )
+
+    if entry.status == ArtifactStatus.NOT_EVALUATED or not entry.canonical_artifact_relpath:
+        return None
+
 
     artifact_path = REPO_ROOT / entry.canonical_artifact_relpath
     if not artifact_path.exists():

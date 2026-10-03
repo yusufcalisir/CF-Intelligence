@@ -887,7 +887,7 @@ $$
 
 ### 5.3 Asynchronous Federated Learning Engine & Dynamic Quorum Coordination (`async_fl_engine.py`, `coordinator_service.py`, `quorum_manager.py`)
 Provides non-blocking, asynchronous parameter updates (FedAsync; Xie et al., 2019) allowing fast participant banks to contribute weights continuously without waiting on high-latency straggler nodes:
-1. **Staleness Attenuation Factor ($S(\tau)$):** Down-weights parameter updates from slower nodes based on staleness delay $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ using polynomial decay with damping coefficient $\alpha$:
+1. **Staleness Attenuation Factor** ($S(\tau)$): Down-weights parameter updates from slower nodes based on staleness delay $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ using polynomial decay with damping coefficient $\alpha$:
 
 $$
 S(\tau) = (1 + \tau)^{-\alpha}, \quad \alpha \in [0.1, 1.0]
@@ -900,7 +900,7 @@ $$
 W^{(t+1)} = (1 - \eta \cdot S(\tau)) W^{(t)} + \eta \cdot S(\tau) W_{\mathrm{client}}
 $$
 
-3. **Straggler Bounded Cutoff ($\tau_{\max}$):** Updates with staleness delay exceeding $\tau_{\max} = 50$ are automatically dropped to prevent parameter degradation from ancient checkpoints.
+3. **Straggler Bounded Cutoff** ($\tau_{\max}$): Updates with staleness delay exceeding $\tau_{\max} = 50$ are automatically dropped to prevent parameter degradation from ancient checkpoints.
 4. **Byzantine & Non-Finite Defense:** Client parameter updates undergo strict numerical validation (`np.isfinite`); updates containing `NaN` or `Inf` are rejected with `ValueError`, keeping the global consensus model unpoisoned.
 5. **Thread-Safe Mutex Lock:** All read and write operations on global weights and update histories are serialized via internal `threading.Lock()`, enforcing race-free multi-tenant concurrency.
 6. **Dynamic Quorum Timeout Manager (`quorum_manager.py`):** Continuously monitors participant check-in progress across bank nodes. A round transitions to `QUORUM_REACHED` as soon as $\ge 60\%$ of active nodes submit, or to `TIMEOUT_EXPIRED` after the 300-second target window.
@@ -920,13 +920,13 @@ $$
 
 ### 6.1 Opacus Differential Privacy Guard (`privacy_service.py`)
 Applies formal $(\epsilon, \delta)$-Differential Privacy to local model training rounds:
-- **$L_2$ Gradient Norm Clipping ($C$):**
+- $L_2$ **Gradient Norm Clipping** ($C$):
 
 $$
 \bar{g}_i = \frac{g_i}{\max\left(1, \frac{\|g_i\|_2}{C}\right)}
 $$
 
-- **Gaussian Noise Addition ($\sigma$):**
+- **Gaussian Noise Addition** ($\sigma$):
 
 $$
 \sigma = \frac{\sqrt{2 \ln(1.25/\delta)}}{\epsilon}, \quad \tilde{g}_i = \bar{g}_i + \mathcal{N}(0, \sigma^2 C^2 I)
@@ -983,7 +983,7 @@ To empirically demonstrate defense mechanisms in real-time, the platform include
 - **500 tx/s Smurfing / Layering Burst Interception:** 
   - Simulates a coordinated money laundering syndicate executing high-velocity micro-transfers ($4,850 – $9,950) across multiple consortium institutions.
   - GraphSAGE relational graph embeddings and MinHash LSH Private Set Intersection intercept the syndicate, demonstrating immediate velocity threshold escalation.
-- **Byzantine Poisoned Gradient Attack ($\Delta w \times -10.0$):**
+- **Byzantine Poisoned Gradient Attack** ($\Delta w \times -10.0$):
   - Simulates a compromised bank node (Bank Gamma) injecting inverted, malicious parameter weights to degrade the global model.
   - The **Krum / Bulyan Defense Shield** evaluates neighbor Euclidean distance sums ($\Delta = 48.2$, exceeding the distance threshold of $14.1$).
   - The malicious gradient is rejected, Bank Gamma is isolated with an immediate visual quarantine badge (`QUARANTINED BY KRUM`), and global model resilience is maintained.
@@ -1386,9 +1386,9 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **`CLM-CREDITCARD-PRAUC`** | Credit Card Fraud Controlled-Budget Federated Benchmark | `0.8250` | `0.8248` (FedAvg, 10-pass equalized) / `0.8219` (Centralized equalized) | [`multi_seed_controlled_results.json`](experiments/credit_card/multi_seed_controlled_results.json) | `python experiments/credit_card/run_creditcard_benchmark.py --all-rows --require-real --centralized-epochs 10` | `EMPIRICAL_PARITY_VERIFIED` |
 | **`CLM-DP-SIGMA30`** | DP High-Noise Utility ($\sigma=3.0$) | `0.3465` | `0.3465` ($\epsilon=0.3497$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
 | **`CLM-DP-SIGMA00`** | DP Non-Private Ceiling ($\sigma=0.0$) | `0.8965` | `0.8965` ($\epsilon=\infty$) | [`dp_privacy_utility_tradeoff.json`](benchmarks/results/raw/dp_privacy_utility_tradeoff.json) | `python benchmarks/runners/run_dp_tradeoff.py` | `VERIFIED_MEASURED` |
-| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($eta=0.20$) | `0.7344` | `0.7344` (99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
-| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector | `0.7257` | `0.7257` (98.5% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
-| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator | `0.7070` | `0.7070` (95.9% baseline) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `EMPIRICAL_PARITY_VERIFIED` |
+| **`CLM-BYZ-TRIMMED`** | Byzantine Defense: Trimmed Mean ($\beta=0.20$, Historical Prototype) | `—` (Under Re-evaluation) | `0.7344` (Historical proxy: 99.7% of clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
+| **`CLM-BYZ-KRUM`** | Byzantine Defense: Krum Multi-Vector (Historical Prototype) | `—` (Under Re-evaluation) | `0.7257` (Historical proxy: 98.5% baseline; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
+| **`CLM-BYZ-BULYAN`** | Byzantine Defense: Bulyan Aggregator (Historical Prototype) | `—` (Under Re-evaluation) | `0.7070` (Historical proxy: 95.9% baseline; canonical re-evaluation pending) | [`byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) | `python benchmarks/runners/run_byzantine_benchmark.py --attack sign_inversion` | `REQUIRES_RE_EVALUATION` |
 | **`CLM-LATENCY-FASTPATH`** | In-Process Fast-Path Scoring Latency | `< 15.0 ms` (Target) | `2.569 ms` (p99: 8.87 ms @ C=1, 105.02 ms @ C=100) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
 | **`CLM-LATENCY-SHAP`** | In-Process Explainability Latency (with SHAP) | `< 50.0 ms` (Target) | `2.516 ms` (linear attribution) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --with-shap` | `VERIFIED_MEASURED` |
 | **`CLM-GATEWAY-PEAK-THROUGHPUT`** | In-Process Microbenchmark Peak Throughput | `> 1,200 req/s` (Target) | `1,109.9 req/s` @ C=100 (`1,246.3` @ C=50) | [`latency_microbenchmark.json`](benchmarks/results/raw/latency_microbenchmark.json) | `python benchmarks/runners/run_latency_benchmark.py --target-requests 1000` | `VERIFIED_MEASURED` |
@@ -1423,7 +1423,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **SecAgg Throughput (NumPy Vectorized Masking)** | **~5,630,000 param/s** | > 1M param/s | `fl_engine.py` | `Empirical NumPy Array Vectorization Benchmark` |
 | **SecAgg Latency Scaling** | **O(n x d), R^2 = 0.9703** | Linear O(n x d) | `fl_engine.py` (NumPy masking path via `secagg_benchmark_scalability.py`) | `Empirical Vectorization Benchmark (see secagg_scalability_benchmark_report.md; variance range: 0.91–0.99)` |
 | **FL Synthetic ROC-AUC (FedAvg)** | **0.835 mean (range 0.563–0.952)** | > 0.80 measured / 0.950 lab design goal | `simulation_service.py` (5-seed empirical benchmark, 3-bank consortium, 5 rounds) | `Empirical Simulation Benchmark (5 seeds: [42, 123, 456, 789, 2026])` |
-| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | **$\epsilon = 0.3497$ at $\sigma=3.0, \delta=10^{-5}$** (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
+| **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
 | **Full Test Suite Pass Rate** | 100% | **4,249 / 4,249 passing** (3,453 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
@@ -1436,11 +1436,11 @@ Using genuine per-sample DP-SGD via PyTorch Opacus (`PrivacyEngine(accountant='p
 
 | Noise Multiplier ($\sigma$) | Accounted Privacy Budget ($\epsilon, \delta=10^{-5}$) | Test PR-AUC (Mean $\pm$ Sample Std) | Test ROC-AUC (Mean $\pm$ Sample Std) | Absolute Utility Loss | Relative Utility Loss | Operational / Compliance Status ($\epsilon \le 2.0$ Target) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---|
-| **$\sigma = 3.0$** | $\epsilon = 0.3497$ | **0.3465 $\pm$ 0.1580** | 0.8720 $\pm$ 0.0551 | 0.5500 | -61.35% | ✅ Compliant (High Privacy Regime, $\epsilon \le 1.0$) |
-| **$\sigma = 2.0$** | $\epsilon = 0.5725$ | **0.4710 $\pm$ 0.1752** | 0.8990 $\pm$ 0.0431 | 0.4255 | -47.46% | ✅ Compliant (Strong Privacy, $\epsilon \le 1.0$) |
-| **$\sigma = 1.0$** | $\epsilon = 1.7744$ | **0.7088 $\pm$ 0.1155** | 0.9514 $\pm$ 0.0184 | 0.1877 | -20.94% | ✅ Compliant (Balanced Production Target, $\epsilon \le 2.0$) |
-| **$\sigma = 0.5$** | $\epsilon = 12.1989$ | **0.8457 $\pm$ 0.0429** | 0.9777 $\pm$ 0.0047 | 0.0509 | -5.67% | ⚠️ Target Exceeded ($\epsilon > 2.0$, High-Utility Weak-Privacy Point) |
-| **$\sigma = 0.0$** | $\infty$ (Non-Private Baseline) | **0.8965 $\pm$ 0.0078** | 0.9872 $\pm$ 0.0050 | 0.0000 | 0.00% | Non-Private Baseline Ceiling |
+| $\sigma = 3.0$ | $\epsilon = 0.3497$ | **0.3465 ± 0.1580** | 0.8720 ± 0.0551 | 0.5500 | -61.35% | ✅ Compliant (High Privacy Regime, $\epsilon \le 1.0$) |
+| $\sigma = 2.0$ | $\epsilon = 0.5725$ | **0.4710 ± 0.1752** | 0.8990 ± 0.0431 | 0.4255 | -47.46% | ✅ Compliant (Strong Privacy, $\epsilon \le 1.0$) |
+| $\sigma = 1.0$ | $\epsilon = 1.7744$ | **0.7088 ± 0.1155** | 0.9514 ± 0.0184 | 0.1877 | -20.94% | ✅ Compliant (Balanced Production Target, $\epsilon \le 2.0$) |
+| $\sigma = 0.5$ | $\epsilon = 12.1989$ | **0.8457 ± 0.0429** | 0.9777 ± 0.0047 | 0.0509 | -5.67% | ⚠️ Target Exceeded ($\epsilon > 2.0$, High-Utility Weak-Privacy Point) |
+| $\sigma = 0.0$ | $\infty$ (Non-Private Baseline) | **0.8965 ± 0.0078** | 0.9872 ± 0.0050 | 0.0000 | 0.00% | Non-Private Baseline Ceiling |
 
 > [!NOTE]
 > **Operational Target vs. Empirically Measured Configurations:**  
@@ -1466,12 +1466,12 @@ Measures in-process algorithmic compute budget on host CPU threads (PyTorch CPU 
 
 | Concurrency ($C$) | Measured Throughput (Mean $\pm$ SD) | p50 Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Observed Error Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **338.5 $\pm$ 45.4 req/s** | **2.70 $\pm$ 0.15 ms** | 3.75 $\pm$ 0.44 ms | 8.87 $\pm$ 1.96 ms | 0.00% |
-| **10** | **1,231.0 $\pm$ 137.9 req/s** | **7.61 $\pm$ 0.95 ms** | 10.92 $\pm$ 1.25 ms | 18.13 $\pm$ 2.45 ms | 0.00% |
-| **50** | **1,246.3 $\pm$ 87.9 req/s** | **31.97 $\pm$ 4.21 ms** | 53.16 $\pm$ 6.32 ms | 63.09 $\pm$ 7.15 ms | 0.00% |
-| **100** | **1,109.9 $\pm$ 76.5 req/s** | **47.49 $\pm$ 5.82 ms** | 87.31 $\pm$ 9.14 ms | 105.02 $\pm$ 11.20 ms | 0.00% |
-| **250** | **1,149.2 $\pm$ 94.3 req/s** | **46.96 $\pm$ 6.12 ms** | 79.14 $\pm$ 8.95 ms | 92.85 $\pm$ 10.45 ms | 0.00% |
-| **500** | **1,013.4 $\pm$ 102.1 req/s** | **32.07 $\pm$ 4.88 ms** | 53.84 $\pm$ 7.55 ms | 122.07 $\pm$ 14.80 ms | 0.00% |
+| **1** | **338.5 ± 45.4 req/s** | **2.70 ± 0.15 ms** | 3.75 ± 0.44 ms | 8.87 ± 1.96 ms | 0.00% |
+| **10** | **1,231.0 ± 137.9 req/s** | **7.61 ± 0.95 ms** | 10.92 ± 1.25 ms | 18.13 ± 2.45 ms | 0.00% |
+| **50** | **1,246.3 ± 87.9 req/s** | **31.97 ± 4.21 ms** | 53.16 ± 6.32 ms | 63.09 ± 7.15 ms | 0.00% |
+| **100** | **1,109.9 ± 76.5 req/s** | **47.49 ± 5.82 ms** | 87.31 ± 9.14 ms | 105.02 ± 11.20 ms | 0.00% |
+| **250** | **1,149.2 ± 94.3 req/s** | **46.96 ± 6.12 ms** | 79.14 ± 8.95 ms | 92.85 ± 10.45 ms | 0.00% |
+| **500** | **1,013.4 ± 102.1 req/s** | **32.07 ± 4.88 ms** | 53.84 ± 7.55 ms | 122.07 ± 14.80 ms | 0.00% |
 
 <div align="center">
   <img src="docs/figures/benchmark_latency_concurrency.png" alt="In-Process Scoring Pipeline Latency under Concurrency" width="800" />
@@ -1505,12 +1505,12 @@ Measures client-observed wall-clock HTTP latency against a live running Uvicorn 
 
 | Concurrency ($C$) | Successful Throughput (Mean $\pm$ SD) | Status 2xx | Status 4xx | Timeouts | 2xx p50 Latency (ms) | 2xx p95 Latency (ms) | 2xx p99 Latency (ms) | 2xx Max Latency (ms) | Success Rate |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| **1** | **134.9 $\pm$ 2.4 req/s** | 3,000 | 0 | 0 | **7.12 ms** | 9.00 ms | 10.85 ms | 14.88 ms | 100.0% |
-| **10** | **452.8 $\pm$ 14.0 req/s** | 3,000 | 0 | 0 | **20.48 ms** | 31.84 ms | 39.96 ms | 53.64 ms | 100.0% |
-| **50** | **543.0 $\pm$ 23.6 req/s** | 3,000 | 0 | 0 | **89.02 ms** | 104.70 ms | 156.81 ms | 189.07 ms | 100.0% |
-| **100** | **520.8 $\pm$ 37.6 req/s** | 3,000 | 0 | 0 | **178.50 ms** | 266.38 ms | 289.42 ms | 337.89 ms | 100.0% |
-| **250** | **431.9 $\pm$ 29.6 req/s** | 3,000 | 0 | 0 | **474.97 ms** | 918.33 ms | 950.14 ms | 1,024.12 ms | 100.0% |
-| **500** | **401.7 $\pm$ 26.7 req/s** | 3,000 | 0 | 0 | **1,060.89 ms** | 1,469.24 ms | 1,760.77 ms | 2,187.52 ms | 100.0% |
+| **1** | **134.9 ± 2.4 req/s** | 3,000 | 0 | 0 | **7.12 ms** | 9.00 ms | 10.85 ms | 14.88 ms | 100.0% |
+| **10** | **452.8 ± 14.0 req/s** | 3,000 | 0 | 0 | **20.48 ms** | 31.84 ms | 39.96 ms | 53.64 ms | 100.0% |
+| **50** | **543.0 ± 23.6 req/s** | 3,000 | 0 | 0 | **89.02 ms** | 104.70 ms | 156.81 ms | 189.07 ms | 100.0% |
+| **100** | **520.8 ± 37.6 req/s** | 3,000 | 0 | 0 | **178.50 ms** | 266.38 ms | 289.42 ms | 337.89 ms | 100.0% |
+| **250** | **431.9 ± 29.6 req/s** | 3,000 | 0 | 0 | **474.97 ms** | 918.33 ms | 950.14 ms | 1,024.12 ms | 100.0% |
+| **500** | **401.7 ± 26.7 req/s** | 3,000 | 0 | 0 | **1,060.89 ms** | 1,469.24 ms | 1,760.77 ms | 2,187.52 ms | 100.0% |
 
 *Artifacts: [`benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json`](benchmarks/results/raw/latency_http_service_benchmark_post_basehttp0_diagnosis.json), [`benchmarks/results/raw/latency_http_service_samples.json`](benchmarks/results/raw/latency_http_service_samples.json)*
 
@@ -1530,35 +1530,23 @@ Exercises the production SlowAPI rate limiter (`60/minute`) under stable client 
 
 ---
 
-### 15.6 Byzantine Adversarial Resilience & Model Poisoning Defense
+> [!NOTE]
+> **Status: Byzantine Robustness Benchmark Under Canonical Re-Evaluation**
+> Robust aggregation implementations (Coordinate-wise Median, Trimmed Mean, Krum, Multi-Krum, and Bulyan) are fully implemented and verified in `benchmarks/byzantine/` and `backend/app/domain/byzantine_defense.py`. Current empirical Byzantine performance claims are being re-evaluated under a multi-round federated protocol on real credit card fraud data (`byzantine_federated_canonical`). The metrics below represent the historical single-seed synthetic Gaussian proxy and are retained strictly for archival traceability.
 
-Evaluating model defenses against Byzantine client poisoning (Sign Inversion attack: 2 malicious nodes out of 10 clients submitting $\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$):
+### 15.6 Byzantine Adversarial Resilience & Model Poisoning Defense (Historical Prototype)
+
+Evaluating historical model defenses against Byzantine client poisoning (Sign Inversion attack: 2 malicious nodes out of 10 clients submitting $\Delta w_{\mathrm{mal}} = -3.0 \cdot \Delta w_{\mathrm{honest}}$):
 
 | Aggregation Strategy | Test PR-AUC | Test ROC-AUC | Resilience Assessment |
 |:---|:---:|:---:|:---|
 | **Honest FedAvg (Clean Baseline)** | **0.7369** | **0.9781** | Reference Baseline (0 Attackers) |
 | **Poisoned FedAvg (No Defense)** | **0.6794** | **0.9665** | Degraded by Malicious Inversion |
-| **Coordinate-wise Trimmed Mean ($\beta=0.20$)** | **0.7344** | **0.9782** | **Resilient** (99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack, 10 clients, 2 Byzantine) |
-| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | **Resilient** (98.5% of Clean PR-AUC) |
-| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | **Resilient** (95.9% of Clean PR-AUC) |
+| **Coordinate-wise Trimmed Mean** ($\beta=0.20$) | **0.7344** | **0.9782** | Historical Proxy: 99.7% of Clean PR-AUC under evaluated 20% sign-inversion attack (10 clients, 2 Byzantine) |
+| **Krum (Blanchard et al., 2017)** | **0.7257** | **0.9688** | Historical Proxy: 98.5% of Clean PR-AUC |
+| **Bulyan (Guerraoui et al., 2018)** | **0.7070** | **0.9716** | Historical Proxy: 95.9% of Clean PR-AUC |
 
-<div align="center">
-  <img src="docs/figures/benchmark_byzantine_resilience.png" alt="Byzantine Attack Defense PR-AUC" width="750" />
-</div>
-
-*Artifact: [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json)*
-
----
-
-### 15.6 Federated Optimization & Non-IID Convergence (`benchmarks/runners/run_fl_benchmark.py`)
-
-Evaluating optimization convergence under Dirichlet label skew ($\alpha = 0.50$):
-
-<div align="center">
-  <img src="docs/figures/benchmark_fl_convergence.png" alt="FL Strategy Convergence" width="850" />
-</div>
-
-*Artifact: [`benchmarks/results/raw/fl_comparison_alpha_0.5.json`](benchmarks/results/raw/fl_comparison_alpha_0.5.json)*
+*Historical Artifact: [`benchmarks/results/raw/byzantine_benchmark_sign_inversion.json`](benchmarks/results/raw/byzantine_benchmark_sign_inversion.json) (Status: `HISTORICAL`). Note: Exploratory diagnostic figure `docs/figures/benchmark_byzantine_resilience.png` reflects a separate historical multi-attack script (`experiments/byzantine/run_poisoning_suite.py`) and is decoupled from canonical FL evaluation.*
 
 ---
 

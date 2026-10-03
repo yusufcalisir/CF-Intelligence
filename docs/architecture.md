@@ -270,7 +270,7 @@ Model retraining is decoupled from manual tick loops into an automated, asynchro
 
 The parameter exchange pipeline (`backend/app/infrastructure/security/secure_parameter_pipeline.py`) enforces a 7-step cryptographic transmission sequence to protect local model updates against gradient inversion attacks, model poisoning, and network interception:
 
-1. **Gradient Calculation ($\Delta w$)**: Computes parameter deltas relative to current global model weights.
+1. **Gradient Calculation** ($\Delta w$): Computes parameter deltas relative to current global model weights.
 2. **Gradient Sparsification & Compression (`compression_engine.py`)**: Applies Top-K sparsification (retaining top K% highest magnitude gradient elements) and Zstandard/zlib lossless payload compression to reduce bandwidth footprint.
 3. **Differential Privacy Injection (`privacy_service.py`)**: Inject calibrated Gaussian noise via Opacus DP-SGD ($\epsilon, \delta$) with clipping bounds.
 4. **Cryptographic Masking (`fhe_driver.py` / SecAgg)**: Applies pairwise zero-sum SecAgg masks or FHE CKKS ciphertext vectors.
@@ -287,15 +287,23 @@ Prevents training round deadlocks caused by bank node network outages, maintenan
 ### 6.1 Asynchronous Federated Aggregation (`async_fl_engine.py`, `coordinator_service.py`)
 The `AsyncFLEngine` implements the **FedAsync** parameter update protocol (Xie et al., 2019). Fast bank nodes submit model updates immediately — without blocking on straggler nodes — using a staleness attenuation factor to preserve convergence quality.
 
-**Staleness Attenuation Functions ($S(\tau)$):**
-$$S(\tau) = (1 + \tau)^{-\alpha}$$
+**Staleness Attenuation Functions** ($S(\tau)$):
+
+$$
+S(\tau) = (1 + \tau)^{-\alpha}
+$$
+
 where $\tau = t_{\mathrm{current}} - t_{\mathrm{submitted}}$ (rounds elapsed since submission) and $\alpha$ is the attenuation exponent (default: $\alpha = 0.5$). Additional supported formulations include exponential decay $S(\tau) = e^{-\alpha \tau}$, constant $S(\tau) = 1.0$, and hinge decay $S(\tau) = \min\left(1, \frac{1}{\alpha(\tau - 2) + 1}\right)$.
 
-**Straggler Cutoff Bound ($\tau_{\max}$):**
+**Straggler Cutoff Bound** ($\tau_{\max}$):
 Updates with $\tau > \tau_{\max} = 50$ are automatically dropped ($S(\tau) = 0.0$) to prevent model divergence caused by severely outdated gradients.
 
 **Global Weight Update Rule:**
-$$W^{(t+1)} = (1 - \alpha_\tau)\,W^{(t)} + \alpha_\tau\,W_i^{(t-\tau)}$$
+
+$$
+W^{(t+1)} = (1 - \alpha_\tau)\,W^{(t)} + \alpha_\tau\,W_i^{(t-\tau)}
+$$
+
 where $\alpha_\tau = \eta \cdot S(\tau)$ is the learning rate weighted by staleness attenuation. Fresh updates ($\tau = 0$) receive full learning rate weight ($S(0) = 1.0$); older stale updates are progressively down-weighted.
 
 **Invariants & Safety Protections:**

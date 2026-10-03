@@ -175,11 +175,28 @@ class TestAggregateMathematicalReconciliation:
         assert abs(fed_mean - 0.8248) < 0.001
 
     def test_byzantine_retention_ratio_reconciles_mathematically(self):
-        """Byzantine 99.7% retention must be derived from Trimmed Mean / Clean FedAvg."""
+        """Byzantine historical proxy must be quarantined and retention ratio verified on disk."""
         entry = CANONICAL_REGISTRY["byzantine_sign_inversion"]
-        assert entry.status == ArtifactStatus.CANONICAL
-        data = resolve_canonical_artifact("byzantine_sign_inversion")
-        assert data is not None
+        assert entry.status == ArtifactStatus.HISTORICAL
+        assert entry.communication_eligibility == CommunicationEligibility.HISTORICAL_ONLY
+        assert entry.canonical_artifact_relpath is None
+        assert entry.is_external_communication_safe is False
+
+        # Must reject canonical resolution of historical proxy
+        with pytest.raises(ValueError, match="non-canonical status"):
+            resolve_canonical_artifact("byzantine_sign_inversion")
+
+        # New canonical benchmark must be registered as NOT_EVALUATED
+        new_entry = CANONICAL_REGISTRY["byzantine_federated_canonical"]
+        assert new_entry.status == ArtifactStatus.NOT_EVALUATED
+        assert resolve_canonical_artifact("byzantine_federated_canonical") is None
+
+        # Verify historical artifact on disk remains numerically intact
+        raw_path = REPO_ROOT / "benchmarks" / "results" / "raw" / "byzantine_benchmark_sign_inversion.json"
+        with open(raw_path, encoding="utf-8") as f:
+            data = json.load(f)
+        assert data["status"] == "HISTORICAL"
+        assert data["is_canonical"] is False
         clean = data["honest_fedavg_pr_auc"]
         trimmed = data["trimmed_mean_pr_auc"]
         reported_ratio = data["trimmed_mean_retention_ratio"]
@@ -579,11 +596,15 @@ class TestPhase2AdversarialDefectRegressions:
         assert byz_claim["malicious_client_count"] == 2
         assert "sign-inversion" in byz_claim["mandatory_scope"].lower()
         assert "atomic_claim_rendered" in byz_claim
+        assert byz_claim.get("centralized_baseline_value") is None
+        assert byz_claim["claim_classification"] == "REQUIRES_RE_EVALUATION"
+        assert byz_claim["is_external_communication_safe"] is False
 
         # Ensure README rendering of 99.7% retention includes attack scope
         readme_text = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
         assert "99.7% of clean PR-AUC" in readme_text
         assert "under evaluated 20% sign-inversion attack" in readme_text
+
 
     def test_claims_registry_contains_non_iid_alpha_0_5(self):
         """Verify claim registry contains structured Non-IID Dirichlet alpha=0.5 claim."""

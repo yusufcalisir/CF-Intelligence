@@ -33,7 +33,7 @@ const PLATFORM_MODULES: Module[] = [
   { id: 'secure-agg', name: 'Secure Homomorphic Aggregation', category: 'Core Production Engine', purpose: 'Executes additive homomorphic aggregation of encrypted model updates inside Intel SGX hardware TEE enclaves.', algorithm: 'Paillier HE, Shamir Secret Sharing', inputs: 'Encrypted gradient ciphertexts', outputs: 'Homomorphically summed global ciphertext', tech: 'Intel SGX Enclave v2, python-phe, C++' },
   { id: 'telemetry', name: 'Real-Time Telemetry & Monitoring', category: 'Core Production Engine', purpose: 'Streams live FL training metrics, gradient norms, privacy budget consumption, and node health to the coordinator dashboard.', algorithm: 'EWMA smoothing, streaming anomaly detection', inputs: 'Node heartbeats, round gradient metrics', outputs: 'Prometheus time-series, InfluxDB metrics', tech: 'Prometheus, Grafana, OpenTelemetry' },
   { id: 'bank-connector', name: 'Bank Connector Integration Framework', category: 'Core Production Engine', purpose: 'Ingests, validates XSD schemas, and normalises ISO 20022 XML financial messages from core banking ledgers.', algorithm: 'Schema validation, normalisation pipeline', inputs: 'Raw pacs.008 credit transfers & camt.053 statements', outputs: 'Normalised transaction graph tensors', tech: 'Apache Kafka, lxml, xmlschema' },
-  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time Multi-Krum defense shield quarantine (Δ=48.2 > 14.1) and +0.42 AUC resilience (monitored via live simulated demo proxy).', algorithm: 'Multi-Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
+  { id: 'chaos-simulator', name: 'Interactive Chaos & Attack Injector', category: 'Core Production Engine', purpose: 'Injects live 500 tx/s smurfing bursts and Byzantine poisoned gradients (Δw × -10.0) with real-time defense filter simulation (Krum quarantine demonstration via live interactive scenario proxy).', algorithm: 'Krum, Trimmed Mean, Spectral SVD', inputs: 'Adversarial gradient vectors, velocity bursts', outputs: 'Quarantined node alert, shielded consensus', tech: 'PyTorch, Multi-Krum, WebSockets' },
   { id: 'docker-stack', name: 'One-Click Enterprise Deployment Stack', category: 'Core Production Engine', purpose: 'Full multi-container orchestration package deploying Nginx Gateway, React 19 SPA, FastAPI, PostgreSQL 16, and Redis 7.2 in under 30s with Same-Origin routing and 86400s WebSocket keepalive.', algorithm: 'Same-Origin Reverse Proxy, Zero-Trust Health Probing', inputs: 'docker compose up -d, .env credentials', outputs: 'Healthy production mesh, unified same-origin portal', tech: 'Docker Compose v2, Nginx, PostgreSQL 16, Redis 7.2' },
   { id: 'db-migrations', name: 'Multi-Tenant Database & Alembic Engine', category: 'Core Production Engine', purpose: 'Executes linear dual-revision migrations (001 -> 002) with dynamic tenant discovery from tenant_configs across PostgreSQL schemas and isolated SQLite databases.', algorithm: 'Alembic Linear Revision, Dynamic Discovery, Auto-Stamping', inputs: 'SQLAlchemy AsyncEngine, active_tenant context', outputs: 'Zero-drift isolated schemas, batch SQLite migration', tech: 'Alembic, SQLAlchemy 2.0 Async, PostgreSQL 16, SQLite' },
   { id: 'tenant-kms', name: 'Multi-Tenant KMS & Key Lifecycle Engine', category: 'Core Production Engine', purpose: 'Enforces versioned envelope encryption (v1/v2) with AES-256-GCM, automated re-encryption, fail-closed revocation, and scheduled rotation cron triggers.', algorithm: 'Envelope AES-256-GCM, Key Rotation Pipeline, HashiCorp Vault', inputs: 'Tenant secret keys, master Vault secret', outputs: 'Versioned ciphertext envelopes, re-encrypted payloads', tech: 'Cryptography (AES-GCM), HashiCorp Vault, Python 3.12' },
@@ -111,7 +111,7 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'bft-agg': {
     sla: '< 45 ms Byzantine poisoning filter',
-    security: 'Krum & Trimmed Mean f < n/2 Defense',
+    security: 'Krum, Trimmed Mean & Bulyan Filters',
     compliance: 'Cosine Gradient Anomaly Rejection',
     actionRoute: '/security',
     actionLabel: 'Open Byzantine Defense Lab',
@@ -147,8 +147,8 @@ const MODULE_SPECS_EXTRA: Record<string, {
   },
   'chaos-simulator': {
     sla: '< 15 ms attack detection & quarantine',
-    security: 'Multi-Krum Euclidean Distance Shield',
-    compliance: 'Byzantine Fault Tolerance (f < n/2)',
+    security: 'Robust Aggregation Defense Filter',
+    compliance: 'Byzantine Fault Tolerance Protocol',
     actionRoute: '/operations',
     actionLabel: 'Launch Chaos Simulator',
     tensorSample: 'Gradient Distance: ||Δw_k - Σ w_j|| = 48.2 > 14.1 → QUARANTINED BY KRUM',
@@ -359,7 +359,7 @@ const PRESENTATION_WORKFLOW = [
     short: 'BFT Defense',
     label: 'Byzantine-Robust Adversarial Poisoning Filter',
     summary: 'The FL Coordinator runs Byzantine-robust aggregation (Krum algorithm + Trimmed Mean) to evaluate incoming gradient vectors. Poisoned or malicious updates from compromised nodes are isolated and quenched.',
-    highlights: ['Krum & Trimmed Mean Byzantine resilience', 'Quenches up to f < n/2 malicious node attacks', 'Gradient cosine distance anomaly detection'],
+    highlights: ['Robust aggregation implementations (Krum, Trimmed Mean, Bulyan)', 'Theoretical Byzantine upper bound verification', 'Gradient cosine distance anomaly detection'],
     input: 'Node gradient vectors',
     output: 'Verified, filtered global update',
     badge: 'Stage 05'
@@ -963,7 +963,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="text-rose-300 font-bold">Interactive Chaos & Attack Simulator</span>
                     <span className="text-[8px] bg-rose-500/20 text-rose-300 px-1.5 py-0.5 rounded font-mono">SIMULATED DEMO</span>
                   </div>
-                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Multi-Krum Shield (/scenarios)</div>
+                  <div className="text-slate-400 text-[8.5px] sm:text-[9px]">Live Byzantine Injection & Defense Filter (/scenarios)</div>
                 </div>
                 <div className="grid grid-cols-2 gap-1.5 sm:gap-2 text-[8.5px] sm:text-[9px]">
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-rose-500/20">
@@ -971,8 +971,8 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <div className="text-rose-400 font-bold mt-0.5">Δw × -10.0 Poison</div>
                   </div>
                   <div className="p-2 sm:p-2.5 rounded-xl bg-[#03030c] border border-emerald-500/20">
-                    <div className="text-slate-400">Defense Shield</div>
-                    <div className="text-emerald-400 font-bold mt-0.5">Multi-Krum (Δ=48.2)</div>
+                    <div className="text-slate-400">Defense Filter</div>
+                    <div className="text-emerald-400 font-bold mt-0.5">Krum (Score=48.2)</div>
                   </div>
                 </div>
                 <div className="p-2 rounded-lg bg-rose-950/30 border border-rose-500/30 text-rose-300 flex items-center justify-between text-[8.5px] sm:text-[9px]">
@@ -980,7 +980,7 @@ const InteractiveDashboardPreview = memo(function InteractiveDashboardPreview({ 
                     <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                     Bank Gamma: QUARANTINED BY KRUM
                   </span>
-                  <span className="font-bold text-emerald-400">+0.42 AUC (Simulated)</span>
+                  <span className="font-bold text-emerald-400">Robust Filter Active</span>
                 </div>
               </motion.div>
             )}
@@ -2159,7 +2159,7 @@ export default function LandingPage() {
                       {threat:'Compromised Bank Footprint',  mitigation:'Confidential Federated Unlearning removes historical contributions via Exact Re-Aggregation and Lineage Subtraction without retraining.'},
                       {threat:'Malicious Weight Tampering',  mitigation:'Groth16 zk-SNARK bilinear pairings over BN254 enforce Poseidon hash commitments and norm bounds in constant time (<5ms).'},
                       {threat:'Gradient Inversion Attack',    mitigation:'Gaussian DP noise (σ calibrated dynamically via Rényi DP) makes gradient inversion mathematically infeasible.'},
-                      {threat:'Byzantine Gradient Poisoning', mitigation:'Krum + Trimmed Mean Byzantine-robust aggregation neutralises up to f < n/2 adversarial bank nodes per round.'},
+                      {threat:'Byzantine Gradient Poisoning', mitigation:'Krum, Trimmed Mean, and Bulyan robust aggregation implementations isolate adversarial updates under algorithm-specific Byzantine tolerance bounds.'},
                       {threat:'Coordinator Compromise',       mitigation:'Intel SGX TEE and P2P Curve25519 SecAgg ensure the coordinator only receives zero-sum masked ciphertexts.'},
                       {threat:'Membership Inference (MIA)',  mitigation:'Dynamic RDP Auto-Scaler bounds cumulative privacy expenditure, halting unlearning and training if ε limit is reached.'},
                       {threat:'Cross-Ledger Settlement Desync',mitigation:'Chainlink CCIP EVM2AnyMessage and LayerZero V2 enforce atomic, programmable multi-ledger liquidity routing.'},
