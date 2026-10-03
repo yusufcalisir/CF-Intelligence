@@ -87,9 +87,9 @@ export const SecureHardwarePanel: React.FC<SecureHardwarePanelProps> = ({ simula
           <p className="text-xs text-slate-400">
             {hwMode === 'tee' 
               ? (isHwBacked
-                  ? 'Intel SGX / AWS Nitro Enclave secure memory yalıtımı ve donanım attestation doğrulaması.'
-                  : 'Kriptografik yazılım emülasyonu (MRENCLAVE/MRSIGNER sandbox ölçümü, sıfır donanım SGX).')
-              : 'CKKS şeması ile model ağırlıkları şifreli haldeyken plaintext sızıntısı olmadan homomorfik toplama.'}
+                  ? 'Intel SGX / AWS Nitro Enclave secure memory isolation and hardware attestation verification.'
+                  : 'Cryptographic software emulation (MRENCLAVE/MRSIGNER sandbox measurement, zero hardware SGX).')
+              : 'Homomorphic aggregation over encrypted model weights using the CKKS scheme without plaintext leakage.'}
           </p>
         </div>
         <div>

@@ -1599,7 +1599,7 @@ export default function LandingPage() {
                 </button>
               </div>
 
-              {/* Clean, High-Level Category Links (Ferah, sade ve yazı boğulması yok) */}
+              {/* Clean, High-Level Category Links */}
               <div className="py-8 flex flex-col space-y-2 flex-1 justify-center">
                 {[
                   { num: '01', label: 'Platform Overview',      targetId: 'hero' },

@@ -292,7 +292,7 @@ Standards: ISO 20022 pacs.008 | FinCEN SAR Compliant | GDPR Art. 22
               <Printer className="h-4 w-4" />
             </button>
 
-            {/* Expand / Fullscreen Toggle ("ekran büyüsün") */}
+            {/* Expand / Fullscreen Toggle */}
             <button
               type="button"
               onClick={() => setIsFullscreen(!isFullscreen)}
