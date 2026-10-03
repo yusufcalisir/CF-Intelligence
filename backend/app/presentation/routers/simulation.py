@@ -981,6 +981,11 @@ def _run_simulation_in_process(simulation_id: str, config_dict: dict) -> None:
             "settlement_block_number": simulation.settlement_block_number,
             "settlement_status": simulation.settlement_status,
             "on_chain_payouts": simulation.on_chain_payouts,
+            "is_canonical_reference": False,
+            "provenance": "LIVE_ORCHESTRATED_RUN",
+            "execution_mode": "LIVE_RUNTIME",
+            "tee_is_hardware_backed": False,
+            "tee_driver_mode": "SOFTWARE_EMULATION_SANDBOX",
         }
 
         for bank in simulation.banks:

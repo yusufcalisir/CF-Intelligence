@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.0.0",
+  "phase": "PHASE_3_FAILURE_INJECTION_AND_REALITY_VERIFICATION",
+  "timestamp": "2026-10-04T01:54:00Z",
+  "repository": {
+    "name": "CF-Intelligence",
+    "branch": "main",
+    "head_commit": "eb3a777ec6bd1ce54c1a5886214bf841d021ad52"
+  },
+  "failure_injection_matrix": [
+    {
+      "injection_id": "FAIL-INJ-01",
+      "target_dependency": "Kafka Streaming Broker",
+      "condition": "Kafka broker offline / not configured on port 9092",
+      "injection_method": "Default local startup without KAFKA_BOOTSTRAP_SERVERS environment",
+      "expected_behavior": "WebSocket emits CONNECTED with stream_type: UNAVAILABLE, provenance: NO_LIVE_CONNECTOR_CONFIGURED, status: STANDBY; stops background generator; zero fake browser transactions emitted",
+      "observed_behavior": "Handshake banner returned stream_type == 'UNAVAILABLE', provenance == 'NO_LIVE_CONNECTOR_CONFIGURED', payload.status == 'STANDBY'. Zero transactions pushed to frontend store.",
+      "fake_success_check": "PASSED (Zero fake live transactions, Header displays Telemetry Standby)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-02",
+      "target_dependency": "Redis Persistence Store",
+      "condition": "Redis server absent on port 6379",
+      "injection_method": "Workstation environment without local Redis daemon running",
+      "expected_behavior": "Storage backend gracefully activates in-memory dictionary; health check reports storage_backend: in_memory and durability: ephemeral without claiming durable persistence",
+      "observed_behavior": "GET /api/v1/health returned storage_backend == 'in_memory' and durability == 'ephemeral'. In-process locks and in-memory caches handle state.",
+      "fake_success_check": "PASSED (No false durable storage guarantee surfaced to users)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-03",
+      "target_dependency": "Intel SGX / AWS Nitro Enclave Hardware",
+      "condition": "Physical SGX hardware and driver missing from host OS",
+      "injection_method": "Execution on standard Windows host lacking SGX kernel extensions",
+      "expected_behavior": "TEEDriver falls back to SOFTWARE_EMULATION_SANDBOX; attestation report explicitly sets is_hardware_backed: False; UI renders software emulation badge",
+      "observed_behavior": "TEEDriver.generate_attestation_report() returned is_hardware_backed == False, driver_mode == 'SOFTWARE_EMULATION_SANDBOX'. UI displays cryptographic software sandbox.",
+      "fake_success_check": "PASSED (Zero fraudulent hardware attestation claims)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-04",
+      "target_dependency": "Model Checkpoint Registry",
+      "condition": "Requested model ID does not exist in registry catalog",
+      "injection_method": "POST /api/v1/models/non_existent_model_id_9999/score-sample",
+      "expected_behavior": "Explicit HTTP 404 Not Found error returned; zero synthesized inference probabilities via Beta distributions",
+      "observed_behavior": "HTTP 404 with detail 'Model non_existent_model_id_9999 not found'. Zero synthetic output generated.",
+      "fake_success_check": "PASSED (Zero synthetic probability masquerading as model scoring)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-05",
+      "target_dependency": "Real Financial / Graph Dataset",
+      "condition": "Real Elliptic Bitcoin CSV files absent from specified dataset directory",
+      "injection_method": "load_elliptic(path=empty_dir, require_real=True)",
+      "expected_behavior": "Explicit FileNotFoundError raised; zero silent substitution with synthetic transactions",
+      "observed_behavior": "FileNotFoundError raised with message 'Real Elliptic Bitcoin dataset files not found'. Synthetic path only activated when explicit allow_synthetic=True is specified.",
+      "fake_success_check": "PASSED (Zero silent synthetic dataset substitution)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-06",
+      "target_dependency": "Canonical Benchmark Baselines File",
+      "condition": "comparative_baselines.json absent from experiments directory",
+      "injection_method": "Mock Path.exists() -> False during GET /api/v1/dashboard/comparative-baselines",
+      "expected_behavior": "HTTP 503 Service Unavailable returned with explicit detail; zero fallback to hardcoded classical model metrics",
+      "observed_behavior": "HTTP 503 Service Unavailable with detail 'Comparative baselines not available on disk'. Zero hardcoded fallback metrics returned.",
+      "fake_success_check": "PASSED (Zero fabricated baseline metric injection)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-07",
+      "target_dependency": "Browser WebSocket Connection",
+      "condition": "Telemetry WebSocket connection closed / interrupted",
+      "injection_method": "Forced socket termination from server or client side",
+      "expected_behavior": "useRealTimeFraudStream transitions to disconnected state; exponential backoff reconnect initiated; zero browser setInterval synthetic transaction generation",
+      "observed_behavior": "Zero browser transactions generated after socket closure; hook adheres strictly to connection state without local generator fallback.",
+      "fake_success_check": "PASSED (Zero client-side synthetic fallback generation)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    },
+    {
+      "injection_id": "FAIL-INJ-08",
+      "target_dependency": "Economic Utility Denominator",
+      "condition": "Cost of federated learning is 0 or missing in benchmark comparison",
+      "injection_method": "Pass cost_fl = 0.0 to ROI evaluation logic",
+      "expected_behavior": "UI displays 'ROI Multiple: Pending Evaluation' or 'Calculating ROI Multiple...'; literal '8.4' string eliminated",
+      "observed_behavior": "Zero denominator yields 'ROI Multiple: Pending Evaluation'. Literal '8.4' string completely absent.",
+      "fake_success_check": "PASSED (Zero hardcoded ROI multiple fallback)",
+      "status": "VERIFIED_DEGRADED_BEHAVIOR"
+    }
+  ],
+  "summary": {
+    "total_failure_injections": 8,
+    "total_degraded_behaviors_verified": 8,
+    "total_fake_successes_detected": 0,
+    "fail_truthful_invariant_met": true
+  }
+}
