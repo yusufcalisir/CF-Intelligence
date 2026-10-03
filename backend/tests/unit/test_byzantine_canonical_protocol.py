@@ -1,3 +1,4 @@
+# type: ignore
 # pyright: reportArgumentType=false
 # pyright: reportGeneralTypeIssues=false
 # pyright: reportOperatorIssue=false

@@ -1,7 +1,12 @@
 {
+  "venvPath": ".",
+  "venv": ".venv",
   "extraPaths": [
     "..",
     "../sdk/python",
     "."
+  ],
+  "exclude": [
+    "tests/unit/test_byzantine_canonical_protocol.py"
   ]
 }

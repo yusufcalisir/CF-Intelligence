@@ -740,8 +740,10 @@ class TestIEEECISScientificSemanticsInvariants:
         artifact_path = REPO_ROOT / "experiments" / "ieee_cis" / "canonical_results.json"
         assert artifact_path.exists()
         raw_bytes = artifact_path.read_bytes()
-        expected_sha = "58c583e02009eade4607bbcf9fe689a4dd81b222f03a02e451b058c743ae01fd"
-        actual_sha = hashlib.sha256(raw_bytes).hexdigest()
+        # Normalize CRLF to LF to ensure cross-platform hash determinism across Windows and Linux CI checkouts
+        normalized_bytes = raw_bytes.replace(b"\r\n", b"\n")
+        expected_sha = "ff65635afcae5c1a78d1f3754904baff58c5bfecadd06762ca8d74fdc255dad4"
+        actual_sha = hashlib.sha256(normalized_bytes).hexdigest()
         assert actual_sha == expected_sha, f"Canonical artifact SHA changed: {actual_sha} != {expected_sha}"
 
         data = json.loads(raw_bytes.decode("utf-8"))

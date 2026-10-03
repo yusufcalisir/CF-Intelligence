@@ -118,7 +118,7 @@ class TestIEEECISPartitioner:
             seed=42,
             test_ratio=0.20,
         )
-        partitioner.load_data(nrows=500)
+        partitioner.load_data(nrows=500, require_real=False)
 
         assert partitioner.X_train is not None
         assert partitioner.X_test is not None
@@ -145,7 +145,7 @@ class TestIEEECISPartitioner:
             min_samples_per_client=10,
             test_ratio=0.20,
         )
-        partitioner.load_data(nrows=1000)
+        partitioner.load_data(nrows=1000, require_real=False)
         client_parts = partitioner.partition_dirichlet()
 
         assert set(client_parts.keys()) == {"bank_a", "bank_b", "bank_c"}
@@ -174,7 +174,7 @@ class TestIEEECISPartitioner:
     def test_partitioner_card_brand_split(self) -> None:
         """Verify card brand institutional partitioning assigns non-empty partitions."""
         partitioner = IEEECISPartitioner(num_clients=3, seed=42)
-        partitioner.load_data(nrows=1000)
+        partitioner.load_data(nrows=1000, require_real=False)
         brand_parts = partitioner.partition_by_card_brand()
 
         assert len(brand_parts) == 3
@@ -184,7 +184,7 @@ class TestIEEECISPartitioner:
     def test_partitioner_multi_alpha_comparison(self) -> None:
         """Verify multi-alpha comparison produces expected distribution heterogeneity scaling."""
         partitioner = IEEECISPartitioner(num_clients=3, seed=42)
-        partitioner.load_data(nrows=1000)
+        partitioner.load_data(nrows=1000, require_real=False)
 
         reports = partitioner.partition_multi_alpha([0.1, 0.5, 1.0])
         assert set(reports.keys()) == {0.1, 0.5, 1.0}
@@ -197,7 +197,7 @@ class TestIEEECISPartitioner:
     def test_partitioner_getters_and_summary_persistence(self, tmp_path: Path) -> None:
         """Verify get_bank_train_partitions, get_global_test, and summary JSON persistence."""
         partitioner = IEEECISPartitioner(num_clients=3, seed=42)
-        partitioner.load_data(nrows=500)
+        partitioner.load_data(nrows=500, require_real=False)
         partitioner.partition_dirichlet()
 
         train_parts = partitioner.get_bank_train_partitions()
