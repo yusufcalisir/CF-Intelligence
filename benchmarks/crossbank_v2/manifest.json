@@ -1,0 +1,51 @@
+{
+  "manifest_version": "2.1.0",
+  "protocol_version": "2.1.0",
+  "benchmark_id": "CFI-CrossBank-02",
+  "phase2e_candidate_manifest_sha256": "2d12cdde3a1171cf5de3ba773eb0a64c55318e5d9acf3340bbdd8844fcc4190a",
+  "supersedes_manifest_sha256": "3aeabcc8f2455ff5e7ab49f0bc1d8e809546786cdfcd2b91ac58eb3cb10ed81f",
+  "superseded_protocol_version": "2.0.0",
+  "supersession_reason": "Phase 2F execution-binding remediation: bound batch_size, learning_rate, dropout_rate, weight_decay, and minimum_test_negatives into protocol_config_hash; recorded Phase 2E candidate provenance (2d12cdde); preserved historical v2.0 supersession (3aeabcc8) and 5-seed dataset content hashes.",
+  "protocol_config_hash": "45cb32022baf4b3339b4ebed6c6c6c80bd799194faf16f7248ed78d9355a8204",
+  "experiment_matrix_hash": "89f502d85fc0f4ffb6bb7fc86bf410f550bfc6df7463fb1da9c91d82709f4fc4",
+  "generator_source_hash": "a9981ae94e7c4b3cc5ad915355fa3cf05722639867100ed47d31f635663736bd",
+  "feature_schema_hash": "3e5b3a6f8a64ba346e614e25986a4d1afdbfcf4abe3e608165d932eaabb857c3",
+  "canonical_seeds": [
+    42,
+    123,
+    456,
+    789,
+    2025
+  ],
+  "canonical_transactions": 35000,
+  "target_prevalence": 0.012,
+  "target_fpr": 0.001,
+  "minimum_test_negatives": 5000,
+  "conditions": [
+    "COND_LOCAL_ISOLATED",
+    "COND_FEDERATED_FEDAVG_LOCAL_FEATS",
+    "COND_CENTRALIZED_POOLED",
+    "COND_COLD_START_ZERO_POSITIVE",
+    "COND_FEDERATED_CONSORTIUM_SIGNAL",
+    "COND_SIMPLE_BASELINE_LOGISTIC"
+  ],
+  "feature_columns": [
+    "log_amount",
+    "hour_of_day",
+    "is_weekend",
+    "is_outward",
+    "is_inward",
+    "is_cross_bank",
+    "local_src_degree",
+    "local_tgt_degree",
+    "local_velocity_2h",
+    "rail_code"
+  ],
+  "dataset_content_hashes": {
+    "42": "5904bad5de085c47f4ab63f32953f9a8cda78ff690b918edbcbf7554cd035dbd",
+    "123": "abecd7eb341e9b4022ead242097839fa09acee4a5b441a83a0d68b015c4d44b8",
+    "456": "d13d23766442f5b7942f71c2a1619626a427e8b891c761fb1cde62f6efcff699",
+    "789": "e851e61225e71a31c6190487df48f5a66de07f89aa2b0ea205acd326e484898b",
+    "2025": "6757332ef7ae992352ad19645cd5aa1a95ca904bad99f6c22b37086b9c7a54bc"
+  }
+}
