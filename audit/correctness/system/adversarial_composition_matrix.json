@@ -1,0 +1,86 @@
+{
+  "matrix_version": "1.0.0",
+  "generated_at": "2026-10-04T20:30:00Z",
+  "scenarios": [
+    {
+      "scenario_id": "FINAL-SCENARIO-01",
+      "name": "Compound Transaction Lifecycle Failure",
+      "domains_crossed": ["Streaming Graph", "Feature Store", "Inference", "Case Persistence"],
+      "fault_injected": "Mid-lifecycle failure after graph and feature mutation, before case creation response",
+      "real_boundaries": ["FeatureStoreService", "StreamingGraphService", "RedisStore CAS"],
+      "mocked_boundaries": ["Physical Redis cluster (in-memory fallback)", "PostgreSQL (SQLite)"],
+      "independent_oracle": "graph_edges == 1, customer_history_entries == 1, case_identities == 1 despite transport_attempts == 2",
+      "recovery_performed": "Client retries idempotent transaction ingestion; system replays without double counting",
+      "invariant": "FINAL-INV-01, FINAL-INV-05",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FINAL-SCENARIO-02",
+      "name": "Cross-Tenant Adversarial Composition",
+      "domains_crossed": ["API Routing", "Multi-Tenancy", "Idempotency", "Feature Store", "Cases"],
+      "fault_injected": "Deliberately colliding transaction ID, customer ID, and idempotency key across Bank Alpha and Bank Beta",
+      "real_boundaries": ["Tenant context separation", "IdempotencyService tenant namespacing", "FeatureStore tenant scoping"],
+      "mocked_boundaries": ["Physical multi-tenant network gateway"],
+      "independent_oracle": "Tuple (tenant_id, object_type, canonical_object_id) strictly segregated; Tenant B cannot access or mutate Tenant A data",
+      "recovery_performed": "Cross-tenant access attempted under retry/cache hit; server returns 403 Forbidden or isolated Tenant B state",
+      "invariant": "FINAL-INV-02, FINAL-INV-07",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FINAL-SCENARIO-03",
+      "name": "Model-Version / Decision-Provenance Race",
+      "domains_crossed": ["ML Serving", "Model Registry", "Evaluation Engine", "Explainability"],
+      "fault_injected": "Model Version 2 promoted to champion while Transaction T is in-flight under Version 1",
+      "real_boundaries": ["ModelRegistry manifest", "ModelEvaluationEngine logging", "ExplainabilityService"],
+      "mocked_boundaries": ["GPU distributed serving cluster"],
+      "independent_oracle": "Transaction T provenance remains strictly Version 1; Transaction U bound to Version 2; historical query reports V1",
+      "recovery_performed": "Downstream asynchronous evaluation completes; records verified against respective model versions",
+      "invariant": "FINAL-INV-03, FINAL-INV-06",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FINAL-SCENARIO-04",
+      "name": "Corrupted or Replayed State Boundary",
+      "domains_crossed": ["Request Validation", "Idempotency", "FL Aggregator", "Case State Machine"],
+      "fault_injected": "A: Identity conflict with altered payload; B: Non-finite numeric state (NaN/Inf); C: Stale case version replay",
+      "real_boundaries": ["FastAPI validator", "IdempotencyService canonical hash", "FL Engine quarantine", "Case CAS"],
+      "mocked_boundaries": ["Physical Kafka broker"],
+      "independent_oracle": "All three corruption classes rejected/quarantined with 409 Conflict, 422 Unprocessable, or InvalidCaseTransitionError",
+      "recovery_performed": "Client refetches authoritative state or submits valid finite payload; state remains uncorrupted",
+      "invariant": "FINAL-INV-04, FINAL-INV-07",
+      "result": "PASS"
+    },
+    {
+      "scenario_id": "FINAL-SCENARIO-05",
+      "name": "Full Lifecycle Recovery & Semantic Reconciliation",
+      "domains_crossed": ["End-to-End: Ingestion -> ML Decision -> Alert -> Case -> Four-Eyes -> Resolution -> Audit"],
+      "fault_injected": "Worker service interruption after case creation; recovered worker completes investigation",
+      "real_boundaries": ["CaseManagementService", "Timeline hash verifier", "Four-Eyes governance engine"],
+      "mocked_boundaries": ["Physical Redis cluster (in-memory fallback)", "External FIU filing gateway"],
+      "independent_oracle": "7-dimension semantic reconciliation: Transaction, Machine, Alert, Case, Regulatory, Audit, and API truth coherent",
+      "recovery_performed": "Fresh service instance recovers case dossier, collects distinct supervisor signatures, and resolves case",
+      "invariant": "FINAL-INV-05, FINAL-INV-06, FINAL-INV-07",
+      "result": "PASS"
+    }
+  ],
+  "metamorphic_checks": [
+    {
+      "check_id": "M1",
+      "name": "Clean vs Recovered Lifecycle",
+      "criterion": "LogicalState(clean) == LogicalState(recovered) for durable business objects",
+      "result": "PASS"
+    },
+    {
+      "check_id": "M2",
+      "name": "Tenant Renaming",
+      "criterion": "Identical workflow under alternative tenant namespace produces strictly partitioned namespace with identical financial semantics",
+      "result": "PASS"
+    },
+    {
+      "check_id": "M3",
+      "name": "Model Activation Timing",
+      "criterion": "Transaction T provenance is identical whether Model V2 is activated during or after T's downstream async work",
+      "result": "PASS"
+    }
+  ]
+}

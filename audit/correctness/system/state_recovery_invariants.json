@@ -1,0 +1,55 @@
+{
+  "pass": "Final Adversarial Composition, Lifecycle Integrity & Recovery Verification",
+  "generated_at": "2026-10-04T20:30:00Z",
+  "invariants": {
+    "FINAL-INV-01": {
+      "name": "Failure Cannot Fragment One Logical Transaction",
+      "definition": "For one canonical financial transaction, partial success across feature state, graph state, persistence, inference, alerting, and recovery must not produce mutually contradictory business identities.",
+      "boundary": "StreamingGraphService, FeatureStoreService, and CaseManagementService",
+      "oracle": "logical_financial_events == 1, graph_edges == 1, feature_entries == 1 despite transport_attempts == 2",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-02": {
+      "name": "Tenant Context Cannot Be Rebound During Recovery",
+      "definition": "A retry, replay, cache restoration, stale response, or recovery action must never cause an object originally belonging to Tenant A to become visible or mutable under Tenant B.",
+      "boundary": "IdempotencyService, FeatureStoreService, CaseRepository, and API Tenant Isolation",
+      "oracle": "Tuple (tenant_id, object_type, canonical_object_id) strictly partitioned; cross-tenant retry blocked with 403 or isolated B state",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-03": {
+      "name": "Decision Evidence Is Version-Bound",
+      "definition": "A decision produced by model version V1 must not silently acquire V2 model identity, V2 score, V2 explanation, or another transaction's evidence merely because V2 becomes active while asynchronous work is completing.",
+      "boundary": "ModelEvaluationEngine, ExplainabilityService, and ModelRegistry",
+      "oracle": "T bound to V1 metadata/score; U bound to V2; historical query for T returns V1 even when active champion is V2",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-04": {
+      "name": "Untrusted Persisted or Replayed State Fails Safely",
+      "definition": "Malformed, conflicting, non-finite, stale, or identity-inconsistent state crossing an authoritative boundary must not silently become valid application state.",
+      "boundary": "FastAPI request schemas, IdempotencyService payload hash, and CaseManagementService CAS",
+      "oracle": "Payload mismatch yields HTTP 409; non-finite numeric state rejected/quarantined; stale version yields 409/Precondition Failed",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-05": {
+      "name": "Recovery Preserves Meaning, Not Just Availability",
+      "definition": "After failure and recovery, the system must return to a state semantically equivalent to a valid execution. Service availability alone is insufficient.",
+      "boundary": "Lifecycle state machine, case resolution, and timeline integrity",
+      "oracle": "Metamorphic equivalence: LogicalState(clean) == LogicalState(recovered) for durable business objects",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-06": {
+      "name": "Authoritative History Remains Internally Consistent",
+      "definition": "After adversarial lifecycle execution, transaction identity, model decision, alert identity, case history, human disposition, and audit trail must describe one coherent history.",
+      "boundary": "Immutable timeline hash chain and CaseEvent audit sequence",
+      "oracle": "verify_timeline() == True; human disposition is CLOSED_CONFIRMED without altering original model prediction history",
+      "status": "VERIFIED"
+    },
+    "FINAL-INV-07": {
+      "name": "No Silent Security Downgrade Appears During Recovery",
+      "definition": "Recovery/retry logic must not bypass tenant isolation, privacy enforcement, robust aggregation requirements, authorization, case concurrency protection, or input validation simply because the system is recovering from another fault.",
+      "boundary": "Four-Eyes dual control enforcement, ABAC/RBAC tenant gates, and Differential Privacy accountant",
+      "oracle": "Four-Eyes signatures strictly required; self-approval prohibited; privacy limits enforced during recovery",
+      "status": "VERIFIED"
+    }
+  }
+}
