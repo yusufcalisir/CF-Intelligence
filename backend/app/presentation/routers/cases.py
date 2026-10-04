@@ -152,7 +152,7 @@ async def create_case(
     If a request with the same key was successfully processed within 24 hours,
     the original response is returned without creating a duplicate case.
     """
-    tenant_id = (caller_tenant.tenant_id if caller_tenant else None) or getattr(req, "bank_id", None)
+    tenant_id = caller_tenant or getattr(req, "bank_id", None)
     payload_hash = IdempotencyService.canonical_payload_hash(req)
     idem = IdempotencyService.get()
     status_or_hit, cached = idem.acquire(

@@ -89,6 +89,16 @@ class TestCasesRoutes:
         case_data2 = resp2.json()
         assert case_data2["id"] == case_data1["id"]
 
+        # Request with explicit caller tenant header verifies TenantDep string handling
+        tenant_headers = {
+            "Idempotency-Key": "case-test-key-tenant-8888",
+            "X-Tenant-ID": "bank_alpha",
+        }
+        resp3 = client.post("/api/v1/cases", json=payload, headers=tenant_headers)
+        assert resp3.status_code == 200
+        case_data3 = resp3.json()
+        assert case_data3["title"] == payload["title"]
+
     def test_get_case_detail_and_not_found(self, client: TestClient, clean_case_service):
         case = clean_case_service.create_case(title="Mule network detection")
 
