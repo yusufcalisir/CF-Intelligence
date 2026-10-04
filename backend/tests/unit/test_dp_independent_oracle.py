@@ -24,7 +24,7 @@ from app.application.services.privacy_service import (
 
 def independent_parallel_oracle(client_epsilons: list[float]) -> float:
     """Independent mathematical oracle for Parallel Composition.
-    
+
     Theorem (McSherry 2009):
     If mechanisms M_1, ..., M_K operate on disjoint datasets D_1, ..., D_K,
     then the composite release M(D) = (M_1(D_1), ..., M_K(D_K)) provides
@@ -37,7 +37,7 @@ def independent_parallel_oracle(client_epsilons: list[float]) -> float:
 
 def independent_sequential_oracle(round_epsilons: list[float]) -> float:
     """Independent mathematical oracle for Sequential Composition.
-    
+
     Theorem (Dwork et al. 2006, 2014):
     If mechanisms M^(1), ..., M^(R) are executed sequentially on the same population,
     the cumulative privacy loss is bounded by sum_{r=1}^R epsilon^(r).
@@ -50,13 +50,13 @@ class TestDifferentialPrivacyIndependentOracle:
 
     def test_scenario_a_disjoint_clients_single_round(self) -> None:
         """Scenario A: Disjoint client datasets within one round compose in parallel.
-        
+
         Three banks hold mutually disjoint partitions D_A, D_B, D_C.
         Local Opacus engines report:
           epsilon_A = 0.45
           epsilon_B = 0.82
           epsilon_C = 0.61
-        
+
         Independent Oracle:
           round_loss = max(0.45, 0.82, 0.61) = 0.82
           (NOT the sum: 0.45 + 0.82 + 0.61 = 1.88)
@@ -73,12 +73,12 @@ class TestDifferentialPrivacyIndependentOracle:
 
     def test_scenario_b_same_clients_multiple_rounds_sequential(self) -> None:
         """Scenario B: Same protected population queried across multiple rounds composes sequentially.
-        
+
         Rounds 1 to 3 execute with disjoint banks in each round:
           Round 1: max(0.30, 0.50, 0.40) = 0.50
           Round 2: max(0.45, 0.35, 0.55) = 0.55
           Round 3: max(0.60, 0.40, 0.50) = 0.60
-        
+
         Independent Oracle:
           total_loss = 0.50 + 0.55 + 0.60 = 1.65
         """
@@ -103,13 +103,13 @@ class TestDifferentialPrivacyIndependentOracle:
 
     def test_scenario_c_heterogeneous_client_participation(self) -> None:
         """Scenario C: Heterogeneous participation across rounds.
-        
+
         Only clients that actually participate in a round contribute to that round's spend.
           Round 1: Bank A (0.50), Bank B (0.70), Bank C (Offline / None)
                    -> round spend = max(0.50, 0.70) = 0.70
           Round 2: Bank A (Offline / None), Bank B (0.40), Bank C (0.65)
                    -> round spend = max(0.40, 0.65) = 0.65
-        
+
         Independent Oracle:
           total_loss = 0.70 + 0.65 = 1.35
         """
@@ -131,11 +131,11 @@ class TestDifferentialPrivacyIndependentOracle:
 
     def test_scenario_d_budget_exhaustion_fails_closed(self) -> None:
         """Scenario D: Cumulative privacy expenditure exceeding budget limit MUST fail closed.
-        
+
         Budget limit: epsilon_limit = 2.0
           Round 1 spend: 1.10 <= 2.0 (succeeds)
           Round 2 spend: 1.05 -> cumulative 2.15 > 2.0 (MUST raise PrivacyBudgetExceededError)
-        
+
         No DP disablement, no plaintext fallback, no limit increase.
         """
         epsilon_limit = 2.0
@@ -158,7 +158,7 @@ class TestDifferentialPrivacyIndependentOracle:
 
     def test_scenario_e_below_budget_successful_completion(self) -> None:
         """Scenario E: Valid configuration remaining below budget limit completes successfully.
-        
+
         Budget limit: epsilon_limit = 4.0
         Rounds: [0.80, 0.75, 0.90]
         Cumulative: 2.45 <= 4.0

@@ -1645,10 +1645,10 @@ class EllipticGraphSAGEBenchmark:
             "",
             "## 5. Scientific Artifact Traceability",
             "",
-            f"- **Result Payload**: [`results.json`](results.json)",
-            f"- **Comparative Baselines**: [`comparative_baselines.json`](comparative_baselines.json)",
-            f"- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](graphsage_elliptic_benchmark.json)",
-            f"- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](plots/benchmark_graphsage_elliptic.png)",
+            "- **Result Payload**: [`results.json`](results.json)",
+            "- **Comparative Baselines**: [`comparative_baselines.json`](comparative_baselines.json)",
+            "- **Raw Benchmark**: [`graphsage_elliptic_benchmark.json`](graphsage_elliptic_benchmark.json)",
+            "- **Consolidated Figure**: [`benchmark_graphsage_elliptic.png`](plots/benchmark_graphsage_elliptic.png)",
             "",
         ])
 

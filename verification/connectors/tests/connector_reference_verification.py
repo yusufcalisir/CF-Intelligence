@@ -26,6 +26,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 backend_path = str(Path(__file__).resolve().parents[3] / "backend")
 if backend_path not in sys.path:
