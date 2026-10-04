@@ -1,0 +1,62 @@
+{
+  "pass": "Distributed Failure, Compound-Fault & Recovery Correctness Verification",
+  "generated_at": "2026-10-04T20:15:00Z",
+  "invariants": {
+    "DIST-INV-01": {
+      "name": "Shared Authoritative State Wins Across Workers",
+      "definition": "Two workers acting on the same authoritative object must not both succeed when the contract permits only one transition. Process-local locks are insufficient proof.",
+      "boundary": "Authoritative persistence layer / CAS precondition check (update_conditional)",
+      "oracle": "success_count == 1 and conflict_count == 1 across concurrent workers",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-02": {
+      "name": "Retry After Ambiguous Outcome Preserves Logical Identity",
+      "definition": "If the client cannot determine whether an operation committed, retry/recovery must not silently turn one intended operation into two business operations.",
+      "boundary": "IdempotencyService acquire/complete/replay lifecycle and durable case persistence",
+      "oracle": "request_attempts == 2, durable_business_objects == 1, cached response replayed with identical ID",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-03": {
+      "name": "Partial FL Failure Cannot Corrupt the Global Model",
+      "definition": "Failed, malformed, non-finite, stale, or missing client updates must not partially corrupt a committed global aggregation round.",
+      "boundary": "FederatedLearningEngine parameter filtering and quarantine pipeline",
+      "oracle": "Quarantined non-finite/exception updates excluded; independent tensor oracle matches accepted-only aggregate",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-04": {
+      "name": "Failed Round Cannot Masquerade as Successful Round",
+      "definition": "A round that does not satisfy its success contract must not advance model/version/evaluation state as though it succeeded.",
+      "boundary": "ModelRegistry version manifest and SimulationService round state machine",
+      "oracle": "Registry version remains N; serving model remains N; round status is FAILED; no half-committed version N+1",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-05": {
+      "name": "Recovery Does Not Resurrect Stale Work",
+      "definition": "After worker/service restart, previously stale operations must not regain authority merely because process-local state disappeared.",
+      "boundary": "Worker restart lifecycle and durable version validation",
+      "oracle": "Fresh worker instance without process-local cache/lock rejects stale V1 operation against durable V2 state",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-06": {
+      "name": "Compound Failure Preserves Truth",
+      "definition": "When two failures occur together, handling the first failure must not hide, bypass, or convert the second into a false success.",
+      "boundary": "Multi-fault handling pipeline (privacy budget exhaustion + client failure)",
+      "oracle": "Client failure does not bypass privacy budget check; system raises PrivacyBudgetExceededError and fails closed",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-07": {
+      "name": "Durable State and External Side Effects Remain Distinguishable",
+      "definition": "Database success, event acknowledgement, webhook delivery, report generation, and similar effects are different facts. Recovery logic must not collapse them into one boolean notion of 'success.'",
+      "boundary": "Idempotency and event dispatch boundary",
+      "oracle": "Durable business entity count == 1, request attempts == 2, external transport notifications recorded distinctly",
+      "status": "VERIFIED"
+    },
+    "DIST-INV-08": {
+      "name": "Security Mechanisms Fail Closed Under Dependency Failure",
+      "definition": "A security/privacy mechanism that cannot execute must not silently downgrade to an unprotected path unless that fallback is an explicit, truthful, tested contract.",
+      "boundary": "PrivacyService / ModelEvaluationEngine security gate enforcement",
+      "oracle": "Differential privacy and Byzantine defense refuse un-noised/plaintext aggregation under budget or invariant failure",
+      "status": "VERIFIED"
+    }
+  }
+}

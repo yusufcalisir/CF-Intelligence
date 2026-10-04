@@ -1,0 +1,72 @@
+{
+  "matrix_version": "1.0.0",
+  "generated_at": "2026-10-04T20:15:00Z",
+  "scenarios": [
+    {
+      "scenario_id": "SCENARIO-01",
+      "name": "Multi-Worker Case CAS",
+      "primary_fault": "Concurrent incompatible mutations from independent workers",
+      "secondary_condition": "Neither worker observes the other's in-flight mutation before CAS submission",
+      "authoritative_state": "Shared persistent store (RedisStore / CaseRepository) at version V",
+      "expected_recovery": "Exactly one worker succeeds (advancing to V+1); competing worker receives InvalidCaseTransitionError",
+      "observed_recovery": "success_count == 1, conflict_count == 1, durable version == 2, single transition in timeline",
+      "invariant": "DIST-INV-01",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-02",
+      "name": "Ambiguous Commit + Client Retry",
+      "primary_fault": "Response lost or client timeout after server durable commit",
+      "secondary_condition": "Client retries identical logical mutation with same Idempotency-Key",
+      "authoritative_state": "IdempotencyService store and CaseRepository durable entity",
+      "expected_recovery": "Original case response replayed without creating second business entity",
+      "observed_recovery": "request_attempts == 2, durable_business_objects == 1, cached response replayed with Idempotency-Replayed header",
+      "invariant": "DIST-INV-02, DIST-INV-07",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-03",
+      "name": "Federated Round with Partial Client Failure",
+      "primary_fault": "Client C suffers training exception / drop; Client D submits non-finite (NaN/Inf) weights",
+      "secondary_condition": "Clients A and B submit valid updates with unequal sample sizes",
+      "authoritative_state": "FL Engine aggregation buffer and clean candidate model weights",
+      "expected_recovery": "Client C excluded, Client D quarantined; aggregation reweighted strictly over accepted clients {A, B}",
+      "observed_recovery": "Global aggregate matches independent tensor oracle W_expected = sum(n_i * W_i)/sum(n_i) over {A, B}",
+      "invariant": "DIST-INV-03, DIST-INV-04",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-04",
+      "name": "Model Round Publication Atomicity",
+      "primary_fault": "Disk I/O error or metadata crash during save_version after aggregation succeeds",
+      "secondary_condition": "Version N was already published; candidate Version N+1 is being committed",
+      "authoritative_state": "ModelRegistry manifest (registry.json) and serving model (global_model.pt)",
+      "expected_recovery": "Round fails truthfully; no half-committed version N+1 exposed; Version N remains active champion",
+      "observed_recovery": "Manifest contains only Version N; serving weights match Version N; retry commits Version N+1 cleanly",
+      "invariant": "DIST-INV-04, DIST-INV-07",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-05",
+      "name": "Worker Restart with Stale Operation",
+      "primary_fault": "Worker process terminates and restarts, clearing all process-local memory/locks",
+      "secondary_condition": "Worker attempts to replay a mutation based on pre-restart version V1 against store now at V2",
+      "authoritative_state": "Durable persistence store holding version V2",
+      "expected_recovery": "Shared CAS boundary rejects stale V1 mutation; restart does not grant authority to obsolete state",
+      "observed_recovery": "Fresh worker instance raises InvalidCaseTransitionError; version remains V2",
+      "invariant": "DIST-INV-05",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-06",
+      "name": "Compound Security / Failure Path",
+      "primary_fault": "Privacy budget exhausted or client training fails while Differential Privacy is active",
+      "secondary_condition": "One participating client drops offline during round with active DP mechanism",
+      "authoritative_state": "PrivacyService budget accountant and ModelEvaluationEngine security gate",
+      "expected_recovery": "System refuses un-noised/plaintext aggregation and fails closed with PrivacyBudgetExceededError",
+      "observed_recovery": "True DP noise is verified on accepted clients; budget exhaustion halts training; zero silent fallback",
+      "invariant": "DIST-INV-06, DIST-INV-08",
+      "status": "PASS"
+    }
+  ]
+}

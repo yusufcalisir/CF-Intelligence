@@ -1433,7 +1433,7 @@ Pursuant to Federal Reserve SR 11-7 and EU AI Act Article 11 Annex IV replicatio
 | **Differential Privacy Budget** | $\epsilon \le 1.0, \delta = 10^{-5}$ | $\mathbf{\epsilon = 0.3497}$ at $\sigma=3.0, \delta=10^{-5}$ (Opacus PRVAccountant; Target $\epsilon \le 1.0$) | `privacy_audit_service.py` | `Self-Verified (Opacus DP-SGD benchmark; PRV accounting via `run_dp_tradeoff.py`)` |
 | **Disaster Recovery Failover (RTO)** | **15.01 s (RPO = 0 records)** | < 30 s | `chaos_dr_drill.py` | `Logical Drill (in-memory state model: 15.0s baseline timeout + ~10-20ms promotion; not multi-region cloud infra failover)` |
 | **Multi-Tenant Isolation & Security** | **21/21 SaaS Multi-Tenant Tests Passing** | Strict Isolation (403 BOLA rejection, Linear Alembic, Vault KMS) | [`docs/saas_multitenancy.md`](docs/saas_multitenancy.md) | `Self-Verified (4/4 BOLA Security, 3/3 Lifecycle, 4/4 Alembic, 5/5 KMS, 5/5 Concurrency)` |
-| **Full Test Suite Pass Rate** | 100% | **4,249 / 4,249 passing** (3,453 Backend Pytest + 409 Scientific Verification + 356 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
+| **Full Test Suite Pass Rate** | 100% | **4,769 / 4,769 passing** (3,965 Backend Pytest + 409 Scientific Verification + 364 Frontend Vitest + 31 Smart Contracts) | `Self-Verified (Internal Test Suite)` | `Self-Verified (Playwright E2E suites run out-of-band)` |
 
 ---
 
@@ -1800,7 +1800,7 @@ python scripts/verify_reproducibility.py --all
   3. *Benchmark Matrices & Invariants (6/6)*: Master matrix schema, Strict Null Representation Invariant, evaluated zero distinction, cross-dataset numerical parity, 16-configuration factorial ablation matrix, 5-seed statistical robustness matrix (Student-t 95% CIs).
   4. *Claim Registry & Governance (6/6)*: 19 empirical claims reconciled with raw JSON execution outputs, 4-rule Anti-Metric Shopping Protocol, zero marketing superlatives, unified continuous metric definitions ([`docs/METRICS.md`](docs/METRICS.md)), demographic data minimization ($0/10$ protected attributes).
   5. *Cryptographic & Security Invariants (5/5)*: Strict zero-leakage federated partition contract, Rényi DP moments accounting ([`rdp_accountant.py`](backend/app/infrastructure/security/rdp_accountant.py)), pairwise zero-sum SecAgg ($\|\sum m_i\|_{\infty} < 10^{-4}$), Byzantine tolerance breakdown limits ($f < n/2$), multi-tenant BOLA/IDOR isolation with HMAC-SHA256 pseudonymization.
-  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 3,311 Backend Pytest tests, 356 Frontend Vitest tests, 409 Scientific Verification tests across 21 modules, 31 Smart Contract tests and clean static analysis (0 Ruff errors).
+  6. *Code Quality, CI/CD & Automated Test Suites (5/5)*: Deterministic CI smoke gates ($< 20\text{s}$), 3,965 Backend Pytest tests, 364 Frontend Vitest tests, 409 Scientific Verification tests across 21 modules, 31 Smart Contract tests and clean static analysis (0 Ruff errors).
 - **Authoritative Attestation Document:** Full attestation sign-off codified in Section 8 of [`docs/engineering-audit.md`](docs/engineering-audit.md).
 
 ---
@@ -2171,16 +2171,16 @@ npm run dev
 ```
 Open `http://localhost:3000` to inspect the visualizer, counterfactual workbench, and live operations dashboard.
 
-### Step 5: Master Test Suites Execution (3,961 Core Python / 4,348 Total Collected Tests)
+### Step 5: Master Test Suites Execution (4,374 Core Python / 4,769 Total Collected Tests)
 ```bash
 # (Ensure commands are executed from the repository root directory)
-# 1. Run full backend pytest suite (3,552 collected tests)
+# 1. Run full backend pytest suite (3,965 collected tests)
 pytest backend/tests/ -v
 
 # 2. Run Interactive POC Sandbox Replay CLI evaluation
 python benchmark.py --poc-replay
 
-# 3. Run full frontend vitest suite (356 tests across 86 test files)
+# 3. Run full frontend vitest suite (364 tests across 86 test files)
 npm --prefix frontend test
 
 # 4. Run Playwright real-browser multi-device E2E suite (10 browser tests)
