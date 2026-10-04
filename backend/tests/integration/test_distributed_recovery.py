@@ -146,6 +146,7 @@ class TestDistributedCoordinationAndRecovery:
         # Inspect durable store directly via a 3rd fresh worker
         verifier = CaseManagementService()
         final_case = verifier.get_case(case_id)
+        assert final_case is not None, f"Case {case_id} not found"
         assert getattr(final_case, "version", 1) == 2, f"Final version should be 2, got {final_case.version}"
 
         # Inspect timeline: exactly 1 creation event + exactly 1 status change event
@@ -198,6 +199,7 @@ class TestDistributedCoordinationAndRecovery:
         # Oracle 1: Durable store contains exactly 1 case matching this ID
         svc = CaseManagementService()
         durable_case = svc.get_case(case_id)
+        assert durable_case is not None, f"Case {case_id} not found"
         assert durable_case.title == payload["title"]
         all_cases = svc.get_cases()
         matching_cases = [c for c in all_cases if c.id == case_id]
@@ -241,7 +243,7 @@ class TestDistributedCoordinationAndRecovery:
 
         settings = get_settings()
         engine = FederatedLearningEngine(settings, ModelService(settings), PrivacyService())
-        layer_shapes = [(4,)]
+        layer_shapes: list[tuple[int, ...]] = [(4,)]
 
         w_a = ModelWeights(layer_shapes=layer_shapes, flat_weights=[1.0, 2.0, 3.0, 4.0])
         w_b = ModelWeights(layer_shapes=layer_shapes, flat_weights=[3.0, 4.0, 5.0, 6.0])
@@ -400,6 +402,7 @@ class TestDistributedCoordinationAndRecovery:
             expected_status="open",
         )
         case_v2 = worker_other.get_case(case_id)
+        assert case_v2 is not None, f"Case {case_id} not found"
         assert getattr(case_v2, "version", 1) == 2
         assert case_v2.status == CaseStatus.INVESTIGATING
 
@@ -421,6 +424,7 @@ class TestDistributedCoordinationAndRecovery:
 
         # Oracle: Final state in store remains V2 (investigating)
         authoritative_case = worker_restarted.get_case(case_id)
+        assert authoritative_case is not None, f"Case {case_id} not found"
         assert getattr(authoritative_case, "version", 1) == 2
         assert authoritative_case.status == CaseStatus.INVESTIGATING
 
