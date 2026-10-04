@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import math
 import os
 import uuid
 from collections import deque
@@ -128,14 +129,44 @@ class MambuConnector(BaseBankConnector):
             or payload.get("targetAccountId")
             or f"mambu_cpty_{account_id[-6:] if len(account_id) >= 6 else '000000'}"
         )
-        raw_amount = payload.get("amount") or payload.get("transactionAmount") or 100.0
+        raw_amount = payload.get("amount") if payload.get("amount") is not None else payload.get("transactionAmount")
+        if raw_amount is None:
+            raw_amount = 100.0
         try:
             amount = float(raw_amount)
+            if not math.isfinite(amount):
+                amount = 1.0
         except (ValueError, TypeError):
             amount = 1.0
 
         currency = payload.get("currencyCode") or payload.get("currency") or "EUR"
         channel = str(payload.get("channel") or payload.get("transactionType") or "ONLINE").upper()
+
+        raw_ts = (
+            payload.get("creationDate")
+            or payload.get("timestamp")
+            or payload.get("valueDate")
+            or payload.get("bookingDate")
+        )
+        if raw_ts:
+            try:
+                if isinstance(raw_ts, datetime):
+                    event_time = raw_ts
+                elif isinstance(raw_ts, str):
+                    event_time = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                elif isinstance(raw_ts, (int, float)):
+                    event_time = datetime.fromtimestamp(raw_ts, tz=UTC)
+                else:
+                    event_time = datetime.now(UTC)
+            except Exception:
+                event_time = datetime.now(UTC)
+        else:
+            event_time = datetime.now(UTC)
+
+        if event_time.tzinfo is None:
+            event_time = event_time.replace(tzinfo=UTC)
+        else:
+            event_time = event_time.astimezone(UTC)
 
         normalized = NormalizedTransaction(
             transaction_id=str(tx_id),
@@ -143,13 +174,14 @@ class MambuConnector(BaseBankConnector):
             counterparty_account_id=str(counterparty_id),
             amount=max(0.01, amount),
             currency=currency,
-            timestamp=datetime.now(UTC),
+            timestamp=event_time,
             merchant_category_code=str(payload.get("mcc") or "6011"),
             origin_country=str(payload.get("originCountry") or "DE"),
             destination_country=str(payload.get("destinationCountry") or "DE"),
             device_fingerprint=str(payload.get("deviceFingerprint") or ""),
             ip_subnet=str(payload.get("ipSubnet") or "10.0.0.0/24"),
             channel_type=channel if channel in ("ONLINE", "MOBILE", "ATM", "POS", "SWIFT") else "ONLINE",
+            bank_id=self.tenant_id,
         )
         self._buffer.append(normalized)
         return normalized

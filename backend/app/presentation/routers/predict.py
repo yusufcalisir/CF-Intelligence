@@ -251,8 +251,9 @@ async def predict_transaction(
         model = _get_cached_serving_model(payload.simulation_id)
         bank_id = payload.bank_id or "serving_client"
         txn_id = payload.transaction_id or str(uuid.uuid4())
-        # Use stable entity hash to demonstrate velocity windows on repeated requests
-        entity_hash = f"serving:{bank_id}:customer_1"
+        # Resolve entity hash from customer_id, account_id, or default entity
+        customer_ref = payload.customer_id or payload.account_id or "customer_1"
+        entity_hash = f"serving:{bank_id}:{customer_ref}"
 
         txn_dict = payload.model_dump()
 
@@ -308,6 +309,7 @@ async def predict_transaction(
                 customer_history_score=payload.customer_history_score,
                 chargeback_count=payload.chargeback_count,
                 account_age_days=payload.account_age_days,
+                transaction_id=txn_id,
             )
 
         network = getattr(model, "network", None)

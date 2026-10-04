@@ -43,9 +43,26 @@ class StreamingGraphService:
 
     def add_transaction(self, tx: dict[str, Any]) -> None:
         """Ingest a new transaction into the streaming graph buffer with incremental indexing."""
-        from_id = tx.get("sender_id") or tx.get("source_owner")
-        to_id = tx.get("receiver_id") or tx.get("destination_owner")
-        amount = float(tx.get("amount") or 0.0)
+        from_id = (
+            tx.get("sender_id")
+            or tx.get("source_owner")
+            or tx.get("account_id")
+            or tx.get("debtor_account")
+            or tx.get("src")
+        )
+        to_id = (
+            tx.get("receiver_id")
+            or tx.get("destination_owner")
+            or tx.get("counterparty_account_id")
+            or tx.get("creditor_account")
+            or tx.get("dst")
+        )
+        raw_amt = tx.get("amount", 0.0)
+        try:
+            val = float(raw_amt) if raw_amt is not None else 0.0
+            amount = val if math.isfinite(val) else 0.0
+        except (ValueError, TypeError):
+            amount = 0.0
         timestamp_str = tx.get("timestamp")
         bank_id = tx.get("bank_id")
 

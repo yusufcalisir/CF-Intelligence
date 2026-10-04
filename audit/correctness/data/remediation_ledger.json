@@ -1,0 +1,78 @@
+{
+  "audit_capability": "data_remediation_ledger",
+  "version": "1.0.0",
+  "remediations": [
+    {
+      "finding_id": "DATA-0001",
+      "target_file": "backend/app/application/services/idempotency.py",
+      "secondary_file": "backend/app/presentation/routers/cases.py",
+      "action": "Tenant-scoped namespacing for idempotency Redis keys and case creation integration",
+      "invariant_restored": "DATA-INV-02 (Tenant Ownership), DATA-INV-08 (Idempotency)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_tenant_idempotency_isolation",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0002",
+      "target_file": "backend/app/application/schemas/transaction.py",
+      "secondary_file": "backend/app/presentation/routers/predict.py",
+      "action": "Expose customer_id and account_id on TransactionPredictRequest and bind dynamically in prediction router",
+      "invariant_restored": "DATA-INV-01 (Identity Preservation), DATA-INV-14 (Provenance Fidelity)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_prediction_request_entity_identity",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0003",
+      "target_file": "backend/app/infrastructure/connectors/base_connector.py",
+      "secondary_file": "backend/app/application/schemas/transaction.py",
+      "action": "Enforce strict math.isfinite check on NormalizedTransaction amount and all TransactionPredictRequest float fields",
+      "invariant_restored": "DATA-INV-03 (Schema Fidelity), DATA-INV-05 (Unit Fidelity)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_normalized_transaction_non_finite_amount_rejected, test_prediction_request_non_finite_rejection",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0004",
+      "target_file": "backend/app/infrastructure/connectors/iso20022_connector.py",
+      "secondary_file": "backend/app/infrastructure/connectors/thought_machine_connector.py, backend/app/infrastructure/connectors/mambu_connector.py",
+      "action": "Implement ISO 8601/RFC 3339 datetime parsing for CreDtTm, ValDt, value_timestamp, creationDate, and SWIFT tag 32A",
+      "invariant_restored": "DATA-INV-06 (Temporal Fidelity), DATA-INV-16 (Replay Fidelity)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_iso20022_event_time_preservation, test_mambu_event_time_preservation, test_thought_machine_event_time_preservation",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0005",
+      "target_file": "backend/app/infrastructure/connectors/factory.py",
+      "secondary_file": null,
+      "action": "Add explicit factory dispatch branches for Mambu, Thought Machine, and Kafka Streaming connectors",
+      "invariant_restored": "DATA-INV-10 (Failure Truth), DATA-INV-17 (Downstream Contract Fidelity)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_connector_factory_resolution",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0006",
+      "target_file": "backend/app/infrastructure/connectors/kafka_streaming_connector.py",
+      "secondary_file": null,
+      "action": "Implement atomic thread-safe try_acquire lock and tenant-prefixed deduplication in IdempotencyEngine",
+      "invariant_restored": "DATA-INV-08 (Idempotency), DATA-INV-15 (Concurrency Safety)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_kafka_connector_concurrent_deduplication",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0007",
+      "target_file": "backend/app/application/services/streaming_graph_service.py",
+      "secondary_file": null,
+      "action": "Support canonical account_id and counterparty_account_id in add_transaction to eliminate schema divergence",
+      "invariant_restored": "DATA-INV-04 (Value Fidelity), DATA-INV-17 (Downstream Contract Fidelity)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_streaming_graph_direction_preservation",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0008",
+      "target_file": "backend/app/application/services/feature_store_service.py",
+      "secondary_file": "backend/app/infrastructure/connectors/mambu_connector.py, backend/app/infrastructure/connectors/thought_machine_connector.py",
+      "action": "Enforce strict positive amounts without zero fabrication, and deduplicate feature store sliding window entries by tx_id",
+      "invariant_restored": "DATA-INV-09 (Retry Safety), DATA-INV-13 (Missing-Value Truth)",
+      "verification_test": "backend/tests/unit/test_connector_correctness.py::test_feature_store_retry_deduplication",
+      "verification_status": "PASSED"
+    }
+  ]
+}

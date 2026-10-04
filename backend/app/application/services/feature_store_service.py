@@ -8,6 +8,7 @@ simulating Apache Flink or Spark Streaming.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from typing import Any
 
@@ -47,6 +48,7 @@ class FeatureStoreService:
         chargeback_count: int,
         account_age_days: int,
         timestamp: float | None = None,
+        transaction_id: str | None = None,
     ) -> None:
         """Dynamic Streaming Ingestion Pipeline (Flink/Spark Simulation).
 
@@ -55,6 +57,12 @@ class FeatureStoreService:
         the Online Store.
         """
         if not self.settings.feature_store_enabled:
+            return
+
+        if not math.isfinite(amount):
+            logger.warning(
+                "FeatureStore rejected non-finite amount %s for customer %s", amount, customer_id
+            )
             return
 
         ts = timestamp or time.time()
@@ -78,11 +86,19 @@ class FeatureStoreService:
         )
 
         # 2. Update dynamic streaming features using sliding windows
-        tx_event = {"timestamp": ts, "amount": amount}
-        self.tx_history.push_list(customer_id, tx_event)
-
-        # Retrieve full window history for the customer
+        # Retrieve full window history for the customer first to check idempotency
         history = self.tx_history.get_list(customer_id)
+
+        # Guard against double-counting on retries or duplicate delivery
+        if transaction_id and any(tx.get("tx_id") == transaction_id for tx in history):
+            logger.debug(
+                "FeatureStore duplicate tx_id %s ignored for customer %s", transaction_id, customer_id
+            )
+            return
+
+        tx_event = {"timestamp": ts, "amount": amount, "tx_id": transaction_id}
+        self.tx_history.push_list(customer_id, tx_event)
+        history.append(tx_event)
 
         # Filter sliding windows
         one_hour_ago = ts - 3600.0

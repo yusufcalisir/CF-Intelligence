@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import logging
+import math
 import os
 import uuid
 from collections import deque
@@ -50,6 +51,7 @@ class ThoughtMachineConnector(BaseBankConnector):
         base_url: str | None = None,
         api_key: str | None = None,
         webhook_secret: str | None = None,
+        tenant_id: str = "vault_default_tenant",
         max_buffer_size: int = 1000,
     ) -> None:
         super().__init__()
@@ -57,6 +59,7 @@ class ThoughtMachineConnector(BaseBankConnector):
         self.base_url = resolved_url.rstrip("/")
         self.api_key = api_key or os.getenv("VAULT_CORE_API_KEY", "")
         self.webhook_secret = webhook_secret or os.getenv("VAULT_CORE_WEBHOOK_SECRET", "thought_machine_consortium_2026")
+        self.tenant_id = tenant_id
         self._buffer: deque[NormalizedTransaction] = deque(maxlen=max_buffer_size)
         self._audit_restrictions: list[dict[str, Any]] = []
         self._events_ingested: int = 0
@@ -140,7 +143,11 @@ class ThoughtMachineConnector(BaseBankConnector):
 
             for post in postings:
                 acc = post.get("account_id", "ACC_UNKNOWN")
-                raw_amt = float(post.get("amount", 0.0))
+                try:
+                    val = float(post.get("amount", 0.0))
+                    raw_amt = val if math.isfinite(val) else 0.0
+                except (ValueError, TypeError):
+                    raw_amt = 0.0
                 currency = post.get("denomination", "EUR")
                 is_credit = bool(post.get("credit", False))
 
@@ -151,26 +158,83 @@ class ThoughtMachineConnector(BaseBankConnector):
                     debtor_acc = acc
                     amount = max(amount, raw_amt)
 
+            raw_ts = (
+                posting_data.get("value_timestamp")
+                or inst.get("value_timestamp")
+                or inst.get("insertion_timestamp")
+                or posting_data.get("timestamp")
+            )
+            if raw_ts:
+                try:
+                    if isinstance(raw_ts, datetime):
+                        event_time = raw_ts
+                    elif isinstance(raw_ts, str):
+                        event_time = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                    elif isinstance(raw_ts, (int, float)):
+                        event_time = datetime.fromtimestamp(raw_ts, tz=UTC)
+                    else:
+                        event_time = datetime.now(UTC)
+                except Exception:
+                    event_time = datetime.now(UTC)
+            else:
+                event_time = datetime.now(UTC)
+
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=UTC)
+            else:
+                event_time = event_time.astimezone(UTC)
+
             return NormalizedTransaction(
                 transaction_id=str(instruction_id),
                 account_id=str(debtor_acc),
                 counterparty_account_id=str(creditor_acc),
                 amount=max(0.01, amount),
                 currency=currency,
-                timestamp=datetime.now(UTC),
+                timestamp=event_time,
                 merchant_category_code=str(posting_data.get("mcc", "6011")),
                 origin_country="GB",
                 destination_country="GB",
                 device_fingerprint=str(posting_data.get("device_id", "")),
                 ip_subnet="172.16.0.0/16",
                 channel_type="ONLINE",
+                bank_id=self.tenant_id,
             )
         else:
             # Single-leg or direct instruction representation
             account_id = posting_data.get("account_id") or inst.get("account_id") or "ACC_UNKNOWN"
             target_account = posting_data.get("target_account_id") or f"tm_cpty_{account_id[-6:]}"
-            amount = float(posting_data.get("amount") or inst.get("amount") or 100.0)
+            try:
+                val = float(posting_data.get("amount") or inst.get("amount") or 100.0)
+                amount = val if math.isfinite(val) else 100.0
+            except (ValueError, TypeError):
+                amount = 100.0
             currency = posting_data.get("denomination") or inst.get("currency") or "EUR"
+
+            raw_ts = (
+                posting_data.get("value_timestamp")
+                or inst.get("value_timestamp")
+                or inst.get("insertion_timestamp")
+                or posting_data.get("timestamp")
+            )
+            if raw_ts:
+                try:
+                    if isinstance(raw_ts, datetime):
+                        event_time = raw_ts
+                    elif isinstance(raw_ts, str):
+                        event_time = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
+                    elif isinstance(raw_ts, (int, float)):
+                        event_time = datetime.fromtimestamp(raw_ts, tz=UTC)
+                    else:
+                        event_time = datetime.now(UTC)
+                except Exception:
+                    event_time = datetime.now(UTC)
+            else:
+                event_time = datetime.now(UTC)
+
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=UTC)
+            else:
+                event_time = event_time.astimezone(UTC)
 
             return NormalizedTransaction(
                 transaction_id=str(instruction_id),
@@ -178,13 +242,14 @@ class ThoughtMachineConnector(BaseBankConnector):
                 counterparty_account_id=str(target_account),
                 amount=max(0.01, amount),
                 currency=currency,
-                timestamp=datetime.now(UTC),
+                timestamp=event_time,
                 merchant_category_code="6011",
                 origin_country="GB",
                 destination_country="GB",
                 device_fingerprint="",
                 ip_subnet="172.16.0.0/16",
                 channel_type="ONLINE",
+                bank_id=self.tenant_id,
             )
 
     async def apply_provisional_hold(

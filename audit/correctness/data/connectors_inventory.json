@@ -1,0 +1,152 @@
+{
+  "audit_capability": "data_connectors_and_ingestion",
+  "audit_scope": "production_runtime_connectors",
+  "connectors": [
+    {
+      "connector_id": "iso20022",
+      "class_name": "ISO20022MessagingConnector",
+      "module": "app.infrastructure.connectors.iso20022_connector",
+      "protocol": "XML/SWIFT MT Text over HTTP/mTLS",
+      "direction": "INBOUND",
+      "supported_formats": [
+        "pacs.008.001.08",
+        "pain.001.001.08",
+        "camt.053.001.08",
+        "pacs.002.001.10",
+        "pacs.003.001.08",
+        "SWIFT_MT103"
+      ],
+      "authentication": "mTLS / API Key / XSD Schema Validation",
+      "tenant_scoping": "ISO20022 / Debtor BIC country / Bank partition",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "kafka_streaming",
+      "class_name": "KafkaStreamingConnector",
+      "module": "app.infrastructure.connectors.kafka_streaming_connector",
+      "protocol": "Apache Kafka / CloudEvents 1.0 JSON over SASL_SSL",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "CNCF CloudEvents 1.0",
+        "org.cfi.finint.transaction.v1",
+        "org.cfi.finint.alert.v1",
+        "org.cfi.finint.recall.v1",
+        "org.cfi.finint.deadletter.v1"
+      ],
+      "authentication": "SCRAM-SHA-256 / SASL_SSL / HMAC-SHA256 event signatures",
+      "tenant_scoping": "ce_tenant_id / ce_bank_id partition namespace",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "mambu",
+      "class_name": "MambuConnector",
+      "module": "app.infrastructure.connectors.mambu_connector",
+      "protocol": "REST / Webhooks over HTTPS",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "Mambu v2 Webhook JSON",
+        "deposit-transaction.created",
+        "client.created",
+        "account.hold"
+      ],
+      "authentication": "API Key / HMAC-SHA256 Webhook Signatures",
+      "tenant_scoping": "Explicit tenant_id parameter bound to bank node",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "thought_machine",
+      "class_name": "ThoughtMachineConnector",
+      "module": "app.infrastructure.connectors.thought_machine_connector",
+      "protocol": "REST / Webhooks / PIB Streaming over HTTPS",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "Vault Core PostingInstructionBatch JSON",
+        "postings",
+        "custom_instruction",
+        "transfer"
+      ],
+      "authentication": "HMAC-SHA256 Signatures / Vault API Key",
+      "tenant_scoping": "Explicit tenant_id parameter bound to bank node",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "open_banking",
+      "class_name": "OpenBankingConnector",
+      "module": "app.infrastructure.connectors.open_banking_connector",
+      "protocol": "REST / PSD2 NextGenPSD2 XS2A JSON",
+      "direction": "INBOUND",
+      "supported_formats": [
+        "Berlin Group NextGenPSD2 Account Information Service",
+        "Payment Initiation Service JSON"
+      ],
+      "authentication": "OAuth 2.0 / QWAC / eIDAS Certificates",
+      "tenant_scoping": "Institution BIC / ASPSP ID",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "rest",
+      "class_name": "RESTBankConnector",
+      "module": "app.infrastructure.connectors.rest_connector",
+      "protocol": "REST JSON over HTTP/HTTPS",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "NormalizedTransaction JSON"
+      ],
+      "authentication": "OAuth 2.0 / Bearer Token / API Key / mTLS",
+      "tenant_scoping": "bank_urls configuration map",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "parquet",
+      "class_name": "ParquetConnector",
+      "module": "app.infrastructure.connectors.parquet_connector",
+      "protocol": "Local File / Object Store IO",
+      "direction": "INBOUND",
+      "supported_formats": [
+        "Apache Parquet Columnar Datasets"
+      ],
+      "authentication": "Filesystem POSIX / IAM",
+      "tenant_scoping": "bank_id filesystem partitioning",
+      "runtime_status": "ACTIVE_RUNTIME"
+    },
+    {
+      "connector_id": "batch",
+      "class_name": "BatchEODFileConnector",
+      "module": "app.infrastructure.connectors.batch_connector",
+      "protocol": "SFTP / Bulk File Drops (CSV / Fixed-width)",
+      "direction": "INBOUND",
+      "supported_formats": [
+        "EOD Transaction CSV / NDJSON"
+      ],
+      "authentication": "SSH Key / SFTP",
+      "tenant_scoping": "Partner drop directory namespace",
+      "runtime_status": "ACTIVE_OPTIONAL"
+    },
+    {
+      "connector_id": "redis",
+      "class_name": "RedisBankConnector",
+      "module": "app.infrastructure.connectors.redis_connector",
+      "protocol": "RESP / Redis PubSub & Streams",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "Serialized NormalizedTransaction JSON"
+      ],
+      "authentication": "AUTH password / mTLS",
+      "tenant_scoping": "Stream key prefix namespace",
+      "runtime_status": "ACTIVE_OPTIONAL"
+    },
+    {
+      "connector_id": "rabbitmq",
+      "class_name": "RabbitMQBankConnector",
+      "module": "app.infrastructure.connectors.rabbitmq_connector",
+      "protocol": "AMQP 0-9-1",
+      "direction": "BIDIRECTIONAL",
+      "supported_formats": [
+        "AMQP Message Envelope JSON"
+      ],
+      "authentication": "Username / Password / TLS",
+      "tenant_scoping": "Exchange & Routing Key namespace",
+      "runtime_status": "ACTIVE_OPTIONAL"
+    }
+  ]
+}

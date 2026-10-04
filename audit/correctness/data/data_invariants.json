@@ -1,0 +1,107 @@
+{
+  "audit_capability": "data_correctness_invariants",
+  "invariants": [
+    {
+      "id": "DATA-INV-01",
+      "name": "Identity Preservation",
+      "definition": "A source record must remain associated with the exact same logical transaction and customer entity identifier throughout parsing, transformation, and storage.",
+      "enforcement_mechanism": "Deterministic UUID / message ID tracking and customer_id / account_id propagation in NormalizedTransaction and TransactionPredictRequest."
+    },
+    {
+      "id": "DATA-INV-02",
+      "name": "Tenant Ownership",
+      "definition": "A record belonging to institution/tenant A must not become owned by, cached for, or visible as tenant B through ingestion-state corruption or key collision.",
+      "enforcement_mechanism": "Tenant-namespaced Redis keys in IdempotencyService ('idem:{tenant}:{hash}') and CloudEvents ('{tenant}:{key}')."
+    },
+    {
+      "id": "DATA-INV-03",
+      "name": "Schema Fidelity",
+      "definition": "Accepted records must strictly satisfy the canonical schema expected downstream, rejecting malformed structures and non-finite floats.",
+      "enforcement_mechanism": "Pydantic v2 strict models, XSD schema validation, and field validators enforcing math.isfinite."
+    },
+    {
+      "id": "DATA-INV-04",
+      "name": "Value Fidelity",
+      "definition": "Fields must not silently change meaning or invert relationships during parsing, normalization, serialization, or persistence.",
+      "enforcement_mechanism": "Strict directed debtor -> creditor edge construction and unswapped account mapping."
+    },
+    {
+      "id": "DATA-INV-05",
+      "name": "Unit Fidelity",
+      "definition": "Monetary amounts, velocities, and risk scores must preserve explicitly defined units without binary precision loss or unauthorized scale changes.",
+      "enforcement_mechanism": "Standard float bounds with ge=0.0 / le=1.0 and Decimal representations in CloudEvents."
+    },
+    {
+      "id": "DATA-INV-06",
+      "name": "Temporal Fidelity",
+      "definition": "Source event time, system ingestion time, and processing time must not be silently conflated or overwritten.",
+      "enforcement_mechanism": "Explicit parsing of CreDtTm, value_timestamp, and creationDate, with fallback to now(UTC) only when absent."
+    },
+    {
+      "id": "DATA-INV-07",
+      "name": "Ordering Truth",
+      "definition": "Any ordering guarantee relied upon downstream must actually be enforced via sequential offsets or explicitly declared absent.",
+      "enforcement_mechanism": "Topic partition sequential offsets in Kafka and sliding window timestamp sorting."
+    },
+    {
+      "id": "DATA-INV-08",
+      "name": "Idempotency",
+      "definition": "Reprocessing the same logical event must produce deterministic duplicate acknowledgment without side-effects or state duplication.",
+      "enforcement_mechanism": "IdempotencyService acquire-complete protocol and FeatureStoreService transaction_id deduplication."
+    },
+    {
+      "id": "DATA-INV-09",
+      "name": "Retry Safety",
+      "definition": "Retrying an unacknowledged message or API call must not duplicate balances, velocities, or cases.",
+      "enforcement_mechanism": "Atomic reservation in IdempotencyEngine and 24-hour response caching."
+    },
+    {
+      "id": "DATA-INV-10",
+      "name": "Failure Truth",
+      "definition": "Malformed or unavailable data must fail closed or route to a dead-letter queue rather than fabricating valid mock data.",
+      "enforcement_mechanism": "DLQ isolation on CloudEvent parsing failures and SIEM parse failure audit logging."
+    },
+    {
+      "id": "DATA-INV-11",
+      "name": "Serialization Fidelity",
+      "definition": "Encode/decode and persistence round trips must preserve the canonical record semantics identically.",
+      "enforcement_mechanism": "CloudEvent.to_json_bytes and CloudEvent.from_raw_json isomorphic parsing."
+    },
+    {
+      "id": "DATA-INV-12",
+      "name": "Partition Fidelity",
+      "definition": "Data assigned to a bank or tenant partition must belong strictly to the intended partition without cross-client leakage.",
+      "enforcement_mechanism": "enforce_tenant_isolation checks at Presentation boundaries and bank_id filesystem partitioning."
+    },
+    {
+      "id": "DATA-INV-13",
+      "name": "Missing-Value Truth",
+      "definition": "Missing data must remain distinguishable from genuine zero or default values where business semantics differ.",
+      "enforcement_mechanism": "Explicit None checks (payload.get('amount') is not None) preventing 0.0 from fabricating defaults."
+    },
+    {
+      "id": "DATA-INV-14",
+      "name": "Provenance Fidelity",
+      "definition": "Downstream records must remain traceable to their originating institution and source message reference.",
+      "enforcement_mechanism": "NormalizedTransaction.bank_id, CloudEvent.source, and FinCEN SAR audit hashes."
+    },
+    {
+      "id": "DATA-INV-15",
+      "name": "Concurrency Safety",
+      "definition": "Concurrent ingestion must not corrupt shared state, race check-then-act locks, or duplicate records.",
+      "enforcement_mechanism": "Thread locks in IdempotencyEngine, atomic set(..., nx=True) in Redis, and RLock in StreamingGraphService."
+    },
+    {
+      "id": "DATA-INV-16",
+      "name": "Replay Fidelity",
+      "definition": "Replaying historical events must follow defined event-time semantics without mutating current real-time state.",
+      "enforcement_mechanism": "Preserved event timestamps and timestamp-based sliding window filtering."
+    },
+    {
+      "id": "DATA-INV-17",
+      "name": "Downstream Contract Fidelity",
+      "definition": "Graph, model, FL, and explainability layers must receive the exact typed representation their contracts require.",
+      "enforcement_mechanism": "Preprocessed NumPy/PyTorch tensor dimensional normalization and typed DTO conversion."
+    }
+  ]
+}

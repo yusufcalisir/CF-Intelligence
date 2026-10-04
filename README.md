@@ -9,7 +9,7 @@
 [![Python Version](https://img.shields.io/badge/python-3.12-3776AB.svg?style=flat&logo=python&logoColor=white)](https://python.org)
 [![FastAPI](https://img.shields.io/badge/FastAPI-%E2%89%A50.115-009688.svg?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%E2%89%A52.4-EE4C2C.svg?style=flat&logo=pytorch&logoColor=white)](https://pytorch.org)
-[![Tests Collected](https://img.shields.io/badge/tests-4648_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
+[![Tests Collected](https://img.shields.io/badge/tests-4670_collected-blue.svg?style=flat&logo=pytest&logoColor=white)](https://github.com/yusufcalisir/CF-Intelligence/actions)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Security Policy](https://img.shields.io/badge/Security-Policy-blue.svg)](SECURITY.md)
@@ -831,10 +831,12 @@ CF-Intelligence/
 ### 4.1 Synthetic Multi-Bank Data Generator (`data_generator.py`)
 Generates reproducible cross-bank transaction datasets across 3 distinct financial institutions (Bank Alpha, Bank Beta, Bank Gamma) modeling heterogeneous local fraud distributions (credit card velocity, structured wire transfers, cross-border layering) with customizable random seeds and noise profiles.
 
-### 4.2 Multi-Standard Financial Payload Parser & Connectors (`financial_message_parser.py`, `iso20022_connector.py`, `open_banking_connector.py`)
-Parses industry financial payload formats into a unified `NormalizedTransaction` schema:
-- **ISO 20022 Messages:** `pacs.008` (Financial Interbank Credit Transfer) and `camt.053` (Bank-to-Customer Statement XML).
-- **SWIFT MT Messages:** Legacy `MT103` Single Customer Credit Transfer.
+### 4.2 Multi-Standard Financial Payload Parser & Connectors (`financial_message_parser.py`, `iso20022_connector.py`, `mambu_connector.py`, `thought_machine_connector.py`, `kafka_streaming_connector.py`)
+Parses industry financial payload formats into a unified `NormalizedTransaction` canonical schema with strict numeric finiteness validation (`math.isfinite`), UTC timezone normalization, and source event-time preservation:
+- **ISO 20022 Messages (`iso20022_connector.py`):** `pacs.008` (Credit Transfer), `pain.001` (Customer Initiation), `camt.053` (Statement XML), `pacs.002` (Payment Status Report), and `pacs.003` (Direct Debit), preserving source execution timestamps (`CreDtTm`, `ValDt`).
+- **SWIFT MT Messages:** Legacy `MT103` Single Customer Credit Transfer with tag 32A value-date parsing.
+- **Core Banking Connectors:** Direct API connectors for Mambu Cloud Banking (`mambu_connector.py`) and Thought Machine Vault Core (`thought_machine_connector.py`) with native posting instruction and execution timestamp extraction.
+- **CNCF CloudEvents & Streaming (`kafka_streaming_connector.py`):** CloudEvents v1.0 asynchronous Kafka topic consumer with thread-safe atomic deduplication (`IdempotencyEngine`) and tenant-scoped keys.
 - **PSD2 Open Banking:** Open Banking REST API webhook JSON payloads with eIDAS QWAC/QSeal signature parsing.
 
 ### 4.3 Data Contracts & Validation (`data_validator.py`)

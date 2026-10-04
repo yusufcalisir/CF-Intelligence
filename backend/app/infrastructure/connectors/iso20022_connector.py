@@ -120,6 +120,27 @@ class ISO20022MessagingConnector(BaseBankConnector):
         siem.export_event(event)
         logger.warning("SIEM event logged: ISO20022_PARSE_FAILURE for %s", message_type)
 
+    @staticmethod
+    def _parse_iso_datetime(raw_dt: str | None) -> datetime:
+        """Parse ISO 8601 or date string, returning UTC datetime, or current UTC if absent/malformed."""
+        if not raw_dt or not raw_dt.strip():
+            return datetime.now(UTC)
+        try:
+            clean = raw_dt.strip().replace("Z", "+00:00")
+            dt = datetime.fromisoformat(clean)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=UTC)
+            return dt.astimezone(UTC)
+        except Exception:
+            try:
+                # If only date format (YYYY-MM-DD)
+                parts = raw_dt.strip()[:10].split("-")
+                if len(parts) == 3:
+                    return datetime(int(parts[0]), int(parts[1]), int(parts[2]), 12, 0, tzinfo=UTC)
+            except Exception:
+                pass
+            return datetime.now(UTC)
+
     def validate_xml_schema(
         self, xml_content: str, schema_name: str = "pacs.008.001.08.xsd"
     ) -> None:
@@ -348,17 +369,21 @@ class ISO20022MessagingConnector(BaseBankConnector):
             creditor_account, root.findtext(".//Cdtr/PstlAdr/Ctry")
         )
 
+        raw_ts = root.findtext(".//GrpHdr/CreDtTm") or root.findtext(".//CdtTrfTxInf/IntrBkSttlmDt")
+        ts = self._parse_iso_datetime(raw_ts)
+
         tx = NormalizedTransaction(
             transaction_id=msg_id,
             account_id=debtor_account,
             counterparty_account_id=creditor_account,
             amount=amount,
             currency=currency,
-            timestamp=datetime.now(UTC),
+            timestamp=ts,
             merchant_category_code="6012",
             origin_country=debtor_country,
             destination_country=creditor_country,
             channel_type="ISO20022_PACS008",
+            bank_id="ISO20022",
         )
         self._parsed_queue.append(tx)
         return tx
@@ -415,17 +440,21 @@ class ISO20022MessagingConnector(BaseBankConnector):
             creditor_account, root.findtext(".//Cdtr/PstlAdr/Ctry")
         )
 
+        raw_ts = root.findtext(".//GrpHdr/CreDtTm") or root.findtext(".//PmtInf/ReqdExctnDt")
+        ts = self._parse_iso_datetime(raw_ts)
+
         tx = NormalizedTransaction(
             transaction_id=msg_id,
             account_id=debtor_account,
             counterparty_account_id=creditor_account,
             amount=amount,
             currency=currency,
-            timestamp=datetime.now(UTC),
+            timestamp=ts,
             merchant_category_code="6012",
             origin_country=debtor_country,
             destination_country=creditor_country,
             channel_type="ISO20022_PAIN001",
+            bank_id="ISO20022",
         )
         self._parsed_queue.append(tx)
         return tx
@@ -452,13 +481,19 @@ class ISO20022MessagingConnector(BaseBankConnector):
                 tx_id = stripped.replace(":20:", "").strip()
             elif stripped.startswith(":32A:"):
                 val = stripped.replace(":32A:", "").strip()
-                m = re.search(r"^[0-9]{6}([A-Z]{3})([0-9,.]+)", val)
+                m = re.search(r"^([0-9]{6})([A-Z]{3})([0-9,.]+)", val)
                 if m:
-                    currency = m.group(1)
+                    date_str = m.group(1)
+                    currency = m.group(2)
                     try:
-                        amount = float(m.group(2).replace(",", "."))
-                    except ValueError:
+                        amount = float(m.group(3).replace(",", "."))
+                        year = 2000 + int(date_str[:2])
+                        month = int(date_str[2:4])
+                        day = int(date_str[4:6])
+                        event_time = datetime(year, month, day, 12, 0, tzinfo=UTC)
+                    except Exception:
                         amount = None
+                        event_time = datetime.now(UTC)
             elif stripped.startswith(":50K:") or stripped.startswith(":50A:") or stripped.startswith(":50F:"):
                 debtor = stripped.split(":", 2)[-1].strip()
             elif stripped.startswith(":59:") or stripped.startswith(":59A:"):
@@ -491,11 +526,12 @@ class ISO20022MessagingConnector(BaseBankConnector):
             counterparty_account_id=creditor,
             amount=amount,
             currency=currency,
-            timestamp=datetime.now(UTC),
+            timestamp=locals().get("event_time", datetime.now(UTC)),
             merchant_category_code="6011",
             origin_country=origin_country,
             destination_country=destination_country,
             channel_type="SWIFT_MT103",
+            bank_id="SWIFT",
         )
         self._parsed_queue.append(tx)
         return tx
@@ -526,6 +562,8 @@ class ISO20022MessagingConnector(BaseBankConnector):
         acct_country = FinancialMessageParser.extract_country_code(acct_id)
         entries = root.findall(".//Stmt/Ntry")
         results: list[NormalizedTransaction] = []
+
+        header_ts = self._parse_iso_datetime(root.findtext(".//GrpHdr/CreDtTm"))
 
         for idx, ntry in enumerate(entries):
             amt_elem = ntry.find(".//Amt")
@@ -558,17 +596,26 @@ class ISO20022MessagingConnector(BaseBankConnector):
             entry_country = FinancialMessageParser.extract_country_code(entry_acct) or acct_country
             counterparty_country = FinancialMessageParser.extract_country_code(counterparty) or entry_country
 
+            raw_ntry_ts = (
+                ntry.findtext(".//BookgDt/DtTm")
+                or ntry.findtext(".//BookgDt/Dt")
+                or ntry.findtext(".//ValDt/DtTm")
+                or ntry.findtext(".//ValDt/Dt")
+            )
+            entry_ts = self._parse_iso_datetime(raw_ntry_ts) if raw_ntry_ts else header_ts
+
             tx = NormalizedTransaction(
                 transaction_id=tx_id,
                 account_id=entry_acct,
                 counterparty_account_id=counterparty,
                 amount=amount,
                 currency=currency,
-                timestamp=datetime.now(UTC),
+                timestamp=entry_ts,
                 merchant_category_code="6012",
                 origin_country=entry_country,
                 destination_country=counterparty_country,
                 channel_type="ISO20022_CAMT053",
+                bank_id="ISO20022",
             )
             results.append(tx)
             self._parsed_queue.append(tx)
@@ -601,17 +648,20 @@ class ISO20022MessagingConnector(BaseBankConnector):
             except ValueError:
                 amount = 1.0
 
+        ts = self._parse_iso_datetime(root.findtext(".//GrpHdr/CreDtTm"))
+
         tx = NormalizedTransaction(
             transaction_id=msg_id,
             account_id=orig_msg_id,
             counterparty_account_id=f"STATUS_{status}",
             amount=amount,
             currency="EUR",
-            timestamp=datetime.now(UTC),
+            timestamp=ts,
             merchant_category_code="6012",
             origin_country="XX",
             destination_country="XX",
             channel_type="ISO20022_PACS002",
+            bank_id="ISO20022",
         )
         self._parsed_queue.append(tx)
         return tx
@@ -621,17 +671,19 @@ class ISO20022MessagingConnector(BaseBankConnector):
         """Parses an ISO 20022 pacs.003.001.08 Direct Debit XML string into NormalizedTransaction."""
         self.validate_xml_schema(xml_content, "pacs.003.001.08.xsd")
         parsed = FinancialMessageParser.parse_iso_20022_pacs003(xml_content)
+        ts = self._parse_iso_datetime(parsed.get("creation_date_time") or parsed.get("date"))
         tx = NormalizedTransaction(
             transaction_id=parsed["transaction_id"],
             account_id=parsed["sender_account"],
             counterparty_account_id=parsed["receiver_account"],
             amount=parsed["amount"],
             currency=parsed["currency"],
-            timestamp=datetime.now(UTC),
+            timestamp=ts,
             merchant_category_code="6012",
             origin_country=parsed["sender_country"],
             destination_country=parsed["receiver_country"],
             channel_type="ISO20022_PACS003",
+            bank_id="ISO20022",
         )
         self._parsed_queue.append(tx)
         return tx

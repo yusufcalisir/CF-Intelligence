@@ -82,8 +82,17 @@ class IdempotencyService:
                     cls._instance = cls()
         return cls._instance
 
+    def _build_redis_key(self, idempotency_key: str, tenant_id: str | None = None) -> str:
+        """Construct namespaced Redis key scoped by tenant to prevent cross-tenant collisions."""
+        if tenant_id and tenant_id.strip():
+            return f"{_REDIS_KEY_PREFIX}{tenant_id.strip()}:{self._hash_key(idempotency_key)}"
+        return f"{_REDIS_KEY_PREFIX}{self._hash_key(idempotency_key)}"
+
     def acquire(
-        self, idempotency_key: str | None, in_progress_timeout: float = 30.0
+        self,
+        idempotency_key: str | None,
+        in_progress_timeout: float = 30.0,
+        tenant_id: str | None = None,
     ) -> tuple[str, Any | None]:
         """Atomically tests whether an idempotency key is already cached, in-progress, or acquires it.
 
@@ -95,7 +104,7 @@ class IdempotencyService:
         if not idempotency_key:
             return ("ACQUIRED", None)
 
-        redis_key = _REDIS_KEY_PREFIX + self._hash_key(idempotency_key)
+        redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
 
         if self._redis_client is not None:
             try:
@@ -136,11 +145,16 @@ class IdempotencyService:
             self._evict_expired()
             return ("ACQUIRED", None)
 
-    def complete(self, idempotency_key: str | None, response_body: Any) -> None:
+    def complete(
+        self,
+        idempotency_key: str | None,
+        response_body: Any,
+        tenant_id: str | None = None,
+    ) -> None:
         """Persist final response_body under idempotency_key, clearing in-progress state."""
         if not idempotency_key:
             return
-        redis_key = _REDIS_KEY_PREFIX + self._hash_key(idempotency_key)
+        redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
         serialized = json.dumps(response_body, default=str)
 
         if self._redis_client is not None:
@@ -156,11 +170,11 @@ class IdempotencyService:
             self._fallback[redis_key] = (json.loads(serialized), expires_at, False)
             self._evict_expired()
 
-    def release(self, idempotency_key: str | None) -> None:
+    def release(self, idempotency_key: str | None, tenant_id: str | None = None) -> None:
         """Release in-progress reservation on error or cancellation."""
         if not idempotency_key:
             return
-        redis_key = _REDIS_KEY_PREFIX + self._hash_key(idempotency_key)
+        redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
         if self._redis_client is not None:
             try:
                 raw = self._redis_client.get(redis_key)
@@ -180,11 +194,11 @@ class IdempotencyService:
                 if in_prog:  # only delete if in_progress
                     del self._fallback[redis_key]
 
-    def get_cached(self, idempotency_key: str | None) -> Any | None:
+    def get_cached(self, idempotency_key: str | None, tenant_id: str | None = None) -> Any | None:
         """Return previously stored response for idempotency_key, or None if in-progress/absent."""
         if not idempotency_key:
             return None
-        redis_key = _REDIS_KEY_PREFIX + self._hash_key(idempotency_key)
+        redis_key = self._build_redis_key(idempotency_key, tenant_id=tenant_id)
         if self._redis_client is not None:
             try:
                 raw = self._redis_client.get(redis_key)
@@ -215,9 +229,14 @@ class IdempotencyService:
                     del self._fallback[redis_key]
             return None
 
-    def store(self, idempotency_key: str | None, response_body: Any) -> None:
+    def store(
+        self,
+        idempotency_key: str | None,
+        response_body: Any,
+        tenant_id: str | None = None,
+    ) -> None:
         """Persist response_body under idempotency_key for TTL seconds."""
-        self.complete(idempotency_key, response_body)
+        self.complete(idempotency_key, response_body, tenant_id=tenant_id)
 
     @staticmethod
     def _hash_key(raw_key: str) -> str:

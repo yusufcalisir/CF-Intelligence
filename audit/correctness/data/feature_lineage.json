@@ -1,0 +1,127 @@
+{
+  "audit_capability": "feature_lineage_matrix",
+  "version": "1.0.0",
+  "features": [
+    {
+      "feature_name": "amount",
+      "source_field": "NormalizedTransaction.amount",
+      "source_rail": "Core Banking / ISO 20022 IntrBkSttlmAmt / Mambu amount / Thought Machine amount",
+      "transformation": "Explicit validation (isfinite > 0.0), preserved as fiat float",
+      "aggregation_window": "Point-in-time",
+      "time_basis": "Event time",
+      "missing_behavior": "Rejection (HTTP 422 / Connector Parse Error)",
+      "tenant_scope": "Institution isolated",
+      "downstream_consumers": ["FeatureStoreService", "StreamingGraphService", "TransactionPredictRequest", "FraudDetector"]
+    },
+    {
+      "feature_name": "hour_of_day",
+      "source_field": "NormalizedTransaction.timestamp.hour",
+      "source_rail": "CreDtTm / value_timestamp / creationDate / message timestamp",
+      "transformation": "Extracted hour in UTC [0, 23]",
+      "aggregation_window": "Point-in-time",
+      "time_basis": "Event time (UTC normalized)",
+      "missing_behavior": "Defaults to ingestion time hour only if event time absent in unversioned payload",
+      "tenant_scope": "Universal",
+      "downstream_consumers": ["FraudDetector", "XGBoostModel", "MLInferenceService"]
+    },
+    {
+      "feature_name": "day_of_week",
+      "source_field": "NormalizedTransaction.timestamp.weekday()",
+      "source_rail": "CreDtTm / value_timestamp / creationDate / message timestamp",
+      "transformation": "Extracted integer [0, 6] (0=Monday, 6=Sunday)",
+      "aggregation_window": "Point-in-time",
+      "time_basis": "Event time (UTC normalized)",
+      "missing_behavior": "Defaults to ingestion time weekday if event time absent",
+      "tenant_scope": "Universal",
+      "downstream_consumers": ["FraudDetector", "XGBoostModel", "MLInferenceService"]
+    },
+    {
+      "feature_name": "velocity_1h",
+      "source_field": "NormalizedTransaction.transaction_id, timestamp",
+      "source_rail": "Event stream sliding window",
+      "transformation": "Count of transactions in [t - 3600s, t] for entity_hash",
+      "aggregation_window": "Sliding 1 hour",
+      "time_basis": "Event time",
+      "missing_behavior": "Evaluates to 0.0 for cold-start entities",
+      "tenant_scope": "Tenant scoped (f'{tenant_id}:{customer_id}')",
+      "downstream_consumers": ["FeatureStoreService", "FraudDetector"]
+    },
+    {
+      "feature_name": "velocity_24h",
+      "source_field": "NormalizedTransaction.transaction_id, timestamp",
+      "source_rail": "Event stream sliding window",
+      "transformation": "Count of transactions in [t - 86400s, t] for entity_hash",
+      "aggregation_window": "Sliding 24 hours",
+      "time_basis": "Event time",
+      "missing_behavior": "Evaluates to 0.0 for cold-start entities",
+      "tenant_scope": "Tenant scoped (f'{tenant_id}:{customer_id}')",
+      "downstream_consumers": ["FeatureStoreService", "FraudDetector"]
+    },
+    {
+      "feature_name": "avg_amount_24h",
+      "source_field": "NormalizedTransaction.amount, timestamp",
+      "source_rail": "Event stream sliding window",
+      "transformation": "Mean sum(amounts) / count in [t - 86400s, t] for entity_hash",
+      "aggregation_window": "Sliding 24 hours",
+      "time_basis": "Event time",
+      "missing_behavior": "Evaluates to 0.0 for cold-start entities",
+      "tenant_scope": "Tenant scoped (f'{tenant_id}:{customer_id}')",
+      "downstream_consumers": ["FeatureStoreService", "FraudDetector"]
+    },
+    {
+      "feature_name": "is_foreign",
+      "source_field": "NormalizedTransaction.metadata.debtor_country, creditor_country",
+      "source_rail": "ISO 20022 Country / Core banking postal routing",
+      "transformation": "1 if debtor_country != creditor_country else 0",
+      "aggregation_window": "Point-in-time",
+      "time_basis": "Event time",
+      "missing_behavior": "0 (domestic assumption)",
+      "tenant_scope": "Cross-border boundary",
+      "downstream_consumers": ["FraudDetector", "MLInferenceService"]
+    },
+    {
+      "feature_name": "is_high_risk_mcc",
+      "source_field": "NormalizedTransaction.metadata.mcc",
+      "source_rail": "Card / Merchant rails (ISO 18245 MCC)",
+      "transformation": "1 if mcc in HIGH_RISK_MCC_SET else 0",
+      "aggregation_window": "Point-in-time",
+      "time_basis": "Event time",
+      "missing_behavior": "0 (standard commercial retail)",
+      "tenant_scope": "Merchant rail",
+      "downstream_consumers": ["FraudDetector", "MLInferenceService"]
+    },
+    {
+      "feature_name": "graph_degree",
+      "source_field": "StreamingGraphService debtor node degree",
+      "source_rail": "NormalizedTransaction.account_id -> counterparty_account_id directed edges",
+      "transformation": "In-degree + out-degree in streaming MultiDiGraph",
+      "aggregation_window": "Dynamic streaming graph snapshot",
+      "time_basis": "Event time edge insertion",
+      "missing_behavior": "0.0 for new disconnected nodes",
+      "tenant_scope": "Tenant isolated / Federated pseudonymized graph",
+      "downstream_consumers": ["StreamingGraphService", "FraudDetector", "GraphSAGE"]
+    },
+    {
+      "feature_name": "graph_pagerank",
+      "source_field": "StreamingGraphService PageRank score",
+      "source_rail": "Directed transaction network flow",
+      "transformation": "Power iteration PageRank on local/global transaction topology",
+      "aggregation_window": "Graph snapshot window",
+      "time_basis": "Event time",
+      "missing_behavior": "1.0 / N default initial rank",
+      "tenant_scope": "Tenant isolated / Federated graph",
+      "downstream_consumers": ["StreamingGraphService", "FraudDetector", "GraphSAGE"]
+    },
+    {
+      "feature_name": "graph_community_risk",
+      "source_field": "StreamingGraphService community detection",
+      "source_rail": "Louvain community partition of accounts",
+      "transformation": "Ratio of confirmed mule/fraud accounts in detected community cluster",
+      "aggregation_window": "Historical partition",
+      "time_basis": "Investigation outcome time (post-outcome guard applied for pre-outcome inference)",
+      "missing_behavior": "0.0 for clean communities",
+      "tenant_scope": "Cross-bank consortium intelligence",
+      "downstream_consumers": ["StreamingGraphService", "FraudDetector"]
+    }
+  ]
+}

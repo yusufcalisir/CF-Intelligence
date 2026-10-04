@@ -6,9 +6,10 @@ batch prediction, SHAP/LIME explainability, and tenant inference quota telemetry
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class SignalBreakdown(BaseModel):
@@ -69,12 +70,25 @@ class TransactionPredictRequest(BaseModel):
     bank_id: str | None = Field(
         None, max_length=256, description="Optional bank identifier. Defaults to gateway ID."
     )
+    customer_id: str | None = Field(
+        None, max_length=256, description="Optional customer identifier for entity feature resolution."
+    )
+    account_id: str | None = Field(
+        None, max_length=256, description="Optional account identifier for entity feature resolution."
+    )
     simulation_id: str | None = Field(
         None, max_length=256, description="Optional simulation run ID to resolve versioned models."
     )
     transaction_id: str | None = Field(
         None, max_length=256, description="Optional client-provided transaction identifier"
     )
+
+    @field_validator("transaction_amount", "velocity", "merchant_risk_score", "customer_history_score")
+    @classmethod
+    def _validate_finite_float(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("Numeric fields must be finite numbers (NaN, +Inf, -Inf rejected)")
+        return v
 
 
 class TransactionPredictResponse(BaseModel):

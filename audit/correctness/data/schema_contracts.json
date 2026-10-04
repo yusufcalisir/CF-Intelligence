@@ -1,0 +1,190 @@
+{
+  "audit_capability": "data_schema_contracts",
+  "version": "1.0.0",
+  "authoritative_schemas": [
+    {
+      "schema_name": "NormalizedTransaction",
+      "authoritative_file": "backend/app/infrastructure/connectors/base_connector.py",
+      "format": "Pydantic v2 BaseDTO",
+      "scope": "Canonical ingestion record produced by all banking connectors (ISO 20022, Mambu, Thought Machine, Kafka, CloudEvents)",
+      "fields": {
+        "transaction_id": {
+          "type": "str",
+          "required": true,
+          "null_allowed": false,
+          "description": "Unique transaction identifier preserved from core banking / payment rail"
+        },
+        "amount": {
+          "type": "float",
+          "required": true,
+          "null_allowed": false,
+          "bounds": "isfinite(x) and x > 0.0",
+          "description": "Monetary value strictly verified to be finite positive float"
+        },
+        "currency": {
+          "type": "str",
+          "required": true,
+          "default": "EUR",
+          "null_allowed": false,
+          "description": "ISO 4217 currency code"
+        },
+        "timestamp": {
+          "type": "datetime",
+          "required": true,
+          "null_allowed": false,
+          "normalization": "UTC timezone normalized (naive datetimes coerced to UTC)",
+          "description": "Original business event execution timestamp"
+        },
+        "account_id": {
+          "type": "str",
+          "required": false,
+          "default": "",
+          "description": "Debtor / sender account identifier"
+        },
+        "counterparty_account_id": {
+          "type": "str",
+          "required": false,
+          "default": "",
+          "description": "Creditor / beneficiary account identifier"
+        },
+        "bank_id": {
+          "type": "str",
+          "required": false,
+          "default": null,
+          "description": "Originating institution tenant identifier"
+        },
+        "metadata": {
+          "type": "dict",
+          "required": false,
+          "default": {},
+          "description": "Preserved protocol-specific attributes without loss of lineage"
+        }
+      },
+      "invariants": [
+        "amount must be strictly finite and > 0",
+        "timestamp must be timezone-aware UTC",
+        "account_id and counterparty_account_id must not be identical if both are non-empty"
+      ]
+    },
+    {
+      "schema_name": "TransactionPredictRequest",
+      "authoritative_file": "backend/app/application/schemas/transaction.py",
+      "format": "Pydantic v2 BaseModel",
+      "scope": "Real-time HTTP inference and synchronous fraud scoring ingestion boundary",
+      "fields": {
+        "amount": {
+          "type": "float",
+          "required": true,
+          "bounds": "isfinite(x) and x > 0.0",
+          "description": "Transaction amount in fiat currency"
+        },
+        "hour_of_day": {
+          "type": "int",
+          "required": true,
+          "bounds": "0 <= x <= 23",
+          "description": "Hour of transaction event in UTC"
+        },
+        "day_of_week": {
+          "type": "int",
+          "required": true,
+          "bounds": "0 <= x <= 6",
+          "description": "Day of week (0=Monday, 6=Sunday)"
+        },
+        "is_foreign": {
+          "type": "int",
+          "required": true,
+          "bounds": "x in (0, 1)",
+          "description": "Binary indicator for cross-border transaction"
+        },
+        "is_high_risk_mcc": {
+          "type": "int",
+          "required": true,
+          "bounds": "x in (0, 1)",
+          "description": "Binary indicator for high-risk merchant category code"
+        },
+        "velocity_1h": {
+          "type": "float",
+          "required": false,
+          "default": 0.0,
+          "bounds": "isfinite(x) and x >= 0.0",
+          "description": "Transaction volume velocity in preceding 1-hour window"
+        },
+        "velocity_24h": {
+          "type": "float",
+          "required": false,
+          "default": 0.0,
+          "bounds": "isfinite(x) and x >= 0.0",
+          "description": "Transaction volume velocity in preceding 24-hour window"
+        },
+        "graph_degree": {
+          "type": "float",
+          "required": false,
+          "default": 0.0,
+          "bounds": "isfinite(x) and x >= 0.0",
+          "description": "Streaming graph network degree"
+        },
+        "graph_pagerank": {
+          "type": "float",
+          "required": false,
+          "default": 0.0,
+          "bounds": "isfinite(x) and x >= 0.0",
+          "description": "Streaming graph PageRank score"
+        },
+        "graph_community_risk": {
+          "type": "float",
+          "required": false,
+          "default": 0.0,
+          "bounds": "isfinite(x) and 0.0 <= x <= 1.0",
+          "description": "Louvain community risk coefficient"
+        },
+        "bank_id": {
+          "type": "str",
+          "required": false,
+          "default": null,
+          "description": "Optional payload institution claim (strictly overridden by authenticated tenant context)"
+        },
+        "customer_id": {
+          "type": "str",
+          "required": false,
+          "default": null,
+          "description": "Primary customer identity for feature store and entity resolution"
+        },
+        "account_id": {
+          "type": "str",
+          "required": false,
+          "default": null,
+          "description": "Account identity fallback for entity resolution"
+        },
+        "metadata": {
+          "type": "dict",
+          "required": false,
+          "default": {},
+          "description": "Pass-through metadata payload"
+        }
+      },
+      "invariants": [
+        "All float fields strictly reject NaN, +Inf, -Inf",
+        "entity_hash resolution dynamically binds to customer_id or account_id instead of static mock fallback"
+      ]
+    },
+    {
+      "schema_name": "CloudEventTransaction",
+      "authoritative_file": "backend/app/infrastructure/connectors/kafka_streaming_connector.py",
+      "format": "CloudEvents v1.0 Spec",
+      "scope": "Asynchronous messaging bus envelope across Kafka, RabbitMQ, and event gateways",
+      "fields": {
+        "specversion": { "type": "str", "required": true, "const": "1.0" },
+        "id": { "type": "str", "required": true, "description": "CloudEvent unique event UUID" },
+        "source": { "type": "str", "required": true, "description": "URI identifier of originating bank connector" },
+        "type": { "type": "str", "required": true, "const": "com.cfintel.transaction.v1" },
+        "time": { "type": "str", "required": true, "format": "RFC3339 UTC timestamp" },
+        "datacontenttype": { "type": "str", "required": true, "const": "application/json" },
+        "data": { "type": "NormalizedTransaction", "required": true }
+      },
+      "invariants": [
+        "Round-trip serialization to JSON preserves all NormalizedTransaction fields and precise UTC timestamps",
+        "Tenant key prefix in idempotency map prevents cross-bank deduplication collision"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "audit_capability": "data_flow_mapping",
+  "data_pipelines": [
+    {
+      "pipeline_name": "core_banking_webhook_ingestion",
+      "entry_points": [
+        "POST /connectors/core-banking/mambu/webhook",
+        "POST /connectors/core-banking/thought-machine/webhook"
+      ],
+      "boundary_sequence": [
+        "External Core Banking Webhook Payload (JSON)",
+        "Webhook HMAC-SHA256 Signature Verification",
+        "Connector Normalizer (_normalize_transaction_event / _extract_transactions_from_pib)",
+        "Canonical Representation (NormalizedTransaction with UTC event_time and tenant_id)",
+        "Zero-Raw-PII Pseudonymization (Type-salted HMAC-SHA256)",
+        "Ring Buffer Append (self._buffer)",
+        "Event Stream Consumer / Downstream Orchestration"
+      ]
+    },
+    {
+      "pipeline_name": "financial_messages_xml_ingestion",
+      "entry_points": [
+        "POST /financial-messages/parse",
+        "POST /financial-messages/camt053/parse",
+        "POST /financial-messages/pacs002/parse",
+        "POST /financial-messages/pacs003/parse"
+      ],
+      "boundary_sequence": [
+        "Raw MX XML / SWIFT MT103 Text Payload",
+        "XXE / DTD Injection DefusedXML Security Guard",
+        "XSD Formal Validation (lxml / fallback schemas)",
+        "Message Element Unpacking (GrpHdr, CdtTrfTxInf, Stmt/Ntry, DrctDbtTxInf)",
+        "Canonical Event Timestamp Extraction (CreDtTm / BookgDt / Tag 32A YYMMDD)",
+        "Canonical Representation (NormalizedTransaction with bank_id=ISO20022)",
+        "Privacy Transformation (Salted HMAC account hashing)",
+        "Risk Scoring & Presentation Response"
+      ]
+    },
+    {
+      "pipeline_name": "realtime_cloud_events_streaming",
+      "entry_points": [
+        "KafkaStreamingConnector.publish",
+        "KafkaStreamingConnector.consume_batch"
+      ],
+      "boundary_sequence": [
+        "CloudEvent 1.0 JSON Model Validation",
+        "Multi-Tenant Idempotency Key Scoping (f'{tenant}:{idempotency_key}')",
+        "Atomic Idempotency Reservation (IdempotencyEngine.try_acquire)",
+        "Topic Partition Selection & Sequential Log Offset Assignment",
+        "Broker Message Commit (Live Kafka SASL_SSL or In-Memory Loopback)",
+        "Dead Letter Queue (DLQ) Quarantine on Malformed Envelopes",
+        "Streaming Consumer Parsing & Dispatch"
+      ]
+    },
+    {
+      "pipeline_name": "inference_and_feature_store_ingestion",
+      "entry_points": [
+        "POST /predict",
+        "POST /predict/batch"
+      ],
+      "boundary_sequence": [
+        "TransactionPredictRequest Ingestion",
+        "Tenant Isolation Enforcement (enforce_tenant_isolation)",
+        "Entity Identity Resolution (payload.customer_id or payload.account_id or customer_1)",
+        "Online Feature Store Snapshot Read (get_online_features)",
+        "Preprocessing Matrix Precomputation (preprocess_transaction)",
+        "Model Inference Evaluation (evaluate_fraud_probability)",
+        "Composite Risk Scoring & Dynamic Policy Decision",
+        "Background Task Asynchronous Feature Store Ingestion (with tx_id deduplication)"
+      ]
+    },
+    {
+      "pipeline_name": "streaming_graph_ingestion",
+      "entry_points": [
+        "StreamingGraphService.add_transaction",
+        "GraphEngine.register_entity",
+        "GraphEngine.add_relationship"
+      ],
+      "boundary_sequence": [
+        "Transaction Dict or NormalizedTransaction.model_dump()",
+        "Account & Counterparty ID Extraction (from_id, to_id)",
+        "Direction Preservation (debtor -> creditor edge, positive amount)",
+        "Event Timestamp UTC Normalization",
+        "Incremental Node Indexing (node_to_index, index_to_node)",
+        "Sliding-Window Pruning & Adjacency List Update",
+        "Graph Embedding & Subgraph Expansion"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "audit_capability": "temporal_semantics_specification",
+  "version": "1.0.0",
+  "timestamp_taxonomy": {
+    "event_time": {
+      "definition": "The exact physical or logical instant when the financial event was executed at the source core banking rail or payment network.",
+      "source_attributes": ["CreDtTm (ISO 20022)", "value_timestamp (Thought Machine)", "creationDate (Mambu)", "time (CloudEvents)"],
+      "canonical_field": "NormalizedTransaction.timestamp",
+      "timezone_policy": "Strict UTC normalization. Naive timestamps are coerced to UTC; offset-bearing ISO 8601 timestamps are converted via astimezone(timezone.utc)."
+    },
+    "ingestion_time": {
+      "definition": "The timestamp recorded by the CF-Intelligence connector edge when the incoming payload crosses the network boundary.",
+      "canonical_field": "NormalizedTransaction.metadata['ingested_at']",
+      "relationship_to_event_time": "Must NEVER overwrite or conflate with event_time. Used strictly for connector SLA, latency calculation, and audit trail."
+    },
+    "processing_time": {
+      "definition": "The timestamp recorded during feature store enrichment, graph insertion, model inference, or alert dispatch.",
+      "canonical_field": "PredictionResult.timestamp / Case.created_at",
+      "relationship_to_event_time": "Independent pipeline operational timestamp."
+    }
+  },
+  "temporal_handling_policies": {
+    "naive_datetime_policy": "Explicit UTC assignment (dt.replace(tzinfo=timezone.utc)). Rejecting machine-local timezone assumptions to prevent silent DST / UTC offset drift.",
+    "future_dated_events": "Tolerates clock skew up to 300 seconds. Events with event_time > current_time + 300s are tagged with future_timestamp anomaly flags.",
+    "out_of_order_events": "Streaming graph and feature store accept out-of-order events. Edges in MultiDiGraph retain the true event timestamp. Sliding windows insert transactions and sort or filter by event time.",
+    "late_arriving_events": "Events arriving after window expiry (t > event_time + 86400s) are recorded in persistent storage and graph topology, but do not retroactively invalidate already evaluated real-time inference scores.",
+    "duplicate_replay_timing": "Replays or duplicate retries are deduplicated via transaction_id in the feature store, ensuring historical window velocities (velocity_1h, velocity_24h) remain mathematically invariant under network retries."
+  }
+}

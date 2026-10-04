@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import math
 import time
 from abc import ABC, abstractmethod
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.application.interfaces.bank_connector import BankConnectorInterface
 
@@ -81,6 +82,32 @@ class NormalizedTransaction(BaseModel):
     channel_type: str = Field(
         default="ONLINE", description="Transaction channel (ONLINE, MOBILE, ATM, POS, SWIFT)"
     )
+    bank_id: str | None = Field(
+        default=None, description="Originating bank or institution identifier"
+    )
+
+    @field_validator("amount")
+    @classmethod
+    def _validate_amount(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("Transaction amount must be a finite number (NaN, +Inf, -Inf rejected)")
+        if v <= 0:
+            raise ValueError("Transaction amount must be strictly positive")
+        return v
+
+    @field_validator("timestamp")
+    @classmethod
+    def _validate_timestamp(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            return v.replace(tzinfo=UTC)
+        return v.astimezone(UTC)
+
+    @field_validator("account_id", "counterparty_account_id")
+    @classmethod
+    def _validate_account(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Account identifier must be a non-empty string")
+        return v.strip()
 
 
 class BaseBankConnector(BankConnectorInterface, ABC):

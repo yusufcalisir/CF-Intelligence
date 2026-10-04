@@ -14,6 +14,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import threading
 import time
 from collections import defaultdict
 from datetime import UTC, datetime
@@ -128,16 +129,33 @@ class IdempotencyEngine:
     def __init__(self, ttl_seconds: int = 86400) -> None:
         self._ttl_seconds = ttl_seconds
         self._processed_keys: dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def try_acquire(self, idempotency_key: str) -> bool:
+        """Atomically test and reserve an idempotency key if not already processed."""
+        with self._lock:
+            self._evict_expired()
+            if idempotency_key in self._processed_keys:
+                return False
+            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+            return True
+
+    def release(self, idempotency_key: str) -> None:
+        """Release key on publish failure so it may be retried."""
+        with self._lock:
+            self._processed_keys.pop(idempotency_key, None)
 
     def is_duplicate(self, idempotency_key: str) -> bool:
         """Check if an event key has already been processed within the TTL window."""
-        self._evict_expired()
-        return idempotency_key in self._processed_keys
+        with self._lock:
+            self._evict_expired()
+            return idempotency_key in self._processed_keys
 
     def mark_processed(self, idempotency_key: str) -> None:
         """Record an event key as successfully processed."""
-        self._evict_expired()
-        self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
+        with self._lock:
+            self._evict_expired()
+            self._processed_keys[idempotency_key] = time.time() + self._ttl_seconds
 
     def _evict_expired(self) -> None:
         now = time.time()
@@ -146,7 +164,8 @@ class IdempotencyEngine:
             self._processed_keys.pop(k, None)
 
     def clear(self) -> None:
-        self._processed_keys.clear()
+        with self._lock:
+            self._processed_keys.clear()
 
 
 # ── Enterprise Kafka Streaming Connector ──────────────────────────────────────
@@ -233,28 +252,34 @@ class KafkaStreamingConnector:
 
         target_topic = topic or self._resolve_topic_for_event(ce.type)
 
-        # 2. Check Idempotency Deduplication Key
-        dedup_key = ce.ce_idempotency_key or ce.id
-        if self.enable_idempotency and self._idempotency.is_duplicate(dedup_key):
-            self._duplicates_rejected += 1
-            latency = (time.perf_counter() - start) * 1000.0
-            logger.info("Kafka duplicate event ignored: %s (idempotency key: %s)", ce.id, dedup_key)
-            return PublishReceipt(
-                event_id=ce.id,
-                topic=target_topic,
-                partition=0,
-                offset=0,
-                status="DUPLICATE_IGNORED",
-                idempotent_duplicate=True,
-                latency_ms=round(latency, 3),
-            )
+        # 2. Check Idempotency Deduplication Key (tenant-namespaced)
+        tenant = ce.ce_tenant_id or ce.ce_bank_id or "global"
+        raw_key = ce.ce_idempotency_key or ce.id
+        dedup_key = f"{tenant}:{raw_key}"
+        if self.enable_idempotency:
+            acquired = self._idempotency.try_acquire(dedup_key)
+            if not acquired:
+                self._duplicates_rejected += 1
+                latency = (time.perf_counter() - start) * 1000.0
+                logger.info("Kafka duplicate event ignored: %s (idempotency key: %s)", ce.id, dedup_key)
+                return PublishReceipt(
+                    event_id=ce.id,
+                    topic=target_topic,
+                    partition=0,
+                    offset=0,
+                    status="DUPLICATE_IGNORED",
+                    idempotent_duplicate=True,
+                    latency_ms=round(latency, 3),
+                )
 
         # 3. Publish to Broker
-        payload_bytes = ce.to_json_bytes()
-        partition, offset = await self._broker.publish(target_topic, payload_bytes)
-
-        if self.enable_idempotency:
-            self._idempotency.mark_processed(dedup_key)
+        try:
+            payload_bytes = ce.to_json_bytes()
+            partition, offset = await self._broker.publish(target_topic, payload_bytes)
+        except Exception:
+            if self.enable_idempotency:
+                self._idempotency.release(dedup_key)
+            raise
 
         latency = (time.perf_counter() - start) * 1000.0
         self._total_published += 1

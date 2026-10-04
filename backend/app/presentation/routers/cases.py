@@ -144,6 +144,7 @@ async def log_session_duration(req: SessionDurationRequest) -> dict:
 async def create_case(
     req: CaseCreateRequest,
     idempotency_key: str | None = Header(None, alias="Idempotency-Key"),
+    caller_tenant: TenantDep = None,
 ) -> CaseResponse | JSONResponse:
     """Create a new investigation case.
 
@@ -151,8 +152,9 @@ async def create_case(
     If a request with the same key was successfully processed within 24 hours,
     the original response is returned without creating a duplicate case.
     """
+    tenant_id = (caller_tenant.tenant_id if caller_tenant else None) or getattr(req, "bank_id", None)
     idem = IdempotencyService.get()
-    status_or_hit, cached = idem.acquire(idempotency_key)
+    status_or_hit, cached = idem.acquire(idempotency_key, tenant_id=tenant_id)
     if status_or_hit == "HIT":
         return JSONResponse(
             content=cached,
@@ -183,10 +185,10 @@ async def create_case(
             assigned_to=req.assigned_to,
         )
         result = _serialize_case(case)
-        idem.complete(idempotency_key, result.model_dump())
+        idem.complete(idempotency_key, result.model_dump(), tenant_id=tenant_id)
         return result
     except Exception:
-        idem.release(idempotency_key)
+        idem.release(idempotency_key, tenant_id=tenant_id)
         raise
 
 

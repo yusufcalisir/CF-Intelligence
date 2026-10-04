@@ -145,6 +145,19 @@ class BankConnectorFactory:
                 username=getattr(settings, "rabbitmq_user", "guest"),
                 password=getattr(settings, "rabbitmq_password", "guest"),
             )
+        elif connector_type == "mambu":
+            base_url = settings.bank_urls.get(bank_id) or "https://api.mambu.com"
+            return MambuConnector(base_url=base_url, api_key=api_key, tenant_id=bank_id)
+        elif connector_type in ("thought_machine", "thoughtmachine"):
+            base_url = settings.bank_urls.get(bank_id) or "https://vault.thoughtmachine.com"
+            return ThoughtMachineConnector(base_url=base_url, api_key=api_key, tenant_id=bank_id)
+        elif connector_type in ("kafka_streaming", "cloudevents"):
+            return KafkaStreamingConnector(
+                bootstrap_servers=getattr(settings, "kafka_bootstrap_servers", "localhost:9092"),
+                client_id=f"cfi-{bank_id}",
+                security_protocol=getattr(settings, "kafka_security_protocol", "PLAINTEXT"),
+                sasl_mechanism=getattr(settings, "kafka_sasl_mechanism", "SCRAM-SHA-256"),
+            )
         elif connector_type == "kafka":
             return KafkaBankConnector(
                 bootstrap_servers=getattr(settings, "kafka_bootstrap_servers", "localhost:9092"),
@@ -154,5 +167,5 @@ class BankConnectorFactory:
             )
         else:
             raise ValueError(
-                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST"
+                f"Unknown connector type: {connector_type}. Production connectors: ISO20022, OPEN_BANKING, KAFKA, RABBITMQ, PARQUET, REST, MAMBU, THOUGHT_MACHINE, KAFKA_STREAMING"
             )
