@@ -364,10 +364,11 @@ class KafkaStreamingConnector:
         Invalid payloads are automatically quarantined to the DLQ.
         """
         active_group = group_id or self.group_id
+        current_offset = self._broker._group_offsets[active_group].get(f"{topic}:0", 0)
         raw_messages = await self._broker.fetch_messages(topic, active_group, max_messages=max_messages)
         parsed_events: list[CloudEvent] = []
 
-        for raw_bytes in raw_messages:
+        for idx, raw_bytes in enumerate(raw_messages):
             self._total_consumed += 1
             try:
                 raw_str = raw_bytes.decode("utf-8")
@@ -375,11 +376,23 @@ class KafkaStreamingConnector:
                 parsed_events.append(ce)
             except Exception as exc:
                 # Quarantine to DLQ
-                await self._route_raw_to_dlq(
-                    raw_payload=raw_bytes.decode("utf-8", errors="replace"),
-                    original_topic=topic,
-                    error=exc,
-                )
+                try:
+                    await self._route_raw_to_dlq(
+                        raw_payload=raw_bytes.decode("utf-8", errors="replace"),
+                        original_topic=topic,
+                        error=exc,
+                    )
+                except Exception as dlq_err:
+                    self._broker.reset_group_offset(topic, active_group, offset=current_offset + idx)
+                    logger.error(
+                        "DLQ publishing failed for message index %d; reset group offset to %d: %s",
+                        idx,
+                        current_offset + idx,
+                        dlq_err,
+                    )
+                    raise RuntimeError(
+                        f"DLQ publishing failed for corrupted message at offset {current_offset + idx}"
+                    ) from dlq_err
 
         return parsed_events
 

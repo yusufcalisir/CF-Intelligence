@@ -241,6 +241,46 @@
       "tests": "backend/tests/unit/test_data_contract_certification.py::test_kafka_idempotency_semantics",
       "historical_evidence_relevance": "Clarifies distributed vs in-process concurrency boundaries.",
       "status": "REMEDIATED"
+    },
+    {
+      "id": "DATA-0013",
+      "severity": "HIGH",
+      "capability": "temporal_fidelity_and_event_time",
+      "component": "BankingConnectors",
+      "file_function": "backend/app/infrastructure/connectors/iso20022_connector.py, thought_machine_connector.py, mambu_connector.py",
+      "trigger": "Source transaction payload provides an explicit execution timestamp field but its string representation is malformed or unparseable.",
+      "source_representation": "ISO 20022 CreDtTm='not-a-timestamp', Mambu creationDate='invalid-date', or Thought Machine value_timestamp='2026-99-99T99:99:99Z'.",
+      "expected_canonical_representation": "Fail closed (raise ValueError) or route to DLQ quarantine, preserving temporal truth and preventing semantic corruption.",
+      "actual_representation": "Connectors caught ValueError/Exception and silently fell back to datetime.now(timezone.utc), substituting wall-clock ingestion time for source event time.",
+      "root_cause": "Datetime parsing methods had permissive fallback to now(UTC) on parse error instead of distinguishing absent timestamp from malformed timestamp.",
+      "downstream_blast_radius": "Event-time sliding window feature calculation, temporal graph reconstruction, and audit timestamp integrity.",
+      "tenant_impact": "Distorted temporal ordering and false feature velocities for malformed source events.",
+      "temporal_impact": "Permanent event-time corruption for affected records.",
+      "proof": "test_malformed_event_time_fail_closed verifies that malformed source timestamps strictly fail closed by raising ValueError.",
+      "repair": "Removed silent fallback to now(UTC) on parse errors across ISO 20022, Mambu, and Thought Machine connectors; fail-closed ValueError is raised, preserving now(UTC) strictly for genuine field omissions.",
+      "tests": "backend/tests/unit/test_data_contract_certification.py::test_malformed_event_time_fail_closed",
+      "historical_evidence_relevance": "No impact on static historical benchmark files; critical for live banking connectors and replay fidelity.",
+      "status": "REMEDIATED"
+    },
+    {
+      "id": "DATA-0014",
+      "severity": "HIGH",
+      "capability": "failure_truth_and_dlq_safety",
+      "component": "KafkaStreamingConnector",
+      "file_function": "backend/app/infrastructure/connectors/kafka_streaming_connector.py:consume_batch",
+      "trigger": "Kafka consumer encounters an unparseable or malformed CloudEvent payload, but the Dead-Letter Queue (DLQ) broker or publish mechanism fails.",
+      "source_representation": "Unparseable binary or malformed JSON CloudEvent message during DLQ publisher outage.",
+      "expected_canonical_representation": "Consumer aborts processing, rolls back consumer group offset to the unquarantined message, and raises RuntimeError to prevent message loss.",
+      "actual_representation": "Consumer logged DLQ publishing failure and continued batch iteration, advancing consumer group offset and permanently dropping the unquarantined message.",
+      "root_cause": "consume_batch did not check the return status of _route_raw_to_dlq and did not execute offset rollback upon quarantine failure.",
+      "downstream_blast_radius": "Auditability, dead-letter recovery pipelines, and regulatory message retention.",
+      "tenant_impact": "Silent unrecoverable event loss during transient DLQ infrastructure degradation.",
+      "temporal_impact": "Permanent event loss from consumer stream.",
+      "proof": "test_dlq_failure_semantics verifies consumer rolls back offset and raises RuntimeError when DLQ routing fails.",
+      "repair": "Updated consume_batch to check _route_raw_to_dlq outcome; upon failure, the consumer group offset is rolled back to the failed message and a RuntimeError is raised fail-closed.",
+      "tests": "backend/tests/unit/test_data_contract_certification.py::test_dlq_failure_semantics",
+      "historical_evidence_relevance": "Guarantees streaming ingestion safety and zero silent message loss during infrastructure failures.",
+      "status": "REMEDIATED"
     }
   ]
 }

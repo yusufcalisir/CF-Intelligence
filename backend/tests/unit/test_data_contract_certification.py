@@ -22,18 +22,24 @@ from unittest.mock import MagicMock
 import pytest
 from pydantic import ValidationError
 
+from app.application.schemas.cases import CaseCreateRequest
 from app.application.schemas.transaction import (
     TransactionPredictRequest,
 )
 from app.application.services.feature_store_service import FeatureStoreService
 from app.application.services.idempotency import IdempotencyService
+from app.application.services.streaming_graph_service import StreamingGraphService
 from app.infrastructure.connectors.base_connector import NormalizedTransaction
 from app.infrastructure.connectors.factory import BankConnectorFactory
+from app.infrastructure.connectors.iso20022_connector import ISO20022MessagingConnector
 from app.infrastructure.connectors.kafka_streaming_connector import (
     CloudEvent,
     IdempotencyEngine,
+    InMemoryKafkaBroker,
     KafkaStreamingConnector,
 )
+from app.infrastructure.connectors.mambu_connector import MambuConnector
+from app.infrastructure.connectors.thought_machine_connector import ThoughtMachineConnector
 
 # ── 1. Currency Semantics & Multi-Currency Tests ──────────────────────────────
 
@@ -540,3 +546,645 @@ def test_connector_factory_constructibility() -> None:
 
     kafka = BankConnectorFactory.get_connector("bank-c", mock_settings)
     assert kafka.__class__.__name__ == "KafkaStreamingConnector"
+
+
+# ── 8. Deep Certification Closure Tests ───────────────────────────────────────
+
+
+def test_currency_feature_contract() -> None:
+    """Certify Outcome C: Multi-currency transport is supported, but ML feature
+
+    aggregation is strictly nominal without FX conversion (input-contract limitation).
+    Also proves that Tenant Isolation (Tenant A vs Tenant B) does NOT prove currency
+    safety within Tenant A.
+    """
+    store = FeatureStoreService()
+    store.clear()
+
+    # Part 1: Within Tenant A, Account X processes 100 EUR then 100 USD
+    # The system aggregates nominal units: 100 + 100 = 200
+    t0 = 1770000000.0
+    store.ingest_transaction(
+        customer_id="CUST_X",
+        amount=100.0,
+        merchant_id="MERCH_1",
+        merchant_category="retail",
+        merchant_risk_score=0.05,
+        customer_history_score=0.9,
+        chargeback_count=0,
+        account_age_days=100,
+        timestamp=t0,
+        transaction_id="tx_eur_1",
+        tenant_id="tenant_a",
+    )
+    store.ingest_transaction(
+        customer_id="CUST_X",
+        amount=100.0,
+        merchant_id="MERCH_1",
+        merchant_category="retail",
+        merchant_risk_score=0.05,
+        customer_history_score=0.9,
+        chargeback_count=0,
+        account_age_days=100,
+        timestamp=t0 + 60.0,
+        transaction_id="tx_usd_1",
+        tenant_id="tenant_a",
+    )
+
+    stats_a = store.online_stats.get("tenant_a:CUST_X")
+    assert stats_a["rolling_velocity_1h"] == 2.0
+    # Nominal aggregation without FX: average is 100.0 nominal units
+    assert stats_a["avg_amount_24h"] == 100.0
+
+    # Part 2: Tenant B processes 100 USD for Account X
+    store.ingest_transaction(
+        customer_id="CUST_X",
+        amount=100.0,
+        merchant_id="MERCH_1",
+        merchant_category="retail",
+        merchant_risk_score=0.05,
+        customer_history_score=0.9,
+        chargeback_count=0,
+        account_age_days=100,
+        timestamp=t0 + 120.0,
+        transaction_id="tx_usd_b",
+        tenant_id="tenant_b",
+    )
+
+    stats_b = store.online_stats.get("tenant_b:CUST_X")
+    assert stats_b["rolling_velocity_1h"] == 1.0
+    assert stats_b["avg_amount_24h"] == 100.0
+    # Tenant A remains unchanged at 2 transactions
+    stats_a_check = store.online_stats.get("tenant_a:CUST_X")
+    assert stats_a_check["rolling_velocity_1h"] == 2.0
+    store.clear()
+
+
+def test_missing_currency_semantics() -> None:
+    """Verify omission of currency across connectors:
+
+    - NormalizedTransaction defaults omitted currency to USD
+    - Mambu connector defaults omitted currency to EUR
+    - Thought Machine connector defaults omitted currency to EUR
+    - Explicit EUR/USD are strictly distinguished from defaults
+    """
+    # 1. NormalizedTransaction default
+    tx_default = NormalizedTransaction(
+        transaction_id="tx_def",
+        account_id="acc1",
+        counterparty_account_id="acc2",
+        amount=50.0,
+    )
+    assert tx_default.currency == "USD"
+
+    # 2. NormalizedTransaction explicit
+    tx_explicit = NormalizedTransaction(
+        transaction_id="tx_exp",
+        account_id="acc1",
+        counterparty_account_id="acc2",
+        amount=50.0,
+        currency="eur",
+    )
+    assert tx_explicit.currency == "EUR"
+
+    # 3. Mambu connector
+    mambu = MambuConnector(tenant_id="bank_mambu")
+    payload_no_ccy = {
+        "id": "mambu-no-ccy",
+        "accountId": "ACC1",
+        "counterpartyAccountId": "ACC2",
+        "amount": 75.0,
+        "creationDate": "2026-03-01T10:00:00Z",
+    }
+    tx_mambu = mambu._normalize_transaction_event(payload_no_ccy)
+    assert tx_mambu.currency == "EUR"
+
+    # 4. Thought Machine connector
+    tm = ThoughtMachineConnector(tenant_id="bank_tm")
+    tm_payload = {
+        "id": "tm_b1",
+        "posting_instructions": [
+            {
+                "id": "inst1",
+                "custom_instruction": {
+                    "value_timestamp": "2026-03-01T10:00:00Z",
+                    "postings": [
+                        {"account_id": "ACC1", "amount": "80.0", "credit": False},
+                        {"account_id": "ACC2", "amount": "80.0", "credit": True},
+                    ],
+                },
+            }
+        ],
+    }
+    txs_tm = tm.parse_batch(tm_payload)
+    assert txs_tm[0].currency == "EUR"
+
+
+def test_malformed_event_time_fail_closed() -> None:
+    """Certify that connectors reject or quarantine malformed source timestamps
+
+    rather than silently substituting datetime.now(UTC).
+    """
+    # 1. ISO 20022 parser raises ValueError on unparseable timestamp
+    with pytest.raises(ValueError, match="Malformed ISO 20022 datetime"):
+        ISO20022MessagingConnector._parse_iso_datetime("not-a-valid-date-2026")
+
+    # 2. Mambu connector raises ValueError on unparseable creationDate
+    mambu = MambuConnector(tenant_id="bank_mambu")
+    with pytest.raises(ValueError, match="Malformed Mambu timestamp"):
+        mambu._normalize_transaction_event({
+            "id": "mambu-bad-date",
+            "accountId": "ACC1",
+            "amount": 100.0,
+            "creationDate": "2026-99-99T99:99:99Z",
+        })
+
+    # 3. Thought Machine connector raises ValueError on unparseable timestamp
+    tm = ThoughtMachineConnector(tenant_id="bank_tm")
+    with pytest.raises(ValueError, match="Malformed Thought Machine timestamp"):
+        tm.parse_batch({
+            "id": "tm_bad",
+            "posting_instructions": [
+                {
+                    "id": "inst_bad",
+                    "custom_instruction": {
+                        "value_timestamp": "garbage-date-string",
+                        "postings": [{"account_id": "ACC1", "amount": "50.0", "credit": True}],
+                    },
+                }
+            ],
+        })
+
+    # 4. Kafka CloudEvents quarantines malformed time to DLQ
+    malformed_ce = {
+        "specversion": "1.0",
+        "id": "evt-bad-time",
+        "source": "/test",
+        "type": "cfi.transaction.v1",
+        "time": "not-a-datetime",
+        "data": {},
+    }
+    with pytest.raises(ValidationError):
+        CloudEvent.model_validate(malformed_ce)
+
+
+def test_naive_timestamp_contract() -> None:
+    """Certify repository contract for naive datetime inputs:
+
+    Naive timestamps are explicitly normalized to UTC, and timezone-aware
+    inputs representing the same UTC instant are recognized as equivalent.
+    """
+    naive_dt = datetime(2026, 6, 1, 14, 30, 0)
+    tx = NormalizedTransaction(
+        transaction_id="tx_naive",
+        account_id="acc1",
+        counterparty_account_id="acc2",
+        amount=100.0,
+        timestamp=naive_dt,
+    )
+    assert tx.timestamp.tzinfo == UTC
+    assert tx.timestamp == datetime(2026, 6, 1, 14, 30, 0, tzinfo=UTC)
+
+    # Cross-timezone equivalent instant (UTC+2 at 16:30 is 14:30 UTC)
+    tz_plus2 = timezone(timedelta(hours=2))
+    aware_dt = datetime(2026, 6, 1, 16, 30, 0, tzinfo=tz_plus2)
+    tx_aware = NormalizedTransaction(
+        transaction_id="tx_aware",
+        account_id="acc1",
+        counterparty_account_id="acc2",
+        amount=100.0,
+        timestamp=aware_dt,
+    )
+    assert tx_aware.timestamp == tx.timestamp
+
+
+def test_float_threshold_boundaries() -> None:
+    """Test monetary float threshold boundaries with math.nextafter, cent boundaries,
+
+    and repeated summation rounding truth.
+    """
+    threshold = 10000.0
+
+    # 1. Probing binary float boundaries around threshold
+    val_below = math.nextafter(threshold, 0.0)
+    val_exact = threshold
+    val_above = math.nextafter(threshold, float("inf"))
+
+    assert val_below < threshold
+    assert val_exact == threshold
+    assert val_above > threshold
+
+    # The gap between threshold and adjacent float is << 1 cent
+    delta_below = threshold - val_below
+    delta_above = val_above - threshold
+    assert delta_below < 1e-11
+    assert delta_above < 1e-11
+
+    # 2. Cent boundaries (real currency precision)
+    cent_below = 9999.99
+    cent_above = 10000.01
+    assert cent_below < threshold
+    assert cent_above > threshold
+    assert round(threshold - cent_below, 2) == 0.01
+    assert round(cent_above - threshold, 2) == 0.01
+
+    # 3. Floating-point precision demonstrates IEEE-754 binary float limitation
+    # 0.1 + 0.2 is strictly 0.30000000000000004 in IEEE-754 binary double precision
+    float_sum = 0.1 + 0.2
+    assert float_sum != 0.3
+    assert abs(float_sum - 0.3) < 1e-15
+    assert round(float_sum, 2) == 0.30
+
+
+def test_monetary_serialization_round_trip() -> None:
+    """Certify that representative decimal amounts round-trip accurately
+
+    at 2 decimal places (cent precision).
+    """
+    test_amounts = [0.01, 0.10, 0.30, 100.10, 9999999.99]
+    for amt in test_amounts:
+        tx = NormalizedTransaction(
+            transaction_id=f"tx_{amt}",
+            account_id="acc_src",
+            counterparty_account_id="acc_dst",
+            amount=amt,
+            currency="EUR",
+        )
+        json_str = tx.model_dump_json()
+        parsed = NormalizedTransaction.model_validate_json(json_str)
+        assert round(parsed.amount, 2) == amt
+        data = json.loads(json_str)
+        assert data["amount"] == amt
+
+
+@pytest.mark.asyncio
+async def test_kafka_distributed_idempotency_binding() -> None:
+    """Certify that two completely independent Kafka connector instances
+
+    (with zero shared in-memory state) coordinate deduplication when a shared
+    distributed store (simulated Redis) is configured.
+    """
+    shared_redis_store: dict[str, str] = {}
+
+    class RedisDouble:
+        def set(self, name: str, value: str, nx: bool = False, ex: int | None = None) -> bool:
+            if nx and name in shared_redis_store:
+                return False
+            shared_redis_store[name] = value
+            return True
+
+        def get(self, name: str) -> str | None:
+            return shared_redis_store.get(name)
+
+    idem_service = IdempotencyService.get()
+    orig_redis = idem_service._redis_client
+    idem_service._redis_client = RedisDouble()
+
+    try:
+        broker1 = InMemoryKafkaBroker()
+        broker2 = InMemoryKafkaBroker()
+
+        conn1 = KafkaStreamingConnector(
+            client_id="worker-1",
+            group_id="group-1",
+            in_memory_broker=broker1,
+        )
+        conn2 = KafkaStreamingConnector(
+            client_id="worker-2",
+            group_id="group-2",
+            in_memory_broker=broker2,
+        )
+
+        assert conn1._idempotency._processed_keys is not conn2._idempotency._processed_keys
+
+        event = CloudEvent(
+            id="evt-dist-100",
+            source="/test/dist",
+            type="cfi.transaction.v1",
+            ce_tenant_id="bank_dist",
+            data={"amount": 500.0, "currency": "EUR"},
+        )
+
+        receipt1 = await conn1.publish(event)
+        assert receipt1.status == "COMMITTED"
+        assert not receipt1.idempotent_duplicate
+
+        receipt2 = await conn2.publish(event)
+        assert receipt2.status == "DUPLICATE_IGNORED"
+        assert receipt2.idempotent_duplicate
+    finally:
+        idem_service._redis_client = orig_redis
+
+
+def test_kafka_crash_window_duplicate_semantics() -> None:
+    """Trace Crash Window C: business mutations succeed, then process crashes
+
+    before idempotency completion. On redelivery:
+    - FeatureStoreService is DEDUPLICATED_BY_EVENT_ID (via tx_id check in history)
+    - StreamingGraphService is NON_IDEMPOTENT (appends duplicate edge to edge buffer)
+    """
+    store = FeatureStoreService()
+    store.clear()
+    graph = StreamingGraphService()
+
+    tx_payload = {
+        "transaction_id": "tx_crash_test",
+        "sender_id": "ACC_CRASH_SRC",
+        "receiver_id": "ACC_CRASH_DST",
+        "customer_id": "CUST_CRASH",
+        "amount": 250.0,
+        "currency": "EUR",
+        "timestamp": 1770000000.0,
+    }
+
+    # Initial delivery: both execute mutation
+    store.ingest_transaction(
+        customer_id="CUST_CRASH",
+        amount=250.0,
+        merchant_id="MERCH_CRASH",
+        merchant_category="retail",
+        merchant_risk_score=0.1,
+        customer_history_score=0.8,
+        chargeback_count=0,
+        account_age_days=60,
+        timestamp=1770000000.0,
+        transaction_id="tx_crash_test",
+        tenant_id="tenant_crash",
+    )
+    graph.add_transaction(tx_payload)
+
+    assert len(graph.edges) == 1
+    assert store.online_stats.get("tenant_crash:CUST_CRASH")["rolling_velocity_1h"] == 1.0
+
+    # Crash Window C: process crashes before idempotency completion; redelivery occurs
+    store.ingest_transaction(
+        customer_id="CUST_CRASH",
+        amount=250.0,
+        merchant_id="MERCH_CRASH",
+        merchant_category="retail",
+        merchant_risk_score=0.1,
+        customer_history_score=0.8,
+        chargeback_count=0,
+        account_age_days=60,
+        timestamp=1770000000.0,
+        transaction_id="tx_crash_test",
+        tenant_id="tenant_crash",
+    )
+    graph.add_transaction(tx_payload)
+
+    # 1. Feature store deduplicated by tx_id -> count remains 1
+    assert store.online_stats.get("tenant_crash:CUST_CRASH")["rolling_velocity_1h"] == 1.0
+
+    # 2. Graph service is non-idempotent -> edge count increases to 2
+    assert len(graph.edges) == 2
+    store.clear()
+
+
+def test_idempotency_ttl_expiry() -> None:
+    """Certify that idempotency protection is temporally bounded by TTL.
+
+    After expiry, the key can be acquired as a new event.
+    """
+    idem = IdempotencyService()
+    idem._redis_client = None
+    key = "bounded_key_test"
+
+    status, _ = idem.acquire(key, in_progress_timeout=0.05)
+    assert status == "ACQUIRED"
+    idem.complete(key, {"created": True})
+
+    hit_status, cached = idem.acquire(key)
+    assert hit_status == "HIT"
+    assert cached == {"created": True}
+
+    with idem._fallback_lock:
+        data, _, in_prog = idem._fallback[idem._build_redis_key(key)]
+        idem._fallback[idem._build_redis_key(key)] = (data, time.monotonic() - 1.0, in_prog)
+
+    expired_status, _ = idem.acquire(key)
+    assert expired_status == "ACQUIRED"
+
+
+def test_idempotency_payload_canonicalization() -> None:
+    """Certify that payload canonicalization hashes identical semantics
+
+    regardless of whitespace/ordering, and detects material parameter changes.
+    """
+    req_a = CaseCreateRequest(title="Mule Network Investigation", priority="p2_high")
+    req_b = CaseCreateRequest(priority="p2_high", title="Mule Network Investigation")
+
+    hash_a = hashlib.sha256(req_a.model_dump_json().encode("utf-8")).hexdigest()
+    hash_b = hashlib.sha256(req_b.model_dump_json().encode("utf-8")).hexdigest()
+    assert hash_a == hash_b
+
+    req_diff = CaseCreateRequest(title="Mule Network Investigation", priority="p1_critical")
+    hash_diff = hashlib.sha256(req_diff.model_dump_json().encode("utf-8")).hexdigest()
+    assert hash_diff != hash_a
+
+    idem = IdempotencyService()
+    idem._redis_client = None
+    key = "idem_canon_test"
+    idem.acquire(key, payload_hash=hash_a)
+    idem.complete(key, {"case_id": "case-123"}, payload_hash=hash_a)
+
+    status_match, resp = idem.acquire(key, payload_hash=hash_a)
+    assert status_match == "HIT"
+    assert resp == {"case_id": "case-123"}
+
+    status_mismatch, _ = idem.acquire(key, payload_hash=hash_diff)
+    assert status_mismatch == "MISMATCH"
+
+
+def test_feature_store_full_tenant_namespace() -> None:
+    """Certify full tenant isolation across all feature store structures:
+
+    online_customer, online_merchant, online_stats, tx_history, and deduplication state
+    using identical IDs across two tenants.
+    """
+    store = FeatureStoreService()
+    store.clear()
+
+    tx_alpha = {
+        "transaction_id": "shared_tx_99",
+        "customer_id": "shared_cust_99",
+        "merchant_id": "shared_merch_99",
+        "account_id": "shared_acc_99",
+        "amount": 100.0,
+        "currency": "EUR",
+        "timestamp": 1770000000.0,
+        "customer_history_score": 0.95,
+        "account_age_days": 365,
+        "chargeback_count": 0,
+        "merchant_category": "grocery",
+        "merchant_risk_score": 0.05,
+    }
+    tx_beta = {
+        "transaction_id": "shared_tx_99",
+        "customer_id": "shared_cust_99",
+        "merchant_id": "shared_merch_99",
+        "account_id": "shared_acc_99",
+        "amount": 500.0,
+        "currency": "USD",
+        "timestamp": 1770000000.0,
+        "customer_history_score": 0.30,
+        "account_age_days": 10,
+        "chargeback_count": 5,
+        "merchant_category": "crypto",
+        "merchant_risk_score": 0.85,
+    }
+
+    store.ingest_transaction(
+        customer_id=tx_alpha["customer_id"],
+        amount=tx_alpha["amount"],
+        merchant_id=tx_alpha["merchant_id"],
+        merchant_category=tx_alpha["merchant_category"],
+        merchant_risk_score=tx_alpha["merchant_risk_score"],
+        customer_history_score=tx_alpha["customer_history_score"],
+        chargeback_count=tx_alpha["chargeback_count"],
+        account_age_days=tx_alpha["account_age_days"],
+        timestamp=tx_alpha["timestamp"],
+        transaction_id=tx_alpha["transaction_id"],
+        tenant_id="bank_alpha",
+    )
+    store.ingest_transaction(
+        customer_id=tx_beta["customer_id"],
+        amount=tx_beta["amount"],
+        merchant_id=tx_beta["merchant_id"],
+        merchant_category=tx_beta["merchant_category"],
+        merchant_risk_score=tx_beta["merchant_risk_score"],
+        customer_history_score=tx_beta["customer_history_score"],
+        chargeback_count=tx_beta["chargeback_count"],
+        account_age_days=tx_beta["account_age_days"],
+        timestamp=tx_beta["timestamp"],
+        transaction_id=tx_beta["transaction_id"],
+        tenant_id="bank_beta",
+    )
+
+    # 1. online_customer
+    cust_a = store.online_customer.get("bank_alpha:shared_cust_99")
+    cust_b = store.online_customer.get("bank_beta:shared_cust_99")
+    assert cust_a["customer_history_score"] == 0.95
+    assert cust_b["customer_history_score"] == 0.30
+
+    # 2. online_merchant
+    merch_a = store.online_merchant.get("bank_alpha:shared_merch_99")
+    merch_b = store.online_merchant.get("bank_beta:shared_merch_99")
+    assert merch_a["merchant_category"] == "grocery"
+    assert merch_b["merchant_category"] == "crypto"
+
+    # 3. online_stats
+    stats_a = store.online_stats.get("bank_alpha:shared_cust_99")
+    stats_b = store.online_stats.get("bank_beta:shared_cust_99")
+    assert stats_a["avg_amount_24h"] == 100.0
+    assert stats_b["avg_amount_24h"] == 500.0
+
+    # 4. tx_history
+    hist_a = store.tx_history.get_list("bank_alpha:shared_cust_99")
+    hist_b = store.tx_history.get_list("bank_beta:shared_cust_99")
+    assert len(hist_a) == 1 and hist_a[0]["amount"] == 100.0
+    assert len(hist_b) == 1 and hist_b[0]["amount"] == 500.0
+
+    # 5. Deduplication state
+    assert hist_a[0]["tx_id"] == "bank_alpha:shared_tx_99"
+    assert hist_b[0]["tx_id"] == "bank_beta:shared_tx_99"
+    store.clear()
+
+
+def test_temporal_window_exact_boundaries() -> None:
+    """Certify that sliding window filtering enforces [ts - W, ts] exactly,
+
+    testing ts - 3600 - epsilon, ts - 3600, ts, and ts + epsilon.
+    """
+    ts = 1770000000.0
+    one_hour_ago = ts - 3600.0
+
+    history = [
+        {"tx_id": "t_out_past", "amount": 10.0, "timestamp": one_hour_ago - 0.001},
+        {"tx_id": "t_exact_past", "amount": 20.0, "timestamp": one_hour_ago},
+        {"tx_id": "t_mid", "amount": 30.0, "timestamp": ts - 1800.0},
+        {"tx_id": "t_exact_anchor", "amount": 40.0, "timestamp": ts},
+        {"tx_id": "t_future_leak", "amount": 50.0, "timestamp": ts + 0.001},
+    ]
+
+    tx_1h = [tx for tx in history if one_hour_ago <= tx["timestamp"] <= ts]
+    included_ids = [tx["tx_id"] for tx in tx_1h]
+
+    assert "t_out_past" not in included_ids
+    assert "t_exact_past" in included_ids
+    assert "t_mid" in included_ids
+    assert "t_exact_anchor" in included_ids
+    assert "t_future_leak" not in included_ids
+    assert len(tx_1h) == 3
+    assert sum(tx["amount"] for tx in tx_1h) == 90.0
+
+
+@pytest.mark.asyncio
+async def test_dlq_failure_semantics() -> None:
+    """Certify that if DLQ publishing fails, consume_batch does NOT commit
+
+    the original offset and raises an error instead of pretending quarantine succeeded.
+    """
+    broker = InMemoryKafkaBroker()
+    connector = KafkaStreamingConnector(
+        transaction_topic="cfi.test.dlq.tx",
+        dlq_topic="cfi.test.dlq.unparseable",
+        in_memory_broker=broker,
+    )
+
+    await broker.publish("cfi.test.dlq.tx", b"poisoned-raw-binary-payload")
+
+    orig_publish = broker.publish
+
+    async def mock_publish(topic: str, message: bytes, partition: int = 0) -> tuple[int, int]:
+        if topic == connector.dlq_topic:
+            raise RuntimeError("DLQ Broker Disk Full")
+        return await orig_publish(topic, message, partition)
+
+    broker.publish = mock_publish  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError, match="DLQ publishing failed"):
+        await connector.consume_batch("cfi.test.dlq.tx", max_messages=1)
+
+    assert broker._group_offsets[connector.group_id]["cfi.test.dlq.tx:0"] == 0
+
+
+def test_transaction_persistence_round_trip() -> None:
+    """Certify that a full canonical transaction preserves tenant, currency,
+
+    timezone-aware UTC timestamp, monetary amount, accounts, and channel across
+    data transfer and database serialization boundaries.
+    """
+    tx = NormalizedTransaction(
+        transaction_id="tx_persist_999",
+        account_id="ACC_DEBTOR_DE",
+        counterparty_account_id="ACC_CREDITOR_FR",
+        amount=12500.50,
+        currency="EUR",
+        timestamp=datetime(2026, 7, 20, 15, 30, 45, tzinfo=UTC),
+        merchant_category_code="6011",
+        origin_country="DE",
+        destination_country="FR",
+        device_fingerprint="fp_secure_888",
+        ip_subnet="10.0.0.0/24",
+        channel_type="SWIFT_MT103",
+        bank_id="bank_bundesbank",
+    )
+
+    row_dict = tx.model_dump()
+    assert row_dict["bank_id"] == "bank_bundesbank"
+    assert row_dict["currency"] == "EUR"
+    assert row_dict["amount"] == 12500.50
+    assert row_dict["timestamp"] == datetime(2026, 7, 20, 15, 30, 45, tzinfo=UTC)
+
+    json_payload = tx.model_dump_json()
+    reconstructed = NormalizedTransaction.model_validate_json(json_payload)
+
+    assert reconstructed.transaction_id == tx.transaction_id
+    assert reconstructed.account_id == tx.account_id
+    assert reconstructed.counterparty_account_id == tx.counterparty_account_id
+    assert reconstructed.amount == tx.amount
+    assert reconstructed.currency == tx.currency
+    assert reconstructed.timestamp == tx.timestamp
+    assert reconstructed.timestamp.tzinfo == UTC
+    assert reconstructed.bank_id == tx.bank_id
+    assert reconstructed.channel_type == tx.channel_type

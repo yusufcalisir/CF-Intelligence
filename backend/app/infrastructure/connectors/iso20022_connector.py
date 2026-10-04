@@ -122,7 +122,11 @@ class ISO20022MessagingConnector(BaseBankConnector):
 
     @staticmethod
     def _parse_iso_datetime(raw_dt: str | None) -> datetime:
-        """Parse ISO 8601 or date string, returning UTC datetime, or current UTC if absent/malformed."""
+        """Parse ISO 8601 or date string, returning UTC datetime.
+
+        Raises ValueError if raw_dt is provided but malformed.
+        If raw_dt is absent or empty, returns current UTC datetime as arrival timestamp.
+        """
         if not raw_dt or not raw_dt.strip():
             return datetime.now(UTC)
         try:
@@ -135,11 +139,11 @@ class ISO20022MessagingConnector(BaseBankConnector):
             try:
                 # If only date format (YYYY-MM-DD)
                 parts = raw_dt.strip()[:10].split("-")
-                if len(parts) == 3:
+                if len(parts) == 3 and len(parts[0]) == 4 and len(parts[1]) == 2 and len(parts[2]) == 2:
                     return datetime(int(parts[0]), int(parts[1]), int(parts[2]), 12, 0, tzinfo=UTC)
             except Exception:
                 pass
-            return datetime.now(UTC)
+            raise ValueError(f"Malformed ISO 20022 datetime: '{raw_dt}'")
 
     def validate_xml_schema(
         self, xml_content: str, schema_name: str = "pacs.008.001.08.xsd"

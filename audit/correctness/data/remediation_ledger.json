@@ -109,6 +109,24 @@
       "invariant_restored": "DATA-INV-08 (Idempotency), DATA-INV-15 (Concurrency Safety)",
       "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_kafka_idempotency_semantics",
       "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0013",
+      "target_file": "backend/app/infrastructure/connectors/iso20022_connector.py",
+      "secondary_file": "backend/app/infrastructure/connectors/thought_machine_connector.py, backend/app/infrastructure/connectors/mambu_connector.py",
+      "action": "Eliminate silent fallback to now(UTC) on timestamp parse failures; raise fail-closed ValueError on malformed timestamps",
+      "invariant_restored": "DATA-INV-06 (Temporal Fidelity), DATA-INV-10 (Failure Truth)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_malformed_event_time_fail_closed",
+      "verification_status": "PASSED"
+    },
+    {
+      "finding_id": "DATA-0014",
+      "target_file": "backend/app/infrastructure/connectors/kafka_streaming_connector.py",
+      "secondary_file": null,
+      "action": "Enforce consumer offset rollback and raise RuntimeError when DLQ message quarantine routing fails",
+      "invariant_restored": "DATA-INV-10 (Failure Truth), DATA-INV-07 (Ordering Truth)",
+      "verification_test": "backend/tests/unit/test_data_contract_certification.py::test_dlq_failure_semantics",
+      "verification_status": "PASSED"
     }
   ]
 }

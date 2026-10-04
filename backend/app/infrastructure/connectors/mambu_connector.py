@@ -149,17 +149,19 @@ class MambuConnector(BaseBankConnector):
             or payload.get("bookingDate")
         )
         if raw_ts:
-            try:
-                if isinstance(raw_ts, datetime):
-                    event_time = raw_ts
-                elif isinstance(raw_ts, str):
+            if isinstance(raw_ts, datetime):
+                event_time = raw_ts
+            elif isinstance(raw_ts, (int, float)):
+                if not math.isfinite(raw_ts) or raw_ts < 0:
+                    raise ValueError(f"Malformed Mambu epoch timestamp: {raw_ts}")
+                event_time = datetime.fromtimestamp(raw_ts, tz=UTC)
+            elif isinstance(raw_ts, str):
+                try:
                     event_time = datetime.fromisoformat(raw_ts.replace("Z", "+00:00"))
-                elif isinstance(raw_ts, (int, float)):
-                    event_time = datetime.fromtimestamp(raw_ts, tz=UTC)
-                else:
-                    event_time = datetime.now(UTC)
-            except Exception:
-                event_time = datetime.now(UTC)
+                except Exception as err:
+                    raise ValueError(f"Malformed Mambu timestamp string: '{raw_ts}'") from err
+            else:
+                raise ValueError(f"Unsupported Mambu timestamp type: {type(raw_ts)}")
         else:
             event_time = datetime.now(UTC)
 
