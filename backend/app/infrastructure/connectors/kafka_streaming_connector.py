@@ -12,6 +12,7 @@ Provides:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
 import threading
@@ -527,7 +528,7 @@ class KafkaStreamingConnector(BaseBankConnector):
                 results.append(item)
             elif isinstance(item, CloudEvent):
                 ce_data: dict[str, Any] = item.data if isinstance(item.data, dict) else {}
-                try:
+                with contextlib.suppress(Exception):
                     results.append(
                         NormalizedTransaction(
                             transaction_id=str(
@@ -545,12 +546,10 @@ class KafkaStreamingConnector(BaseBankConnector):
                             currency=str(ce_data.get("currency", "EUR")),
                         )
                     )
-                except Exception:
-                    pass
             elif isinstance(item, dict):
                 inner = item.get("data")
                 dict_data: dict[str, Any] = inner if isinstance(inner, dict) else item
-                try:
+                with contextlib.suppress(Exception):
                     results.append(
                         NormalizedTransaction(
                             transaction_id=str(
@@ -568,7 +567,5 @@ class KafkaStreamingConnector(BaseBankConnector):
                             currency=str(dict_data.get("currency", "EUR")),
                         )
                     )
-                except Exception:
-                    pass
         self._buffered_transactions.extend(results)
         return results
