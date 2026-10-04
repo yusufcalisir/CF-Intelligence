@@ -729,7 +729,9 @@ class AlertIntelligenceService:
                 {
                     "feature": f["feature"],
                     "contribution": round(f["contribution"], 4),
-                    "value": round(f["contribution"], 4),
+                    "value": round(float(f.get("raw_value", txn.get(f["feature"], f.get("value", 0.0)))), 4)
+                    if isinstance(f.get("raw_value", txn.get(f["feature"], f.get("value", 0.0))), (int, float))
+                    else str(f.get("raw_value", txn.get(f["feature"], f.get("value", "0.0")))),
                 }
                 for f in shap_features
             ]
@@ -753,13 +755,18 @@ class AlertIntelligenceService:
             for feat, base_weight in feature_weights.items():
                 val = txn.get(feat, 0)
                 if isinstance(val, str):
-                    val = hash(val) % 100 / 100  # Normalize categorical
-                contribution = base_weight * score * (0.5 + 0.5 * min(1.0, float(val) / 100))
+                    val_num = hash(val) % 100 / 100  # Normalize categorical for weight
+                else:
+                    try:
+                        val_num = float(val)
+                    except (ValueError, TypeError):
+                        val_num = 0.0
+                contribution = base_weight * score * (0.5 + 0.5 * min(1.0, val_num / 100.0))
                 features.append(
                     {
                         "feature": feat,
                         "contribution": round(contribution, 4),
-                        "value": round(contribution, 4),
+                        "value": round(float(val), 4) if isinstance(val, (int, float)) else str(val),
                     }
                 )
             return sorted(features, key=lambda f: float(f["contribution"]), reverse=True)

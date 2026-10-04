@@ -1,0 +1,35 @@
+{
+  "phase": "5F",
+  "name": "Explainability, Attribution Semantics, SHAP Mathematics & Prediction-to-Explanation Binding Execution Map",
+  "execution_graph": {
+    "raw_request": "TransactionPredictRequest / ExplainTransactionRequest",
+    "request_validation": "Pydantic V2 schema validation (TransactionPredictRequest/ExplainTransactionRequest)",
+    "feature_enrichment": "FeatureStoreService online feature store aggregation (velocity, historical counts, device history)",
+    "preprocessing": "app.application.services.data_generator.preprocess_transaction (canonical 10-feature min-max & ordinal mapping)",
+    "authoritative_feature_vector": "torch.FloatTensor shape (1, 10) in [0, 1] bounds",
+    "model_version_resolution": "_get_cached_serving_model(simulation_id) / ModelRegistry active champion",
+    "prediction": "serving_model.forward(tensor) -> sigmoid probability in [0, 1]",
+    "prediction_output_space": "Fraud probability p in [0, 1], calibrated score in [0, 1000]",
+    "explanation_entry_point": "POST /predict/explain -> explain_transaction",
+    "explainer_model_binding": "Explicit model pass: _explainability_service.compute_shap_values(txn_dict, model=serving_model)",
+    "background_population": "30 synthetic stratified baseline reference points spanning feature range [c_min, c_max]",
+    "attribution_computation": "shap.KernelExplainer(predict_fn, baseline).shap_values(input_matrix, nsamples=100)",
+    "expected_value": "explainer.expected_value (model baseline expectation)",
+    "attribution_transformation": "raw_shap[0] -> float64 array -> abs/signed contribution -> direction INCREASES_RISK / DECREASES_RISK",
+    "feature_name_association": "SHAP_FEATURE_NAMES index 0..9 mapped directly to FEATURE_NAMES in data_generator",
+    "attribution_ranking": "Sorted descending by abs(contribution)",
+    "reason_code_generation": "9-signal policy breakdown matching threshold criteria (HIGH-AMT, VEL-001, GEO-RISK, etc.)",
+    "caching": {
+      "kernel_explainer_cache": "Thread-safe RLock-protected _explainer_cache keyed by (id(model), baseline_len)",
+      "realtime_cache": "Tenant-isolated Redis / LRU cache keyed by cfi:shap:{tenant_id}:{transaction_id} with 300s TTL"
+    },
+    "serialization": "ExplainTransactionResponse (transaction_id, method, base_value, predicted_score, attributions)",
+    "frontend": "Predictor.tsx & AlertsPage.tsx rendering with directional styling, continuous absolute magnitude bars, and truthful method labels"
+  },
+  "graph_explanation_path": {
+    "graph_state": "GraphEngine subgraphs and neighbor topologies",
+    "as_of_binding": "Historical alert.created_at timestamp passed to find_neighbors and get_subgraph",
+    "attribution": "EdgeContribution list normalized to 100% relative graph contribution",
+    "endpoint": "GET /alerts/{alert_id}/gnn-explanation"
+  }
+}

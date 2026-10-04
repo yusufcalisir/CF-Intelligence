@@ -47,7 +47,9 @@ from app.application.schemas.transaction import (
     TransactionPredictResponse,
 )
 from app.application.services.alert_service import AlertIntelligenceService
-from app.application.services.data_generator import REFERENCE_BOUNDS
+from app.application.services.data_generator import (
+    preprocess_transaction,
+)
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.feature_store_service import FeatureStoreService
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
@@ -221,62 +223,6 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     return _cached_serving_model
 
-
-def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
-    """Preprocess, ordinal-encode, and min-max scale a single transaction payload."""
-    from app.application.services.data_generator import (
-        COUNTRIES,
-        DEVICES,
-        FEATURE_NAMES,
-        MERCHANT_CATEGORIES,
-    )
-
-    vals = []
-    for name in FEATURE_NAMES:
-        val = txn.get(name)
-        if val is None:
-            # Defaults matching data generator logic
-            if name == "country_code":
-                val = "US"
-            elif name == "merchant_category":
-                val = "grocery"
-            elif name == "device_type":
-                val = "web_browser"
-            else:
-                val = 0.0
-
-        # Validate non-finite numeric input (MODEL-INV-13 fail-closed)
-        if isinstance(val, (int, float)) and not math.isfinite(val):
-            raise ValueError(f"Feature '{name}' contains non-finite value: {val}")
-
-        # Encode categorical variables using constant list indexes
-        if name == "merchant_category":
-            val_str = val if isinstance(val, str) else str(val)
-            val = float(MERCHANT_CATEGORIES.index(val_str) if val_str in MERCHANT_CATEGORIES else 0)
-        elif name == "country_code":
-            val_str = val if isinstance(val, str) else str(val)
-            val = float(COUNTRIES.index(val_str) if val_str in COUNTRIES else 0)
-        elif name == "device_type":
-            val_str = val if isinstance(val, str) else str(val)
-            val = float(DEVICES.index(val_str) if val_str in DEVICES else 0)
-        else:
-            try:
-                val = float(val)
-            except (ValueError, TypeError) as exc:
-                raise ValueError(f"Invalid numeric value for feature '{name}': {val}") from exc
-            if not math.isfinite(val):
-                raise ValueError(f"Feature '{name}' contains non-finite numeric value: {val}")
-
-        # Scale with pre-defined dataset reference bounds
-        c_min, c_max = REFERENCE_BOUNDS.get(name, (0.0, 1.0))
-        if c_max > c_min:
-            val_norm = (val - c_min) / (c_max - c_min)
-            val_norm = max(0.0, min(1.0, val_norm))  # clip to [0, 1]
-        else:
-            val_norm = 0.0
-        vals.append(val_norm)
-
-    return torch.FloatTensor([vals])
 
 
 @router.post("/predict", response_model=TransactionPredictResponse)
@@ -768,12 +714,17 @@ async def explain_transaction(
     txn_id = payload.transaction_id or payload.transaction.transaction_id or f"tx_{uuid.uuid4().hex[:8]}"
 
     try:
+        # Resolve active serving model bound to the simulation/tenant
+        sim_id = getattr(payload.transaction, "simulation_id", None)
+        serving_model = _get_cached_serving_model(sim_id)
+
         # Offload CPU-heavy SHAP kernel explanation to threadpool to preserve event loop health
-        shap_features = await asyncio.to_thread(_explainability_service.compute_shap_values, txn_dict)
+        shap_features = await asyncio.to_thread(_explainability_service.compute_shap_values, txn_dict, model=serving_model)
 
         attributions: list[FeatureAttributionItem] = []
         base_val = 0.50
         predicted_val = 0.50
+        explanation_method = payload.method
 
         for f_item in shap_features:
             name = f_item.get("feature", "unknown")
@@ -781,6 +732,10 @@ async def explain_transaction(
             raw_val = float(f_item.get("raw_value", f_item.get("value", 0.0)))
             base_val = float(f_item.get("base_value", base_val))
             predicted_val = float(f_item.get("model_output", predicted_val))
+            method_used = f_item.get("explanation_method", "shap_kernel_explainer")
+            if method_used == "fallback_heuristic":
+                explanation_method = "fallback_heuristic"
+
             direction = "INCREASES_RISK" if contrib > 0 else "DECREASES_RISK"
             desc = (
                 f"Feature '{name}' increases fraud probability by {abs(contrib):.2%}"
@@ -817,15 +772,21 @@ async def explain_transaction(
                 )
             )
 
-        summary = (
-            f"Explanation generated via {payload.method}. "
-            f"Top contributing risk driver: {attributions[0].feature if attributions else 'none'}."
-        )
+        if explanation_method == "fallback_heuristic":
+            summary = (
+                f"Explanation generated via fallback_heuristic (SHAP unavailable). "
+                f"Top contributing risk driver: {attributions[0].feature if attributions else 'none'}."
+            )
+        else:
+            summary = (
+                f"Explanation generated via {explanation_method}. "
+                f"Top contributing risk driver: {attributions[0].feature if attributions else 'none'}."
+            )
 
         latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
         return ExplainTransactionResponse(
             transaction_id=txn_id,
-            method=payload.method,
+            method=explanation_method,
             base_value=round(base_val, 4),
             predicted_score=round(predicted_val, 4),
             attributions=attributions,

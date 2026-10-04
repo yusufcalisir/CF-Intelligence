@@ -213,7 +213,11 @@ export default function AlertsPage() {
       // 5. Append initial forensic SHAP attribution and triage note
       const shapDrivers = (alertToEscalate.top_features || [])
         .slice(0, 5)
-        .map((f: any) => `${f.feature || f.name}: +${Math.round((f.contribution ?? f.value ?? 0) * 100)}%`)
+        .map((f: any) => {
+          const val = f.contribution ?? f.value ?? 0;
+          const sign = val >= 0 ? '+' : '';
+          return `${f.feature || f.name}: ${sign}${Math.round(val * 100)}%`;
+        })
         .join(', ');
       const entityList = (alertToEscalate.involved_entity_ids || []).join(', ');
       const reasonList = (alertToEscalate.reason_codes || []).join(', ');
@@ -786,14 +790,16 @@ export function ExplainabilityPanel({
                 <div className="space-y-2.5">
                   {(report.top_features || []).slice(0, 5).map((f, i) => {
                     const anyF = f as any;
-                    const rawVal =
+                    const contrib =
                       typeof anyF.contribution === 'number'
                         ? anyF.contribution
                         : typeof anyF.value === 'number'
                         ? anyF.value
                         : 0;
-                    const pct = rawVal * 100;
-                    const barWidth = rawVal > 0.25 ? pct : pct * 5;
+                    const absVal = Math.abs(contrib);
+                    const pct = absVal * 100;
+                    const barWidth = Math.min(100, Math.max(3, pct));
+                    const isPositive = contrib >= 0;
 
                     return (
                       <div key={i} className="text-xs space-y-1">
@@ -801,14 +807,20 @@ export function ExplainabilityPanel({
                           <span className="font-semibold text-slate-200 capitalize">
                             {f.feature.replace(/_/g, ' ')}
                           </span>
-                          <span className="font-mono font-bold text-cyan-400">{pct.toFixed(0)}%</span>
+                          <span className={`font-mono font-bold ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            {isPositive ? '+' : '-'}{pct.toFixed(0)}%
+                          </span>
                         </div>
                         <div className="h-2 bg-slate-900 border border-slate-800 rounded-full overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${Math.min(100, barWidth)}%` }}
+                            animate={{ width: `${barWidth}%` }}
                             transition={{ delay: i * 0.1 }}
-                            className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-sky-400 to-cyan-400"
+                            className={`h-full rounded-full ${
+                              isPositive
+                                ? 'bg-gradient-to-r from-amber-500 via-rose-400 to-rose-500'
+                                : 'bg-gradient-to-r from-teal-500 via-emerald-400 to-emerald-500'
+                            }`}
                           />
                         </div>
                       </div>

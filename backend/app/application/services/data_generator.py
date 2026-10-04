@@ -11,9 +11,12 @@ different slices of fraud, and collaboration fills blind spots.
 from __future__ import annotations
 
 import logging
+import math
+from typing import Any
 
 import numpy as np
 import pandas as pd
+import torch
 
 from app.domain.entities import Bank
 from app.domain.enums import BankTier
@@ -100,6 +103,69 @@ REFERENCE_BOUNDS: dict[str, tuple[float, float]] = {
     "chargeback_count": (0.0, 10.0),
     "account_age_days": (0.0, 1000.0),
 }
+
+
+def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
+    """Preprocess, ordinal-encode, and min-max scale a single transaction payload.
+
+    Canonical authoritative reference preprocessor ensuring strict 100% feature
+    representation parity across model training, real-time inference, and explainability (SHAP & LIME).
+    """
+    vals = []
+    for name in FEATURE_NAMES:
+        val = txn.get(name)
+        if val is None:
+            # Defaults matching data generator logic
+            if name == "country_code":
+                val = "US"
+            elif name == "merchant_category":
+                val = "grocery"
+            elif name == "device_type":
+                val = "web_browser"
+            else:
+                val = 0.0
+
+        # Validate non-finite numeric input (MODEL-INV-13 fail-closed)
+        if isinstance(val, (int, float)) and not math.isfinite(val):
+            raise ValueError(f"Feature '{name}' contains non-finite value: {val}")
+
+        # Encode categorical variables using constant list indexes
+        if name == "merchant_category":
+            val_str = val if isinstance(val, str) else str(val)
+            if val_str not in MERCHANT_CATEGORIES:
+                cat_aliases = {"retail": "grocery", "food": "dining", "online_retail": "online_marketplace"}
+                val_str = cat_aliases.get(val_str, val_str)
+            val = float(MERCHANT_CATEGORIES.index(val_str) if val_str in MERCHANT_CATEGORIES else 0)
+        elif name == "country_code":
+            val_str = val if isinstance(val, str) else str(val)
+            if val_str not in COUNTRIES:
+                country_aliases = {"GB": "UK"}
+                val_str = country_aliases.get(val_str, val_str)
+            val = float(COUNTRIES.index(val_str) if val_str in COUNTRIES else 0)
+        elif name == "device_type":
+            val_str = val if isinstance(val, str) else str(val)
+            if val_str not in DEVICES:
+                device_aliases = {"web": "web_browser", "mobile": "mobile_app", "mobile_web": "web_browser"}
+                val_str = device_aliases.get(val_str, val_str)
+            val = float(DEVICES.index(val_str) if val_str in DEVICES else 0)
+        else:
+            try:
+                val = float(val)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Invalid numeric value for feature '{name}': {val}") from exc
+            if not math.isfinite(val):
+                raise ValueError(f"Feature '{name}' contains non-finite numeric value: {val}")
+
+        # Scale with pre-defined dataset reference bounds
+        c_min, c_max = REFERENCE_BOUNDS.get(name, (0.0, 1.0))
+        if c_max > c_min:
+            val_norm = (val - c_min) / (c_max - c_min)
+            val_norm = max(0.0, min(1.0, val_norm))  # clip to [0, 1]
+        else:
+            val_norm = 0.0
+        vals.append(val_norm)
+
+    return torch.FloatTensor([vals])
 
 
 class DataGenerator:

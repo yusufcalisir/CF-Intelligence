@@ -1,0 +1,149 @@
+{
+  "phase": "5F",
+  "invariants": [
+    {
+      "id": "XAI-INV-01",
+      "description": "Every explanation must correspond to the exact prediction execution it claims to explain.",
+      "importance": "CRITICAL",
+      "test": "test_model_version_binding_and_hotswapping",
+      "evidence": "POST /predict/explain resolves active serving_model and binds explanation directly to model output.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-02",
+      "description": "The explainer must use the same model parameters/version as the prediction being explained.",
+      "importance": "CRITICAL",
+      "test": "test_model_version_binding_and_hotswapping",
+      "evidence": "Explainer cache is keyed by (id(model), baseline_len); hot-swapping creates new explainer instances.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-03",
+      "description": "The explainer must receive the intended representation of the same logical input.",
+      "importance": "CRITICAL",
+      "test": "test_preprocessing_parity_with_prediction",
+      "evidence": "_parse_transaction_features delegates directly to canonical preprocess_transaction.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-04",
+      "description": "Prediction and explanation paths must use semantically identical preprocessing.",
+      "importance": "CRITICAL",
+      "test": "test_preprocessing_parity_with_prediction, test_lime_surrogate_explanation_uses_canonical_preprocessing",
+      "evidence": "Both SHAP and LIME consume preprocess_transaction(txn) in [0, 1] range.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-05",
+      "description": "Attribution index i must correspond to the feature occupying model input position i.",
+      "importance": "HIGH",
+      "test": "test_feature_order_and_naming_fidelity",
+      "evidence": "SHAP_FEATURE_NAMES aligns 100% with FEATURE_NAMES in data_generator.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-06",
+      "description": "User-visible feature names must remain bound to the correct attribution values.",
+      "importance": "HIGH",
+      "test": "test_adversarial_feature_permutation",
+      "evidence": "Adversarial feature value shifts propagate strictly with their associated feature keys.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-07",
+      "description": "Explanation semantics must explicitly correspond to the quantity actually explained (probability in [0, 1]).",
+      "importance": "HIGH",
+      "test": "test_shapley_local_additivity_oracle",
+      "evidence": "predict_fn returns model probabilities via final sigmoid; base_value and model_output are in [0, 1].",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-08",
+      "description": "Expected/reference/baseline values must correspond to the explainer and output space actually used.",
+      "importance": "HIGH",
+      "test": "test_shapley_local_additivity_oracle",
+      "evidence": "explainer.expected_value evaluated over baseline population in probability space.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-09",
+      "description": "Attribution decomposition must locally reconstruct the model output: f(x) == E[f(x)] + sum(phi_i).",
+      "importance": "CRITICAL",
+      "test": "test_shapley_local_additivity_oracle, test_shap_efficiency_axiom_mathematical_precision",
+      "evidence": "abs((base_value + sum_contributions) - model_output) < 1e-3 verified across batches.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-10",
+      "description": "Positive/negative attribution labels must correspond to their actual mathematical direction.",
+      "importance": "HIGH",
+      "test": "test_sign_oracle_directionality",
+      "evidence": "Verified with deterministic linear oracle: positive weights yield positive attributions.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-11",
+      "description": "Top-feature ordering must derive from the intended attribution ranking rule.",
+      "importance": "MEDIUM",
+      "test": "test_compute_shap_values_formats_correctly",
+      "evidence": "Features sorted descending by abs(contribution) with preserved raw feature values.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-12",
+      "description": "Heuristic/approximate explanations must not be represented as exact SHAP/model attribution.",
+      "importance": "CRITICAL",
+      "test": "test_fast_inference_explainer_semantics_and_cache_isolation",
+      "evidence": "FastInferenceExplainer reports method=fast_heuristic, source=FAST_HEURISTIC_COMPUTED; fallback reports fallback_heuristic.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-13",
+      "description": "Cached explanations must be keyed by every state dimension necessary (model, baseline, tenant).",
+      "importance": "HIGH",
+      "test": "test_fast_inference_explainer_semantics_and_cache_isolation",
+      "evidence": "Realtime cache keys use cfi:shap:{tenant_id}:{transaction_id}; KernelExplainer cache uses (id(model), baseline_len).",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-14",
+      "description": "Explanation failure must not silently produce fabricated reason codes or successful-looking explanations.",
+      "importance": "CRITICAL",
+      "test": "test_fail_closed_on_non_finite_numeric_inputs",
+      "evidence": "Non-finite values raise explicit ValueError; zero fabricated fallbacks on bad input.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-15",
+      "description": "NaN/Inf explanation values must not be serialized as valid explanation output.",
+      "importance": "HIGH",
+      "test": "test_explainer_produces_strictly_finite_attributions",
+      "evidence": "Assert np.all(np.isfinite(shap_matrix)) enforces strict mathematical validity before serialization.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-16",
+      "description": "Explanation paths described as deterministic must be reproducible under equivalent state.",
+      "importance": "MEDIUM",
+      "test": "test_zero_global_random_seed_pollution",
+      "evidence": "np.random state saved and restored with local scoped seed=42 for KernelExplainer sampling.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "XAI-INV-17",
+      "description": "Where graph state contributes to explanation, explanation must correspond to graph state legitimately used.",
+      "importance": "HIGH",
+      "test": "test_gnn_explanation_temporal_binding_with_as_of",
+      "evidence": "explain_gnn_embedding accepts as_of=alert.created_at to prevent future-edge leakage into historical explanations.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "XAI-INV-18",
+      "description": "API/frontend explanation output must preserve the semantics produced by the explanation engine.",
+      "importance": "HIGH",
+      "test": "test_alert_intelligence_service_preserves_actual_feature_values",
+      "evidence": "_get_top_features preserves true raw value; Predictor.tsx and AlertsPage.tsx render directional +/- sign and continuous magnitude bars.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    }
+  ]
+}

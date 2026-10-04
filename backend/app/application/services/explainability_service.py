@@ -15,7 +15,11 @@ and investigator trust.
 from __future__ import annotations
 
 import logging
+import threading
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
+
+import numpy as np
 
 from app.domain.value_objects_phase2 import (
     CounterfactualExplanation,
@@ -42,6 +46,15 @@ class ExplainabilityService:
     risk factors and historical evidence to produce a comprehensive
     explainability report.
     """
+
+    def __init__(self) -> None:
+        self._explainer_cache: dict[tuple, Any] = {}
+        self._explainer_lock = threading.RLock()
+
+    def invalidate_explainer_cache(self) -> None:
+        """Invalidate cached KernelExplainer instances."""
+        with self._explainer_lock:
+            self._explainer_cache.clear()
 
     def explain_alert(
         self, alert: Alert, risk_signals: list[RiskSignal] | None = None
@@ -205,86 +218,22 @@ class ExplainabilityService:
     ]
 
     def _parse_transaction_features(self, txn_dict: dict) -> list[float]:
-        """Parse raw transaction dictionary into a numeric vector in [0, 1]."""
-        import numpy as np
+        """Parse raw transaction dictionary into an authoritative numeric vector in [0, 1].
 
-        raw_features: list[float] = []
-        for name in self.SHAP_FEATURE_NAMES:
-            val = txn_dict.get(name, 0.0)
-            if name == "merchant_category":
-                categories = [
-                    "retail",
-                    "online_retail",
-                    "travel",
-                    "entertainment",
-                    "financial",
-                    "food",
-                    "services",
-                    "other",
-                ]
-                try:
-                    idx = categories.index(val)
-                except ValueError:
-                    idx = len(categories) - 1
-                val = idx / (len(categories) - 1) if len(categories) > 1 else 0.0
-            elif name == "country_code":
-                countries = ["US", "GB", "DE", "FR", "CA", "BR", "RU", "NG", "PH", "OTHER"]
-                try:
-                    idx = countries.index(val)
-                except ValueError:
-                    idx = len(countries) - 1
-                val = idx / (len(countries) - 1) if len(countries) > 1 else 0.0
-            elif name == "device_type":
-                devices = ["web", "mobile_app", "mobile_web", "pos", "other"]
-                try:
-                    idx = devices.index(val)
-                except ValueError:
-                    idx = len(devices) - 1
-                val = idx / (len(devices) - 1) if len(devices) > 1 else 0.0
-            elif name == "transaction_amount":
-                try:
-                    val = min(1.0, float(val) / 10000.0)
-                except (ValueError, TypeError):
-                    val = 0.0
-            elif name == "account_age_days":
-                try:
-                    val = min(1.0, float(val) / 365.0)
-                except (ValueError, TypeError):
-                    val = 0.0
-            elif name == "velocity":
-                try:
-                    val = min(1.0, float(val) / 20.0)
-                except (ValueError, TypeError):
-                    val = 0.0
-            elif name == "hour_of_day":
-                try:
-                    val = min(1.0, float(val) / 23.0)
-                except (ValueError, TypeError):
-                    val = 0.0
-            elif name == "chargeback_count":
-                try:
-                    val = min(1.0, float(val) / 10.0)
-                except (ValueError, TypeError):
-                    val = 0.0
-            else:
-                try:
-                    val = float(val)
-                except (ValueError, TypeError):
-                    val = 0.5
-            raw_features.append(val)
+        Guarantees 100% preprocessing parity with model training and real-time inference.
+        Fails closed on non-finite numeric input (MODEL-INV-13 / XAI-INV-15).
+        """
+        from app.application.services.data_generator import preprocess_transaction
 
-        return [
-            float(np.nan_to_num(val, nan=0.0, posinf=1e30, neginf=-1e30))
-            if isinstance(val, (int, float))
-            else 0.0
-            for val in raw_features
-        ]
+        tensor = preprocess_transaction(txn_dict)
+        return tensor[0].cpu().numpy().tolist()
 
     def compute_batch_shap_values(
         self,
         txns: list[dict],
         nsamples: int = 100,
         model: Any = None,
+        background_data: np.ndarray | None = None,
     ) -> list[list[dict[str, Any]]]:
         """Compute SHAP values for a batch of transactions using KernelExplainer.
 
@@ -329,11 +278,12 @@ class ExplainabilityService:
                         ):
                             input_dim = int(state_dict[weight_key].shape[1])
                             break
-                    model = FraudDetectionModel(input_dim=input_dim)
-                    model.load_state_dict(state_dict)
-                    model.eval()
+                    loaded_model = FraudDetectionModel(input_dim=input_dim)
+                    loaded_model.load_state_dict(state_dict)
+                    loaded_model.eval()
+                    model = loaded_model
                 except Exception as e:
-                    logger.warning("Failed to load saved model for SHAP: %s. Using random init.", e)
+                    logger.warning("Failed to load saved model for SHAP: %s.", e)
                     model = None
 
             if not model:
@@ -343,7 +293,7 @@ class ExplainabilityService:
                     model = FraudDetectionModel()
                     model.eval()
                 except Exception as e:
-                    logger.warning("Failed to create default FraudDetectionModel: %s", e)
+                    logger.warning("Failed to initialize FraudDetectionModel for SHAP: %s.", e)
 
         if model:
             try:
@@ -366,25 +316,34 @@ class ExplainabilityService:
                         preds = model(tensor_x).cpu().numpy().reshape(-1)
                     return preds
 
-                baseline = np.zeros((30, 10), dtype=np.float32)
-                baseline[:, 0] = np.linspace(0.01, 0.20, 30)
-                baseline[:, 1] = np.linspace(0.0, 0.5, 30)
-                baseline[:, 2] = 0.0
-                baseline[:, 3] = 0.0
-                baseline[:, 4] = np.linspace(0.05, 0.20, 30)
-                baseline[:, 5] = np.linspace(0.30, 0.80, 30)
-                baseline[:, 6] = np.linspace(0.05, 0.25, 30)
-                baseline[:, 7] = np.linspace(0.70, 0.98, 30)
-                baseline[:, 8] = 0.0
-                baseline[:, 9] = np.linspace(0.20, 1.0, 30)
+                if background_data is not None:
+                    baseline = np.asarray(background_data, dtype=np.float32)
+                else:
+                    baseline = np.zeros((30, 10), dtype=np.float32)
+                    baseline[:, 0] = np.linspace(0.01, 0.20, 30)
+                    baseline[:, 1] = np.linspace(0.0, 0.5, 30)
+                    baseline[:, 2] = 0.0
+                    baseline[:, 3] = 0.0
+                    baseline[:, 4] = np.linspace(0.05, 0.20, 30)
+                    baseline[:, 5] = np.linspace(0.30, 0.80, 30)
+                    baseline[:, 6] = np.linspace(0.05, 0.25, 30)
+                    baseline[:, 7] = np.linspace(0.70, 0.98, 30)
+                    baseline[:, 8] = 0.0
+                    baseline[:, 9] = np.linspace(0.20, 1.0, 30)
 
-                prev_rng_state = np.random.get_state()
-                try:
-                    np.random.seed(42)
-                    explainer = shap.KernelExplainer(predict_fn, baseline)
-                    raw_shap = explainer.shap_values(input_matrix, nsamples=nsamples)
-                finally:
-                    np.random.set_state(prev_rng_state)
+                with self._explainer_lock:
+                    cache_key = (id(model), baseline.shape[0])
+                    explainer = self._explainer_cache.get(cache_key)
+                    if explainer is None:
+                        explainer = shap.KernelExplainer(predict_fn, baseline)
+                        self._explainer_cache[cache_key] = explainer
+
+                    prev_rng_state = np.random.get_state()
+                    try:
+                        np.random.seed(42)
+                        raw_shap = explainer.shap_values(input_matrix, nsamples=nsamples)
+                    finally:
+                        np.random.set_state(prev_rng_state)
 
                 if isinstance(raw_shap, list):
                     shap_matrix = np.array(raw_shap[0], dtype=np.float64)
@@ -393,6 +352,9 @@ class ExplainabilityService:
 
                 if shap_matrix.ndim == 1:
                     shap_matrix = shap_matrix.reshape(1, -1)
+
+                if not np.all(np.isfinite(shap_matrix)):
+                    raise ValueError("KernelExplainer produced non-finite attributions.")
 
                 raw_base = explainer.expected_value
                 base_value = (
@@ -414,11 +376,12 @@ class ExplainabilityService:
 
                     features = []
                     for i, name in enumerate(self.SHAP_FEATURE_NAMES):
+                        raw_val = txns[k].get(name, float(input_matrix[k, i]))
                         features.append({
                             "feature": name,
                             "contribution": float(row_shap[i]),
                             "value": float(input_matrix[k, i]),
-                            "raw_value": float(input_matrix[k, i]),
+                            "raw_value": float(raw_val) if isinstance(raw_val, (int, float)) else str(raw_val),
                             "explanation_method": "shap_kernel_explainer",
                             "base_value": base_value,
                             "model_output": model_output,
@@ -450,21 +413,27 @@ class ExplainabilityService:
         base_value = 0.50
         for txn_dict in txns:
             features = []
+            try:
+                parsed_vals = self._parse_transaction_features(txn_dict)
+                parsed_norm = dict(zip(self.SHAP_FEATURE_NAMES, parsed_vals))
+            except Exception:
+                parsed_norm = {}
+
             raw_contribs = {}
             for name, w in feature_weights.items():
                 val = txn_dict.get(name, 0.5)
-                val = float(val) if isinstance(val, (int, float)) else 0.5
-                raw_contribs[name] = (w, val, w * (val - 0.5))
+                val_norm = parsed_norm.get(name, 0.5)
+                raw_contribs[name] = (w, val, w * (val_norm - 0.5), val_norm)
 
             sum_delta = sum(c[2] for c in raw_contribs.values())
             model_output = round(base_value + sum_delta, 4)
 
-            for name, (w, val, delta) in raw_contribs.items():
+            for name, (w, val, delta, val_norm) in raw_contribs.items():
                 features.append({
                     "feature": name,
                     "contribution": round(delta, 4),
-                    "value": round(val, 4),
-                    "raw_value": round(val, 4),
+                    "value": round(val_norm, 4),
+                    "raw_value": float(val) if isinstance(val, (int, float)) else str(val),
                     "explanation_method": "fallback_heuristic",
                     "base_value": base_value,
                     "model_output": model_output,
@@ -478,12 +447,13 @@ class ExplainabilityService:
         self,
         txn_dict: dict,
         model: Any = None,
+        background_data: np.ndarray | None = None,
     ) -> list[dict[str, Any]]:
         """Compute SHAP values for a single transaction using the trained global model.
 
         If no model is trained yet, falls back to an analytical local explanation.
         """
-        results = self.compute_batch_shap_values([txn_dict], model=model)
+        results = self.compute_batch_shap_values([txn_dict], model=model, background_data=background_data)
         return results[0] if results else []
 
     def compute_lime_explanation(
@@ -494,6 +464,7 @@ class ExplainabilityService:
         num_samples: int = 100,
         l2_reg: float = 1.0,
         seed: int = 42,
+        model: Any = None,
     ) -> LIMEExplanationReport:
         """Compute LIME (Local Interpretable Model-agnostic Explanations) surrogate model.
 
@@ -543,7 +514,7 @@ class ExplainabilityService:
                 "transaction_amount": 4500.0 if has_high_amt else 150.0,
                 "country_code": "KP" if has_geo else "US",
                 "velocity": 12.0 if has_vel else 1.0,
-                "merchant_category": "gambling" if has_merch else "retail",
+                "merchant_category": "gambling" if has_merch else "grocery",
                 "device_type": "phone_banking" if orig_score > 700 else "web_browser",
                 "customer_history_score": 0.35 if orig_score > 600 else 0.85,
                 "merchant_risk_score": 0.85 if has_merch else 0.10,
@@ -554,95 +525,52 @@ class ExplainabilityService:
         else:
             working_txn = {}
 
-        # 2. Extract and normalize feature vector to [0, 1]
-        countries = ["US", "GB", "DE", "FR", "CA", "KP", "IR", "SY", "RU"]
-        merchants = ["retail", "grocery", "travel", "electronics", "gambling", "crypto", "wire"]
-        devices = [
-            "mobile_ios",
-            "mobile_android",
-            "web_browser",
-            "pos_terminal",
-            "atm",
-            "api_gateway",
-            "phone_banking",
-        ]
+        # 2. Extract and normalize feature vector to [0, 1] using canonical preprocessor
+        from app.application.services.data_generator import preprocess_transaction
 
-        x_vals: list[float] = []
-        for name in feature_names:
-            val = working_txn.get(name, 0.5)
-            if name == "country_code":
-                idx = countries.index(val) if val in countries else len(countries) - 1
-                norm_val = idx / (len(countries) - 1)
-            elif name == "merchant_category":
-                idx = merchants.index(val) if val in merchants else len(merchants) - 1
-                norm_val = idx / (len(merchants) - 1)
-            elif name == "device_type":
-                idx = devices.index(val) if val in devices else len(devices) - 1
-                norm_val = idx / (len(devices) - 1)
-            elif name == "transaction_amount":
-                norm_val = min(1.0, max(0.0, float(val) / 10000.0))
-            elif name == "account_age_days":
-                norm_val = min(1.0, max(0.0, float(val) / 365.0))
-            elif name == "velocity":
-                norm_val = min(1.0, max(0.0, float(val) / 20.0))
-            elif name == "hour_of_day":
-                norm_val = min(1.0, max(0.0, float(val) / 23.0))
-            elif name == "chargeback_count":
-                norm_val = min(1.0, max(0.0, float(val) / 10.0))
-            else:
-                try:
-                    norm_val = min(1.0, max(0.0, float(val)))
-                except (ValueError, TypeError):
-                    norm_val = 0.5
-            x_vals.append(float(norm_val))
-
-        x_0 = np.array(x_vals, dtype=np.float64)  # Shape: (10,)
+        x_0_tensor = preprocess_transaction(working_txn)
+        x_0 = x_0_tensor[0].cpu().numpy().astype(np.float64)  # Shape: (10,)
         p = len(x_0)
 
         # 3. Model predict function
-        import os
+        if model is None:
+            import os
 
-        import torch
+            import torch
 
-        from app.infrastructure.storage.storage_utils import get_storage_dir
+            from app.infrastructure.storage.storage_utils import get_storage_dir
 
-        model_dir = get_storage_dir()
-        model_path = os.path.join(model_dir, "global_model.pt")
-        model = None
-        if os.path.exists(model_path):
-            try:
-                from app.application.services.model_service import NUM_FEATURES, FraudDetectionModel
+            model_dir = get_storage_dir()
+            model_path = os.path.join(model_dir, "global_model.pt")
+            if os.path.exists(model_path):
+                try:
+                    from app.application.services.model_service import (
+                        NUM_FEATURES,
+                        FraudDetectionModel,
+                    )
 
-                state_dict = torch.load(
-                    model_path, map_location=torch.device("cpu"), weights_only=True
-                )
-                input_dim = NUM_FEATURES
-                for weight_key in ("network.0.weight", "module.network.0.weight"):
-                    if (
-                        weight_key in state_dict
-                        and hasattr(state_dict[weight_key], "shape")
-                        and len(state_dict[weight_key].shape) >= 2
-                    ):
-                        input_dim = int(state_dict[weight_key].shape[1])
-                        break
-                model = FraudDetectionModel(input_dim=input_dim)
-                model.load_state_dict(state_dict)
-                model.eval()
-            except Exception as e:
-                logger.warning("Failed to load saved model for LIME: %s", e)
-                model = None
-
-        if not model:
-            try:
-                from app.application.services.model_service import FraudDetectionModel
-
-                model = FraudDetectionModel()
-                model.eval()
-            except Exception as e:
-                logger.warning("Failed to initialize FraudDetectionModel for LIME: %s", e)
+                    state_dict = torch.load(
+                        model_path, map_location=torch.device("cpu"), weights_only=True
+                    )
+                    input_dim = NUM_FEATURES
+                    for weight_key in ("network.0.weight", "module.network.0.weight"):
+                        if (
+                            weight_key in state_dict
+                            and hasattr(state_dict[weight_key], "shape")
+                            and len(state_dict[weight_key].shape) >= 2
+                        ):
+                            input_dim = int(state_dict[weight_key].shape[1])
+                            break
+                    model = FraudDetectionModel(input_dim=input_dim)
+                    model.load_state_dict(state_dict)
+                    model.eval()
+                except Exception as e:
+                    logger.warning("Failed to load saved model for LIME: %s", e)
+                    model = None
 
         def predict_fn(X_mat: np.ndarray) -> np.ndarray:
             if model is not None:
+                import torch
                 tensor_x = torch.tensor(X_mat, dtype=torch.float32)
                 if hasattr(model, "network") and len(model.network) > 0:
                     first_layer = model.network[0]
@@ -782,11 +710,14 @@ class ExplainabilityService:
     def replay_inference_audit(
         self,
         alert: Alert,
+        model_version: str | None = None,
     ) -> DecisionReplayReport:
         """Execute deterministic decision replay for regulatory inference audit.
 
         Reproduces the exact 9-signal policy rule execution using archived model version metadata.
         """
+        resolved_version = model_version or "v1.4.2-champion"
+
         # Build 9-signal policy breakdown snapshot
         signals_spec = [
             ("ML-HIGH", "ml_prediction", 0.25, "ML model prediction score"),
@@ -832,7 +763,7 @@ class ExplainabilityService:
             timestamp=alert.created_at.isoformat()
             if hasattr(alert.created_at, "isoformat")
             else str(alert.created_at),
-            model_version="v1.4.2-champion",
+            model_version=resolved_version,
             model_auc=0.948,
             features_snapshot={
                 "bank_id": alert.bank_id,
@@ -855,17 +786,19 @@ class ExplainabilityService:
     def explain_gnn_embedding(
         self,
         node_id: str,
+        as_of: datetime | None = None,
     ) -> GNNExplanationReport:
         """Compute GNNExplainer graph attribution over entity neighborhood.
 
         Highlights top-contributing subgraphs, edge types, and neighbor linkages
         that drove GraphSAGE embedding classification.
+        Binds to graph state as of historical timestamp to prevent future-edge leakage.
         """
         from app.application.services.graph_engine import GraphEngine
 
         ge = GraphEngine()
-        neighbors = ge.find_neighbors(node_id, depth=2)
-        subgraph = ge.get_subgraph(node_id, radius=2)
+        neighbors = ge.find_neighbors(node_id, depth=2, as_of=as_of)
+        subgraph = ge.get_subgraph(node_id, radius=2, as_of=as_of)
 
         contributions: list[EdgeContribution] = []
 

@@ -171,12 +171,18 @@ export const Predictor: React.FC = () => {
               {result.alert_details && (
                 <div className="bg-slate-900/80 p-3 rounded-lg border border-slate-800 space-y-2">
                   <span className="text-slate-400 font-medium">SHAP Feature Contributions</span>
-                  {(result.alert_details.top_features || []).map((f, i) => (
-                    <div key={i} className="flex justify-between items-center text-[11px]">
-                      <span className="text-slate-300 font-mono">{f.feature}</span>
-                      <span className="text-cyan-400 font-mono">+{(f.contribution * 100).toFixed(0)}%</span>
-                    </div>
-                  ))}
+                  {(result.alert_details.top_features || []).map((f, i) => {
+                    const isPositive = f.contribution >= 0;
+                    const pct = Math.abs(f.contribution * 100).toFixed(0);
+                    return (
+                      <div key={i} className="flex justify-between items-center text-[11px]">
+                        <span className="text-slate-300 font-mono">{f.feature}</span>
+                        <span className={`font-mono font-medium ${isPositive ? 'text-rose-400' : 'text-emerald-400'}`}>
+                          {isPositive ? '+' : '-'}{pct}%
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

@@ -568,7 +568,9 @@ async def get_alert_gnn_explanation(
     node_id = (
         alert.involved_entity_ids[0] if alert.involved_entity_ids else f"entity_{alert.id[:8]}"
     )
-    gnn_exp = _explainability_service.explain_gnn_embedding(node_id)
+    gnn_exp = _explainability_service.explain_gnn_embedding(
+        node_id, as_of=getattr(alert, "created_at", None)
+    )
 
     return GNNExplanationResponse(
         node_id=gnn_exp.node_id,

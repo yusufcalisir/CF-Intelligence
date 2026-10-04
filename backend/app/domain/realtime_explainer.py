@@ -33,6 +33,13 @@ _local_cache_lock = threading.RLock()
 _MAX_LOCAL_CACHE_SIZE = 1000
 
 
+def _build_cache_key(transaction_id: str, tenant_id: str | None = None) -> str:
+    """Build tenant-isolated cache key for realtime explanation results."""
+    if tenant_id:
+        return f"cfi:shap:{tenant_id}:{transaction_id}"
+    return f"cfi:shap:{transaction_id}"
+
+
 def _put_local_cache(key: str, value: str) -> None:
     with _local_cache_lock:
         _local_shap_cache[key] = value
@@ -49,6 +56,26 @@ def _get_local_cache(key: str) -> str | None:
         return val
 
 
+def invalidate_realtime_cache(transaction_id: str | None = None, tenant_id: str | None = None) -> None:
+    """Invalidate local and Redis cache for transaction_id or all if transaction_id is None."""
+    with _local_cache_lock:
+        if transaction_id is None:
+            _local_shap_cache.clear()
+        else:
+            k = _build_cache_key(transaction_id, tenant_id)
+            _local_shap_cache.pop(k, None)
+            _local_shap_cache.pop(f"cfi:shap:{transaction_id}", None)
+
+    try:
+        client = get_redis_client()
+        if client and transaction_id:
+            k = _build_cache_key(transaction_id, tenant_id)
+            client.delete(k)
+            client.delete(f"cfi:shap:{transaction_id}")
+    except Exception as exc:
+        logger.debug("Redis cache invalidation error: %s", exc)
+
+
 @dataclass
 class RealtimeFeatureAttribution:
     """Attribution vector item for real-time inference decision explanation."""
@@ -60,6 +87,10 @@ class RealtimeFeatureAttribution:
 
 class FastInferenceExplainer:
     """Provides sub-millisecond feature attributions without heavy explainer overhead."""
+
+    def invalidate_cache(self, transaction_id: str | None = None, tenant_id: str | None = None) -> None:
+        """Invalidate cached attributions."""
+        invalidate_realtime_cache(transaction_id=transaction_id, tenant_id=tenant_id)
 
     def explain_realtime_score(
         self,
@@ -122,8 +153,9 @@ class FastInferenceExplainer:
         transaction_id: str,
         feature_vector: dict[str, Any] | list[float],
         webhook_url: str | None = None,
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
-        """Calculates SHAP feature attributions asynchronously, caches result in Redis (300s TTL), and triggers webhook."""
+        """Calculates fast heuristic feature attributions asynchronously, caches result in Redis (300s TTL), and triggers webhook."""
         if isinstance(feature_vector, dict):
             amount = float(feature_vector.get("amount", 100.0))
             velocity_1h = int(feature_vector.get("velocity_1h", 1))
@@ -141,23 +173,26 @@ class FastInferenceExplainer:
         res = {
             "transaction_id": transaction_id,
             "status": "COMPLETED",
-            "source": "COMPUTED",
+            "source": "FAST_HEURISTIC_COMPUTED",
+            "method": "fast_heuristic",
+            "attributions": shap_values,
             "shap_values": shap_values,
         }
 
+        redis_key = _build_cache_key(transaction_id, tenant_id)
         serialized = json.dumps(res)
-        _put_local_cache(f"cfi:shap:{transaction_id}", serialized)
+        _put_local_cache(redis_key, serialized)
 
         # Store in Redis with 300 seconds (5 min) TTL
         try:
             client = get_redis_client()
             if client:
-                client.setex(f"cfi:shap:{transaction_id}", 300, serialized)
+                client.setex(redis_key, 300, serialized)
                 logger.info(
-                    "Cached SHAP result for transaction '%s' in Redis (TTL=300s)", transaction_id
+                    "Cached fast explanation result for transaction '%s' in Redis (TTL=300s)", transaction_id
                 )
         except Exception as exc:
-            logger.warning("Could not cache SHAP result in Redis (%s); using in-memory cache", exc)
+            logger.warning("Could not cache fast explanation result in Redis (%s); using in-memory cache", exc)
 
         # Trigger webhook if URL provided
         if webhook_url and isinstance(webhook_url, str) and webhook_url.strip().lower().startswith(("http://", "https://")):
@@ -171,7 +206,7 @@ class FastInferenceExplainer:
                 }
                 httpx.post(webhook_url, json=res, headers=headers, timeout=3.0)
                 logger.info(
-                    "Delivered SHAP webhook callback to %s for tx '%s'", webhook_url, transaction_id
+                    "Delivered fast explanation webhook callback to %s for tx '%s'", webhook_url, transaction_id
                 )
             except Exception as exc:
                 logger.warning("Webhook delivery to %s failed: %s", webhook_url, exc)
@@ -183,9 +218,10 @@ class FastInferenceExplainer:
         transaction_id: str,
         feature_vector: dict[str, Any] | list[float],
         webhook_url: str | None = None,
+        tenant_id: str | None = None,
     ) -> dict[str, Any]:
-        """Asynchronously requests SHAP explanation, checking Redis cache first for sub-millisecond hit."""
-        redis_key = f"cfi:shap:{transaction_id}"
+        """Asynchronously requests fast heuristic explanation, checking Redis cache first for sub-millisecond hit."""
+        redis_key = _build_cache_key(transaction_id, tenant_id)
 
         # 1. Fast Path: In-memory LRU cache hit
         cached_local = _get_local_cache(redis_key)
@@ -212,15 +248,15 @@ class FastInferenceExplainer:
         if cached_str:
             data = json.loads(cached_str)
             data["source"] = "REDIS_CACHE"
-            logger.info("SHAP cache HIT for transaction '%s'", transaction_id)
+            logger.info("Fast explanation cache HIT for transaction '%s'", transaction_id)
             return data
 
         # 2. Cache miss: trigger computation or return pending job
         job_id = f"job_shap_{transaction_id}"
         logger.info(
-            "SHAP cache MISS for transaction '%s'. Enqueueing async computation...", transaction_id
+            "Fast explanation cache MISS for transaction '%s'. Enqueueing async computation...", transaction_id
         )
-        self.compute_shap(transaction_id, feature_vector, webhook_url=webhook_url)
+        self.compute_shap(transaction_id, feature_vector, webhook_url=webhook_url, tenant_id=tenant_id)
 
         return {
             "job_id": job_id,

@@ -1,0 +1,75 @@
+{
+  "phase": "5F",
+  "remediations": [
+    {
+      "finding_id": "XAI-0001",
+      "action": "Consolidated preprocessing logic into canonical preprocess_transaction function in data_generator.py and delegated all feature parsing in ExplainabilityService to it.",
+      "files_modified": [
+        "backend/app/application/services/data_generator.py",
+        "backend/app/application/services/explainability_service.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_preprocessing_parity_with_prediction"
+    },
+    {
+      "finding_id": "XAI-0002",
+      "action": "Bound active serving model instance explicitly from predict router into compute_shap_values(model=serving_model) and introduced thread-safe model-keyed caching.",
+      "files_modified": [
+        "backend/app/presentation/routers/predict.py",
+        "backend/app/application/services/explainability_service.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_model_version_binding_and_hotswapping"
+    },
+    {
+      "finding_id": "XAI-0003",
+      "action": "Updated FastInferenceExplainer to report method='fast_heuristic' and source='FAST_HEURISTIC_COMPUTED'; updated predict router to report explanation_method truthfully.",
+      "files_modified": [
+        "backend/app/domain/realtime_explainer.py",
+        "backend/app/presentation/routers/predict.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_fast_inference_explainer_semantics_and_cache_isolation"
+    },
+    {
+      "finding_id": "XAI-0004",
+      "action": "Fixed AlertIntelligenceService._get_top_features so 'value' reports the actual feature value rather than being clobbered with contribution score.",
+      "files_modified": [
+        "backend/app/application/services/alert_service.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_alert_intelligence_service_preserves_actual_feature_values"
+    },
+    {
+      "finding_id": "XAI-0005",
+      "action": "Added as_of parameter to ExplainabilityService.explain_gnn_embedding and passed alert.created_at to bind GNN explanations to historical graph state.",
+      "files_modified": [
+        "backend/app/application/services/explainability_service.py",
+        "backend/app/presentation/routers/alerts.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_gnn_explanation_temporal_binding_with_as_of"
+    },
+    {
+      "finding_id": "XAI-0006",
+      "action": "Refactored Predictor.tsx and AlertsPage.tsx attribution rendering with directional +/- sign, emerald/rose styling, and continuous absolute magnitude bar widths.",
+      "files_modified": [
+        "frontend/src/components/Predictor.tsx",
+        "frontend/src/pages/AlertsPage.tsx"
+      ],
+      "verification_test": "npm --prefix frontend run build"
+    },
+    {
+      "finding_id": "XAI-0007",
+      "action": "Added tenant_id namespace to FastInferenceExplainer cache keys (cfi:shap:{tenant_id}:{transaction_id}) and implemented invalidate_cache method.",
+      "files_modified": [
+        "backend/app/domain/realtime_explainer.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_fast_inference_explainer_semantics_and_cache_isolation"
+    },
+    {
+      "finding_id": "XAI-0008",
+      "action": "Enforced fail-closed validation on non-finite numeric input in preprocessing and asserted np.all(np.isfinite(shap_matrix)) before serialization.",
+      "files_modified": [
+        "backend/app/application/services/data_generator.py",
+        "backend/app/application/services/explainability_service.py"
+      ],
+      "verification_test": "backend/tests/unit/test_phase5f_explainability_correctness.py::test_fail_closed_on_non_finite_numeric_inputs"
+    }
+  ]
+}

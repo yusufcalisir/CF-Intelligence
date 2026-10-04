@@ -1,0 +1,65 @@
+{
+  "phase": "5F",
+  "model_binding_matrix": [
+    {
+      "prediction_entry_point": "POST /predict",
+      "prediction_model_resolver": "_get_cached_serving_model(sim_id)",
+      "model_identity_version": "FraudDetectionModel / v1.4.2-champion",
+      "explainer_resolver": "ExplainabilityService.compute_shap_values(txn, model=serving_model)",
+      "explainer_model_identity_version": "FraudDetectionModel / v1.4.2-champion (identical object reference)",
+      "feature_schema": "FEATURE_NAMES (10 features: amount, mcc, country, device, velocity, hour, merch_risk, cust_hist, cb_count, acct_age)",
+      "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
+      "cache_key": "(id(model), baseline.shape[0])",
+      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping)",
+      "status": "BOUND_AND_VERIFIED"
+    },
+    {
+      "prediction_entry_point": "POST /predict/explain",
+      "prediction_model_resolver": "_get_cached_serving_model(sim_id)",
+      "model_identity_version": "FraudDetectionModel / active serving model",
+      "explainer_resolver": "ExplainabilityService.compute_shap_values(txn, model=serving_model)",
+      "explainer_model_identity_version": "Bound explicitly to serving_model",
+      "feature_schema": "SHAP_FEATURE_NAMES (10 features)",
+      "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
+      "cache_key": "(id(model), baseline.shape[0])",
+      "binding_verification": "VERIFIED (test_model_version_binding_and_hotswapping)",
+      "status": "BOUND_AND_VERIFIED"
+    },
+    {
+      "prediction_entry_point": "GET /alerts/{alert_id}/lime-explanation",
+      "prediction_model_resolver": "_get_cached_serving_model(sim_id) / global_model.pt",
+      "model_identity_version": "FraudDetectionModel (active checkpoint)",
+      "explainer_resolver": "ExplainabilityService.compute_lime_explanation(alert, model=serving_model)",
+      "explainer_model_identity_version": "FraudDetectionModel",
+      "feature_schema": "FEATURE_NAMES (10 features)",
+      "preprocessing_path": "app.application.services.data_generator.preprocess_transaction",
+      "cache_key": "Stateless per alert request",
+      "binding_verification": "VERIFIED (test_lime_surrogate_explanation_uses_canonical_preprocessing)",
+      "status": "BOUND_AND_VERIFIED"
+    },
+    {
+      "prediction_entry_point": "GET /alerts/{alert_id}/gnn-explanation",
+      "prediction_model_resolver": "GraphSAGE 2-hop neighborhood aggregator",
+      "model_identity_version": "GraphSAGE model weights",
+      "explainer_resolver": "ExplainabilityService.explain_gnn_embedding(node_id, as_of=alert.created_at)",
+      "explainer_model_identity_version": "GraphSAGE embedding topology",
+      "feature_schema": "Graph edge attributes (relationshipType, source, target)",
+      "preprocessing_path": "GraphEngine.get_subgraph(radius=2, as_of=as_of)",
+      "cache_key": "Historical timestamp filtered (as_of)",
+      "binding_verification": "VERIFIED (test_gnn_explanation_temporal_binding_with_as_of)",
+      "status": "BOUND_AND_VERIFIED"
+    },
+    {
+      "prediction_entry_point": "Fast path online scoring",
+      "prediction_model_resolver": "FastInferenceExplainer.explain_realtime_score",
+      "model_identity_version": "FastPath-Online-V1",
+      "explainer_resolver": "FastInferenceExplainer.compute_shap",
+      "explainer_model_identity_version": "FastPath-Online-V1 (Heuristic)",
+      "feature_schema": "amount, velocity_1h, merchant_category",
+      "preprocessing_path": "Clean MCC lower string parsing & float cast",
+      "cache_key": "cfi:shap:{tenant_id}:{transaction_id}",
+      "binding_verification": "VERIFIED (test_fast_inference_explainer_semantics_and_cache_isolation)",
+      "status": "BOUND_AND_VERIFIED"
+    }
+  ]
+}

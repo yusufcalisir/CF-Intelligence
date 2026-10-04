@@ -1,0 +1,57 @@
+{
+  "phase": "5F",
+  "background_semantics": [
+    {
+      "explainer": "shap.KernelExplainer via ExplainabilityService",
+      "background_source": "Stratified synthetic grid over reference bounds",
+      "selection": "30 samples linearly interpolated across active feature ranges",
+      "size": [30, 10],
+      "feature_schema": "FEATURE_NAMES (10 features in [0, 1])",
+      "preprocessing": "app.application.services.data_generator.REFERENCE_BOUNDS normalization",
+      "tenant_scope": "Global domain reference distribution",
+      "model_version_scope": "Compatible with active champion model input dimension",
+      "temporal_scope": "Stationary reference distribution",
+      "failure_behavior": "Fails closed; raises exception if baseline generation fails",
+      "status": "VERIFIED"
+    },
+    {
+      "explainer": "LIME Ridge Surrogate via ExplainabilityService",
+      "background_source": "Gaussian perturbations around instance x_0",
+      "selection": "N=100 samples generated via rng.normal(0.0, 0.15), clipped to [0, 1]",
+      "size": [100, 10],
+      "feature_schema": "FEATURE_NAMES (10 features in [0, 1])",
+      "preprocessing": "Canonical preprocess_transaction(txn)",
+      "tenant_scope": "Local instance-centered neighborhood",
+      "model_version_scope": "Evaluated against active model predict_fn",
+      "temporal_scope": "Local instance scope",
+      "failure_behavior": "Closed-form Ridge solve with lstsq fallback",
+      "status": "VERIFIED"
+    },
+    {
+      "explainer": "FastInferenceExplainer",
+      "background_source": "NOT_APPLICABLE",
+      "selection": "Domain threshold rules",
+      "size": "NOT_APPLICABLE",
+      "feature_schema": "amount, velocity_1h, merchant_category",
+      "preprocessing": "Clean MCC and float casting",
+      "tenant_scope": "Tenant-isolated caching (cfi:shap:{tenant_id}:{transaction_id})",
+      "model_version_scope": "FastPath-Online-V1",
+      "temporal_scope": "Real-time online scoring window",
+      "failure_behavior": "Safe fallback with default return structure",
+      "status": "NOT_APPLICABLE"
+    },
+    {
+      "explainer": "GNN Graph Embedding Neighborhood Explainer",
+      "background_source": "GraphEngine topological adjacency",
+      "selection": "2-hop subgraph edges filtered as_of alert.created_at",
+      "size": "Dynamic (up to top 6 edges)",
+      "feature_schema": "Edge relationshipType and endpoints",
+      "preprocessing": "GraphEngine.get_subgraph(radius=2, as_of=as_of)",
+      "tenant_scope": "Entity neighborhood",
+      "model_version_scope": "GraphSAGE embedding model",
+      "temporal_scope": "Historical as_of cutoff timestamp",
+      "failure_behavior": "Gracefully handles isolated nodes with 0 edges (zero mock integrity)",
+      "status": "VERIFIED"
+    }
+  ]
+}
