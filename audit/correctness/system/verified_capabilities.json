@@ -8,7 +8,7 @@
       "implementation": "FederatedLearningEngine (FedAvg, FedProx, SCAFFOLD)",
       "verification_level": "VERIFIED",
       "evidence": "backend/tests/unit/test_fl_engine.py, test_fl_algorithms.py, test_lifecycle_integrity.py",
-      "known_limitations": "Communication rounds bounded in memory; multi-datacenter network jitter emulated locally.",
+      "known_limitations": "Verified local multi-client federated execution with isolated client datasets; physical distributed multi-datacenter deployment across independent banking rails not verified.",
       "production_claim_allowed": true
     },
     {
@@ -29,10 +29,10 @@
     },
     {
       "capability": "Secure Aggregation (SecAgg)",
-      "implementation": "Pairwise additive zero-sum masking with HKDF domain separation",
+      "implementation": "Pairwise additive masking with verified zero-sum mask cancellation under tested protocol",
       "verification_level": "VERIFIED",
       "evidence": "verification/secure_aggregation/tests/, test_zero_server_knowledge.py",
-      "known_limitations": "Evaluated in local and in-memory multi-node harnesses; full distributed threshold key reconstruction depends on network layer.",
+      "known_limitations": "Verified pairwise additive mask cancellation under tested protocol; does not claim formal zero-knowledge coordinator proof or physical multi-datacenter deployment.",
       "production_claim_allowed": true
     },
     {
@@ -109,10 +109,18 @@
     },
     {
       "capability": "Explainability (SHAP & LIME)",
-      "implementation": "Surrogate KernelExplainer (bounded permutations) and Local Heuristic Explainer",
+      "implementation": "SHAP KernelExplainer (bounded evaluation budget N=100), LIME local linear surrogate, and fast/fallback heuristic explainers",
       "verification_level": "VERIFIED_WITH_LIMITATIONS",
-      "evidence": "backend/tests/unit/test_explainability.py, test_alert_explainability.py",
-      "known_limitations": "Evaluates bounded permutation budget (N=100) for sub-50ms API SLAs; heuristics must not be claimed as exhaustive Shapley values.",
+      "evidence": "backend/tests/unit/test_explainability_correctness.py, test_explainability_service.py, test_shap_mathematical_invariants.py",
+      "known_limitations": "SHAP KernelExplainer evaluates a bounded sample budget (N=100) and background dataset (N=30) for sub-50ms API SLAs; LIME provides local linear surrogate attributions; heuristics and topological graph risk must not be represented as exhaustive Shapley values or gradient-based GNNExplainer attributions.",
+      "production_claim_allowed": true
+    },
+    {
+      "capability": "Entity Pseudonymization",
+      "implementation": "Type-salted keyed HMAC-SHA256 pseudonymization for deterministic entity linking",
+      "verification_level": "VERIFIED",
+      "evidence": "backend/tests/unit/test_zero_leakage_contract.py, backend/tests/integration/test_tenant_isolation_e2e.py",
+      "known_limitations": "Preimage resistance depends on key protection and input-entropy assumptions; does not provide unconditional information-theoretic secrecy against compromised keys or dictionary attacks on low-entropy identifiers.",
       "production_claim_allowed": true
     },
     {

@@ -86,10 +86,10 @@ Detailed in [`audit/correctness/system/verified_capabilities.json`](file:///audi
 
 | Subsystem / Capability | Implementation Component | Verification Level | Test Evidence | Claim Boundary |
 | :--- | :--- | :--- | :--- | :--- |
-| **Federated Learning Core** | `FederatedLearningEngine` (FedAvg, FedProx, SCAFFOLD) | `VERIFIED` | 26 unit & integration tests | Production-grade local multi-bank federation |
+| **Federated Learning Core** | `FederatedLearningEngine` (FedAvg, FedProx, SCAFFOLD) | `VERIFIED` | 26 unit & integration tests | Verified local multi-client federated execution with isolated client datasets |
 | **Server-Side FL Optimizers** | `FedAdam`, `FedYogi`, `FedAdagrad`, `Q-FedAvg` | `VERIFIED` | `test_server_optimizers.py` (100%) | Verified adaptive server momentum |
 | **Differential Privacy** | Opacus DP-SGD with PRVAccountant | `VERIFIED_WITH_LIMITATIONS` | `verification/differential_privacy/` | Verified accounting; subject to NR-001 utility trade-off |
-| **Secure Aggregation** | Pairwise zero-sum masking ($\|\sum m_i\|_\infty < 10^{-4}$) | `VERIFIED` | `test_zero_server_knowledge.py` | Cryptographically verified zero-knowledge coordinator |
+| **Secure Aggregation** | Pairwise additive masking ($\|\sum m_i\|_\infty < 10^{-4}$) | `VERIFIED` | `test_zero_server_knowledge.py` | Pairwise additive secure aggregation with verified mask cancellation under tested protocol |
 | **Homomorphic Encryption** | TenSEAL CKKS vector encryption | `VERIFIED` | `test_fhe_homomorphic_sum.py` | Verified homomorphic parameter summation |
 | **Hardware Enclave (TEE)** | `SoftwareEmulatedTEEDriver` | `EMULATED` | `test_sgx_enclave_attestation.py` | Software emulation only; physical SGX not claimed |
 | **Byzantine Defenses** | Trimmed Mean, Median, Multi-Krum, Bulyan | `VERIFIED` | `byzantine_federated_canonical.json` | Real-data verified; subject to Non-IID clean penalty |
@@ -99,7 +99,7 @@ Detailed in [`audit/correctness/system/verified_capabilities.json`](file:///audi
 | **Graph Intelligence** | `StreamingGraphService` & `UBOGraphService` | `VERIFIED` | `test_ubo_graph.py`, `test_streaming_graph.py` | Streaming directed graph with UBO cycle detection |
 | **Inductive GraphSAGE** | PyG Inductive GraphSAGE (2-layer Mean) | `REAL_DATA_BENCHMARKED` | `elliptic_temporal_canonical.json` | Real Bitcoin transaction graph benchmark (AP: 0.3761) |
 | **Historical Graph Queries** | Temporal `as_of` edge filtering | `VERIFIED_WITH_LIMITATIONS` | `test_transaction_lifecycle.py` (Scenario 9) | Edge-time filtering; not full bi-temporal node replay |
-| **Model Explainability** | Surrogate KernelExplainer (N=100) & Local Heuristic | `VERIFIED_WITH_LIMITATIONS` | `test_explainability.py` | Fast surrogate attributions; not exhaustive Shapley |
+| **Model Explainability** | SHAP KernelExplainer (bounded budget N=100), LIME local surrogate & heuristics | `VERIFIED_WITH_LIMITATIONS` | `test_explainability_correctness.py` | Bounded sample SHAP & local surrogate attributions; heuristics explicitly separated |
 | **Streaming Ingestion** | `StreamingEngine` with Pandera schema validation | `VERIFIED` | `test_streaming_engine.py` | In-process & WebSocket streaming; Kafka optional |
 | **Online Feature Store** | `FeatureStoreService` with TTL rolling stats | `VERIFIED` | `test_feature_store_service.py` | Real-time feature retrieval with async ingestion |
 | **Idempotency Engine** | `IdempotencyService` `(tenant_id, key)` | `VERIFIED` | `test_retry_consistency.py` | Request idempotency; bounded by 24h cache TTL |
@@ -152,7 +152,7 @@ All benchmark numbers reported across documentation are strictly reconciled with
 
 ### Critical Provenance Reconciliations:
 1. **Separation of Real vs. Synthetic:** Kaggle IEEE-CIS, European Credit Card, Elliptic, and Byzantine evaluations are executed on real historical financial data. PaySim and AMLSim are external simulations. CrossBank v2, SynthAML, and AMLNet are internal synthetics.
-2. **Multi-Seed Variance Disclosure:** All canonical claims report mean $\pm$ standard deviation across $\ge 3$ (and up to 5) standardized seeds (`[42, 123, 456, 789, 2026]`).
+2. **Multi-Seed Variance & Provenance Disclosure:** Canonical multi-seed results report their benchmark-specific seed sets and mean $\pm$ standard deviation where applicable. Multi-seed benchmarks include Kaggle IEEE-CIS, European Credit Card, Elliptic Bitcoin Graph, PaySim, and Byzantine evaluations across 3 seeds (`[42, 123, 456]`), and CrossBank v2 across 5 seeds (`[42, 123, 456, 789, 2025]`). Single-seed benchmarks (AMLSim, SynthAML, AMLNet, DP sweep, Non-IID testbed, Latency) are explicitly documented as single-seed diagnostic or controlled-parameter experiments and do not claim multi-seed statistical variance.
 3. **Retired Prototypes Isolated:** The single-seed algebraic Byzantine prototype claiming 99.7% universal retention remains quarantined in `benchmarks/results/raw/byzantine_benchmark_sign_inversion.json` and is never cited as current evidence.
 
 ---
@@ -162,12 +162,12 @@ All benchmark numbers reported across documentation are strictly reconciled with
 | Privacy / Security Mechanism | Implemented Technology | Verification Scope | Tested Boundary Reality | Forbidden Overclaim |
 | :--- | :--- | :--- | :--- | :--- |
 | **Differential Privacy** | Opacus DP-SGD + PRV Accountant | Unit, integration & noise sweep | Bounded noise injection on PyTorch tensors | Never claim $\epsilon < 1.0$ without disclosing NR-001 utility penalty |
-| **Secure Aggregation** | Pairwise additive masking + HKDF | Mathematical verification suite | In-process & multi-thread zero-sum identity | Never claim multi-datacenter network deployment |
+| **Secure Aggregation** | Pairwise additive masking + HKDF | Mathematical verification suite | Verified zero-sum mask cancellation under tested protocol | Never claim formal zero-knowledge coordinator proof or multi-datacenter deployment |
 | **Homomorphic Encryption** | TenSEAL CKKS scheme | PyTest mathematical correctness | Parameter addition linearity | Never claim full homomorphic neural inference |
 | **Hardware Enclave (TEE)** | `SoftwareEmulatedTEEDriver` | Interface & measurement parsing | Software emulation with HMAC signing | **Never claim physical Intel SGX hardware attestation** |
 | **Zero-Trust mTLS / PKI** | HashiCorp Vault PKI engine | API & certificate unit tests | Software CA issuance & CRL checks | Never claim production enterprise CA infrastructure |
 | **Tenant Isolation** | Schema routing & BOLA headers | 21 multi-tenant test suites | SQLite file partitions & HTTP 403 BOLA | Never claim physical multi-cloud VPC air-gapping |
-| **Entity Pseudonymization** | Type-salted HMAC-SHA256 | Unit tests & privacy audit | Irreversible pseudonym generation | Never claim information-theoretic irreversibility against quantum attacks |
+| **Entity Pseudonymization** | Type-salted keyed HMAC-SHA256 | Unit tests & privacy audit | Deterministic cross-record entity linking with keyed preimage resistance | Never claim unconditional irreversibility, absolute anonymization, or security without key protection against low-entropy dictionary attacks |
 | **Byzantine Robustness** | Trimmed Mean, Krum, Bulyan | 72-condition benchmark | Scaled sign-inversion attack resistance | Never claim universal immunity against arbitrary poisoning shifts |
 
 ---
@@ -193,7 +193,11 @@ All benchmark numbers reported across documentation are strictly reconciled with
 
 - **Directed Financial Relationships:** The graph engine models transactions as directed edges ($A \to B$) with distinct source and destination account semantics.
 - **Event-Time Filtering vs. Full Bitemporality:** Graph traversal supports event-time filtering (`as_of=T`), correctly excluding edges created after $T$. However, node-level attributes reflect the latest state; full bi-temporal node history reconstruction is an architectural limitation.
-- **Surrogate vs. Exhaustive Explainability:** Real-time API explanations evaluate a surrogate KernelExplainer over a bounded permutation budget ($N=100$) to satisfy sub-50ms latency SLAs. Fast heuristics are explicitly labelled as heuristics and never misrepresented as exhaustive Shapley values.
+- **SHAP KernelExplainer with Bounded Evaluation Budget:** Real-time API explanations execute the official SHAP `KernelExplainer` algorithm over a bounded sample evaluation budget ($nsamples=100$) and background dataset ($N=30$) to satisfy sub-50ms latency SLAs. It is not an ad-hoc "Surrogate KernelExplainer", but the standard KernelExplainer with a bounded evaluation budget enforcing the Shapley efficiency axiom ($\sum \phi_i = f(x) - \mathbb{E}[f(x)]$).
+- **LIME Local Linear Surrogate:** For local decision boundaries, the platform fits a separate LIME local linear surrogate model (`compute_lime_explanation`) via $L_2$-regularized weighted ridge regression over local Gaussian perturbations.
+- **Fast & Fallback Heuristics:** Sub-millisecond scoring uses `FastInferenceExplainer` (`realtime_explainer.py`), and uninitialized/failed models fall back to analytical feature weighting. Fast/fallback heuristics are explicitly labelled as heuristics and never misrepresented as Shapley values or LIME coefficients.
+- **Topological Graph Heuristic vs. GNNExplainer:** Graph explanations (`explain_gnn_embedding`) evaluate a 2-hop topological neighborhood structure heuristic. It must not be represented as a gradient-based GNNExplainer optimization or true GraphSAGE model weight attribution.
+- **Driver Agreement vs. Accuracy:** Any measured explainability metric is strictly evaluated as **top-1 driver agreement**, which must never be conflated with generic "SHAP accuracy".
 
 ---
 
@@ -234,7 +238,7 @@ Derived from [`audit/correctness/system/known_limitations.json`](file:///audit/c
 | :--- | :--- | :--- | :--- | :--- |
 | **"Decentralized training without pooling raw PII"** | `FederatedLearningEngine`, `test_zero_leakage_contract.py` | `VERIFIED` | "Supports federated learning across isolated client datasets without raw data pooling." | "Proven production deployment across live banking core rails." |
 | **"Byzantine robustness under poisoning attacks"** | `byzantine_federated_canonical.json`, `test_byzantine_suite.py` | `VERIFIED` | "Tolerates evaluated sign-inversion attacks with 99.5% retention using Trimmed Mean on real Credit Card data." | "Universal immunity against arbitrary adversarial poisoning." |
-| **"Cryptographic zero-server-knowledge aggregation"** | `test_zero_server_knowledge.py`, `secagg_correctness.py` | `VERIFIED` | "Pairwise zero-sum masks cancel out during server aggregation, revealing only the global sum." | "Unconditional quantum-proof security." |
+| **"Pairwise additive secure aggregation"** | `test_zero_server_knowledge.py`, `secagg_correctness.py` | `VERIFIED` | "Pairwise additive masks cancel out exactly during server aggregation under the tested protocol, revealing only the aggregate." | "Formal zero-knowledge coordinator proof or live multi-datacenter deployment." |
 | **"Sub-50ms real-time scoring latency"** | `benchmarks/results/raw/latency_benchmark.json` | `VERIFIED` | "Evaluates transactions in 2.70 ms in-process and 89 ms under concurrent HTTP load on local test host." | "Guaranteed global sub-5ms latency across multi-region cloud networks." |
 | **"Optimistic concurrency prevents lost case updates"** | `test_distributed_recovery.py`, `test_case_concurrency.py` | `VERIFIED` | "Version-based CAS validation rejects stale case modifications with HTTP 409." | "Distributed database serializability certification." |
 | **"Four-Eyes dual supervisor control"** | `test_lifecycle_integrity.py` (Scenario 5), `cases.py` | `VERIFIED` | "Requires two distinct supervisor sign-offs before a fraud case can be finalized." | "Regulatory compliance certification by FinCEN or BaFin." |
@@ -310,11 +314,11 @@ All 26 certification gates (**A through Z**) are evaluated:
 5. **Which artifacts are historical or superseded?** Synthetic IEEE-CIS fallback (0.7811), PaySim synthetic fallback (0.4654), toy Elliptic chain (0.9001), single-seed Byzantine proxy (99.7%).
 6. **Are any historical benchmark numbers still presented as current?** No. All have been reconciled or isolated to historical archives.
 7. **Are synthetic and real-data results clearly separated?** Yes. Explicitly distinguished in Section 6 and `CANONICAL_EVIDENCE.md`.
-8. **Are single-seed and multi-seed results clearly separated?** Yes. All canonical results report mean $\pm$ std across $\ge 3$ seeds.
+8. **Are single-seed and multi-seed results clearly separated?** Yes. Canonical multi-seed results report benchmark-specific seed sets (`[42, 123, 456]` for real/simulated datasets; `[42, 123, 456, 789, 2025]` for CrossBank v2) and mean $\pm$ std where applicable. Single-seed benchmarks (AMLSim, SynthAML, AMLNet, DP sweep, Non-IID, Latency) are explicitly distinguished as single-seed diagnostic or controlled evaluations.
 9. **Are negative benchmark results preserved?** Yes (NR-001 through NR-005 in `LIMITATIONS.md`).
-10. **Is FL core currently verified?** Yes (FedAvg, FedProx, SCAFFOLD verified).
+10. **Is FL core currently verified?** Yes (verified local multi-client federated execution with isolated client datasets across FedAvg, FedProx, and SCAFFOLD; live banking production deployment not claimed).
 11. **Is DP runtime enforcement currently verified?** Yes (Opacus DP-SGD with PRV moments accountant).
-12. **Is secure aggregation currently verified within its tested scope?** Yes (pairwise zero-sum masking verified).
+12. **Is secure aggregation currently verified within its tested scope?** Yes (pairwise additive masking with exact zero-sum cancellation verified under tested protocol; zero-knowledge coordinator not claimed).
 13. **Is FHE currently verified within its tested scope?** Yes (TenSEAL CKKS vector addition verified).
 14. **Is TEE physical hardware attestation verified?** No; emulated in software via `SoftwareEmulatedTEEDriver`.
 15. **Are Byzantine defenses currently verified?** Yes (Trimmed Mean, Median, Multi-Krum, Bulyan verified on real data).
@@ -322,7 +326,7 @@ All 26 certification gates (**A through Z**) are evaluated:
 17. **Is model-version provenance verified?** Yes (permanently version-bound; verified under race conditions).
 18. **Is graph message-passing semantics verified?** Yes (inductive GraphSAGE on PyG verified).
 19. **Is historical graph behavior described within its real limits?** Yes (event-time filtering; not bitemporal node reconstruction).
-20. **Are explanation methods labelled truthfully?** Yes (KernelExplainer surrogate budget and heuristics explicit).
+20. **Are explanation methods labelled truthfully?** Yes (SHAP KernelExplainer with bounded evaluation budget, LIME local surrogate, fast/fallback heuristics, and topological graph risk clearly delineated; top-1 driver agreement not conflated with accuracy).
 21. **Is streaming retry/idempotency behavior described correctly?** Yes (bounded TTL idempotency; at-least-once transport).
 22. **Is tenant isolation verified across tested whole-system paths?** Yes (403 BOLA rejection verified).
 23. **Is case concurrency/version protection verified?** Yes (optimistic CAS version checking verified).

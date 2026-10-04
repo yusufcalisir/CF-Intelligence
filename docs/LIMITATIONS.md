@@ -47,7 +47,7 @@ To enforce scientific transparency, CF-Intelligence mandates the following bindi
 3. **Unconditional Negative Result Preservation**:
    - Any experimental configuration where federated learning, differential privacy, or Byzantine defenses lag behind baselines must be retained in public tables and reports with explicit negative deltas ($\Delta < 0$).
 4. **Multi-Seed Distribution Reporting**:
-   - Benchmarks must disclose mean and sample standard deviation across at least 5 standardized random seeds (`[42, 123, 456, 789, 2026]`), detailing both champion and worst-case convergence behavior.
+   - Benchmarks must disclose mean and sample standard deviation across standardized random seeds (e.g. `[42, 123, 456, 789, 2025]` for 5-seed benchmarks such as CrossBank v2, or `[42, 123, 456]` for 3-seed real-data benchmarks), detailing both champion and worst-case convergence behavior.
 
 ---
 
@@ -175,7 +175,7 @@ To satisfy the transparency requirements of **Federal Reserve SR 11-7** and **EU
 - **Software Emulation Layer:** Production deployments require physical Hardware Security Modules (PKCS#11 HSMs), bare-metal Intel SGX / AWS Nitro Enclaves, and live distributed Apache Kafka clusters. In local development and automated CI/CD testing, the platform utilizes authentic software emulators (`SoftwareHSMSignerEngine`, `SoftwareEmulatedTEEDriver`, in-memory message buses).
 
 ### 3.5 Explainability & Manifold Constraints
-- **Surrogate KernelExplainer Budget:** To satisfy sub-50ms API SLAs, SHAP attributions evaluate a bounded permutation budget ($N=100$) over background reference sets ($N=30$), rather than calculating exhaustive exponential Shapley permutations ($2^D$).
+- **Bounded SHAP Evaluation Budget:** To satisfy sub-50ms API SLAs, SHAP KernelExplainer evaluates a bounded sample budget ($N=100$) over background reference sets ($N=30$), rather than calculating exhaustive exponential Shapley permutations ($2^D$).
 - **Discrete Counterfactual Search:** Counterfactual explanations search a greedy discrete perturbation space over domain-mutable features, rather than performing continuous gradient descent along an empirical data manifold.
 
 ---

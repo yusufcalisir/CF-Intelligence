@@ -114,7 +114,7 @@
       "path": "benchmarks/crossbank_v2/results/canonical_results.json",
       "classification": "SYNTHETIC_EVIDENCE",
       "domain": "empirical_benchmark",
-      "description": "Flagship CrossBank v2 synthetic multi-bank benchmark across 5 seeds and 7 topologies under Protocol 2.1.0."
+      "description": "Flagship CrossBank v2 synthetic multi-bank benchmark across 5 canonical seeds [42, 123, 456, 789, 2025] and 7 topologies under Protocol 2.1.0."
     },
     {
       "path": "benchmarks/results/raw/dp_privacy_utility_tradeoff.json",
