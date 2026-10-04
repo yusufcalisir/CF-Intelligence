@@ -87,6 +87,20 @@ DEVICES: list[str] = ["mobile_app", "web_browser", "pos_terminal", "atm", "phone
 HIGH_RISK_COUNTRIES = {"NG", "RU", "PH", "BR"}
 HIGH_RISK_MERCHANTS = {"gambling", "crypto", "wire_transfer", "jewelry"}
 
+# Authoritative dataset reference bounds for feature scaling
+REFERENCE_BOUNDS: dict[str, tuple[float, float]] = {
+    "transaction_amount": (0.0, 5000.0),
+    "merchant_category": (0.0, 19.0),
+    "country_code": (0.0, 19.0),
+    "device_type": (0.0, 4.0),
+    "velocity": (0.0, 30.0),
+    "hour_of_day": (0.0, 23.0),
+    "merchant_risk_score": (0.0, 1.0),
+    "customer_history_score": (0.0, 1.0),
+    "chargeback_count": (0.0, 10.0),
+    "account_age_days": (0.0, 1000.0),
+}
+
 
 class DataGenerator:
     """Generates synthetic Non-IID transaction datasets for federated learning.
@@ -386,24 +400,35 @@ class DataGenerator:
 
     @staticmethod
     def encode_features(df: pd.DataFrame) -> np.ndarray:
-        """Convert categorical features to numeric for model training.
+        """Convert categorical features to numeric and normalize for model training.
 
-        Uses ordinal encoding for simplicity. In production you'd use
-        target encoding or embeddings, but for a simulation demo this
-        is sufficient and keeps the model interpretable.
+        Enforces strict feature schema alignment with FEATURE_NAMES and
+        authoritative vocabularies/reference bounds to ensure training and
+        inference preprocessing parity.
         """
-        encoded = df.copy()
+        missing = [f for f in FEATURE_NAMES if f not in df.columns]
+        if missing:
+            raise ValueError(f"Missing required features for model encoding: {missing}")
 
-        # Encode categoricals as integer codes
-        for col in ["merchant_category", "country_code", "device_type"]:
-            encoded[col] = encoded[col].astype("category").cat.codes.astype(float)
+        encoded = df[FEATURE_NAMES].copy()
 
-        # Normalize numeric features to [0, 1]
+        # Encode categoricals using authoritative vocabulary indices matching inference
+        cat_mappings = [
+            ("merchant_category", MERCHANT_CATEGORIES),
+            ("country_code", COUNTRIES),
+            ("device_type", DEVICES),
+        ]
+        for col, vocab in cat_mappings:
+            vocab_map = {val: float(idx) for idx, val in enumerate(vocab)}
+            encoded[col] = encoded[col].map(lambda x, vm=vocab_map: vm.get(str(x), 0.0)).astype(float)
+
+        # Normalize features using shared REFERENCE_BOUNDS
         for col in encoded.columns:
-            col_min = encoded[col].min()
-            col_max = encoded[col].max()
-            if col_max > col_min:
-                encoded[col] = (encoded[col] - col_min) / (col_max - col_min)
+            c_min, c_max = REFERENCE_BOUNDS.get(col, (0.0, 1.0))
+            if c_max > c_min:
+                col_vals = encoded[col].astype(float)
+                val_norm = (col_vals - c_min) / (c_max - c_min)
+                encoded[col] = val_norm.clip(0.0, 1.0)
             else:
                 encoded[col] = 0.0
 

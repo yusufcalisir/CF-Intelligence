@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import functools
 import logging
+import math
 import os
 import random
 import time
@@ -46,6 +47,7 @@ from app.application.schemas.transaction import (
     TransactionPredictResponse,
 )
 from app.application.services.alert_service import AlertIntelligenceService
+from app.application.services.data_generator import REFERENCE_BOUNDS
 from app.application.services.explainability_service import ExplainabilityService
 from app.application.services.feature_store_service import FeatureStoreService
 from app.application.services.model_registry import ModelEvaluationEngine, ModelRegistry
@@ -74,7 +76,10 @@ _settings = get_settings()
 def _eval_model(model: torch.nn.Module, input_tensor: torch.Tensor) -> float:
     """Evaluate PyTorch model forward pass synchronously (offloaded to threadpool)."""
     with torch.no_grad():
-        return float(model(input_tensor).item())
+        out = float(model(input_tensor).item())
+        if not math.isfinite(out):
+            raise ValueError(f"Model inference produced non-finite output: {out}")
+        return out
 
 
 def _eval_model_batch(model: torch.nn.Module, input_tensors: torch.Tensor) -> list[float]:
@@ -82,10 +87,15 @@ def _eval_model_batch(model: torch.nn.Module, input_tensors: torch.Tensor) -> li
     with torch.no_grad():
         outputs = model(input_tensors)
         if outputs.dim() == 0:
-            return [float(outputs.item())]
-        if outputs.dim() == 1:
-            return [float(v) for v in outputs.tolist()]
-        return [float(v[0]) if len(v) > 0 else 0.0 for v in outputs.tolist()]
+            res = [float(outputs.item())]
+        elif outputs.dim() == 1:
+            res = [float(v) for v in outputs.tolist()]
+        else:
+            res = [float(v[0]) if len(v) > 0 else 0.0 for v in outputs.tolist()]
+        for v in res:
+            if not math.isfinite(v):
+                raise ValueError(f"Model batch inference produced non-finite output: {v}")
+        return res
 
 
 
@@ -145,11 +155,29 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
                 detail=f"No trained models found for simulation ID: {simulation_id}",
             )
         state_dict = _registry.load_version(simulation_id, active_entry["version"])
-        model = _model_service.create_model(input_dim=NUM_FEATURES, dp_compatible=True)
+        sim_dp = True
+        for key in state_dict:
+            if "running_mean" in key or "running_var" in key:
+                sim_dp = False
+                break
+        sim_input_dim = NUM_FEATURES
+        for weight_key in ("network.0.weight", "module.network.0.weight", "_module.network.0.weight"):
+            if (
+                weight_key in state_dict
+                and hasattr(state_dict[weight_key], "shape")
+                and len(state_dict[weight_key].shape) >= 2
+            ):
+                sim_input_dim = int(state_dict[weight_key].shape[1])
+                break
+        model = _model_service.create_model(input_dim=sim_input_dim, dp_compatible=sim_dp)
         try:
             model.load_state_dict(state_dict, strict=False)
         except Exception as exc:
-            logger.warning("Incompatible state dict for simulation %s (%s); using fresh weights", simulation_id, exc)
+            logger.error("Incompatible or corrupt state dict for simulation %s: %s", simulation_id, exc)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Incompatible or corrupt model state dict for simulation {simulation_id}: {exc}",
+            )
         model.eval()
         return model
 
@@ -193,20 +221,6 @@ def _get_cached_serving_model(simulation_id: str | None = None) -> torch.nn.Modu
 
     return _cached_serving_model
 
-# Global reference bounds for min-max scaling of single transactions
-REFERENCE_BOUNDS = {
-    "transaction_amount": (0.0, 5000.0),
-    "merchant_category": (0.0, 19.0),
-    "country_code": (0.0, 19.0),
-    "device_type": (0.0, 4.0),
-    "velocity": (0.0, 30.0),
-    "hour_of_day": (0.0, 23.0),
-    "merchant_risk_score": (0.0, 1.0),
-    "customer_history_score": (0.0, 1.0),
-    "chargeback_count": (0.0, 10.0),
-    "account_age_days": (0.0, 1000.0),
-}
-
 
 def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
     """Preprocess, ordinal-encode, and min-max scale a single transaction payload."""
@@ -231,6 +245,10 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
             else:
                 val = 0.0
 
+        # Validate non-finite numeric input (MODEL-INV-13 fail-closed)
+        if isinstance(val, (int, float)) and not math.isfinite(val):
+            raise ValueError(f"Feature '{name}' contains non-finite value: {val}")
+
         # Encode categorical variables using constant list indexes
         if name == "merchant_category":
             val_str = val if isinstance(val, str) else str(val)
@@ -242,7 +260,12 @@ def preprocess_transaction(txn: dict[str, Any]) -> torch.Tensor:
             val_str = val if isinstance(val, str) else str(val)
             val = float(DEVICES.index(val_str) if val_str in DEVICES else 0)
         else:
-            val = float(val)
+            try:
+                val = float(val)
+            except (ValueError, TypeError) as exc:
+                raise ValueError(f"Invalid numeric value for feature '{name}': {val}") from exc
+            if not math.isfinite(val):
+                raise ValueError(f"Feature '{name}' contains non-finite numeric value: {val}")
 
         # Scale with pre-defined dataset reference bounds
         c_min, c_max = REFERENCE_BOUNDS.get(name, (0.0, 1.0))
@@ -348,10 +371,12 @@ async def predict_transaction(
         input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
         input_tensor = preprocess_transaction(txn_dict).to(_model_service.device)
         if input_tensor.shape[1] < input_dim:
+            logger.warning("Padding input tensor from %d to %d", input_tensor.shape[1], input_dim)
             input_tensor = torch.nn.functional.pad(
                 input_tensor, (0, input_dim - input_tensor.shape[1]), value=0.0
             )
         elif input_tensor.shape[1] > input_dim:
+            logger.warning("Truncating input tensor from %d to %d", input_tensor.shape[1], input_dim)
             input_tensor = input_tensor[:, :input_dim]
 
         # Measure Champion Latency
@@ -603,14 +628,55 @@ async def predict_batch(
         input_dim = int(getattr(first_layer, "in_features", NUM_FEATURES))
 
         txn_dicts = [t.model_dump() for t in payload.transactions]
+        if _settings.feature_store_enabled:
+            entity_rows = [
+                {
+                    "customer_id": f"serving:{target_tenant}:customer_1",
+                    "merchant_id": f"merch_{t.merchant_category}",
+                }
+                for t in payload.transactions
+            ]
+            online_feats = _feature_store.get_online_features(
+                entity_rows,
+                [
+                    "rolling_velocity_1h",
+                    "avg_amount_24h",
+                    "customer_history_score",
+                    "account_age_days",
+                    "chargeback_count",
+                    "merchant_risk_score",
+                    "merchant_category",
+                ],
+            )
+            for idx, feats in enumerate(online_feats):
+                td = txn_dicts[idx]
+                td["velocity"] = feats.get("rolling_velocity_1h", td.get("velocity", 1.0))
+                td["customer_history_score"] = feats.get(
+                    "customer_history_score", td.get("customer_history_score", 0.95)
+                )
+                td["account_age_days"] = feats.get(
+                    "account_age_days", td.get("account_age_days", 365)
+                )
+                td["chargeback_count"] = feats.get(
+                    "chargeback_count", td.get("chargeback_count", 0)
+                )
+                td["merchant_risk_score"] = feats.get(
+                    "merchant_risk_score", td.get("merchant_risk_score", 0.05)
+                )
+                td["merchant_category"] = feats.get(
+                    "merchant_category", td.get("merchant_category", "grocery")
+                )
+
         tensors = []
         for td in txn_dicts:
             t_tensor = preprocess_transaction(td)
             if t_tensor.shape[1] < input_dim:
+                logger.warning("Padding input tensor from %d to %d", t_tensor.shape[1], input_dim)
                 t_tensor = torch.nn.functional.pad(
                     t_tensor, (0, input_dim - t_tensor.shape[1]), value=0.0
                 )
             elif t_tensor.shape[1] > input_dim:
+                logger.warning("Truncating input tensor from %d to %d", t_tensor.shape[1], input_dim)
                 t_tensor = t_tensor[:, :input_dim]
             tensors.append(t_tensor)
 

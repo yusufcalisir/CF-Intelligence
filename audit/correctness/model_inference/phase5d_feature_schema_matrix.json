@@ -1,0 +1,126 @@
+{
+  "phase": "5D",
+  "name": "Phase 5D Feature Schema Matrix (FraudDetectionModel)",
+  "features": [
+    {
+      "model": "FraudDetectionModel",
+      "feature": "transaction_amount",
+      "training_position": 0,
+      "inference_position": 0,
+      "training_transform": "Min-Max scaling via REFERENCE_BOUNDS['transaction_amount'] = (0.0, 5000.0), clipped to [0, 1]",
+      "inference_transform": "Min-Max scaling via REFERENCE_BOUNDS['transaction_amount'] = (0.0, 5000.0), clipped to [0, 1]",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:encode_features vs backend/app/presentation/routers/predict.py:preprocess_transaction"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "merchant_category",
+      "training_position": 1,
+      "inference_position": 1,
+      "training_transform": "Authoritative list index via MERCHANT_CATEGORIES (20 classes) scaled by REFERENCE_BOUNDS['merchant_category'] = (0.0, 19.0)",
+      "inference_transform": "Authoritative list index via MERCHANT_CATEGORIES (20 classes) scaled by REFERENCE_BOUNDS['merchant_category'] = (0.0, 19.0)",
+      "dtype": "float32",
+      "missing_semantics": "Default 'grocery' -> index 0.0",
+      "status": "MISMATCH_REMEDIATED",
+      "evidence": "MODEL-0001: DataGenerator.encode_features previously used pandas alphabetical .astype('category').cat.codes; remediated to authoritative MERCHANT_CATEGORIES index."
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "country_code",
+      "training_position": 2,
+      "inference_position": 2,
+      "training_transform": "Authoritative list index via COUNTRIES (20 classes) scaled by REFERENCE_BOUNDS['country_code'] = (0.0, 19.0)",
+      "inference_transform": "Authoritative list index via COUNTRIES (20 classes) scaled by REFERENCE_BOUNDS['country_code'] = (0.0, 19.0)",
+      "dtype": "float32",
+      "missing_semantics": "Default 'US' -> index 0.0",
+      "status": "MISMATCH_REMEDIATED",
+      "evidence": "MODEL-0001: DataGenerator.encode_features previously used pandas alphabetical .astype('category').cat.codes; remediated to authoritative COUNTRIES index."
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "device_type",
+      "training_position": 3,
+      "inference_position": 3,
+      "training_transform": "Authoritative list index via DEVICES (5 classes) scaled by REFERENCE_BOUNDS['device_type'] = (0.0, 4.0)",
+      "inference_transform": "Authoritative list index via DEVICES (5 classes) scaled by REFERENCE_BOUNDS['device_type'] = (0.0, 4.0)",
+      "dtype": "float32",
+      "missing_semantics": "Default 'web_browser' -> index 1.0",
+      "status": "MISMATCH_REMEDIATED",
+      "evidence": "MODEL-0001: DataGenerator.encode_features previously used pandas alphabetical .astype('category').cat.codes; remediated to authoritative DEVICES index."
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "velocity",
+      "training_position": 4,
+      "inference_position": 4,
+      "training_transform": "Min-Max scaling via REFERENCE_BOUNDS['velocity'] = (0.0, 30.0), clipped to [0, 1]",
+      "inference_transform": "Min-Max scaling via REFERENCE_BOUNDS['velocity'] = (0.0, 30.0), clipped to [0, 1]",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0 (or feature store snapshot rolling_velocity_1h)",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "hour_of_day",
+      "training_position": 5,
+      "inference_position": 5,
+      "training_transform": "Min-Max scaling via REFERENCE_BOUNDS['hour_of_day'] = (0.0, 23.0), clipped to [0, 1]",
+      "inference_transform": "Min-Max scaling via REFERENCE_BOUNDS['hour_of_day'] = (0.0, 23.0), clipped to [0, 1]",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0 (or payload default 12)",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "merchant_risk_score",
+      "training_position": 6,
+      "inference_position": 6,
+      "training_transform": "Domain bounds [0.0, 1.0], identity normalization",
+      "inference_transform": "Domain bounds [0.0, 1.0], identity normalization",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0 (or payload default 0.05)",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "customer_history_score",
+      "training_position": 7,
+      "inference_position": 7,
+      "training_transform": "Domain bounds [0.0, 1.0], identity normalization",
+      "inference_transform": "Domain bounds [0.0, 1.0], identity normalization",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0 (or payload default 0.95)",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "chargeback_count",
+      "training_position": 8,
+      "inference_position": 8,
+      "training_transform": "Min-Max scaling via REFERENCE_BOUNDS['chargeback_count'] = (0.0, 10.0), clipped to [0, 1]",
+      "inference_transform": "Min-Max scaling via REFERENCE_BOUNDS['chargeback_count'] = (0.0, 10.0), clipped to [0, 1]",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    },
+    {
+      "model": "FraudDetectionModel",
+      "feature": "account_age_days",
+      "training_position": 9,
+      "inference_position": 9,
+      "training_transform": "Min-Max scaling via REFERENCE_BOUNDS['account_age_days'] = (0.0, 1000.0), clipped to [0, 1]",
+      "inference_transform": "Min-Max scaling via REFERENCE_BOUNDS['account_age_days'] = (0.0, 1000.0), clipped to [0, 1]",
+      "dtype": "float32",
+      "missing_semantics": "Default 0.0 (or payload default 365)",
+      "status": "MATCH",
+      "evidence": "backend/app/application/services/data_generator.py:REFERENCE_BOUNDS"
+    }
+  ]
+}

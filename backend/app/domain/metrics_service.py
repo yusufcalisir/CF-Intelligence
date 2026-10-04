@@ -56,12 +56,58 @@ def _subsample_for_curve(y_t: np.ndarray, y_p: np.ndarray, max_samples: int = 50
     return y_t[sampled_idx], y_p[sampled_idx]
 
 
+def is_roc_auc_defined(y_true: list[int] | np.ndarray) -> bool:
+    """Return True if ROC-AUC is mathematically defined (at least two classes present)."""
+    y_t = np.asarray(y_true)
+    return bool(y_t.size > 0 and len(np.unique(y_t)) >= 2)
+
+
+def is_pr_auc_defined(y_true: list[int] | np.ndarray) -> bool:
+    """Return True if PR-AUC is mathematically defined (at least two classes present)."""
+    y_t = np.asarray(y_true)
+    return bool(y_t.size > 0 and len(np.unique(y_t)) >= 2)
+
+
+def compute_roc_auc_with_status(
+    y_true: list[int] | np.ndarray,
+    y_pred: list[float] | np.ndarray,
+    default: float = 0.5,
+) -> tuple[float, bool, str]:
+    """Compute ROC-AUC with explicit mathematical definedness status.
+
+    Returns:
+        tuple[float, bool, str]: (score, is_defined, status_code)
+        where status_code is 'defined', 'undefined_single_class', 'undefined_empty', or 'computation_error'.
+    """
+    y_t = np.asarray(y_true)
+    y_p = np.asarray(y_pred)
+    if y_t.size == 0 or y_p.size == 0:
+        return default, False, "undefined_empty"
+    if len(np.unique(y_t)) < 2:
+        return default, False, "undefined_single_class"
+    try:
+        from sklearn.metrics import roc_auc_score
+
+        val = float(roc_auc_score(y_t, y_p))
+        if np.isnan(val):
+            return default, False, "computation_error"
+        return val, True, "defined"
+    except Exception:
+        return default, False, "computation_error"
+
+
 def safe_roc_auc_score(
     y_true: list[int] | np.ndarray,
     y_pred: list[float] | np.ndarray,
     default: float = 0.5,
 ) -> float:
-    """Safely compute ROC-AUC score, guarding against single-class, empty, or NaN inputs."""
+    """Safely compute ROC-AUC score.
+
+    When y_true contains only one class, ROC-AUC is mathematically undefined because
+    a binary ranking cannot be formed. In that degenerate case, this function returns
+    the documented fallback sentinel `default` (0.5). Callers requiring strict definedness
+    truth must verify `is_roc_auc_defined(y_true)` or call `compute_roc_auc_with_status`.
+    """
     y_t = np.asarray(y_true)
     y_p = np.asarray(y_pred)
     if y_t.size == 0 or y_p.size == 0 or len(np.unique(y_t)) < 2:

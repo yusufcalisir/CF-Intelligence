@@ -513,7 +513,8 @@ class ModelEvaluationEngine:
             # Rollback Gating:
             rollback_triggered = False
             rollback_message = ""
-            if champ_auc < 0.65 or avg_champ_latency > 200.0 or champ_fpr > 0.05:
+            has_both_classes = len(set(y_true)) >= 2
+            if (has_both_classes and champ_auc < 0.65) or avg_champ_latency > 200.0 or champ_fpr > 0.05:
                 rollback_triggered = True
                 manifest = self.registry._load_manifest(simulation_id)
                 previous_versions = [v for v in manifest if v["version"] < active_ver_num]

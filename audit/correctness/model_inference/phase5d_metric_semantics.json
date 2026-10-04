@@ -1,0 +1,66 @@
+{
+  "phase": "5D",
+  "name": "Phase 5D Metric Semantics Audit Artifact",
+  "metrics": [
+    {
+      "metric": "ROC-AUC",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: continuous probabilities in [0.0, 1.0]",
+      "source_data": "Model forward pass output vs ground truth labels",
+      "aggregation": "Pooled or macro-averaged across clients",
+      "undefined_conditions": "Single-class ground truth (len(unique(y_true)) < 2) or empty arrays (len == 0)",
+      "runtime_behavior": "Returns fallback sentinel default=0.5 with explicit is_roc_auc_defined=False and status='undefined_single_class'. Rollback gating in ModelEvaluationEngine checks has_both_classes before evaluating degradation thresholds.",
+      "api_representation": "float (0.5000 if undefined, otherwise calculated AUC in [0, 1])",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "metric": "PR-AUC / Average Precision",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: continuous probabilities in [0.0, 1.0]",
+      "source_data": "Model forward pass output vs ground truth labels",
+      "aggregation": "Area under precision-recall curve via sklearn.metrics.auc(recall, precision)",
+      "undefined_conditions": "Single-class ground truth or empty arrays",
+      "runtime_behavior": "Returns fallback sentinel default=0.5 with explicit is_pr_auc_defined=False. Promotion gating checks has_both_classes.",
+      "api_representation": "float in [0, 1]",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "metric": "Binary F1-Score",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: continuous probabilities thresholded at 0.5",
+      "source_data": "Thresholded predictions vs ground truth",
+      "aggregation": "Binary harmonic mean of precision and recall with zero_division=0",
+      "undefined_conditions": "TP + FP == 0 or TP + FN == 0 (zero predicted or true positives)",
+      "runtime_behavior": "Returns 0.0 without throwing division by zero exceptions",
+      "api_representation": "float in [0.0, 1.0]",
+      "status": "VERIFIED"
+    },
+    {
+      "metric": "Precision",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: binary predictions",
+      "source_data": "Thresholded predictions vs ground truth",
+      "aggregation": "TP / (TP + FP) with zero_division=0",
+      "undefined_conditions": "TP + FP == 0",
+      "runtime_behavior": "Returns 0.0 when no positives are predicted",
+      "api_representation": "float in [0.0, 1.0]",
+      "status": "VERIFIED"
+    },
+    {
+      "metric": "Recall",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: binary predictions",
+      "source_data": "Thresholded predictions vs ground truth",
+      "aggregation": "TP / (TP + FN) with zero_division=0",
+      "undefined_conditions": "TP + FN == 0",
+      "runtime_behavior": "Returns 0.0 when no true positives exist",
+      "api_representation": "float in [0.0, 1.0]",
+      "status": "VERIFIED"
+    },
+    {
+      "metric": "False Positive Rate (FPR)",
+      "input_type": "y_true: binary labels {0, 1}; y_pred: continuous probabilities thresholded at 0.5",
+      "source_data": "Evaluation store logged predictions vs actual labels",
+      "aggregation": "FP / (FP + TN)",
+      "undefined_conditions": "FP + TN == 0 (no true negative samples logged)",
+      "runtime_behavior": "Returns 0.0 if denominator is 0",
+      "api_representation": "float in [0.0, 1.0]",
+      "status": "VERIFIED"
+    }
+  ]
+}

@@ -502,21 +502,26 @@ class ModelService:
 
         preds = (probs >= 0.5).astype(int)
 
-        # Handle edge case where test set has only one class
-        if len(np.unique(y_test)) >= 2:
+        # Handle edge case where test set has only one class (mathematically undefined)
+        is_defined = len(np.unique(y_test)) >= 2
+        if is_defined:
             try:
                 auc = float(roc_auc_score(y_test, probs))
                 fpr, tpr, thresholds = roc_curve(y_test, probs)
+                auc_status = "defined"
             except Exception:
                 auc = 0.5
                 fpr = np.array([0.0, 1.0])
                 tpr = np.array([0.0, 1.0])
                 thresholds = np.array([1.0, 0.0])
+                is_defined = False
+                auc_status = "undefined_computation_error"
         else:
             auc = 0.5
             fpr = np.array([0.0, 1.0])
             tpr = np.array([0.0, 1.0])
             thresholds = np.array([1.0, 0.0])
+            auc_status = "undefined_single_class"
 
         cm = confusion_matrix(y_test, preds, labels=[0, 1])
 
@@ -586,6 +591,8 @@ class ModelService:
             "recall": float(recall_score(y_test, preds, zero_division=0)),
             "f1_score": float(f1_score(y_test, preds, zero_division=0)),
             "auc_roc": auc,
+            "auc_roc_defined": is_defined,
+            "auc_roc_status": auc_status,
             "loss": loss,
             "confusion_matrix": cm.tolist(),
             "roc_fpr": fpr.tolist(),

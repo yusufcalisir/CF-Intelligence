@@ -1,0 +1,118 @@
+{
+  "phase": "5D",
+  "name": "Phase 5D Model and Inference Invariants",
+  "invariants": [
+    {
+      "id": "MODEL-INV-01",
+      "description": "Every inference feature must represent the same semantic variable expected during training.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_gate_e_training_inference_preprocessing_parity",
+      "evidence": "Asserted equality across FEATURE_NAMES semantics between DataGenerator.encode_features and preprocess_transaction.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-02",
+      "description": "Feature order at inference must exactly match training order.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_feature_ordering_strict_schema_enforcement",
+      "evidence": "DataGenerator.encode_features enforces df[FEATURE_NAMES] re-indexing, preventing dictionary or column order permutation.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-03",
+      "description": "The same intended transformation semantics (categorical indices and reference bounds) must apply during training and inference.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_categorical_encoding_vocabulary_alignment",
+      "evidence": "Shared REFERENCE_BOUNDS and authoritative list indices applied identically in training and inference.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-04",
+      "description": "A model artifact must be loaded only with a compatible feature and model schema without silent corrupting dimension mismatch.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_predict.py",
+      "evidence": "Dynamic state_dict layer shape inspection in _get_cached_serving_model and _load_challenger_model with explicit warning logging on alignment.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-05",
+      "description": "An inference result must identify the model version that actually produced it.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_model_governance.py::test_shadow_routing_metrics_log",
+      "evidence": "ModelEvaluationEngine logs champion_version, challenger_version, and routed_to for every scored transaction.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-06",
+      "description": "Raw model output, logits, probabilities, scores, and labels must not be conflated.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_independent_mathematical_oracle",
+      "evidence": "Verified FraudDetectionModel final layer is nn.Sigmoid() producing single probability in [0, 1]; composite risk score scales to [0, 1000]; binary threshold applies at score >= 600.0.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-07",
+      "description": "Sigmoid probability transformation must occur exactly once.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_independent_mathematical_oracle",
+      "evidence": "Verified _eval_model and _eval_model_batch do not re-apply sigmoid to model output.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-08",
+      "description": "The threshold used for classification must be the intended threshold associated with that inference path.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_predict.py",
+      "evidence": "Decision threshold is_fraud_suspected = score >= 600.0 consistently applied across single and batch responses.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-09",
+      "description": "A model in evaluation mode given identical deterministic input must produce equivalent output.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_model_evaluation_mode_and_determinism",
+      "evidence": "Repeated forward evaluations under torch.no_grad() produce identical outputs.",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-10",
+      "description": "Single-record inference and equivalent one-record batch inference must agree within numerical tolerance.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_single_vs_batch_inference_equivalence",
+      "evidence": "Aligned feature store enrichment and tensor batching ensure infer(A) == infer_batch([A])[0] and preserve row ordering.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-11",
+      "description": "Cached models must be bound to mtime, version, and simulation identity.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_model_lifecycle_hardening.py",
+      "evidence": "_get_cached_serving_model checks mtime on global_model.pt; challenger models keyed by (simulation_id, version, dp_compatible).",
+      "status": "VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-12",
+      "description": "Undefined metrics must not silently become fabricated valid values that trigger false governance actions.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_single_class_roc_auc_truthfulness",
+      "evidence": "Added is_roc_auc_defined, is_pr_auc_defined, compute_roc_auc_with_status, and protected ModelEvaluationEngine rollback gating.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-13",
+      "description": "Inference and model loading failures must fail closed and never silently return fabricated predictions or uninitialized random weights.",
+      "importance": "CRITICAL",
+      "test": "backend/tests/unit/test_phase5d_model_inference_correctness.py::test_non_finite_input_fail_closed_validation",
+      "evidence": "Removed silent random weight fallback on state_dict loading failure; added non-finite (NaN/Inf) rejection in preprocessing and eval.",
+      "status": "REMEDIATED_AND_VERIFIED"
+    },
+    {
+      "id": "MODEL-INV-14",
+      "description": "Tenant inference state must remain isolated.",
+      "importance": "HIGH",
+      "test": "backend/tests/unit/test_predict.py",
+      "evidence": "enforce_tenant_isolation rejects cross-tenant requests; metered tenant quotas enforced per bank.",
+      "status": "VERIFIED"
+    }
+  ]
+}

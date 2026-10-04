@@ -1,0 +1,86 @@
+{
+  "phase": "5D",
+  "name": "Model Lifecycle, Feature Semantics & Inference Deep Correctness Map",
+  "lifecycle_stages": [
+    {
+      "stage": "raw_data_generation",
+      "module": "backend/app/application/services/data_generator.py",
+      "symbol": "DataGenerator.generate_transaction_features",
+      "input": "n_samples, Non-IID bank profile distributions",
+      "output": "pandas.DataFrame with canonical FEATURE_NAMES columns",
+      "semantics": "Synthesizes raw transactional attributes (amounts, categories, countries, devices, velocity, age, scores)."
+    },
+    {
+      "stage": "training_preprocessing_and_encoding",
+      "module": "backend/app/application/services/data_generator.py",
+      "symbol": "DataGenerator.encode_features",
+      "input": "pandas.DataFrame",
+      "output": "numpy.ndarray (float32, shape=(N, 10))",
+      "semantics": "Enforces strict FEATURE_NAMES schema ordering, categorical ordinal mapping via MERCHANT_CATEGORIES, COUNTRIES, DEVICES, and min-max scaling with REFERENCE_BOUNDS."
+    },
+    {
+      "stage": "model_definition",
+      "module": "backend/app/application/services/model_service.py",
+      "symbol": "FraudDetectionModel",
+      "input": "torch.Tensor of shape (B, 10)",
+      "output": "torch.Tensor of shape (B,)",
+      "semantics": "3-layer MLP (10 -> 64 -> 32 -> 1) with ReLU activations, GroupNorm/BatchNorm1d, Dropout, and final nn.Sigmoid() activation producing probabilities in [0, 1]."
+    },
+    {
+      "stage": "federated_training_and_serialization",
+      "module": "backend/app/application/services/fl_engine.py",
+      "symbol": "FederatedLearningEngine.train_federated_round",
+      "input": "Local bank datasets (X_train, y_train)",
+      "output": "Aggregated state_dict serialized to storage/models/{simulation_id}/model_v{version}.pt",
+      "semantics": "Local client optimization with BCELoss (on probabilities), DP noise injection (Opacus), secure/robust aggregation, and state dict serialization."
+    },
+    {
+      "stage": "model_registry_and_lineage",
+      "module": "backend/app/application/services/model_registry.py",
+      "symbol": "ModelRegistry.save_version",
+      "input": "simulation_id, state_dict, metrics, dp_noise_profile, git_commit_hash",
+      "output": "manifest.json version metadata record",
+      "semantics": "SR 11-7 lineage tracking, cryptographic sign-off gating, and status assignment (champion/challenger/inactive)."
+    },
+    {
+      "stage": "model_loading_and_serving_cache",
+      "module": "backend/app/presentation/routers/predict.py",
+      "symbol": "_get_cached_serving_model",
+      "input": "simulation_id | None",
+      "output": "torch.nn.Module in eval() mode",
+      "semantics": "Resolves active champion/global model from registry, dynamically inspects state dict architecture (input_dim, dp_compatible), checks mtime cache invalidation, and fails truthfully if state dict is corrupt."
+    },
+    {
+      "stage": "inference_preprocessing",
+      "module": "backend/app/presentation/routers/predict.py",
+      "symbol": "preprocess_transaction",
+      "input": "dict of transaction features",
+      "output": "torch.FloatTensor of shape (1, 10)",
+      "semantics": "Validates non-finite (NaN/Inf) inputs, maps categoricals via authoritative vocabulary indices, and normalizes using shared REFERENCE_BOUNDS with bit-level parity to training."
+    },
+    {
+      "stage": "forward_inference_execution",
+      "module": "backend/app/presentation/routers/predict.py",
+      "symbol": "_eval_model / _eval_model_batch",
+      "input": "model (eval mode), torch.Tensor",
+      "output": "float / list[float] fraud probability",
+      "semantics": "Executes forward pass under torch.no_grad(), validates that output is finite, verifies 0.0 <= prob <= 1.0 (exact single Sigmoid output)."
+    },
+    {
+      "stage": "composite_risk_scoring",
+      "module": "backend/app/application/services/risk_engine.py",
+      "symbol": "RiskScoringEngine.score_transaction",
+      "input": "transaction dict, ml_prediction (0-1), entity_hash",
+      "output": "RiskScore (score in [0, 1000], signal breakdown)",
+      "semantics": "Combines ML prediction with rule-based signals (velocity, reputation, country risk, device anomaly, history) into composite score [0, 1000]."
+    },
+    {
+      "stage": "thresholding_and_policy_decision",
+      "module": "backend/app/presentation/routers/predict.py",
+      "symbol": "predict_transaction / predict_batch",
+      "input": "RiskScore, Dynamic Policy Rules",
+      "output": "TransactionPredictResponse / BatchPredictionResponse",
+      "semantics": "Applies fraud suspicion threshold (score >= 600.0), maps risk levels (LOW/MED/HIGH/CRITICAL), and triggers dynamic policy actions (ALLOW/REVIEW/BLOCK)."
+    }
+  ]
+}

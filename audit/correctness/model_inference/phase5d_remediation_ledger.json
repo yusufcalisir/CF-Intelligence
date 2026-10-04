@@ -1,0 +1,74 @@
+{
+  "phase": "5D",
+  "name": "Phase 5D Remediation Ledger",
+  "remediations": [
+    {
+      "finding_id": "MODEL-0001",
+      "action": "Synchronized training and inference categorical encoding and feature scaling.",
+      "files_modified": [
+        "backend/app/application/services/data_generator.py",
+        "backend/app/presentation/routers/predict.py"
+      ],
+      "changes": [
+        "Exported shared REFERENCE_BOUNDS from data_generator.py.",
+        "Replaced pandas .astype('category').cat.codes in DataGenerator.encode_features with exact index mapping matching MERCHANT_CATEGORIES, COUNTRIES, and DEVICES.",
+        "Enforced strict FEATURE_NAMES schema column ordering in DataGenerator.encode_features.",
+        "Used REFERENCE_BOUNDS min-max scaling across both training and inference preprocessing."
+      ],
+      "verification": "Passed test_gate_e_training_inference_preprocessing_parity and test_categorical_encoding_vocabulary_alignment."
+    },
+    {
+      "finding_id": "MODEL-0002",
+      "action": "Eliminated false auto-rollbacks on single-class data and documented degenerate metric sentinels.",
+      "files_modified": [
+        "backend/app/domain/metrics_service.py",
+        "backend/app/application/services/model_service.py",
+        "backend/app/application/services/model_registry.py"
+      ],
+      "changes": [
+        "Added is_roc_auc_defined, is_pr_auc_defined, and compute_roc_auc_with_status to metrics_service.py.",
+        "Enhanced safe_roc_auc_score documentation for fallback sentinel 0.5.",
+        "Added auc_roc_defined and auc_roc_status to ModelService.evaluate return dictionary.",
+        "Guarded ModelEvaluationEngine.evaluate_performance rollback check with has_both_classes before evaluating champ_auc < 0.65."
+      ],
+      "verification": "Passed test_governance_no_false_rollback_on_single_class and test_single_class_roc_auc_truthfulness."
+    },
+    {
+      "finding_id": "MODEL-0003",
+      "action": "Harmonized feature store enrichment across single and batch inference endpoints.",
+      "files_modified": [
+        "backend/app/presentation/routers/predict.py"
+      ],
+      "changes": [
+        "Added online feature store batch query and enrichment to predict_batch before tensor preprocessing.",
+        "Ensured batch predictions evaluate the same feature set as single-record predictions."
+      ],
+      "verification": "Passed test_single_vs_batch_inference_equivalence."
+    },
+    {
+      "finding_id": "MODEL-0004",
+      "action": "Enforced fail-closed validation for non-finite inputs and outputs.",
+      "files_modified": [
+        "backend/app/presentation/routers/predict.py"
+      ],
+      "changes": [
+        "Added math.isfinite check on all numeric features in preprocess_transaction.",
+        "Added math.isfinite check on model outputs in _eval_model and _eval_model_batch."
+      ],
+      "verification": "Passed test_non_finite_input_fail_closed_validation."
+    },
+    {
+      "finding_id": "MODEL-0005",
+      "action": "Fixed model architecture binding and eliminated silent random fallback.",
+      "files_modified": [
+        "backend/app/presentation/routers/predict.py"
+      ],
+      "changes": [
+        "Dynamically detected running_mean/running_var in state dict for simulation model loading in _get_cached_serving_model.",
+        "Dynamically detected input_dim from state dict weights.",
+        "Replaced silent random weight instantiation with HTTP 500 on load failure."
+      ],
+      "verification": "Passed test_model_serialization_round_trip and model governance test suites."
+    }
+  ]
+}
