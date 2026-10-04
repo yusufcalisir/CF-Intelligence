@@ -1,5 +1,4 @@
 {
-  "phase": "5F",
   "model_binding_matrix": [
     {
       "prediction_entry_point": "POST /predict",

@@ -1,9 +1,9 @@
-# CF-Intelligence Phase 5F: Explainability, Attribution Semantics, SHAP Mathematics & Prediction-to-Explanation Binding Deep Correctness Verification Report
+# CF-Intelligence Explainability, Attribution Semantics, SHAP Mathematics & Prediction-to-Explanation Binding Deep Correctness Verification Report
 ## (Addendum-Closed Edition: Cache Identity, Background Binding, Historical Graph-State Semantics & Claim Precision)
 
 ## A. Executive Summary
 
-Phase 5F of the **CF-Intelligence Technical Perfection Program** conducted an exhaustive, adversarial, and mathematically grounded verification of the explainability layer. Operating under the central inquiry:
+The explainability audit of the **CF-Intelligence Technical Perfection Program** conducted an exhaustive, adversarial, and mathematically grounded verification of the explainability layer. Operating under the central inquiry:
 
 > **"When CF-Intelligence presents an explanation for a prediction, does that explanation actually correspond to the exact model, exact model version, exact input representation, exact feature ordering, exact preprocessing state, exact graph state where applicable, exact output quantity, and exact prediction that the user is being shown?"**
 
@@ -29,7 +29,7 @@ All 18 Explainability Invariants (`XAI-INV-01` through `XAI-INV-18`) and all 44 
 
 - **Branch**: `main`
 - **Base Commit**: `2db34f9f4faf7bbce56ac429164dbeb2bb8bc012`
-- **Verified Working Tree**: Clean working tree with targeted Phase 5F remediations and zero gratuitous modifications.
+- **Verified Working Tree**: Clean working tree with targeted explainability remediations and zero gratuitous modifications.
 - **Canonical Benchmarks**: Immutable. Category 2 benchmark artifacts (`benchmarks/results/raw/*`, `experiments/*`) remained completely untouched.
 
 ---
@@ -382,7 +382,7 @@ The 9-signal policy evaluation reconstructs the rule-based risk score (0-1000) e
 
 ## AE. Regression Verification
 
-Executes across all Phase 5F and core unit suites:
+Executes across all explainability and core unit suites:
 ```
 backend/tests/unit/test_explainability_correctness.py: 21 passed in 44.29s
 backend/tests/unit/test_explainability_service.py: 3 passed
@@ -439,13 +439,13 @@ backend/tests/unit/test_advanced_explainability.py: 6 passed
     No. TanStack React Query scopes requests by `queryKey: ['alert-explain', alertId]`. Stale responses commit to their own key and cannot overwrite the active view.
 20. **Can fallback heuristic output be mislabeled anywhere downstream?**
     No. The backend returns `method="fallback_heuristic"` and the frontend displays an amber `FALLBACK HEURISTIC` badge and `Analytical Fallback Attribution` heading.
-21. **Are all affected Phase 5F invariants now genuinely supported?**
+21. **Are all affected explainability invariants now genuinely supported?**
     Yes. All 18 invariants (`XAI-INV-01` through `XAI-INV-18`) are verified with automated adversarial tests.
 22. **Are all CRITICAL/HIGH findings closed?**
     Yes. All 10 findings (`XAI-0001` through `XAI-0010`) are remediated and verified.
 23. **Were canonical scientific benchmark artifacts untouched?**
     Yes. Zero modifications to `benchmarks/results/raw/*` or `experiments/*`.
-24. **Is Phase 5F now sufficiently trustworthy to proceed to Phase 5G?**
+24. **Is the explainability layer now sufficiently trustworthy to proceed to the data and connector correctness audit?**
     Yes. All claims, cache boundaries, mathematical properties, and implementation semantics are unified.
 
 ---

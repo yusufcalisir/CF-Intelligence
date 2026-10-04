@@ -1,5 +1,4 @@
 {
-  "phase": "5F",
   "name": "Explainability, Attribution Semantics, SHAP Mathematics & Prediction-to-Explanation Binding Execution Map",
   "execution_graph": {
     "raw_request": "TransactionPredictRequest / ExplainTransactionRequest",

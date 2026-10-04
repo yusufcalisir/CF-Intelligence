@@ -1,5 +1,4 @@
 {
-  "phase": "5F",
   "capabilities": [
     {
       "capability": "SHAP Kernel Attribution",

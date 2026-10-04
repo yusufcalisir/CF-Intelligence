@@ -1,5 +1,4 @@
 {
-  "phase": "5F",
   "background_semantics": [
     {
       "explainer": "shap.KernelExplainer via ExplainabilityService",
