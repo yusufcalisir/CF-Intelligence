@@ -203,7 +203,11 @@ class TestTransactionLifecycleAndSystemInvariants:
         """
         # 1. Pipeline Compatibility Oracle
         settings = get_settings()
+        from app.application.services.data_generator import DataGenerator
+        from app.application.services.metrics_service import MetricsService
         from app.application.services.model_service import ModelService
+        from app.domain.value_objects import SimulationConfig
+
         model_svc = ModelService(settings)
         priv_svc = PrivacyService()
         fl_engine = FederatedLearningEngine(
@@ -217,20 +221,20 @@ class TestTransactionLifecycleAndSystemInvariants:
             simulation_repo=None,
             bank_repo=None,
             metrics_repo=None,
-            data_generator=None,
+            data_generator=DataGenerator(seed=42),
             fl_engine=fl_engine,
-            metrics_service=None,
+            metrics_service=MetricsService(),
             model_service=model_svc,
         )
 
-        class MockConfig:
-            num_rounds = 1
-            enable_secure_aggregation = True
-            aggregation_method = AggregationMethod.KRUM
-            hardware_isolation_mode = "none"
+        config = SimulationConfig(
+            num_rounds=1,
+            enable_secure_aggregation=True,
+            aggregation_method=AggregationMethod.KRUM,
+        )
 
         with pytest.raises(InvalidPipelineConfigurationError, match="Additive Secure Aggregation is mathematically incompatible"):
-            sim_svc.run_simulation(MockConfig())
+            sim_svc.run_simulation(config)
 
         # 2. Real DP Execution Truth
         budget = priv_svc.get_or_create_budget("sim_dp_truth", epsilon=2.0, delta=1e-5)
