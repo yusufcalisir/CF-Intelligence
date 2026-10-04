@@ -1,0 +1,132 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-10-04T19:33:15Z",
+  "system": "CF-Intelligence",
+  "description": "Cross-domain whole-system invariant specification matrix.",
+  "invariants": [
+    {
+      "id": "SYS-INV-01",
+      "name": "Tenant Isolation Survives the Entire Path",
+      "description": "A transaction or investigation belonging to Tenant A must never affect Tenant B across feature state, model context, graph topology, alerts, cases, cache, database persistence, or webhook identity.",
+      "enforcement_layers": [
+        "app.dependencies.enforce_tenant_isolation",
+        "app.application.services.feature_store_service (scoped keys)",
+        "app.application.services.streaming_graph_service (scoped_tx_key)",
+        "app.infrastructure.repositories.alert_repository (tenant query scoping)",
+        "app.presentation.routers.cases (_enforce_case_tenant)"
+      ],
+      "verification_scenario": "Scenario 1 — Cross-Tenant Same-ID Collision",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-02",
+      "name": "One Financial Event Retains One Logical Identity",
+      "description": "Retrying or redelivering the same canonical transaction must not create a second persisted transaction, a second graph edge, a second feature contribution, or duplicate logical case.",
+      "enforcement_layers": [
+        "app.application.services.streaming_graph_service._seen_transactions",
+        "app.application.services.feature_store_service.tx_history deduplication",
+        "app.application.services.idempotency.IdempotencyService",
+        "app.application.services.webhook_service deterministic event_id generation"
+      ],
+      "verification_scenario": "Scenario 2 — Same Event Redelivery & Scenario 4 — Crash-Window Redelivery",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-03",
+      "name": "Distinct Events Remain Distinct",
+      "description": "Idempotency must not over-deduplicate. Two legitimate transactions between the same accounts must remain distinct when their canonical transaction identities differ, preserving MultiDiGraph parallel edges.",
+      "enforcement_layers": [
+        "app.application.services.streaming_graph_service (MultiDiGraph edge preservation)",
+        "app.application.services.feature_store_service (distinct tx_id registration)",
+        "app.application.services.idempotency.IdempotencyService (payload hash hashing)"
+      ],
+      "verification_scenario": "Scenario 3 — Parallel Legitimate Transactions",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-04",
+      "name": "Decision Provenance Remains Bound",
+      "description": "A fraud decision must remain strictly and immutably traceable to the exact relevant transaction, tenant, model version, risk score, explanation attributions, and policy state without asynchronous cross-contamination.",
+      "enforcement_layers": [
+        "app.presentation.routers.predict.predict_transaction (coroutine stack isolation)",
+        "app.domain.investigation_entities.Alert (immutable transaction_id linkage)",
+        "app.application.services.explainability_service (bound alert attributions)"
+      ],
+      "verification_scenario": "Scenario 6 — Decision Provenance Under Async Activity",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-05",
+      "name": "Failure Does Not Become Success",
+      "description": "A failure in an authoritative stage (model inference, database persistence, stale case mutation, webhook delivery) must never be converted downstream into a plausible successful business outcome or masked with silent static fallbacks.",
+      "enforcement_layers": [
+        "app.presentation.routers.predict (fail-closed HTTP 500 on inference failure)",
+        "app.application.services.case_service (HTTP 409 precondition failure on stale CAS)",
+        "app.application.services.webhook_service (returns False on dispatch failure)",
+        "app.infrastructure.database (transaction rollback on commit error)"
+      ],
+      "verification_scenario": "Scenario 8 — Failure Propagation",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-06",
+      "name": "Retry Does Not Change Meaning",
+      "description": "A retry of the same logical operation may repeat transport work but must not change the business meaning merely because it was retried.",
+      "enforcement_layers": [
+        "app.application.services.streaming_graph_service (immutable payload conflict check)",
+        "app.application.services.idempotency.IdempotencyService (cached response replay)"
+      ],
+      "verification_scenario": "Scenario 2 — Same Event Redelivery & Scenario 4 — Crash-Window Redelivery",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-07",
+      "name": "Concurrency Does Not Silently Lose Authoritative State",
+      "description": "Concurrent mutations to investigation cases, approvals, or states must either serialize safely via compare-and-set or reject stale updates with conflict errors. Silent lost updates are prohibited.",
+      "enforcement_layers": [
+        "app.application.services.case_service (optimistic locking on expected_version)",
+        "app.infrastructure.redis_store.RedisStore.update_conditional",
+        "app.domain.models.case.FourEyesVerificationError (signature staleness invalidation)"
+      ],
+      "verification_scenario": "Scenario 5 — Concurrent Case Decision",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-08",
+      "name": "Security/Privacy Configuration Is Not Merely Decorative",
+      "description": "If a runtime path claims Differential Privacy, Secure Aggregation, or Byzantine robust defenses are active, the real execution path must execute those algorithms. Incompatible pipeline configurations must be rejected upfront.",
+      "enforcement_layers": [
+        "app.application.services.simulation_service (pre-run compatibility validator)",
+        "app.application.services.model_service.train_local_with_opacus (DP-SGD)",
+        "app.application.services.fl_engine.apply_byzantine_defense (robust aggregators)",
+        "app.application.services.fl_engine.apply_secure_aggregation_masks (SecAgg)"
+      ],
+      "verification_scenario": "Scenario 7 — Active Privacy / Robustness Path Truth",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-09",
+      "name": "Historical Decisions Do Not Gain Future Evidence",
+      "description": "Where point-in-time as_of temporal cutoff semantics exist, later graph edges or events must not leak into historical decision evaluations.",
+      "enforcement_layers": [
+        "app.application.services.streaming_graph_service.get_active_subgraph_tensors (as_of filter)",
+        "app.application.services.graph_engine.get_neighborhood (as_of edge cutoff)",
+        "app.application.services.feature_store_service (ts-bounded sliding windows)"
+      ],
+      "verification_scenario": "Scenario 9 — Historical Decision Boundary",
+      "status": "CERTIFIED"
+    },
+    {
+      "id": "SYS-INV-10",
+      "name": "Human Decisions Do Not Rewrite Machine History",
+      "description": "Case disposition, false-positive clearance, or supervisor signoff must record human outcomes separately and must never rewrite or mutate historical model scores, versions, or explanations into a different machine result.",
+      "enforcement_layers": [
+        "app.application.services.case_service.change_status (distinct case disposition)",
+        "app.domain.investigation_entities.Alert (immutable model_confidence and risk_score)",
+        "app.presentation.routers.cases.file_sar_report (disqualifies false positives without altering prediction history)"
+      ],
+      "verification_scenario": "Scenario 10 — Machine Result vs Human Outcome",
+      "status": "CERTIFIED"
+    }
+  ]
+}

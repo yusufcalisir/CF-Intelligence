@@ -1,0 +1,328 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-10-04T19:33:00Z",
+  "system": "CF-Intelligence",
+  "description": "Authoritative end-to-end runtime call paths across core operational lifecycles.",
+  "paths": {
+    "path_a_transaction_decision": {
+      "name": "Transaction Decision Lifecycle",
+      "entry_endpoints": [
+        "POST /api/v1/predict",
+        "POST /api/v1/predict/batch",
+        "POST /api/v1/predict/score",
+        "POST /api/v1/score-transaction"
+      ],
+      "pipeline_stages": [
+        {
+          "stage": 1,
+          "name": "Input Validation & Normalization",
+          "module": "app.application.schemas.transaction",
+          "handler": "TransactionPredictRequest / ScoreTransactionRequest",
+          "optional": false,
+          "description": "Validates schema types, ensures amounts are finite and non-negative, and applies ISO defaults."
+        },
+        {
+          "stage": 2,
+          "name": "Tenant Resolution & Access Control",
+          "module": "app.dependencies",
+          "handler": "resolve_tenant & enforce_tenant_isolation",
+          "optional": false,
+          "description": "Extracts tenant from JWT/header/API-key and blocks cross-tenant access with HTTP 403."
+        },
+        {
+          "stage": 3,
+          "name": "Online Feature State Retrieval",
+          "module": "app.application.services.feature_store_service",
+          "handler": "FeatureStoreService.get_online_features",
+          "optional": true,
+          "activation_condition": "Settings.feature_store_enabled == True",
+          "description": "Fetches last committed customer history, chargeback rate, and rolling velocity snapshot from Redis/in-memory store. Ingestion scheduled asynchronously via BackgroundTasks."
+        },
+        {
+          "stage": 4,
+          "name": "Model Input Preprocessing & Padding",
+          "module": "app.application.services.data_generator",
+          "handler": "preprocess_transaction",
+          "optional": false,
+          "description": "Converts transaction dictionary to PyTorch tensor; dynamically pads or truncates to model input dimension."
+        },
+        {
+          "stage": 5,
+          "name": "Active Neural Network Inference",
+          "module": "app.presentation.routers.predict",
+          "handler": "_get_cached_serving_model & _eval_model",
+          "optional": false,
+          "description": "Evaluates champion model on CPU/CUDA with torch.no_grad(). Optional shadow evaluation against challenger model via _load_challenger_model."
+        },
+        {
+          "stage": 6,
+          "name": "Property Graph Context Enrichment",
+          "module": "app.application.services.graph_engine",
+          "handler": "GraphEngine.get_neighborhood / StreamingGraphService.query_subgraph",
+          "optional": true,
+          "activation_condition": "Entity exists in property graph / streaming graph active window",
+          "description": "Extracts entity node degree, prior alert flags, and 1-hop neighbor risk attributes."
+        },
+        {
+          "stage": 7,
+          "name": "Composite Risk Scoring Engine",
+          "module": "app.application.services.risk_engine",
+          "handler": "RiskScoringEngine.score_transaction",
+          "optional": false,
+          "description": "Synthesizes ML prediction with FATF country risk, merchant category risk, velocity, and chargebacks into a [0, 1000] composite score."
+        },
+        {
+          "stage": 8,
+          "name": "Dynamic Policy Rule Evaluation",
+          "module": "app.application.services.policy_engine",
+          "handler": "PolicyEngineService.test_rule",
+          "optional": true,
+          "activation_condition": "Active dynamic rules configured in database",
+          "description": "Applies AST-validated conditional rules to allow, review, or block transactions."
+        },
+        {
+          "stage": 9,
+          "name": "Alert Generation & Deduplication",
+          "module": "app.application.services.alert_service",
+          "handler": "AlertIntelligenceService.generate_alerts",
+          "optional": true,
+          "activation_condition": "is_fraud_suspected == True (risk_score >= 600 or BLOCK rule triggered)",
+          "description": "Deduplicates alerts over sliding window, creates structured Alert entity with SLA and reason codes."
+        },
+        {
+          "stage": 10,
+          "name": "Explainability Attribution (SHAP)",
+          "module": "app.application.services.explainability_service",
+          "handler": "ExplainabilityService.explain_alert",
+          "optional": true,
+          "activation_condition": "Alert generated",
+          "description": "Computes SHAP kernel attributions or heuristic risk factor breakdowns for triage."
+        },
+        {
+          "stage": 11,
+          "name": "Persistence & Shared Intelligence Dispatch",
+          "module": "app.infrastructure.repositories.alert_repository",
+          "handler": "AlertRepository.create & AlertIntelligenceService.publish_intelligence",
+          "optional": true,
+          "activation_condition": "Alert generated",
+          "description": "Stores alert in tenant database; dispatches anonymized indicator to Redis/PubSub and WebhookService."
+        }
+      ]
+    },
+    "path_b_investigation_lifecycle": {
+      "name": "Investigation & Case Management Lifecycle",
+      "entry_endpoints": [
+        "POST /api/v1/cases",
+        "GET /api/v1/cases/{case_id}",
+        "PUT /api/v1/cases/{case_id}/status",
+        "POST /api/v1/cases/{case_id}/sign",
+        "POST /api/v1/cases/{case_id}/resolve",
+        "POST /api/v1/cases/{case_id}/file-sar"
+      ],
+      "pipeline_stages": [
+        {
+          "stage": 1,
+          "name": "Case Creation & Idempotent Ingestion",
+          "module": "app.presentation.routers.cases",
+          "handler": "create_case & CaseManagementService.create_case",
+          "optional": false,
+          "description": "Enforces 24-hour request idempotency via IdempotencyService; scopes case and linked alerts to tenant."
+        },
+        {
+          "stage": 2,
+          "name": "Evidence Registration & Cryptographic Hashing",
+          "module": "app.application.services.case_service",
+          "handler": "EvidenceRegistryService.register_evidence",
+          "optional": true,
+          "activation_condition": "Analyst submits supporting artifacts/documents",
+          "description": "Calculates SHA-256 digest of evidence file, binds evidence ID to case record, updates timeline."
+        },
+        {
+          "stage": 3,
+          "name": "Analyst Notes & Status Transitions",
+          "module": "app.application.services.case_service",
+          "handler": "CaseManagementService.change_status & add_note",
+          "optional": false,
+          "description": "Validates state machine transitions, executes optimistic lock check (expected_version/expected_status), updates Merkle timeline hash."
+        },
+        {
+          "stage": 4,
+          "name": "Four-Eyes Dual Control Signoff",
+          "module": "app.presentation.routers.cases",
+          "handler": "sign_case & CaseManagementService.change_status",
+          "optional": true,
+          "activation_condition": "Terminal closure transitions (CLOSED_CONFIRMED or CLOSED_FALSE_POSITIVE)",
+          "description": "Verifies primary and secondary supervisor signatures; enforces separation of duties (Approver != Analyst, Approver != Investigator); invalidates stale signatures if dossier changed."
+        },
+        {
+          "stage": 5,
+          "name": "Terminal Resolution & Regulatory Disposition",
+          "module": "app.presentation.routers.cases",
+          "handler": "resolve_case",
+          "optional": false,
+          "description": "Transitions case to terminal status. Confirmed fraud enables SAR export; false positive permanently disqualifies SAR filing without mutating machine prediction history."
+        },
+        {
+          "stage": 6,
+          "name": "Audit Logging & Immutable Timeline Hash",
+          "module": "app.application.services.case_service",
+          "handler": "AuditService.log_action & verify_timeline_integrity",
+          "optional": false,
+          "description": "Records append-only investigator actions and verifies cryptographic chain continuity."
+        }
+      ]
+    },
+    "path_c_federated_training_lifecycle": {
+      "name": "Federated Training Lifecycle",
+      "entry_endpoints": [
+        "POST /api/v1/simulations",
+        "POST /api/v1/simulations/{sim_id}/start"
+      ],
+      "pipeline_stages": [
+        {
+          "stage": 1,
+          "name": "Simulation Configuration & Pipeline Compatibility Validation",
+          "module": "app.application.services.simulation_service",
+          "handler": "SimulationService.run_simulation",
+          "optional": false,
+          "description": "Rejects incompatible configurations upfront (e.g. Additive SecAgg or FHE combined with non-linear Byzantine defenses like Krum/Bulyan/Median)."
+        },
+        {
+          "stage": 2,
+          "name": "Data Ingestion & Non-IID Partitioning",
+          "module": "app.application.services.dataloader",
+          "handler": "load_dataset & partition_dataset_non_iid",
+          "optional": false,
+          "description": "Loads benchmark dataset (e.g. Elliptic, PaySim) or generates synthetic data, applying Dirichlet partition across consortium bank nodes."
+        },
+        {
+          "stage": 3,
+          "name": "Local Model Baseline Training",
+          "module": "app.application.services.model_service",
+          "handler": "ModelService.train_local",
+          "optional": true,
+          "activation_condition": "Baseline evaluation enabled",
+          "description": "Trains bank-specific baseline models on local partitions to measure isolated vs federated performance."
+        },
+        {
+          "stage": 4,
+          "name": "Federated Client Availability & Selection",
+          "module": "app.application.services.fl_engine",
+          "handler": "FederatedLearningEngine.simulate_client_availability",
+          "optional": false,
+          "description": "Selects participating clients per round; simulates network dropouts and ensures quarantined nodes remain offline."
+        },
+        {
+          "stage": 5,
+          "name": "Local Training with Privacy Mechanisms",
+          "module": "app.application.services.model_service",
+          "handler": "ModelService.train_local_with_opacus / PrivacyService.clip_model_update",
+          "optional": true,
+          "activation_condition": "enable_differential_privacy == True",
+          "description": "Applies DP-SGD per-sample gradient clipping, Gaussian noise addition, and Renyi Differential Privacy budget accounting."
+        },
+        {
+          "stage": 6,
+          "name": "Adversarial Poisoning Injection",
+          "module": "app.application.services.fl_engine",
+          "handler": "FederatedLearningEngine.apply_model_poisoning",
+          "optional": true,
+          "activation_condition": "enable_poisoning_simulation == True",
+          "description": "Malicious bank client scales weights or injects backdoor gradients."
+        },
+        {
+          "stage": 7,
+          "name": "Robust Byzantine Defense",
+          "module": "app.application.services.fl_engine",
+          "handler": "FederatedLearningEngine.apply_byzantine_defense",
+          "optional": true,
+          "activation_condition": "byzantine_defense != 'none'",
+          "description": "Applies robust statistical filters (Krum, Bulyan, Coordinate-wise Median, Trimmed Mean, Spectral SVD) to isolate malicious updates."
+        },
+        {
+          "stage": 8,
+          "name": "Secure Aggregation & Hardware Isolation",
+          "module": "app.application.services.fl_engine",
+          "handler": "apply_secure_aggregation_masks / FHEDriver / TEEDriver",
+          "optional": true,
+          "activation_condition": "enable_secure_aggregation == True or hardware_isolation_mode in ('tee', 'fhe')",
+          "description": "Applies pairwise additive masking, TenSEAL CKKS homomorphic averaging, or Intel SGX enclave attestation."
+        },
+        {
+          "stage": 9,
+          "name": "Global Parameter Aggregation",
+          "module": "app.application.services.fl_engine",
+          "handler": "FederatedLearningEngine.aggregate_parameters",
+          "optional": false,
+          "description": "Computes weighted average (FedAvg, FedProx) or custom robust consensus update."
+        },
+        {
+          "stage": 10,
+          "name": "Global Model Evaluation & Model Registry Promotion",
+          "module": "app.application.services.model_registry",
+          "handler": "ModelRegistry.save_version",
+          "optional": false,
+          "description": "Evaluates global model metrics (AUC-ROC, F1), records provenance and DP noise profile, and promotes version to 'champion' for live serving."
+        }
+      ]
+    },
+    "path_d_streaming_redelivery_lifecycle": {
+      "name": "Streaming Ingestion & Redelivery Lifecycle",
+      "entry_endpoints": [
+        "POST /api/v1/graph/stream/edge",
+        "Kafka Streaming Consumer / Connector Ingest"
+      ],
+      "pipeline_stages": [
+        {
+          "stage": 1,
+          "name": "Event Ingestion & Schema Parsing",
+          "module": "app.infrastructure.connectors.base_connector",
+          "handler": "NormalizedTransaction / StreamingEdgeEvent",
+          "optional": false,
+          "description": "Extracts canonical transaction fields (sender_id, receiver_id, amount, timestamp, bank_id, transaction_id)."
+        },
+        {
+          "stage": 2,
+          "name": "Canonical Scoped Identity Generation",
+          "module": "app.application.services.streaming_graph_service",
+          "handler": "scoped_tx_key = f\"{bank_id}:{tx_id}\"",
+          "optional": false,
+          "description": "Establishes tenant-scoped identity to prevent cross-institution collisions."
+        },
+        {
+          "stage": 3,
+          "name": "Transport Redelivery & Idempotency Check",
+          "module": "app.application.services.streaming_graph_service",
+          "handler": "StreamingGraphService.add_transaction",
+          "optional": false,
+          "description": "Inspects _seen_transactions registry: if exact re-delivery, suppresses duplicate edge; if contradictory payload, raises ValueError."
+        },
+        {
+          "stage": 4,
+          "name": "Feature Store Dynamic Window Update",
+          "module": "app.application.services.feature_store_service",
+          "handler": "FeatureStoreService.ingest_transaction",
+          "optional": true,
+          "activation_condition": "Settings.feature_store_enabled == True",
+          "description": "Checks tx_id idempotency in customer window, appends transaction event, recalculates 1h velocity and 24h rolling average."
+        },
+        {
+          "stage": 5,
+          "name": "MultiDiGraph Edge Mutation",
+          "module": "app.application.services.streaming_graph_service",
+          "handler": "StreamingGraphService.add_transaction (edge insertion)",
+          "optional": false,
+          "description": "Inserts edge into sliding window, updates node degrees and index lookup table; preserves distinct parallel financial edges."
+        },
+        {
+          "stage": 6,
+          "name": "Downstream Risk Triggering & Broker Offset Commit",
+          "module": "app.presentation.routers.predict",
+          "handler": "Inference / Alert Pipeline & Kafka Offset Ack",
+          "optional": false,
+          "description": "Executes downstream scoring if configured and commits message offset only after mutations succeed."
+        }
+      ]
+    }
+  }
+}

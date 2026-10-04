@@ -1,0 +1,158 @@
+{
+  "version": "1.0.0",
+  "generated_at": "2026-10-04T19:33:25Z",
+  "system": "CF-Intelligence",
+  "description": "Adversarial fault injection and cross-domain scenario execution matrix.",
+  "scenarios": [
+    {
+      "scenario_id": "SCENARIO-01",
+      "name": "Cross-Tenant Same-ID Collision",
+      "target_invariant": "SYS-INV-01",
+      "injected_fault": "Identical transaction_id 'tx_shared_001' ingested concurrently by Bank A and Bank B with conflicting amounts and accounts.",
+      "tested_boundaries": [
+        "REST API Layer",
+        "Feature Store",
+        "Streaming Graph",
+        "Database Persistence",
+        "Alert & Case Service"
+      ],
+      "independent_oracle": "Partitioned tenant key set disjointness: set(Bank A keys) & set(Bank B keys) == empty_set; retry(Bank A) does not alter Bank B state.",
+      "expected_result": "Both transactions coexist in separate tenant namespaces; feature stores, graph edges, alerts, and cases remain strictly tenant-scoped.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-02",
+      "name": "Same Event Redelivery",
+      "target_invariant": "SYS-INV-02",
+      "injected_fault": "Canonical transaction T redelivered 3 times through streaming ingestion simulating Kafka at-least-once transport retries.",
+      "tested_boundaries": [
+        "Streaming Graph Ingestion",
+        "Feature Store Sliding Window",
+        "Database Repository",
+        "Webhook Event Generation"
+      ],
+      "independent_oracle": "Count of unique transactions in database == 1; count of edges in graph == 1; feature store customer history length == 1; webhook event_id is identical across dispatches.",
+      "expected_result": "Exact metamorphic state equivalence between single delivery [T] and triple delivery [T, T, T]. No duplicate graph edges, feature velocity increments, or persisted rows.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-03",
+      "name": "Parallel Legitimate Transactions",
+      "target_invariant": "SYS-INV-03",
+      "injected_fault": "Two rapid legitimate transactions T1 and T2 executed between identical source and destination accounts with distinct transaction IDs.",
+      "tested_boundaries": [
+        "Idempotency Filter",
+        "MultiDiGraph Engine",
+        "Feature Store Aggregation",
+        "Alert Deduplication"
+      ],
+      "independent_oracle": "Unique transaction set size == 2; MultiDiGraph edge count == 2; node degrees for sender and receiver == 2; neither transaction suppressed.",
+      "expected_result": "MultiDiGraph preserves both distinct parallel financial edges; velocity rules accurately count both events.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-04",
+      "name": "Crash-Window Redelivery",
+      "target_invariant": "SYS-INV-02, SYS-INV-06",
+      "injected_fault": "Transaction T mutation succeeds in graph/feature store, then broker/process crashes before offset acknowledgement; broker redelivers T.",
+      "tested_boundaries": [
+        "Streaming Graph Service",
+        "Feature Store Service",
+        "Database Persistence",
+        "Webhook Dispatch"
+      ],
+      "independent_oracle": "Post-redelivery graph edge count == pre-crash edge count; feature velocity is not double-incremented; webhook event identity remains deterministic.",
+      "expected_result": "System absorbs crash-window redelivery with zero duplicate side effects. Duplicate transport attempt is safely distinguished from duplicate business entity.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-05",
+      "name": "Concurrent Case Decision",
+      "target_invariant": "SYS-INV-07",
+      "injected_fault": "Two independent investigators load Case V1; Investigator A commits terminal closure to V2; Investigator B concurrently submits decision based on stale V1.",
+      "tested_boundaries": [
+        "Case Management Service",
+        "Redis Distributed Compare-And-Set",
+        "Four-Eyes Governance",
+        "REST API Layer"
+      ],
+      "independent_oracle": "Investigator A commit succeeds (status updated, version incremented, timeline hash updated); Investigator B receives HTTP 409 Precondition Failed; no lost update.",
+      "expected_result": "Optimistic lock prevents stale overwrite; timeline integrity hash remains valid; audit log captures failed conflict attempt.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-06",
+      "name": "Decision Provenance Under Async Activity",
+      "target_invariant": "SYS-INV-04",
+      "injected_fault": "High-risk transaction T and low-risk transaction U processed concurrently with randomized async execution interleaving and delayed explanation completion.",
+      "tested_boundaries": [
+        "Predict API Router",
+        "Risk Scoring Engine",
+        "Explainability Service",
+        "Alert Intelligence Service"
+      ],
+      "independent_oracle": "Direct mapping verification: response_T.transaction_id == T.id and response_T.alert.id == alert_T.id; response_U receives no attributes from T.",
+      "expected_result": "Zero cross-talk between concurrent async coroutines. Model score, SHAP attributions, alert details, and timeline remain strictly bound to respective transactions.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-07",
+      "name": "Active Privacy / Robustness Path Truth",
+      "target_invariant": "SYS-INV-08",
+      "injected_fault": "1. Configuration enabling DP executes actual clipping and noise addition. 2. Configuration with Byzantine defense executes robust aggregator. 3. Incompatible configuration (SecAgg + non-linear Krum defense) injected.",
+      "tested_boundaries": [
+        "Simulation Service",
+        "Federated Learning Engine",
+        "Privacy Service (Opacus & Post-hoc DP)",
+        "Byzantine Robust Aggregators"
+      ],
+      "independent_oracle": "DP runtime path records non-zero spent epsilon; robust defense filters out poisoned weights; incompatible SecAgg + Krum pipeline raises InvalidPipelineConfigurationError upfront.",
+      "expected_result": "Security/privacy controls are executed for real; invalid composition is rejected rather than silently downgraded.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-08",
+      "name": "Failure Propagation",
+      "target_invariant": "SYS-INV-05",
+      "injected_fault": "Injected failures across four boundaries: 1. Model inference forward pass raises RuntimeError. 2. Persistence commit fails. 3. Case CAS version mismatch. 4. Webhook HTTP dispatch timeout.",
+      "tested_boundaries": [
+        "Predict Router",
+        "Database Repository",
+        "Case State Machine",
+        "Webhook Service"
+      ],
+      "independent_oracle": "Inference failure returns HTTP 500 (not fallback 200); persistence failure aborts transaction; stale case mutation returns HTTP 409; webhook timeout returns False (not marked delivered).",
+      "expected_result": "Failures propagate truthfully across all layers. Zero conversion of failures into plausible false successes.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-09",
+      "name": "Historical Decision Boundary",
+      "target_invariant": "SYS-INV-09",
+      "injected_fault": "Transactions ingested at T; baseline historical query executed with as_of=T; future high-value transaction added at T+1 hour; historical query re-executed with as_of=T.",
+      "tested_boundaries": [
+        "Streaming Graph Service (get_active_subgraph_tensors)",
+        "Graph Engine (get_neighborhood)",
+        "Feature Store Service"
+      ],
+      "independent_oracle": "Graph topology and edge count for as_of=T query before and after T+1 ingestion are mathematically identical. Future edge at T+1 is excluded from as_of=T evaluation.",
+      "expected_result": "Future events do not leak into historical point-in-time graph queries. Temporal event-time boundary is strictly preserved.",
+      "status": "PASS"
+    },
+    {
+      "scenario_id": "SCENARIO-10",
+      "name": "Machine Result vs Human Outcome",
+      "target_invariant": "SYS-INV-10",
+      "injected_fault": "High-risk transaction triggers alert and case; case is formally resolved by compliance team as CLOSED_FALSE_POSITIVE under Four-Eyes dual control.",
+      "tested_boundaries": [
+        "Case Management Router",
+        "Alert Repository",
+        "Regulatory Reporting (FinCEN SAR)",
+        "Model Registry & Audit Log"
+      ],
+      "independent_oracle": "Historical alert risk score, model prediction, and explanation remain unchanged; case status reflects CLOSED_FALSE_POSITIVE; SAR report generation is rejected with HTTP 400.",
+      "expected_result": "Human clearance does not rewrite or erase machine prediction history. Regulatory filing eligibility reflects false-positive clearance truthfully.",
+      "status": "PASS"
+    }
+  ]
+}

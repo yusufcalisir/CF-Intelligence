@@ -974,9 +974,14 @@ async def score_transaction(
         elif input_tensor.shape[1] > input_dim:
             input_tensor = input_tensor[:, :input_dim]
         ml_prediction = await asyncio.to_thread(_eval_model, serving_model, input_tensor)
+    except HTTPException:
+        raise
     except Exception as exc:
-        logger.warning("Serving model inference failed; using baseline risk: %s", exc)
-        ml_prediction = 0.15
+        logger.error("Serving model inference failed: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Inference pipeline execution error: {exc}",
+        )
 
     # Run composite risk scoring engine offloaded to threadpool with genuine ML confidence
     entity_hash = f"scoring:{x_bank_id or 'global'}:{payload.account_id}"

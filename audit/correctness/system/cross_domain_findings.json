@@ -1,0 +1,21 @@
+[
+  {
+    "finding_id": "SYS-0001",
+    "severity": "HIGH",
+    "scenario": "Scenario 8 — Failure Propagation",
+    "subsystems_crossed": [
+      "Model & Inference",
+      "Alerts, Cases, Regulatory & Business Logic",
+      "Presentation (FastAPI Serving Routers)"
+    ],
+    "initial_state": "Live prediction scoring endpoint (/score-transaction, /transactions/score, /predict/score) receiving real-time transaction scoring request.",
+    "fault_order_injected": "Serving model forward pass raises unexpected exception (e.g. CUDA OOM, PyTorch tensor dimension mismatch, runtime crash) during _eval_model.",
+    "expected_invariant": "SYS-INV-05 (Failure Does Not Become Success): A failure in an authoritative stage must not be converted downstream into a plausible successful business outcome. The endpoint must propagate HTTP 500 error truthfully.",
+    "actual_result": "In backend/app/presentation/routers/predict.py lines 977-984, the exception was caught and swallowed, falling back to a hardcoded fabricated ml_prediction = 0.15, returning HTTP 200 with an artificial risk score.",
+    "first_divergence": "backend/app/presentation/routers/predict.py:981 where except Exception caught the model evaluation failure and assigned ml_prediction = 0.15 instead of raising HTTPException.",
+    "root_cause": "Permissive silent fallback in score_transaction designed to mask model crashes, violating truthful failure propagation contract.",
+    "business_security_impact": "High-risk fraudulent transactions occurring during transient ML model memory exhaustion or crashes would be assigned a low fraud score (0.15), bypassed from fraud review, and erroneously approved as legitimate transactions.",
+    "repair": "Replaced the swallowed exception fallback with a strict fail-closed HTTPException(status_code=500, detail=f'Inference pipeline execution error: {exc}'), guaranteeing truthful failure propagation across all serving routes.",
+    "regression_test": "backend/tests/integration/test_transaction_lifecycle.py::TestTransactionLifecycleAndSystemInvariants::test_scenario_8_failure_propagation_truthful_semantics"
+  }
+]
