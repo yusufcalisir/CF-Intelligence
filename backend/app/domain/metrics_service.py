@@ -59,13 +59,13 @@ def _subsample_for_curve(y_t: np.ndarray, y_p: np.ndarray, max_samples: int = 50
 def is_roc_auc_defined(y_true: list[int] | np.ndarray) -> bool:
     """Return True if ROC-AUC is mathematically defined (at least two classes present)."""
     y_t = np.asarray(y_true)
-    return bool(y_t.size > 0 and len(np.unique(y_t)) >= 2)
+    return y_t.size > 0 and len(np.unique(y_t)) >= 2
 
 
 def is_pr_auc_defined(y_true: list[int] | np.ndarray) -> bool:
     """Return True if PR-AUC is mathematically defined (at least two classes present)."""
     y_t = np.asarray(y_true)
-    return bool(y_t.size > 0 and len(np.unique(y_t)) >= 2)
+    return y_t.size > 0 and len(np.unique(y_t)) >= 2
 
 
 def compute_roc_auc_with_status(
