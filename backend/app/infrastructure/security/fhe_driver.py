@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Attempt to import TenSEAL (Microsoft SEAL Python binding)
 try:
-    import tenseal as ts
+    import tenseal as ts  # type: ignore[import-not-found,import-untyped]
 
     TENSEAL_AVAILABLE = True
 except ImportError:
